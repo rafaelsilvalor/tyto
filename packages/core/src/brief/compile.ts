@@ -360,7 +360,7 @@ export async function compileDeferred(
 
   const plans = planArtworks(resolved, manifest);
   const measure = measureOf(options.faces);
-  const brand = brandKitOf(manifest, options);
+  const brand = brandKitOf(resolved, manifest, options);
   const { values } = resolveValues(manifest, suppliedOf(resolved, options), noFiles);
   const answers = new Map<string, Result<Frame, Diagnostics>>();
   const reported = new Map<string, Diagnostic[]>();
@@ -418,12 +418,18 @@ function measureOf(faces: FaceCache | undefined): TemplateContext['measure'] {
 }
 
 /**
- * The kit under the template's own brand (ADR 0063): a template is never handed another
- * brand's, and one that names no brand, or whose brand nobody supplied, gets the empty kit.
+ * The kit under the brand chosen for this render: the configuration's when the brief reached
+ * one that names a brand, the manifest's otherwise (ADR 0063, ADR 0155). A template is never
+ * handed a brand nobody chose for it, and one whose brand nobody supplied gets the empty kit.
  */
-function brandKitOf(manifest: TemplateManifest, options: CompileOptions): BrandKit {
-  if (manifest.brand === undefined) return noBrandKit;
-  return options.brandKits?.get(manifest.brand) ?? noBrandKit;
+function brandKitOf(
+  resolved: ResolvedBrief,
+  manifest: TemplateManifest,
+  options: CompileOptions,
+): BrandKit {
+  const brand = resolved.brand ?? manifest.brand;
+  if (brand === undefined) return noBrandKit;
+  return options.brandKits?.get(brand) ?? noBrandKit;
 }
 
 function contextOf(
@@ -482,7 +488,7 @@ function compileWith(
   const faces = options.faces;
   // What a template is told a node will measure is what it then measures (ADR 0038).
   const measure = measureOf(faces);
-  const brand = brandKitOf(manifest, options);
+  const brand = brandKitOf(resolved, manifest, options);
   const values = resolveValues(manifest, suppliedOf(resolved, options), files);
 
   const plans = planArtworks(resolved, manifest);

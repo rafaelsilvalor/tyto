@@ -48,6 +48,7 @@ import {
 } from '@tyto/template-kit';
 
 import { CALL_TO_COMMENT } from './brands.js';
+import { accentOf } from './kit.js';
 import { callToComment, logo, signOff } from './parts.js';
 import { EXAM_STYLE, TITLE_LINE, TITLE_STYLE, examTable } from './presets.js';
 import { sealOf } from './seal.js';
@@ -57,8 +58,10 @@ import type { Brand } from './brands.js';
 import type { RichText, TemplateBuild, TemplateContext } from '@tyto/core';
 
 /** The build for one brand's template. */
-export function simuladosDaSemana(brand: Brand): TemplateBuild {
+export function simuladosDaSemana(own: Brand): TemplateBuild {
   return (context: TemplateContext) => {
+    // The kit's accent over the brand's own (ADR 0155); everything else is the brand's.
+    const brand: Brand = { ...own, accent: accentOf(context.brand, own.accent) };
     const story = context.format === 'story';
     const room = context.size.w - MARGIN * 2;
 

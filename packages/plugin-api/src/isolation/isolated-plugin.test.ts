@@ -418,7 +418,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 9 and this host speaks 10.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 10 and this host speaks 11.",
     );
   });
 
@@ -1419,6 +1419,14 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
     expect(activated.host.registry.brandKitsByBrand().kits.get('test-brand')).toEqual(KIT);
   });
 
+  it('crosses the brand’s colours as data (ADR 0155)', async () => {
+    const coloured = { ...KIT, colors: { accent: '#5900a6' } };
+    const activated = await registered({ id: 'kit', brands: { 'test-brand': coloured } });
+
+    expect(activated.ok).toBe(true);
+    expect(activated.host.registry.brandKitsByBrand().kits.get('test-brand')).toEqual(coloured);
+  });
+
   it('crosses a toned logo and a wordmark as data (ADR 0066)', async () => {
     const activated = await registered({ id: 'kit', brands: { 'test-brand': TONED_KIT } });
 
@@ -1437,6 +1445,8 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
       { 'test-brand': { logo: { ...TRIANGLE, d: 'M0 0'.padEnd(MARK_PATH_LIMIT + 1, ' ') } } },
     ],
     ['a box of no size', { 'test-brand': { logo: { ...TRIANGLE, box: { w: 0, h: 10 } } } }],
+    ['an accent that is not hex', { 'test-brand': { colors: { accent: 'purple' } } }],
+    ['a colour nobody declared', { 'test-brand': { colors: { ink: '#000000' } } }],
     [
       'a layer with a colour',
       {
@@ -1493,6 +1503,7 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
           context.brand.signature ?? 'none',
           logoPaths(context.brand.logo),
           logoPaths(context.brand.wordmark),
+          context.brand.colors?.accent ?? 'none',
         ].join('|'),
         size: context.size,
         children: [],
@@ -1519,12 +1530,22 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
     const withKit = await build('demo', call, []);
     const withTonedKit = await build('demo', { ...call, brand: TONED_KIT }, []);
     const withoutKit = await build('demo', { ...call, brand: {} }, []);
-
-    expect(withKit.ok && withKit.value.frame.format).toBe('@test-brand|M0 10 L5 0 L10 10 Z|none');
-    expect(withTonedKit.ok && withTonedKit.value.frame.format).toBe(
-      'none|secondary:M0 0H10V10H0Z M2 2V8H8V2Z,primary:M3 3H7V7H3Z|M0 10 L5 0 L10 10 Z',
+    const withColours = await build(
+      'demo',
+      { ...call, brand: { ...KIT, colors: { accent: '#5900a6' } } },
+      [],
     );
-    expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none|none');
+
+    expect(withKit.ok && withKit.value.frame.format).toBe(
+      '@test-brand|M0 10 L5 0 L10 10 Z|none|none',
+    );
+    expect(withTonedKit.ok && withTonedKit.value.frame.format).toBe(
+      'none|secondary:M0 0H10V10H0Z M2 2V8H8V2Z,primary:M3 3H7V7H3Z|M0 10 L5 0 L10 10 Z|none',
+    );
+    expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none|none|none');
+    expect(withColours.ok && withColours.value.frame.format).toBe(
+      '@test-brand|M0 10 L5 0 L10 10 Z|none|#5900a6',
+    );
   });
 
   it('hands a code template its values, and its readers fall back when none crossed (TYTO-439)', async () => {

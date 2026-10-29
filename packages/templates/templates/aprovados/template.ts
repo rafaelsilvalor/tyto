@@ -20,7 +20,7 @@ import { frame, solid } from '@tyto/core/template';
 import { sealOf } from '@tyto/house-style';
 import { type Block, bandedPage, pillTable, stack, titleBlock, sealed } from '@tyto/template-kit';
 
-import { footer, hasNextSlide, header } from '../_azul/parts.js';
+import { accentOfAzul, footer, hasNextSlide, header } from '../_azul/parts.js';
 import { approvedTable, resultTitle } from '../_azul/presets.js';
 import { APPROVED, BAND, EDGE, MARGIN, PAPER } from '../_azul/tokens.js';
 
@@ -29,7 +29,7 @@ import type { RichText, TemplateBuild, TemplateContext } from '@tyto/core';
 export const build: TemplateBuild = (context: TemplateContext) => {
   const width = context.size.w - MARGIN * 2;
 
-  const list = pillTable(approvedTable, {
+  const list = pillTable(approvedTable(accentOfAzul(context.brand)), {
     text: richTextOf(context, 'lamina') ?? [],
     width,
     measure: context.measure,
@@ -71,7 +71,7 @@ function titleOf(context: TemplateContext, width: number): Block[] {
   if (context.artwork.index !== 0) return [];
 
   return [
-    titleBlock(resultTitle, {
+    titleBlock(resultTitle(accentOfAzul(context.brand)), {
       width,
       fields: {
         imagem: imageOf(context, 'imagem'),

@@ -53,6 +53,8 @@ export interface PluginFileConfiguration {
   readonly values: Readonly<Record<string, SuppliedValue>>;
   /** Slot defaults, formats, skeleton and editor rules, each kept with its range (TYTO-440). */
   readonly brief: ConfigurationBrief;
+  /** The brand whose kit the configuration draws, as written; checked in core (ADR 0155). */
+  readonly brand?: SuppliedValue;
 }
 
 export interface PluginFileTemplate {
@@ -209,7 +211,7 @@ class FileReader {
   }
 
   configuration(path: string, node: Node, nameNode: Node): PluginFileConfiguration | undefined {
-    const keys = this.keys(path, node, ['alias', 'values', 'brief']);
+    const keys = this.keys(path, node, ['alias', 'brand', 'values', 'brief']);
     if (keys === undefined) return this.refuse(path, 'a configuration is a mapping', node);
     const aliasNode = keys.get('alias');
     let alias: string | undefined;
@@ -228,12 +230,14 @@ class FileReader {
     if (values === undefined || brief === undefined) return undefined;
     const aliasRange = rangeOf(aliasNode);
     const range = rangeOf(nameNode);
+    const brandNode = keys.get('brand');
     return {
       ...(alias === undefined ? {} : { alias }),
       ...(alias === undefined || aliasRange === undefined ? {} : { aliasRange }),
       ...(range === undefined ? {} : { range }),
       values,
       brief,
+      ...(brandNode === undefined ? {} : { brand: supplied(brandNode) }),
     };
   }
 
@@ -504,6 +508,7 @@ export function configuredTemplates(
         ...(configuration.range === undefined ? {} : { range: configuration.range }),
         values: configuration.values,
         brief: configuration.brief,
+        ...(configuration.brand === undefined ? {} : { brand: configuration.brand }),
       })),
     }));
 }

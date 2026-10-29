@@ -20,7 +20,7 @@ import { frame, solid } from '@tyto/core/template';
 import { sealOf } from '@tyto/house-style';
 import { type Block, bandedPage, pillTable, stack, titleBlock, sealed } from '@tyto/template-kit';
 
-import { footer, hasNextSlide, header } from '../_azul/parts.js';
+import { accentOfAzul, footer, hasNextSlide, header } from '../_azul/parts.js';
 import { coverTitle, sessionTable } from '../_azul/presets.js';
 import { BAND, EDGE, GAP, MARGIN, PAPER } from '../_azul/tokens.js';
 
@@ -29,7 +29,7 @@ import type { RichText, TemplateBuild, TemplateContext } from '@tyto/core';
 export const build: TemplateBuild = (context: TemplateContext) => {
   const width = context.size.w - MARGIN * 2;
 
-  const sessions = pillTable(sessionTable, {
+  const sessions = pillTable(sessionTable(accentOfAzul(context.brand)), {
     text: richTextOf(context, 'lamina') ?? [],
     width,
     measure: context.measure,

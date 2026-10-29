@@ -131,6 +131,29 @@ describe('a plugin file', () => {
     expect(read.value?.templates).toHaveLength(1);
   });
 
+  it('keeps a configuration’s brand as written, where it was written, for core to check', () => {
+    const source = `version: 1
+templates:
+  tabela:
+    source: { git: ./t, ref: v1 }
+    configurations:
+      azul:
+        brand: azul
+      torta:
+        brand: [x]
+`;
+    const read = parsePluginFile(source, 'tabelas.yaml');
+
+    expect(read.diagnostics).toEqual([]);
+    const azul = read.value?.templates[0]?.configurations.azul?.brand;
+    expect(azul?.value).toBe('azul');
+    expect(source.slice(azul?.range?.start, azul?.range?.end)).toBe('azul');
+    expect(read.value?.templates[0]?.configurations.torta?.brand?.value).toEqual(['x']);
+    expect(
+      configuredTemplates(read.value ? [read.value] : [], '/w')[0]?.configurations[0]?.brand?.value,
+    ).toBe('azul');
+  });
+
   it('keeps the brief block’s four parts, each where it was written, and warns on a fifth', () => {
     const source = `version: 1
 templates:

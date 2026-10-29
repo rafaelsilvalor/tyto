@@ -189,6 +189,34 @@ story-01.svg
 
 Um slot que se repete não tem padrão, porque cada ocorrência é uma arte própria. Os formatos de cada parte estão no [guia de autoria de plugins](../extend/), em inglês.
 
+### Qual marca uma configuração desenha
+
+Uma configuração pode nomear uma **marca** com `brand:`. O template passa a desenhar o kit dessa marca, com logo, assinatura e cor, em vez do que o próprio manifesto nomeia, então `tabela-roxo` e `tabela-azul` podem ser um template só com duas configurações. Uma configuração sem `brand:` fica com a do `default`, e depois com a do próprio template. Um brief não nomeia marca: ele escolhe uma pelo apelido que escreve.
+
+Uma marca cujo kit não está instalado sai mesmo assim, com os substitutos do template e a cor dele, e a linha do arquivo de plugin avisa:
+
+```yaml
+# ~/.tyto/plugin-files/avisos.yaml
+version: 1
+templates:
+  aviso:
+    source:
+      git: ../../../my-pack
+      ref: v1.0.0
+    configurations:
+      azul: # um brief escreve `template: aviso-azul`
+        brand: azul
+```
+
+<!-- Executado em 2026-10-29 num build da branch feat/TYTO-455-brand-per-configuration, no Windows 11, com TYTO_HOME=home, nenhum kit de marca instalado e o pacote de exemplo num repositório três pastas acima do arquivo, com a tag v1.0.0. O brief é `template: aviso-azul` e um título. -->
+
+```
+$ tyto render aviso.brief --out out --types svg --formats-file ../my-pack/templates/formats.yaml
+home\plugin-files\avisos.yaml:9:16: warning W_BRAND_KIT_MISSING No installed brand kit offers 'azul', which 'aviso-azul' names; it draws the placeholders and the template's own accent.
+grid-1x1-01.svg
+story-01.svg
+```
+
 ## Começar o seu
 
 `tyto plugin new my-pack` grava uma pasta de plugin com um template dentro, pronta para instalar; o [guia de autoria de plugins](../extend/) continua dali. Cada opção de cada comando `plugin` está na [Linha de comando](../reference/command-line.md#tyto-plugin-list) da Referência.

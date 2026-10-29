@@ -70,7 +70,14 @@ describe('brandKitSchema', () => {
       'a wordmark with a colour',
       { wordmark: { box: BOX, d: 'M0 0Z', fillRule: 'nonzero', fill: '#000' } },
     ],
+    ['an accent that is not hex', { colors: { accent: 'purple' } }],
+    ['a colour nobody declared', { colors: { accent: '#5900a6', ink: '#000000' } }],
   ])('refuses %s', (_, kit) => {
     expect(brandKitSchema.safeParse(kit).success).toBe(false);
+  });
+
+  it('takes the brand’s accent, and colours with nothing in them (ADR 0155)', () => {
+    expect(brandKitSchema.safeParse({ colors: { accent: '#5900a6' } }).success).toBe(true);
+    expect(brandKitSchema.safeParse({ colors: {} }).success).toBe(true);
   });
 });

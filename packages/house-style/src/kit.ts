@@ -66,6 +66,15 @@ export function drawLogo(kit: BrandKit, height: number, inks: ToneInks): Block {
   return drawBrandMark(kit.logo ?? PLACEHOLDER_LOGO, height, inks, 'logo');
 }
 
+/**
+ * The kit's accent, or the template's own (ADR 0155). The fallback is the colour the template
+ * drew before kits carried colours, so a render without a kit keeps its bytes; a kit's accent
+ * wins, so switching a configuration's brand switches its colour with its logo.
+ */
+export function accentOf(kit: BrandKit, fallback: string): string {
+  return kit.colors?.accent ?? fallback;
+}
+
 /** The kit's signature, or the placeholder. */
 export function signatureOf(kit: BrandKit): string {
   return kit.signature ?? PLACEHOLDER_SIGNATURE;

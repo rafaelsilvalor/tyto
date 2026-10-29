@@ -574,3 +574,41 @@ describe("a configuration's brief side (TYTO-440)", () => {
     SLOW,
   );
 });
+
+describe("a configuration's brand (ADR 0155)", () => {
+  it(
+    'renders with the placeholders and warns at the file’s line when no kit offers the brand',
+    async () => {
+      const pack = await repository('pack');
+      await mkdir(join(home, 'plugin-files'), { recursive: true });
+      await writeFile(
+        join(home, 'plugin-files', 'templates.yaml'),
+        [
+          'version: 1',
+          'templates:',
+          '  aviso:',
+          `    source: { git: '${urlOf(pack)}', ref: v1 }`,
+          '    configurations:',
+          '      azul:',
+          '        brand: azul',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      const brief = join(workspace, 'azul.brief');
+      await writeFile(
+        brief,
+        '---\ntemplate: aviso-azul\n---\n::titulo\n  Inscrições abertas hoje\n',
+        'utf8',
+      );
+
+      const rendered = await render(brief);
+
+      expect(rendered.code, stderr()).toBe(EXIT_OK);
+      expect(rendered.svg).toContain(ORANGE);
+      expect(rendered.codes).toEqual(['W_BRAND_KIT_MISSING']);
+      expect(stderr()).toMatch(/templates\.yaml:7:16: warning W_BRAND_KIT_MISSING/u);
+    },
+    SLOW,
+  );
+});

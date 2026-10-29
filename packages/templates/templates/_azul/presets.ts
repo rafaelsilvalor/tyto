@@ -14,7 +14,6 @@ import {
   COVER_INK,
   FACE,
   GAP,
-  INK,
   LIGHT,
   MEDIUM,
   ON_INK,
@@ -37,6 +36,7 @@ const style = (size: number, weight: number, color: string): TextStyle => ({
 
 /** The blue pill on the left of a row, holding one field centred on the row. */
 function badge(options: {
+  readonly accent: string;
   readonly name: string;
   readonly text: string;
   readonly width: number;
@@ -48,7 +48,7 @@ function badge(options: {
     kind: 'label',
     name: options.name,
     width: options.width,
-    shape: { fill: INK, radius: options.radius },
+    shape: { fill: options.accent, radius: options.radius },
     text: {
       name: options.text,
       style: options.style,
@@ -68,52 +68,55 @@ function badge(options: {
  * end, as the published slide draws the two — one shape, no gap between them. A title that
  * wraps makes its pill, and the row, taller (TYTO-184).
  */
-export const sessionTable: PillTableStyle = {
-  layering: 'overlap',
-  rowGap: GAP.sessions,
-  minRowHeight: TABLE.badge.h,
-  columns: [
-    badge({
-      name: 'date-pill',
-      text: 'date',
-      width: TABLE.badge.w,
-      radius: RADIUS,
-      style: style(TYPE.date, MEDIUM, ON_INK),
-    }),
-    {
-      kind: 'lines',
-      name: 'session-pill',
-      width: 'fill',
-      shape: { fill: PILL, radius: RADIUS },
-      padding: TABLE.padding,
-      lineGap: TABLE.lineGap,
-      lines: [
-        {
-          name: 'session-title',
-          style: style(TYPE.sessionTitle, MEDIUM, PILL_INK),
-          minHeight: TABLE.line.title,
-        },
-        {
-          name: 'professor',
-          style: style(TYPE.professor, LIGHT, PILL_INK),
-          minHeight: TABLE.line.professor,
-        },
-      ],
+export function sessionTable(accent: string): PillTableStyle {
+  return {
+    layering: 'overlap',
+    rowGap: GAP.sessions,
+    minRowHeight: TABLE.badge.h,
+    columns: [
+      badge({
+        accent,
+        name: 'date-pill',
+        text: 'date',
+        width: TABLE.badge.w,
+        radius: RADIUS,
+        style: style(TYPE.date, MEDIUM, ON_INK),
+      }),
+      {
+        kind: 'lines',
+        name: 'session-pill',
+        width: 'fill',
+        shape: { fill: PILL, radius: RADIUS },
+        padding: TABLE.padding,
+        lineGap: TABLE.lineGap,
+        lines: [
+          {
+            name: 'session-title',
+            style: style(TYPE.sessionTitle, MEDIUM, PILL_INK),
+            minHeight: TABLE.line.title,
+          },
+          {
+            name: 'professor',
+            style: style(TYPE.professor, LIGHT, PILL_INK),
+            minHeight: TABLE.line.professor,
+          },
+        ],
+      },
+    ],
+    groups: {
+      heading: {
+        name: 'discipline',
+        height: TABLE.heading,
+        style: style(TYPE.discipline, MEDIUM, accent),
+        align: 'center',
+        overflow: 'shrink',
+      },
+      headingGap: GAP.heading,
+      gap: GAP.disciplines,
     },
-  ],
-  groups: {
-    heading: {
-      name: 'discipline',
-      height: TABLE.heading,
-      style: style(TYPE.discipline, MEDIUM, INK),
-      align: 'center',
-      overflow: 'shrink',
-    },
-    headingGap: GAP.heading,
-    gap: GAP.disciplines,
-  },
-  names: { table: 'session-table', group: 'discipline-group', rows: 'sessions', row: 'session' },
-};
+    names: { table: 'session-table', group: 'discipline-group', rows: 'sessions', row: 'session' },
+  };
+}
 
 /** The agenda's cover: the calendar illustration over the cover words. */
 export const coverTitle: TitleBlockStyle = {
@@ -171,94 +174,99 @@ function capitals(value: RichText): RichText {
  * specialty's rows are as wide as its longest name, up to 800 (`fit`). The brief writes `1º`;
  * the badge draws `1º Lugar`.
  */
-export const approvedTable: PillTableStyle = {
-  layering: 'overlap',
-  rowGap: APPROVED.gap.rows,
-  minRowHeight: APPROVED.badge.h,
-  fit: { max: APPROVED.table.max },
-  columns: [
-    badge({
-      name: 'rank-pill',
-      text: 'rank',
-      width: APPROVED.badge.w,
-      radius: APPROVED.badge.radius,
-      style: style(APPROVED.type.rank, BOLD, ON_INK),
-      rewrite: followedBy(PLACE),
-    }),
-    {
-      kind: 'lines',
-      name: 'name-pill',
-      width: 'fill',
-      shape: { fill: PILL, radius: APPROVED.badge.radius },
-      padding: APPROVED.padding,
-      lineGap: 0,
-      lines: [
-        {
-          name: 'name',
-          style: style(APPROVED.type.name, BOLD, PILL_INK),
-          minHeight: APPROVED.line,
-          rewrite: capitals,
-        },
-      ],
+export function approvedTable(accent: string): PillTableStyle {
+  return {
+    layering: 'overlap',
+    rowGap: APPROVED.gap.rows,
+    minRowHeight: APPROVED.badge.h,
+    fit: { max: APPROVED.table.max },
+    columns: [
+      badge({
+        accent,
+        name: 'rank-pill',
+        text: 'rank',
+        width: APPROVED.badge.w,
+        radius: APPROVED.badge.radius,
+        style: style(APPROVED.type.rank, BOLD, ON_INK),
+        rewrite: followedBy(PLACE),
+      }),
+      {
+        kind: 'lines',
+        name: 'name-pill',
+        width: 'fill',
+        shape: { fill: PILL, radius: APPROVED.badge.radius },
+        padding: APPROVED.padding,
+        lineGap: 0,
+        lines: [
+          {
+            name: 'name',
+            style: style(APPROVED.type.name, BOLD, PILL_INK),
+            minHeight: APPROVED.line,
+            rewrite: capitals,
+          },
+        ],
+      },
+    ],
+    groups: {
+      heading: {
+        name: 'specialty',
+        height: APPROVED.box.specialty,
+        style: style(APPROVED.type.specialty, BOLD, accent),
+        align: 'center',
+        overflow: 'shrink',
+      },
+      headingGap: APPROVED.gap.heading,
+      gap: APPROVED.gap.groups,
     },
-  ],
-  groups: {
-    heading: {
-      name: 'specialty',
-      height: APPROVED.box.specialty,
-      style: style(APPROVED.type.specialty, BOLD, INK),
-      align: 'center',
-      overflow: 'shrink',
+    names: {
+      table: 'approved-table',
+      group: 'specialty-group',
+      rows: 'approved',
+      row: 'approved-row',
     },
-    headingGap: APPROVED.gap.heading,
-    gap: APPROVED.gap.groups,
-  },
-  names: {
-    table: 'approved-table',
-    group: 'specialty-group',
-    rows: 'approved',
-    row: 'approved-row',
-  },
-};
+  };
+}
 
 /** The approved list's title: emblem, kicker, subtitle, rule, and the exam's name. */
-export const resultTitle: TitleBlockStyle = {
-  name: 'result-title',
-  parts: [
-    { kind: 'image', field: 'imagem', name: 'emblem', size: APPROVED.emblem },
-    {
-      kind: 'text',
-      field: 'chamada',
-      name: 'kicker',
-      style: style(APPROVED.type.kicker, MEDIUM, COVER_INK),
-      height: APPROVED.box.kicker,
-      gapAbove: APPROVED.gap.kicker,
-    },
-    {
-      kind: 'text',
-      field: 'subtitulo',
-      name: 'subtitle',
-      style: style(APPROVED.type.subtitle, LIGHT, COVER_INK),
-      height: APPROVED.box.subtitle,
-      gapAbove: APPROVED.gap.subtitle,
-    },
-    {
-      kind: 'rule',
-      name: 'rule',
-      width: APPROVED.rule.w,
-      thickness: APPROVED.rule.h,
-      color: COVER_INK,
-      gapAbove: APPROVED.gap.rule,
-    },
-    {
-      kind: 'text',
-      field: 'titulo',
-      name: 'exam',
-      style: style(APPROVED.type.exam, BOLD, INK),
-      height: APPROVED.box.exam,
-      lineHeight: 1,
-      overflow: 'shrink',
-      gapAbove: APPROVED.gap.exam,
-    },
-  ],
-};
+export function resultTitle(accent: string): TitleBlockStyle {
+  return {
+    name: 'result-title',
+    parts: [
+      { kind: 'image', field: 'imagem', name: 'emblem', size: APPROVED.emblem },
+      {
+        kind: 'text',
+        field: 'chamada',
+        name: 'kicker',
+        style: style(APPROVED.type.kicker, MEDIUM, COVER_INK),
+        height: APPROVED.box.kicker,
+        gapAbove: APPROVED.gap.kicker,
+      },
+      {
+        kind: 'text',
+        field: 'subtitulo',
+        name: 'subtitle',
+        style: style(APPROVED.type.subtitle, LIGHT, COVER_INK),
+        height: APPROVED.box.subtitle,
+        gapAbove: APPROVED.gap.subtitle,
+      },
+      {
+        kind: 'rule',
+        name: 'rule',
+        width: APPROVED.rule.w,
+        thickness: APPROVED.rule.h,
+        color: COVER_INK,
+        gapAbove: APPROVED.gap.rule,
+      },
+      {
+        kind: 'text',
+        field: 'titulo',
+        name: 'exam',
+        style: style(APPROVED.type.exam, BOLD, accent),
+        height: APPROVED.box.exam,
+        lineHeight: 1,
+        overflow: 'shrink',
+        gapAbove: APPROVED.gap.exam,
+      },
+    ],
+  };
+}

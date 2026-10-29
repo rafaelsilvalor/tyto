@@ -118,6 +118,8 @@ non-zero.
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_REDUNDANT_BREAK` | warning | no | A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line. |
 | `W_BRAND_KIT_SHADOWED` | warning | no | Two plugins contribute a kit for the same brand; the earlier plugin is the one used. |
+| `W_BRAND_KIT_MISSING` | warning | no | A configuration names a brand that no installed brand kit offers. |
+| `W_CONFIGURATION_BRAND_INVALID` | warning | no | A configuration's brand is not spelled as a brand id. |
 | `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
 | `W_SLOT_VOCABULARY` | warning | no | A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina. |
 | `W_PLUGIN_SKIPPED` | warning | no | An installed plugin was not activated for this run, and the run went on without it. |
@@ -2182,6 +2184,34 @@ The brand kit for '{brand}' from plugin '{shadowed}' is shadowed by the one from
 ```
 
 Parameters: `brand`, `shadowed`, `used`
+
+### `W_BRAND_KIT_MISSING`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0155-a-configuration-picks-its-brand-and-restricts-its-formats.md`
+
+A configuration names a brand that no installed brand kit offers.
+
+A warning never replaces a value (ADR 0013).
+
+```
+No installed brand kit offers '{brand}', which '{alias}' names; it draws the placeholders and the template's own accent.
+```
+
+Parameters: `brand`, `alias`
+
+### `W_CONFIGURATION_BRAND_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0155-a-configuration-picks-its-brand-and-restricts-its-formats.md`
+
+A configuration's brand is not spelled as a brand id.
+
+A warning never replaces a value (ADR 0013).
+
+```
+The brand of configuration '{configuration}' of template '{template}' must be lower case letters, digits and single hyphens; it is ignored.
+```
+
+Parameters: `configuration`, `template`
 
 ### `W_TEMPLATE_SHADOWED`
 

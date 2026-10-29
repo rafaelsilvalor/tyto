@@ -527,6 +527,33 @@ that key alone, as a value does. A named configuration starts from the entry's `
 and rules by name, formats and skeleton whole. Nothing on the brief side reaches your plugin's
 process: the host resolves the brief before it calls the template, so the protocol is unchanged.
 
+## What a configuration's brand changes
+
+A configuration may name the brand it draws (ADR 0155), so one template is several brands' art
+with no copy of it:
+
+```yaml
+configurations:
+  roxo:
+    alias: tabela-roxo
+    brand: roxo
+  azul:
+    alias: tabela-azul
+    brand: azul # azul's logo, signature and accent
+```
+
+The template is handed that brand's kit in `context.brand` instead of its manifest's: the
+configuration's own `brand`, else its entry `default`'s, else the manifest's. A brief cannot
+name a brand; an alias is how it picks one. A brand spelled against the manifest's rule is
+`W_CONFIGURATION_BRAND_INVALID` and costs that key. A brand no installed kit offers is
+`W_BRAND_KIT_MISSING` at its line in the CLI, and the template draws its placeholders.
+
+**Read the accent from the kit, with your own fallback.** A kit may carry `colors.accent`; draw
+it with `context.brand.colors?.accent ?? '<the colour you drew before>'` (a house template uses
+`accentOf` from `@tyto/house-style`). The fallback keeps your render without a kit unchanged,
+and the kit's accent wins, so switching a configuration's brand switches its colour with its
+logo. Do not declare the accent as a configurable value: the brand is its only source.
+
 ## Other extension points
 
 A plugin can contribute more than templates. `contributes` must name every point it registers
