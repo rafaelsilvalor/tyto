@@ -110,6 +110,7 @@ non-zero.
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
 | `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration sets a declared value to one of the wrong kind or outside its limits. |
+| `E_TEMPLATE_ALIAS_TAKEN` | error | no | A plugin file gives a configuration an alias that is a template's name. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_REDUNDANT_BREAK` | warning | no | A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line. |
@@ -278,6 +279,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
 | `E_OUTPUT_FILE_BLOCKED` | no | Depends on the file, and nothing that is drawn is lost. The copied brief: the delivery is not opened, so nothing is rendered. An artwork file: that one artifact is missing and the others are written. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 | `E_FONT_FACE_UNAVAILABLE` | no | The frame is still built and previewed, with the text laid out from the lines the brief wrote; it is an error because the export is certain to fail, and saying so while the brief is written is the point. |
+| `E_TEMPLATE_ALIAS_TAKEN` | no | Only that alias is missing; the template of that name renders as before. |
 | `E_SETTINGS_SYNTAX` | no | Every key that parsed still applies and the rest fall back to their defaults. |
 | `E_KEYBINDINGS_SYNTAX` | no | The last file that read without one stays in effect, and the built-in keys stay bound. |
 | `E_SNIPPETS_SYNTAX` | no | The last file that read without one stays in effect. |
@@ -1418,6 +1420,20 @@ Font '{font}' is not available to template '{template}', so this text cannot be 
 ```
 
 Parameters: `font`, `template`
+
+### `E_TEMPLATE_ALIAS_TAKEN`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A plugin file gives a configuration an alias that is a template's name.
+
+Only that alias is missing; the template of that name renders as before.
+
+```
+Alias '{alias}' in plugin file '{file}' is the name of a template, so the alias does not load and the template keeps the name.
+```
+
+Parameters: `alias`, `file`
 
 ### `E_SETTINGS_SYNTAX`
 

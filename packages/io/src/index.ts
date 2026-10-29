@@ -169,3 +169,4 @@ export {
   readPluginFolder,
   syncPluginFolder,
 } from './plugin-files.js';
+export { type PluginFileImagesOptions, pluginFileImages } from './plugin-file-images.js';

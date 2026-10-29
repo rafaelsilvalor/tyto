@@ -101,7 +101,7 @@ describe("a folder's sync", () => {
       fetches: true,
     });
 
-    expect(synced).toEqual({ copies: [], diagnostics: [] });
+    expect(synced).toEqual({ copies: [], files: [], diagnostics: [] });
     expect(await exists(join(folder, 'plugin-files.lock.json'))).toBe(false);
   });
 

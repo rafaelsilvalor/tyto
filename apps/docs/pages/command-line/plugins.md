@@ -106,7 +106,36 @@ home\cache\plugin-files\94529b5cf90e68c9814015bbcf2aac31f959747fb4e294710d4d3dfc
 Removed 1 cached copy.
 ```
 
-A fetched plugin that asks for permissions is shown and asked about by `tyto plugin sync`, as `install` does, or approved with `--yes`; a render never asks, and skips one nobody approved. Configurations and aliases in the files are not applied yet.
+A fetched plugin that asks for permissions is shown and asked about by `tyto plugin sync`, as `install` does, or approved with `--yes`; a render never asks, and skips one nobody approved.
+
+### Configurations and aliases
+
+A fetched pack offers only the templates its file names. Each template can have named **configurations**, which set the values the template declares it lets you change, such as a colour, a size, a face or an image. A brief reaches a configuration by its **alias**: write `alias:` to choose it, or leave it out and the alias is the template's name, a dash and the configuration's name. `default:` names the configuration a brief gets when it writes the template's own name, and every other configuration starts from that one and changes only what it lists. An image path is read from the plugin file's own folder and must stay inside the project, or inside `~/.tyto` for the machine's files.
+
+```yaml
+# ~/.tyto/plugin-files/avisos.yaml
+version: 1
+templates:
+  aviso:
+    source:
+      git: ../../../my-pack
+      ref: v1.0.0
+    configurations:
+      laranja: # a brief writes `template: aviso-laranja`
+        values:
+          paper: '#ffffff'
+```
+
+<!-- Run on 2026-10-29 on a build of the branch feat/TYTO-439-configurations-and-aliases, on Windows 11, with TYTO_HOME=home and the example pack committed to a repository three folders up from the file, tagged v1.0.0. -->
+
+A value the template does not declare, or one outside its limits, is a warning at the line that wrote it, and the template's own value stands:
+
+```
+$ tyto render aviso.brief --out out --types svg
+home\plugin-files\avisos.yaml:10:18: warning W_TEMPLATE_VALUE_UNKNOWN Template 'aviso' declares no configurable value 'paper'; the setting is ignored.
+```
+
+An alias may never be a template's name: `E_TEMPLATE_ALIAS_TAKEN` points at it, the alias does not load, and the template of that name renders as before. The same alias in two files of one folder loads from neither, and a project's alias wins over the machine's.
 
 ## Start your own
 

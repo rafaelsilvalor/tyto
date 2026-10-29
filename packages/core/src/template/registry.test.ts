@@ -290,6 +290,24 @@ describe('a search path of several roots (ADR 0020)', () => {
     ]);
   });
 
+  it('offers only the templates a root names when it names some (ADR 0151, TYTO-439)', async () => {
+    // A pack fetched through plugin files offers what the files name; the rest of it is
+    // skipped in silence, as a folder nobody asked for is, and shadows nothing.
+    const result = await loadTemplateRegistry(twoRoots(), [
+      'project',
+      { directory: 'pack', only: new Set(['so-do-pack']) },
+    ]);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.list().map((entry) => entry.name)).toEqual([
+      'promo',
+      'so-do-pack',
+      'so-do-projeto',
+    ]);
+    expect(result.value.directoryOf('promo')).toBe('project/promo');
+    expect(result.diagnostics).toEqual([]);
+  });
+
   it('accepts a single string, and behaves exactly as it always did', async () => {
     // Every existing caller passes one root. The string form is not a shim; it is the
     // common case spelled the short way.

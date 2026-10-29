@@ -17,9 +17,8 @@ export type TemplateValues = Readonly<Record<string, TemplateValue>>;
 
 /**
  * What a template reads its declared values through. Each takes the code's own constant as
- * the fallback, for a context with no `values` — one built by hand in a test, or a template
- * running in its plugin's process, where values do not cross yet (TYTO-439) — and for a value
- * of another kind than asked. A test pins the manifest's default to that constant, so both
+ * the fallback, for a context with no `values` — one built by hand in a test, or a call from a
+ * host older than protocol 10, which sent none — and for a value of another kind than asked. A test pins the manifest's default to that constant, so both
  * paths draw the same.
  */
 export function numberValue(

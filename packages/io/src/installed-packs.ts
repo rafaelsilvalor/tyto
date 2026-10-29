@@ -53,6 +53,11 @@ export interface InstalledCodePack {
 export interface InstalledPacks {
   /** Searched after the built-in pack, in the order the plugins were loaded. */
   readonly directories: readonly string[];
+  /**
+   * The plugin each of those folders came from, so a caller can offer only the templates a
+   * plugin file names from a fetched pack (ADR 0151 decision 2, TYTO-439).
+   */
+  readonly owners: ReadonlyMap<string, string>;
   /** The packs among them that registered `build`. */
   readonly code: readonly InstalledCodePack[];
   /** One `W_PLUGIN_SKIPPED` per reason a plugin's pack was refused. */
@@ -73,6 +78,7 @@ export interface InstalledPacksOptions {
 
 export const NO_INSTALLED_PACKS: InstalledPacks = {
   directories: [],
+  owners: new Map(),
   code: [],
   warnings: [],
   refused: new Set(),
@@ -94,6 +100,7 @@ export async function installedPacks(
 ): Promise<InstalledPacks> {
   const allowCode = options.allowCode === true;
   const directories: string[] = [];
+  const owners = new Map<string, string>();
   const code: InstalledCodePack[] = [];
   const warnings: Diagnostic[] = [];
   const refused = new Set<string>();
@@ -136,11 +143,12 @@ export async function installedPacks(
       warnings.push(...skippedPluginWarnings(plugin.id, problems));
     } else {
       directories.push(...checked);
+      for (const directory of checked) owners.set(directory, plugin.id);
       code.push(...built);
     }
   }
 
-  return { directories, code, warnings, refused };
+  return { directories, owners, code, warnings, refused };
 }
 
 /** The loaded plugins minus the refused ones, closing all of them as before. */

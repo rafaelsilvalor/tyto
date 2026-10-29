@@ -395,6 +395,7 @@ export async function renderTask(
     },
     {
       registry: context.registry,
+      configurations: context.configurations,
       templates,
       assets: assets.resolver,
       exporters: host.registry.exporters,

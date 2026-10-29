@@ -48,6 +48,16 @@ function readFailure(path: string, cause: unknown): Diagnostics {
   ];
 }
 
+/**
+ * A root that offers only some of its templates: a pack fetched through plugin files offers
+ * the ones the files name and no other (ADR 0151 decision 2). A folder it holds outside
+ * `only` is skipped in silence, as a folder without a manifest is: nobody asked for it.
+ */
+export interface TemplateRoot {
+  readonly directory: string;
+  readonly only?: ReadonlySet<string>;
+}
+
 interface Entry {
   readonly manifest: TemplateManifest;
   readonly directory: string;
@@ -80,7 +90,7 @@ interface Entry {
  */
 export async function loadTemplateRegistry(
   fileSystem: FileSystem,
-  roots: string | readonly string[],
+  roots: string | readonly (string | TemplateRoot)[],
 ): Promise<Result<TemplateRegistry, Diagnostics>> {
   // De-duplicated, because a root listed twice would shadow itself: every template in it
   // would be reported as hidden by the copy of itself in the earlier position. That is not
@@ -90,14 +100,18 @@ export async function loadTemplateRegistry(
   // Exact string equality, because this package is pure and path normalisation is a
   // filesystem's opinion: `C:\x` and `c:/x` are the same folder on Windows and this cannot
   // know it. Callers resolve to absolute paths, which is what makes the comparison enough.
-  const search = [...new Set(typeof roots === 'string' ? [roots] : roots)];
+  const search: TemplateRoot[] = [];
+  for (const root of typeof roots === 'string' ? [roots] : roots) {
+    const listed = typeof root === 'string' ? { directory: root } : root;
+    if (!search.some((item) => item.directory === listed.directory)) search.push(listed);
+  }
 
   const entries = new Map<string, Entry>();
   const failures: TemplateFailure[] = [];
   const warnings: Diagnostic[] = [];
   const unreadable: Diagnostics[] = [];
 
-  for (const [index, root] of search.entries()) {
+  for (const [index, { directory: root, only }] of search.entries()) {
     let rootEntries: readonly { name: string; isDirectory: boolean }[];
     try {
       rootEntries = await fileSystem.readDirectory(root);
@@ -135,6 +149,8 @@ export async function loadTemplateRegistry(
         failures.push({ directory, diagnostics: parsed.error });
         continue;
       }
+
+      if (only !== undefined && !only.has(parsed.value.name)) continue;
 
       const existing = entries.get(parsed.value.name);
       if (existing !== undefined) {

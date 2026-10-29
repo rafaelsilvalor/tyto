@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type PluginFilesCopy,
   chooseCopies,
+  configuredTemplates,
   folderSources,
   parsePluginFile,
   parsePluginFilesLock,
@@ -59,10 +60,43 @@ describe('a plugin file', () => {
       ref: 'v1.0.0',
     });
     expect(tabela?.default).toBe('roxo');
-    expect(tabela?.configurations.roxo).toEqual({
-      alias: 'tabela-roxo',
-      values: { background: '#4b2a7b', logo: './images/logo-light.png' },
-      brief: {},
+    const roxo = tabela?.configurations.roxo;
+    const at = (range: { start: number; end: number } | undefined): string | undefined =>
+      range === undefined ? undefined : ADR_EXAMPLE.slice(range.start, range.end);
+    expect(roxo?.alias).toBe('tabela-roxo');
+    expect(at(roxo?.aliasRange)).toBe('tabela-roxo');
+    expect(at(roxo?.range)).toBe('roxo');
+    expect(roxo?.brief).toEqual({});
+    // Each value keeps where it was written, so a refused one is a warning at it.
+    expect(roxo?.values.background?.value).toBe('#4b2a7b');
+    expect(at(roxo?.values.background?.range)).toBe("'#4b2a7b'");
+    expect(roxo?.values.logo?.value).toBe('./images/logo-light.png');
+    const [, simulados] = read.value?.templates ?? [];
+    expect(simulados?.configurations.compacta?.values['title-face']?.value).toEqual({
+      family: 'Source Sans 3',
+      weight: 700,
+    });
+  });
+
+  it('hands a folder its configured templates, leaving out a template two files name', () => {
+    const one = parsePluginFile(ADR_EXAMPLE, 'one.yaml').value;
+    const other = parsePluginFile(
+      'version: 1\ntemplates:\n  tabela:\n    source: { git: ./t, ref: v2 }\n',
+      'other.yaml',
+    ).value;
+    if (one === undefined || other === undefined) throw new Error('unread');
+
+    const configured = configuredTemplates([one, other], '/work/.tyto/plugin-files');
+
+    expect(configured.map((entry) => entry.template)).toEqual(['simulados-semana']);
+    expect(configured[0]).toMatchObject({
+      file: 'one.yaml',
+      directory: '/work/.tyto/plugin-files',
+      configurations: [{ name: 'compacta', alias: 'simulados-compacto' }],
+    });
+    expect(configuredTemplates([one], '/w')[0]).toMatchObject({
+      template: 'tabela',
+      default: 'roxo',
     });
   });
 
