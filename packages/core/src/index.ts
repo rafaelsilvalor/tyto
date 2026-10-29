@@ -250,6 +250,7 @@ export {
   type TemplateAlias,
   type TemplateConfigurations,
   type TemplateSelection,
+  configurationAlias,
   resolveTemplateConfigurations,
 } from './template/configurations.js';
 

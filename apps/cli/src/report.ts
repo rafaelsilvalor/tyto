@@ -53,6 +53,22 @@ export function registerOrigin(items: Diagnostics, origin: DiagnosticOrigin): vo
   for (const item of items) if (!origins.has(item)) origins.set(item, origin);
 }
 
+/**
+ * Diagnostics about no file the run names: a plugin file's source that could not be fetched,
+ * say. The fallback to the run's primary file would print them under the brief's name, which
+ * points at a file that has nothing to do with them (TYTO-456).
+ */
+const unplaced = new WeakSet<Diagnostic>();
+
+/** Marks these diagnostics as printed with no path when no source claimed them. */
+export function registerUnplaced(items: Diagnostics): void {
+  for (const item of items) unplaced.add(item);
+}
+
+function originOf(item: Diagnostic, options: ReportOptions): DiagnosticOrigin | undefined {
+  return origins.get(item) ?? (unplaced.has(item) ? undefined : options.primary);
+}
+
 export interface ReportOptions {
   /** The file a range indexes when nothing more specific was registered for it. */
   readonly primary?: DiagnosticOrigin;
@@ -76,7 +92,7 @@ export function formatDiagnostics(items: Diagnostics, options: ReportOptions = {
 
   return sortDiagnostics(items)
     .map((item) => {
-      const origin = origins.get(item) ?? options.primary;
+      const origin = originOf(item, options);
       const position =
         item.range === undefined || origin === undefined
           ? undefined
@@ -118,7 +134,7 @@ export function diagnosticsDocument(
   return {
     status: hasErrors(items) ? 'error' : 'ok',
     diagnostics: sortDiagnostics(items).map((item) => {
-      const origin = origins.get(item) ?? options.primary;
+      const origin = originOf(item, options);
       const position =
         item.range === undefined || origin === undefined
           ? undefined

@@ -108,6 +108,20 @@ Removed 1 cached copy.
 
 Um plugin buscado que pede permissões é mostrado e perguntado por `tyto plugin sync`, como o `install` faz, ou aprovado com `--yes`; um render nunca pergunta, e pula o que ninguém aprovou.
 
+`tyto plugin list` mostra o que os arquivos de plugins nomeiam abaixo dos plugins instalados: o plugin, se o arquivo é da máquina ou do projeto, a fonte, a ref, o commit que o lock fixa e se um render o carrega (`approved`, aprovado; `not approved`, sem aprovação; `not synced`, antes da primeira sincronização; `refused`, quando o commit não é um plugin que este Tyto consegue carregar). Depois vem cada apelido, com o template e a configuração a que ele leva. Ele lê só o que está neste computador: não busca nada e não roda nenhum plugin.
+
+```
+$ tyto plugin list
+…
+plugin files:
+example-pack  machine  ../../my-pack  v1.0.0  c50a1231d0be  approved  home\plugin-files\avisos.yaml
+
+aliases:
+aviso-laranja → aviso (laranja)  home\plugin-files\avisos.yaml
+```
+
+Numa pasta que não é confiável, os arquivos de plugins do projeto não são carregados nem listados, e `tyto render` e `tyto plugin list` avisam isso numa linha que nomeia `.tyto/plugin-files`.
+
 ### Configurações e apelidos
 
 Um pacote buscado oferece só os templates que o arquivo cita. Cada template pode ter **configurações** com nome, que mudam os valores que o template declara que deixa mudar, como uma cor, um tamanho, uma fonte ou uma imagem. Um brief chega a uma configuração pelo **apelido**: escreva `alias:` para escolher o apelido, ou deixe de fora e o apelido é o nome do template, um traço e o nome da configuração. `default:` diz qual configuração um brief recebe quando escreve o nome do próprio template, e toda outra configuração parte dessa e muda só o que lista. O caminho de uma imagem é lido a partir da pasta do próprio arquivo de plugin e precisa ficar dentro do projeto, ou dentro de `~/.tyto` nos arquivos da máquina.

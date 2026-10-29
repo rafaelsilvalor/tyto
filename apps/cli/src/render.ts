@@ -5,7 +5,12 @@ import type { Diagnostics } from '@tyto/core';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
-import { NO_PLUGIN_FILES, type SyncedPluginFiles, syncPluginFiles } from './plugin-files.js';
+import {
+  NO_PLUGIN_FILES,
+  type SyncedPluginFiles,
+  leftOutPluginFiles,
+  syncPluginFiles,
+} from './plugin-files.js';
 import {
   type OutputKind,
   type SectionOverrides,
@@ -25,7 +30,7 @@ import { type RenderContextOptions, loadRenderContext, readFailure } from './ren
 import { renderTask } from './render-task.js';
 import { googleFontsOption } from './google-fonts.js';
 import { optionalSources, renderSources } from './sources.js';
-import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
+import { diagnosticsDocument, formatDiagnostics, json, registerUnplaced } from './report.js';
 import { workspaceOfBrief } from './workspace.js';
 
 /**
@@ -174,26 +179,28 @@ export async function renderCommand(
   // The plugin files first: their copies load as installed plugins. A render never moves a
   // pinned ref and never asks, so it reaches the network only for a copy the cache lacks
   // (ADR 0151 decision 3); a plugin nobody approved is skipped with the reason.
+  const pluginFilesWorkspace =
+    workspace === undefined
+      ? undefined
+      : { folder: workspace.loaded.folder, trusted: workspace.loaded.trust === 'trusted' };
   const pluginFiles =
     environment.home === undefined
       ? NO_PLUGIN_FILES
       : await syncPluginFiles(
           {
             home: environment.home,
-            ...(workspace === undefined
-              ? {}
-              : {
-                  workspace: {
-                    folder: workspace.loaded.folder,
-                    trusted: workspace.loaded.trust === 'trusted',
-                  },
-                }),
+            ...(pluginFilesWorkspace === undefined ? {} : { workspace: pluginFilesWorkspace }),
             update: false,
             fetches: true,
             approval: 'never',
           },
           environment,
         );
+  // A source that could not be fetched is about no file this run names: not the brief's.
+  registerUnplaced(pluginFiles.diagnostics);
+  // On stderr in both modes: `--json`'s stdout is one document, and this line is not in it.
+  const leftOut = await leftOutPluginFiles(pluginFilesWorkspace, 'loaded', environment);
+  if (leftOut !== '') environment.console.err(leftOut);
   const loaded = await loadInstalledPlugins(environment.home, {
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {

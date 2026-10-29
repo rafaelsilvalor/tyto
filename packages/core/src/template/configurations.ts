@@ -41,6 +41,14 @@ export interface ConfigurationEntry {
   readonly values: Readonly<Record<string, SuppliedValue>>;
 }
 
+/** The name a brief reaches a configuration by: its alias, or `<template>-<configuration>`. */
+export function configurationAlias(
+  template: string,
+  configuration: Pick<ConfigurationEntry, 'name' | 'alias'>,
+): string {
+  return configuration.alias ?? `${template}-${configuration.name}`;
+}
+
 /** One template a plugin file configures. */
 export interface ConfiguredTemplate {
   readonly template: string;
@@ -156,7 +164,7 @@ export async function resolveTemplateConfigurations(
   const candidates: Candidate[] = [];
   for (const { entry, scope } of loaded) {
     for (const configuration of entry.configurations) {
-      const alias = configuration.alias ?? `${entry.template}-${configuration.name}`;
+      const alias = configurationAlias(entry.template, configuration);
       if (templateNames.has(alias)) {
         report(
           entry.file,

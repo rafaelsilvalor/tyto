@@ -108,6 +108,20 @@ Removed 1 cached copy.
 
 A fetched plugin that asks for permissions is shown and asked about by `tyto plugin sync`, as `install` does, or approved with `--yes`; a render never asks, and skips one nobody approved.
 
+`tyto plugin list` shows what the plugin files name below the installed plugins: the plugin, whether the file is the machine's or the project's, the source, the ref, the commit the lock pins and whether a render loads it (`approved`, `not approved`, `not synced` before the first sync, `refused` when the commit is not a plugin this Tyto can load). Then every alias, with the template and configuration it reaches. It reads only what is on this computer: it fetches nothing and runs no plugin.
+
+```
+$ tyto plugin list
+…
+plugin files:
+example-pack  machine  ../../my-pack  v1.0.0  c50a1231d0be  approved  home\plugin-files\avisos.yaml
+
+aliases:
+aviso-laranja → aviso (laranja)  home\plugin-files\avisos.yaml
+```
+
+In a folder that is not trusted, the project's plugin files are neither loaded nor listed, and `tyto render` and `tyto plugin list` say so in one line naming `.tyto/plugin-files`.
+
 ### Configurations and aliases
 
 A fetched pack offers only the templates its file names. Each template can have named **configurations**, which set the values the template declares it lets you change, such as a colour, a size, a face or an image. A brief reaches a configuration by its **alias**: write `alias:` to choose it, or leave it out and the alias is the template's name, a dash and the configuration's name. `default:` names the configuration a brief gets when it writes the template's own name, and every other configuration starts from that one and changes only what it lists. An image path is read from the plugin file's own folder and must stay inside the project, or inside `~/.tyto` for the machine's files.

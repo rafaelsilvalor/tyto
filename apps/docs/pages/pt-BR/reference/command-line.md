@@ -116,11 +116,17 @@ tyto template new [options] <name>
 
 ## tyto plugin list
 
-list every plugin: name, version, origin, status and what it contributes
+list every plugin: name, version, origin, status and what it contributes; then what the plugin files name, at which commit, and their aliases
 
 ```sh
-tyto plugin list [options]
+tyto plugin list [options] [folder]
 ```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `[folder]` | a folder inside the workspace whose plugin files count |
 
 **Opções**
 
