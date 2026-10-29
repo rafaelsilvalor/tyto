@@ -171,3 +171,12 @@ export {
   syncPluginFolder,
 } from './plugin-files.js';
 export { type PluginFileImagesOptions, pluginFileImages } from './plugin-file-images.js';
+export {
+  type PluginFilesApproval,
+  type PluginFilesSyncOptions,
+  type SyncedPluginFiles,
+  NO_PLUGIN_FILES,
+  machinePluginFiles,
+  projectPluginFiles,
+  syncPluginFiles,
+} from './plugin-files-sync.js';
