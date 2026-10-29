@@ -155,3 +155,17 @@ export {
   type TrustedEntry,
   fsTrustStore,
 } from './fs-trust-store.js';
+export {
+  type FileReadListener,
+  type PluginFilesCopyOnDisk,
+  type PluginFolderRead,
+  type SyncPluginFolderOptions,
+  type SyncedFolder,
+  PLUGIN_FILES_CACHE,
+  cachedCopy,
+  cleanPluginFilesCache,
+  fetchToCache,
+  pluginStoreWithCopies,
+  readPluginFolder,
+  syncPluginFolder,
+} from './plugin-files.js';

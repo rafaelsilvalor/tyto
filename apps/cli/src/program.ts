@@ -9,6 +9,7 @@ import {
   parseSection,
   parseTypes,
 } from './options.js';
+import { pluginCleanCommand, pluginSyncCommand } from './plugin-files.js';
 import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { renderCommand } from './render.js';
@@ -249,6 +250,30 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     .option('--code', "a code template, built in the plugin's process, instead of markup")
     .action(async (name: string) => {
       captured.code = await pluginNewCommand(name, pluginNew.opts(), environment);
+    });
+
+  const pluginSync = plugin
+    .command('sync')
+    .description(
+      "fetch what the plugin files name (~/.tyto/plugin-files and the workspace's .tyto/plugin-files) and write their locks; tyto render does this too, without --update",
+    )
+    .argument('[folder]', 'a folder inside the workspace whose plugin files count', '.')
+    .option(
+      '--update',
+      'move every ref to where it is now, instead of the commit the lock pins',
+      false,
+    )
+    .option('-y, --yes', "approve the fetched plugins' permissions without asking", false)
+    .action(async (folder: string) => {
+      captured.code = await pluginSyncCommand(folder, pluginSync.opts(), environment);
+    });
+
+  plugin
+    .command('clean')
+    .description("delete the cached copies of the plugin files' sources that no lock names")
+    .argument('[folder]', 'a folder inside the workspace whose lock counts too', '.')
+    .action(async (folder: string) => {
+      captured.code = await pluginCleanCommand(folder, environment);
     });
 
   for (const [change, description] of [

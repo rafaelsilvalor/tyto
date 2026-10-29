@@ -65,6 +65,14 @@ non-zero.
 | `E_WORKSPACE_FILE_RESTRICTED` | error | no | A plugin asked for a file of a workspace the person has not trusted. |
 | `W_PLUGIN_CRASHED` | warning | no | An installed plugin's process crashed on an earlier run. History, not a refusal. |
 | `E_PLUGIN_FETCH` | error | yes | A plugin could not be copied or fetched from where tyto plugin install was told. |
+| `E_PLUGIN_FILE_SYNTAX` | error | no | A plugin file or its lock could not be read or is not YAML or JSON of the shape it needs. |
+| `W_PLUGIN_FILE_KEY_UNKNOWN` | warning | no | A plugin file has a key Tyto does not know. |
+| `E_PLUGIN_FILE_ENTRY` | error | no | An entry of a plugin file was refused, and that entry alone does not load. |
+| `E_PLUGIN_FILE_DUPLICATE` | error | no | One name is given twice in one folder's plugin files, so that folder supplies it from neither. |
+| `W_PLUGIN_FILE_OVERRIDDEN` | warning | no | A project's plugin file names what the machine's names too, and the project's wins. |
+| `W_PLUGIN_FILE_REPLACES_INSTALLED` | warning | no | A plugin from the plugin files has the name of one installed with tyto plugin install. |
+| `W_PLUGIN_FILE_FETCH` | warning | no | A source the plugin files name could not be fetched. |
+| `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A commit a plugin file names was fetched and could not be loaded as a plugin. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | yes | The same id is used more than once in one scene. |
 | `E_SCENE_MASK_NOT_FOUND` | error | yes | A mask references a node the scene does not contain. |
@@ -236,6 +244,10 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_WORKSPACE_FILE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WORKSPACE_FILE_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
+| `E_PLUGIN_FILE_SYNTAX` | no | Only what that file names is missing; a brief that needs it says so on its own. |
+| `E_PLUGIN_FILE_ENTRY` | no | Only that entry is missing; the rest of the file loads. |
+| `E_PLUGIN_FILE_DUPLICATE` | no | Only that name is missing; a brief that needs it says so on its own. |
+| `E_PLUGIN_FILE_SOURCE_REFUSED` | no | The commit locked before loads when there is one; otherwise nothing from that source does. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_MASK_NOT_FOUND` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -956,6 +968,62 @@ Could not fetch a plugin from '{source}': {problem}.
 ```
 
 Parameters: `source`, `problem`
+
+### `E_PLUGIN_FILE_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A plugin file or its lock could not be read or is not YAML or JSON of the shape it needs.
+
+Only what that file names is missing; a brief that needs it says so on its own.
+
+```
+Plugin file '{file}' was not loaded: {problem}.
+```
+
+Parameters: `file`, `problem`
+
+### `E_PLUGIN_FILE_ENTRY`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+An entry of a plugin file was refused, and that entry alone does not load.
+
+Only that entry is missing; the rest of the file loads.
+
+```
+Plugin file '{file}': '{path}' was refused: {problem}.
+```
+
+Parameters: `file`, `path`, `problem`
+
+### `E_PLUGIN_FILE_DUPLICATE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+One name is given twice in one folder's plugin files, so that folder supplies it from neither.
+
+Only that name is missing; a brief that needs it says so on its own.
+
+```
+'{name}' is named by both '{file}' and '{other}' in one folder, which chose no order between them, so neither supplies it.
+```
+
+Parameters: `name`, `file`, `other`
+
+### `E_PLUGIN_FILE_SOURCE_REFUSED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A commit a plugin file names was fetched and could not be loaded as a plugin.
+
+The commit locked before loads when there is one; otherwise nothing from that source does.
+
+```
+'{git}' at '{ref}' resolved to commit {commit}, which was refused: {problem}. {outcome}
+```
+
+Parameters: `git`, `ref`, `commit`, `problem`, `outcome`
 
 ### `E_SCENE_SHAPE`
 
@@ -1812,6 +1880,62 @@ Plugin '{plugin}' crashed at {at}: {reason}. It is still activated; installing o
 ```
 
 Parameters: `plugin`, `at`, `reason`
+
+### `W_PLUGIN_FILE_KEY_UNKNOWN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A plugin file has a key Tyto does not know.
+
+An ignored key changes nothing that loads.
+
+```
+Plugin file '{file}': '{path}' is not a key Tyto knows, so it is ignored.
+```
+
+Parameters: `file`, `path`
+
+### `W_PLUGIN_FILE_OVERRIDDEN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A project's plugin file names what the machine's names too, and the project's wins.
+
+Something loads; it is the project entry rather than the machine one.
+
+```
+'{name}' is named by the project's '{file}' and the machine's '{other}'; the project's is used.
+```
+
+Parameters: `name`, `file`, `other`
+
+### `W_PLUGIN_FILE_REPLACES_INSTALLED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A plugin from the plugin files has the name of one installed with tyto plugin install.
+
+A plugin of that name loads; it is the one the files name.
+
+```
+Plugin '{plugin}' comes from plugin file '{file}', so the copy installed with tyto plugin install is not activated.
+```
+
+Parameters: `plugin`, `file`
+
+### `W_PLUGIN_FILE_FETCH`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A source the plugin files name could not be fetched.
+
+The copy fetched earlier loads when there is one; a brief that needs one that is missing says so on its own.
+
+```
+Could not fetch '{git}' at '{ref}': {problem}. {outcome}
+```
+
+Parameters: `git`, `ref`, `problem`, `outcome`
 
 ### `W_EXPORT_APPROXIMATED`
 

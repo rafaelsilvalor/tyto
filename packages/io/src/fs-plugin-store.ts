@@ -50,7 +50,7 @@ function isMissing(cause: unknown): boolean {
   return (cause as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
 }
 
-async function readIfPresent(path: string): Promise<string | undefined> {
+export async function readIfPresent(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, 'utf8');
   } catch (cause) {
@@ -60,7 +60,7 @@ async function readIfPresent(path: string): Promise<string | undefined> {
 }
 
 /** Written beside itself and renamed, so a crash mid-write leaves the old file whole. */
-async function writeAtomically(path: string, text: string): Promise<void> {
+export async function writeAtomically(path: string, text: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const staging = `${path}.writing`;
   await writeFile(staging, text, 'utf8');
@@ -89,7 +89,7 @@ function isWithin(root: string, path: string): boolean {
  * failure for a folder a person made (TYTO-50). A junction counts as a link here, which is
  * what `lstat` reports it as.
  */
-async function linksOutside(from: string): Promise<Diagnostic[]> {
+export async function linksOutside(from: string): Promise<Diagnostic[]> {
   const root = await realpath(from);
   const problems: Diagnostic[] = [];
   const walk = async (directory: string): Promise<void> => {

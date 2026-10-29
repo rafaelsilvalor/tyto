@@ -709,6 +709,25 @@ pdf                 1.0.0  external  disabled  exporter
 
 `origin` is the one column a manifest cannot fill in for itself — an author has no way to know whether their plugin ended up bundled or installed — so it is the host's: `built-in` for this repository's, `external` for what the loader found under `plugins/`.
 
+### Plugin files (ADR 0151)
+
+A plugin file names a source to fetch, `{ git, ref }`, for one plugin or for several templates. The machine's are `TYTO_HOME/plugin-files/*.yaml`; a workspace's are `.tyto/plugin-files/*.yaml`, read only once the folder is trusted. The parser, the lock's schema and the rules for which folder wins a name are `@tyto/plugin-api`'s `plugin-files.ts`; reading the folders, running `git` and the cache are `@tyto/io`'s `plugin-files.ts`; the CLI composes them in `apps/cli/src/plugin-files.ts` (TYTO-432).
+
+```
+TYTO_HOME/
+  plugin-files/*.yaml, plugin-files.lock.json      the machine's files and their lock
+  cache/plugin-files/<sha256(git)>/<commit>/       one copy per commit, without .git
+<workspace>/.tyto/plugin-files/*.yaml, plugin-files.lock.json
+```
+
+- **`tyto plugin sync [folder]`** makes the copies match the files and the locks: it fetches a locked commit the cache lacks, resolves a source the lock lacks or whose `git` or `ref` changed, and writes the lock. **`--update`** resolves every ref again, which is the only way a moving ref such as a branch moves. A commit that is not a plugin this Tyto loads (`checkInstallable`) is `E_PLUGIN_FILE_SOURCE_REFUSED`, and the lock keeps the commit it had.
+- **`tyto render` runs the same sync without `--update`**, so it reaches the network only for a copy the cache lacks and never moves a pinned ref. `tyto watch` never fetches: it loads the machine's locked copies already in the cache.
+- **`tyto plugin clean [folder]`** deletes the copies that no lock it can see names — the machine's and that folder's workspace's.
+- A `git` that starts with `./` or `../` is a folder relative to the plugin file's own folder, as an image path is; the lock keeps it as written. A fetch runs `git init`, `git fetch --depth 1 <git> <ref>` and a checkout of `FETCH_HEAD` with `core.autocrlf=false`, so one commit is the same bytes on every machine, and `GIT_TERMINAL_PROMPT=0` so a missing credential fails instead of waiting. When it fails, the copy the lock pins loads if it is cached, and `W_PLUGIN_FILE_FETCH` names the source either way. A lock that cannot be read makes its folder load nothing (`E_PLUGIN_FILE_SYNTAX`): resolving instead would move every ref without a word.
+- A copy loads as an installed plugin does, through `pluginStoreWithCopies`, before the plugins `install` copied and over their names (`W_PLUGIN_FILE_REPLACES_INSTALLED`). Its approval is in `plugins.json` by name, never in the lock: `sync` asks, or takes `--yes`; a plugin that asks for no permissions needs no answer; a render never asks, and skips an unapproved one with `W_PLUGIN_SKIPPED`.
+- Collisions: one name twice in one folder is `E_PLUGIN_FILE_DUPLICATE` and that folder supplies it from neither; the project's entry replaces the machine's whole, with `W_PLUGIN_FILE_OVERRIDDEN`; a built-in's name is `E_PLUGIN_NAME_TAKEN`.
+- Not yet: configurations, `default` and aliases are parsed and kept, and resolved by TYTO-439. A fetched pack still offers every template it holds, not only the ones the file names.
+
 ### The output kinds are open
 
 `--types` takes the four built-in kinds or any kind an installed exporter declares. `ArtifactKind` is `BuiltInKind | (string & Record<never, never>)` — open, and still autocompleting the four — and whether a kind can be produced is the exporter registry's answer, asked once before a task starts: a kind nothing produces is refused with exit 1 and the list of kinds that are available. **A document exporter names its own file**: the artifact's extension and `mime` in `result.json` are the exporter's `extension` and `mime`; only a `rasterized` exporter's come from the raster port. **An installed plugin whose rasterized exporter declares a kind no rasterizer encodes** — `gif` — is refused at activation (`E_PLUGIN_EXPORTER_KIND`, naming the plugin), so asking for that kind is the ordinary exit 1 with the reason printed above it; `runJob`'s own `TypeError` for the same case stays as a wiring check for built-ins. Whether a browser is launched is asked of the exporters too, so `--types pdf` from a document exporter launches none.

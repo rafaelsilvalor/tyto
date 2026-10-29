@@ -2,7 +2,7 @@
 
 # Linha de comando
 
-Todos os comandos que o `tyto` aceita: 13. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
+Todos os comandos que o `tyto` aceita: 15. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
 
 ::: info Ajuda em inglês
 A ajuda da linha de comando existe só em inglês, e esta página a mostra como o terminal a imprime.
@@ -169,6 +169,41 @@ tyto plugin new [options] <name>
 | --- | --- | --- |
 | `--out <dir>` | where the plugin folder is created | `"."` |
 | `--code` | a code template, built in the plugin's process, instead of markup |  |
+
+## tyto plugin sync
+
+fetch what the plugin files name (~/.tyto/plugin-files and the workspace's .tyto/plugin-files) and write their locks; tyto render does this too, without --update
+
+```sh
+tyto plugin sync [options] [folder]
+```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `[folder]` | a folder inside the workspace whose plugin files count |
+
+**Opções**
+
+| Opção | O que faz | Padrão |
+| --- | --- | --- |
+| `--update` | move every ref to where it is now, instead of the commit the lock pins |  |
+| `-y, --yes` | approve the fetched plugins' permissions without asking |  |
+
+## tyto plugin clean
+
+delete the cached copies of the plugin files' sources that no lock names
+
+```sh
+tyto plugin clean [options] [folder]
+```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `[folder]` | a folder inside the workspace whose lock counts too |
 
 ## tyto plugin remove
 

@@ -233,3 +233,28 @@ export {
   startInstalledPlugins,
   writeCrash,
 } from './installed.js';
+
+export {
+  type PluginFile,
+  type PluginFileConfiguration,
+  type PluginFileRead,
+  type PluginFileSource,
+  type PluginFileTemplate,
+  type PluginFilesCopy,
+  type PluginFilesLock,
+  type PluginFilesLockEntry,
+  type PluginFolderSource,
+  type PluginFolderSources,
+  type PluginSyncStep,
+  EMPTY_PLUGIN_FILES_LOCK,
+  PLUGIN_FILES_DIRECTORY,
+  PLUGIN_FILES_LOCK_FILE,
+  PLUGIN_FILE_EXTENSION,
+  chooseCopies,
+  folderSources,
+  parsePluginFile,
+  parsePluginFilesLock,
+  planPluginSync,
+  sameSource,
+  serializePluginFilesLock,
+} from './plugin-files.js';
