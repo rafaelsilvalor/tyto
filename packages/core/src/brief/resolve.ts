@@ -7,6 +7,7 @@ import { type Diagnostics, type Result, err, fromPartial } from '../result/resul
 import type { AssetRef } from '../scene/primitives.js';
 import type { SourceRange } from '../source/range.js';
 import type { TemplateConfigurations } from '../template/configurations.js';
+import { type BriefDefaults, measured } from '../template/configured-brief.js';
 import type { SuppliedValues } from '../template/declared-values.js';
 import type { Slot, TemplateManifest } from '../template/manifest.js';
 import type { TemplateRegistry } from '../template/registry.js';
@@ -459,6 +460,53 @@ class Resolver {
     }
   }
 
+  /**
+   * A configuration's editor rules, tighter than the manifest's (TYTO-440). Past one is a
+   * warning and the value stays: the manifest's `max` is the limit the template was drawn
+   * for, and it already refused anything past that.
+   */
+  checkConfiguredLimits(brief: BriefDefaults, configuration: string): void {
+    for (const [name, limit] of Object.entries(brief.editor)) {
+      const slot = this.manifest.slots[name];
+      if (slot === undefined) continue;
+      let count: number;
+      let range: SourceRange | undefined;
+      if (slot.repeat) {
+        const occurrences = this.artworks.filter((artwork) => artwork.slot.name === name);
+        count = occurrences.length;
+        range = occurrences[limit.max]?.slot.range;
+      } else {
+        const resolved = this.slots.get(name);
+        if (resolved?.value.kind !== 'rich-text') continue;
+        count = plainText(resolved.value.text).trim().length;
+        range = resolved.range;
+      }
+      if (count <= limit.max) continue;
+      this.report(
+        diagnostic(
+          'W_SLOT_OVER_CONFIGURED_LIMIT',
+          {
+            slot: name,
+            measured: measured(slot, count),
+            template: this.manifest.name,
+            configuration,
+            max: limit.max,
+          },
+          range === undefined ? {} : { range },
+        ),
+      );
+    }
+  }
+
+  /** A configuration's slot defaults, for the slots the brief left unset: the brief wins. */
+  fillDefaults(brief: BriefDefaults): void {
+    for (const [name, value] of Object.entries(brief.slots)) {
+      if (this.slots.has(name) || this.manifest.slots[name] === undefined) continue;
+      if (value.kind === 'image') this.assets.set(value.asset.id, value.asset);
+      this.slots.set(name, { name, value, adjustments: [] });
+    }
+  }
+
   /** Manifest defaults, the required slots nobody set, and the repeat count. */
   finish(fallbackRange: SourceRange | undefined): void {
     for (const [name, slot] of Object.entries(this.manifest.slots)) {
@@ -553,7 +601,7 @@ export function listedFormats(data: Readonly<Record<string, unknown>>): string[]
 
 /**
  * The formats to render: the frontmatter's, narrowed by the caller's when both list some;
- * else the caller's; else the manifest's own (ADR 0107).
+ * else the caller's; else the configuration's (TYTO-440); else the manifest's own (ADR 0107).
  *
  * The range goes on a diagnostic only when the frontmatter is involved, because a
  * `--formats` flag has nowhere in the file for an editor to underline.
@@ -562,6 +610,7 @@ function formatsOf(
   ast: BriefAst,
   manifest: TemplateManifest,
   override: readonly string[] | undefined,
+  configured: readonly string[] | undefined,
   report: (problem: Diagnostic) => void,
 ): readonly string[] {
   const written = listedFormats(ast.frontmatter.data);
@@ -584,7 +633,9 @@ function formatsOf(
     });
 
   if (written === undefined) {
-    return requested === undefined ? manifest.formats : rendered(requested, undefined);
+    return requested === undefined
+      ? (configured ?? manifest.formats)
+      : rendered(requested, undefined);
   }
 
   const listed = rendered(written, range);
@@ -674,7 +725,8 @@ export async function resolve(
   }
 
   const resolver = new Resolver(manifest, options);
-  const formats = formatsOf(ast, manifest, options.formats, (problem) => {
+  const briefSide = selection?.brief;
+  const formats = formatsOf(ast, manifest, options.formats, briefSide?.formats, (problem) => {
     resolver.report(problem);
   });
 
@@ -694,6 +746,11 @@ export async function resolve(
     await resolver.take(candidateOf(directive), false);
   }
 
+  if (briefSide !== undefined && selection?.configuration !== undefined) {
+    // The limits read what the brief wrote, so they run before the defaults fill the rest.
+    resolver.checkConfiguredLimits(briefSide, selection.configuration);
+    resolver.fillDefaults(briefSide);
+  }
   resolver.finish(ast.frontmatter.range ?? ast.range);
 
   const built = resolver.build(formats);

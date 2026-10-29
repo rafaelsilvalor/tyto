@@ -104,6 +104,7 @@ describe('a configuration and its alias', () => {
       template: 'tabela',
       configuration: 'roxo',
       values: { paper: { value: '#4b2a7b', range: at(20) }, gap: { value: 30 } },
+      brief: { slots: {}, editor: {} },
     });
     expect(configurations.select('tabela')?.configuration).toBe('roxo');
   });

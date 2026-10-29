@@ -131,6 +131,60 @@ describe('a plugin file', () => {
     expect(read.value?.templates).toHaveLength(1);
   });
 
+  it('keeps the brief block’s four parts, each where it was written, and warns on a fifth', () => {
+    const source = `version: 1
+templates:
+  semana:
+    source: { git: ./semana, ref: v1 }
+    configurations:
+      roxo:
+        brief:
+          slots:
+            rodape: Inscrições abertas
+            selo: ./images/selo.png
+          formats: [story, feed]
+          skeleton: |
+            ---
+            template: semana-roxo
+            ---
+          editor:
+            titulo: { max: 40, min: 2 }
+            linha: { max: 3 }
+          colors: nope
+`;
+    const read = parsePluginFile(source, 'semana.yaml');
+    const at = (range: { start: number; end: number } | undefined): string | undefined =>
+      range === undefined ? undefined : source.slice(range.start, range.end);
+
+    expect(codes(read)).toEqual(['W_PLUGIN_FILE_KEY_UNKNOWN', 'W_PLUGIN_FILE_KEY_UNKNOWN']);
+    expect(read.diagnostics.map((item) => item.message).join('\n')).toContain(
+      'templates.semana.configurations.roxo.brief.editor.titulo.min',
+    );
+    const brief = read.value?.templates[0]?.configurations.roxo?.brief;
+    expect(brief?.slots?.rodape?.value).toBe('Inscrições abertas');
+    expect(at(brief?.slots?.selo?.range)).toBe('./images/selo.png');
+    expect(brief?.formats?.value).toEqual(['story', 'feed']);
+    expect(at(brief?.formats?.range)).toBe('[story, feed]');
+    expect(brief?.skeleton?.value).toBe('---\ntemplate: semana-roxo\n---\n');
+    expect(brief?.editor?.titulo?.max?.value).toBe(40);
+    expect(at(brief?.editor?.titulo?.max?.range)).toBe('40');
+    expect(brief?.editor?.linha?.max?.value).toBe(3);
+    // Handed on whole to what `@tyto/core` resolves.
+    expect(
+      configuredTemplates(read.value ? [read.value] : [], '/w')[0]?.configurations[0]?.brief,
+    ).toBe(brief);
+  });
+
+  it('refuses a configuration whose brief block is not a mapping', () => {
+    const read = parsePluginFile(
+      'version: 1\ntemplates:\n  a:\n    source: { git: ./a, ref: v1 }\n    configurations:\n      x:\n        brief: [slots]\n',
+      'a.yaml',
+    );
+
+    expect(codes(read)).toEqual(['E_PLUGIN_FILE_ENTRY']);
+    expect(read.value?.templates).toEqual([]);
+  });
+
   it('refuses a git or a ref that git would read as an option', () => {
     const read = parsePluginFile(
       'version: 1\ntemplates:\n  a:\n    source: { git: --upload-pack=evil, ref: v1 }\n  b:\n    source: { git: ./b, ref: -v }\n',

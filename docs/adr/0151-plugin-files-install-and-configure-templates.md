@@ -332,6 +332,14 @@ plugin files, not here (ADR 0127 decision 4).
 - The cache grows with every commit a lock has named, until the cleanup command runs. There is no
   size limit, as with ADR 0117's cache.
 
+## Notes
+
+- **2026-10-29, TYTO-440.** TYTO-440 fixes the shapes of a configuration's `brief` block:
+  `slots`, `formats`, `skeleton` and `editor` (a `max` per slot), the warnings
+  `W_CONFIGURATION_BRIEF_INVALID`, `W_EDITOR_RULE_LOOSER` and `W_SLOT_OVER_CONFIGURED_LIMIT`,
+  and that a slot that repeats takes no default. See "What a configuration sets for the brief"
+  in `docs/plugin-authoring.md`. The decision above is unchanged.
+
 ## Rejected
 
 - **npm as the template registry.** The contract is already on GitHub Packages (ADR 0149), so a

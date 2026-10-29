@@ -483,6 +483,49 @@ the branch `tyto/contract-update`: a run against the same contract leaves it alo
 contract replaces it. Inputs, if your repository differs: `checks` (default
 `typecheck build test`), `ci-workflow` (default `ci.yml`), `node-version` (default `24`).
 
+## What a configuration sets for the brief
+
+A plugin file's configuration (ADR 0151) sets the template's declared `values`, and under
+`brief:` four things on the brief's side (TYTO-440). Each is checked against your manifest once,
+when the files are read, and **the brief wins every one of them**:
+
+```yaml
+configurations:
+  curto:
+    brief:
+      slots: # a slot's content when the brief leaves it unset
+        detalhe: Vagas limitadas
+        selo: ./images/selo.png # relative to the plugin file, as an image value is
+      formats: [story] # what renders when the brief lists no formats
+      skeleton: | # what "new from template" and the "/" menu write, whole
+        ---
+        template: aviso-curto
+        ---
+        ::titulo
+          Título
+      editor: # tighter than the manifest, never looser
+        titulo: { max: 20 }
+```
+
+- **`slots`** sets a slot that does not repeat. Its value is checked as the brief's would be:
+  an enum against its `values`, text against the manifest's `min` and `max`. A repeated slot
+  takes no default: its occurrences are the brief's artworks.
+- **`formats`** must name formats the manifest renders. A `--formats` flag or the Export
+  dialog's ticks still win when the brief lists none.
+- **`skeleton`** is a whole brief, written as it is. Without one, the skeleton is computed from
+  the manifest. It is checked and kept today; the desktop's New brief from template and "/"
+  menu start writing it in TYTO-440's desktop change.
+- **`editor`** takes a `max` per slot, counted as the manifest's `max` counts: characters on a
+  text slot, occurrences on a repeated one. Past it is `W_SLOT_OVER_CONFIGURED_LIMIT`, a warning
+  at the brief's line; the manifest's own `max` stays the error that refuses the value. A rule
+  looser than the manifest is `W_EDITOR_RULE_LOOSER` at its line in the file, and the manifest's
+  limit stands.
+
+Anything else your manifest cannot take is `W_CONFIGURATION_BRIEF_INVALID` at its line and costs
+that key alone, as a value does. A named configuration starts from the entry's `default`: slots
+and rules by name, formats and skeleton whole. Nothing on the brief side reaches your plugin's
+process: the host resolves the brief before it calls the template, so the protocol is unchanged.
+
 ## Other extension points
 
 A plugin can contribute more than templates. `contributes` must name every point it registers

@@ -965,6 +965,38 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'Only that alias is missing; the template of that name renders as before.',
   },
+  // The brief side of a configuration (TYTO-440) is tolerant per key as its values are: a
+  // default, a format list or a rule the template cannot take costs that one key.
+  W_CONFIGURATION_BRIEF_INVALID: {
+    severity: 'warning',
+    summary: "A configuration's brief block sets something the template cannot take.",
+    template:
+      "brief.{key} in configuration '{configuration}' of template '{template}' {problem}; it is ignored.",
+    spec: 'docs/plugin-authoring.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // Never looser: the template was drawn for its own limit, so a configuration may only tighten it.
+  W_EDITOR_RULE_LOOSER: {
+    severity: 'warning',
+    summary: "A configuration's editor rule allows more than the template's manifest does.",
+    template:
+      "The editor rule on slot '{slot}' in configuration '{configuration}' allows {max}, more than template '{template}' allows ({allowed}); the template's limit stands.",
+    spec: 'docs/plugin-authoring.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // A warning where the manifest's own `max` is an error: the template still draws the value,
+  // and the configuration's rule is the house's, not the template's.
+  W_SLOT_OVER_CONFIGURED_LIMIT: {
+    severity: 'warning',
+    summary: 'A slot runs past the editor rule of the configuration the brief reached.',
+    template:
+      "Slot '{slot}' {measured}, and configuration '{configuration}' of template '{template}' allows {max}.",
+    spec: 'docs/plugin-authoring.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_UNUSED_SLOT: {
     severity: 'warning',
     summary: 'The brief sets a slot the chosen template never renders.',

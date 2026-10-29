@@ -111,6 +111,9 @@ non-zero.
 | `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
 | `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration sets a declared value to one of the wrong kind or outside its limits. |
 | `E_TEMPLATE_ALIAS_TAKEN` | error | no | A plugin file gives a configuration an alias that is a template's name. |
+| `W_CONFIGURATION_BRIEF_INVALID` | warning | no | A configuration's brief block sets something the template cannot take. |
+| `W_EDITOR_RULE_LOOSER` | warning | no | A configuration's editor rule allows more than the template's manifest does. |
+| `W_SLOT_OVER_CONFIGURED_LIMIT` | warning | no | A slot runs past the editor rule of the configuration the brief reached. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
 | `W_REDUNDANT_BREAK` | warning | no | A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line. |
@@ -2081,6 +2084,48 @@ Value '{name}' of template '{template}' {problem}; the template's default is use
 ```
 
 Parameters: `name`, `template`, `problem`
+
+### `W_CONFIGURATION_BRIEF_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/plugin-authoring.md`
+
+A configuration's brief block sets something the template cannot take.
+
+A warning never replaces a value (ADR 0013).
+
+```
+brief.{key} in configuration '{configuration}' of template '{template}' {problem}; it is ignored.
+```
+
+Parameters: `key`, `configuration`, `template`, `problem`
+
+### `W_EDITOR_RULE_LOOSER`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/plugin-authoring.md`
+
+A configuration's editor rule allows more than the template's manifest does.
+
+A warning never replaces a value (ADR 0013).
+
+```
+The editor rule on slot '{slot}' in configuration '{configuration}' allows {max}, more than template '{template}' allows ({allowed}); the template's limit stands.
+```
+
+Parameters: `slot`, `configuration`, `max`, `template`, `allowed`
+
+### `W_SLOT_OVER_CONFIGURED_LIMIT`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/plugin-authoring.md`
+
+A slot runs past the editor rule of the configuration the brief reached.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Slot '{slot}' {measured}, and configuration '{configuration}' of template '{template}' allows {max}.
+```
+
+Parameters: `slot`, `measured`, `configuration`, `template`, `max`
 
 ### `W_UNUSED_SLOT`
 
