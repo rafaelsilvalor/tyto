@@ -189,7 +189,22 @@ export async function createTemplateCatalogue(
           ];
     });
 
-    return { templates: [...withPreviews, ...aliases], failures };
+    // What the configuration a name reaches says about a new brief (TYTO-440): the bare name
+    // reaches the entry's `default`, an alias its own.
+    const configured = [...withPreviews, ...aliases].map((row) => {
+      const brief = snapshot.configurations.select(row.name)?.brief;
+      if (brief === undefined) return row;
+      return {
+        ...row,
+        configured: {
+          ...(brief.skeleton === undefined ? {} : { skeleton: brief.skeleton }),
+          ...(brief.formats === undefined ? {} : { formats: [...brief.formats] }),
+          filled: Object.keys(brief.slots),
+        },
+      };
+    });
+
+    return { templates: configured, failures };
   };
 
   let cached: { snapshot: ProjectSnapshot; answer: IpcResponse<'templates:list'> } = {

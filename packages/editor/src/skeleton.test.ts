@@ -204,3 +204,48 @@ describe('insertBriefSkeleton', () => {
     );
   });
 });
+
+describe('a configured skeleton (TYTO-440)', () => {
+  it('writes the configuration’s formats and leaves out the slots it fills', () => {
+    expect(
+      skeletonText(
+        briefSkeleton({ ...AGENDA, configured: { formats: ['story'], filled: ['titulo'] } }),
+      ),
+    ).toBe(
+      [
+        '---',
+        'template: agenda-semana',
+        'formats: [story]',
+        '---',
+        '',
+        '::lamina',
+        '\tlamina',
+        '',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('writes the configuration’s own text whole, naming the template the person picked', () => {
+    const skeleton = '---\ntemplate: agenda-roxo\nformats: [grid]\n---\n\n::titulo {Semana}\n';
+
+    expect(
+      skeletonText(briefSkeleton({ ...AGENDA, name: 'agenda-compacta', configured: { skeleton } })),
+    ).toBe('---\ntemplate: agenda-compacta\nformats: [grid]\n---\n\n::titulo {Semana}\n');
+    // Text with no template line, or no frontmatter, gets one.
+    expect(
+      skeletonText(
+        briefSkeleton({ ...AGENDA, configured: { skeleton: '---\nformats: [grid]\n---\n' } }),
+      ),
+    ).toBe('---\ntemplate: agenda-semana\nformats: [grid]\n---\n');
+    expect(
+      skeletonText(briefSkeleton({ ...AGENDA, configured: { skeleton: '::titulo Oi\n' } })),
+    ).toBe('---\ntemplate: agenda-semana\n---\n\n::titulo Oi\n');
+  });
+
+  it('ends a configured skeleton with the cursor after its text', () => {
+    expect(briefSkeleton({ ...AGENDA, configured: { skeleton: '::titulo Oi\n' } })).toMatch(
+      /::titulo Oi\n\$\{0\}$/u,
+    );
+  });
+});

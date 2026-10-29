@@ -2927,7 +2927,8 @@ function openSkeleton(name: string): void {
 
 /**
  * Replaces the text in the editor with `name`'s skeleton and focuses its first field. The
- * manifest is the picker's row: the formats go by id, which is what a brief writes.
+ * manifest is the picker's row: the formats go by id, which is what a brief writes. A plugin
+ * file's configuration rides on the row too (TYTO-440), so an alias writes its own skeleton.
  */
 function insertSkeleton(name: string): void {
   const template = panel.templates.find((candidate) => candidate.name === name);
@@ -2937,6 +2938,7 @@ function insertSkeleton(name: string): void {
     name: template.name,
     formats: template.formats.map((format) => format.id),
     slots: template.slots,
+    ...(template.configured === undefined ? {} : { configured: template.configured }),
   });
   target.view.focus();
 }

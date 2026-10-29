@@ -256,6 +256,7 @@ export { type TemplateLintOptions, templateLint, templateSuggestionFor } from '.
 export { completeTemplate, templateCompletion } from './template-completion.js';
 
 export {
+  type ConfiguredSkeleton,
   type SkeletonManifest,
   briefSkeleton,
   inSkeleton,

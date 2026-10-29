@@ -234,6 +234,50 @@ describe('the template catalogue', () => {
       ...template,
       name: 'with-preview-escura',
       alias: { template: 'with-preview', configuration: 'escura' },
+      configured: { filled: [] },
+    });
+  });
+
+  it('carries what the configuration a name reaches says about a new brief (TYTO-440)', async () => {
+    const sources = await sourcesOver(scratch);
+    const skeleton = '---\ntemplate: with-preview\n---\n';
+    await sources.setFetched({
+      packs: NO_INSTALLED_PACKS,
+      only: new Map(),
+      replaces: new Set(),
+      problems: [],
+      configured: {
+        project: [],
+        machine: [
+          {
+            template: 'with-preview',
+            file: 'cores.yaml',
+            directory: scratch,
+            default: 'clara',
+            configurations: [
+              {
+                name: 'clara',
+                values: {},
+                brief: { slots: { titulo: { value: 'Agenda' } }, skeleton: { value: skeleton } },
+              },
+              { name: 'escura', values: {}, brief: { formats: { value: ['feed'] } } },
+            ],
+          },
+        ],
+      },
+      images: NO_PLUGIN_FILES.images,
+      texts: new Map(),
+    });
+
+    const { templates } = await (await createTemplateCatalogue({ sources })).list();
+    const configured = Object.fromEntries(templates.map((row) => [row.name, row.configured]));
+
+    // The bare name reaches the `default`; a named configuration starts from it.
+    expect(configured['with-preview']).toEqual({ skeleton, filled: ['titulo'] });
+    expect(configured['with-preview-escura']).toEqual({
+      skeleton,
+      formats: ['feed'],
+      filled: ['titulo'],
     });
   });
 
