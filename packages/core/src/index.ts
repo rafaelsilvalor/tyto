@@ -255,6 +255,14 @@ export {
 } from './template/configurations.js';
 
 export {
+  type BriefDefaults,
+  type BriefLimit,
+  type ConfigurationBrief,
+  type ConfigurationEditorRule,
+  NO_BRIEF_DEFAULTS,
+} from './template/configured-brief.js';
+
+export {
   type LineColumn,
   type LineColumnRange,
   type LineIndex,

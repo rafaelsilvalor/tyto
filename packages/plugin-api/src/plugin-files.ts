@@ -1,4 +1,6 @@
 import {
+  type ConfigurationBrief,
+  type ConfigurationEditorRule,
   type ConfiguredTemplate,
   type Diagnostic,
   type Diagnostics,
@@ -40,7 +42,7 @@ export interface PluginFileSource {
 
 /**
  * One named configuration, kept as written: `resolveTemplateConfigurations` in `@tyto/core`
- * resolves it (TYTO-439), and TYTO-440 its brief side. Each value keeps where it was written,
+ * resolves it (TYTO-439), and its brief side (TYTO-440). Each value keeps where it was written,
  * so a value the template refuses is a warning at that value.
  */
 export interface PluginFileConfiguration {
@@ -49,7 +51,8 @@ export interface PluginFileConfiguration {
   /** The configuration's name in the file. */
   readonly range?: SourceRange;
   readonly values: Readonly<Record<string, SuppliedValue>>;
-  readonly brief: Readonly<Record<string, unknown>>;
+  /** Slot defaults, formats, skeleton and editor rules, each kept with its range (TYTO-440). */
+  readonly brief: ConfigurationBrief;
 }
 
 export interface PluginFileTemplate {
@@ -88,6 +91,12 @@ function rangeOf(node: Node): SourceRange | undefined {
 function at(node: Node): { range?: SourceRange } {
   const range = rangeOf(node);
   return range === undefined ? {} : { range };
+}
+
+/** A node as plain data with the range it was written at. */
+function supplied(node: Node): SuppliedValue {
+  const data: unknown = isNode(node) ? node.toJSON() : node;
+  return { value: data, ...at(node) };
 }
 
 /** A mapping's entries as `[key, value node, key node]`, or `undefined` when it is not one. */
@@ -150,10 +159,43 @@ class FileReader {
     return { git, ref };
   }
 
-  mapping(path: string, node: Node): Record<string, unknown> | undefined {
+  /**
+   * A configuration's `brief:` block. Its shape is checked here and its contents in
+   * `@tyto/core` against the manifest, so a key that is not one of the four is a warning and
+   * the rest stand, as a file is tolerant per key.
+   */
+  brief(path: string, node: Node): ConfigurationBrief | undefined {
     if (node === undefined || node === null) return {};
-    if (!isMap(node)) return this.refuse(path, 'it must be a mapping', node);
-    return (node.toJSON() ?? {}) as Record<string, unknown>;
+    const keys = this.keys(path, node, ['slots', 'formats', 'skeleton', 'editor']);
+    if (keys === undefined) return this.refuse(path, 'it must be a mapping', node);
+    const slots = this.values(`${path}.slots`, keys.get('slots'));
+    if (slots === undefined) return undefined;
+    const editor: Record<string, ConfigurationEditorRule> = {};
+    const editorNode = keys.get('editor');
+    if (editorNode !== undefined && editorNode !== null) {
+      const entries = entriesOf(editorNode);
+      if (entries === undefined)
+        return this.refuse(`${path}.editor`, 'it must be a mapping', editorNode);
+      for (const [slot, ruleNode] of entries) {
+        const rule = this.keys(`${path}.editor.${slot}`, ruleNode, ['max']);
+        if (rule === undefined) {
+          return this.refuse(
+            `${path}.editor.${slot}`,
+            'a rule is a mapping, as in { max: 40 }',
+            ruleNode,
+          );
+        }
+        editor[slot] = rule.has('max') ? { max: supplied(rule.get('max')) } : {};
+      }
+    }
+    const formats = keys.get('formats');
+    const skeleton = keys.get('skeleton');
+    return {
+      ...(Object.keys(slots).length === 0 ? {} : { slots }),
+      ...(formats === undefined ? {} : { formats: supplied(formats) }),
+      ...(skeleton === undefined ? {} : { skeleton: supplied(skeleton) }),
+      ...(Object.keys(editor).length === 0 ? {} : { editor }),
+    };
   }
 
   /** A mapping's entries, each value as plain data with the range it was written at. */
@@ -162,10 +204,7 @@ class FileReader {
     const entries = entriesOf(node);
     if (entries === undefined) return this.refuse(path, 'it must be a mapping', node);
     const values: Record<string, SuppliedValue> = {};
-    for (const [name, value] of entries) {
-      const data: unknown = isNode(value) ? value.toJSON() : value;
-      values[name] = { value: data, ...at(value) };
-    }
+    for (const [name, value] of entries) values[name] = supplied(value);
     return values;
   }
 
@@ -185,7 +224,7 @@ class FileReader {
       }
     }
     const values = this.values(`${path}.values`, keys.get('values'));
-    const brief = this.mapping(`${path}.brief`, keys.get('brief'));
+    const brief = this.brief(`${path}.brief`, keys.get('brief'));
     if (values === undefined || brief === undefined) return undefined;
     const aliasRange = rangeOf(aliasNode);
     const range = rangeOf(nameNode);
@@ -464,6 +503,7 @@ export function configuredTemplates(
         ...(configuration.aliasRange === undefined ? {} : { aliasRange: configuration.aliasRange }),
         ...(configuration.range === undefined ? {} : { range: configuration.range }),
         values: configuration.values,
+        brief: configuration.brief,
       })),
     }));
 }

@@ -1,4 +1,10 @@
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
+import {
+  type BriefDefaults,
+  type ConfigurationBrief,
+  checkBrief,
+  overlayBrief,
+} from './configured-brief.js';
 import { checkValue } from './declared-values.js';
 
 import type { AssetRef } from '../scene/primitives.js';
@@ -39,6 +45,8 @@ export interface ConfigurationEntry {
   /** Where the configuration's name is, for a diagnostic about the whole of it. */
   readonly range?: SourceRange;
   readonly values: Readonly<Record<string, SuppliedValue>>;
+  /** The brief side: slot defaults, formats, skeleton and editor rules (TYTO-440). */
+  readonly brief?: ConfigurationBrief;
 }
 
 /** The name a brief reaches a configuration by: its alias, or `<template>-<configuration>`. */
@@ -79,6 +87,8 @@ export interface TemplateSelection {
   /** Absent for a template's bare name when its entry names no `default`. */
   readonly configuration?: string;
   readonly values: SuppliedValues;
+  /** The configuration's brief side, checked. Absent when no configuration is reached. */
+  readonly brief?: BriefDefaults;
 }
 
 /** An alias that loads, for a list or a picker. */
@@ -125,6 +135,11 @@ export interface ResolveConfigurationsInput {
 interface Placed {
   readonly entry: ConfiguredTemplate;
   readonly scope: ConfigurationScope;
+}
+
+interface Checked {
+  readonly values: SuppliedValues;
+  readonly brief: BriefDefaults;
 }
 
 interface Candidate extends Placed {
@@ -215,34 +230,48 @@ export async function resolveTemplateConfigurations(
   }
 
   // Checked once per configuration a name can reach, however many names reach it.
-  const checked = new Map<ConfigurationEntry, SuppliedValues>();
-  const valuesOf = async (
+  const checked = new Map<ConfigurationEntry, Checked>();
+  const checkedOf = async (
     { entry, scope }: Placed,
     configuration: ConfigurationEntry,
-  ): Promise<SuppliedValues> => {
+  ): Promise<Checked> => {
     const known = checked.get(configuration);
     if (known !== undefined) return known;
     // Defined: only loaded entries reach here.
     const manifest = input.registry.get(entry.template) as TemplateManifest;
-    const own = await checkValues(manifest, entry, scope, configuration, input.images, report);
+    const values = await checkValues(manifest, entry, scope, configuration, input.images, report);
+    const brief = await checkBrief({
+      manifest,
+      configuration: configuration.name,
+      brief: configuration.brief,
+      image: (path) => input.images(path, { directory: entry.directory, scope }),
+      report: (item) => {
+        report(entry.file, item);
+      },
+    });
     // A named configuration starts from the entry's `default` and changes what it lists.
     // The default is checked once, as itself, so a value it refuses is said once.
     const base = entry.configurations.find((item) => item.name === entry.default);
-    const values =
-      base === undefined || base === configuration
-        ? own
-        : { ...(await valuesOf({ entry, scope }, base)), ...own };
-    checked.set(configuration, values);
-    return values;
+    const own = { values, brief };
+    let result = own;
+    if (base !== undefined && base !== configuration) {
+      const from = await checkedOf({ entry, scope }, base);
+      result = { values: { ...from.values, ...values }, brief: overlayBrief(from.brief, brief) };
+    }
+    checked.set(configuration, result);
+    return result;
+  };
+  const selectionOf = async (
+    placed: Placed,
+    configuration: ConfigurationEntry,
+  ): Promise<TemplateSelection> => {
+    const { values, brief } = await checkedOf(placed, configuration);
+    return { template: placed.entry.template, configuration: configuration.name, values, brief };
   };
 
   const selections = new Map<string, TemplateSelection>();
   for (const [alias, candidate] of aliases) {
-    selections.set(alias, {
-      template: candidate.entry.template,
-      configuration: candidate.configuration.name,
-      values: await valuesOf(candidate, candidate.configuration),
-    });
+    selections.set(alias, await selectionOf(candidate, candidate.configuration));
   }
   for (const item of loaded) {
     const chosen = item.entry.configurations.find(
@@ -252,11 +281,7 @@ export async function resolveTemplateConfigurations(
       item.entry.template,
       chosen === undefined
         ? { template: item.entry.template, values: {} }
-        : {
-            template: item.entry.template,
-            configuration: chosen.name,
-            values: await valuesOf(item, chosen),
-          },
+        : await selectionOf(item, chosen),
     );
   }
 

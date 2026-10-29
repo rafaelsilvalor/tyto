@@ -153,6 +153,42 @@ home\plugin-files\avisos.yaml:10:18: warning W_TEMPLATE_VALUE_UNKNOWN Template '
 
 Um apelido nunca pode ser o nome de um template: `E_TEMPLATE_ALIAS_TAKEN` aponta para ele, o apelido não carrega, e o template com esse nome renderiza como antes. O mesmo apelido em dois arquivos de uma pasta não carrega de nenhum dos dois, e o apelido do projeto vence o da máquina.
 
+### Do que um brief parte
+
+Uma configuração também pode definir coisas do lado do brief, em `brief:`. **O brief vence todas elas.** `slots` preenche um slot que o brief deixa de fora, `formats` diz quais formatos saem quando o brief não lista nenhum, e `editor` dá um `max` a um slot, mais apertado que o do próprio template e nunca mais frouxo. Uma quarta, `skeleton`, é o texto com que um brief novo começa; ela é conferida e guardada, e o app de mesa ainda não a escreve.
+
+```yaml
+# ~/.tyto/plugin-files/avisos.yaml
+version: 1
+templates:
+  aviso:
+    source:
+      git: ../../../my-pack
+      ref: v1.0.0
+    configurations:
+      curto: # um brief escreve `template: aviso-curto`
+        brief:
+          slots:
+            detalhe: Vagas limitadas
+          formats: [story]
+          editor:
+            titulo: { max: 20 }
+            detalhe: { max: 200 }
+```
+
+<!-- Executado em 2026-10-29 num build da branch feat/TYTO-440-brief-side-configuration, no Windows 11, com TYTO_HOME=home e o pacote de exemplo num repositório três pastas acima do arquivo, com a tag v1.0.0. O brief define só `titulo`, como "Inscrições abertas até sexta". -->
+
+O brief abaixo define só o título. Ele sai só em `story`, com "Vagas limitadas" como detalhe. Um título que passa do limite da configuração é um aviso na linha do brief e sai mesmo assim; uma regra mais frouxa que a do template é um aviso na linha do arquivo, e o limite do template continua:
+
+```
+$ tyto render aviso.brief --out out --types svg
+aviso.brief:4:1: warning W_SLOT_OVER_CONFIGURED_LIMIT Slot 'titulo' is 28 characters, and configuration 'curto' of template 'aviso' allows 20.
+home\plugin-files\avisos.yaml:15:29: warning W_EDITOR_RULE_LOOSER The editor rule on slot 'detalhe' in configuration 'curto' allows 200, more than template 'aviso' allows (120); the template's limit stands.
+story-01.svg
+```
+
+Um slot que se repete não tem padrão, porque cada ocorrência é uma arte própria. Os formatos de cada parte estão no [guia de autoria de plugins](../extend/), em inglês.
+
 ## Começar o seu
 
 `tyto plugin new my-pack` grava uma pasta de plugin com um template dentro, pronta para instalar; o [guia de autoria de plugins](../extend/) continua dali. Cada opção de cada comando `plugin` está na [Linha de comando](../reference/command-line.md#tyto-plugin-list) da Referência.

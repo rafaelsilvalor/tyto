@@ -153,6 +153,42 @@ home\plugin-files\avisos.yaml:10:18: warning W_TEMPLATE_VALUE_UNKNOWN Template '
 
 An alias may never be a template's name: `E_TEMPLATE_ALIAS_TAKEN` points at it, the alias does not load, and the template of that name renders as before. The same alias in two files of one folder loads from neither, and a project's alias wins over the machine's.
 
+### What a brief starts from
+
+A configuration can also set things on the brief's side, under `brief:`. **The brief wins every one of them.** `slots` fills a slot the brief leaves out, `formats` says which formats render when the brief lists none, and `editor` sets a `max` for a slot, tighter than the template's own and never looser. A fourth, `skeleton`, is the text a new brief starts with; it is checked and kept, and the desktop app does not write it yet.
+
+```yaml
+# ~/.tyto/plugin-files/avisos.yaml
+version: 1
+templates:
+  aviso:
+    source:
+      git: ../../../my-pack
+      ref: v1.0.0
+    configurations:
+      curto: # a brief writes `template: aviso-curto`
+        brief:
+          slots:
+            detalhe: Vagas limitadas
+          formats: [story]
+          editor:
+            titulo: { max: 20 }
+            detalhe: { max: 200 }
+```
+
+<!-- Run on 2026-10-29 on a build of the branch feat/TYTO-440-brief-side-configuration, on Windows 11, with TYTO_HOME=home and the example pack committed to a repository three folders up from the file, tagged v1.0.0. The brief sets only `titulo`, to "Inscrições abertas até sexta". -->
+
+The brief below sets only its title. It renders in `story` alone, with "Vagas limitadas" as its detail. A title past the configuration's limit is a warning at the brief's line and still renders; a rule looser than the template's is a warning at the file's line, and the template's limit stands:
+
+```
+$ tyto render aviso.brief --out out --types svg
+aviso.brief:4:1: warning W_SLOT_OVER_CONFIGURED_LIMIT Slot 'titulo' is 28 characters, and configuration 'curto' of template 'aviso' allows 20.
+home\plugin-files\avisos.yaml:15:29: warning W_EDITOR_RULE_LOOSER The editor rule on slot 'detalhe' in configuration 'curto' allows 200, more than template 'aviso' allows (120); the template's limit stands.
+story-01.svg
+```
+
+A slot that repeats takes no default, since each occurrence is an artwork of its own. The shapes are in the [plugin author's guide](../extend/plugin-authoring.md#what-a-configuration-sets-for-the-brief).
+
 ## Start your own
 
 `tyto plugin new my-pack` writes a plugin folder with one template in it, ready to install; the [plugin author's guide](../extend/plugin-authoring.md) goes on from there. Every option of every `plugin` command is in the Reference's [Command line](../reference/command-line.md#tyto-plugin-list).

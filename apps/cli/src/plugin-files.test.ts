@@ -519,3 +519,58 @@ describe('configurations and aliases (TYTO-439)', () => {
     SLOW,
   );
 });
+
+describe("a configuration's brief side (TYTO-440)", () => {
+  it(
+    'fills a slot, picks the formats, warns past its editor rule and refuses a looser one',
+    async () => {
+      const pack = await repository('pack');
+      await mkdir(join(home, 'plugin-files'), { recursive: true });
+      await writeFile(
+        join(home, 'plugin-files', 'templates.yaml'),
+        [
+          'version: 1',
+          'templates:',
+          '  aviso:',
+          `    source: { git: '${urlOf(pack)}', ref: v1 }`,
+          '    configurations:',
+          '      curto:',
+          '        brief:',
+          '          slots: { detalhe: Vagas limitadas }',
+          '          formats: [story]',
+          '          editor:',
+          '            titulo: { max: 10 }',
+          '            detalhe: { max: 200 }',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      const brief = join(workspace, 'curto.brief');
+      await writeFile(
+        brief,
+        '---\ntemplate: aviso-curto\n---\n::titulo\n  Inscrições abertas hoje\n',
+        'utf8',
+      );
+
+      const rendered = await render(brief);
+      const result = JSON.parse(await readFile(join(workspace, 'out', 'result.json'), 'utf8')) as {
+        artifacts: { name: string }[];
+      };
+
+      expect(rendered.code, stderr()).toBe(EXIT_OK);
+      // The brief names no formats, so the configuration's one renders and the pack's other does not.
+      expect(result.artifacts.map((artifact) => artifact.name)).toEqual([
+        expect.stringContaining('story'),
+      ]);
+      expect(rendered.svg).toContain('Vagas limitadas');
+      expect([...rendered.codes].sort()).toEqual([
+        'W_EDITOR_RULE_LOOSER',
+        'W_SLOT_OVER_CONFIGURED_LIMIT',
+      ]);
+      // The looser rule is placed in the plugin file, the limit in the brief.
+      expect(stderr()).toMatch(/templates\.yaml:12:29: warning W_EDITOR_RULE_LOOSER/u);
+      expect(stderr()).toMatch(/curto\.brief:4:1: warning W_SLOT_OVER_CONFIGURED_LIMIT/u);
+    },
+    SLOW,
+  );
+});
