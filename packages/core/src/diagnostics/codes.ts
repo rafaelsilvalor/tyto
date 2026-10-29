@@ -954,6 +954,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // An error and never a precedence: if an alias could shadow a template, which one a brief
+  // renders would depend on whether a configuration somewhere had that name (ADR 0151 decision 7).
+  E_TEMPLATE_ALIAS_TAKEN: {
+    severity: 'error',
+    summary: "A plugin file gives a configuration an alias that is a template's name.",
+    template:
+      "Alias '{alias}' in plugin file '{file}' is the name of a template, so the alias does not load and the template keeps the name.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'Only that alias is missing; the template of that name renders as before.',
+  },
   W_UNUSED_SLOT: {
     severity: 'warning',
     summary: 'The brief sets a slot the chosen template never renders.',

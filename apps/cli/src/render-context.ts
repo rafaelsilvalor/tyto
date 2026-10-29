@@ -2,17 +2,22 @@ import {
   type Diagnostics,
   type FileSystem,
   type FormatCatalogue,
+  NO_TEMPLATE_CONFIGURATIONS,
   type Result,
+  type TemplateConfigurations,
   type TemplateRegistry,
+  type TemplateRoot,
   diagnostic,
   err,
   loadFormats,
   loadTemplateRegistry,
   ok,
+  resolveTemplateConfigurations,
 } from '@tyto/core';
 import {
   type ExportResources,
   type InstalledCodePack,
+  type InstalledPacks,
   type InstalledTemplateFonts,
   NO_INSTALLED_PACKS,
   fileTemplateAssets,
@@ -32,6 +37,7 @@ import {
   markupTemplateSource,
 } from '@tyto/pipeline';
 
+import type { SyncedPluginFiles } from './plugin-files.js';
 import { configureDefaults } from './plugins/external.js';
 import {
   builtInTemplatesDirectory,
@@ -94,12 +100,20 @@ export interface RenderContextOptions {
   readonly installed?: {
     readonly plugins: LoadedPlugins;
     folderOf(plugin: string): string;
+    /**
+     * What the plugin files fetched and configure (ADR 0151, TYTO-439). A fetched pack offers
+     * only the templates its files name, and their configurations and aliases are resolved
+     * against the registry. Left out, no plugin file configures anything.
+     */
+    readonly pluginFiles?: Pick<SyncedPluginFiles, 'copies' | 'configured' | 'images' | 'texts'>;
   };
 }
 
 export interface RenderContext {
   readonly fileSystem: FileSystem;
   readonly registry: TemplateRegistry;
+  /** The plugin files' configurations and aliases, which a brief's `template:` reaches first. */
+  readonly configurations: TemplateConfigurations;
   readonly formats: FormatCatalogue;
   /** For `result.json`'s `tyto.templates`: which templates, at which versions, were here. */
   readonly templateVersions: readonly { readonly name: string; readonly version: string }[];
@@ -172,13 +186,29 @@ export async function loadRenderContext(
   // than a package that came along with the program, so their `promo-curso` is the one
   // that renders and the built-in is reported as shadowed (ADR 0020). The same warning
   // names an installed template that a built-in or the project hides.
+  const pluginFiles = options.installed?.pluginFiles;
   const registry = await loadTemplateRegistry(fileSystem, [
     options.templatesDirectory,
     ...(options.projectTemplatesDirectories ?? []),
     ...builtInDirectories,
-    ...installed.directories,
+    ...installed.directories.map((directory) => fetchedRoot(directory, installed, pluginFiles)),
   ]);
   if (!registry.ok) return err(registry.error);
+
+  const configured =
+    pluginFiles === undefined
+      ? { configurations: NO_TEMPLATE_CONFIGURATIONS, diagnostics: [] }
+      : await resolveTemplateConfigurations({
+          ...pluginFiles.configured,
+          registry: registry.value,
+          images: pluginFiles.images,
+        });
+  // Each range points into the plugin file that wrote it, not into the brief being rendered.
+  const configurationProblems = configured.diagnostics.map(({ file, diagnostic: item }) => {
+    const source = file === undefined ? undefined : pluginFiles?.texts.get(file);
+    if (file !== undefined && source !== undefined) registerOrigin([item], { path: file, source });
+    return item;
+  });
 
   // A failure on the default `templates/` folder is dropped, and only that one: the user
   // never named it, the pack answered anyway, and every run in a project without one would
@@ -190,6 +220,7 @@ export async function loadRenderContext(
     ...installed.warnings,
     ...formats.diagnostics,
     ...registry.diagnostics,
+    ...configurationProblems,
     ...registry.value.failures
       .filter((failure) => failure.directory !== silenced)
       .flatMap((failure) => failure.diagnostics),
@@ -199,6 +230,7 @@ export async function loadRenderContext(
     {
       fileSystem,
       registry: registry.value,
+      configurations: configured.configurations,
       formats: formats.value,
       templateVersions: registry.value
         .list()
@@ -208,6 +240,23 @@ export async function loadRenderContext(
     },
     problems,
   );
+}
+
+/**
+ * A pack fetched through plugin files offers the templates the files name and no other
+ * (ADR 0151 decision 2); a `plugin:` entry names the whole plugin, and so does an installed
+ * plugin, which no file names.
+ */
+function fetchedRoot(
+  directory: string,
+  installed: InstalledPacks,
+  pluginFiles: Pick<SyncedPluginFiles, 'copies'> | undefined,
+): TemplateRoot {
+  const plugin = installed.owners.get(directory);
+  const copy = pluginFiles?.copies.find((item) => item.plugin === plugin);
+  return copy === undefined || copy.wholePlugin
+    ? { directory }
+    : { directory, only: new Set(copy.templates) };
 }
 
 /** The built-in pack's catalogue sits beside its templates, where the window reads it. */

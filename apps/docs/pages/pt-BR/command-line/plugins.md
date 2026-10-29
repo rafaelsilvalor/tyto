@@ -106,7 +106,36 @@ home\cache\plugin-files\94529b5cf90e68c9814015bbcf2aac31f959747fb4e294710d4d3dfc
 Removed 1 cached copy.
 ```
 
-Um plugin buscado que pede permissões é mostrado e perguntado por `tyto plugin sync`, como o `install` faz, ou aprovado com `--yes`; um render nunca pergunta, e pula o que ninguém aprovou. As configurações e os apelidos dos arquivos ainda não são aplicados.
+Um plugin buscado que pede permissões é mostrado e perguntado por `tyto plugin sync`, como o `install` faz, ou aprovado com `--yes`; um render nunca pergunta, e pula o que ninguém aprovou.
+
+### Configurações e apelidos
+
+Um pacote buscado oferece só os templates que o arquivo cita. Cada template pode ter **configurações** com nome, que mudam os valores que o template declara que deixa mudar, como uma cor, um tamanho, uma fonte ou uma imagem. Um brief chega a uma configuração pelo **apelido**: escreva `alias:` para escolher o apelido, ou deixe de fora e o apelido é o nome do template, um traço e o nome da configuração. `default:` diz qual configuração um brief recebe quando escreve o nome do próprio template, e toda outra configuração parte dessa e muda só o que lista. O caminho de uma imagem é lido a partir da pasta do próprio arquivo de plugin e precisa ficar dentro do projeto, ou dentro de `~/.tyto` nos arquivos da máquina.
+
+```yaml
+# ~/.tyto/plugin-files/avisos.yaml
+version: 1
+templates:
+  aviso:
+    source:
+      git: ../../../my-pack
+      ref: v1.0.0
+    configurations:
+      laranja: # um brief escreve `template: aviso-laranja`
+        values:
+          paper: '#ffffff'
+```
+
+<!-- Executado em 2026-10-29 num build da branch feat/TYTO-439-configurations-and-aliases, no Windows 11, com TYTO_HOME=home e o pacote de exemplo num repositório três pastas acima do arquivo, com a tag v1.0.0. -->
+
+Um valor que o template não declara, ou que passa dos limites dele, é um aviso na linha que o escreveu, e o valor do próprio template continua:
+
+```
+$ tyto render aviso.brief --out out --types svg
+home\plugin-files\avisos.yaml:10:18: warning W_TEMPLATE_VALUE_UNKNOWN Template 'aviso' declares no configurable value 'paper'; the setting is ignored.
+```
+
+Um apelido nunca pode ser o nome de um template: `E_TEMPLATE_ALIAS_TAKEN` aponta para ele, o apelido não carrega, e o template com esse nome renderiza como antes. O mesmo apelido em dois arquivos de uma pasta não carrega de nenhum dos dois, e o apelido do projeto vence o da máquina.
 
 ## Começar o seu
 

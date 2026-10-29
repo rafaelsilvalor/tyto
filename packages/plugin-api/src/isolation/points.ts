@@ -5,10 +5,12 @@ import {
   type Inline,
   type TemplateReport,
   artworkSchema,
+  assetRefSchema,
   brandIdSchema,
   brandKitSchema,
   err,
   frameSchema,
+  manifestFaceSchema,
   noFiles,
   ok,
   sceneSchema,
@@ -188,6 +190,11 @@ const templateCallSchema = z.strictObject({
   adjustments: z.record(z.string(), z.union([z.string(), z.literal(true)])),
   // Data, so it crosses as it is (ADR 0063): the kit of the template's own brand.
   brand: brandKitSchema,
+  // The declared values, resolved by the host (ADR 0153, TYTO-439): an image is the ref the
+  // host read it as, so the plugin's process never reads the file (ADR 0049).
+  values: z
+    .record(z.string(), z.union([z.string(), z.number(), manifestFaceSchema, assetRefSchema]))
+    .optional(),
 });
 
 /**

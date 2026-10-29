@@ -6,6 +6,8 @@ import type { AssetResolver } from '../ports/asset-resolver.js';
 import { type Diagnostics, type Result, err, fromPartial } from '../result/result.js';
 import type { AssetRef } from '../scene/primitives.js';
 import type { SourceRange } from '../source/range.js';
+import type { TemplateConfigurations } from '../template/configurations.js';
+import type { SuppliedValues } from '../template/declared-values.js';
 import type { Slot, TemplateManifest } from '../template/manifest.js';
 import type { TemplateRegistry } from '../template/registry.js';
 
@@ -74,6 +76,13 @@ export interface ResolvedBrief {
    * case and means the artwork is whole.
    */
   readonly missingRequiredSlots: readonly string[];
+  /**
+   * The configuration a plugin file gave the name the brief wrote (ADR 0151): an alias's, or
+   * the entry's `default` for the template's own name. Absent when no file configures it.
+   */
+  readonly configuration?: string;
+  /** That configuration's values, checked already, for `compile` (ADR 0153). */
+  readonly values?: SuppliedValues;
 }
 
 export interface ResolveOptions {
@@ -109,6 +118,12 @@ export interface ResolveOptions {
    * activated any. Absent, every namespaced directive is `E_UNKNOWN_DIRECTIVE`.
    */
   readonly directives?: DirectiveResolver;
+  /**
+   * The plugin files' configurations and aliases (TYTO-439). A name the brief writes is
+   * looked up here first, so an alias renders its template with its configuration's values.
+   * Absent, every name is a template's own.
+   */
+  readonly configurations?: TemplateConfigurations;
 }
 
 /** Reserved frontmatter keys: metadata about the brief, not slots of the template. */
@@ -636,9 +651,13 @@ export async function resolve(
     return err([diagnostic('E_NO_TEMPLATE', {}, { range })]);
   }
 
-  const manifest = options.registry.get(name);
+  const selection = options.configurations?.select(name);
+  const manifest = options.registry.get(selection?.template ?? name);
   if (manifest === undefined) {
-    const available = options.registry.list().map((entry) => entry.name);
+    const available = [
+      ...options.registry.list().map((entry) => entry.name),
+      ...(options.configurations?.aliases().map((entry) => entry.alias) ?? []),
+    ].sort((left, right) => left.localeCompare(right));
     const range = ast.frontmatter.ranges.template ?? ast.frontmatter.range ?? ast.range;
     return err([
       diagnostic(
@@ -677,7 +696,13 @@ export async function resolve(
 
   resolver.finish(ast.frontmatter.range ?? ast.range);
 
-  return fromPartial(resolver.build(formats), resolver.diagnostics);
+  const built = resolver.build(formats);
+  return fromPartial(
+    selection?.configuration === undefined
+      ? built
+      : { ...built, configuration: selection.configuration, values: selection.values },
+    resolver.diagnostics,
+  );
 }
 
 /**

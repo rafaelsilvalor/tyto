@@ -233,8 +233,25 @@ export { checkSlotVocabulary } from './template/slot-vocabulary.js';
 export {
   type TemplateFailure,
   type TemplateRegistry,
+  type TemplateRoot,
   loadTemplateRegistry,
 } from './template/registry.js';
+
+export {
+  type ConfigurationDiagnostic,
+  type ConfigurationEntry,
+  type ConfigurationImage,
+  type ConfigurationImageResolver,
+  type ConfigurationScope,
+  type ConfiguredTemplate,
+  NO_TEMPLATE_CONFIGURATIONS,
+  type ResolveConfigurationsInput,
+  type ResolvedConfigurations,
+  type TemplateAlias,
+  type TemplateConfigurations,
+  type TemplateSelection,
+  resolveTemplateConfigurations,
+} from './template/configurations.js';
 
 export {
   type LineColumn,

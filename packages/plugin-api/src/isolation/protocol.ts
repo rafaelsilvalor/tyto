@@ -27,9 +27,11 @@ import { z } from 'zod';
  * a `configure` message a guest on 6 would not read (ADR 0145); 8 since every recipe verb call
  * carries the plugin's project section, a field the strict schemas of a guest on 7 would refuse
  * (ADR 0147); 9 since a source's `page` call carries `refresh` on a run without cache, a field
- * the strict `page` schema of a guest on 8 would refuse (ADR 0148).
+ * the strict `page` schema of a guest on 8 would refuse (ADR 0148); 10 since a template call
+ * carries the template's declared values, a field the strict schema of a guest on 9 would
+ * refuse (ADR 0153, TYTO-439).
  */
-export const RPC_PROTOCOL_VERSION = 9;
+export const RPC_PROTOCOL_VERSION = 10;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

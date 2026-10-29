@@ -15,6 +15,7 @@ import {
   resolve,
   sourceRange,
 } from '@tyto/core';
+import { colorValue, faceValue, imageValue, numberValue } from '@tyto/core/template';
 import { type Plan, type Table, parseRecipe, runRecipe } from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -417,7 +418,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 8 and this host speaks 9.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 9 and this host speaks 10.",
     );
   });
 
@@ -1524,6 +1525,69 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
       'none|secondary:M0 0H10V10H0Z M2 2V8H8V2Z,primary:M3 3H7V7H3Z|M0 10 L5 0 L10 10 Z',
     );
     expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none|none');
+  });
+
+  it('hands a code template its values, and its readers fall back when none crossed (TYTO-439)', async () => {
+    // What a template built against an older `@tyto/core/template` does: read through the
+    // readers with its own constants as fallbacks. The guest runs in the host's bundle, so
+    // the template itself is never rebuilt for protocol 10.
+    const logo = {
+      id: 'TYTO_HOME/logo.png',
+      source: 'file',
+      path: '/h/logo.png',
+      hash: 'h',
+    } as const;
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      build: (_template, context) => ({
+        format: [
+          colorValue(context, 'paper', '#fbfbfb'),
+          numberValue(context, 'gap', 20),
+          faceValue(context, 'face', { family: 'Inter', weight: 400, style: 'normal' }).family,
+          imageValue(context, 'logo')?.id ?? 'no-logo',
+        ].join('|'),
+        size: context.size,
+        children: [],
+      }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const build = host.registry.templatePacks()[0]?.build as unknown as IsolatedPackBuild;
+    const call: TemplateCall = {
+      format: 'feed',
+      size: { w: 10, h: 10 },
+      idPrefix: 'lamina-1.feed',
+      artwork: { id: 'lamina-1', index: 0, count: 1 },
+      slots: {},
+      adjustments: {},
+      brand: {},
+    };
+
+    const configured = await build(
+      'demo',
+      {
+        ...call,
+        values: {
+          paper: '#4b2a7b',
+          gap: 8,
+          face: { family: 'Source Sans 3', weight: 700, style: 'normal' },
+          logo,
+        },
+      },
+      [],
+    );
+    const bare = await build('demo', call, []);
+
+    expect(configured.ok ? configured.value.frame.format : configured.error[0]?.message).toBe(
+      '#4b2a7b|8|Source Sans 3|TYTO_HOME/logo.png',
+    );
+    expect(bare.ok && bare.value.frame.format).toBe('#fbfbfb|20|Inter|no-logo');
   });
 });
 
