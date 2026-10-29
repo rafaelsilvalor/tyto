@@ -251,6 +251,7 @@ export {
   PLUGIN_FILES_LOCK_FILE,
   PLUGIN_FILE_EXTENSION,
   chooseCopies,
+  configuredTemplates,
   folderSources,
   parsePluginFile,
   parsePluginFilesLock,

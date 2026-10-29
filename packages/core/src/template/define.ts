@@ -121,9 +121,8 @@ export interface TemplateContext {
    * configuration supplied (ADR 0153). Read them through `numberValue`, `colorValue`,
    * `faceValue` and `imageValue`, which take the template's own constant as the fallback.
    *
-   * Optional, because a context built by hand has none, and so does a template running in
-   * its plugin's process: values do not cross the call yet (TYTO-439). `compile` always
-   * sets it.
+   * Optional, because a context built by hand has none. `compile` always sets it, and it
+   * crosses to a template running in its plugin's process with the call (TYTO-439).
    */
   readonly values?: TemplateValues;
 }
@@ -196,10 +195,10 @@ export function defineTemplate(
  * rebuilds `measure` over the faces that crossed with the call, with the same `measureText`,
  * `report` as a list that crosses back beside the frame (ADR 0058), and `files` as
  * {@link noFiles}: a plugin's own folder is not read for its templates yet (ADR 0062).
- * `brand` is data and crosses as it is (ADR 0063). `values` does not cross yet: the call's
- * wire is strict, and adding it is TYTO-439's protocol bump (ADR 0153).
+ * `brand` is data and crosses as it is (ADR 0063), and so do `values` since protocol 10
+ * (TYTO-439): colours, numbers, faces and the refs the host read an image as.
  */
-export type TemplateCall = Omit<TemplateContext, 'measure' | 'report' | 'files' | 'values'>;
+export type TemplateCall = Omit<TemplateContext, 'measure' | 'report' | 'files'>;
 
 /** What an installed template's build answers across the boundary: its frame and reports. */
 export interface TemplateAnswer {

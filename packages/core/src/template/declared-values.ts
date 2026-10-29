@@ -12,9 +12,8 @@ import type { TemplateValue, TemplateValues } from './value-readers.js';
  * The values a template declared configurable, resolved for one compile (ADR 0153).
  *
  * The manifest's `values` say what may change and what it is when nothing changes it. A
- * caller supplies some of them — a test today, a plugin file's configuration once TYTO-439
- * reads one — and this overlays the supplied over the defaults, value by value. A supplied
- * value the template did not declare, of the wrong kind or outside its limits costs that value
+ * caller supplies some of them — a test, or a plugin file's configuration (TYTO-439) — and
+ * this overlays the supplied over the defaults, value by value. A supplied value the template did not declare, of the wrong kind or outside its limits costs that value
  * alone: it is a warning at the range it was written at, and the default stands (ADR 0151
  * decision 2, "a refused entry costs that entry alone").
  */
@@ -58,7 +57,7 @@ export function resolveValues(
       );
       continue;
     }
-    const checked = check(declaration, value);
+    const checked = checkValue(declaration, value);
     if ('problem' in checked) {
       diagnostics.push(
         diagnostic(
@@ -80,9 +79,10 @@ function defaultOf(declaration: DeclaredValue, files: TemplateFiles): TemplateVa
   return declaration.default === undefined ? undefined : files.image(declaration.default);
 }
 
-type Checked = { readonly value: TemplateValue } | { readonly problem: string };
+export type Checked = { readonly value: TemplateValue } | { readonly problem: string };
 
-function check(declaration: DeclaredValue, value: unknown): Checked {
+/** One supplied value against what the template declared for it: the value, or why not. */
+export function checkValue(declaration: DeclaredValue, value: unknown): Checked {
   switch (declaration.type) {
     case 'color':
       return typeof value === 'string' && HEX_COLOR.test(value)

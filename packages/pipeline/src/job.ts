@@ -14,6 +14,7 @@ import {
   type Scene,
   type SceneResources,
   type Template,
+  type TemplateConfigurations,
   type TemplateManifest,
   type TemplateRegistry,
   compile,
@@ -165,6 +166,12 @@ export interface JobRequest {
 
 export interface JobPorts {
   readonly registry: TemplateRegistry;
+  /**
+   * The plugin files' configurations and aliases (TYTO-439): the name a brief writes is
+   * looked up here first, for the template to load and for `resolve`. Absent, every name is
+   * a template's own.
+   */
+  readonly configurations?: TemplateConfigurations;
   readonly templates: TemplateSource;
   readonly assets: AssetResolver;
   readonly formats: FormatCatalogue;
@@ -433,7 +440,12 @@ export async function runJob(
   // is left for `resolve` to report: it owns E_NO_TEMPLATE and E_UNKNOWN_TEMPLATE, with
   // the frontmatter range and the "did you mean" the job has no business rewriting.
   notify(onEvent, { kind: 'stage-started', stage: 'template' });
-  const name = templateNameOf(parsed.value, request.template);
+  const written = templateNameOf(parsed.value, request.template);
+  // An alias loads the template it is a configuration of.
+  const name =
+    written === undefined
+      ? undefined
+      : (ports.configurations?.select(written)?.template ?? written);
   let template: Template | DeferredTemplate | undefined;
 
   if (name !== undefined && ports.registry.get(name) !== undefined) {
@@ -457,6 +469,7 @@ export async function runJob(
     ...(request.formats === undefined ? {} : { formats: request.formats }),
     ...(renderedSlots === undefined ? {} : { renderedSlots }),
     ...(ports.directives === undefined ? {} : { directives: ports.directives }),
+    ...(ports.configurations === undefined ? {} : { configurations: ports.configurations }),
   });
   if (!resolved.ok) return err([...problems, ...resolved.error]);
   problems.push(...resolved.diagnostics);

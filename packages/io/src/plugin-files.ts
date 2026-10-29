@@ -242,6 +242,8 @@ export interface SyncPluginFolderOptions {
 
 export interface SyncedFolder {
   readonly copies: readonly PluginFilesCopyOnDisk[];
+  /** The files as read, for their configurations and aliases (TYTO-439). */
+  readonly files: readonly PluginFile[];
   readonly diagnostics: Diagnostics;
 }
 
@@ -259,7 +261,7 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
   const diagnostics: Diagnostic[] = [...read.diagnostics];
   // A lock nobody can read pins nothing anybody can trust; resolving instead would move every
   // ref without a word, so the folder loads nothing until the lock is fixed or deleted.
-  if (read.lock === undefined) return { copies: [], diagnostics };
+  if (read.lock === undefined) return { copies: [], files: [], diagnostics };
 
   const named = folderSources(read.files);
   diagnostics.push(...named.diagnostics);
@@ -364,7 +366,7 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
     const lockPath = join(directory, PLUGIN_FILES_LOCK_FILE);
     if ((await readIfPresent(lockPath)) !== next) await writeAtomically(lockPath, next);
   }
-  return { copies, diagnostics };
+  return { copies, files: read.files, diagnostics };
 }
 
 /**
