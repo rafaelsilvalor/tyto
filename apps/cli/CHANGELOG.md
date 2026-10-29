@@ -1,5 +1,27 @@
 # @tyto/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- 7115286: TYTO-432: the CLI fetches what the plugin files name (ADR 0151). `tyto plugin sync` reads `~/.tyto/plugin-files/*.yaml` and a trusted workspace's `.tyto/plugin-files/*.yaml`, fetches each source with the person's own `git` into `~/.tyto/cache/plugin-files/`, and pins the commit in `plugin-files.lock.json`; `--update` moves a branch, and nothing else does. `tyto render` runs the same sync without moving anything, so it reaches the network only for a copy that is missing, and loads each copy as an installed plugin. A source that cannot be reached loads the copy fetched before and says so. `tyto plugin clean` deletes the copies no lock names. `@tyto/plugin-api` gains the plugin-file parser and the lock's schema, `@tyto/io` the fetch, cache and lock adapters, and `@tyto/core` the `*_PLUGIN_FILE_*` diagnostic codes.
+
+### Patch Changes
+
+- Updated dependencies [7115286]
+- Updated dependencies [46a0b89]
+  - @tyto/core@0.30.0
+  - @tyto/io@4.1.0
+  - @tyto/plugin-api@0.7.0
+  - @tyto/templates@1.0.4
+  - @tyto/export-html@0.7.3
+  - @tyto/export-svg@2.0.3
+  - @tyto/fonts@0.4.0
+  - @tyto/google-fonts@0.1.2
+  - @tyto/pipeline@0.11.2
+  - @tyto/raster@0.2.2
+  - @tyto/template-lang@0.8.2
+
 ## 0.5.2
 
 ### Patch Changes
