@@ -364,6 +364,8 @@ export const en: Catalogue = {
   'command.document.newFromTemplate': 'New brief from template…',
   'template.pick.placeholder': 'Select a template',
   'template.root.builtIn': 'built-in',
+  'template.alias.declared':
+    'Alias of {template} with the {configuration} configuration, declared in {file}',
   'command.editor.insertMenu': 'Insert: templates…',
   'command.editor.goToBlock': 'Go to Block…',
   'goToBlock.placeholder': 'Go to a block of the brief',

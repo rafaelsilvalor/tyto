@@ -34,6 +34,7 @@ import {
   markdownToHtml,
   openSlashMenu,
   relintBrief,
+  type SlashItem,
   type SlashSource,
   slashCompletion,
   snippetsSlashSource,
@@ -89,7 +90,10 @@ import {
   type SlashTemplateNote,
   type TabKind,
   slashTemplateChoiceFor,
+  slashTemplateDetail,
   slashTemplateNote,
+  templateAliasDeclared,
+  templatePickDetail,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import { type KeybindingCommand, keybindingsAssist } from './keybindings-assist.js';
@@ -2758,16 +2762,16 @@ function pickTemplate(): void {
   const bar = elements.commandBar;
   if (bar === null) return;
   bar.pick({
-    entries: panel.templates.map((template) => ({
-      id: template.name,
-      label: template.name,
-      detail: [
-        template.root ?? translate(state.locale, 'template.root.builtIn'),
-        template.description,
-      ]
-        .filter((part): part is string => part !== undefined)
-        .join(' · '),
-    })),
+    entries: panel.templates.map((template) => {
+      // An alias says where it was declared on hover (TYTO-467): the file is too long for the row.
+      const declared = aliasDeclaredText(template.alias);
+      return {
+        id: template.name,
+        label: template.name,
+        detail: templatePickDetail(template, translate(state.locale, 'template.root.builtIn')),
+        ...(declared === undefined ? {} : { title: declared }),
+      };
+    }),
     placeholder: translate(state.locale, 'template.pick.placeholder'),
     highlight: () => undefined,
     choose: (name) => {
@@ -2956,27 +2960,37 @@ const templatesSlashSource = (): SlashSource => ({
   },
   items: (editorState, from, to) => {
     const text = editorState.doc.toString();
-    return panel.templates.map((template) => ({
-      label: template.name,
-      detail: slashNoteText(slashTemplateNote(text, from, to, template.name)),
-      apply: (view, start, end) => {
-        const choice = slashTemplateChoiceFor(
-          active().kind,
-          view.state.doc.toString(),
-          start,
-          end,
-          template.name,
-        );
-        if (choice === undefined) return;
-        if (choice.kind === 'skeleton') {
-          insertSkeleton(template.name);
-          return;
-        }
-        view.dispatch({ changes: choice.changes, userEvent: 'input.complete' });
-      },
-    }));
+    return panel.templates.map((template): SlashItem => {
+      const declared = aliasDeclaredText(template.alias);
+      return {
+        label: template.name,
+        detail: slashTemplateDetail(
+          slashNoteText(slashTemplateNote(text, from, to, template.name)),
+          template.alias,
+        ),
+        ...(declared === undefined ? {} : { info: declared }),
+        apply: (view, start, end) => {
+          const choice = slashTemplateChoiceFor(
+            active().kind,
+            view.state.doc.toString(),
+            start,
+            end,
+            template.name,
+          );
+          if (choice === undefined) return;
+          if (choice.kind === 'skeleton') {
+            insertSkeleton(template.name);
+            return;
+          }
+          view.dispatch({ changes: choice.changes, userEvent: 'input.complete' });
+        },
+      };
+    });
   },
 });
+
+const aliasDeclaredText = (alias: Template['alias']): string | undefined =>
+  templateAliasDeclared(translate(state.locale, 'template.alias.declared'), alias);
 
 const slashNoteText = (note: SlashTemplateNote): string => {
   const text = translate(state.locale, note.key);

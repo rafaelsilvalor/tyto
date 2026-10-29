@@ -233,7 +233,7 @@ describe('the template catalogue', () => {
     expect(alias).toEqual({
       ...template,
       name: 'with-preview-escura',
-      alias: { template: 'with-preview', configuration: 'escura' },
+      alias: { template: 'with-preview', configuration: 'escura', file: 'cores.yaml' },
       configured: { filled: [] },
     });
   });

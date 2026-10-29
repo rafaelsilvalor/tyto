@@ -107,6 +107,28 @@ describe('the "/" menu', () => {
     expect(option?.detail).toBe('detail of agenda-semana');
   });
 
+  it('carries the info of an item to the panel beside it, none for one without (TYTO-467)', () => {
+    const source: SlashSource = {
+      section: 'Templates',
+      items: () => [
+        { ...itemFor('aviso-laranja'), info: 'from plugins/cores.yaml' },
+        itemFor('aviso'),
+      ],
+    };
+    const result = completeSlash([source])(
+      new CompletionContext(
+        EditorState.create({ doc: '/', extensions: [briefLanguage] }),
+        1,
+        false,
+      ),
+    );
+
+    expect(result?.options.map((option) => [option.label, option.info])).toEqual([
+      ['aviso-laranja', 'from plugins/cores.yaml'],
+      ['aviso', undefined],
+    ]);
+  });
+
   it('opens in a brief whose frontmatter is not closed yet, which is body to the grammar', () => {
     expect(answers('---\ntemplate: agenda-semana\n/')).toBe(true);
   });

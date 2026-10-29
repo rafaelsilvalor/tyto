@@ -32,6 +32,11 @@ import { treeAt } from './syntax.js';
 export interface SlashItem {
   readonly label: string;
   readonly detail?: string;
+  /**
+   * More than the row's line has room for, shown in CodeMirror's panel beside the highlighted
+   * row: where an alias was declared (TYTO-467).
+   */
+  readonly info?: string;
   apply(view: EditorView, from: number, to: number): void;
 }
 
@@ -94,6 +99,7 @@ const optionsOf = (
       // language they are written in (TYTO-277): unranked, CodeMirror sorts them by name.
       section: { name: source.section, rank },
       ...(item.detail === undefined ? {} : { detail: item.detail }),
+      ...(item.info === undefined ? {} : { info: item.info }),
       // CodeMirror hands over the span the query covers; the "/" in front of it goes too.
       apply: (view, _completion, start, end) => {
         item.apply(view, slash ? start - 1 : start, end);

@@ -273,3 +273,67 @@ export function slashTemplateNote(
     ? { key: 'slash.template.current' }
     : { key: 'slash.template.switch', current };
 }
+
+/** The part of a `templates:list` row that says a name is an alias (TYTO-433). */
+export interface TemplateAliasOf {
+  readonly template: string;
+  readonly configuration: string;
+  readonly file: string;
+}
+
+/**
+ * The template and configuration an alias stands for, as one quiet line: `aviso · laranja`
+ * (TYTO-467). Undefined for a template that is not an alias, whose row stays as it was: an
+ * alias row is otherwise its target's, so without this `aviso-laranja` reads as a template of
+ * its own.
+ */
+export function templateAliasLine(alias: TemplateAliasOf | undefined): string | undefined {
+  return alias === undefined ? undefined : `${alias.template} · ${alias.configuration}`;
+}
+
+/**
+ * Where an alias came from, filled into the window's sentence for it (`template.alias.declared`):
+ * the hover in "New brief from template…" and the panel beside the "/" menu's row. The plugin
+ * file is the longest part and the one a person goes looking for, which is why it is not on the
+ * row itself.
+ */
+export function templateAliasDeclared(
+  sentence: string,
+  alias: TemplateAliasOf | undefined,
+): string | undefined {
+  if (alias === undefined) return undefined;
+  return sentence
+    .replace('{template}', alias.template)
+    .replace('{configuration}', alias.configuration)
+    .replace('{file}', alias.file);
+}
+
+/**
+ * The quieter words beside a template in "New brief from template…": for an alias, what it
+ * stands for — its folder and description are its target's and say nothing about it — and for
+ * any other template, the folder it came from and its description, as before.
+ */
+export function templatePickDetail(
+  row: {
+    readonly root: string | null;
+    readonly description?: string | undefined;
+    readonly alias?: TemplateAliasOf | undefined;
+  },
+  builtIn: string,
+): string {
+  return (
+    templateAliasLine(row.alias) ??
+    [row.root ?? builtIn, row.description]
+      .filter((part): part is string => part !== undefined)
+      .join(' · ')
+  );
+}
+
+/**
+ * The line beside a template in the "/" menu: what choosing it does to this brief, led by what an
+ * alias stands for. A dash between the two, since the alias's own line already uses the dot.
+ */
+export function slashTemplateDetail(note: string, alias: TemplateAliasOf | undefined): string {
+  const line = templateAliasLine(alias);
+  return line === undefined ? note : `${line} — ${note}`;
+}

@@ -366,6 +366,8 @@ export const ptBR: Catalogue = {
   'command.document.newFromTemplate': 'Novo brief a partir de template…',
   'template.pick.placeholder': 'Escolha um template',
   'template.root.builtIn': 'embutido',
+  'template.alias.declared':
+    'Apelido de {template} com a configuração {configuration}, declarado em {file}',
   'command.editor.insertMenu': 'Inserir: templates…',
   'command.editor.goToBlock': 'Ir para bloco…',
   'goToBlock.placeholder': 'Ir para um bloco do brief',

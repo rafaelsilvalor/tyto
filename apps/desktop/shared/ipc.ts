@@ -786,8 +786,12 @@ export const IPC_CHANNELS = {
            * renders and the configuration it selects. The row is otherwise that template's,
            * so the picker, the "/" menu and "New brief from template" offer it as they offer
            * any template, and a brief that names it resolves through the same configurations.
+           * `file` is the plugin file that declares it, as messages name that file, so the
+           * window can say where an alias came from (TYTO-467).
            */
-          alias: z.object({ template: z.string(), configuration: z.string() }).optional(),
+          alias: z
+            .object({ template: z.string(), configuration: z.string(), file: z.string() })
+            .optional(),
           /**
            * What the configuration this name reaches says about a new brief (TYTO-440, ADR
            * 0151): its own skeleton text, the formats it renders when a brief names none and
