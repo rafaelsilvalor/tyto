@@ -37,14 +37,24 @@ export const ALWAYS_RESTRICTED: TrustStore = {
   revoke: () => Promise.resolve(ok(false)),
 };
 
-export async function workspaceOfBrief(
+export function workspaceOfBrief(
   briefPath: string,
   options: { readonly trust?: boolean },
   environment: CliEnvironment,
   shown: (path: string) => string,
 ): Promise<BriefWorkspace | undefined> {
+  return workspaceOfFolder(dirname(briefPath), options, environment, shown);
+}
+
+/** The workspace `start` is in, as `workspaceOfBrief` finds a brief's. */
+export async function workspaceOfFolder(
+  start: string,
+  options: { readonly trust?: boolean },
+  environment: CliEnvironment,
+  shown: (path: string) => string,
+): Promise<BriefWorkspace | undefined> {
   const home = environment.home;
-  const folder = await findWorkspace(dirname(briefPath), home === undefined ? {} : { home });
+  const folder = await findWorkspace(start, home === undefined ? {} : { home });
   if (folder === undefined) return undefined;
 
   const loaded = await loadWorkspace(folder, {

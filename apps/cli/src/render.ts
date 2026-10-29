@@ -5,6 +5,7 @@ import type { Diagnostics } from '@tyto/core';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
+import { NO_PLUGIN_FILES, type SyncedPluginFiles, syncPluginFiles } from './plugin-files.js';
 import {
   type OutputKind,
   type SectionOverrides,
@@ -95,10 +96,13 @@ const BRIEF_SUFFIX = '.brief';
 export function installedOption(
   environment: CliEnvironment,
   plugins: LoadedPlugins,
+  pluginFiles: SyncedPluginFiles = NO_PLUGIN_FILES,
 ): Pick<RenderContextOptions, 'installed'> {
   return environment.home === undefined
     ? {}
-    : { installed: { plugins, folderOf: pluginFolders(environment.home) } };
+    : {
+        installed: { plugins, folderOf: pluginFolders(environment.home, pluginFiles.copies) },
+      };
 }
 
 /** Paths are printed as the user would type them, not as this machine stores them. */
@@ -163,7 +167,31 @@ export async function renderCommand(
   // registry a brief is resolved against has to be able to find its templates (ADR 0046).
   // A plugin's cache lives in `TYTO_HOME`; its workspace files are the brief's folder's, with
   // that folder's trust, and a brief in no workspace answers that none is open (ADR 0138).
+  // The plugin files first: their copies load as installed plugins. A render never moves a
+  // pinned ref and never asks, so it reaches the network only for a copy the cache lacks
+  // (ADR 0151 decision 3); a plugin nobody approved is skipped with the reason.
+  const pluginFiles =
+    environment.home === undefined
+      ? NO_PLUGIN_FILES
+      : await syncPluginFiles(
+          {
+            home: environment.home,
+            ...(workspace === undefined
+              ? {}
+              : {
+                  workspace: {
+                    folder: workspace.loaded.folder,
+                    trusted: workspace.loaded.trust === 'trusted',
+                  },
+                }),
+            update: false,
+            fetches: true,
+            approval: 'never',
+          },
+          environment,
+        );
   const loaded = await loadInstalledPlugins(environment.home, {
+    copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto render',
       ...(environment.home === undefined ? {} : { home: environment.home }),
@@ -179,11 +207,11 @@ export async function renderCommand(
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
     formatsFileIsDefault: options.formatsNamed !== true,
-    ...installedOption(environment, loaded),
+    ...installedOption(environment, loaded, pluginFiles),
   });
   if (!context.ok) {
     await loaded.close();
-    return reportFailure(context.error, options, environment, {
+    return reportFailure([...pluginFiles.diagnostics, ...context.error], options, environment, {
       path: shownBrief,
       source,
     });
@@ -234,7 +262,7 @@ export async function renderCommand(
         ...optionalSources(renderSources(environment.home, workspace?.loaded, options.section)),
         ...googleFontsOption(options.googleFonts, environment.variables),
       },
-      [...projectDiagnostics, ...context.diagnostics],
+      [...projectDiagnostics, ...pluginFiles.diagnostics, ...context.diagnostics],
     );
 
     const scope = { primary: { path: shownBrief, source } };

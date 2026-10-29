@@ -13,6 +13,7 @@ import {
 } from './plugins/index.js';
 import { loadRenderContext } from './render-context.js';
 import { renderTask } from './render-task.js';
+import { NO_PLUGIN_FILES, syncPluginFiles } from './plugin-files.js';
 import { displayPath, installedOption } from './render.js';
 import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
 import { googleFontsOption } from './google-fonts.js';
@@ -72,7 +73,21 @@ export async function watchCommand(
   // installed template pack is part of it (ADR 0046).
   // The cache and no workspace files: an inbox has no folder a person opened and trusted
   // (ADR 0118, ADR 0138), and the refusal names `tyto watch`.
+  // The machine's plugin files' copies that are already cached, and no fetch: a watcher runs
+  // unattended for days, and a render it makes must not change because somebody pushed
+  // (ADR 0151 decision 3). An inbox is no workspace, so no project's files count.
+  const pluginFiles =
+    environment.home === undefined
+      ? NO_PLUGIN_FILES
+      : await syncPluginFiles(
+          { home: environment.home, update: false, fetches: false, approval: 'never' },
+          environment,
+        );
+  if (pluginFiles.diagnostics.length > 0) {
+    environment.console.err(formatDiagnostics(pluginFiles.diagnostics));
+  }
   const loaded = await loadInstalledPlugins(environment.home, {
+    copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto watch',
       ...(environment.home === undefined ? {} : { home: environment.home }),
@@ -83,7 +98,7 @@ export async function watchCommand(
     formatsFile: resolve(cwd, options.formatsFile),
     templatesDirectoryIsDefault: options.templatesNamed !== true,
     formatsFileIsDefault: options.formatsNamed !== true,
-    ...installedOption(environment, loaded),
+    ...installedOption(environment, loaded, pluginFiles),
   });
   if (!context.ok) {
     await loaded.close();

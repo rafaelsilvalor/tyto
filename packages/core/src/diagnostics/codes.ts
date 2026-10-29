@@ -491,6 +491,82 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'A plugin that did not load contributed no slot to skip.',
   },
+  // The plugin files' codes (TYTO-432, ADR 0151). A file is tolerant per key and per entry,
+  // as `project.json` is: what is refused costs itself alone, and the rest of the file loads.
+  // Errors where a person wrote something that cannot stand, warnings where Tyto chose for them.
+  E_PLUGIN_FILE_SYNTAX: {
+    severity: 'error',
+    summary:
+      'A plugin file or its lock could not be read or is not YAML or JSON of the shape it needs.',
+    template: "Plugin file '{file}' was not loaded: {problem}.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'Only what that file names is missing; a brief that needs it says so on its own.',
+  },
+  W_PLUGIN_FILE_KEY_UNKNOWN: {
+    severity: 'warning',
+    summary: 'A plugin file has a key Tyto does not know.',
+    template: "Plugin file '{file}': '{path}' is not a key Tyto knows, so it is ignored.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'An ignored key changes nothing that loads.',
+  },
+  E_PLUGIN_FILE_ENTRY: {
+    severity: 'error',
+    summary: 'An entry of a plugin file was refused, and that entry alone does not load.',
+    template: "Plugin file '{file}': '{path}' was refused: {problem}.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'Only that entry is missing; the rest of the file loads.',
+  },
+  E_PLUGIN_FILE_DUPLICATE: {
+    severity: 'error',
+    summary:
+      "One name is given twice in one folder's plugin files, so that folder supplies it from neither.",
+    template:
+      "'{name}' is named by both '{file}' and '{other}' in one folder, which chose no order between them, so neither supplies it.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'Only that name is missing; a brief that needs it says so on its own.',
+  },
+  W_PLUGIN_FILE_OVERRIDDEN: {
+    severity: 'warning',
+    summary: "A project's plugin file names what the machine's names too, and the project's wins.",
+    template:
+      "'{name}' is named by the project's '{file}' and the machine's '{other}'; the project's is used.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'Something loads; it is the project entry rather than the machine one.',
+  },
+  W_PLUGIN_FILE_REPLACES_INSTALLED: {
+    severity: 'warning',
+    summary:
+      'A plugin from the plugin files has the name of one installed with tyto plugin install.',
+    template:
+      "Plugin '{plugin}' comes from plugin file '{file}', so the copy installed with tyto plugin install is not activated.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'A plugin of that name loads; it is the one the files name.',
+  },
+  W_PLUGIN_FILE_FETCH: {
+    severity: 'warning',
+    summary: 'A source the plugin files name could not be fetched.',
+    template: "Could not fetch '{git}' at '{ref}': {problem}. {outcome}",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality:
+      'The copy fetched earlier loads when there is one; a brief that needs one that is missing says so on its own.',
+  },
+  E_PLUGIN_FILE_SOURCE_REFUSED: {
+    severity: 'error',
+    summary: 'A commit a plugin file names was fetched and could not be loaded as a plugin.',
+    template:
+      "'{git}' at '{ref}' resolved to commit {commit}, which was refused: {problem}. {outcome}",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality:
+      'The commit locked before loads when there is one; otherwise nothing from that source does.',
+  },
   E_SCENE_SHAPE: {
     severity: 'error',
     summary: 'A scene does not match the IR schema.',

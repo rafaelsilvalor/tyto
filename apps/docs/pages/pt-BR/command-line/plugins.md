@@ -65,6 +65,49 @@ $ tyto plugin remove my-pack
 Removed my-pack.
 ```
 
+## Buscar templates nos seus próprios repositórios
+
+Um **arquivo de plugin** diz de que repositório buscar um plugin ou os seus templates, e qual versão. Os da máquina ficam em `~/.tyto/plugin-files`; os de um projeto ficam em `.tyto/plugin-files` ao lado dos briefs, e só contam depois que a pasta é de confiança. A entrada de um template no projeto vence a da máquina.
+
+<!-- Os comandos desta seção foram executados em 2026-10-29 num build da branch feat/TYTO-432-plugin-files-sync, no Windows 11, com TYTO_HOME apontando para uma pasta vazia e o pacote de exemplo num repositório duas pastas acima, com a tag v1.0.0. -->
+
+```yaml
+# ~/.tyto/plugin-files/avisos.yaml
+version: 1
+templates:
+  aviso:
+    source:
+      git: ../../my-pack # qualquer endereço que o seu git leia: https://…/repo.git, git@…, uma pasta
+      ref: v1.0.0 # uma tag, uma branch ou um commit completo
+```
+
+Uma pasta que começa com `./` ou `../` é lida a partir da pasta do próprio arquivo de plugin. `tyto plugin sync` busca cada origem com o seu próprio `git` — as suas credenciais, chaves SSH e proxy, nada guardado pelo Tyto — e grava o commit que obteve em `plugin-files.lock.json`, ao lado dos arquivos:
+
+```
+$ tyto plugin sync
+example-pack  ../../my-pack  v1.0.0  c50a1231d0be  home\plugin-files\avisos.yaml
+```
+
+**`tyto render` faz o mesmo antes de renderizar**, então um render só usa a rede quando falta uma cópia, na primeira vez, e no resto usa o que já está neste computador. Ele nunca move o que o lock fixou: uma branch que alguém atualizou fica onde o lock diz até você rodar `tyto plugin sync --update`. O lock de um projeto vai para o controle de versão dele, para todo mundo renderizar o mesmo commit. `tyto watch` nunca busca nada.
+
+Sem rede, a cópia buscada antes é usada, e a execução avisa:
+
+```
+$ tyto plugin sync --update
+example-pack  ../../my-pack  v1.0.0  c50a1231d0be  home\plugin-files\avisos.yaml
+warning W_PLUGIN_FILE_FETCH Could not fetch '../../my-pack' at 'v1.0.0': fatal: 'C:\Users\rafae\AppData\Local\Temp\t432\my-pack' does not appear to be a git repository. The copy of commit c50a1231d0be435c0717c2fd89715f2a68d755f6 fetched earlier loads.
+```
+
+Um template tirado dos arquivos para de carregar na hora; a cópia dele fica até `tyto plugin clean` apagar as cópias que nenhum lock cita:
+
+```
+$ tyto plugin clean
+home\cache\plugin-files\94529b5cf90e68c9814015bbcf2aac31f959747fb4e294710d4d3dfcc98b0fc3\c50a1231d0be435c0717c2fd89715f2a68d755f6
+Removed 1 cached copy.
+```
+
+Um plugin buscado que pede permissões é mostrado e perguntado por `tyto plugin sync`, como o `install` faz, ou aprovado com `--yes`; um render nunca pergunta, e pula o que ninguém aprovou. As configurações e os apelidos dos arquivos ainda não são aplicados.
+
 ## Começar o seu
 
 `tyto plugin new my-pack` grava uma pasta de plugin com um template dentro, pronta para instalar; o [guia de autoria de plugins](../extend/) continua dali. Cada opção de cada comando `plugin` está na [Linha de comando](../reference/command-line.md#tyto-plugin-list) da Referência.

@@ -105,7 +105,7 @@ function reportProblems(
   environment.console.err(formatDiagnostics(problems));
 }
 
-function builtInManifests(): { manifests: PluginManifest[]; problems: Diagnostic[] } {
+export function builtInManifests(): { manifests: PluginManifest[]; problems: Diagnostic[] } {
   const manifests: PluginManifest[] = [];
   const problems: Diagnostic[] = [];
   for (const manifest of BUILT_IN_MANIFESTS) {
@@ -219,7 +219,7 @@ function fail(problems: Diagnostics, environment: CliEnvironment): ExitCode {
  * model, and not confined on the network, where `net:` permissions filter `host.fetch` only
  * (ADR 0042).
  */
-function permissionPrompt(manifest: PluginManifest, source: string): string {
+export function permissionPrompt(manifest: PluginManifest, source: string): string {
   const permissions =
     manifest.permissions.length === 0
       ? '  (none)\n'

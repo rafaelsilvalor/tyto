@@ -2,7 +2,7 @@ import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { Diagnostics } from '@tyto/core';
-import { fsPluginStore } from '@tyto/io';
+import { type PluginFilesCopyOnDisk, fsPluginStore, pluginStoreWithCopies } from '@tyto/io';
 import { isRasterFormat } from '@tyto/pipeline';
 import {
   type HostCapabilities,
@@ -42,6 +42,13 @@ export interface LoadOptions {
   readonly launch?: PluginProcessLauncher;
   /** What `host.fetch` and `host.credentials` reach, once a plugin's permissions allow it. */
   readonly capabilities?: HostCapabilities;
+  /** The plugin files' copies, loaded before the installed plugins and over their names. */
+  readonly copies?: readonly PluginFilesCopyOnDisk[];
+}
+
+/** The installed plugins' store, with the plugin files' copies in front when there are any. */
+function storeOf(home: string, copies: readonly PluginFilesCopyOnDisk[] = []) {
+  return copies.length === 0 ? fsPluginStore(home) : pluginStoreWithCopies(home, copies);
 }
 
 /** Starts every enabled plugin under `home` that passed its checks, once per process. */
@@ -50,7 +57,7 @@ export async function loadInstalledPlugins(
   options: LoadOptions = {},
 ): Promise<LoadedPlugins> {
   if (home === undefined) return NO_PLUGINS;
-  const store = fsPluginStore(home);
+  const store = storeOf(home, options.copies);
   return startInstalledPlugins(store, {
     launch: options.launch ?? launchPluginProcess,
     requireSandbox: true,
@@ -67,9 +74,12 @@ export async function loadInstalledPlugins(
   });
 }
 
-/** Where `install` copied each plugin under `home` — what a pack's `directory` is relative to. */
-export function pluginFolders(home: string): (plugin: string) => string {
-  const store = fsPluginStore(home);
+/** Where each plugin's folder is — what a pack's `directory` is relative to. */
+export function pluginFolders(
+  home: string,
+  copies: readonly PluginFilesCopyOnDisk[] = [],
+): (plugin: string) => string {
+  const store = storeOf(home, copies);
   return (plugin) => store.directoryOf(plugin);
 }
 
