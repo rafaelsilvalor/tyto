@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
 import { diagnostic } from '@tyto/core';
-import { NO_INSTALLED_PACKS, nodeFileSystem } from '@tyto/io';
+import { NO_INSTALLED_PACKS, NO_PLUGIN_FILES, nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createProjectSources } from './project.js';
@@ -189,6 +189,9 @@ describe('the template catalogue', () => {
       only: new Map(),
       replaces: new Set(),
       problems: [fetch],
+      configured: NO_PLUGIN_FILES.configured,
+      images: NO_PLUGIN_FILES.images,
+      texts: NO_PLUGIN_FILES.texts,
     });
 
     const { failures } = await (await createTemplateCatalogue({ sources })).list();
@@ -199,6 +202,39 @@ describe('the template catalogue', () => {
         diagnostics: [{ severity: 'warning', code: 'W_PLUGIN_FILE_FETCH', message: fetch.message }],
       },
     ]);
+  });
+
+  it('lists an alias as a row of its own, the template it reaches under its name (TYTO-433)', async () => {
+    const sources = await sourcesOver(scratch);
+    await sources.setFetched({
+      packs: NO_INSTALLED_PACKS,
+      only: new Map(),
+      replaces: new Set(),
+      problems: [],
+      configured: {
+        project: [],
+        machine: [
+          {
+            template: 'with-preview',
+            file: 'cores.yaml',
+            directory: scratch,
+            configurations: [{ name: 'escura', alias: 'with-preview-escura', values: {} }],
+          },
+        ],
+      },
+      images: NO_PLUGIN_FILES.images,
+      texts: new Map(),
+    });
+
+    const { templates } = await (await createTemplateCatalogue({ sources })).list();
+
+    const [template, alias] = templates;
+    expect(templates.map((item) => item.name)).toEqual(['with-preview', 'with-preview-escura']);
+    expect(alias).toEqual({
+      ...template,
+      name: 'with-preview-escura',
+      alias: { template: 'with-preview', configuration: 'escura' },
+    });
   });
 
   it('carries each manifest’s slots and names the folder a template came from', async () => {

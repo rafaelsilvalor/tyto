@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import { GAP_COLOR_CSS, ok } from '@tyto/core';
-import { nodeFileSystem } from '@tyto/io';
+import { NO_INSTALLED_PACKS, NO_PLUGIN_FILES, nodeFileSystem } from '@tyto/io';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { type PreviewService, createPreviewService } from './preview.js';
@@ -211,5 +211,47 @@ describe('the preview service with a plugin directive (TYTO-49)', () => {
 
     expect(result.diagnostics.map((item) => item.code)).toContain('E_UNKNOWN_DIRECTIVE');
     expect(result.completion).toMatchObject({ directives: [], manifest: { name: 'promo-curso' } });
+  });
+});
+
+describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
+  it('draws the template the alias reaches, with its configuration over the defaults', async () => {
+    const sources = await createProjectSources({
+      fileSystem: nodeFileSystem(),
+      builtIn: packDirectory,
+    });
+    await sources.setFetched({
+      packs: NO_INSTALLED_PACKS,
+      only: new Map(),
+      replaces: new Set(),
+      problems: [],
+      configured: {
+        project: [],
+        machine: [
+          {
+            template: 'tabela-roxo',
+            file: 'tabelas.yaml',
+            directory: packDirectory,
+            configurations: [
+              { name: 'sepia', alias: 'tabela-sepia', values: { paper: { value: '#f4e9d0' } } },
+            ],
+          },
+        ],
+      },
+      images: NO_PLUGIN_FILES.images,
+      texts: new Map(),
+    });
+    const withAlias = await createPreviewService({ fileSystem: nodeFileSystem(), sources });
+    const brief = exampleBrief('tabela-roxo', 'tres-colunas.brief');
+
+    const plain = await withAlias.preview(brief);
+    const aliased = await withAlias.preview(
+      brief.replace('template: tabela-roxo', 'template: tabela-sepia'),
+    );
+
+    expect(aliased.diagnostics.map((item) => item.code)).not.toContain('E_UNKNOWN_TEMPLATE');
+    expect(aliased.frames.length).toBe(plain.frames.length);
+    expect(aliased.frames[0]?.html.toLowerCase()).toContain('#f4e9d0');
+    expect(plain.frames[0]?.html.toLowerCase()).not.toContain('#f4e9d0');
   });
 });

@@ -781,6 +781,13 @@ export const IPC_CHANNELS = {
            * be listed, so this is what tells a person whose `agenda-semana` they are picking.
            */
           root: z.string().nullable(),
+          /**
+           * Present on an alias a plugin file names (TYTO-433, ADR 0151): the template it
+           * renders and the configuration it selects. The row is otherwise that template's,
+           * so the picker, the "/" menu and "New brief from template" offer it as they offer
+           * any template, and a brief that names it resolves through the same configurations.
+           */
+          alias: z.object({ template: z.string(), configuration: z.string() }).optional(),
         }),
       ),
       /**

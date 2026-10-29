@@ -347,6 +347,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
       formats: catalogue,
       diagnostics: startup,
       codePacks,
+      configurations,
     } = sources.current();
 
     if (templates === undefined || catalogue === undefined) {
@@ -480,6 +481,8 @@ export async function createExportService(options: ExportServiceOptions): Promis
         // The run's own host, which the installed plugins were activated into above: a
         // directive resolves through the same activation that the run reports refusals of.
         directives: directiveResolverOf(() => host.registry.directives()),
+        // An alias a plugin file names selects its template and values, as in `tyto render`.
+        configurations,
         formats: catalogue,
         ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
         // Measured, as the CLI and the preview are: without faces a `shrink` is clipped and

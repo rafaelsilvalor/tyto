@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { ok } from '@tyto/core';
-import { nodeFileSystem } from '@tyto/io';
+import { NO_INSTALLED_PACKS, NO_PLUGIN_FILES, nodeFileSystem } from '@tyto/io';
 import type { LoadedPlugins, Plugin } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -573,5 +573,61 @@ describe('a queue kind whose exporter is gone (TYTO-188)', () => {
     });
 
     expect(progress.failure).toMatch(/No registered exporter produces 'txt'/u);
+  }, 60_000);
+});
+
+describe("the export of a plugin file's alias (TYTO-433, ADR 0151)", () => {
+  it('exports the template the alias reaches, with its configuration', async () => {
+    const sources = await createProjectSources({
+      fileSystem: nodeFileSystem(),
+      builtIn: packDirectory,
+    });
+    await sources.setFetched({
+      packs: NO_INSTALLED_PACKS,
+      only: new Map(),
+      replaces: new Set(),
+      problems: [],
+      configured: {
+        project: [],
+        machine: [
+          {
+            template: 'tabela-roxo',
+            file: 'tabelas.yaml',
+            directory: packDirectory,
+            configurations: [
+              { name: 'sepia', alias: 'tabela-sepia', values: { paper: { value: '#f4e9d0' } } },
+            ],
+          },
+        ],
+      },
+      images: NO_PLUGIN_FILES.images,
+      texts: new Map(),
+    });
+    const aliased = await createExportService({
+      fileSystem: nodeFileSystem(),
+      sources,
+      version: '0.0.0-test',
+    });
+
+    const { exportId } = await aliased.start({
+      brief: exampleBrief('tabela-roxo', 'tres-colunas.brief').replace(
+        'template: tabela-roxo',
+        'template: tabela-sepia',
+      ),
+      directory: out,
+      label: 'sepia',
+      outputs: [{ kind: 'svg' }],
+    });
+    for (;;) {
+      const progress = aliased.progress(exportId);
+      if (progress?.status !== 'running') {
+        expect(progress?.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+
+    const svg = readdirSync(out).find((name) => name.endsWith('.svg')) ?? '';
+    expect(readFileSync(join(out, svg), 'utf8').toLowerCase()).toContain('#f4e9d0');
   }, 60_000);
 });
