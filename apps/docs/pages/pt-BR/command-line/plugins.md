@@ -155,7 +155,7 @@ Um apelido nunca pode ser o nome de um template: `E_TEMPLATE_ALIAS_TAKEN` aponta
 
 ### Do que um brief parte
 
-Uma configuração também pode definir coisas do lado do brief, em `brief:`. **O brief vence todas elas.** `slots` preenche um slot que o brief deixa de fora, `formats` diz quais formatos saem quando o brief não lista nenhum, e `editor` dá um `max` a um slot, mais apertado que o do próprio template e nunca mais frouxo. Uma quarta, `skeleton`, é o texto com que um brief novo começa; ela é conferida e guardada, e o app de mesa ainda não a escreve.
+Uma configuração também pode definir coisas do lado do brief, em `brief:`. **O brief vence todas elas.** `slots` preenche um slot que o brief deixa de fora, `formats` diz quais formatos saem quando o brief não lista nenhum, e `editor` dá um `max` a um slot, mais apertado que o do próprio template e nunca mais frouxo. Uma quarta, `skeleton`, é o texto com que um brief novo começa: o Novo brief a partir de template e o menu "/" do app de mesa a escrevem, com a linha `template:` dizendo o que você escolheu. Sem ela, escrevem o esqueleto do próprio template com os formatos configurados, sem os slots que a configuração preenche.
 
 ```yaml
 # ~/.tyto/plugin-files/avisos.yaml

@@ -17,8 +17,22 @@ import { type Slot, type TemplateManifest } from '@tyto/core';
  * CodeMirror.
  */
 
+/**
+ * What a plugin file's configuration says about a new brief (TYTO-440, ADR 0151), read off the
+ * template's row. `skeleton` is the whole text, written as it is; without it the skeleton is
+ * computed, with the configured `formats` and leaving out the slots the configuration `filled`.
+ */
+export interface ConfiguredSkeleton {
+  // `| undefined` so a row a Zod schema read, whose optional keys may hold `undefined`, fits.
+  readonly skeleton?: string | undefined;
+  readonly formats?: readonly string[] | undefined;
+  readonly filled?: readonly string[] | undefined;
+}
+
 /** The parts of a manifest the skeleton reads; a whole `TemplateManifest` is one. */
-export type SkeletonManifest = Pick<TemplateManifest, 'name' | 'formats' | 'slots'>;
+export type SkeletonManifest = Pick<TemplateManifest, 'name' | 'formats' | 'slots'> & {
+  readonly configured?: ConfiguredSkeleton;
+};
 
 /**
  * Whether a slot goes in the skeleton.
@@ -79,6 +93,10 @@ const scalarOf = (name: string, slot: Slot): string =>
  * block, once per occurrence its minimum asks for.
  */
 export function briefSkeleton(manifest: SkeletonManifest): string {
+  const written = manifest.configured?.skeleton;
+  if (written !== undefined) return `${literal(namingTemplate(written, manifest.name))}\${0}`;
+  const filled = new Set(manifest.configured?.filled ?? []);
+  const formats = manifest.configured?.formats ?? manifest.formats;
   let next = 1;
   const take = (): number => {
     const number = next;
@@ -90,7 +108,8 @@ export function briefSkeleton(manifest: SkeletonManifest): string {
   const directives: string[] = [];
 
   for (const [name, slot] of Object.entries(manifest.slots)) {
-    if (!inSkeleton(slot)) continue;
+    // A slot the configuration fills is not one the brief cannot do without.
+    if (!inSkeleton(slot) || filled.has(name)) continue;
 
     if (slot.repeat) {
       for (let occurrence = 0; occurrence < occurrencesOf(slot); occurrence += 1) {
@@ -112,13 +131,31 @@ export function briefSkeleton(manifest: SkeletonManifest): string {
   const frontmatter = [
     '---',
     `template: ${literal(manifest.name)}`,
-    `formats: [${manifest.formats.map(literal).join(', ')}]`,
+    `formats: [${formats.map(literal).join(', ')}]`,
     ...scalars,
     '---',
   ].join('\n');
 
   // A blank line between directives, because a blank line is what ends an indented block.
   return `${frontmatter}\n\n${[...directives, '${0}'].join('\n\n')}`;
+}
+
+/**
+ * A configured skeleton with its `template:` line naming the row it was chosen from.
+ *
+ * A named configuration inherits the skeleton of the entry's `default`, so the text a file
+ * wrote may name another alias than the one picked. The name picked is the one the brief
+ * means, so it replaces that line, or is added when the skeleton's frontmatter has none.
+ */
+function namingTemplate(text: string, name: string): string {
+  const line = `template: ${name}`;
+  const frontmatter = /^---\r?\n([\s\S]*?)^---$/mu.exec(text);
+  if (frontmatter === null) return `---\n${line}\n---\n\n${text}`;
+  const start = frontmatter.index + frontmatter[0].indexOf('\n') + 1;
+  const body = frontmatter[1] ?? '';
+  const named = /^template:.*$/mu;
+  const replaced = named.test(body) ? body.replace(named, line) : `${line}\n${body}`;
+  return `${text.slice(0, start)}${replaced}${text.slice(start + body.length)}`;
 }
 
 /**

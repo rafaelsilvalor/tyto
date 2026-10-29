@@ -188,4 +188,65 @@ describe('the plugin files in the window', () => {
     expect(offered).toContain('aviso-laranja');
     expect(offered.filter((label) => label === 'tabela-roxo')).toHaveLength(1);
   }, 60_000);
+
+  it('writes an alias’s configured skeleton from the "/" menu, and warns past its editor rule', async () => {
+    // TYTO-440. The skeleton names `aviso`, as the entry's default would; the window writes
+    // the name picked instead. Its title runs past the configuration's `max` of 10.
+    writeFileSync(
+      join(home, 'plugin-files', 'templates.yaml'),
+      [
+        'version: 1',
+        'templates:',
+        '  aviso:',
+        `    source: { git: '${packUrl}', ref: 'v1' }`,
+        '    configurations:',
+        '      curto:',
+        '        brief:',
+        '          skeleton: |',
+        '            ---',
+        '            template: aviso',
+        '            ---',
+        '',
+        '            ::titulo Inscrições abertas até sexta',
+        '          editor:',
+        '            titulo: { max: 10 }',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    await page.evaluate(() =>
+      (window as unknown as { tyto: Record<string, (body: unknown) => Promise<unknown>> }).tyto[
+        'plugin-files:sync'
+      ]!({ update: false }),
+    );
+    await expect
+      .poll(async () => (await list()).templates.map((template) => template.name), {
+        timeout: 15_000,
+      })
+      .toContain('aviso-curto');
+
+    // An empty brief: the "/" menu's choice writes the whole skeleton.
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Delete');
+    await page.keyboard.type('/aviso-curto');
+    await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
+    await page.keyboard.press('Enter');
+
+    const text = () =>
+      page.evaluate(() => document.querySelector<HTMLElement>('#editor .cm-content')?.innerText);
+    await expect.poll(text, { timeout: 15_000 }).toContain('template: aviso-curto');
+    expect(await text()).toContain('::titulo Inscrições abertas até sexta');
+
+    const rows = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('.problems__row')].map((row) => row.textContent ?? ''),
+      );
+    await expect
+      .poll(rows, { timeout: 15_000 })
+      .toEqual(expect.arrayContaining([expect.stringContaining('W_SLOT_OVER_CONFIGURED_LIMIT')]));
+    // For a person to look at: the skeleton in the editor and the warning in the panel.
+    const shot = process.env['TYTO_E2E_SCREENSHOT_SKELETON'];
+    if (shot !== undefined) await page.screenshot({ path: shot });
+  }, 60_000);
 });

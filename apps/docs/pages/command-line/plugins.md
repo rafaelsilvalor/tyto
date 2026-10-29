@@ -155,7 +155,7 @@ An alias may never be a template's name: `E_TEMPLATE_ALIAS_TAKEN` points at it, 
 
 ### What a brief starts from
 
-A configuration can also set things on the brief's side, under `brief:`. **The brief wins every one of them.** `slots` fills a slot the brief leaves out, `formats` says which formats render when the brief lists none, and `editor` sets a `max` for a slot, tighter than the template's own and never looser. A fourth, `skeleton`, is the text a new brief starts with; it is checked and kept, and the desktop app does not write it yet.
+A configuration can also set things on the brief's side, under `brief:`. **The brief wins every one of them.** `slots` fills a slot the brief leaves out, `formats` says which formats render when the brief lists none, and `editor` sets a `max` for a slot, tighter than the template's own and never looser. A fourth, `skeleton`, is the text a new brief starts with: the desktop app's New brief from template and "/" menu write it, with the `template:` line naming what you picked. Without one, they write the template's own skeleton with the configured formats, leaving out the slots the configuration fills.
 
 ```yaml
 # ~/.tyto/plugin-files/avisos.yaml

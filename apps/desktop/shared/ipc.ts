@@ -788,6 +788,19 @@ export const IPC_CHANNELS = {
            * any template, and a brief that names it resolves through the same configurations.
            */
           alias: z.object({ template: z.string(), configuration: z.string() }).optional(),
+          /**
+           * What the configuration this name reaches says about a new brief (TYTO-440, ADR
+           * 0151): its own skeleton text, the formats it renders when a brief names none and
+           * the slots it fills. Absent when no configuration is reached, so the skeleton is
+           * the manifest's.
+           */
+          configured: z
+            .object({
+              skeleton: z.string().optional(),
+              formats: z.array(z.string()).optional(),
+              filled: z.array(z.string()),
+            })
+            .optional(),
         }),
       ),
       /**

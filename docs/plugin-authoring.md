@@ -512,9 +512,10 @@ configurations:
   takes no default: its occurrences are the brief's artworks.
 - **`formats`** must name formats the manifest renders. A `--formats` flag or the Export
   dialog's ticks still win when the brief lists none.
-- **`skeleton`** is a whole brief, written as it is. Without one, the skeleton is computed from
-  the manifest. It is checked and kept today; the desktop's New brief from template and "/"
-  menu start writing it in TYTO-440's desktop change.
+- **`skeleton`** is a whole brief, which the desktop's New brief from template and "/" menu
+  write as it is, except its `template:` line: that names what the person picked, since a named
+  configuration inherits the default's skeleton. Without one, the skeleton is computed from the
+  manifest, with the configured `formats` and without the slots the configuration fills.
 - **`editor`** takes a `max` per slot, counted as the manifest's `max` counts: characters on a
   text slot, occurrences on a repeated one. Past it is `W_SLOT_OVER_CONFIGURED_LIMIT`, a warning
   at the brief's line; the manifest's own `max` stays the error that refuses the value. A rule
