@@ -26,7 +26,7 @@ import {
   configuredTemplates,
   withPluginEntry,
 } from '@tyto/plugin-api';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
@@ -57,6 +57,38 @@ export function machinePluginFiles(home: string): string {
 /** Where a workspace's plugin files are. */
 export function projectPluginFiles(workspace: string): string {
   return join(workspace, '.tyto', PLUGIN_FILES_DIRECTORY);
+}
+
+/**
+ * The line that names a restricted workspace's plugin files as left out. ADR 0111: what a
+ * restricted folder does not run is named, not hidden, and `sync`, `render` and `plugin list`
+ * say it in the same words.
+ */
+export function leftOutNotice(
+  workspace: string,
+  what: 'fetched' | 'loaded' | 'listed',
+  environment: CliEnvironment,
+): string {
+  return (
+    `${displayPath(environment.cwd, projectPluginFiles(workspace))} was not ${what}: ` +
+    'this folder is restricted, and a project’s plugins run only once it is trusted ' +
+    '(tyto trust add).\n'
+  );
+}
+
+/**
+ * The same line, for a command that is not only about the plugin files: said only when the
+ * restricted workspace has a plugin-files folder, so a render in a project with none stays
+ * quiet. Empty when there is nothing to say.
+ */
+export async function leftOutPluginFiles(
+  workspace: { readonly folder: string; readonly trusted: boolean } | undefined,
+  what: 'loaded' | 'listed',
+  environment: CliEnvironment,
+): Promise<string> {
+  if (workspace === undefined || workspace.trusted) return '';
+  const found = await stat(projectPluginFiles(workspace.folder)).catch(() => undefined);
+  return found?.isDirectory() === true ? leftOutNotice(workspace.folder, what, environment) : '';
 }
 
 /** Who answers when a fetched plugin asks for permissions nobody approved yet. */
@@ -235,7 +267,7 @@ export interface PluginSyncCommandOptions {
 }
 
 /** The workspace `folder` is in, with its trust, as the sync and the cleanup read it. */
-async function workspaceOf(
+export async function workspaceOf(
   folder: string,
   environment: CliEnvironment,
 ): Promise<{ readonly folder: string; readonly trusted: boolean } | undefined> {
@@ -247,7 +279,7 @@ async function workspaceOf(
     : { folder: found.loaded.folder, trusted: found.loaded.trust === 'trusted' };
 }
 
-function homeOf(environment: CliEnvironment): string {
+export function homeOf(environment: CliEnvironment): string {
   if (environment.home === undefined) {
     throw new TypeError(
       'This environment names no home folder, so there are no plugin files to sync. ' +
@@ -265,11 +297,7 @@ export async function pluginSyncCommand(
   const home = homeOf(environment);
   const workspace = await workspaceOf(folder, environment);
   if (workspace !== undefined && !workspace.trusted) {
-    environment.console.err(
-      `${displayPath(environment.cwd, projectPluginFiles(workspace.folder))} was not fetched: ` +
-        'this folder is restricted, and a project’s plugins run only once it is trusted ' +
-        '(tyto trust add).\n',
-    );
+    environment.console.err(leftOutNotice(workspace.folder, 'fetched', environment));
   }
   const synced = await syncPluginFiles(
     {

@@ -226,11 +226,14 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
 
   const pluginList = plugin
     .command('list')
-    .description('list every plugin: name, version, origin, status and what it contributes')
+    .description(
+      'list every plugin: name, version, origin, status and what it contributes; then what the plugin files name, at which commit, and their aliases',
+    )
+    .argument('[folder]', 'a folder inside the workspace whose plugin files count', '.')
     .option('--active', 'only the plugins a render would activate', false)
     .option('--json', 'print a machine-readable document instead of prose', false)
-    .action(async () => {
-      captured.code = await pluginListCommand(pluginList.opts(), environment);
+    .action(async (folder: string) => {
+      captured.code = await pluginListCommand({ ...pluginList.opts(), folder }, environment);
     });
 
   const pluginInstall = plugin

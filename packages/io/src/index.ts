@@ -165,6 +165,7 @@ export {
   cachedCopy,
   cleanPluginFilesCache,
   fetchToCache,
+  locationOf,
   pluginStoreWithCopies,
   readPluginFolder,
   syncPluginFolder,

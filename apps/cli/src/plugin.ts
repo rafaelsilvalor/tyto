@@ -17,6 +17,7 @@ import {
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import { type InstalledPlugins, readInstalledPlugins, writeCrash } from './plugins/external.js';
+import { type ListedPluginFiles, listPluginFiles } from './plugin-files-list.js';
 import { fetchPlugin } from './plugins/fetch.js';
 import { BUILT_IN_MANIFESTS } from './plugins/index.js';
 import { formatDiagnostics, json } from './report.js';
@@ -39,6 +40,8 @@ export interface PluginListOptions {
   readonly json: boolean;
   /** Only what a render would activate: no disabled plugin, no refused one; crashed ones stay. */
   readonly active?: boolean;
+  /** A folder inside the workspace whose plugin files count; the cwd when absent. */
+  readonly folder?: string;
 }
 
 export interface PluginInstallOptions {
@@ -80,7 +83,54 @@ function formatList(plugins: readonly ListedPlugin[]): string {
     .join('\n')}\n`;
 }
 
-function document(plugins: readonly ListedPlugin[]): unknown {
+const NO_LISTED_PLUGIN_FILES: ListedPluginFiles = {
+  sources: [],
+  aliases: [],
+  leftOut: '',
+  diagnostics: [],
+};
+
+/**
+ * The plugin files' sources, then their aliases, each under a heading so a reader can tell
+ * them from the installed plugins above. Nothing at all when the files name nothing.
+ */
+function formatPluginFiles(files: ListedPluginFiles): string {
+  const lines: string[] = [];
+  if (files.sources.length > 0) {
+    const pluginOf = (source: ListedPluginFiles['sources'][number]): string => source.plugin ?? '-';
+    const commitOf = (source: ListedPluginFiles['sources'][number]): string =>
+      source.commit?.slice(0, 12) ?? '-';
+    const plugin = column(files.sources.map(pluginOf));
+    const scope = column(files.sources.map((source) => source.scope));
+    const git = column(files.sources.map((source) => source.git));
+    const ref = column(files.sources.map((source) => source.ref));
+    const commit = column(files.sources.map(commitOf));
+    const status = column(files.sources.map((source) => source.status));
+    lines.push(
+      '',
+      'plugin files:',
+      ...files.sources.map(
+        (source) =>
+          `${plugin(pluginOf(source))}  ${scope(source.scope)}  ${git(source.git)}  ` +
+          `${ref(source.ref)}  ${commit(commitOf(source))}  ${status(source.status)}  ${source.file}`,
+      ),
+    );
+  }
+  if (files.aliases.length > 0) {
+    const named = files.aliases.map(
+      (alias) => `${alias.alias} → ${alias.template} (${alias.configuration})`,
+    );
+    const name = column(named);
+    lines.push(
+      '',
+      'aliases:',
+      ...files.aliases.map((alias, index) => `${name(named[index] ?? '')}  ${alias.file}`),
+    );
+  }
+  return lines.length === 0 ? '' : `${lines.join('\n')}\n`;
+}
+
+function document(plugins: readonly ListedPlugin[], files: ListedPluginFiles): unknown {
   return {
     status: 'ok',
     plugins: plugins.map((plugin) => ({
@@ -93,6 +143,16 @@ function document(plugins: readonly ListedPlugin[]): unknown {
       status: plugin.status,
       crashed: plugin.crashed ?? null,
     })),
+    pluginFiles: files.sources.map((source) => ({
+      plugin: source.plugin ?? null,
+      scope: source.scope,
+      file: source.file,
+      git: source.git,
+      ref: source.ref,
+      commit: source.commit ?? null,
+      status: source.status,
+    })),
+    aliases: files.aliases,
   };
 }
 
@@ -140,7 +200,10 @@ export async function pluginListCommand(
   }));
 
   const refusals: Diagnostic[] = [];
+  let files = NO_LISTED_PLUGIN_FILES;
   if (environment.home !== undefined) {
+    files = await listPluginFiles(options.folder ?? '.', environment.home, environment);
+    refusals.push(...files.diagnostics);
     const installed = await readInstalledPlugins(environment.home);
     refusals.push(...installed.stateProblems);
     // History, read only here: nothing that decides whether a plugin loads reads it.
@@ -177,7 +240,17 @@ export async function pluginListCommand(
     options.active === true
       ? listed.filter((plugin) => plugin.status === 'enabled' || plugin.status === 'crashed')
       : listed;
-  environment.console.out(options.json ? json(document(shown)) : formatList(shown));
+  // `--active` keeps the copies a render would load, as it keeps the installed plugins.
+  const shownFiles =
+    options.active === true
+      ? { ...files, sources: files.sources.filter((source) => source.status === 'approved') }
+      : files;
+  environment.console.out(
+    options.json
+      ? json(document(shown, shownFiles))
+      : `${formatList(shown)}${formatPluginFiles(shownFiles)}`,
+  );
+  if (files.leftOut !== '') environment.console.err(files.leftOut);
   // Said, not hidden: a listing that shows `refused` or `crashed` owes the reason.
   if (refusals.length > 0 && options.active !== true) {
     environment.console.err(formatDiagnostics(refusals));

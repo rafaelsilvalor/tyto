@@ -44,7 +44,7 @@ import {
   packDirectories,
   templatePackPlugin,
 } from './plugins/templates.js';
-import { registerOrigin } from './report.js';
+import { registerOrigin, registerUnplaced } from './report.js';
 
 /**
  * The parts of a render that do not change between briefs: the template registry, the
@@ -207,6 +207,7 @@ export async function loadRenderContext(
   const configurationProblems = configured.diagnostics.map(({ file, diagnostic: item }) => {
     const source = file === undefined ? undefined : pluginFiles?.texts.get(file);
     if (file !== undefined && source !== undefined) registerOrigin([item], { path: file, source });
+    else registerUnplaced([item]);
     return item;
   });
 
