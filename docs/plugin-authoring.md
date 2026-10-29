@@ -438,28 +438,43 @@ template does, not when a machine has another font. Pass `faces` and `font` for 
 layout, and `values` (`{ 'title-gap': { value: 32 } }`) to compile with what a configuration
 would set (ADR 0153). A markup template (`template.html`) is not covered yet, and neither is the PNG.
 
-### Hear about a breaking release before your users do
+### Move onto a new contract when it passes
 
 Your range keeps your tests on the contract you built against, so a release that breaks your
-plugin reaches you only when you move the range. A scheduled workflow moves it for one run —
-install as locked, then the newest published contract over it, then build and test:
+plugin reaches you only when you move the range. Tyto's `contract-update` workflow moves it
+for you (ADR 0154): it re-adds every `@tyto/*` alias your `package.json` asks for at
+`@latest`, moves your manifest's `engine` with `@tyto/plugin-api`, runs your checks on that
+tree, and only when they pass opens a pull request carrying it — ranges, `engine`, lockfile
+and whatever your build changed. Call it from `.github/workflows/contract.yml`:
 
 ```yaml
+name: contract
 on:
   schedule:
-    - cron: '0 9 * * 1'
+    - cron: '0 9 * * *'
   workflow_dispatch:
-    # ...
-    - run: pnpm install --frozen-lockfile
-    - run: pnpm add --save-dev '@tyto/plugin-api@npm:@rafaelsilvalor/tyto-plugin-api@latest'
-    - run: pnpm build
-    - run: pnpm test
+concurrency: { group: contract, cancel-in-progress: false }
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  packages: read
+jobs:
+  newest-contract:
+    uses: rafaelsilvalor/tyto/.github/workflows/contract-update.yml@main
 ```
 
+Two things outside the file, once. Your CI workflow must accept `workflow_dispatch:` — a pull
+request opened with the workflow's own token starts no checks, so the job starts your CI on
+the branch itself. And Settings › Actions › General › "Allow GitHub Actions to create and
+approve pull requests" must be on, or the run goes red at `gh pr create`.
+
 `@latest` goes past your caret on purpose: a protocol change is a minor while the contract is
-0.x, and that minor is the release you want to hear about. The run changes nothing in the
-repository. A red run means a new Tyto refuses or breaks your plugin; move the range and
-`engine` together once it passes. `tyto-plugin-jira` runs this as its `contract` workflow.
+0.x, and that minor is the release you want to hear about. A red run means a new Tyto refuses
+or breaks your plugin, and nothing is opened. A green run opens at most one pull request, on
+the branch `tyto/contract-update`: a run against the same contract leaves it alone, and a newer
+contract replaces it. Inputs, if your repository differs: `checks` (default
+`typecheck build test`), `ci-workflow` (default `ci.yml`), `node-version` (default `24`).
 
 ## Other extension points
 

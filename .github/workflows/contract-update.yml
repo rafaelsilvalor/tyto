@@ -1,0 +1,132 @@
+name: contract-update
+# **Called by a plugin's or a template's own repository, never run here** (ADR 0154, TYTO-460).
+# It re-adds every `@tyto/*` alias the caller asks for at `@latest`, moves the manifest's
+# `engine` with `@tyto/plugin-api`, runs the caller's checks on that tree, and only then opens a
+# pull request carrying it. A red run is the warning the weekly `contract.yml` used to be: the
+# newest contract breaks this repository, and nothing is opened.
+#
+# A caller is about ten lines; `docs/plugin-authoring.md` has them. It grants the job
+# `contents: write`, `pull-requests: write`, `actions: write` and `packages: read`, and its
+# repository allows GitHub Actions to create pull requests (Settings › Actions › General).
+on:
+  workflow_call:
+    inputs:
+      checks:
+        description: The caller's package scripts to run against the newest contract, in order. A missing one is skipped.
+        type: string
+        default: typecheck build test
+      ci-workflow:
+        description: The caller's workflow file that checks a pull request. It must accept workflow_dispatch.
+        type: string
+        default: ci.yml
+      node-version:
+        type: string
+        default: '24'
+      tyto-ref:
+        description: The Tyto ref the bump script is read from. Keep it the ref the caller pins this workflow at.
+        type: string
+        default: main
+env:
+  # The bot's one branch in each repository. A newer contract replaces it; see the push step.
+  BRANCH: tyto/contract-update
+  HUSKY: 0
+jobs:
+  newest-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: repository }
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      # The default branch, whatever ref the run was dispatched on: a test of a caller on a
+      # branch still bumps what `main` holds and opens its pull request against it.
+      - uses: actions/checkout@v7
+        with:
+          path: repository
+          ref: ${{ github.event.repository.default_branch }}
+      # The bump script and the one constant it imports (ADR 0149's `PUBLISHED_PREFIX`), and
+      # nothing else of Tyto.
+      - uses: actions/checkout@v7
+        with:
+          repository: rafaelsilvalor/tyto
+          ref: ${{ inputs.tyto-ref }}
+          path: tyto
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools/repo-checks/src/contract-update.mjs
+            tools/repo-checks/src/publish-contract.mjs
+      - uses: pnpm/action-setup@v6
+        with: { package_json_file: repository/package.json }
+      - uses: actions/setup-node@v7
+        # Writes the scope and `${NODE_AUTH_TOKEN}` into a user-level .npmrc, which pnpm reads.
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+          cache-dependency-path: repository/pnpm-lock.yaml
+          registry-url: https://npm.pkg.github.com
+          scope: '@rafaelsilvalor'
+      - run: pnpm install --frozen-lockfile
+      - id: bump
+        run: node ../tyto/tools/repo-checks/src/contract-update.mjs .
+      - name: checks against the newest contract
+        env:
+          CHECKS: ${{ inputs.checks }}
+        run: |
+          for script in $CHECKS; do
+            echo "::group::pnpm run $script"
+            pnpm run --if-present "$script"
+            echo "::endgroup::"
+          done
+      # The default branch already asks for the newest contract — somebody moved it by hand —
+      # so a bot pull request still open is for a tree nobody needs.
+      - name: close a pull request the default branch caught up with
+        if: steps.bump.outputs.moved == 'false'
+        run: |
+          open_number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')
+          if [ -n "$open_number" ]; then
+            gh pr close "$open_number" --delete-branch --comment 'The default branch already asks for the newest Tyto contract.'
+          fi
+      # Everything from here runs only on a green tree that moved. The commit takes whatever
+      # the checks' build changed along with the manifests, because a repository that commits
+      # its `dist/` checks in CI that it is what `src/` builds to.
+      - name: leave an open pull request for the same contract alone
+        id: open
+        if: steps.bump.outputs.moved == 'true'
+        env:
+          TITLE: ${{ steps.bump.outputs.title }}
+        run: |
+          open_title=$(gh pr list --head "$BRANCH" --state open --json title --jq '.[0].title // ""')
+          open_number=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')
+          echo "number=$open_number" >> "$GITHUB_OUTPUT"
+          if [ "$open_title" = "$TITLE" ]; then
+            echo "Pull request #$open_number already carries this contract; nothing to push."
+            echo "same=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "same=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: push the branch and open or update the pull request
+        if: steps.bump.outputs.moved == 'true' && steps.open.outputs.same == 'false'
+        env:
+          TITLE: ${{ steps.bump.outputs.title }}
+          BODY: ${{ steps.bump.outputs.body }}
+          OPEN: ${{ steps.open.outputs.number }}
+          BASE: ${{ github.event.repository.default_branch }}
+          CI_WORKFLOW: ${{ inputs.ci-workflow }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+          git switch --create "$BRANCH"
+          git add --all
+          git commit --quiet --message 'chore(deps): TYTO-0 move onto the newest Tyto contract' --message "$TITLE"
+          # Forced: the branch is the bot's, rebuilt from the default branch on every run, so
+          # an older contract's commit is replaced rather than stacked under the new one.
+          git push --force origin "HEAD:refs/heads/$BRANCH"
+          if [ -n "$OPEN" ]; then
+            gh pr edit "$OPEN" --title "$TITLE" --body "$BODY"
+          else
+            gh pr create --base "${BASE:-main}" --head "$BRANCH" --title "$TITLE" --body "$BODY"
+          fi
+          # A push made with GITHUB_TOKEN starts no workflow, so the pull request would sit
+          # with no checks. `workflow_dispatch` is the one event that token may start.
+          gh workflow run "$CI_WORKFLOW" --ref "$BRANCH"
