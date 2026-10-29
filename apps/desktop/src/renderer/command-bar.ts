@@ -26,6 +26,11 @@ export interface CommandEntry {
   readonly binding?: string;
   /** A second, quieter word after the label: a theme's kind in the theme picker. */
   readonly detail?: string;
+  /**
+   * What hovering the row says, when that is more than the detail: where an alias was declared
+   * (TYTO-467). The detail's own text otherwise, so a cut-off detail can still be read whole.
+   */
+  readonly title?: string;
 }
 
 /**
@@ -267,7 +272,9 @@ export class CommandBar extends LitElement {
       ${
         entry.detail === undefined
           ? nothing
-          : html`<span class="command-bar__detail" title=${entry.detail}>${entry.detail}</span>`
+          : html`<span class="command-bar__detail" title=${entry.title ?? entry.detail}
+              >${entry.detail}</span
+            >`
       }
       ${
         entry.binding === undefined

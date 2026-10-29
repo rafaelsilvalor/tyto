@@ -641,6 +641,12 @@ export interface Catalogue {
   readonly 'template.pick.placeholder': string;
   readonly 'template.root.builtIn': string;
   /**
+   * TYTO-467. Where an alias came from, on hover in "New brief from template…" and in the
+   * panel beside the "/" menu's row: `{template}`, `{configuration}` and `{file}` are the
+   * row's. Neither surface is on screen at load.
+   */
+  readonly 'template.alias.declared': string;
+  /**
    * TYTO-276. The "/" menu: the command that opens it without a "/", its section heading and
    * the line beside each template saying what choosing it does. `{current}` is the template
    * the brief names now. All of it is CodeMirror's list or the bar, so none is on screen at load.
@@ -1071,6 +1077,7 @@ export const CATALOGUE_KEYS = [
   'command.document.newFromTemplate',
   'template.pick.placeholder',
   'template.root.builtIn',
+  'template.alias.declared',
   'command.editor.insertMenu',
   'command.editor.goToBlock',
   'goToBlock.placeholder',

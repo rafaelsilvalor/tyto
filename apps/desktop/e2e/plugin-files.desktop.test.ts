@@ -181,12 +181,53 @@ describe('the plugin files in the window', () => {
         (label) => label.textContent ?? '',
       ),
     );
-    // For a person to look at: the "/" menu open, with the alias among the templates.
+    expect(offered).toContain('aviso-laranja');
+    expect(offered.filter((label) => label === 'tabela-roxo')).toHaveLength(1);
+
+    // TYTO-467: the highlighted alias says what it stands for on its line, and the panel
+    // CodeMirror opens beside it names the plugin file. Matched without the words around them,
+    // which are in whichever language the machine runs.
+    await page.keyboard.type('aviso-l');
+    await page.waitForSelector('.cm-completionInfo', { state: 'visible', timeout: 15_000 });
+    const described = await page.evaluate(() => ({
+      detail:
+        document.querySelector('.cm-tooltip-autocomplete li[aria-selected] .cm-completionDetail')
+          ?.textContent ?? '',
+      info: document.querySelector('.cm-completionInfo')?.textContent ?? '',
+    }));
+    // For a person to look at: the "/" menu open on the alias, with the panel beside it.
     const shot = process.env['TYTO_E2E_SCREENSHOT_ALIAS'];
     if (shot !== undefined) await page.screenshot({ path: shot });
     await page.keyboard.press('Escape');
-    expect(offered).toContain('aviso-laranja');
-    expect(offered.filter((label) => label === 'tabela-roxo')).toHaveLength(1);
+    expect(described.detail.startsWith('aviso · laranja — ')).toBe(true);
+    expect(described.info).toMatch(/aviso.*laranja.*templates\.yaml/u);
+
+    // The same alias in "New brief from template…": the line, and the file on hover.
+    await page.keyboard.press('Control+k');
+    await page.waitForSelector('.command-bar__input', { state: 'visible' });
+    await page.keyboard.type('document.newFromTemplate');
+    await page.waitForTimeout(100);
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll('.command-bar__label')].some(
+          (label) => label.textContent === 'aviso-laranja',
+        ),
+      undefined,
+      { timeout: 15_000 },
+    );
+    const row = await page.evaluate(() => {
+      const option = [...document.querySelectorAll('.command-bar__option')].find(
+        (item) => item.querySelector('.command-bar__label')?.textContent === 'aviso-laranja',
+      );
+      const detail = option?.querySelector('.command-bar__detail');
+      return { detail: detail?.textContent ?? '', title: detail?.getAttribute('title') ?? '' };
+    });
+    const pickShot = process.env['TYTO_E2E_SCREENSHOT_ALIAS_PICK'];
+    if (pickShot !== undefined) await page.screenshot({ path: pickShot });
+    await page.keyboard.press('Escape');
+    expect(row.detail).toBe('aviso · laranja');
+    expect(row.title).toMatch(/aviso.*laranja.*templates\.yaml/u);
   }, 60_000);
 
   it('writes an alias’s configured skeleton from the "/" menu, and warns past its editor rule', async () => {

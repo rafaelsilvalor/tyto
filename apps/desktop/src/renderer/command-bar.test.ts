@@ -276,6 +276,32 @@ describe('the bar as a picker (TYTO-208)', () => {
     expect(seen.highlighted).toEqual([]);
   });
 
+  it("says an entry's own title on hover, and its detail for one without (TYTO-467)", async () => {
+    const { bar } = mount();
+    bar.pick({
+      entries: [
+        { id: 'aviso', label: 'aviso', detail: 'embutido' },
+        {
+          id: 'aviso-laranja',
+          label: 'aviso-laranja',
+          detail: 'aviso · laranja',
+          title: 'Apelido de aviso com a configuração laranja, declarado em cores.yaml',
+        },
+      ],
+      placeholder: 'Escolha um template',
+      highlight: () => undefined,
+      choose: () => undefined,
+      cancel: () => undefined,
+    });
+    await bar.updateComplete;
+
+    const details = [...bar.querySelectorAll('.command-bar__detail')];
+    expect(details.map((detail) => [detail.textContent, detail.getAttribute('title')])).toEqual([
+      ['embutido', 'embutido'],
+      ['aviso · laranja', 'Apelido de aviso com a configuração laranja, declarado em cores.yaml'],
+    ]);
+  });
+
   it('reports each entry as the selection moves onto it, typing included', async () => {
     const { bar, seen } = await pick();
     await press(bar, 'ArrowDown');

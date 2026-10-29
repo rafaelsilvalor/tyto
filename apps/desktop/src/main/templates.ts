@@ -184,7 +184,11 @@ export async function createTemplateCatalogue(
             {
               ...target,
               name: alias.alias,
-              alias: { template: alias.template, configuration: alias.configuration },
+              alias: {
+                template: alias.template,
+                configuration: alias.configuration,
+                file: alias.file,
+              },
             },
           ];
     });

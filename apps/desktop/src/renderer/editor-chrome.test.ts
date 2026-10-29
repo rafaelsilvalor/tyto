@@ -25,8 +25,11 @@ import {
   editorChromeFor,
   languageOf,
   slashTemplateChoiceFor,
+  slashTemplateDetail,
   slashTemplateNote,
+  templateAliasDeclared,
   templateChoiceFor,
+  templatePickDetail,
   templateEditFor,
 } from './editor-chrome.js';
 import { type TemplateEdit } from './frontmatter.js';
@@ -305,5 +308,36 @@ describe('the "/" menu choosing a template (TYTO-276)', () => {
 
   it('answers nothing on an app file', () => {
     expect(slashTemplateChoiceFor('settings', '/a', 0, 2, 'agenda-semana')).toBeUndefined();
+  });
+});
+
+describe('an alias in "New brief from template…" and the "/" menu (TYTO-467)', () => {
+  const ALIAS = { template: 'aviso', configuration: 'laranja', file: 'plugins/cores.yaml' };
+  const SENTENCE = 'Alias of {template} with the {configuration} configuration, declared in {file}';
+
+  it("shows what an alias stands for in place of its target's folder and description", () => {
+    const row = { root: 'casa', description: 'Um aviso', alias: ALIAS };
+    expect(templatePickDetail(row, 'built-in')).toBe('aviso · laranja');
+  });
+
+  it('leaves a template that is not an alias as it was', () => {
+    expect(templatePickDetail({ root: null, description: 'Um aviso' }, 'built-in')).toBe(
+      'built-in · Um aviso',
+    );
+    expect(templatePickDetail({ root: 'casa' }, 'built-in')).toBe('casa');
+    expect(slashTemplateDetail('current template', undefined)).toBe('current template');
+    expect(templateAliasDeclared(SENTENCE, undefined)).toBeUndefined();
+  });
+
+  it('leads the line in the "/" menu with the alias, before what choosing it does', () => {
+    expect(slashTemplateDetail('sets the template', ALIAS)).toBe(
+      'aviso · laranja — sets the template',
+    );
+  });
+
+  it('names the plugin file that declared it, for the hover and the panel beside the row', () => {
+    expect(templateAliasDeclared(SENTENCE, ALIAS)).toBe(
+      'Alias of aviso with the laranja configuration, declared in plugins/cores.yaml',
+    );
   });
 });

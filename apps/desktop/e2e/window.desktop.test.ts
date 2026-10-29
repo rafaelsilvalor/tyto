@@ -788,6 +788,8 @@ describe('switching the language', () => {
     'command.document.newFromTemplate',
     'template.pick.placeholder',
     'template.root.builtIn',
+    // TYTO-467: where an alias came from, on hover in the bar and beside a "/" menu row.
+    'template.alias.declared',
     // TYTO-276: the "/" menu's command, section heading and the line beside each template, all
     // inside CodeMirror's list or the bar. `e2e/slash-menu.desktop.test.ts` opens it.
     'command.editor.insertMenu',
