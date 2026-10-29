@@ -1332,6 +1332,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  W_PROJECT_PLUGIN_FILES_WITHHELD: {
+    severity: 'warning',
+    summary:
+      "A restricted folder's plugin files are neither fetched nor loaded until the folder is trusted.",
+    template:
+      'The plugin files in {folder} ({files}) were not fetched or loaded because this folder is not trusted.',
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: "Only the project's plugin files are left out; the machine's still load.",
+  },
   // ADR 0114: a missing or refused profile costs the profile alone; the folder opens with its own.
   W_PROJECT_PROFILE_INVALID: {
     severity: 'warning',

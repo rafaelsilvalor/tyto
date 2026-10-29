@@ -321,6 +321,9 @@ describe('the bridge', () => {
       'on',
       // TYTO-49: a plugin panel's list and its bridge. Exercised by `e2e/panel-plugin.desktop.test.ts`.
       'panel:request',
+      // TYTO-433: Plugins: Sync / Update Plugin Files. Exercised by
+      // `e2e/plugin-files.desktop.test.ts`.
+      'plugin-files:sync',
       // TYTO-207: the plugins' keymaps. Exercised by `e2e/keybindings.desktop.test.ts`.
       'plugins:keymaps',
       'plugins:list',
@@ -468,6 +471,13 @@ describe('switching the language', () => {
     'command.workspace.closeFolder',
     // TYTO-278: the trust banner and the Manage Trust dialog, painted from main's answer.
     'command.workspace.manageTrust',
+    // TYTO-433: the plugin files' commands, command bar only, and the native box main shows
+    // for a fetched plugin that asks for permissions, which no plugin file names here.
+    'command.pluginFiles.sync',
+    'command.pluginFiles.update',
+    'pluginFiles.approve.message',
+    'pluginFiles.approve.load',
+    'pluginFiles.approve.skip',
     'workspace.banner.text',
     'workspace.banner.trust',
     'workspace.banner.problems',

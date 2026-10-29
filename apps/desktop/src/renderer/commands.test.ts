@@ -54,6 +54,8 @@ import {
   TEMPLATES_CHOOSE_FOLDER,
   TEMPLATES_CLEAR_FOLDER,
   WORKSPACE_CLOSE_FOLDER,
+  PLUGIN_FILES_SYNC,
+  PLUGIN_FILES_UPDATE,
   WORKSPACE_MANAGE_TRUST,
   WORKSPACE_SHOW_PROJECT,
   WORKSPACE_OPEN_FOLDER,
@@ -118,6 +120,7 @@ const actions = () =>
     openWorkspaceFolder: vi.fn<() => void>(),
     closeWorkspaceFolder: vi.fn<() => void>(),
     manageTrust: vi.fn<() => void>(),
+    syncPluginFiles: vi.fn<(update: boolean) => void>(),
     showProject: vi.fn<() => void>(),
     editTemplate: vi.fn<() => void>(),
     newTemplate: vi.fn<() => void>(),
@@ -265,6 +268,15 @@ describe('the ids the window registers', () => {
     // TYTO-347.
     expect(registry.run(WORKSPACE_SHOW_PROJECT, NO_VIEW)).toBe(true);
     expect(spies.showProject).toHaveBeenCalledOnce();
+  });
+
+  it('runs the two plugin files commands, the update moving the refs (TYTO-433)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(PLUGIN_FILES_SYNC, NO_VIEW)).toBe(true);
+    expect(registry.run(PLUGIN_FILES_UPDATE, NO_VIEW)).toBe(true);
+    expect(spies.syncPluginFiles.mock.calls).toEqual([[false], [true]]);
   });
 
   it('runs the three recipe commands, each to its own action, with no keystroke (TYTO-377)', () => {

@@ -95,7 +95,7 @@ Sem rede, a cópia buscada antes é usada, e a execução avisa:
 ```
 $ tyto plugin sync --update
 example-pack  ../../my-pack  v1.0.0  c50a1231d0be  home\plugin-files\avisos.yaml
-warning W_PLUGIN_FILE_FETCH Could not fetch '../../my-pack' at 'v1.0.0': fatal: 'C:\Users\rafae\AppData\Local\Temp\t432\my-pack' does not appear to be a git repository. The copy of commit c50a1231d0be435c0717c2fd89715f2a68d755f6 fetched earlier loads.
+home\plugin-files\avisos.yaml: warning W_PLUGIN_FILE_FETCH Could not fetch '../../my-pack' at 'v1.0.0': fatal: 'C:\Users\rafae\AppData\Local\Temp\t432\my-pack' does not appear to be a git repository. The copy of commit c50a1231d0be435c0717c2fd89715f2a68d755f6 fetched earlier loads.
 ```
 
 Um template tirado dos arquivos para de carregar na hora; a cópia dele fica até `tyto plugin clean` apagar as cópias que nenhum lock cita:
@@ -121,6 +121,8 @@ aviso-laranja → aviso (laranja)  home\plugin-files\avisos.yaml
 ```
 
 Numa pasta que não é confiável, os arquivos de plugins do projeto não são carregados nem listados, e `tyto render` e `tyto plugin list` avisam isso numa linha que nomeia `.tyto/plugin-files`.
+
+**O app de mesa faz a mesma sincronização** ao abrir, ao abrir uma pasta de trabalho e com os comandos **Plugins: sincronizar arquivos de plugins** e **Plugins: atualizar arquivos de plugins** (Ctrl+K), este último movendo cada ref como `--update`. Os templates buscados aparecem na lista de templates; um repositório que não respondeu vira uma linha no painel de problemas com o nome dele, e a cópia anterior continua valendo. Um plugin que pede permissões é perguntado numa caixa. Numa pasta que ainda não é confiável, os arquivos de plugins do projeto não são buscados, e a faixa de confiança os conta entre o que ficou de fora.
 
 ### Configurações e apelidos
 

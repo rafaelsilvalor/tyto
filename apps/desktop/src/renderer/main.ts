@@ -1458,6 +1458,12 @@ const registry: CommandRegistry = withCommandGate(
     manageTrust: () => {
       openTrustDialog();
     },
+    syncPluginFiles: (update) => {
+      // Main tells the window with `templates:changed` once the templates it brings are in.
+      void withBridge(async (bridge) => {
+        await bridge['plugin-files:sync']({ update });
+      });
+    },
     showProject: () => {
       showProject();
     },
@@ -5324,6 +5330,12 @@ async function load(): Promise<void> {
       // TYTO-366: an image a preview shows is asked again with its version, so main answers
       // `unchanged` from a `stat` unless the file did change.
       refreshImages();
+    });
+
+    // A sync of the plugin files fetched or dropped a pack (TYTO-433): the picker, the "/"
+    // menu and the problems panel list again, and every open brief is compiled again.
+    bridge.on('templates:changed', () => {
+      void afterTemplatesReread(bridge);
     });
 
     // `settings.json` changed or refused a screen's change (TYTO-206).

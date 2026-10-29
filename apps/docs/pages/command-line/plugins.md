@@ -95,7 +95,7 @@ Without a network, the copy fetched before is used, and the run says so:
 ```
 $ tyto plugin sync --update
 example-pack  ../../my-pack  v1.0.0  c50a1231d0be  home\plugin-files\avisos.yaml
-warning W_PLUGIN_FILE_FETCH Could not fetch '../../my-pack' at 'v1.0.0': fatal: 'C:\Users\rafae\AppData\Local\Temp\t432\my-pack' does not appear to be a git repository. The copy of commit c50a1231d0be435c0717c2fd89715f2a68d755f6 fetched earlier loads.
+home\plugin-files\avisos.yaml: warning W_PLUGIN_FILE_FETCH Could not fetch '../../my-pack' at 'v1.0.0': fatal: 'C:\Users\rafae\AppData\Local\Temp\t432\my-pack' does not appear to be a git repository. The copy of commit c50a1231d0be435c0717c2fd89715f2a68d755f6 fetched earlier loads.
 ```
 
 A template removed from the files stops loading at once; its copy stays until `tyto plugin clean` deletes the copies no lock names:
@@ -121,6 +121,8 @@ aviso-laranja → aviso (laranja)  home\plugin-files\avisos.yaml
 ```
 
 In a folder that is not trusted, the project's plugin files are neither loaded nor listed, and `tyto render` and `tyto plugin list` say so in one line naming `.tyto/plugin-files`.
+
+**The desktop app runs the same sync** when it starts, when it opens a workspace folder, and on **Plugins: Sync Plugin Files** and **Plugins: Update Plugin Files** (Ctrl+K), the second moving every ref as `--update` does. The templates it fetches are in the template list; a repository that did not answer is a row in the problems panel that names it, and the copy fetched before keeps working. A plugin that asks for permissions is asked about in a box. In a folder you have not trusted yet, the project's plugin files are not fetched, and the trust strip counts them among what it left out.
 
 ### Configurations and aliases
 

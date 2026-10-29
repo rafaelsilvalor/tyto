@@ -41,9 +41,15 @@ export const en: Catalogue = {
   'command.workspace.openFolder': 'Open Folder…',
   'command.workspace.closeFolder': 'Close Folder',
   'command.workspace.manageTrust': 'Workspace: Manage Trust',
+  'command.pluginFiles.sync': 'Plugins: Sync Plugin Files',
+  'command.pluginFiles.update': 'Plugins: Update Plugin Files',
+  'pluginFiles.approve.message':
+    "The plugin files name '{plugin}', which asks for these permissions. Load it?",
+  'pluginFiles.approve.load': 'Load it',
+  'pluginFiles.approve.skip': 'Not now',
   'command.workspace.showProject': 'Workspace: Show Project',
   'workspace.banner.text':
-    'This folder is not trusted, so {count} of the folders and sections its project file names were left out.',
+    'This folder is not trusted, so {count} of the folders, sections and plugin files it ships were left out.',
   'workspace.banner.trust': 'Trust this folder',
   'workspace.banner.problems': 'Show problems',
   'workspace.banner.project': 'Show project',

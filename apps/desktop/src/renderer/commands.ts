@@ -152,6 +152,12 @@ export const WORKSPACE_CLOSE_FOLDER = 'workspace.closeFolder';
 /** TYTO-278. The open folder's trust, in a small dialog of its own (ADR 0111). */
 export const WORKSPACE_MANAGE_TRUST = 'workspace.manageTrust';
 /**
+ * TYTO-433. Fetches what the plugin files name, in main (ADR 0151 decision 3): the sync
+ * fetches only what the cache lacks, the update moves every ref to where it is now.
+ */
+export const PLUGIN_FILES_SYNC = 'pluginFiles.sync';
+export const PLUGIN_FILES_UPDATE = 'pluginFiles.update';
+/**
  * TYTO-347. Opens the Project panel: where each place came from (ADR 0114). Open and not
  * toggle, for `queue.show`'s reason; the trust strip's third button runs it too.
  */
@@ -317,6 +323,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [WORKSPACE_OPEN_FOLDER]: 'command.workspace.openFolder',
   [WORKSPACE_CLOSE_FOLDER]: 'command.workspace.closeFolder',
   [WORKSPACE_MANAGE_TRUST]: 'command.workspace.manageTrust',
+  [PLUGIN_FILES_SYNC]: 'command.pluginFiles.sync',
+  [PLUGIN_FILES_UPDATE]: 'command.pluginFiles.update',
   [WORKSPACE_SHOW_PROJECT]: 'command.workspace.showProject',
   [TEMPLATE_EDIT]: 'command.template.edit',
   [TEMPLATE_NEW]: 'command.template.new',
@@ -435,6 +443,8 @@ export interface DesktopActions {
   openWorkspaceFolder(): void;
   closeWorkspaceFolder(): void;
   manageTrust(): void;
+  /** TYTO-433. Syncs the plugin files; `update` moves every ref. */
+  syncPluginFiles(update: boolean): void;
   /** TYTO-347. Opens the Project panel beside Problems. */
   showProject(): void;
   /** TYTO-44. Both open the template mode; what happens in it is a round trip to main. */
@@ -599,6 +609,14 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(WORKSPACE_MANAGE_TRUST, () => {
     actions.manageTrust();
+  });
+
+  add(PLUGIN_FILES_SYNC, () => {
+    actions.syncPluginFiles(false);
+  });
+
+  add(PLUGIN_FILES_UPDATE, () => {
+    actions.syncPluginFiles(true);
   });
 
   add(WORKSPACE_SHOW_PROJECT, () => {

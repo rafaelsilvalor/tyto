@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, isAbsolute, join, relative } from 'node:path';
 
 import { type TemplateRegistry } from '@tyto/core';
+import { PLUGIN_FILES_DIRECTORY } from '@tyto/plugin-api';
 
 import { type IpcResponse } from '../../shared/ipc.js';
 import { type ProjectSnapshot, type ProjectSources } from './project.js';
@@ -166,6 +167,11 @@ export async function createTemplateCatalogue(
         directory: failure.directory,
         diagnostics: flatten(failure.diagnostics),
       })),
+      // The plugin files' last sync (TYTO-433): a repository that could not be fetched is why
+      // its templates are missing or old, said whether or not a brief is open.
+      ...(snapshot.pluginFiles.length === 0
+        ? []
+        : [{ directory: PLUGIN_FILES_DIRECTORY, diagnostics: flatten(snapshot.pluginFiles) }]),
     ];
 
     return { templates: withPreviews, failures };

@@ -954,6 +954,14 @@
     },
     {
       "paths": [
+        "apps/desktop/src/main/plugin-files.ts",
+        "apps/desktop/e2e/plugin-files.desktop.test.ts"
+      ],
+      "e2e": ["plugin-files.desktop.test.ts"],
+      "why": "reviewed: the plugin files' sync in main, the fetched copies' plugin set and the failures the window lists (TYTO-433)"
+    },
+    {
+      "paths": [
         "apps/desktop/src/main/workspace.ts",
         "apps/desktop/src/renderer/project-panel.ts",
         "apps/desktop/src/renderer/trust-dialog.ts",

@@ -4,10 +4,13 @@ import {
   type FormatCatalogue,
   type TemplateFailure,
   type TemplateRegistry,
+  type TemplateRoot,
   loadFormats,
   loadTemplateRegistry,
 } from '@tyto/core';
 import type { InstalledCodePack } from '@tyto/io';
+
+import type { FetchedTemplates } from './plugin-files.js';
 
 /**
  * Which folders this app searches for templates, and the one thing in main that is rebuilt
@@ -36,8 +39,9 @@ import type { InstalledCodePack } from '@tyto/io';
 /** Everything one read of the folders produced, as one value nothing can change under you. */
 export interface ProjectSnapshot {
   /**
-   * In search order, earlier wins: the chosen folder, the built-in pack, then the packs of
-   * installed plugins (ADR 0046) — the CLI's order.
+   * In search order, earlier wins: the chosen folder, the workspace's template folders, the
+   * built-in pack, the packs the plugin files fetched (the project's, then the machine's), then
+   * the packs of installed plugins (ADR 0046, ADR 0151 decision 7) — the CLI's order.
    */
   readonly roots: readonly string[];
   /** Absent when every root was unreadable, which is a window that opens and says so. */
@@ -59,6 +63,12 @@ export interface ProjectSnapshot {
   readonly folder: { readonly path: string; readonly found: number } | undefined;
   /** Installed packs whose code templates are built in their plugin's process (ADR 0048). */
   readonly codePacks: readonly InstalledCodePack[];
+  /**
+   * What the last sync of the plugin files had to say (TYTO-433): a source it could not fetch,
+   * a file it could not read. About the app rather than about a brief, so the window shows it
+   * among the template list's failures, with no brief open too.
+   */
+  readonly pluginFiles: readonly Diagnostic[];
 }
 
 export interface ProjectSources {
@@ -78,7 +88,15 @@ export interface ProjectSources {
     readonly directories: readonly string[];
     readonly warnings: readonly Diagnostic[];
     readonly code?: readonly InstalledCodePack[];
+    /** The plugin each folder came from, so a plugin a file replaces leaves the search. */
+    readonly owners?: ReadonlyMap<string, string>;
   }): Promise<ProjectSnapshot>;
+  /**
+   * The packs the plugin files fetched, after each sync (TYTO-433), searched after the built-in
+   * pack and before the installed ones. A pack offers only the templates its file names, and
+   * an installed plugin a file replaces is left out of the search (ADR 0151 decision 7).
+   */
+  setFetched(fetched: FetchedTemplates): Promise<ProjectSnapshot>;
   /**
    * The open workspace's template folders (TYTO-278, ADR 0113), searched after the chosen
    * folder and before the built-in pack, the order `tyto render` gives them. Empty when no
@@ -118,16 +136,27 @@ export async function createProjectSources({
   };
 
   let installed: readonly string[] = [];
+  let installedOwners: ReadonlyMap<string, string> = new Map();
   let installedWarnings: readonly Diagnostic[] = [];
   let codePacks: readonly InstalledCodePack[] = [];
   let workspaceFolders: readonly string[] = [];
+  let fetched: FetchedTemplates | undefined;
 
   const read = async (chosen: string | undefined): Promise<ProjectSnapshot> => {
+    const replaced = fetched?.replaces ?? new Set<string>();
+    const stillInstalled = installed.filter(
+      (directory) => !replaced.has(installedOwners.get(directory) ?? ''),
+    );
+    const fetchedRoots: TemplateRoot[] = (fetched?.packs.directories ?? []).map((directory) => {
+      const only = fetched?.only.get(directory);
+      return only === undefined ? { directory } : { directory, only };
+    });
     const roots = [
       ...(chosen === undefined ? [] : [chosen]),
       ...workspaceFolders,
       builtIn,
-      ...installed,
+      ...fetchedRoots.map((root) => root.directory),
+      ...stillInstalled,
     ];
 
     const probe = chosen === undefined ? undefined : await countIn(chosen);
@@ -135,7 +164,13 @@ export async function createProjectSources({
     // Earlier wins, which is the CLI's precedence exactly (ADR 0020). `W_TEMPLATE_SHADOWED`
     // arrives in the registry's own warnings and is carried through, so the panel can say a
     // built-in template was replaced rather than leaving it silently absent.
-    const registry = await loadTemplateRegistry(fileSystem, roots);
+    const registry = await loadTemplateRegistry(fileSystem, [
+      ...(chosen === undefined ? [] : [chosen]),
+      ...workspaceFolders,
+      builtIn,
+      ...fetchedRoots,
+      ...stillInstalled,
+    ]);
 
     /**
      * The chosen folder's `formats.yaml` **replaces** the built-in pack's, and falls back to
@@ -181,7 +216,11 @@ export async function createProjectSources({
       ],
       failures: registry.ok ? registry.value.failures : [],
       folder: chosen === undefined ? undefined : { path: chosen, found: probe?.found ?? 0 },
-      codePacks,
+      codePacks: [
+        ...(fetched?.packs.code ?? []),
+        ...codePacks.filter((pack) => !replaced.has(pack.plugin)),
+      ],
+      pluginFiles: fetched?.problems ?? [],
     };
   };
 
@@ -197,8 +236,14 @@ export async function createProjectSources({
     },
     setInstalled: async (packs) => {
       installed = [...packs.directories];
+      installedOwners = packs.owners ?? new Map();
       installedWarnings = [...packs.warnings];
       codePacks = [...(packs.code ?? [])];
+      snapshot = await read(chosenFolder);
+      return snapshot;
+    },
+    setFetched: async (next) => {
+      fetched = next;
       snapshot = await read(chosenFolder);
       return snapshot;
     },

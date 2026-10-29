@@ -16,6 +16,8 @@ export const WORKSPACE_CODES: ReadonlySet<string> = new Set([
   'W_PROJECT_KEY_INVALID',
   'W_PROJECT_PATH_OUTSIDE',
   'W_PROJECT_SECTIONS_WITHHELD',
+  // TYTO-433: the plugin files a restricted folder ships, neither fetched nor loaded.
+  'W_PROJECT_PLUGIN_FILES_WITHHELD',
   'W_PROJECT_PROFILE_INVALID',
   'W_PROJECT_PROFILE_MISSING',
   'W_PROFILE_NESTED',

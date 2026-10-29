@@ -280,3 +280,81 @@ describe("an open workspace's template folders (TYTO-278, ADR 0113)", () => {
     expect((await sources.setWorkspaceFolders([])).roots).toEqual([mine, builtIn]);
   });
 });
+
+describe('the packs the plugin files fetched (TYTO-433, ADR 0151 decision 7)', () => {
+  let projectFiles: string;
+  let machineFiles: string;
+  let installed: string;
+
+  beforeAll(() => {
+    projectFiles = join(scratch, 'fetched-project');
+    pack(projectFiles, [
+      ['tabela', "the project file's"],
+      ['aviso', 'a fetched one, hidden by the built-in pack'],
+      ['rascunho', 'in the pack, but no file names it'],
+    ]);
+    machineFiles = join(scratch, 'fetched-machine');
+    pack(machineFiles, [
+      ['tabela', "the machine file's, hidden"],
+      ['cartaz', "the machine file's"],
+    ]);
+    installed = join(scratch, 'installed-under-files');
+    pack(installed, [
+      ['cartaz', 'an installed one, hidden'],
+      ['selo', 'installed by a plugin a file replaces'],
+    ]);
+  });
+
+  const fetched = (replaces: readonly string[] = []) => ({
+    packs: {
+      directories: [projectFiles, machineFiles],
+      owners: new Map([
+        [projectFiles, 'project-pack'],
+        [machineFiles, 'machine-pack'],
+      ]),
+      code: [],
+      warnings: [],
+      refused: new Set<string>(),
+    },
+    only: new Map([[projectFiles, new Set(['tabela', 'aviso'])]]),
+    replaces: new Set(replaces),
+    problems: [diagnostic('W_PLUGIN_SKIPPED', { plugin: 'fora', reason: 'it could not start.' })],
+  });
+
+  it('searches them after the built-in pack and before installed plugins, earlier winning', async () => {
+    const sources = await sourcesOver();
+    await sources.setInstalled({
+      directories: [installed],
+      warnings: [],
+      owners: new Map([[installed, 'installed-pack']]),
+    });
+
+    const snapshot = await sources.setFetched(fetched());
+
+    // Window's folder, workspace folders, built-in pack, project files, machine files, installed.
+    expect(snapshot.roots).toEqual([builtIn, projectFiles, machineFiles, installed]);
+    expect(snapshot.registry?.get('aviso')?.description).toBe('only in the pack');
+    expect(snapshot.registry?.get('tabela')?.description).toBe("the project file's");
+    expect(snapshot.registry?.get('cartaz')?.description).toBe("the machine file's");
+    expect(snapshot.registry?.get('selo')?.description).toBe(
+      'installed by a plugin a file replaces',
+    );
+    // A fetched pack offers what its file names, and nothing else.
+    expect(snapshot.registry?.get('rascunho')).toBeUndefined();
+    expect(snapshot.pluginFiles.map((item) => item.code)).toEqual(['W_PLUGIN_SKIPPED']);
+  });
+
+  it('leaves out the installed pack of a plugin a file replaces', async () => {
+    const sources = await sourcesOver();
+    await sources.setInstalled({
+      directories: [installed],
+      warnings: [],
+      owners: new Map([[installed, 'installed-pack']]),
+    });
+
+    const snapshot = await sources.setFetched(fetched(['installed-pack']));
+
+    expect(snapshot.roots).toEqual([builtIn, projectFiles, machineFiles]);
+    expect(snapshot.registry?.get('selo')).toBeUndefined();
+  });
+});

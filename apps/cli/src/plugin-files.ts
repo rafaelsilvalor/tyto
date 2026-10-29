@@ -1,32 +1,18 @@
-import { join, resolve } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
+import { hasErrors } from '@tyto/core';
 import {
-  type ConfigurationImageResolver,
-  type ConfiguredTemplate,
-  type Diagnostic,
-  type Diagnostics,
-  diagnostic,
-  hasErrors,
-} from '@tyto/core';
-import {
-  PLUGIN_MANIFEST_FILE,
-  type PluginFilesCopyOnDisk,
+  NO_PLUGIN_FILES,
+  type PluginFilesApproval,
+  type SyncedPluginFiles,
   cleanPluginFilesCache,
-  fsPluginStore,
-  pluginFileImages,
+  machinePluginFiles,
+  projectPluginFiles,
   readPluginFolder,
-  syncPluginFolder,
+  syncPluginFiles as syncPluginFolders,
 } from '@tyto/io';
-import {
-  PLUGIN_API_VERSION,
-  PLUGIN_FILES_DIRECTORY,
-  type PluginFilesLock,
-  checkInstallable,
-  chooseCopies,
-  configuredTemplates,
-  withPluginEntry,
-} from '@tyto/plugin-api';
-import { readFile, stat } from 'node:fs/promises';
+import { type PluginFilesLock } from '@tyto/plugin-api';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
@@ -44,20 +30,12 @@ import { workspaceOfFolder } from './workspace.js';
  * asking anything, so a render touches the network only for a copy the cache lacks, and never
  * moves a pinned ref. `tyto plugin clean` deletes the copies no lock names.
  *
- * A copy then loads as an installed plugin does: its own process, every check at every load,
- * and the approval in `TYTO_HOME/plugins.json` by name, never in a lock a project ships
- * (ADR 0151 decision 6).
+ * The sync itself is `@tyto/io`'s, the one the desktop runs too (TYTO-433). What this module
+ * adds is the CLI's half: its built-in plugins, its paths as the shell shows them, and the
+ * permission prompt at a terminal.
  */
 
-/** Where the machine's plugin files are. */
-export function machinePluginFiles(home: string): string {
-  return join(home, PLUGIN_FILES_DIRECTORY);
-}
-
-/** Where a workspace's plugin files are. */
-export function projectPluginFiles(workspace: string): string {
-  return join(workspace, '.tyto', PLUGIN_FILES_DIRECTORY);
-}
+export { NO_PLUGIN_FILES, type SyncedPluginFiles, machinePluginFiles, projectPluginFiles };
 
 /**
  * The line that names a restricted workspace's plugin files as left out. ADR 0111: what a
@@ -104,159 +82,45 @@ export interface PluginFilesSyncOptions {
   readonly approval: Approval;
 }
 
-export interface SyncedPluginFiles {
-  /** What loads, project before machine. */
-  readonly copies: readonly PluginFilesCopyOnDisk[];
-  /** The templates each folder's files configure, for `resolveTemplateConfigurations`. */
-  readonly configured: {
-    readonly project: readonly ConfiguredTemplate[];
-    readonly machine: readonly ConfiguredTemplate[];
-  };
-  /** Reads the images the configurations name, each inside the folder it may read. */
-  readonly images: ConfigurationImageResolver;
-  /** Each file's text by the name messages carry, to place a range in the file it is in. */
-  readonly texts: ReadonlyMap<string, string>;
-  readonly diagnostics: Diagnostics;
-  /** Plugins left unapproved, which a render skips; for `sync`'s hint. */
-  readonly unapproved: readonly string[];
-}
-
-export const NO_PLUGIN_FILES: SyncedPluginFiles = {
-  copies: [],
-  configured: { project: [], machine: [] },
-  images: () => Promise.resolve({ problem: 'has no folder it may be read from' }),
-  texts: new Map(),
-  diagnostics: [],
-  unapproved: [],
-};
-
-export async function syncPluginFiles(
+export function syncPluginFiles(
   options: PluginFilesSyncOptions,
   environment: CliEnvironment,
 ): Promise<SyncedPluginFiles> {
   const shown = (path: string): string => displayPath(environment.cwd, path);
-  const texts = new Map<string, string>();
-  const folder = (directory: string) =>
-    syncPluginFolder({
-      home: options.home,
-      directory,
-      shown,
-      update: options.update,
-      fetches: options.fetches,
-      onFileRead: (path, source, items) => {
-        texts.set(shown(path), source);
-        registerOrigin(items, { path: shown(path), source });
-      },
-    });
-
-  const projectDirectory =
-    options.workspace?.trusted === true ? projectPluginFiles(options.workspace.folder) : undefined;
-  const project =
-    projectDirectory === undefined
-      ? { copies: [], files: [], diagnostics: [] }
-      : await folder(projectDirectory);
-  const machineDirectory = machinePluginFiles(options.home);
-  const machine = await folder(machineDirectory);
-  const chosen = chooseCopies(project.copies, machine.copies);
-  const diagnostics: Diagnostic[] = [
-    ...project.diagnostics,
-    ...machine.diagnostics,
-    ...chosen.diagnostics,
-  ];
-
-  // A built-in's name is never available, as `tyto plugin install` answers.
-  const builtIns = new Set(builtInManifests().manifests.map((manifest) => manifest.name));
-  const copies = chosen.copies.filter((copy) => {
-    if (!builtIns.has(copy.plugin)) return true;
-    diagnostics.push(
-      diagnostic('E_PLUGIN_NAME_TAKEN', { plugin: copy.plugin, origin: 'built-in' }),
-    );
-    return false;
-  });
-
-  const store = fsPluginStore(options.home);
-  const installed = new Set((await store.list()).map((plugin) => plugin.folder));
-  for (const copy of copies) {
-    if (installed.has(copy.plugin)) {
-      diagnostics.push(
-        diagnostic('W_PLUGIN_FILE_REPLACES_INSTALLED', { plugin: copy.plugin, file: copy.file }),
-      );
-    }
-  }
-
-  const unapproved = await approve(copies, options.approval, environment);
-  return {
-    copies,
-    configured: {
-      project:
-        projectDirectory === undefined ? [] : configuredTemplates(project.files, projectDirectory),
-      machine: configuredTemplates(machine.files, machineDirectory),
+  return syncPluginFolders({
+    home: options.home,
+    ...(options.workspace === undefined ? {} : { workspace: options.workspace }),
+    update: options.update,
+    fetches: options.fetches,
+    builtInNames: new Set(builtInManifests().manifests.map((manifest) => manifest.name)),
+    shown,
+    onFileRead: (path, source, items) => {
+      registerOrigin(items, { path: shown(path), source });
     },
-    images: pluginFileImages({
-      home: options.home,
-      ...(projectDirectory === undefined || options.workspace === undefined
-        ? {}
-        : { workspace: options.workspace.folder }),
-    }),
-    texts,
-    diagnostics,
-    unapproved,
-  };
+    // A failed fetch has no range, so it is printed under the file that named the source.
+    onSourceProblem: (file, items) => {
+      registerOrigin(items, { path: file, source: '' });
+    },
+    ...approvalOf(options.approval, environment),
+  });
 }
 
-/**
- * Records the approval of each copy that needs one, in `plugins.json` by name.
- *
- * A plugin that asks for no permissions needs nobody's yes. One whose permissions were all
- * approved before loads without asking; one that asks for more asks again, which is what
- * reinstalling does. A state file nobody can read approves nothing, and the load says so.
- */
-async function approve(
-  copies: readonly PluginFilesCopyOnDisk[],
+/** The answer `approval` gives: always yes, the prompt at a terminal, or nobody to ask. */
+function approvalOf(
   approval: Approval,
   environment: CliEnvironment,
-): Promise<string[]> {
-  if (environment.home === undefined || copies.length === 0) return [];
-  const store = fsPluginStore(environment.home);
-  const read = await store.readState();
-  if (!read.ok) return [];
-  let state = read.value;
-  const unapproved: string[] = [];
-
-  for (const copy of copies) {
-    const manifestPath = join(copy.directory, PLUGIN_MANIFEST_FILE);
-    const checked = checkInstallable(
-      await readFile(manifestPath, 'utf8').catch(() => ''),
-      manifestPath,
-      PLUGIN_API_VERSION,
-    );
-    // Refused at load, with the reason, like any installed folder.
-    if (!checked.ok) continue;
-    const manifest = checked.value;
-    const entry = state.plugins[manifest.name];
-    const missing = manifest.permissions.filter(
-      (permission) => !(entry?.permissions.includes(permission) ?? false),
-    );
-    if (entry !== undefined && missing.length === 0) continue;
-
-    let yes = missing.length === 0 || approval === 'yes';
-    if (!yes && approval === 'ask' && environment.confirm !== undefined) {
-      environment.console.err(permissionPrompt(manifest, `${copy.git} at ${copy.ref}`));
-      yes = await environment.confirm('Load it? [y/N] ');
-    }
-    if (!yes) {
-      unapproved.push(manifest.name);
-      continue;
-    }
-    state = withPluginEntry(state, manifest.name, {
-      enabled: entry?.enabled ?? true,
-      permissions: manifest.permissions,
-      source: copy.git,
-    });
-  }
-
-  if (state !== read.value) await store.writeState(state);
-  return unapproved;
+): { approve?: PluginFilesApproval } {
+  // Approvals are recorded in the home's `plugins.json`; with no home there is nowhere to.
+  if (environment.home === undefined) return {};
+  if (approval === 'yes') return { approve: () => Promise.resolve(true) };
+  const { confirm } = environment;
+  if (approval === 'never' || confirm === undefined) return {};
+  return {
+    approve: async (manifest, source) => {
+      environment.console.err(permissionPrompt(manifest, source));
+      return confirm('Load it? [y/N] ');
+    },
+  };
 }
 
 /* -------------------------------------------------------------------------- commands -- */

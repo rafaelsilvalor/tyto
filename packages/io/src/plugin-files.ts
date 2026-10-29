@@ -238,7 +238,15 @@ export interface SyncPluginFolderOptions {
    */
   readonly fetches: boolean;
   readonly onFileRead?: FileReadListener;
+  /**
+   * Told the file that named a source a fetch or a check failed for, with what it said: those
+   * diagnostics have no range, so this is how a caller prints them under that file.
+   */
+  readonly onSourceProblem?: SourceProblemListener;
 }
+
+/** The plugin file, as `shown` names it, a source's range-less diagnostics are about. */
+export type SourceProblemListener = (file: string, diagnostics: Diagnostics) => void;
 
 export interface SyncedFolder {
   readonly copies: readonly PluginFilesCopyOnDisk[];
@@ -268,8 +276,17 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
 
   const copies: PluginFilesCopyOnDisk[] = [];
   const lock: PluginFilesLockEntry[] = [];
-  const failed = (step: { git: string; ref: string }, problem: string, kept?: string): void => {
-    diagnostics.push(
+  const about = (file: string, item: Diagnostic): void => {
+    diagnostics.push(item);
+    options.onSourceProblem?.(file, [item]);
+  };
+  const failed = (
+    step: { git: string; ref: string; file: string },
+    problem: string,
+    kept?: string,
+  ): void => {
+    about(
+      step.file,
       diagnostic('W_PLUGIN_FILE_FETCH', {
         git: step.git,
         ref: step.ref,
@@ -334,7 +351,8 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
     }
     const plugin = await pluginOf(fetched.value.directory);
     if (!plugin.ok) {
-      diagnostics.push(
+      about(
+        source.file,
         diagnostic('E_PLUGIN_FILE_SOURCE_REFUSED', {
           git: source.git,
           ref: source.ref,
