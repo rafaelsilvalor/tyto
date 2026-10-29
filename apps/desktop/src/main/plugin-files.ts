@@ -90,6 +90,9 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
         const file = shownPath(request.workspace?.folder, path);
         for (const item of items) placed.set(item, { file, text });
       },
+      onSourceProblem: (file, items) => {
+        for (const item of items) placed.set(item, { file, text: '' });
+      },
       approve: options.approve,
     });
 
@@ -182,9 +185,12 @@ function located(
   item: Diagnostic,
   where: { readonly file: string; readonly text: string } | undefined,
 ): Diagnostic {
-  if (item.range === undefined) return item;
+  if (where === undefined) {
+    const { range: _range, ...rest } = item;
+    return rest;
+  }
+  if (item.range === undefined) return { ...item, message: `${where.file}: ${item.message}` };
   const { range, ...rest } = item;
-  if (where === undefined) return rest;
   const at = lineColumnAtIndex(createLineIndex(where.text), range.start);
   return {
     ...rest,

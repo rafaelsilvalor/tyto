@@ -159,6 +159,7 @@ export {
   type FileReadListener,
   type PluginFilesCopyOnDisk,
   type PluginFolderRead,
+  type SourceProblemListener,
   type SyncPluginFolderOptions,
   type SyncedFolder,
   PLUGIN_FILES_CACHE,

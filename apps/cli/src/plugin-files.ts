@@ -97,6 +97,10 @@ export function syncPluginFiles(
     onFileRead: (path, source, items) => {
       registerOrigin(items, { path: shown(path), source });
     },
+    // A failed fetch has no range, so it is printed under the file that named the source.
+    onSourceProblem: (file, items) => {
+      registerOrigin(items, { path: file, source: '' });
+    },
     ...approvalOf(options.approval, environment),
   });
 }

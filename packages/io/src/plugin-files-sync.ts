@@ -23,6 +23,7 @@ import { pluginFileImages } from './plugin-file-images.js';
 import {
   type FileReadListener,
   type PluginFilesCopyOnDisk,
+  type SourceProblemListener,
   syncPluginFolder,
 } from './plugin-files.js';
 
@@ -67,6 +68,8 @@ export interface PluginFilesSyncOptions {
   readonly shown: (path: string) => string;
   /** Told each file's text, besides the `texts` the answer carries. */
   readonly onFileRead?: FileReadListener;
+  /** Told the file a source's range-less diagnostics are about (a failed fetch, a refusal). */
+  readonly onSourceProblem?: SourceProblemListener;
   /** Absent: nobody is asked, and a plugin that needs a yes is left unapproved. */
   readonly approve?: PluginFilesApproval;
 }
@@ -111,6 +114,9 @@ export async function syncPluginFiles(options: PluginFilesSyncOptions): Promise<
         texts.set(shown(path), source);
         options.onFileRead?.(path, source, items);
       },
+      ...(options.onSourceProblem === undefined
+        ? {}
+        : { onSourceProblem: options.onSourceProblem }),
     });
 
   const projectDirectory =

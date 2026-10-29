@@ -233,6 +233,29 @@ describe('what the window gets', () => {
   });
 });
 
+describe('a range-less row', () => {
+  it('carries the plugin file that named the source it is about (TYTO-433)', async () => {
+    const failed = diagnostic('W_PLUGIN_FILE_FETCH', {
+      git: 'https://example.invalid/tabela.git',
+      ref: 'v1',
+      problem: 'fatal: repository not found',
+      outcome: 'Nothing from it loads.',
+    });
+    const { plugins, applied } = harness([], undefined, {
+      sync: (options) => {
+        options.onSourceProblem?.('/home/.tyto/plugin-files/templates.yaml', [failed]);
+        return Promise.resolve(synced([], [failed]));
+      },
+    });
+
+    await plugins.sync({ update: false });
+
+    expect(applied[0]?.problems[0]?.message).toBe(
+      `/home/.tyto/plugin-files/templates.yaml: ${failed.message}`,
+    );
+  });
+});
+
 describe('shownPath', () => {
   it('shortens a path inside the open folder and leaves any other whole', () => {
     expect(shownPath('/work', '/work/.tyto/plugin-files/a.yaml')).toMatch(/^\.tyto/u);

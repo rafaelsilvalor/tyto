@@ -321,6 +321,10 @@ describe('a source that cannot be reached', () => {
       expect(await sync('--update')).toBe(EXIT_OK);
       expect(stderr()).toContain('W_PLUGIN_FILE_FETCH');
       expect(stderr()).toContain('fetched earlier loads');
+      // Under the file that named the source, though the diagnostic has no range (TYTO-433).
+      expect(stderr()).toContain(
+        `${join('home', '.tyto', 'plugin-files', 'templates.yaml')}: warning W_PLUGIN_FILE_FETCH`,
+      );
 
       const rendered = await render();
       expect(rendered.code, stderr()).toBe(EXIT_OK);

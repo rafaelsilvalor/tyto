@@ -277,7 +277,7 @@ describe('a restricted workspace', () => {
 
 describe('a plugin-file diagnostic with no range', () => {
   it(
-    "prints with no path, not under the brief's name",
+    "prints under the plugin file that named the source, not under the brief's name",
     async () => {
       await machineYaml([
         'version: 1',
@@ -291,7 +291,11 @@ describe('a plugin-file diagnostic with no range', () => {
 
       await render(brief);
 
-      expect(stderr()).toMatch(/^warning W_PLUGIN_FILE_FETCH /mu);
+      // Under its plugin file since TYTO-433, which tells the sync which file named the source.
+      expect(stderr()).toContain(
+        `${join('home', '.tyto', 'plugin-files', 'templates.yaml')}: warning W_PLUGIN_FILE_FETCH `,
+      );
+      expect(stderr()).not.toMatch(/^aviso\.brief: warning W_PLUGIN_FILE_FETCH/mu);
       // The brief's own problem still prints under its name.
       expect(stderr()).toMatch(/^aviso\.brief:\d+:\d+: error E_UNKNOWN_TEMPLATE /mu);
     },
