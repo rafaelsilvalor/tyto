@@ -892,6 +892,15 @@ async function start(): Promise<void> {
       read: folderThemeReader(pluginStore.directoryOf(plugin)),
     }));
   void contributed.ready.then(themesReady);
+  // The brands the started plugins' kits offer, the kits the preview draws with, so a plugin
+  // file's configuration naming another is a problem row at its `brand:` (TYTO-471, ADR 0155).
+  // Kept by `sources` for every read after, so a sync or an install says it again.
+  void contributed.ready.then(async () => {
+    await sources.setKitBrands(new Set(contributed.brandKits().kits.keys()));
+    const contents = mainWindow?.webContents;
+    if (contents === undefined || contents.isDestroyed()) return;
+    sendIpcEvent(contents, 'templates:changed', {});
+  });
   // The recipe notebook's runner (TYTO-377, ADR 0148): the plugins' verbs, each with its own
   // section of the folder a recipe is in, read per call (ADR 0147); the folder's trust and data
   // files; the recipe's state in the same `TYTO_HOME`; and the clock in the setting's zone.
