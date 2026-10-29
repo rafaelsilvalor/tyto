@@ -318,13 +318,17 @@ what a `font:<family>` permission sends.
 A kit is what a template draws as its brand's logo and signature, supplied by a plugin rather
 than written into the template (ADR 0063). The contribution is `{ id, brands }`: `id` names the
 kit, and `brands` maps a brand id — spelled as a manifest's `brand` (ADR 0052) — to
-`{ logo?, wordmark?, signature? }`. A logo or a wordmark is a `MarkShape`, `{ box, d, fillRule }`,
+`{ logo?, wordmark?, signature?, colors? }`. A logo or a wordmark is a `MarkShape`, `{ box, d, fillRule }`,
 or toned layers, `{ box, layers: [{ tone, d, fillRule }] }` with `tone` `primary` or
 `secondary` (ADR 0066) — never a colour: the template decides each tone's colour where it places
 the mark, and a one-shape mark is all `primary`. A mark's paths together are at most 65 536
 characters, a toned mark has at most 16 layers, and a signature is at most 500 characters.
+`colors` holds the brand's `accent`, a hex colour, and nothing else (ADR 0155): any other key
+is refused at activation, and a second colour joins by an ADR. Protocol 11 carries it; a guest
+or host on 10 refuses a kit with colours, so the handshake refuses the pair first.
 
-A template reads the kit of **its own** brand from `context.brand`, and never another's. A
+A template reads the kit of **its brand** from `context.brand`: the brand of the plugin file
+configuration the brief reached, else its manifest's (ADR 0155), and never another's. A
 template that names no brand, or whose brand nobody supplied, gets both fields `undefined`, and
 draws its own stand-in. The composition root merges every plugin's kits with
 `registry.brandKitsByBrand()` and hands the map to the job as `brandKits`. **Earlier wins**, in

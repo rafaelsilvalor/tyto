@@ -69,6 +69,13 @@ export interface BrandKit {
   /** The brand's name drawn as a mark, for the layouts that set it beside the logo (ADR 0066). */
   readonly wordmark?: BrandMark;
   readonly signature?: string;
+  /** The brand's colours (ADR 0155). A template reads each with a fallback of its own. */
+  readonly colors?: BrandColors;
+}
+
+/** The colours a kit carries: the brand's accent, and nothing else until an ADR adds one. */
+export interface BrandColors {
+  readonly accent?: string;
 }
 
 /** The kit of a template whose brand nobody supplied one for, or that names no brand. */

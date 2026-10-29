@@ -113,6 +113,7 @@ export {
 } from './template/define.js';
 
 export {
+  type BrandColors,
   type BrandKit,
   type BrandMark,
   type MarkLayer,
@@ -126,6 +127,7 @@ export {
   MARK_LAYER_LIMIT,
   MARK_PATH_LIMIT,
   SIGNATURE_LIMIT,
+  brandColorsSchema,
   brandIdSchema,
   brandKitSchema,
   brandMarkSchema,

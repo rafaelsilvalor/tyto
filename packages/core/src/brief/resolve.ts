@@ -84,6 +84,11 @@ export interface ResolvedBrief {
   readonly configuration?: string;
   /** That configuration's values, checked already, for `compile` (ADR 0153). */
   readonly values?: SuppliedValues;
+  /**
+   * The brand that configuration draws (ADR 0155), whose kit `compile` hands the template in
+   * place of the manifest's. Absent when it names none.
+   */
+  readonly brand?: string;
 }
 
 export interface ResolveOptions {
@@ -757,7 +762,12 @@ export async function resolve(
   return fromPartial(
     selection?.configuration === undefined
       ? built
-      : { ...built, configuration: selection.configuration, values: selection.values },
+      : {
+          ...built,
+          configuration: selection.configuration,
+          values: selection.values,
+          ...(selection.brand === undefined ? {} : { brand: selection.brand }),
+        },
     resolver.diagnostics,
   );
 }

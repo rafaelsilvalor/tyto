@@ -6,6 +6,7 @@ import {
   overlayBrief,
 } from './configured-brief.js';
 import { checkValue } from './declared-values.js';
+import { BRAND_ID } from './manifest.js';
 
 import type { AssetRef } from '../scene/primitives.js';
 import type { SourceRange } from '../source/range.js';
@@ -47,6 +48,8 @@ export interface ConfigurationEntry {
   readonly values: Readonly<Record<string, SuppliedValue>>;
   /** The brief side: slot defaults, formats, skeleton and editor rules (TYTO-440). */
   readonly brief?: ConfigurationBrief;
+  /** The brand whose kit the configuration draws, as written (ADR 0155). */
+  readonly brand?: SuppliedValue;
 }
 
 /** The name a brief reaches a configuration by: its alias, or `<template>-<configuration>`. */
@@ -89,6 +92,11 @@ export interface TemplateSelection {
   readonly values: SuppliedValues;
   /** The configuration's brief side, checked. Absent when no configuration is reached. */
   readonly brief?: BriefDefaults;
+  /**
+   * The brand the configuration draws, its own or its `default`'s (ADR 0155). Absent when
+   * neither names one, and the manifest's `brand` stands.
+   */
+  readonly brand?: string;
 }
 
 /** An alias that loads, for a list or a picker. */
@@ -130,6 +138,12 @@ export interface ResolveConfigurationsInput {
   /** The templates that loaded, filtered packs included: what an alias may not be named. */
   readonly registry: TemplateRegistry;
   readonly images: ConfigurationImageResolver;
+  /**
+   * The brands the installed kits offer (ADR 0155). When given, a configuration naming a
+   * brand outside it is `W_BRAND_KIT_MISSING` at its `brand:`; an app that cannot tell yet
+   * leaves it out, and nothing is said.
+   */
+  readonly kitBrands?: ReadonlySet<string>;
 }
 
 interface Placed {
@@ -140,6 +154,7 @@ interface Placed {
 interface Checked {
   readonly values: SuppliedValues;
   readonly brief: BriefDefaults;
+  readonly brand?: string;
 }
 
 interface Candidate extends Placed {
@@ -252,11 +267,17 @@ export async function resolveTemplateConfigurations(
     // A named configuration starts from the entry's `default` and changes what it lists.
     // The default is checked once, as itself, so a value it refuses is said once.
     const base = entry.configurations.find((item) => item.name === entry.default);
-    const own = { values, brief };
+    const brand = checkBrand(manifest, entry, configuration, input.kitBrands, report);
+    const own: Checked = { values, brief, ...(brand === undefined ? {} : { brand }) };
     let result = own;
     if (base !== undefined && base !== configuration) {
       const from = await checkedOf({ entry, scope }, base);
-      result = { values: { ...from.values, ...values }, brief: overlayBrief(from.brief, brief) };
+      const inherited = brand ?? from.brand;
+      result = {
+        values: { ...from.values, ...values },
+        brief: overlayBrief(from.brief, brief),
+        ...(inherited === undefined ? {} : { brand: inherited }),
+      };
     }
     checked.set(configuration, result);
     return result;
@@ -265,8 +286,14 @@ export async function resolveTemplateConfigurations(
     placed: Placed,
     configuration: ConfigurationEntry,
   ): Promise<TemplateSelection> => {
-    const { values, brief } = await checkedOf(placed, configuration);
-    return { template: placed.entry.template, configuration: configuration.name, values, brief };
+    const { values, brief, brand } = await checkedOf(placed, configuration);
+    return {
+      template: placed.entry.template,
+      configuration: configuration.name,
+      values,
+      brief,
+      ...(brand === undefined ? {} : { brand }),
+    };
   };
 
   const selections = new Map<string, TemplateSelection>();
@@ -298,6 +325,46 @@ export async function resolveTemplateConfigurations(
     configurations: { select: (name) => selections.get(name), aliases: () => listed },
     diagnostics,
   };
+}
+
+/**
+ * A configuration's own `brand:` (ADR 0155): spelled as a manifest's (ADR 0052), or a
+ * warning and the brand it would have had without it. A brand no installed kit offers still
+ * draws, with the placeholders and the template's fallback accent, and says so once here.
+ */
+function checkBrand(
+  manifest: TemplateManifest,
+  entry: ConfiguredTemplate,
+  configuration: ConfigurationEntry,
+  kitBrands: ReadonlySet<string> | undefined,
+  report: (file: string, item: Diagnostic) => void,
+): string | undefined {
+  const supplied = configuration.brand;
+  if (supplied === undefined) return undefined;
+  const where = atRange(supplied.range);
+  const brand = supplied.value;
+  if (typeof brand !== 'string' || !BRAND_ID.test(brand)) {
+    report(
+      entry.file,
+      diagnostic(
+        'W_CONFIGURATION_BRAND_INVALID',
+        { configuration: configuration.name, template: manifest.name },
+        where,
+      ),
+    );
+    return undefined;
+  }
+  if (kitBrands !== undefined && !kitBrands.has(brand)) {
+    report(
+      entry.file,
+      diagnostic(
+        'W_BRAND_KIT_MISSING',
+        { brand, alias: configurationAlias(entry.template, configuration) },
+        where,
+      ),
+    );
+  }
+  return brand;
 }
 
 /**

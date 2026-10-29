@@ -3,7 +3,7 @@ import { pillTable } from '@tyto/template-kit';
 import { describe, expect, it } from 'vitest';
 
 import { approvedTable, sessionTable } from './presets.js';
-import { APPROVED } from './tokens.js';
+import { APPROVED, INK } from './tokens.js';
 
 import type { Inline, RichText } from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
@@ -45,7 +45,7 @@ function words(draft: NodeDraft, name: string): string[] {
 const WIDTH = 940;
 
 describe('approvedTable', () => {
-  const table = pillTable(approvedTable, {
+  const table = pillTable(approvedTable(INK), {
     text: rich('ENDODONTIA\n1º | Ana Beatriz Souza\n2º | Carlos Menezes\n43º | daniela prado'),
     width: APPROVED.table.max,
     measure: measureNothing,
@@ -73,7 +73,7 @@ describe('approvedTable', () => {
   });
 
   it('adds nothing to a rank the brief left empty', () => {
-    const empty = pillTable(approvedTable, {
+    const empty = pillTable(approvedTable(INK), {
       text: rich('ENDODONTIA\n | Sem colocação'),
       width: APPROVED.table.max,
       measure: measureNothing,
@@ -84,7 +84,7 @@ describe('approvedTable', () => {
 
 describe('sessionTable', () => {
   it('reads a discipline heading and its sessions out of one slot', () => {
-    const table = pillTable(sessionTable, {
+    const table = pillTable(sessionTable(INK), {
       text: rich('FARMÁCIA\n16/09 - 14:00 | Farmacologia Geral | Profª. Marcela Rocha'),
       width: WIDTH,
       measure: measureNothing,

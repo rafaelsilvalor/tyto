@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { BRAND_ID } from './manifest.js';
+import { BRAND_ID, HEX_COLOR } from './manifest.js';
 
 /**
  * The checks a brand kit meets where it arrives as somebody else's data — registered by an
@@ -67,10 +67,19 @@ export const tonedMarkSchema = z
 /** A kit's logo or wordmark: one shape, or toned layers (ADR 0066). */
 export const brandMarkSchema = z.union([markSchema, tonedMarkSchema]);
 
+/**
+ * A kit's colours (ADR 0155): closed, so a colour nobody declared is refused at activation
+ * rather than read by a template that guessed its name. A second colour joins by an ADR.
+ */
+export const brandColorsSchema = z.strictObject({
+  accent: z.string().regex(HEX_COLOR, "must be a hex colour such as '#5900a7'").optional(),
+});
+
 export const brandKitSchema = z.strictObject({
   logo: brandMarkSchema.optional(),
   wordmark: brandMarkSchema.optional(),
   signature: z.string().max(SIGNATURE_LIMIT).optional(),
+  colors: brandColorsSchema.optional(),
 });
 
 /** A brand id, as a manifest's `brand` spells it (ADR 0052). */

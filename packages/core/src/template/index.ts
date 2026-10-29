@@ -23,6 +23,7 @@ export {
 } from './define.js';
 
 export {
+  type BrandColors,
   type BrandKit,
   type BrandMark,
   type MarkLayer,
