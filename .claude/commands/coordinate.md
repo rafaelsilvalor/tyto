@@ -164,10 +164,16 @@ Protocol (non-negotiable):
 2. Fresh branch from origin/main: <feat|fix|chore|docs>/<KEY>-<slug>. No
    stacked PRs.
 3. Vitest tests. Perturb each mechanism you add and paste the red output.
-   Desktop e2e with its own --user-data-dir and TYTO_HOME, closeApp(), and
-   `TURBO_FORCE=1 pnpm build` first; run the WHOLE test:desktop and look at the
-   real window. With no Electron binary in the worktree, use
-   ELECTRON_OVERRIDE_DIST_PATH="D:/Projects/tyto/apps/desktop/node_modules/electron/dist".
+   Locally run only: typecheck, lint, the tests of the packages you touch, and
+   the desktop e2e file(s) the card creates or changes. Do NOT run the whole
+   test:desktop locally: the draft PR's CI runs the full suite, and a red there
+   comes back to you on the same draft. Look at the real window only when the
+   card changes layout. Desktop e2e with its own --user-data-dir and TYTO_HOME,
+   closeApp(), and a fresh build first (`TURBO_FORCE=1 pnpm build`; where
+   Smart App Control blocks turbo.exe, `pnpm -r --if-present run
+   generate:parser && pnpm -r --workspace-concurrency=2 run build`). With no
+   Electron binary in the worktree, use
+   ELECTRON_OVERRIDE_DIST_PATH="C:/projects/tyto/tyto/apps/desktop/node_modules/electron/dist".
    An e2e test asserts only what needs the real window (layout, focus, keys,
    IPC, the package); logic is tested in packages/* or jsdom, and a file has a
    60 s budget on CI (ADR 0105, docs/conventions.md).
