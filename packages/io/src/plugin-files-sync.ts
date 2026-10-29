@@ -100,6 +100,25 @@ export const NO_PLUGIN_FILES: SyncedPluginFiles = {
   unapproved: [],
 };
 
+/**
+ * Each entry with the plugin that fetched its template, so its configurations reach that
+ * template and not one another source wins the name with (TYTO-462).
+ *
+ * Every entry names a source (`source is required`), and once copies are chosen a template a
+ * file names is listed by at most one copy. An entry no copy lists was not fetched, by a
+ * fetch that failed or a name refused, and is left out: it configures nothing, as a template
+ * that did not load configures nothing, and the fetch has said why on its own.
+ */
+function fetchedBy(
+  entries: readonly ConfiguredTemplate[],
+  copies: readonly PluginFilesCopyOnDisk[],
+): ConfiguredTemplate[] {
+  return entries.flatMap((entry) => {
+    const copy = copies.find((item) => item.templates.includes(entry.template));
+    return copy === undefined ? [] : [{ ...entry, plugin: copy.plugin }];
+  });
+}
+
 export async function syncPluginFiles(options: PluginFilesSyncOptions): Promise<SyncedPluginFiles> {
   const { shown } = options;
   const texts = new Map<string, string>();
@@ -157,8 +176,10 @@ export async function syncPluginFiles(options: PluginFilesSyncOptions): Promise<
     copies,
     configured: {
       project:
-        projectDirectory === undefined ? [] : configuredTemplates(project.files, projectDirectory),
-      machine: configuredTemplates(machine.files, machineDirectory),
+        projectDirectory === undefined
+          ? []
+          : fetchedBy(configuredTemplates(project.files, projectDirectory), copies),
+      machine: fetchedBy(configuredTemplates(machine.files, machineDirectory), copies),
     },
     images: pluginFileImages({
       home: options.home,

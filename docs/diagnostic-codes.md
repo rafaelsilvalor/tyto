@@ -70,6 +70,7 @@ non-zero.
 | `E_PLUGIN_FILE_ENTRY` | error | no | An entry of a plugin file was refused, and that entry alone does not load. |
 | `E_PLUGIN_FILE_DUPLICATE` | error | no | One name is given twice in one folder's plugin files, so that folder supplies it from neither. |
 | `W_PLUGIN_FILE_OVERRIDDEN` | warning | no | A project's plugin file names what the machine's names too, and the project's wins. |
+| `W_PLUGIN_FILE_TEMPLATE_SHADOWED` | warning | no | A plugin file configures a template from a plugin, and another source wins that name, so the configurations do not apply. |
 | `W_PLUGIN_FILE_REPLACES_INSTALLED` | warning | no | A plugin from the plugin files has the name of one installed with tyto plugin install. |
 | `W_PLUGIN_FILE_FETCH` | warning | no | A source the plugin files name could not be fetched. |
 | `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A commit a plugin file names was fetched and could not be loaded as a plugin. |
@@ -1932,6 +1933,20 @@ Something loads; it is the project entry rather than the machine one.
 ```
 
 Parameters: `name`, `file`, `other`
+
+### `W_PLUGIN_FILE_TEMPLATE_SHADOWED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A plugin file configures a template from a plugin, and another source wins that name, so the configurations do not apply.
+
+The template that won the name renders with its own defaults.
+
+```
+'{file}' configures template '{template}' from plugin '{plugin}', but the one in '{used}' is used; its configurations and aliases do not apply to it.
+```
+
+Parameters: `file`, `template`, `plugin`, `used`
 
 ### `W_PLUGIN_FILE_REPLACES_INSTALLED`
 

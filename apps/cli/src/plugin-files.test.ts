@@ -452,6 +452,45 @@ describe('configurations and aliases (TYTO-439)', () => {
   );
 
   it(
+    'gives a project folder template that shadows the fetched one none of the file’s values (TYTO-462)',
+    async () => {
+      const pack = await repository('pack');
+      await machineYaml(
+        [
+          'version: 1',
+          'templates:',
+          '  aviso:',
+          `    source: { git: '${urlOf(pack)}', ref: v1 }`,
+          '    default: laranja',
+          '    configurations:',
+          '      laranja:',
+          '        values:',
+          "          paper: '#ffffff'",
+          '',
+        ].join('\n'),
+      );
+      // The project's own `aviso`, painted green so its render is told from the pack's.
+      const local = join(workspace, 'templates', 'aviso');
+      await cp(join(EXAMPLE_PACK, 'templates', 'aviso'), local, { recursive: true });
+      await edit(join(local, 'template.html'), (text) => text.replaceAll(ORANGE, '#00aa55'));
+
+      const rendered = await render();
+
+      expect(rendered.code, stderr()).toBe(EXIT_OK);
+      expect(rendered.svg).toContain('#00aa55');
+      // Not checked against the local template at all: `paper` would be unknown to it too.
+      expect(rendered.codes).not.toContain('W_TEMPLATE_VALUE_UNKNOWN');
+      expect(rendered.codes).toContain('W_PLUGIN_FILE_TEMPLATE_SHADOWED');
+      expect(stderr()).toMatch(/templates\.yaml:3:3: warning W_PLUGIN_FILE_TEMPLATE_SHADOWED/u);
+
+      const alias = await render(await briefNaming('aviso-laranja'));
+      expect(alias.code).toBe(EXIT_DIAGNOSTICS);
+      expect(alias.codes).toContain('E_UNKNOWN_TEMPLATE');
+    },
+    SLOW,
+  );
+
+  it(
     'offers only the templates the file names from a fetched pack',
     async () => {
       const pack = await repository('pack');

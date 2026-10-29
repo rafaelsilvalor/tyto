@@ -32,6 +32,13 @@ export interface TemplateRegistry {
   /** Where the template lives, which is what an asset path in it is relative to. */
   directoryOf(name: string): string | undefined;
   /**
+   * The label the app gave the root the template came from, such as the plugin that fetched
+   * it; undefined for a root it gave none. What binds a plugin file's configuration to the
+   * template that file fetched rather than to whichever won the name (TYTO-462). Optional so
+   * that a registry built by hand, for a test or a single folder, need not invent one.
+   */
+  originOf?(name: string): string | undefined;
+  /**
    * One entry per folder whose manifest could not be read. A broken template is not a
    * broken registry: the other templates still render, and a caller that wants to surface
    * the failures reads them here rather than losing the working ones to an `Err`.
@@ -56,11 +63,14 @@ function readFailure(path: string, cause: unknown): Diagnostics {
 export interface TemplateRoot {
   readonly directory: string;
   readonly only?: ReadonlySet<string>;
+  /** An opaque label for where the root came from, which `originOf` answers. */
+  readonly origin?: string;
 }
 
 interface Entry {
   readonly manifest: TemplateManifest;
   readonly directory: string;
+  readonly origin?: string;
   /** Which root it came from, by index — what tells a shadow apart from a duplicate. */
   readonly root: number;
 }
@@ -111,7 +121,7 @@ export async function loadTemplateRegistry(
   const warnings: Diagnostic[] = [];
   const unreadable: Diagnostics[] = [];
 
-  for (const [index, { directory: root, only }] of search.entries()) {
+  for (const [index, { directory: root, only, origin }] of search.entries()) {
     let rootEntries: readonly { name: string; isDirectory: boolean }[];
     try {
       rootEntries = await fileSystem.readDirectory(root);
@@ -182,7 +192,12 @@ export async function loadTemplateRegistry(
         continue;
       }
 
-      entries.set(parsed.value.name, { manifest: parsed.value, directory, root: index });
+      entries.set(parsed.value.name, {
+        manifest: parsed.value,
+        directory,
+        root: index,
+        ...(origin === undefined ? {} : { origin }),
+      });
     }
   }
 
@@ -203,6 +218,7 @@ export async function loadTemplateRegistry(
       get: (name) => entries.get(name)?.manifest,
       formatsOf: (name) => entries.get(name)?.manifest.formats,
       directoryOf: (name) => entries.get(name)?.directory,
+      originOf: (name) => entries.get(name)?.origin,
       failures,
     },
     warnings,

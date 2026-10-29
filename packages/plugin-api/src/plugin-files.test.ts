@@ -66,6 +66,8 @@ describe('a plugin file', () => {
     expect(roxo?.alias).toBe('tabela-roxo');
     expect(at(roxo?.aliasRange)).toBe('tabela-roxo');
     expect(at(roxo?.range)).toBe('roxo');
+    // The entry's own name, where a warning about the whole entry points (TYTO-462).
+    expect(at(tabela?.range)).toBe('tabela');
     expect(roxo?.brief).toEqual({});
     // Each value keeps where it was written, so a refused one is a warning at it.
     expect(roxo?.values.background?.value).toBe('#4b2a7b');
@@ -97,6 +99,7 @@ describe('a plugin file', () => {
     expect(configuredTemplates([one], '/w')[0]).toMatchObject({
       template: 'tabela',
       default: 'roxo',
+      range: one.templates[0]?.range,
     });
   });
 
@@ -119,6 +122,19 @@ describe('a plugin file', () => {
     expect(read.diagnostics[0]?.message).toContain("'templates.a.source.ref'");
     expect(read.diagnostics[0]?.range).toBeDefined();
     expect(read.value?.templates.map((template) => template.name)).toEqual(['b']);
+  });
+
+  it('refuses an entry that configures a template without fetching it', () => {
+    // So every configuration names the plugin it was written for, and binds to its template
+    // rather than to a built-in or a folder template of the same name (TYTO-462).
+    const read = parsePluginFile(
+      'version: 1\ntemplates:\n  tabela-roxo:\n    configurations: { escura: { values: {} } }\n',
+      'built-in.yaml',
+    );
+
+    expect(codes(read)).toEqual(['E_PLUGIN_FILE_ENTRY']);
+    expect(read.diagnostics[0]?.message).toContain("'templates.tabela-roxo.source'");
+    expect(read.value?.templates).toEqual([]);
   });
 
   it('warns on an unknown key and loads the entry anyway', () => {
