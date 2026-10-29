@@ -169,12 +169,40 @@ describe('a sync', () => {
       .fn<(options: PluginFilesSyncOptions) => Promise<SyncedPluginFiles>>()
       .mockRejectedValueOnce(new Error('disk'))
       .mockResolvedValue(NO_PLUGIN_FILES);
-    const { plugins, applied } = harness([], undefined, { sync });
+    const { plugins, started } = harness([], undefined, {
+      sync: (options) =>
+        sync(options).then((answer) =>
+          answer === NO_PLUGIN_FILES ? synced([copy('tabela')]) : answer,
+        ),
+    });
 
     await expect(plugins.sync({ update: false })).rejects.toThrow('disk');
     await plugins.sync({ update: false });
 
+    expect(started).toHaveLength(1);
+  });
+
+  it('tells the window nothing when a sync changed nothing, a start with no files included', async () => {
+    const one = copy('tabela');
+    const { plugins, applied, started } = harness([
+      synced([]),
+      synced([one]),
+      synced([one]),
+      synced([]),
+    ]);
+
+    await plugins.sync({ update: false });
+    expect(applied).toHaveLength(0);
+    expect(started).toHaveLength(0);
+
+    await plugins.sync({ update: false });
+    await plugins.sync({ update: false });
     expect(applied).toHaveLength(1);
+
+    // Dropping the last copy is a change: its templates leave the search.
+    await plugins.sync({ update: false });
+    expect(applied).toHaveLength(2);
+    expect(applied[1]?.replaces.size).toBe(0);
   });
 });
 

@@ -9,7 +9,7 @@ import {
   type SyncedPluginFiles,
   pluginStoreWithCopies,
 } from '@tyto/io';
-import type { LoadedPlugins, PluginStore } from '@tyto/plugin-api';
+import { type LoadedPlugins, NO_PLUGINS, type PluginStore } from '@tyto/plugin-api';
 
 /**
  * The plugin files, for the desktop (ADR 0151, TYTO-433).
@@ -76,6 +76,8 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
   let running: Promise<void> = Promise.resolve();
   let loaded: LoadedPlugins | undefined;
   let loadedKey = '';
+  /** What the last sync the window was told about said, to tell a sync that changed nothing. */
+  let lastSaid = '';
 
   const once = async (request: PluginFilesRequest): Promise<void> => {
     const placed = new Map<Diagnostic, { readonly file: string; readonly text: string }>();
@@ -96,19 +98,30 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
       approve: options.approve,
     });
 
+    const problems = synced.diagnostics.map((item) => located(item, placed.get(item)));
+    const said = problems.map((item) => `${item.code} ${item.message}`).join('\n');
+    // **A sync that changed nothing tells the window nothing.** Every open brief is compiled
+    // again on `templates:changed`, and a folder opened with no plugin files, or a start with
+    // the same copies as before, must not cost a compile (seen on CI: a `.md` opened from the
+    // explorer counted a brief preview it never asked for).
+    const key = keyOf(synced.copies);
+    const started = key === '' || loaded !== undefined;
+    if (key === loadedKey && started && said === lastSaid) return;
+
     // Started again only when what loads changed: a sync that fetched nothing new must not
     // cost every fetched plugin its process.
-    const key = keyOf(synced.copies);
-    if (loaded === undefined || key !== loadedKey) {
+    if (key !== loadedKey || !started) {
       const before = loaded;
       // Forgotten before the start, so a start that throws leaves the next sync to start one.
       loaded = undefined;
       await before?.close();
-      loaded = await options.start(copiesOnly(options.home, synced.copies));
+      if (key !== '') loaded = await options.start(copiesOnly(options.home, synced.copies));
       loadedKey = key;
     }
+    lastSaid = said;
+    const current = loaded ?? NO_PLUGINS;
     const byName = new Map(synced.copies.map((copy) => [copy.plugin, copy]));
-    const packs = await options.packs(loaded, (plugin) => byName.get(plugin)?.directory ?? '');
+    const packs = await options.packs(current, (plugin) => byName.get(plugin)?.directory ?? '');
 
     const only = new Map<string, ReadonlySet<string>>();
     for (const [directory, plugin] of packs.owners) {
@@ -119,11 +132,7 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
       packs,
       only,
       replaces: new Set(byName.keys()),
-      problems: [
-        ...synced.diagnostics.map((item) => located(item, placed.get(item))),
-        ...loaded.warnings,
-        ...packs.warnings,
-      ],
+      problems: [...problems, ...current.warnings, ...packs.warnings],
     });
   };
 
