@@ -21,7 +21,7 @@ templates:
   concursos-abertos:
     source:
       git: https://github.com/rafaelsilvalor/tyto-template-concursos-abertos.git
-      ref: v0.1.0
+      ref: v0.2.0
 ```
 
 O Tyto busca esses templates quando abre, quando você abre uma pasta de trabalho e pelos comandos **Plugins: sincronizar
@@ -69,9 +69,9 @@ assinatura e a cor daquela marca. Assim, a tabela roxa e a tabela azul podem ser
 
 O protocolo entre o Tyto e o processo de um plugin passou para a **versão 11** (`@tyto/plugin-api` 0.9.0). Um plugin
 que roda o próprio processo e foi construído para a versão 10 é recusado ao conectar, com uma mensagem que diz os dois
-números: reconstrua-o contra a `plugin-api` nova. Um pacote de templates como `tyto-template-tabela` e
-`tyto-template-concursos-abertos` roda no ambiente do próprio Tyto e não precisa de nada: os dois carregaram e
-desenharam nesta versão antes de ela sair.
+números: atualize-o para a `plugin-api` nova. Os repositórios de template recebem essa atualização num pull request
+aberto automaticamente. As versões de `tyto-template-tabela` e `tyto-template-concursos-abertos` do exemplo acima já
+carregam e desenham nesta versão: foram testadas nela antes de ela sair.
 
 ## O que ela ainda não faz
 
