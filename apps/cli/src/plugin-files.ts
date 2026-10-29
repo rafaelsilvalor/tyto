@@ -1,11 +1,19 @@
 import { join, resolve } from 'node:path';
 
-import { type Diagnostic, type Diagnostics, diagnostic, hasErrors } from '@tyto/core';
+import {
+  type ConfigurationImageResolver,
+  type ConfiguredTemplate,
+  type Diagnostic,
+  type Diagnostics,
+  diagnostic,
+  hasErrors,
+} from '@tyto/core';
 import {
   PLUGIN_MANIFEST_FILE,
   type PluginFilesCopyOnDisk,
   cleanPluginFilesCache,
   fsPluginStore,
+  pluginFileImages,
   readPluginFolder,
   syncPluginFolder,
 } from '@tyto/io';
@@ -15,6 +23,7 @@ import {
   type PluginFilesLock,
   checkInstallable,
   chooseCopies,
+  configuredTemplates,
   withPluginEntry,
 } from '@tyto/plugin-api';
 import { readFile } from 'node:fs/promises';
@@ -66,18 +75,35 @@ export interface PluginFilesSyncOptions {
 export interface SyncedPluginFiles {
   /** What loads, project before machine. */
   readonly copies: readonly PluginFilesCopyOnDisk[];
+  /** The templates each folder's files configure, for `resolveTemplateConfigurations`. */
+  readonly configured: {
+    readonly project: readonly ConfiguredTemplate[];
+    readonly machine: readonly ConfiguredTemplate[];
+  };
+  /** Reads the images the configurations name, each inside the folder it may read. */
+  readonly images: ConfigurationImageResolver;
+  /** Each file's text by the name messages carry, to place a range in the file it is in. */
+  readonly texts: ReadonlyMap<string, string>;
   readonly diagnostics: Diagnostics;
   /** Plugins left unapproved, which a render skips; for `sync`'s hint. */
   readonly unapproved: readonly string[];
 }
 
-export const NO_PLUGIN_FILES: SyncedPluginFiles = { copies: [], diagnostics: [], unapproved: [] };
+export const NO_PLUGIN_FILES: SyncedPluginFiles = {
+  copies: [],
+  configured: { project: [], machine: [] },
+  images: () => Promise.resolve({ problem: 'has no folder it may be read from' }),
+  texts: new Map(),
+  diagnostics: [],
+  unapproved: [],
+};
 
 export async function syncPluginFiles(
   options: PluginFilesSyncOptions,
   environment: CliEnvironment,
 ): Promise<SyncedPluginFiles> {
   const shown = (path: string): string => displayPath(environment.cwd, path);
+  const texts = new Map<string, string>();
   const folder = (directory: string) =>
     syncPluginFolder({
       home: options.home,
@@ -85,14 +111,20 @@ export async function syncPluginFiles(
       shown,
       update: options.update,
       fetches: options.fetches,
-      onFileRead: (path, source, items) => registerOrigin(items, { path: shown(path), source }),
+      onFileRead: (path, source, items) => {
+        texts.set(shown(path), source);
+        registerOrigin(items, { path: shown(path), source });
+      },
     });
 
+  const projectDirectory =
+    options.workspace?.trusted === true ? projectPluginFiles(options.workspace.folder) : undefined;
   const project =
-    options.workspace?.trusted === true
-      ? await folder(projectPluginFiles(options.workspace.folder))
-      : { copies: [], diagnostics: [] };
-  const machine = await folder(machinePluginFiles(options.home));
+    projectDirectory === undefined
+      ? { copies: [], files: [], diagnostics: [] }
+      : await folder(projectDirectory);
+  const machineDirectory = machinePluginFiles(options.home);
+  const machine = await folder(machineDirectory);
   const chosen = chooseCopies(project.copies, machine.copies);
   const diagnostics: Diagnostic[] = [
     ...project.diagnostics,
@@ -121,7 +153,23 @@ export async function syncPluginFiles(
   }
 
   const unapproved = await approve(copies, options.approval, environment);
-  return { copies, diagnostics, unapproved };
+  return {
+    copies,
+    configured: {
+      project:
+        projectDirectory === undefined ? [] : configuredTemplates(project.files, projectDirectory),
+      machine: configuredTemplates(machine.files, machineDirectory),
+    },
+    images: pluginFileImages({
+      home: options.home,
+      ...(projectDirectory === undefined || options.workspace === undefined
+        ? {}
+        : { workspace: options.workspace.folder }),
+    }),
+    texts,
+    diagnostics,
+    unapproved,
+  };
 }
 
 /**

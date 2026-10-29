@@ -390,3 +390,128 @@ describe('what a sync refuses', () => {
     SLOW,
   );
 });
+
+/* ------------------------------------------------------- configurations and aliases -- */
+
+describe('configurations and aliases (TYTO-439)', () => {
+  const TABELA_ROXO = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    ...['..', '..', '..', 'packages', 'templates', 'templates', 'tabela-roxo', 'examples'],
+    'tres-colunas.brief',
+  );
+
+  /** `aviso`'s brief, naming `template` instead, in the workspace. */
+  async function briefNaming(template: string): Promise<string> {
+    const path = join(workspace, `${template}.brief`);
+    await writeFile(
+      path,
+      (await readFile(BRIEF, 'utf8')).replace('template: aviso', `template: ${template}`),
+      'utf8',
+    );
+    return path;
+  }
+
+  async function machineYaml(text: string): Promise<string> {
+    const path = join(home, 'plugin-files', 'templates.yaml');
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, text, 'utf8');
+    return path;
+  }
+
+  it(
+    'renders an alias as its template, and warns at a value in the file that wrote it',
+    async () => {
+      const pack = await repository('pack');
+      await machineYaml(
+        [
+          'version: 1',
+          'templates:',
+          '  aviso:',
+          `    source: { git: '${urlOf(pack)}', ref: v1 }`,
+          '    configurations:',
+          '      laranja:',
+          '        values:',
+          "          paper: '#ffffff'",
+          '',
+        ].join('\n'),
+      );
+
+      const rendered = await render(await briefNaming('aviso-laranja'));
+
+      expect(rendered.code, stderr()).toBe(EXIT_OK);
+      expect(rendered.svg).toContain(ORANGE);
+      expect(rendered.codes).toEqual(['W_TEMPLATE_VALUE_UNKNOWN']);
+      // The range is placed in the plugin file, line 8, not in the brief.
+      expect(stderr()).toMatch(/templates\.yaml:8:18: warning W_TEMPLATE_VALUE_UNKNOWN/u);
+    },
+    SLOW,
+  );
+
+  it(
+    'offers only the templates the file names from a fetched pack',
+    async () => {
+      const pack = await repository('pack');
+      await cp(join(pack, 'templates', 'aviso'), join(pack, 'templates', 'aviso-b'), {
+        recursive: true,
+      });
+      await edit(join(pack, 'templates', 'aviso-b', 'manifest.yaml'), (text) =>
+        text.replace(/^name: aviso$/mu, 'name: aviso-b'),
+      );
+      await git(pack, 'add', '.');
+      await git(pack, 'commit', '--quiet', '-m', 'a second template');
+      await machineFile({ aviso: { git: urlOf(pack), ref: 'main' } });
+
+      expect((await render()).code, stderr()).toBe(EXIT_OK);
+      const unnamed = await render(await briefNaming('aviso-b'));
+
+      expect(unnamed.code).toBe(EXIT_DIAGNOSTICS);
+      expect(stderr()).toContain('E_UNKNOWN_TEMPLATE');
+    },
+    SLOW,
+  );
+
+  it(
+    'refuses an alias that is a built-in template’s name, and the built-in renders the same bytes',
+    async () => {
+      const builtIn = async (): Promise<Rendered> => {
+        const code = await run(
+          ['render', TABELA_ROXO, '--out', 'out', '--types', 'svg'],
+          environment(),
+        );
+        const result = JSON.parse(
+          await readFile(join(workspace, 'out', 'result.json'), 'utf8'),
+        ) as { artifacts: { name: string }[]; diagnostics: { code: string }[] };
+        const [first] = result.artifacts;
+        const svg =
+          first === undefined ? '' : await readFile(join(workspace, 'out', first.name), 'utf8');
+        return { code, svg, codes: result.diagnostics.map((item) => item.code) };
+      };
+      const before = await builtIn();
+      expect(before.code, stderr()).toBe(EXIT_OK);
+      expect(before.svg).toContain('<svg');
+
+      const pack = await repository('pack');
+      await machineYaml(
+        [
+          'version: 1',
+          'templates:',
+          '  aviso:',
+          `    source: { git: '${urlOf(pack)}', ref: v1 }`,
+          '    configurations:',
+          '      roxo:',
+          '        alias: tabela-roxo',
+          '',
+        ].join('\n'),
+      );
+      errors = [];
+      const after = await builtIn();
+
+      // An error, as every plugin-file error is (ADR 0151 decision 7), and the art is drawn.
+      expect(after.code, stderr()).toBe(EXIT_DIAGNOSTICS);
+      expect(after.codes).toContain('E_TEMPLATE_ALIAS_TAKEN');
+      expect(stderr()).toMatch(/templates\.yaml:7:16: error E_TEMPLATE_ALIAS_TAKEN/u);
+      expect(after.svg).toBe(before.svg);
+    },
+    SLOW,
+  );
+});

@@ -319,7 +319,8 @@ export interface CompileOptions {
    * Values for what the template's manifest declares configurable, by name (ADR 0153), each
    * with the range it was written at. What is not supplied draws with its default; what the
    * template did not declare, or what its limits refuse, is a warning there and the default
-   * stands. Nothing reads a plugin file's configuration into this yet (TYTO-439).
+   * stands. A plugin file's configuration arrives on the resolved brief instead (TYTO-439),
+   * and what is supplied here is laid over it.
    */
   readonly values?: SuppliedValues;
 }
@@ -360,6 +361,7 @@ export async function compileDeferred(
   const plans = planArtworks(resolved, manifest);
   const measure = measureOf(options.faces);
   const brand = brandKitOf(manifest, options);
+  const { values } = resolveValues(manifest, suppliedOf(resolved, options), noFiles);
   const answers = new Map<string, Result<Frame, Diagnostics>>();
   const reported = new Map<string, Diagnostic[]>();
   for (const plan of plans) {
@@ -375,9 +377,9 @@ export async function compileDeferred(
         measure,
         noFiles,
         brand,
-        // Values do not cross to a plugin's process yet (TYTO-439); compileWith below still
-        // checks the supplied ones and reports what it refuses.
-        undefined,
+        // Data, so they cross with the call (TYTO-439). What they refuse is reported once,
+        // by compileWith below, which resolves the same values again.
+        values,
         reports,
       );
       answers.set(context.idPrefix, await template.buildLater(context));
@@ -396,6 +398,12 @@ export async function compileDeferred(
       ? { frame: answer.value, problems: [...reports, ...answer.diagnostics] }
       : { problems: [...reports, ...answer.error] };
   });
+}
+
+/** The brief's configuration first and the caller's over it, value by value (ADR 0151). */
+function suppliedOf(resolved: ResolvedBrief, options: CompileOptions): SuppliedValues | undefined {
+  if (resolved.values === undefined) return options.values;
+  return { ...resolved.values, ...options.values };
 }
 
 /** What one call of a template came to: its frame, or why there is none. */
@@ -475,7 +483,7 @@ function compileWith(
   // What a template is told a node will measure is what it then measures (ADR 0038).
   const measure = measureOf(faces);
   const brand = brandKitOf(manifest, options);
-  const values = resolveValues(manifest, options.values, files);
+  const values = resolveValues(manifest, suppliedOf(resolved, options), files);
 
   const plans = planArtworks(resolved, manifest);
   const problems: Diagnostic[] = [...values.diagnostics];

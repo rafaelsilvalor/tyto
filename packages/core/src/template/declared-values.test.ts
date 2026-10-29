@@ -269,7 +269,7 @@ describe('compile hands a template its values', () => {
     expect(compile(await resolvedFor(MANIFEST), template, { formats: FORMATS }).ok).toBe(true);
   });
 
-  it('sends a deferred template no values, since the call does not carry them yet', async () => {
+  it('sends a deferred template its values with the call, and reports a refused one once', async () => {
     const contexts: TemplateContext[] = [];
     const deferred: DeferredTemplate = {
       manifest: MANIFEST,
@@ -285,9 +285,16 @@ describe('compile hands a template its values', () => {
     };
     const result = await compileDeferred(await resolvedFor(MANIFEST), deferred, {
       formats: FORMATS,
-      values: { gap: { value: 500 } },
+      values: { gap: { value: 500 }, paper: { value: '#000000' } },
     });
-    expect(contexts[0]).not.toHaveProperty('values');
+    // The refused 500 leaves the default, and the taken colour crosses. An image default is
+    // the template folder's, which a plugin's process has no files for (ADR 0062).
+    expect(contexts[0]?.values).toEqual({
+      gap: 20,
+      drop: 0.15,
+      paper: '#000000',
+      'title-face': { family: 'Inter', weight: 700, style: 'normal' },
+    });
     expect(result.ok && result.diagnostics.map((item) => item.code)).toEqual([
       'W_TEMPLATE_VALUE_INVALID',
     ]);

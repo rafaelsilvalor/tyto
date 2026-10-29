@@ -101,7 +101,11 @@ export function installedOption(
   return environment.home === undefined
     ? {}
     : {
-        installed: { plugins, folderOf: pluginFolders(environment.home, pluginFiles.copies) },
+        installed: {
+          plugins,
+          folderOf: pluginFolders(environment.home, pluginFiles.copies),
+          pluginFiles,
+        },
       };
 }
 

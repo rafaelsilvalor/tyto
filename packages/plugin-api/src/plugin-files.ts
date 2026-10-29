@@ -1,14 +1,16 @@
 import {
+  type ConfiguredTemplate,
   type Diagnostic,
   type Diagnostics,
   type Result,
   type SourceRange,
+  type SuppliedValue,
   diagnostic,
   err,
   ok,
   sourceRange,
 } from '@tyto/core';
-import { type Document, isMap, isScalar, parseDocument } from 'yaml';
+import { type Document, isMap, isNode, isScalar, parseDocument } from 'yaml';
 import { z } from 'zod';
 
 /**
@@ -22,8 +24,8 @@ import { z } from 'zod';
  *
  * **Tolerant per key and per entry, as `project.json` is** (ADR 0112): a refused entry costs
  * that entry alone, at its range; an unknown key is a warning; a file that does not parse
- * loads nothing and says so. Configurations, `default` and aliases are kept as written and
- * resolved by TYTO-439; this module checks their shape only.
+ * loads nothing and says so. Configurations, `default` and aliases are kept as written here,
+ * which checks their shape only; `@tyto/core` resolves them against the templates that loaded.
  */
 
 export const PLUGIN_FILES_DIRECTORY = 'plugin-files';
@@ -36,10 +38,17 @@ export interface PluginFileSource {
   readonly ref: string;
 }
 
-/** One named configuration, kept as written: TYTO-439 resolves it, TYTO-440 its brief side. */
+/**
+ * One named configuration, kept as written: `resolveTemplateConfigurations` in `@tyto/core`
+ * resolves it (TYTO-439), and TYTO-440 its brief side. Each value keeps where it was written,
+ * so a value the template refuses is a warning at that value.
+ */
 export interface PluginFileConfiguration {
   readonly alias?: string;
-  readonly values: Readonly<Record<string, unknown>>;
+  readonly aliasRange?: SourceRange;
+  /** The configuration's name in the file. */
+  readonly range?: SourceRange;
+  readonly values: Readonly<Record<string, SuppliedValue>>;
   readonly brief: Readonly<Record<string, unknown>>;
 }
 
@@ -147,7 +156,20 @@ class FileReader {
     return (node.toJSON() ?? {}) as Record<string, unknown>;
   }
 
-  configuration(path: string, node: Node): PluginFileConfiguration | undefined {
+  /** A mapping's entries, each value as plain data with the range it was written at. */
+  values(path: string, node: Node): Record<string, SuppliedValue> | undefined {
+    if (node === undefined || node === null) return {};
+    const entries = entriesOf(node);
+    if (entries === undefined) return this.refuse(path, 'it must be a mapping', node);
+    const values: Record<string, SuppliedValue> = {};
+    for (const [name, value] of entries) {
+      const data: unknown = isNode(value) ? value.toJSON() : value;
+      values[name] = { value: data, ...at(value) };
+    }
+    return values;
+  }
+
+  configuration(path: string, node: Node, nameNode: Node): PluginFileConfiguration | undefined {
     const keys = this.keys(path, node, ['alias', 'values', 'brief']);
     if (keys === undefined) return this.refuse(path, 'a configuration is a mapping', node);
     const aliasNode = keys.get('alias');
@@ -162,10 +184,18 @@ class FileReader {
         );
       }
     }
-    const values = this.mapping(`${path}.values`, keys.get('values'));
+    const values = this.values(`${path}.values`, keys.get('values'));
     const brief = this.mapping(`${path}.brief`, keys.get('brief'));
     if (values === undefined || brief === undefined) return undefined;
-    return { ...(alias === undefined ? {} : { alias }), values, brief };
+    const aliasRange = rangeOf(aliasNode);
+    const range = rangeOf(nameNode);
+    return {
+      ...(alias === undefined ? {} : { alias }),
+      ...(alias === undefined || aliasRange === undefined ? {} : { aliasRange }),
+      ...(range === undefined ? {} : { range }),
+      values,
+      brief,
+    };
   }
 
   template(name: string, node: Node, nameNode: Node): PluginFileTemplate | undefined {
@@ -186,10 +216,11 @@ class FileReader {
       if (entries === undefined) {
         return this.refuse(`${path}.configurations`, 'it must be a mapping', configurationsNode);
       }
-      for (const [configurationName, value] of entries) {
+      for (const [configurationName, value, configurationNode] of entries) {
         const configuration = this.configuration(
           `${path}.configurations.${configurationName}`,
           value,
+          configurationNode,
         );
         if (configuration === undefined) return undefined;
         configurations[configurationName] = configuration;
@@ -400,6 +431,41 @@ export function folderSources(files: readonly PluginFile[]): PluginFolderSources
     }
   }
   return { sources, diagnostics };
+}
+
+/**
+ * One folder's template entries as `resolveTemplateConfigurations` in `@tyto/core` takes them.
+ *
+ * A template two files of the folder name is left out, as {@link folderSources} leaves its
+ * source out and already said why. `directory` is the folder the files are in, which an image
+ * path in them is relative to.
+ */
+export function configuredTemplates(
+  files: readonly PluginFile[],
+  directory: string,
+): ConfiguredTemplate[] {
+  const entries = files.flatMap((file) =>
+    file.templates.map((template) => ({ file: file.file, template })),
+  );
+  const counted = new Map<string, number>();
+  for (const { template } of entries) {
+    counted.set(template.name, (counted.get(template.name) ?? 0) + 1);
+  }
+  return entries
+    .filter(({ template }) => counted.get(template.name) === 1)
+    .map(({ file, template }) => ({
+      template: template.name,
+      file,
+      directory,
+      ...(template.default === undefined ? {} : { default: template.default }),
+      configurations: Object.entries(template.configurations).map(([name, configuration]) => ({
+        name,
+        ...(configuration.alias === undefined ? {} : { alias: configuration.alias }),
+        ...(configuration.aliasRange === undefined ? {} : { aliasRange: configuration.aliasRange }),
+        ...(configuration.range === undefined ? {} : { range: configuration.range }),
+        values: configuration.values,
+      })),
+    }));
 }
 
 /** What a sync does with one source. */
