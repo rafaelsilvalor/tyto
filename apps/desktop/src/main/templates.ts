@@ -174,7 +174,22 @@ export async function createTemplateCatalogue(
         : [{ directory: PLUGIN_FILES_DIRECTORY, diagnostics: flatten(snapshot.pluginFiles) }]),
     ];
 
-    return { templates: withPreviews, failures };
+    // An alias is a row of its own, the template it reaches under the alias's name: a brief
+    // writes the alias, and the brief does not know it is a variant (ADR 0151).
+    const aliases = snapshot.configurations.aliases().flatMap((alias) => {
+      const target = withPreviews.find((template) => template.name === alias.template);
+      return target === undefined
+        ? []
+        : [
+            {
+              ...target,
+              name: alias.alias,
+              alias: { template: alias.template, configuration: alias.configuration },
+            },
+          ];
+    });
+
+    return { templates: [...withPreviews, ...aliases], failures };
   };
 
   let cached: { snapshot: ProjectSnapshot; answer: IpcResponse<'templates:list'> } = {

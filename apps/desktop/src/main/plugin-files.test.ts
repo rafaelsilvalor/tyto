@@ -11,7 +11,9 @@ import { type LoadedPlugins, NO_PLUGINS, type PluginStore } from '@tyto/plugin-a
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  type ApprovalBox,
   type DesktopPluginFilesOptions,
+  approveInABox,
   type FetchedTemplates,
   createDesktopPluginFiles,
   shownPath,
@@ -206,6 +208,25 @@ describe('a sync', () => {
   });
 });
 
+describe('an edited plugin file', () => {
+  it('tells the window when only a file changed, so an alias added there shows (TYTO-433)', async () => {
+    const one = copy('tabela');
+    const texts = (text: string) => new Map([['templates.yaml', text]]);
+    const { plugins, applied, started } = harness([
+      { ...synced([one]), texts: texts('version: 1') },
+      { ...synced([one]), texts: texts('version: 1') },
+      { ...synced([one]), texts: texts('version: 1 # with an alias') },
+    ]);
+
+    await plugins.sync({ update: false });
+    await plugins.sync({ update: false });
+    await plugins.sync({ update: false });
+
+    expect(applied).toHaveLength(2);
+    expect(started).toHaveLength(1);
+  });
+});
+
 describe('what the window gets', () => {
   it('offers only the templates a file names, and says which installed plugins a copy replaces', async () => {
     const named = copy('tabela', { templates: ['tabela'] });
@@ -291,5 +312,48 @@ describe('shownPath', () => {
       '/home/.tyto/plugin-files/a.yaml',
     );
     expect(shownPath(undefined, '/home/a.yaml')).toBe('/home/a.yaml');
+  });
+});
+
+describe('the permission box (ADR 0151 decision 6)', () => {
+  const manifest = {
+    name: 'tabela',
+    version: '1.0.0',
+    engine: '>=0.1.0',
+    contributes: ['template-pack'],
+    permissions: ['net:example.invalid', 'credentials:token'],
+  } as unknown as Parameters<ReturnType<typeof approveInABox>>[0];
+  const words = (key: string): string =>
+    ({
+      'pluginFiles.approve.message': "Load '{plugin}'?",
+      'pluginFiles.approve.load': 'Load it',
+      'pluginFiles.approve.skip': 'Not now',
+    })[key] ?? key;
+
+  it('names the plugin, its source and each permission, with skipping as the default', async () => {
+    const shown: ApprovalBox[] = [];
+    const approve = approveInABox((box) => {
+      shown.push(box);
+      return Promise.resolve({ response: 1 });
+    }, words);
+
+    expect(await approve(manifest, 'https://example.invalid/tabela.git at v1')).toBe(false);
+
+    expect(shown).toEqual([
+      {
+        type: 'question',
+        message: "Load 'tabela'?",
+        detail:
+          'https://example.invalid/tabela.git at v1\n\nnet:example.invalid\ncredentials:token',
+        buttons: ['Load it', 'Not now'],
+        defaultId: 1,
+        cancelId: 1,
+      },
+    ]);
+  });
+
+  it('approves only on the first button', async () => {
+    const approve = approveInABox(() => Promise.resolve({ response: 0 }), words);
+    expect(await approve(manifest, 'x at v1')).toBe(true);
   });
 });

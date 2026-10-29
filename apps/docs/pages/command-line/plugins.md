@@ -122,7 +122,7 @@ aviso-laranja → aviso (laranja)  home\plugin-files\avisos.yaml
 
 In a folder that is not trusted, the project's plugin files are neither loaded nor listed, and `tyto render` and `tyto plugin list` say so in one line naming `.tyto/plugin-files`.
 
-**The desktop app runs the same sync** when it starts, when it opens a workspace folder, and on **Plugins: Sync Plugin Files** and **Plugins: Update Plugin Files** (Ctrl+K), the second moving every ref as `--update` does. The templates it fetches are in the template list; a repository that did not answer is a row in the problems panel that names it, and the copy fetched before keeps working. A plugin that asks for permissions is asked about in a box. In a folder you have not trusted yet, the project's plugin files are not fetched, and the trust strip counts them among what it left out.
+**The desktop app runs the same sync** when it starts, when it opens a workspace folder, and on **Plugins: Sync Plugin Files** and **Plugins: Update Plugin Files** (Ctrl+K), the second moving every ref as `--update` does. The templates it fetches are in the template list, and so is each alias, in the "/" menu and in New brief from template as well; a repository that did not answer is a row in the problems panel that names it, and the copy fetched before keeps working. A plugin that asks for permissions is asked about in a box. In a folder you have not trusted yet, the project's plugin files are not fetched, and the trust strip counts them among what it left out.
 
 ### Configurations and aliases
 

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { diagnostic } from '@tyto/core';
-import { nodeFileSystem } from '@tyto/io';
+import { NO_INSTALLED_PACKS, NO_PLUGIN_FILES, nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createProjectSources } from './project.js';
@@ -319,6 +319,9 @@ describe('the packs the plugin files fetched (TYTO-433, ADR 0151 decision 7)', (
     only: new Map([[projectFiles, new Set(['tabela', 'aviso'])]]),
     replaces: new Set(replaces),
     problems: [diagnostic('W_PLUGIN_SKIPPED', { plugin: 'fora', reason: 'it could not start.' })],
+    configured: NO_PLUGIN_FILES.configured,
+    images: NO_PLUGIN_FILES.images,
+    texts: NO_PLUGIN_FILES.texts,
   });
 
   it('searches them after the built-in pack and before installed plugins, earlier winning', async () => {
@@ -356,5 +359,62 @@ describe('the packs the plugin files fetched (TYTO-433, ADR 0151 decision 7)', (
 
     expect(snapshot.roots).toEqual([builtIn, projectFiles, machineFiles]);
     expect(snapshot.registry?.get('selo')).toBeUndefined();
+  });
+});
+
+describe("the plugin files' configurations and aliases (TYTO-433, ADR 0151)", () => {
+  const entry = (template: string, name: string, alias: string) => ({
+    template,
+    file: 'cores.yaml',
+    directory: scratch,
+    configurations: [{ name, alias, values: {} }],
+  });
+
+  it('selects the template an alias names, and refuses one named like a template', async () => {
+    const sources = await sourcesOver();
+
+    const snapshot = await sources.setFetched({
+      packs: NO_INSTALLED_PACKS,
+      only: new Map(),
+      replaces: new Set(),
+      problems: [],
+      configured: {
+        project: [],
+        machine: [
+          entry('promo-curso', 'verde', 'promo-verde'),
+          entry('aviso', 'roxo', 'promo-curso'),
+        ],
+      },
+      images: NO_PLUGIN_FILES.images,
+      texts: new Map([['cores.yaml', 'version: 1\n']]),
+    });
+
+    expect(snapshot.configurations.select('promo-verde')).toMatchObject({
+      template: 'promo-curso',
+      configuration: 'verde',
+    });
+    // `promo-curso` is a template that loaded, so no alias may take its name.
+    expect(snapshot.configurations.aliases().map((alias) => alias.alias)).toEqual(['promo-verde']);
+    const taken = snapshot.pluginFiles.find((item) => item.code === 'E_TEMPLATE_ALIAS_TAKEN');
+    expect(taken?.message).toMatch(/^cores\.yaml(:\d+:\d+)?: /u);
+    expect(taken?.range).toBeUndefined();
+  });
+
+  it('has none before a sync, and keeps them across a change of the chosen folder', async () => {
+    const sources = await sourcesOver();
+    expect(sources.current().configurations.aliases()).toEqual([]);
+
+    await sources.setFetched({
+      packs: NO_INSTALLED_PACKS,
+      only: new Map(),
+      replaces: new Set(),
+      problems: [],
+      configured: { project: [], machine: [entry('aviso', 'claro', 'aviso-claro')] },
+      images: NO_PLUGIN_FILES.images,
+      texts: new Map(),
+    });
+    const snapshot = await sources.reload(mine);
+
+    expect(snapshot.configurations.select('aviso-claro')?.template).toBe('aviso');
   });
 });

@@ -4,13 +4,16 @@ import {
   type FormatCatalogue,
   type TemplateFailure,
   type TemplateRegistry,
+  type TemplateConfigurations,
   type TemplateRoot,
   loadFormats,
   loadTemplateRegistry,
+  NO_TEMPLATE_CONFIGURATIONS,
+  resolveTemplateConfigurations,
 } from '@tyto/core';
 import type { InstalledCodePack } from '@tyto/io';
 
-import type { FetchedTemplates } from './plugin-files.js';
+import { type FetchedTemplates, located } from './plugin-files.js';
 
 /**
  * Which folders this app searches for templates, and the one thing in main that is rebuilt
@@ -69,6 +72,11 @@ export interface ProjectSnapshot {
    * among the template list's failures, with no brief open too.
    */
   readonly pluginFiles: readonly Diagnostic[];
+  /**
+   * The plugin files' configurations and aliases (TYTO-433), resolved against this registry: a
+   * brief's `template:` is looked up here first, in the preview and the export alike.
+   */
+  readonly configurations: TemplateConfigurations;
 }
 
 export interface ProjectSources {
@@ -204,6 +212,21 @@ export async function createProjectSources({
       }
     }
 
+    // Against the registry this read built, so an alias named like any template that loaded is
+    // refused (ADR 0151 decision 7), and each range is placed in the file that wrote it.
+    const configured =
+      fetched === undefined || !registry.ok
+        ? { configurations: NO_TEMPLATE_CONFIGURATIONS, diagnostics: [] }
+        : await resolveTemplateConfigurations({
+            ...fetched.configured,
+            registry: registry.value,
+            images: fetched.images,
+          });
+    const configurationProblems = configured.diagnostics.map(({ file, diagnostic: item }) => {
+      const text = file === undefined ? undefined : fetched?.texts.get(file);
+      return located(item, file === undefined ? undefined : { file, text: text ?? '' });
+    });
+
     return {
       roots,
       registry: registry.ok ? registry.value : undefined,
@@ -220,7 +243,8 @@ export async function createProjectSources({
         ...(fetched?.packs.code ?? []),
         ...codePacks.filter((pack) => !replaced.has(pack.plugin)),
       ],
-      pluginFiles: fetched?.problems ?? [],
+      pluginFiles: [...(fetched?.problems ?? []), ...configurationProblems],
+      configurations: configured.configurations,
     };
   };
 

@@ -63,7 +63,7 @@ import { openDocumentation } from './documentation.js';
 import { createDocumentService, openFilters, saveFilters } from './documents.js';
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
-import { createDesktopPluginFiles } from './plugin-files.js';
+import { approveInABox, createDesktopPluginFiles } from './plugin-files.js';
 import { fileLayoutStore } from './layout-store.js';
 import { createSessionService, createTemplateFolder } from './session.js';
 import { fileSessionStore } from './session-store.js';
@@ -821,27 +821,15 @@ async function start(): Promise<void> {
       [...host.registry.plugins(), ...exporterBuiltIns()].map((plugin) => plugin.manifest.name),
     ),
     sync: syncPluginFolders,
-    approve: async (manifest, source) => {
-      const box = {
-        type: 'question' as const,
-        message: translate(uiLocale, 'pluginFiles.approve.message').replaceAll(
-          '{plugin}',
-          manifest.name,
-        ),
-        detail: [source, '', ...manifest.permissions].join('\n'),
-        buttons: [
-          translate(uiLocale, 'pluginFiles.approve.load'),
-          translate(uiLocale, 'pluginFiles.approve.skip'),
-        ],
-        defaultId: 1,
-        cancelId: 1,
-      };
-      const answer =
-        mainWindow === undefined
-          ? await dialog.showMessageBox(box)
-          : await dialog.showMessageBox(mainWindow, box);
-      return answer.response === 0;
-    },
+    approve: approveInABox(
+      (box) => {
+        const options = { ...box, buttons: [...box.buttons] };
+        return mainWindow === undefined
+          ? dialog.showMessageBox(options)
+          : dialog.showMessageBox(mainWindow, options);
+      },
+      (key) => translate(uiLocale, key),
+    ),
     start: (store) => startDesktopPlugins({ store, launch, capabilities }),
     packs: (loaded, folderOf) =>
       installedPacks(createPluginHost(), loaded, folderOf, { allowCode: true }),

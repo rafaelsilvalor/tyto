@@ -48,6 +48,8 @@ const AUTHOR = ['-c', 'user.name=Tyto', '-c', 'user.email=tyto@example.invalid']
 
 let scratch: string;
 let missing: string;
+let packUrl: string;
+let home: string;
 let app: ElectronApplication;
 let page: Page;
 
@@ -67,7 +69,7 @@ const list = (): Promise<Listed> =>
 
 beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-plugin-files-e2e-'));
-  const home = join(scratch, 'home');
+  home = join(scratch, 'home');
 
   const pack = join(scratch, 'repositories', 'pack');
   cpSync(EXAMPLE_PACK, pack, { recursive: true });
@@ -76,6 +78,7 @@ beforeAll(async () => {
   execFileSync('git', [...AUTHOR, '-C', pack, 'commit', '--quiet', '-m', 'release']);
   execFileSync('git', [...AUTHOR, '-C', pack, 'tag', 'v1']);
   missing = pathToFileURL(join(scratch, 'repositories', 'not-there')).href;
+  packUrl = pathToFileURL(pack).href;
 
   mkdirSync(join(home, 'plugin-files'), { recursive: true });
   writeFileSync(
@@ -84,7 +87,7 @@ beforeAll(async () => {
       'version: 1',
       'templates:',
       '  aviso:',
-      `    source: { git: '${pathToFileURL(pack).href}', ref: 'v1' }`,
+      `    source: { git: '${packUrl}', ref: 'v1' }`,
       '  sumido:',
       `    source: { git: '${missing}', ref: 'v1' }`,
       '',
@@ -132,5 +135,57 @@ describe('the plugin files in the window', () => {
     // For a person to look at: the real window, with the problems panel's row.
     const shot = process.env['TYTO_E2E_SCREENSHOT'];
     if (shot !== undefined) await page.screenshot({ path: shot });
+  }, 60_000);
+
+  it('offers an alias in the "/" menu, and refuses one named like a built-in template', async () => {
+    writeFileSync(
+      join(home, 'plugin-files', 'templates.yaml'),
+      [
+        'version: 1',
+        'templates:',
+        '  aviso:',
+        `    source: { git: '${packUrl}', ref: 'v1' }`,
+        '    configurations:',
+        '      laranja: { alias: aviso-laranja }',
+        // A built-in template's name until TYTO-436: refused, and the template stands.
+        '      roxo: { alias: tabela-roxo }',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    // Asked as the command asks it; the window lists again only when main says
+    // `templates:changed`, so the rows below appear only if it did (TYTO-433).
+    await page.evaluate(() =>
+      (window as unknown as { tyto: Record<string, (body: unknown) => Promise<unknown>> }).tyto[
+        'plugin-files:sync'
+      ]!({ update: false }),
+    );
+
+    const rows = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('.problems__row')].map((row) => row.textContent ?? ''),
+      );
+    await expect
+      .poll(rows, { timeout: 15_000 })
+      .toEqual(expect.arrayContaining([expect.stringContaining('E_TEMPLATE_ALIAS_TAKEN')]));
+    expect((await rows()).some((row) => row.includes('W_PLUGIN_FILE_FETCH'))).toBe(false);
+
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/');
+    await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
+    const offered = await page.evaluate(() =>
+      [...document.querySelectorAll('.cm-tooltip-autocomplete .cm-completionLabel')].map(
+        (label) => label.textContent ?? '',
+      ),
+    );
+    // For a person to look at: the "/" menu open, with the alias among the templates.
+    const shot = process.env['TYTO_E2E_SCREENSHOT_ALIAS'];
+    if (shot !== undefined) await page.screenshot({ path: shot });
+    await page.keyboard.press('Escape');
+    expect(offered).toContain('aviso-laranja');
+    expect(offered.filter((label) => label === 'tabela-roxo')).toHaveLength(1);
   }, 60_000);
 });

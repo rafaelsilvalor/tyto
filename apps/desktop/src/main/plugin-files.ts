@@ -45,6 +45,14 @@ export interface FetchedTemplates {
   readonly replaces: ReadonlySet<string>;
   /** The sync's problems and the packs' refusals, each without a range into a brief. */
   readonly problems: Diagnostics;
+  /**
+   * The files' configurations and aliases, resolved against the registry each read builds
+   * (TYTO-433): the templates each folder configures, the image port, and each file's text by
+   * the name a configuration's diagnostic carries, to place its range.
+   */
+  readonly configured: SyncedPluginFiles['configured'];
+  readonly images: SyncedPluginFiles['images'];
+  readonly texts: SyncedPluginFiles['texts'];
 }
 
 export interface DesktopPluginFilesOptions {
@@ -99,7 +107,11 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
     });
 
     const problems = synced.diagnostics.map((item) => located(item, placed.get(item)));
-    const said = problems.map((item) => `${item.code} ${item.message}`).join('\n');
+    // The files' text too: an edited alias or value changes no copy and no problem.
+    const said = [
+      ...problems.map((item) => `${item.code} ${item.message}`),
+      ...[...synced.texts].map(([file, text]) => `${file}\n${text}`),
+    ].join('\n');
     // **A sync that changed nothing tells the window nothing.** Every open brief is compiled
     // again on `templates:changed`, and a folder opened with no plugin files, or a start with
     // the same copies as before, must not cost a compile (seen on CI: a `.md` opened from the
@@ -133,6 +145,9 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
       only,
       replaces: new Set(byName.keys()),
       problems: [...problems, ...current.warnings, ...packs.warnings],
+      configured: synced.configured,
+      images: synced.images,
+      texts: synced.texts,
     });
   };
 
@@ -190,7 +205,7 @@ export function shownPath(workspace: string | undefined, path: string): string {
  * front, and one into a plugin file would point at the wrong text. The file and line go in
  * front of the message instead, the way the command line prints them.
  */
-function located(
+export function located(
   item: Diagnostic,
   where: { readonly file: string; readonly text: string } | undefined,
 ): Diagnostic {
@@ -204,5 +219,43 @@ function located(
   return {
     ...rest,
     message: `${where.file}:${String(at.line)}:${String(at.column)}: ${item.message}`,
+  };
+}
+
+/** The native box a permission prompt is, as Electron's `showMessageBox` takes it. */
+export interface ApprovalBox {
+  readonly type: 'question';
+  readonly message: string;
+  readonly detail: string;
+  readonly buttons: readonly [load: string, skip: string];
+  readonly defaultId: 1;
+  readonly cancelId: 1;
+}
+
+/** The window's words for the box, in its language. */
+export type ApprovalText = (
+  key: 'pluginFiles.approve.message' | 'pluginFiles.approve.load' | 'pluginFiles.approve.skip',
+) => string;
+
+/**
+ * Asks about a fetched plugin that wants permissions in a native box (ADR 0151 decision 6):
+ * its name, its repository and ref, and each permission. **Skipping is the default and what
+ * Escape answers**, as `[y/N]` is at a terminal: a box a person dismisses approves nothing.
+ * `show` is Electron's `dialog.showMessageBox`, so the rule is tested without a window.
+ */
+export function approveInABox(
+  show: (box: ApprovalBox) => Promise<{ readonly response: number }>,
+  text: ApprovalText,
+): PluginFilesApproval {
+  return async (manifest, source) => {
+    const answer = await show({
+      type: 'question',
+      message: text('pluginFiles.approve.message').replaceAll('{plugin}', manifest.name),
+      detail: [source, '', ...manifest.permissions].join('\n'),
+      buttons: [text('pluginFiles.approve.load'), text('pluginFiles.approve.skip')],
+      defaultId: 1,
+      cancelId: 1,
+    });
+    return answer.response === 0;
   };
 }

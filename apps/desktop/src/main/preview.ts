@@ -199,6 +199,7 @@ export async function createPreviewService(
         // template folder is unreadable should open, show the editor, and say what is wrong.
         diagnostics: startup,
         codePacks,
+        configurations,
       } = sources.current();
 
       let completion: PreviewCompletion = { directives: options.directives?.names() ?? [] };
@@ -238,6 +239,8 @@ export async function createPreviewService(
 
       const resolved = await resolve(ast.value, {
         registry: templates,
+        // An alias a plugin file names selects its template and values (TYTO-433).
+        configurations,
         assets,
         ...(options.directives === undefined ? {} : { directives: options.directives.resolver }),
       });
