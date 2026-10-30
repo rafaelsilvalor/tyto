@@ -686,6 +686,14 @@ export interface Catalogue {
    */
   readonly 'command.editor.formatBrief': string;
   readonly 'formatBrief.refused': string;
+  /** TYTO-489, ADR 0157: Delivery: New… — the command, its two questions and its refusals. */
+  readonly 'command.delivery.new': string;
+  readonly 'delivery.name.placeholder': string;
+  readonly 'delivery.template.placeholder': string;
+  readonly 'delivery.template.none': string;
+  /** `{problem}` is the diagnostic's own sentence, which says why. */
+  readonly 'delivery.refused': string;
+  readonly 'delivery.noFolder': string;
   readonly 'slash.section.templates': string;
   /** TYTO-277. The heading over the person's snippets in the same menu. */
   readonly 'slash.section.snippets': string;
@@ -1107,6 +1115,12 @@ export const CATALOGUE_KEYS = [
   'breadcrumb.frontmatter',
   'command.editor.formatBrief',
   'formatBrief.refused',
+  'command.delivery.new',
+  'delivery.name.placeholder',
+  'delivery.template.placeholder',
+  'delivery.template.none',
+  'delivery.refused',
+  'delivery.noFolder',
   'slash.section.templates',
   'slash.section.snippets',
   'slash.template.new',

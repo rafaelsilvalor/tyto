@@ -124,6 +124,11 @@ export interface ExplorerService {
    */
   pathOf(entryId: string): string | undefined;
   /**
+   * The ids from the top of the open folder down to `path`, a file main just wrote inside it,
+   * so the window can expand to it and select it (TYTO-489). `undefined` outside the folder.
+   */
+  idsTo(path: string): readonly string[] | undefined;
+  /**
    * The folder listed, as it was opened, or nothing: what a tab's label inside it is relative to
    * (TYTO-274, ADR 0125). For main's own use; the window is told the folder by the workspace.
    */
@@ -538,6 +543,18 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       const path = await filePath(entryId, IMAGE_EXTENSIONS);
       if (path === undefined) return { ok: false, reason: 'gone', name };
       return readExplorerImage(path, have);
+    },
+
+    idsTo(path) {
+      if (root === undefined) return undefined;
+      const inside = relativeUnder(root.folder, path);
+      if (inside === undefined || inside === '') return undefined;
+      const names = inside.split(/[\\/]/u);
+      let at = root.folder;
+      return names.map((name, index) => {
+        at = join(at, name);
+        return idFor(at, kindOf(index < names.length - 1, name));
+      });
     },
 
     async create(parentId, name, kind) {

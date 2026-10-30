@@ -1,7 +1,7 @@
 # Pasta de trabalho
 
 ::: info Como esta página foi conferida
-Cada passo foi seguido em 2026-10-21 num build de desenvolvimento do Tyto no Windows 11, numa pasta com um `.tyto/project.json`, um template em `tpl/`, uma imagem em `art/` e dois briefs em `briefs/`, numa segunda pasta cujos `assets` levavam para fora dela, e no mesmo dia numa pasta que cita um perfil de trabalho guardado em `~/.tyto/profiles/` e numa que cita um arquivo de perfil dentro dela cujos `assets` levavam para fora da pasta do perfil. Os menus e rótulos abaixo são os da janela em português. Os botões do cabeçalho do Explorador foram conferidos em 2026-10-23 num build de desenvolvimento, no tema claro e no escuro. As predefinições de exportação foram conferidas em 2026-10-23 num build de desenvolvimento, pela barra de comandos e por uma tecla ligada no `keybindings.json`.
+Cada passo foi seguido em 2026-10-21 num build de desenvolvimento do Tyto no Windows 11, numa pasta com um `.tyto/project.json`, um template em `tpl/`, uma imagem em `art/` e dois briefs em `briefs/`, numa segunda pasta cujos `assets` levavam para fora dela, e no mesmo dia numa pasta que cita um perfil de trabalho guardado em `~/.tyto/profiles/` e numa que cita um arquivo de perfil dentro dela cujos `assets` levavam para fora da pasta do perfil. Os menus e rótulos abaixo são os da janela em português. Os botões do cabeçalho do Explorador foram conferidos em 2026-10-23 num build de desenvolvimento, no tema claro e no escuro. As predefinições de exportação foram conferidas em 2026-10-23 num build de desenvolvimento, pela barra de comandos e por uma tecla ligada no `keybindings.json`. **Entrega: nova…** foi conferida em 2026-10-30 num build de desenvolvimento, na janela em inglês, com um nome recusado, um nome aceito, **Sem template** e um brief que já existia.
 :::
 
 Uma pasta de trabalho é uma pasta de projeto com um `.tyto/project.json` dentro. O arquivo diz onde o projeto guarda seus templates, imagens e fontes, e para onde vão as exportações:
@@ -65,7 +65,11 @@ Um perfil de trabalho também pode ter predefinições. Uma pasta que define uma
 
 ## Entregas: uma pasta por peça de trabalho
 
-Uma **entrega** é uma pasta para uma peça de trabalho, com o nome do card, `assets/` e `editaveis/` dentro e o brief em `editaveis/`. [`tyto delivery new`](../command-line/deliveries.md) cria uma. A chave `delivery` diz onde e como, e cada parte dela é opcional:
+Uma **entrega** é uma pasta para uma peça de trabalho, com o nome do card, `assets/` e `editaveis/` dentro e o brief em `editaveis/`.
+
+**Arquivo ▸ Entrega: nova…**, ou o mesmo comando na barra de comandos, cria uma na pasta aberta. A barra pergunta o nome e diz, enquanto você digita, por que um nome não pode ser de uma pasta — um `:` ou uma `/`, por exemplo —, e o Enter não faz nada até poder. Depois ela lista os templates, como **Novo brief a partir de template…**, com **Sem template** primeiro. O brief da entrega abre numa aba nova e fica selecionado no Explorador: com um template, ele traz o esqueleto do template; sem nenhum, abre com o menu "/", onde escolher um template escreve o esqueleto dele. Um brief que já existe nunca é sobrescrito: a barra de status diz por que nada foi criado, e nada é escrito. O comando fica cinza enquanto nenhuma pasta está aberta, e pode ganhar uma tecla no [`keybindings.json`](../customize/keybindings-json.md) como `delivery.new`. [`tyto delivery new`](../command-line/deliveries.md) faz o mesmo pela linha de comando.
+
+A chave `delivery` diz onde e como, e cada parte dela é opcional:
 
 ```jsonc
 {

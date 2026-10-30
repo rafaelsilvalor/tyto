@@ -383,6 +383,12 @@ export const en: Catalogue = {
   'command.editor.formatBrief': 'Format Brief',
   'formatBrief.refused':
     'Format Brief: not formatted, the brief has a syntax error. Fix it (see the problems) and try again.',
+  'command.delivery.new': 'Delivery: New…',
+  'delivery.name.placeholder': "The delivery's name: the ticket key and a title",
+  'delivery.template.placeholder': 'Start its brief from a template',
+  'delivery.template.none': 'No template',
+  'delivery.refused': 'No delivery was made. {problem}',
+  'delivery.noFolder': 'Open a folder first: a delivery is made inside the open folder.',
   'slash.section.templates': 'Templates',
   'slash.section.snippets': 'Snippets',
   'slash.template.new': 'new brief from its skeleton',

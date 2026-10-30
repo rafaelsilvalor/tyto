@@ -268,6 +268,9 @@ describe('the bridge', () => {
       'credentials:delete',
       // No `credentials:get` since TYTO-187: nothing in the renderer may read a secret back.
       'credentials:set',
+      // TYTO-489, ADR 0157: Delivery: New…, a name and a text, never a path. Exercised by
+      // `e2e/workspace.desktop.test.ts`.
+      'delivery:new',
       'dialog:confirm',
       'dialog:save-changes',
       // TYTO-333: "Editor: turn vim mode on or off", which writes the `vimMode` setting.

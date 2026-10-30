@@ -24,6 +24,8 @@ describe('the IPC contract', () => {
       'brief:preview',
       'credentials:delete',
       'credentials:set',
+      // TYTO-489, ADR 0157: Delivery: New…, a name and a text, never a path.
+      'delivery:new',
       'dialog:confirm',
       'dialog:save-changes',
       'editor:vim-mode',

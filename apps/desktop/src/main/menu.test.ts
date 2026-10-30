@@ -407,6 +407,7 @@ describe('the File submenu', () => {
     expect(shape).toEqual([
       'document.new',
       'document.newFromTemplate',
+      'delivery.new',
       'editor.open',
       'workspace.openFolder',
       'workspace.openRecent',

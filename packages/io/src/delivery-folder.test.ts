@@ -100,7 +100,7 @@ describe('createDelivery', () => {
       // A junction needs no privilege on Windows, and is a plain link elsewhere.
       await symlink(outside, join(workspace, 'mca-1'), 'junction');
       const made = await createDelivery(plan('mca-1'), { root: workspace, brief: '' });
-      expect(!made.ok && made.error[0]?.code).toBe('W_PROJECT_PATH_OUTSIDE');
+      expect(!made.ok && made.error[0]?.code).toBe('E_DELIVERY_PATH_OUTSIDE');
       expect(await readdir(outside)).toEqual([]);
     } finally {
       await rm(outside, { recursive: true, force: true });

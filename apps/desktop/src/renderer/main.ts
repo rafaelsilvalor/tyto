@@ -27,7 +27,9 @@ import {
   concreteKey,
   createEditor,
   cursorOf,
+  briefSkeleton,
   insertBriefSkeleton,
+  skeletonText,
   isFollower,
   jsonAssist,
   keyOfStroke,
@@ -136,6 +138,7 @@ import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
   COMMAND_LABELS,
+  DELIVERY_NEW,
   DOCUMENT_SLOTS,
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
@@ -160,6 +163,7 @@ import {
   withCommandGate,
 } from './commands.js';
 import { FILE_MENU_COMMANDS, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
+import { deliveryOffered, startDeliveryNew } from './delivery-new.js';
 import {
   type StatusBar,
   type StatusBarCommands,
@@ -1366,7 +1370,9 @@ function showExportPresets(presets: readonly ExportPresetView[]): void {
  * Whether `id` is offered with the tab in front: the one question every door asks (TYTO-283).
  * Lazy, so it reads the workspace at the moment a command is listed or run.
  */
-const offeredNow = (id: string): boolean => commandOffered(activeKind(), id);
+// A delivery is made only inside the open folder (ADR 0157 §3), so its command waits for one.
+const offeredNow = (id: string): boolean =>
+  id === DELIVERY_NEW ? deliveryOffered(workspaceShown) : commandOffered(activeKind(), id);
 
 const registry: CommandRegistry = withCommandGate(
   createDesktopRegistry({
@@ -1556,6 +1562,10 @@ const registry: CommandRegistry = withCommandGate(
 
     newDocumentFromTemplate: () => {
       pickTemplate();
+    },
+
+    newDelivery: () => {
+      newDelivery();
     },
 
     openInsertMenu: () => {
@@ -2789,6 +2799,68 @@ function pickTemplate(): void {
 }
 
 /**
+ * "Delivery: New…" (TYTO-489, ADR 0157 §5): the name and a template in the bar, the delivery
+ * made by main, its brief opened in a new tab and selected in the explorer. An empty brief opens
+ * with the "/" menu, which writes the skeleton of the template chosen there.
+ */
+function newDelivery(): void {
+  const bar = elements.commandBar;
+  if (bar === null) return;
+  // The tab offered to main, which opens the brief in it.
+  let wanted = '';
+  startDeliveryNew({
+    locale: () => state.locale,
+    ask: (request) => {
+      bar.ask(request);
+    },
+    pick: (request) => {
+      bar.pick(request);
+    },
+    templates: () =>
+      panel.templates.map((template) => {
+        const declared = aliasDeclaredText(template.alias);
+        return {
+          id: template.name,
+          label: template.name,
+          detail: templatePickDetail(template, translate(state.locale, 'template.root.builtIn')),
+          ...(declared === undefined ? {} : { title: declared }),
+        };
+      }),
+    skeletonOf: (name) => {
+      const template = panel.templates.find((candidate) => candidate.name === name);
+      if (template === undefined) return undefined;
+      return skeletonText(
+        briefSkeleton({
+          name: template.name,
+          formats: template.formats.map((format) => format.id),
+          slots: template.slots,
+          ...(template.configured === undefined ? {} : { configured: template.configured }),
+        }),
+      );
+    },
+    create: async (name, brief) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { ok: false, code: 'no-folder', message: '' };
+      wanted = nextDocumentId();
+      return bridge['delivery:new']({ documentId: wanted, name, brief });
+    },
+    opened: (made, withTemplate) => {
+      adopt(made.document, made.documentId, wanted);
+      elements.explorerPanel?.reveal(made.reveal);
+      // The brief is empty: the "/" menu is how a template goes into it (ADR 0157 §5).
+      if (!withTemplate) {
+        const target = focusedPane();
+        if (target !== undefined) {
+          target.view.focus();
+          openSlashMenu(target.view);
+        }
+      }
+    },
+    notice: showNoticeText,
+  });
+}
+
+/**
  * Format Brief in one pane (TYTO-297, ADR 0096): one undoable change, the caret kept on its
  * text. A brief with a syntax error is left as it is and the status bar says why for a few
  * seconds — the problems panel already lists where. `false` when it refused.
@@ -2809,14 +2881,22 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined;
  * has to say. `role="status"`, so a screen reader hears it without the focus moving.
  */
 function showNotice(key: CatalogueKey): void {
+  showNoticeText(translate(state.locale, key));
+}
+
+/** {@link showNotice} with a sentence already written: a refusal that quotes its diagnostic. */
+function showNoticeText(text: string): void {
   const notice = elements.statusNotice;
   if (notice === null) return;
-  notice.textContent = translate(state.locale, key);
+  notice.textContent = text;
+  // Cut to the bar's width with an ellipsis; the whole sentence on hover.
+  notice.title = text;
   notice.hidden = false;
   if (noticeTimer !== undefined) clearTimeout(noticeTimer);
   noticeTimer = setTimeout(() => {
     notice.hidden = true;
     notice.textContent = '';
+    notice.title = '';
     noticeTimer = undefined;
   }, NOTICE_MS);
 }

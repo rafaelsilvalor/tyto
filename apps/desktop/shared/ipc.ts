@@ -914,6 +914,31 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * A new delivery in the open folder (TYTO-489, ADR 0157 §5): the folder the `delivery` key
+   * lays out, named `name`, with its brief holding `brief` and opened in the tab `documentId`.
+   * **A name and a text, never a path**: main plans the paths from the folder it has open and
+   * checks the name again, whatever the window checked. The text is content, capped as a recipe
+   * run's is. `reveal` is the explorer's ids from the top down to the brief. A refusal is the
+   * diagnostic's code and message, for the status bar; nothing is written then.
+   */
+  'delivery:new': channel(
+    z.strictObject({
+      documentId,
+      name: z.string().max(1000),
+      brief: z.string().max(1_000_000),
+    }),
+    z.discriminatedUnion('ok', [
+      z.object({
+        ok: z.literal(true),
+        document: openDocument.nullable(),
+        documentId: documentId.nullable(),
+        reveal: z.array(explorerEntryId),
+      }),
+      z.object({ ok: z.literal(false), code: z.string().min(1), message: z.string() }),
+    ]),
+  ),
+
+  /**
    * The workspace folders opened before, newest first, for the title bar's popover (TYTO-487).
    * A folder that is gone is left out. **The id is main's**: the only thing the window sends
    * back; `pathLabel` is shown and never accepted anywhere (ADR 0086).

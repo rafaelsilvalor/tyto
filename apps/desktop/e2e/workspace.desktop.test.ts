@@ -370,3 +370,32 @@ describe('the recent folders in the title bar (TYTO-487)', () => {
     await expect.poll(problemsText, { timeout: 10_000 }).toContain('W_PROJECT_PATH_OUTSIDE');
   }, 30_000);
 });
+
+describe('Delivery: New… (TYTO-489, ADR 0157)', () => {
+  it('makes a delivery in the open folder and opens its brief from editaveis/', async () => {
+    // `promo` is open again, from the test above; its project file names no `delivery`.
+    await run('delivery.new');
+    await window.locator('.command-bar__input').waitFor({ state: 'visible' });
+    await window.keyboard.type('mca-66910_simule-sua-nota-da-2ª-fase');
+    await window.keyboard.press('Enter');
+    // The template list, "No template" first.
+    await window.locator('.command-bar__option').first().waitFor({ state: 'visible' });
+    await window.keyboard.press('Enter');
+
+    const where = join('mca-66910_simule-sua-nota-da-2ª-fase', 'editaveis');
+    await expect
+      .poll(
+        () =>
+          window.evaluate(
+            () =>
+              document.querySelector('.tabs__name[aria-selected="true"]')?.getAttribute('title') ??
+              '',
+          ),
+        { timeout: 10_000 },
+      )
+      .toContain(join(where, 'mca-66910_simule-sua-nota-da-2ª-fase.brief'));
+    expect(
+      readFileSync(join(work, where, 'mca-66910_simule-sua-nota-da-2ª-fase.brief'), 'utf8'),
+    ).toBe('');
+  }, 30_000);
+});

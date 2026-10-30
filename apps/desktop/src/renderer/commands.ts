@@ -232,6 +232,12 @@ export const DOCUMENT_NEW = 'document.new';
  * tab of its own, whatever is in front — and no key by default (ADR 0074).
  */
 export const DOCUMENT_NEW_FROM_TEMPLATE = 'document.newFromTemplate';
+/**
+ * A new delivery in the open folder (TYTO-489, ADR 0157): its name and a template asked in the
+ * bar, the folder made by main, the brief opened. Offered only with a folder open; no key by
+ * default, bindable in `keybindings.json`.
+ */
+export const DELIVERY_NEW = 'delivery.new';
 export const DOCUMENT_CLOSE = 'document.close';
 export const DOCUMENT_NEXT = 'document.next';
 export const DOCUMENT_PREVIOUS = 'document.previous';
@@ -305,6 +311,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_FORMAT_BRIEF]: 'command.editor.formatBrief',
   [DOCUMENT_NEW]: 'command.document.new',
   [DOCUMENT_NEW_FROM_TEMPLATE]: 'command.document.newFromTemplate',
+  [DELIVERY_NEW]: 'command.delivery.new',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
@@ -391,6 +398,8 @@ export interface DesktopActions {
   newDocument(): void;
   /** TYTO-275. Lists the templates in the bar; the chosen one's skeleton opens in a new tab. */
   newDocumentFromTemplate(): void;
+  /** TYTO-489. Asks the name and a template in the bar; main makes the delivery. */
+  newDelivery(): void;
   openDocument(): void;
   saveDocument(saveAs: boolean): void;
   /** E9.10. Puts every panel back where ADR 0024 says it goes. */
@@ -540,6 +549,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(DOCUMENT_NEW_FROM_TEMPLATE, () => {
     actions.newDocumentFromTemplate();
+  });
+  add(DELIVERY_NEW, () => {
+    actions.newDelivery();
   });
   add(EDITOR_OPEN, () => {
     actions.openDocument();

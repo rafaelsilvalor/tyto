@@ -30,6 +30,7 @@ import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
+import { type DeliveryService } from './delivery.js';
 import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExplorerService } from './explorer.js';
@@ -246,8 +247,10 @@ export interface IpcDependencies {
    */
   readonly explorer: Pick<
     ExplorerService,
-    'list' | 'filePath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf'
+    'list' | 'filePath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf' | 'idsTo'
   >;
+  /** A new delivery in the open folder (TYTO-489, ADR 0157): planned and written by main. */
+  readonly delivery: DeliveryService;
   /**
    * A native context menu of the window's items at a point, settling with the id picked or
    * `null` (TYTO-352, ADR 0121). A function for the reason `confirm` is one: `Menu.popup` is
@@ -429,6 +432,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     confirm,
     contextMenu,
     credentials,
+    delivery,
     documents,
     exit,
     exports,
@@ -563,6 +567,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
           ? await documents.openPath(documentId, made.path)
           : { document: null, documentId: null };
       return { ok: true, entry: made.entry, ...opened };
+    },
+
+    // TYTO-489, ADR 0157 §5: the delivery is made by main, then opens like an explorer entry.
+    'delivery:new': async ({ documentId, name, brief }) => {
+      const made = await delivery.create(name, brief);
+      if (!made.ok) return made;
+      const opened = await documents.openPath(documentId, made.brief);
+      return { ok: true, ...opened, reveal: [...(explorer.idsTo(made.brief) ?? [])] };
     },
 
     'explorer:rename': async ({ entryId, name }) => {

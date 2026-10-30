@@ -49,7 +49,7 @@ export async function createDelivery(
   const root = await realOrResolved(options.root);
   for (const path of [...folders, plan.brief]) {
     if (!isInside(root, await realOfNearest(path))) {
-      return err([diagnostic('W_PROJECT_PATH_OUTSIDE', { key: 'delivery', path: shown(path) })]);
+      return err([diagnostic('E_DELIVERY_PATH_OUTSIDE', { path: shown(path) })]);
     }
   }
 
