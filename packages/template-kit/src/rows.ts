@@ -22,7 +22,7 @@
  * works, it needs no card, and it asks the brief's author to learn a separator. TYTO-163 is
  * the version where the language repeats and nobody learns one.
  *
- * Moved here from `agenda-semana` by TYTO-185, because nothing in it knows what the rows
+ * Moved here from the weekly agenda by TYTO-185, because nothing in it knows what the rows
  * mean: the agenda's sessions and an approved list's `rank | name` are read the same way.
  */
 

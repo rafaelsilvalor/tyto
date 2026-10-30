@@ -1,7 +1,7 @@
 import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
+import { build as bannerTeste } from '../templates/banner-teste/template.js';
 import { PLACEHOLDER_LOGO, PLACEHOLDER_SIGNATURE } from '@tyto/house-style';
 
 import type {
@@ -50,8 +50,8 @@ interface Case {
 
 const CASES: readonly Case[] = [
   {
-    name: 'banner-roxo',
-    build: bannerRoxo,
+    name: 'banner-teste',
+    build: bannerTeste,
     format: 'banner',
     size: { w: 1200, h: 628 },
     slots: { titulo: 'Curso de teste' },

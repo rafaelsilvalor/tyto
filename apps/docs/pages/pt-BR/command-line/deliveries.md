@@ -1,7 +1,7 @@
 # Entregas
 
 ::: info Como esta página foi conferida
-Cada comando foi executado em 2026-10-30 num build de desenvolvimento da branch que o criou (TYTO-489) no Windows 11, numa pasta de trabalho cujo `.tyto/project.json` era `{ "delivery": { "parent": "entregas" } }`. As saídas abaixo foram copiadas dessas execuções.
+Cada comando foi executado em 2026-10-30 num build de desenvolvimento da branch que o criou (TYTO-489) no Windows 11, numa pasta de trabalho cujo `.tyto/project.json` era `{ "delivery": { "parent": "entregas" } }`. As saídas abaixo foram copiadas dessas execuções; a do `--template` foi executada de novo em 2026-10-30 na branch da TYTO-436, depois que o template que ela nomeava saiu do aplicativo.
 :::
 
 Uma **entrega** é uma pasta por peça de trabalho, com o nome do card: o brief, as imagens dele e, depois, a arte final, guardados juntos dentro do projeto. `tyto delivery new` cria uma; na janela, **Arquivo ▸ Entrega: nova…** cria ([Pasta de trabalho](../editor/workspace-folder.md#entregas-uma-pasta-por-peça-de-trabalho)).
@@ -24,8 +24,8 @@ Fora de qualquer pasta de trabalho, a entrega é criada na pasta em que você es
 `--template` (ou `-t`) escreve no brief o esqueleto do template em vez de deixá-lo vazio: o mesmo texto que **Novo brief a partir de template…** escreve na janela, com os slots obrigatórios do template e os tamanhos dele.
 
 ```
-$ tyto delivery new mca-66911_aprovados -t aprovados
-entregas\mca-66911_aprovados\editaveis\mca-66911_aprovados.brief
+$ tyto delivery new mca-66911_carrossel -t carrossel-lista
+entregas\mca-66911_carrossel\editaveis\mca-66911_carrossel.brief
 ```
 
 O nome pode ser um template, ou um apelido que um [arquivo de plugins](./plugins.md#configurações-e-apelidos) define; o esqueleto próprio de uma configuração é usado quando ela tem um. Numa pasta em que você ainda não confiou, os arquivos de plugins que a pasta traz não são carregados; `--trust` confia na pasta e no perfil de trabalho dela só nesta execução, como em `tyto render`.

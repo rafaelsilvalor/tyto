@@ -142,7 +142,7 @@ const circular = createFontLibrary({ describe: describeFace });
 const hasCircular = circular.substitutions([system('CircularXX', 500)]).length === 0;
 
 describe.skipIf(!hasCircular)('CircularXX, where it is installed', () => {
-  it('finds the three weights agenda-semana draws in, as three different files', () => {
+  it('finds three weights of one family, as three different files', () => {
     const uris = [300, 500, 900].map((weight) => circular.font(system('CircularXX', weight)));
 
     for (const uri of uris) expect(uri?.startsWith('data:font/otf;base64,')).toBe(true);

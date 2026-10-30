@@ -1025,7 +1025,7 @@ describe('tyto render, where an artwork runs off its format (TYTO-202)', () => {
   // floor and reports by how much it overflows. The range that ties a repeated slide's report
   // to its directive is `compile`'s, pinned in `packages/core/src/brief/compile.test.ts`.
   const BRIEF = `---
-template: banner-roxo
+template: banner-teste
 formats: [banner]
 ---
 ::titulo

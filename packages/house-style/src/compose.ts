@@ -2,8 +2,8 @@
  * The weekly mock-exam agenda ("Simulados da semana"), composed once for three brands
  * (TYTO-200).
  *
- * `simulados-semana-roxo`, `-ocre` and `-vinho` are one piece in three accents, so each template's
- * `template.ts` is this function applied to its brand. The composition is here rather than
+ * The weekly mock-exam schedule (`tyto-template-simulados-semana`) is one piece in three
+ * accents, so each accent's `template.ts` is this function applied to its brand. The composition is here rather than
  * copied three times, and ESLint holds it to the same rule a `template.ts` is held to: every
  * number is a token.
  *

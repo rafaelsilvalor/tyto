@@ -1,8 +1,8 @@
 import { measureNothing, noBrandKit } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import { LAYOUTS, build } from './template.js';
-import { FUNCTION_WORDS, NO_BREAK_SPACE, PLACEHOLDER_LOGO, ROXO } from '@tyto/house-style';
+import { INK, LAYOUTS, build } from './template.js';
+import { FUNCTION_WORDS, NO_BREAK_SPACE, PLACEHOLDER_LOGO } from '@tyto/house-style';
 
 import type {
   AssetRef,
@@ -184,7 +184,7 @@ function linesOf(node: TextNode): string[] {
 
 /* --------------------------------------------------------------------------- tests -- */
 
-describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
+describe.each(Object.keys(SIZES))('banner-teste in %s', (format) => {
   it('draws its own background, full-bleed, under the text', () => {
     const { frame } = render(PREFEITURA, format);
     const [first] = frame.children;
@@ -244,7 +244,7 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
     }
   });
 
-  it('draws in ROXO’s accent, the state in bold, and nothing in italic', () => {
+  it('draws in its ink, the state in bold, and nothing in italic', () => {
     const spans = titleOf(render(PREFEITURA, format).frame).runs.flatMap((run) =>
       run.kind === 'text' ? [run] : [],
     );
@@ -257,7 +257,7 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
     expect(spans.find((span) => span.text.includes('Prefeitura'))?.weight).toBe(400);
     expect(render(PREFEITURA, format).frame.children.length).toBe(3);
     const ink = spans[0]!.color;
-    expect(ink.kind === 'solid' && ink.color).toEqual(solidOf(ROXO.accent));
+    expect(ink.kind === 'solid' && ink.color).toEqual(solidOf(INK));
   });
 
   it('draws a text too long for the floor at the floor, and says by how much it overflows', () => {
@@ -275,7 +275,7 @@ describe.each(Object.keys(SIZES))('banner-roxo in %s', (format) => {
   });
 });
 
-describe('banner-roxo given italic', () => {
+describe('banner-teste given italic', () => {
   it('draws it upright: the house faces have no italic', () => {
     const plain: Inline = { kind: 'text', value: 'Prefeitura', range: { start: 0, end: 10 } };
     const frame = build({
@@ -306,7 +306,7 @@ describe('banner-roxo given italic', () => {
   });
 });
 
-describe('banner-roxo with nothing to measure', () => {
+describe('banner-teste with nothing to measure', () => {
   it('still draws every word, in one block the layout fits into the box', () => {
     const node = titleOf(render(PREFEITURA, 'banner', measureNothing).frame);
     expect(node.overflow).toBe('shrink');
@@ -360,7 +360,7 @@ function layersOf(node: SceneNode | undefined) {
   });
 }
 
-describe('banner-roxo with a kit whose marks have two tones (ADR 0066)', () => {
+describe('banner-teste with a kit whose marks have two tones (ADR 0066)', () => {
   it.each(Object.keys(SIZES))('draws the logo in %s in both purples, in its box', (format) => {
     const box = LAYOUTS[format]!.logo!;
     const layers = layersOf(

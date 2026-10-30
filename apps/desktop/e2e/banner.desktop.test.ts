@@ -17,7 +17,7 @@ import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
  * A bundled code template's own backgrounds, in the window's preview and export, agreeing
  * with `tyto render` (TYTO-210, owning the checks TYTO-214 deferred).
  *
- * `banner-roxo` is the first bundled template that reads its folder through `context.files`
+ * `banner-teste` is the first bundled template that reads its folder through `context.files`
  * (ADR 0062): one PNG per format, `assets/bg-<format>.png`. TYTO-214 wired the reader in the
  * CLI and in the window, but no bundled template used it, so neither the built window nor a
  * look at it could be checked there.
@@ -43,7 +43,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const require_ = createRequire(import.meta.url);
 const built = join(here, '..', 'out', 'main', 'index.js');
 const cli = require_.resolve('@tyto/cli/dist/index.js');
-const BANNER = resolve(here, '..', '..', '..', 'packages', 'templates', 'templates', 'banner-roxo');
+const BANNER = resolve(
+  here,
+  '..',
+  '..',
+  '..',
+  'packages',
+  'templates',
+  'templates',
+  'banner-teste',
+);
 
 for (const file of [built, cli]) {
   if (!existsSync(file)) {
@@ -52,7 +61,7 @@ for (const file of [built, cli]) {
 }
 
 /**
- * The three formats, their canvas, and the boxes `banner-roxo/template.ts` draws over the
+ * The three formats, their canvas, and the boxes `banner-teste/template.ts` draws over the
  * background: the text's, and the logo's (TYTO-225, where the brand kit's logo or its
  * placeholder now stands instead of being painted into the background).
  */
@@ -202,7 +211,7 @@ afterAll(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-describe("banner-roxo's backgrounds in the window and the CLI (TYTO-210)", () => {
+describe("banner-teste's backgrounds in the window and the CLI (TYTO-210)", () => {
   it('previews the 1200×628 over its own background, with no problem listed', async () => {
     const own = background('banner').toString('base64');
     await expect.poll(() => shown(), { timeout: 15_000 }).toContain(own);

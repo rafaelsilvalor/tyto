@@ -14,10 +14,10 @@ import { exportSvg } from '@tyto/export-svg';
 import { compileTemplate, placeholderFont } from '@tyto/template-kit/testing';
 import { describe, expect, it } from 'vitest';
 
-import agenciaBrief from '../templates/banner-roxo/examples/agencia.brief?raw';
-import prefeituraBrief from '../templates/banner-roxo/examples/prefeitura.brief?raw';
-import bannerManifest from '../templates/banner-roxo/manifest.yaml?raw';
-import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
+import agenciaBrief from '../templates/banner-teste/examples/agencia.brief?raw';
+import prefeituraBrief from '../templates/banner-teste/examples/prefeitura.brief?raw';
+import bannerManifest from '../templates/banner-teste/manifest.yaml?raw';
+import { build as bannerTeste } from '../templates/banner-teste/template.js';
 import formatsYaml from '../templates/formats.yaml?raw';
 
 /**
@@ -111,8 +111,8 @@ function svgOf(scene: Scene): readonly string[] {
   return valueOf(exported).map((frame) => frame.svg);
 }
 
-describe('banner-roxo', () => {
-  snapshotsOf(templateOf(bannerManifest, bannerRoxo), [
+describe('banner-teste', () => {
+  snapshotsOf(templateOf(bannerManifest, bannerTeste), [
     { name: 'agencia', brief: agenciaBrief },
     { name: 'prefeitura', brief: prefeituraBrief },
   ]);

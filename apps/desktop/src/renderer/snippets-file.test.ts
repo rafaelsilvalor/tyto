@@ -17,11 +17,11 @@ describe('readSnippetsText', () => {
       '    "body": ["::aula ${1:titulo}", "::prof ${2:nome}"],',
       '    "description": "Uma aula",',
       '  },',
-      '  "Dia": { "prefix": "dia", "body": "::dia $1", "template": "agenda-semana" },',
+      '  "Dia": { "prefix": "dia", "body": "::dia $1", "template": "carrossel-lista" },',
       '}',
     ].join('\n');
 
-    const read = readSnippetsText(text, ['agenda-semana']);
+    const read = readSnippetsText(text, ['carrossel-lista']);
 
     expect(read.syntax).toEqual([]);
     expect(read.problems).toEqual([]);
@@ -32,7 +32,7 @@ describe('readSnippetsText', () => {
         template: '::aula ${1:titulo}\n::prof ${2:nome}',
         description: 'Uma aula',
       },
-      { name: 'Dia', prefixes: ['dia'], template: '::dia ${1}', forTemplate: 'agenda-semana' },
+      { name: 'Dia', prefixes: ['dia'], template: '::dia ${1}', forTemplate: 'carrossel-lista' },
     ]);
   });
 
@@ -79,7 +79,7 @@ describe('readSnippetsText', () => {
     const text =
       '{ "Tom": { "prefix": "tom", "body": "tom ${1|claro,escuro|}", "template": "nenhum" } }';
 
-    const read = readSnippetsText(text, ['agenda-semana']);
+    const read = readSnippetsText(text, ['carrossel-lista']);
 
     expect(read.snippets.map((entry) => entry.template)).toEqual(['tom ${1:claro}']);
     expect(read.problems.map((problem) => problem.code)).toEqual([

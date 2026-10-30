@@ -778,7 +778,7 @@ export const IPC_CHANNELS = {
           /**
            * The folder the template came from, by its name, or `null` for the built-in pack,
            * which the window names in its own language. Two templates of one name cannot both
-           * be listed, so this is what tells a person whose `agenda-semana` they are picking.
+           * be listed, so this is what tells a person whose `promo-curso` they are picking.
            */
           root: z.string().nullable(),
           /**

@@ -8,7 +8,7 @@ import { resolveTarget } from './target.ts';
  * The acceptance criterion, in PNG: for one template, brief and format, the image the page
  * shows has the sha256 of the file `tyto render` writes when a person runs it.
  *
- * Two templates, one per route to a `Template`: `banner-roxo` is code compiled into the
+ * Two templates, one per route to a `Template`: `banner-teste` is code compiled into the
  * build (TYTO-166) and `promo-curso` is markup. Bytes and not a pixel diff, because the
  * CLI's rasterizer is Playwright's Chromium with the determinism flags and the same input
  * gives the same file run to run — measured, not assumed: the hashes below come from two
@@ -28,7 +28,7 @@ afterEach(async () => {
 // Each template's own manifest decides its formats: the banner draws its three sizes, the
 // promo the square grid and the story.
 describe.each([
-  { template: 'banner-roxo', formats: ['banner', 'banner-1x1', 'banner-345x146'] },
+  { template: 'banner-teste', formats: ['banner', 'banner-1x1', 'banner-345x146'] },
   { template: 'promo-curso', formats: ['grid-1x1', 'story'] },
 ])('the $template preview', ({ template, formats }) => {
   it('serves every image with the sha256 of the file `tyto render` writes', async () => {
