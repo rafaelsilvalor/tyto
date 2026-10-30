@@ -1,12 +1,16 @@
+import { resolve } from 'node:path';
+
 import type { CliEnvironment, ExitCode } from '@tyto/command-line';
 import { describe, expect, it } from 'vitest';
 
 import {
+  type CliDiagnostics,
   type CliOutput,
   type CliRunnerOptions,
   type CliStateChange,
   RESTART_NOTE,
   STILL_FINISHING,
+  KEPT_RUNS,
   confirmInABox,
   createCliRunner,
 } from './cli-runner.js';
@@ -284,5 +288,114 @@ describe('after a command with a window twin', () => {
     await settled();
 
     expect(recorded.outputs).toEqual([{ runId, stream: 'err', text: RESTART_NOTE }]);
+  });
+});
+
+describe("a run's diagnostics", () => {
+  const PRINTED = [
+    {
+      severity: 'error',
+      code: 'E_ASSET_NOT_FOUND',
+      message: 'm',
+      path: 'task/brief.brief',
+      line: 5,
+      column: 1,
+    },
+    {
+      severity: 'error',
+      code: 'E_UNSUPPORTED_TAG',
+      message: 'm',
+      path: 'templates/x/template.html',
+      line: 2,
+      column: 3,
+    },
+    { severity: 'warning', code: 'W_PLUGIN_FILE_FETCH', message: 'm' },
+  ] as const;
+
+  it('become Problems rows under the command, each with an index main can open', async () => {
+    const pushed: CliDiagnostics[] = [];
+    const { cli } = runner(
+      (environment) => {
+        environment.diagnostics?.(PRINTED);
+        return Promise.resolve(1);
+      },
+      { diagnostics: (rows) => pushed.push(rows) },
+    );
+
+    const { runId } = cli.start(['render', 'task/brief.brief']);
+    await settled();
+
+    expect(pushed).toEqual([
+      {
+        runId,
+        label: 'tyto render task/brief.brief',
+        diagnostics: [
+          {
+            index: 0,
+            severity: 'error',
+            code: 'E_ASSET_NOT_FOUND',
+            message: 'm',
+            where: 'task/brief.brief',
+            line: 5,
+            column: 1,
+            openable: true,
+          },
+          {
+            index: 1,
+            severity: 'error',
+            code: 'E_UNSUPPORTED_TAG',
+            message: 'm',
+            where: 'templates/x/template.html',
+            line: 2,
+            column: 3,
+            openable: false,
+          },
+          {
+            index: 2,
+            severity: 'warning',
+            code: 'W_PLUGIN_FILE_FETCH',
+            message: 'm',
+            openable: false,
+          },
+        ],
+      },
+    ]);
+    // The path is main's, against the run's folder; the window only ever has the index.
+    expect(cli.diagnosticPath(runId, 0)).toBe(resolve('/work', 'task/brief.brief'));
+    expect(cli.diagnosticPath(runId, 2)).toBeUndefined();
+  });
+
+  it('number on across two reports of one run', async () => {
+    const pushed: CliDiagnostics[] = [];
+    const { cli } = runner(
+      (environment) => {
+        environment.diagnostics?.([PRINTED[0]]);
+        environment.diagnostics?.([PRINTED[1]]);
+        return Promise.resolve(1);
+      },
+      { diagnostics: (rows) => pushed.push(rows) },
+    );
+
+    cli.start(['render', 'a']);
+    await settled();
+
+    expect(pushed.flatMap((push) => push.diagnostics.map((row) => row.index))).toEqual([0, 1]);
+  });
+
+  it(`keeps the paths of the last ${String(KEPT_RUNS)} runs that reported, and lets the oldest go`, async () => {
+    const { cli } = runner(
+      (environment) => {
+        environment.diagnostics?.([PRINTED[0]]);
+        return Promise.resolve(1);
+      },
+      { diagnostics: () => {} },
+    );
+
+    const ids = Array.from({ length: KEPT_RUNS + 1 }, () => cli.start(['render', 'a']).runId);
+    await settled();
+
+    expect(cli.diagnosticPath(ids[0]!, 0)).toBeUndefined();
+    expect(cli.diagnosticPath(ids[1]!, 0)).toBeDefined();
+    expect(cli.diagnosticPath(ids[KEPT_RUNS]!, 0)).toBeDefined();
   });
 });

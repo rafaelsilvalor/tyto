@@ -268,6 +268,7 @@ describe('the bridge', () => {
       // TYTO-495, ADR 0159: a tyto command run in main. Driven by `e2e/cli-runner.desktop.test.ts`.
       'cli:cancel',
       'cli:commands',
+      'cli:open-diagnostic',
       'cli:run',
       'credentials:delete',
       // No `credentials:get` since TYTO-187: nothing in the renderer may read a secret back.

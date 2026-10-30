@@ -15,6 +15,7 @@ import { pluginCleanCommand, pluginSyncCommand } from './plugin-files.js';
 import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { renderCommand } from './render.js';
+import { withDiagnosticsSink } from './report.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
 import { trustAddCommand, trustListCommand, trustRemoveCommand } from './trust.js';
 import { watchCommand } from './watch.js';
@@ -483,7 +484,9 @@ export async function run(
   }
 
   try {
-    await program.parseAsync([...argv], { from: 'user' });
+    await withDiagnosticsSink(environment.diagnostics, () =>
+      program.parseAsync([...argv], { from: 'user' }),
+    );
     return captured.code;
   } catch (cause) {
     if (cause instanceof CommanderError) {

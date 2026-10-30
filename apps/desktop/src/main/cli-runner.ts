@@ -1,12 +1,18 @@
+import { extname, resolve } from 'node:path';
+
 import {
   type CliEnvironment,
   type CommandDescription,
   type CommandInvocation,
   EXIT_INTERNAL,
   type ExitCode,
+  type LocatedDiagnostic,
   commandTree,
   run as runCommand,
 } from '@tyto/command-line';
+import type { Rasterizer } from '@tyto/raster';
+
+import { TAB_EXTENSIONS } from '../../shared/file-icons.js';
 
 /**
  * `tyto` commands run in main, in-process, for the window (ADR 0159, TYTO-495).
@@ -48,10 +54,42 @@ export interface CliRunnerOptions {
   readonly state: (change: CliStateChange) => void;
   /** What the window refreshes after a command with a window twin (decision 3). */
   readonly afterRun?: (path: readonly string[], code: ExitCode) => Promise<void> | void;
+  /** The run's diagnostics as Problems rows, pushed as they are printed (decision 7). */
+  readonly diagnostics?: (rows: CliDiagnostics) => void;
   /** `@tyto/command-line`'s `run`, injected so the runner is tested without a real command. */
   readonly run?: typeof runCommand;
   readonly newId?: () => string;
 }
+
+/** One push of `cli:diagnostics`: the rows a run printed, under the command it ran. */
+export interface CliDiagnostics {
+  readonly runId: string;
+  readonly label: string;
+  readonly diagnostics: readonly CliDiagnosticRow[];
+}
+
+export interface CliDiagnosticRow {
+  /** What `cli:open-diagnostic` takes back: main keeps the path, the window never names it. */
+  readonly index: number;
+  readonly severity: 'error' | 'warning' | 'info';
+  readonly code: string;
+  readonly message: string;
+  /** The file as the text printed it, relative to the run's folder where it could be. */
+  readonly where?: string;
+  readonly line?: number;
+  readonly column?: number;
+  readonly hint?: string;
+  /** Whether a tab opens the file: a brief, a text file or a recipe (`TAB_EXTENSIONS`). */
+  readonly openable: boolean;
+}
+
+/** The runs whose rows a click can still open; the panel shows the same last five. */
+export const KEPT_RUNS = 5;
+
+const opensInATab = (path: string): boolean =>
+  (TAB_EXTENSIONS as readonly string[]).includes(extname(path).toLowerCase());
+
+const SEVERITIES = new Set(['error', 'warning', 'info']);
 
 export interface CliRunner {
   start(argv: readonly string[]): { readonly runId: string };
@@ -60,6 +98,8 @@ export interface CliRunner {
   /** Every running command, stopped: the app quits or the window opens another folder. */
   cancelAll(): void;
   commands(): CommandDescription;
+  /** The file a run's Problems row names, while the run is one of the last {@link KEPT_RUNS}. */
+  diagnosticPath(runId: string, index: number): string | undefined;
 }
 
 /** The two commands that stop part of the way through (decision 6); the rest run to their end. */
@@ -84,6 +124,8 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
   >();
   const run = options.run ?? runCommand;
   const newId = options.newId ?? nextId;
+  // Insertion order is the runs' order, so the first key is the oldest to let go.
+  const paths = new Map<string, (string | undefined)[]>();
 
   const cancel = (runId: string): void => {
     const entry = running.get(runId);
@@ -123,6 +165,36 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
           entry.path = invocation.path;
           return options.refuse(invocation, base.cwd);
         },
+        diagnostics: (items: readonly LocatedDiagnostic[]) => {
+          const report = options.diagnostics;
+          if (report === undefined) return;
+          let kept = paths.get(runId);
+          if (kept === undefined) {
+            kept = [];
+            paths.set(runId, kept);
+            const oldest = paths.keys().next().value;
+            if (paths.size > KEPT_RUNS && oldest !== undefined) paths.delete(oldest);
+          }
+          const rows: CliDiagnosticRow[] = [];
+          for (const item of items) {
+            const path = item.path === undefined ? undefined : resolve(base.cwd, item.path);
+            rows.push({
+              index: kept.length,
+              severity: SEVERITIES.has(item.severity)
+                ? (item.severity as CliDiagnosticRow['severity'])
+                : 'error',
+              code: item.code,
+              message: item.message,
+              ...(item.path === undefined ? {} : { where: item.path }),
+              ...(item.line === undefined ? {} : { line: item.line }),
+              ...(item.column === undefined ? {} : { column: item.column }),
+              ...(item.hint === undefined ? {} : { hint: item.hint }),
+              openable: path !== undefined && opensInATab(path),
+            });
+            kept.push(path);
+          }
+          report({ runId, label: ['tyto', ...argv].join(' '), diagnostics: rows });
+        },
       };
 
       options.state({ runId, state: 'running' });
@@ -149,7 +221,19 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
       for (const runId of [...running.keys()]) cancel(runId);
     },
     commands: () => commandTree({ ...options.environment(), console: { out() {}, err() {} } }),
+    diagnosticPath: (runId, index) => paths.get(runId)?.[index],
   };
+}
+
+/**
+ * The window's rasterizer: the one the plugin registry holds, the hidden-window adapter the app
+ * registered under `chromium` (ADR 0007, ADR 0027). The export and every `tyto` command take
+ * it from here, so a capture from either queues on the same adapter (ADR 0159 decision 3).
+ */
+export function registeredRasterizer(registry: {
+  rasterizers<T>(): readonly { readonly value: T }[];
+}): Rasterizer | undefined {
+  return registry.rasterizers<Rasterizer>()[0]?.value;
 }
 
 /**

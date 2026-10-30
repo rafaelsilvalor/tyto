@@ -41,6 +41,66 @@ export interface ProblemsState {
    * is wrong with `settings.json` in front. Absent means a brief.
    */
   readonly kind?: ProblemsKind;
+  /**
+   * What `tyto` commands run from the window reported (TYTO-495, ADR 0159 decision 7): a section
+   * per run under the brief's rows, the newest last. Absent or empty, the panel is the brief's.
+   */
+  readonly commands?: readonly CommandProblems[];
+}
+
+/** One run's rows, under the command it ran (`cli:diagnostics`). */
+export interface CommandProblems {
+  readonly runId: string;
+  readonly label: string;
+  readonly diagnostics: readonly CommandProblemRow[];
+}
+
+/**
+ * How many runs the panel keeps a section for: the last five, a run's later rows adding to its
+ * own section. A default the command panel (TYTO-496) may revisit, kept in step with main's
+ * `KEPT_RUNS`, which is how many runs a click can still open.
+ */
+export const SHOWN_RUNS = 5;
+
+/** The sections after one `cli:diagnostics` push: added to its run's, or a new one last. */
+export function withCommandProblems(
+  sections: readonly CommandProblems[],
+  pushed: CommandProblems,
+): readonly CommandProblems[] {
+  const found = sections.find((section) => section.runId === pushed.runId);
+  if (found !== undefined) {
+    return sections.map((section) =>
+      section === found
+        ? { ...section, diagnostics: [...section.diagnostics, ...pushed.diagnostics] }
+        : section,
+    );
+  }
+  return [...sections, pushed].slice(-SHOWN_RUNS);
+}
+
+/** The offset of a 1-based line and column in `text`, held inside it. */
+export function offsetAt(text: string, line: number, column: number): number {
+  let offset = 0;
+  for (let at = 1; at < line; at += 1) {
+    const next = text.indexOf('\n', offset);
+    if (next === -1) return text.length;
+    offset = next + 1;
+  }
+  return Math.min(offset + Math.max(0, column - 1), text.length);
+}
+
+/** A diagnostic placed by the command that printed it, in its own file, not the brief's. */
+export interface CommandProblemRow {
+  readonly index: number;
+  readonly severity: 'error' | 'warning' | 'info';
+  readonly code: string;
+  readonly message: string;
+  // `| undefined` because the rows arrive parsed by Zod, which types an absent key that way.
+  readonly where?: string | undefined;
+  readonly line?: number | undefined;
+  readonly column?: number | undefined;
+  readonly hint?: string | undefined;
+  readonly openable: boolean;
 }
 
 /** A brief, one of the app's own files, or a text file (`DocumentState.kind`). */
@@ -101,6 +161,7 @@ export class ProblemsPanel extends LitElement {
   static override properties = {
     state: { attribute: false },
     reveal: { attribute: false },
+    open: { attribute: false },
   };
 
   declare state: ProblemsState;
@@ -116,10 +177,17 @@ export class ProblemsPanel extends LitElement {
    */
   declare reveal: (range: SourceRange) => void;
 
+  /**
+   * What a command's row does when clicked: main opens its file by run and row, never by a
+   * path the window names (ADR 0113), and `main.ts` then puts the cursor on the line.
+   */
+  declare open: (runId: string, row: CommandProblemRow) => void;
+
   constructor() {
     super();
     this.state = EMPTY_STATE;
     this.reveal = () => undefined;
+    this.open = () => undefined;
   }
 
   /**
@@ -188,6 +256,50 @@ export class ProblemsPanel extends LitElement {
     >`;
   }
 
+  /** A command's row: its file and line as the command printed them, since it is not the brief's. */
+  private commandRow(runId: string, item: CommandProblemRow): TemplateResult {
+    const severity = translate(this.state.locale, SEVERITY_KEY[item.severity]);
+    const place =
+      item.where === undefined
+        ? '—'
+        : item.line === undefined
+          ? item.where
+          : `${item.where}:${String(item.line)}:${String(item.column ?? 1)}`;
+    const body = html`<span
+        class="problems__dot problems__dot--${item.severity}"
+        aria-label=${severity}
+        title=${severity}
+      ></span>
+      <code class="problems__code">${item.code}</code>
+      <span class="problems__message">${item.message}</span>
+      <span class="problems__where">${place}</span>`;
+    const title = item.hint !== undefined && item.hint !== '' ? item.hint : nothing;
+
+    if (!item.openable) return html`<div class="problems__row" title=${title}>${body}</div>`;
+    return html`<button
+      type="button"
+      class="problems__row"
+      title=${title}
+      @click=${() => {
+        this.open(runId, item);
+      }}
+    >
+      ${body}
+    </button>`;
+  }
+
+  private commandSections(): TemplateResult[] {
+    return (this.state.commands ?? []).map(
+      (command) =>
+        html`<p class="problems__command">${command.label}</p>
+          ${repeat(
+            command.diagnostics,
+            (item) => item.index,
+            (item) => this.commandRow(command.runId, item),
+          )}`,
+    );
+  }
+
   /**
    * Diagnostics in the order the stages produced them, which is the order to read them in.
    *
@@ -201,10 +313,12 @@ export class ProblemsPanel extends LitElement {
       // On one line, and it has to stay on one line: `textContent` would otherwise carry the
       // indentation of this file, and the panel's empty state is a string a test compares.
       const key = EMPTY_KEYS[this.state.kind ?? 'brief'];
-      return html`<p class="problems__empty">${translate(this.state.locale, key)}</p>`;
+      return html`<p class="problems__empty">${translate(this.state.locale, key)}</p>
+        ${this.commandSections()}`;
     }
 
-    return repeat(this.state.diagnostics, rowKeys(), (item) => this.row(item));
+    return html`${repeat(this.state.diagnostics, rowKeys(), (item) => this.row(item))}
+    ${this.commandSections()}`;
   }
 }
 

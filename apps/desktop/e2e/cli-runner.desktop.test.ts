@@ -189,6 +189,35 @@ describe('a tyto command in the window', () => {
     expect(ended.code).toBeUndefined();
   });
 
+  // ADR 0159 decision 7: what the command printed is also a Problems row, which opens its file.
+  it('lists what a render reported in the Problems panel, and a row opens its brief', async () => {
+    const lost = join(work, 'lost');
+    mkdirSync(lost, { recursive: true });
+    writeFileSync(join(lost, 'perdido.brief'), readFileSync(join(FIXTURES, 'cartaz.brief')));
+
+    const ended = await tyto([
+      'render',
+      join(lost, 'perdido.brief'),
+      '--out',
+      join(work, 'lost-out'),
+      '--types',
+      'svg',
+      '--templates',
+      join(work, 'templates'),
+      '--formats-file',
+      join(work, 'formats.yaml'),
+    ]);
+    expect(ended.code).toBe(1);
+
+    const section = await page.waitForSelector('.problems__command');
+    expect(await section.textContent()).toContain('perdido.brief');
+    const row = page.locator('button.problems__row', { hasText: 'E_ASSET_NOT_FOUND' });
+    expect(await row.locator('.problems__where').textContent()).toMatch(/perdido\.brief:5:1$/u);
+
+    await row.click();
+    await page.waitForSelector('.tabs__tab:has-text("perdido.brief")');
+  });
+
   it('describes its command tree', async () => {
     const tree = await page.evaluate(() =>
       (

@@ -253,7 +253,7 @@ export interface IpcDependencies {
   /** A new delivery in the open folder (TYTO-489, ADR 0157): planned and written by main. */
   readonly delivery: DeliveryService;
   /** `tyto` commands run in main for the window (TYTO-495, ADR 0159). */
-  readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands'>;
+  readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands' | 'diagnosticPath'>;
   /**
    * A native context menu of the window's items at a point, settling with the id picked or
    * `null` (TYTO-352, ADR 0121). A function for the reason `confirm` is one: `Menu.popup` is
@@ -750,6 +750,17 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'cli:commands': () => Promise.resolve({ tree: cli.commands() }),
+
+    // ADR 0159 decision 7: a command's Problems row opens its file, which main kept by run and
+    // row. Only a file a tab opens, the explorer's own rule (`TAB_EXTENSIONS`).
+    'cli:open-diagnostic': async ({ documentId, runId, index }) => {
+      const path = cli.diagnosticPath(runId, index);
+      const name = path?.toLowerCase();
+      if (path === undefined || !TAB_EXTENSIONS.some((extension) => name?.endsWith(extension))) {
+        return { document: null, documentId: null };
+      }
+      return documents.openPath(documentId, path);
+    },
 
     'export:cancel': ({ exportId }) => {
       exports.cancel(exportId);

@@ -728,6 +728,7 @@ const dependencies = () => {
       start: () => ({ runId: 'cli-1' }),
       cancel: () => {},
       commands: () => ({ name: 'tyto', description: '', arguments: [], options: [], commands: [] }),
+      diagnosticPath: () => undefined,
     },
     confirm: () => Promise.resolve(true),
     // The system's menu picks the second item, whatever was offered (TYTO-352).
@@ -2234,6 +2235,7 @@ describe('cli:run, cli:cancel and cli:commands', () => {
           options: [],
           commands: [],
         }),
+        diagnosticPath: () => undefined,
       },
     });
 
@@ -2247,6 +2249,49 @@ describe('cli:run, cli:cancel and cli:commands', () => {
     expect(started).toEqual([['render', 'a b.brief', '|', 'x']]);
     expect(cancelled).toEqual(['cli-7']);
     expect(tree.name).toBe('tyto');
+  });
+
+  // ADR 0159 decision 7: a row opens by run and index, and only a file a tab opens.
+  it('open a Problems row by run and index, and only a file a tab opens', async () => {
+    const kept: Record<string, string> = {
+      'cli-7:0': '/work/task/brief.brief',
+      'cli-7:1': '/work/templates/cartaz/template.html',
+    };
+    const handlers = createHandlers({
+      ...dependencies(),
+      cli: {
+        start: () => ({ runId: 'cli-7' }),
+        cancel: () => {},
+        commands: () => ({
+          name: 'tyto',
+          description: '',
+          arguments: [],
+          options: [],
+          commands: [],
+        }),
+        diagnosticPath: (runId, index) => kept[`${runId}:${String(index)}`],
+      },
+    });
+    const open = guard('cli:open-diagnostic', handlers['cli:open-diagnostic']);
+
+    await expect(
+      open({ documentId: 'document-3', runId: 'cli-7', index: 0 }),
+    ).resolves.toMatchObject({
+      documentId: 'document-3',
+      document: { path: '/work/task/brief.brief' },
+    });
+    await expect(open({ documentId: 'document-3', runId: 'cli-7', index: 1 })).resolves.toEqual({
+      document: null,
+      documentId: null,
+    });
+    await expect(open({ documentId: 'document-3', runId: 'gone', index: 0 })).resolves.toEqual({
+      document: null,
+      documentId: null,
+    });
+    // A path is not a way in: the request takes none.
+    await expect(
+      open({ documentId: 'document-3', runId: 'cli-7', index: 0, path: '/etc/hosts' } as never),
+    ).rejects.toThrow();
   });
 
   it('refuse a command line given as one string', async () => {

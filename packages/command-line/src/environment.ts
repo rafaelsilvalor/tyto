@@ -1,6 +1,7 @@
 import type { PluginProcessLauncher } from '@tyto/plugin-api';
 
 import type { CloseableRasterizer } from './plugins/rasterizer.js';
+import type { LocatedDiagnostic } from './report.js';
 
 /**
  * Everything the commands reach for that is not a pure function of their arguments.
@@ -92,6 +93,13 @@ export interface CliEnvironment {
    * Absent in a terminal, whose person already has a shell.
    */
   readonly shellRefusal?: string;
+  /**
+   * Receives every diagnostic the run prints, already placed: the file, line and column the
+   * printed `path:line:col:` names (ADR 0159 decision 7). The text still reaches `console`
+   * unchanged; this is the same diagnostics as data, for the window's Problems panel.
+   * Absent in a terminal, which has nothing but the text.
+   */
+  readonly diagnostics?: (items: readonly LocatedDiagnostic[]) => void;
 }
 
 /** A command about to run: `['plugin', 'install']`, its arguments and its parsed options. */

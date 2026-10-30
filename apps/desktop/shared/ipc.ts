@@ -2252,6 +2252,21 @@ export const IPC_CHANNELS = {
 
   /** The command tree, for help and completion: the same program `cli:run` parses. */
   'cli:commands': channel(z.object({}), z.object({ tree: commandDescription })),
+
+  /**
+   * Opens the file a command's Problems row names (ADR 0159 decision 7), **by the run and the
+   * row, never by a path**: main kept the path when the run reported it, and the window never
+   * names a file for main to read (ADR 0113). A row whose file no tab opens, or whose run has
+   * gone from the last five, answers no document.
+   */
+  'cli:open-diagnostic': channel(
+    z.strictObject({
+      documentId,
+      runId: z.string().min(1),
+      index: z.number().int().min(0),
+    }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
@@ -2292,6 +2307,31 @@ export const IPC_EVENTS = {
    * `finished` carries the CLI's exit code; `cancelled` carries none, because the CLI defines
    * none for it (decision 6).
    */
+  /**
+   * Diagnostics a run printed, as Problems rows (ADR 0159 decision 7): the place as the text
+   * printed it, and `index`, which `cli:open-diagnostic` takes back. Pushed as they are printed;
+   * a run's rows add up under its `label`, the command it ran.
+   */
+  'cli:diagnostics': z.object({
+    runId: z.string().min(1),
+    label: z.string().max(4000),
+    diagnostics: z
+      .array(
+        z.object({
+          index: z.number().int().min(0),
+          severity: z.enum(['error', 'warning', 'info']),
+          code: z.string().max(200),
+          message: z.string().max(10_000),
+          where: z.string().max(4000).optional(),
+          line: z.number().int().min(1).optional(),
+          column: z.number().int().min(1).optional(),
+          hint: z.string().max(10_000).optional(),
+          openable: z.boolean(),
+        }),
+      )
+      .max(500),
+  }),
+
   'cli:state': z.object({
     runId: z.string().min(1),
     state: z.enum(['running', 'waiting', 'finished', 'cancelled']),
