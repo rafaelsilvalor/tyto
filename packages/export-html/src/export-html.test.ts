@@ -56,6 +56,29 @@ function htmlOf(scene: Scene): readonly string[] {
   return result.value.map((frame) => frame.html);
 }
 
+function shadow(spread: number): unknown {
+  return { kind: 'shadow', x: 0, y: 4, blur: 12, spread, color: { r: 0, g: 0, b: 0, a: 0.5 } };
+}
+
+/** A copy of a fixture with one node's effects replaced, found by id wherever it nests. */
+function withEffects(fixture: unknown, id: string, effects: readonly unknown[]): unknown {
+  // A JSON round trip, because this package's types carry neither the DOM nor Node, and
+  // `structuredClone` is declared by both and by nothing else.
+  const copy: unknown = JSON.parse(JSON.stringify(fixture));
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value !== 'object' || value === null) return;
+    const record = value as Record<string, unknown>;
+    if (record['id'] === id) record['effects'] = effects;
+    Object.values(record).forEach(visit);
+  };
+  visit(copy);
+  return copy;
+}
+
 const VOID_ELEMENTS = new Set([
   'area',
   'base',
@@ -275,16 +298,48 @@ describe('what the exporter cannot do, it says', () => {
     );
   });
 
-  it('warns that a shadow spread is not drawn, and still draws the shadow', () => {
-    const scene = sceneOf(mappingFixture);
-    const result = exportHtml(scene, { resources });
+  it('draws a shadow spread through the SVG filter export-svg draws it with (ADR 0156)', () => {
+    const result = exportHtml(sceneOf(mappingFixture), { resources });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.diagnostics.map((item) => item.message)).toContain(
-      "'spun': a shadow with a spread is approximated by export-html — CSS drop-shadow() has no spread, so 3px of it is not drawn.",
+    expect(result.diagnostics.map((item) => item.message).join(' ')).not.toContain('spread');
+    const html = result.value[0]?.html ?? '';
+    expect(html).toContain(
+      '#spun { transform: matrix(0.7071, 0.7071, -0.7071, 0.7071, 230, -2.4264); filter: url(#tyto-spread-0);',
     );
-    expect(result.value[0]?.html).toContain('drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.5))');
+    expect(html).toContain(
+      '<feMorphology in="alpha" operator="dilate" radius="3" result="grown"/>',
+    );
+    expect(html).toContain('<feGaussianBlur in="moved" stdDeviation="6" result="blurred"/>');
+    expect(html).not.toContain('drop-shadow(');
+  });
+
+  it('erodes for a negative spread, which feMorphology has no radius for', () => {
+    const html = htmlOf(sceneOf(withEffects(mappingFixture, 'spun', [shadow(-2)])))[0] ?? '';
+
+    expect(html).toContain('<feMorphology in="alpha" operator="erode" radius="2" result="grown"/>');
+  });
+
+  it('keeps drop-shadow() for a shadow with no spread, and the filters in the IR order', () => {
+    const effects = [{ kind: 'blur', radius: 2 }, shadow(0), shadow(5)];
+    const html = htmlOf(sceneOf(withEffects(mappingFixture, 'spun', effects)))[0] ?? '';
+
+    expect(html).toContain(
+      'filter: blur(2px) drop-shadow(0px 4px 12px rgba(0, 0, 0, 0.5)) url(#tyto-spread-0);',
+    );
+    expect(html.match(/<filter /gu)).toHaveLength(1);
+  });
+
+  it('gives a group the frame to draw in, since its own box is 0×0', () => {
+    // The region a filter defaults to is a margin around the element's box, and a group's
+    // element has none: a default region would be empty and the group would vanish.
+    const html = htmlOf(sceneOf(withEffects(mappingFixture, 'clipped', [shadow(3)])))[0] ?? '';
+
+    // `clipped` sits at (20, 20) of a 400×400 frame, padded by 4 + 3 + 12 × 2 = 31.
+    expect(html).toContain(
+      'filterUnits="userSpaceOnUse" x="-51" y="-51" width="462" height="462">',
+    );
   });
 
   it('refuses a text used as a mask instead of dropping it silently', () => {

@@ -137,7 +137,7 @@ per node id or wants hidden nodes counted after all.
 | Group.opacity/blend      | `opacity`, `mix-blend-mode`                       | `<g opacity>` + `style="mix-blend-mode"`                                      |
 | mask                     | `mask-image` (mask node rendered as SVG data URI) | `<mask>`                                                                      |
 | clip                     | `overflow: hidden`                                | `<clipPath>`                                                                  |
-| Shadow/Blur              | `filter: drop-shadow()/blur()`                    | `<filter>`                                                                    |
+| Shadow/Blur              | `filter: drop-shadow()/blur()`, spread `url(#…)`  | `<filter>`                                                                    |
 | Text                     | `div` + spans; bundled `@font-face`               | `<text>`+`<tspan>`; font embedded in `<style>` or converted to paths (option) |
 | TextRun `break`          | `<br>`                                            | ends the `<tspan>`; the next one starts at `x` with `dy` of one line          |
 | Vector.svg               | inline `<svg>`, once `checkSvgMarkup` accepts it  | inline (namespaces normalized), once `checkSvgMarkup` accepts it              |
@@ -167,7 +167,8 @@ inside a `url()` and an attribute would have to carry it through HTML escaping.
 
 `packages/export-svg` is the second, and nests the same way — a node is a `<g>` with its
 own matrix. Where the two differ is what each format can state exactly. SVG draws a
-stroke's `align` and a shadow's `spread` precisely and HTML approximates both; HTML lays
+stroke's `align` precisely and HTML approximates it; both draw a shadow's `spread`, HTML
+through an inline SVG filter with the same primitives (ADR 0156); HTML lays
 text out and SVG cannot, so **an SVG does not wrap**: its lines are exactly the brief's
 `LineBreak` runs until E4.5 measures text, and a baseline sits at an approximated ascent.
 ADR 0019 has the reasoning and the rest of the list — `--text-as-paths` takes glyph
