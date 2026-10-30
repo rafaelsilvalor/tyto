@@ -31,9 +31,11 @@ import { z } from 'zod';
  * carries the template's declared values, a field the strict schema of a guest on 9 would
  * refuse (ADR 0153, TYTO-439); 11 since a brand kit may carry the brand's colours, which the
  * strict kit schema of a guest on 10 would refuse in a template call and a host on 10 in a
- * `brand-kit` registration (ADR 0155).
+ * `brand-kit` registration (ADR 0155); 12 since a template's `build` carries the files the
+ * host read from the template's own folder, a fourth argument the strict tuple of a guest on
+ * 11 would refuse (ADR 0062, TYTO-478).
  */
-export const RPC_PROTOCOL_VERSION = 11;
+export const RPC_PROTOCOL_VERSION = 12;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

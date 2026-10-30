@@ -361,21 +361,23 @@ export async function compileDeferred(
   const plans = planArtworks(resolved, manifest);
   const measure = measureOf(options.faces);
   const brand = brandKitOf(resolved, manifest, options);
-  const { values } = resolveValues(manifest, suppliedOf(resolved, options), noFiles);
+  // What the host read from the template's folder in the installed plugin (TYTO-478), so a
+  // declared image's default resolves as a built-in template's does.
+  const files = template.files ?? noFiles;
+  const { values } = resolveValues(manifest, suppliedOf(resolved, options), files);
   const answers = new Map<string, Result<Frame, Diagnostics>>();
   const reported = new Map<string, Diagnostic[]>();
   for (const plan of plans) {
     for (const format of resolved.formats) {
       const reports: Diagnostic[] = [];
-      // A plugin's own folder is not read for its templates yet (ADR 0062), and `files`
-      // would not cross the boundary anyway: it is functions.
+      // `files` is functions and does not cross; `buildLater` sends what it answers as data.
       const context = contextOf(
         plan,
         format,
         plans.length,
         options,
         measure,
-        noFiles,
+        files,
         brand,
         // Data, so they cross with the call (TYTO-439). What they refuse is reported once,
         // by compileWith below, which resolves the same values again.
@@ -387,7 +389,7 @@ export async function compileDeferred(
     }
   }
 
-  return compileWith(resolved, manifest, options, noFiles, (context) => {
+  return compileWith(resolved, manifest, options, files, (context) => {
     const answer = answers.get(context.idPrefix);
     // Unreachable: both loops walk the same plans and formats.
     if (answer === undefined) {

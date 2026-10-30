@@ -1,10 +1,11 @@
 import type { Dirent } from 'node:fs';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 
 import type { AssetRef, Size, TemplateFiles } from '@tyto/core';
 import type { ExportResources } from './export-resources.js';
 
+import { isInside } from './contain.js';
 import { hashOf } from './hash.js';
 import { imageSize } from './image-size.js';
 import { EMBEDDABLE_MIME, dataUri } from './mime.js';
@@ -32,6 +33,14 @@ import { EMBEDDABLE_MIME, dataUri } from './mime.js';
  * one walk of one folder, and because handing back an `AssetRef` whose bytes nobody loaded
  * would produce `E_EXPORT_ASSET_UNRESOLVED` at the far end of the pipeline — a template
  * author's file, reported as if the brief had gone wrong.
+ *
+ * ## Nothing outside the folder
+ *
+ * A folder can be an installed plugin's, whose files somebody else wrote (TYTO-478). A link
+ * whose target is outside the folder is skipped, file or folder alike, and both ends are
+ * compared after `realpath`: otherwise a `bg.png` that links to a file elsewhere on this
+ * machine would be read here and embedded in an export. A link to a file that stays inside
+ * is read.
  */
 
 export interface FileTemplateAssetsOptions {
@@ -57,6 +66,11 @@ export interface FileTemplateAssets {
    * not something either adapter can decide alone.
    */
   readonly resources: ExportResources;
+  /**
+   * Every path `assets` answers, as a template writes it. What an installed template's
+   * `files` is rebuilt from in its plugin's process, where the functions do not reach.
+   */
+  readonly paths: readonly string[];
 }
 
 const DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
@@ -79,6 +93,7 @@ interface Entry {
 async function collect(
   directory: string,
   base: string,
+  root: string,
   recursive: boolean,
   maxBytes: number,
   into: Map<string, Entry>,
@@ -94,8 +109,14 @@ async function collect(
 
   for (const entry of entries) {
     const path = join(directory, entry.name);
+    // A link is read only when it leads to a file inside the folder; a linked folder is
+    // not descended into, as before, so a link to an ancestor cannot loop.
+    if (entry.isSymbolicLink()) {
+      const target = await realpath(path).catch(() => undefined);
+      if (target === undefined || !isInside(root, target)) continue;
+    }
     if (entry.isDirectory()) {
-      if (recursive) await collect(path, base, recursive, maxBytes, into);
+      if (recursive) await collect(path, base, root, recursive, maxBytes, into);
       continue;
     }
 
@@ -119,9 +140,12 @@ export async function fileTemplateAssets(
 ): Promise<FileTemplateAssets> {
   const base = resolve(options.base);
   const byPath = new Map<string, Entry>();
+  // The folder's own real path, so a folder reached through a link is compared as itself.
+  const root = await realpath(base).catch(() => base);
   await collect(
     base,
     base,
+    root,
     options.recursive ?? true,
     options.maxBytes ?? DEFAULT_MAX_BYTES,
     byPath,
@@ -164,5 +188,9 @@ export async function fileTemplateAssets(
     return entry === undefined ? undefined : imageSize(entry.bytes);
   };
 
-  return { assets, resources: { html: { asset }, svg: { asset, assetSize } } };
+  return {
+    assets,
+    resources: { html: { asset }, svg: { asset, assetSize } },
+    paths: [...byPath.keys()],
+  };
 }

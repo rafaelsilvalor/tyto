@@ -4,8 +4,16 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 
-import type { AssetRef, FileSystem, TemplateManifest, TemplateRegistry } from '@tyto/core';
-import { fileTemplateAssets, nodeFileSystem } from '@tyto/io';
+import {
+  type AssetRef,
+  type FileSystem,
+  type TemplateManifest,
+  type TemplateRegistry,
+  isDeferredTemplate,
+  ok,
+} from '@tyto/core';
+import { type InstalledCodePack, fileTemplateAssets, nodeFileSystem } from '@tyto/io';
+import type { IsolatedPackBuild, ShippedFiles } from '@tyto/plugin-api';
 import { markupTemplateSource } from '@tyto/pipeline';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -223,5 +231,56 @@ describe('templateSourceOf', () => {
     expect(reads).toEqual([]);
     const ref: AssetRef = { id: 'assets/x.png', source: 'file', hash: 'sha256-0' };
     expect(wiring.resources.html?.asset?.(ref)).toBeUndefined();
+  });
+
+  it("sends an installed code template its folder's refs, and keeps the bytes for the export (TYTO-478)", async () => {
+    const pack = mkdtempSync(join(tmpdir(), 'tyto-installed-pack-'));
+    try {
+      const folder = join(pack, 'cartaz');
+      mkdirSync(join(folder, 'assets'), { recursive: true });
+      writeFileSync(join(folder, 'assets', 'fundo.png'), BACKGROUND);
+      const manifest = { name: 'cartaz', version: '1.0.0', formats: ['grid-1x1'], slots: {} };
+      const registry: TemplateRegistry = {
+        list: () => [manifest as unknown as TemplateManifest],
+        get: (name) => (name === 'cartaz' ? (manifest as unknown as TemplateManifest) : undefined),
+        formatsOf: () => ['grid-1x1'],
+        directoryOf: (name) => (name === 'cartaz' ? folder : undefined),
+        failures: [],
+      };
+      // The plugin's process, as the wire calls it: what crossed is all it is handed.
+      const sent: ShippedFiles[] = [];
+      const build: IsolatedPackBuild = (_template, call, _faces, files) => {
+        sent.push(files);
+        return Promise.resolve(
+          ok({ frame: { format: call.format, size: call.size, children: [] }, reports: [] }),
+        );
+      };
+      const code: InstalledCodePack = { plugin: 'cartaz', directory: pack, build, permissions: [] };
+
+      const wiring = templateSourceOf(nodeFileSystem(), registry, [code]);
+      const loaded = await wiring.source.load('cartaz');
+      if (!loaded.ok || !isDeferredTemplate(loaded.value)) throw new Error('not deferred');
+      const ref = loaded.value.files?.image('assets/fundo.png');
+      if (ref === undefined) throw new Error('assets/fundo.png was not read');
+      await loaded.value.buildLater({
+        format: 'grid-1x1',
+        size: { w: 10, h: 10 },
+        idPrefix: 'a.grid-1x1',
+        artwork: { id: 'a', index: 0, count: 1 },
+        slots: {},
+        adjustments: {},
+        brand: {},
+        files: loaded.value.files ?? { svg: () => undefined, image: () => undefined },
+        measure: () => undefined,
+        report: () => undefined,
+      });
+
+      expect(sent).toEqual([{ images: { 'assets/fundo.png': ref }, svgs: {} }]);
+      expect(wiring.resources.html?.asset?.(ref)).toBe(
+        `data:image/png;base64,${BACKGROUND.toString('base64')}`,
+      );
+    } finally {
+      rmSync(pack, { recursive: true, force: true });
+    }
   });
 });

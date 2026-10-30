@@ -596,7 +596,9 @@ above, or the scene is refused as `E_SCENE_SVG_MARKUP`. A template cannot write 
 never sees, so a hand-made one renders as `E_EXPORT_ASSET_UNRESOLVED`. **`undefined` means the
 folder has no such file**: draw without it, or report it. The folder is read once per load, by
 whoever composed the source, so nothing here touches a disk. An installed plugin's code
-template is handed `noFiles` for now, and so is a context built by hand in a test.
+template reads its own folder inside the installed plugin the same way: the host reads it and
+sends the refs with the call, and a path out of the folder answers `undefined` (ADR 0062,
+TYTO-478). A context built by hand in a test is handed `noFiles`.
 
 **One path per format gives each format its own background.** A banner in three sizes keeps
 three files and lets the format pick:
