@@ -49,7 +49,8 @@ const WORKSPACE_ROOTS = ['packages', 'apps', 'tools'];
  * bundles most of the workspace, and a hand-written list is how `packages/core` went
  * unchecked on 13 of the 40 pull requests before this script existed. `apps/cli` is added
  * by hand because the graph cannot see it — three e2e suites run the built CLI and compare
- * folders, so the CLI is a dependency of the tests without being one of the package.
+ * folders, so the CLI is a dependency of the tests without being one of the package. So is
+ * `packages/command-line`, the CLI's body since TYTO-495, whose font fixtures two suites read.
  *
  * `visual` keeps the list its `paths:` filter carried (TYTO-138 moved it, it did not
  * widen it); `packages/export-*` is expanded against the disk so a new exporter joins.
@@ -58,7 +59,7 @@ const SUITES = {
   desktop: {
     workflow: '.github/workflows/desktop-e2e.yml',
     package: '@tyto/desktop',
-    extra: ['apps/cli/'],
+    extra: ['apps/cli/', 'packages/command-line/'],
   },
   visual: {
     workflow: '.github/workflows/visual.yml',
@@ -70,6 +71,7 @@ const SUITES = {
       'packages/core/',
       'packages/fonts/',
       'apps/cli/',
+      'packages/command-line/',
       'tools/template-preview/',
     ],
   },

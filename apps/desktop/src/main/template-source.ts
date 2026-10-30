@@ -40,7 +40,7 @@ export interface TemplateWiring {
  * through the proxy `connectIsolatedPlugin` registered, never through an import.
  *
  * A markup template is handed its own folder's files (TYTO-176), the way `tyto render` hands
- * them over in `apps/cli/src/render-context.ts`. Without them a `<vector src="assets/…">`
+ * them over in `packages/command-line/src/render-context.ts`. Without them a `<vector src="assets/…">`
  * or an `<image src="assets/…">` failed to compile in the window and the template drew
  * nothing at all, while the CLI drew it whole. A bundled code template is handed the same
  * files, through `context.files` (ADR 0062, TYTO-214).

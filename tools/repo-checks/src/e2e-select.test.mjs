@@ -80,6 +80,7 @@ describe('reaching nothing locally, since CI runs everything on every push', () 
     ['the renderer page', 'apps/desktop/src/renderer/index.html'],
     ['packages/core, mapped to all', 'packages/core/src/index.ts'],
     ['the CLI, mapped to all', 'apps/cli/src/main.ts'],
+    ['the command tree, mapped to all', 'packages/command-line/src/render.ts'],
     ['a document module, mapped to all', 'apps/desktop/src/main/documents.ts'],
   ])('%s', (_case, path) => {
     expect(choose([path])).toMatchObject({

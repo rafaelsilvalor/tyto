@@ -250,7 +250,7 @@ interface Run {
 /**
  * The exporters, built per run because an exporter binds the bytes of the folder it renders.
  *
- * Exactly the CLI's argument (`apps/cli/src/plugins/index.ts`): two documents open on two
+ * Exactly the CLI's argument (`packages/command-line/src/plugins/index.ts`): two documents open on two
  * different folders have two different `assets/`, and an exporter bound to the wrong one
  * embeds the wrong logo. A host is two maps; building one per export costs nothing worth
  * caching, and it is why this is not folded into `activateBuiltIns`, which is built once at
