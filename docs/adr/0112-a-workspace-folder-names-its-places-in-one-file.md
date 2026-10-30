@@ -3,7 +3,7 @@
 Status: accepted · 2026-10-21 · TYTO-278 · builds what ADR 0111 asks of the first card, beside
 ADR 0011, ADR 0056, ADR 0057 and ADR 0073; leaves the slot TYTO-347 fills; amended by ADR 0114,
 which replaces the `profile` row of the table below; amended by ADR 0126, which adds
-`exportPresets` and makes a preset's folder the one exception to "it names places and nothing else"
+`exportPresets` and makes a preset's folder the one exception to "it names places and nothing else"; amended by ADR 0157, which adds the `delivery` key
 
 ## Context
 
