@@ -6,7 +6,7 @@ import type { AssetResolver } from '../ports/asset-resolver.js';
 import { type Diagnostics, type Result, err, fromPartial } from '../result/result.js';
 import type { AssetRef } from '../scene/primitives.js';
 import type { SourceRange } from '../source/range.js';
-import type { TemplateConfigurations } from '../template/configurations.js';
+import type { TemplateConfigurations, TemplateSelection } from '../template/configurations.js';
 import { type BriefDefaults, measured } from '../template/configured-brief.js';
 import type { SuppliedValues } from '../template/declared-values.js';
 import type { Slot, TemplateManifest } from '../template/manifest.js';
@@ -604,16 +604,47 @@ export function listedFormats(data: Readonly<Record<string, unknown>>): string[]
   return (Array.isArray(written) ? written : [written]).map((entry) => String(entry));
 }
 
+/** The formats a name may ask for, and how a refusal names them. */
+interface Renderable {
+  /** The name `E_UNKNOWN_FORMAT` says does not render a format: the one the brief wrote. */
+  readonly name: string;
+  readonly formats: readonly string[];
+  /** Why the list is shorter than the manifest's, when a configuration restricts it. */
+  readonly hint?: string;
+}
+
+/**
+ * The manifest's formats, or the restriction of the configuration the name reaches (ADR 0155
+ * decision 6). A restricted configuration is refused exactly as a template that does not
+ * render the format, under the name the brief wrote, so the person reads the alias they typed.
+ */
+function renderable(
+  manifest: TemplateManifest,
+  name: string,
+  selection: TemplateSelection | undefined,
+): Renderable {
+  const restriction = selection?.formats;
+  if (restriction === undefined || selection?.configuration === undefined) {
+    return { name: manifest.name, formats: manifest.formats };
+  }
+  return {
+    name,
+    formats: restriction,
+    hint: `Configuration '${selection.configuration}' of template '${manifest.name}' restricts its formats to ${restriction.join(', ')}.`,
+  };
+}
+
 /**
  * The formats to render: the frontmatter's, narrowed by the caller's when both list some;
- * else the caller's; else the configuration's (TYTO-440); else the manifest's own (ADR 0107).
+ * else the caller's; else the configuration's (TYTO-440); else the manifest's own (ADR 0107),
+ * each bounded by the configuration's restriction when it has one (ADR 0155).
  *
  * The range goes on a diagnostic only when the frontmatter is involved, because a
  * `--formats` flag has nowhere in the file for an editor to underline.
  */
 function formatsOf(
   ast: BriefAst,
-  manifest: TemplateManifest,
+  allowed: Renderable,
   override: readonly string[] | undefined,
   configured: readonly string[] | undefined,
   report: (problem: Diagnostic) => void,
@@ -625,21 +656,24 @@ function formatsOf(
     report(
       diagnostic(
         'E_UNKNOWN_FORMAT',
-        { format, template: manifest.name, declared: manifest.formats.join(', ') },
-        at === undefined ? {} : { range: at },
+        { format, template: allowed.name, declared: allowed.formats.join(', ') },
+        {
+          ...(at === undefined ? {} : { range: at }),
+          ...(allowed.hint === undefined ? {} : { hint: allowed.hint }),
+        },
       ),
     );
   };
   const rendered = (formats: readonly string[], at: SourceRange | undefined): string[] =>
     formats.filter((format) => {
-      if (manifest.formats.includes(format)) return true;
+      if (allowed.formats.includes(format)) return true;
       unknown(format, at);
       return false;
     });
 
   if (written === undefined) {
     return requested === undefined
-      ? (configured ?? manifest.formats)
+      ? (configured ?? allowed.formats)
       : rendered(requested, undefined);
   }
 
@@ -731,9 +765,15 @@ export async function resolve(
 
   const resolver = new Resolver(manifest, options);
   const briefSide = selection?.brief;
-  const formats = formatsOf(ast, manifest, options.formats, briefSide?.formats, (problem) => {
-    resolver.report(problem);
-  });
+  const formats = formatsOf(
+    ast,
+    renderable(manifest, name, selection),
+    options.formats,
+    briefSide?.formats,
+    (problem) => {
+      resolver.report(problem);
+    },
+  );
 
   for (const [key, value] of Object.entries(ast.frontmatter.data)) {
     if (RESERVED.has(key)) continue;

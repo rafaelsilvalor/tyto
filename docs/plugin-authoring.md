@@ -554,6 +554,34 @@ it with `context.brand.colors?.accent ?? '<the colour you drew before>'` (a hous
 and the kit's accent wins, so switching a configuration's brand switches its colour with its
 logo. Do not declare the accent as a configurable value: the brand is its only source.
 
+## Which formats a configuration renders
+
+A configuration may restrict its formats with `formats:` beside `brand:` (ADR 0155 decision 6):
+a subset of your manifest's, which a brief cannot widen. One template can declare grid and story
+for two brands while a third renders the story only:
+
+```yaml
+configurations:
+  roxo:
+    brand: roxo
+    formats: [story] # `formats: [grid]` in a brief, or `--formats grid`, is refused
+  ocre:
+    brand: ocre
+```
+
+A brief that reaches the configuration and asks for another format gets `E_UNKNOWN_FORMAT`
+under the name it wrote, with the restriction as what it renders and a hint naming the
+configuration; a run's `--formats` and the desktop's Export dialog meet the same check, and the
+dialog offers only the restriction. A brief that lists no formats renders the restriction. A
+configuration without `formats:` takes its entry `default`'s, then your manifest's.
+
+A format your manifest does not declare is `W_CONFIGURATION_FORMATS_INVALID` at its item and is
+left out; a list with nothing left, or one that is not a list, is the same warning at the key,
+and the configuration keeps your manifest's formats. `brief.formats` is different: it is the
+default a brief starts from, and it must sit inside the restriction; a format outside it is the
+same warning and is left out of the default. The restriction runs in the host before your
+template is called, so the protocol is unchanged.
+
 ## Other extension points
 
 A plugin can contribute more than templates. `contributes` must name every point it registers

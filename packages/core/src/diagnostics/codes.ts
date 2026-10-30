@@ -1070,6 +1070,15 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  W_CONFIGURATION_FORMATS_INVALID: {
+    severity: 'warning',
+    summary:
+      "A configuration's formats restriction, or its brief's default formats, names what it cannot.",
+    template: "In configuration '{configuration}' of template '{template}', {problem}.",
+    spec: 'docs/adr/0155-a-configuration-picks-its-brand-and-restricts-its-formats.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   W_TEMPLATE_SHADOWED: {
     severity: 'warning',
     summary: 'Two template sources declare the same name; the earlier source is the one used.',

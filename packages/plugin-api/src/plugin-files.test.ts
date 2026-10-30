@@ -170,6 +170,35 @@ templates:
     ).toBe('azul');
   });
 
+  it('keeps a configuration’s formats item by item, where each was written (ADR 0155)', () => {
+    const source = `version: 1
+templates:
+  simulados:
+    source: { git: ./s, ref: v1 }
+    configurations:
+      roxo:
+        formats: [story, reel]
+      ocre:
+        formats: story
+`;
+    const read = parsePluginFile(source, 'simulados.yaml');
+
+    expect(read.diagnostics).toEqual([]);
+    const roxo = read.value?.templates[0]?.configurations.roxo?.formats;
+    expect(roxo?.value).toEqual(['story', 'reel']);
+    expect(roxo?.entries?.map((item) => source.slice(item.range?.start, item.range?.end))).toEqual([
+      'story',
+      'reel',
+    ]);
+    const ocre = read.value?.templates[0]?.configurations.ocre?.formats;
+    expect(ocre).not.toHaveProperty('entries');
+    expect(ocre?.value).toBe('story');
+    expect(
+      configuredTemplates(read.value ? [read.value] : [], '/w')[0]?.configurations[0]?.formats
+        ?.value,
+    ).toEqual(['story', 'reel']);
+  });
+
   it('keeps the brief block’s four parts, each where it was written, and warns on a fifth', () => {
     const source = `version: 1
 templates:

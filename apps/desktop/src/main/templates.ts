@@ -195,11 +195,19 @@ export async function createTemplateCatalogue(
 
     // What the configuration a name reaches says about a new brief (TYTO-440): the bare name
     // reaches the entry's `default`, an alias its own.
+    // A configuration that restricts its formats (ADR 0155) offers only those, so the Export
+    // dialog does not tick a format the render would refuse.
     const configured = [...withPreviews, ...aliases].map((row) => {
-      const brief = snapshot.configurations.select(row.name)?.brief;
-      if (brief === undefined) return row;
+      const selection = snapshot.configurations.select(row.name);
+      const restriction = selection?.formats;
+      const brief = selection?.brief;
+      const restricted =
+        restriction === undefined
+          ? row
+          : { ...row, formats: row.formats.filter((format) => restriction.includes(format.id)) };
+      if (brief === undefined) return restricted;
       return {
-        ...row,
+        ...restricted,
         configured: {
           ...(brief.skeleton === undefined ? {} : { skeleton: brief.skeleton }),
           ...(brief.formats === undefined ? {} : { formats: [...brief.formats] }),
