@@ -17,6 +17,10 @@ import { build } from 'tsup';
  *   build wrote, and every package that type-checks against this one would go red for as
  *   long as the preview runs.
  *
+ * `--out-dir <folder>` writes the build there instead of the config's `outDir`: a template in
+ * its own repository is built into the preview's staging folder, so the `dist/` the author
+ * commits is never rewritten by a preview (TYTO-485).
+ *
  * Prints one JSON line: `{ ok: true }`, or `{ ok: false, errors }` with esbuild's locations.
  */
 
@@ -25,8 +29,16 @@ interface EsbuildMessage {
   readonly location?: { readonly file: string; readonly line: number; readonly column: number };
 }
 
+const outDirFlag = process.argv.indexOf('--out-dir');
+const outDir = outDirFlag === -1 ? undefined : process.argv[outDirFlag + 1];
+
 try {
-  await build({ dts: false, clean: false, silent: true });
+  await build({
+    dts: false,
+    clean: false,
+    silent: true,
+    ...(outDir === undefined ? {} : { outDir }),
+  });
   process.stdout.write(`${JSON.stringify({ ok: true })}\n`);
 } catch (cause) {
   const errors = (cause as { errors?: readonly EsbuildMessage[] }).errors;

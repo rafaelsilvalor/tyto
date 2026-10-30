@@ -49,6 +49,8 @@ export interface RenderRequest {
   readonly types: readonly string[];
   /** Another binary in place of the built CLI. Tests use it to prove the page breaks with it. */
   readonly binary?: string;
+  /** `TYTO_HOME` for the render; the person's own when absent (TYTO-485). */
+  readonly home?: string;
 }
 
 export interface RenderOutcome {
@@ -63,18 +65,22 @@ export interface RenderOutcome {
   readonly stderr: string;
 }
 
-interface Exited {
+export interface Exited {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
 }
 
-function spawnNode(args: readonly string[], cwd: string): Promise<Exited> {
+export function spawnNode(
+  args: readonly string[],
+  cwd: string,
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<Exited> {
   return new Promise((resolve) => {
     execFile(
       process.execPath,
       [...args],
-      { cwd, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+      { cwd, env: environment, maxBuffer: 64 * 1024 * 1024, windowsHide: true },
       (error, stdout, stderr) => {
         const code = error === null ? 0 : typeof error.code === 'number' ? error.code : -1;
         resolve({ code, stdout, stderr });
@@ -103,9 +109,19 @@ export async function renderWithTyto(request: RenderRequest): Promise<RenderOutc
     request.types.join(','),
     '--json',
   ];
-  const command = ['node', shown(binary), ...args.map((arg) => shown(arg))].join(' ');
+  // The home is part of what was drawn: a repository's plugin is installed only in its own.
+  const command = [
+    ...(request.home === undefined ? [] : [`TYTO_HOME=${request.home}`]),
+    'node',
+    shown(binary),
+    ...args.map((arg) => shown(arg)),
+  ].join(' ');
 
-  const exited = await spawnNode([binary, ...args], REPOSITORY_ROOT);
+  const exited = await spawnNode(
+    [binary, ...args],
+    REPOSITORY_ROOT,
+    request.home === undefined ? process.env : { ...process.env, TYTO_HOME: request.home },
+  );
 
   let document: {
     status?: string;
