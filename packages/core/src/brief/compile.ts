@@ -255,6 +255,8 @@ interface Plan {
   readonly range?: SourceRange;
   readonly slots: Readonly<Record<string, ResolvedSlot>>;
   readonly adjustments: Readonly<Record<string, string | true>>;
+  /** Whether a required slot is unset for this artwork, so its frames carry the stamp. */
+  readonly gap: boolean;
 }
 
 /**
@@ -269,15 +271,26 @@ function planArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): read
   const repeatable = Object.entries(manifest.slots).find(([, slot]) => slot.repeat)?.[0];
 
   if (repeatable === undefined || resolved.artworks.length === 0) {
-    return [{ id: 'artwork-1', index: 0, slots: resolved.slots, adjustments: {} }];
+    return [
+      {
+        id: 'artwork-1',
+        index: 0,
+        slots: resolved.slots,
+        adjustments: {},
+        gap: resolved.missingRequiredSlots.length > 0,
+      },
+    ];
   }
 
   return resolved.artworks.map((artwork) => ({
     id: `${repeatable}-${artwork.index + 1}`,
     index: artwork.index,
     ...(artwork.slot.range === undefined ? {} : { range: artwork.slot.range }),
-    slots: { ...resolved.slots, [repeatable]: artwork.slot },
+    // A slide's own slots (ADR 0160) read under their names like any other, so a template
+    // reads `slots.imagem` and gets this slide's picture.
+    slots: { ...resolved.slots, ...artwork.slots, [repeatable]: artwork.slot },
     adjustments: flatten(artwork.slot),
+    gap: resolved.missingRequiredSlots.length > 0 || artwork.missingRequiredSlots.length > 0,
   }));
 }
 
@@ -546,7 +559,7 @@ function compileWith(
       // and has nothing to contribute to either list.
       collect(frame.children, fonts, assets);
       for (const asset of paintAssets(frame.background)) assets.set(asset.id, asset);
-      if (resolved.missingRequiredSlots.length > 0) {
+      if (plan.gap) {
         frame = {
           ...frame,
           children: [...frame.children, gapStampNode(`${context.idPrefix}.gap`, frame.size)],

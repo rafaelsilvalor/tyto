@@ -125,6 +125,42 @@ slots:
     expect(skeleton.match(/::lamina/gu)).toHaveLength(1);
   });
 
+  it('writes a required per-slide slot under every slide, and an optional one nowhere', () => {
+    const skeleton = briefSkeleton(
+      manifestOf(`
+name: questao
+version: 1.0.0
+formats: [feed]
+slots:
+  imagem: { type: image, per: lamina, required: true }
+  legenda: { type: rich-text, per: lamina }
+  lamina: { type: rich-text, repeat: true, min: 2 }
+`),
+    );
+
+    expect(skeletonText(skeleton)).toBe(
+      [
+        '---',
+        'template: questao',
+        'formats: [feed]',
+        '---',
+        '',
+        '::lamina',
+        '\tlamina',
+        '',
+        '::imagem ./imagem.png',
+        '',
+        '::lamina',
+        '\tlamina',
+        '',
+        '::imagem ./imagem.png',
+        '',
+        '',
+      ].join('\n'),
+    );
+    expect(fieldNumbers(skeleton)).toEqual([1, 2, 3, 4, 0]);
+  });
+
   it('escapes braces, which would otherwise start a field', () => {
     const manifest = manifestOf(`
 name: "a{b}"

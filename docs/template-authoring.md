@@ -98,6 +98,13 @@ These are the rules it enforces beyond the shape:
   `repeat: true` and the same pair counts occurrences, which is meaningful for every type.
 - **At most one slot may repeat.** Each occurrence becomes an `Artwork`, so a second
   repeatable slot would leave the number of artworks undefined.
+- **`per: lamina` gives each slide a slot of its own** (ADR 0160):
+  `imagem: { type: image, per: lamina }` takes one value per slide, written as `::imagem`
+  after that slide's `::lamina`, and the template reads `slots.imagem` as this slide's
+  picture — the same way it reads `slots.lamina`. `per` names the repeatable slot, and a
+  `per` slot neither repeats nor takes a `default`. Several may belong to one slide
+  (`imagem` and `foto`). This replaces numbered slots (`imagem-1` … `imagem-4`) picked with
+  an adjustment, which capped the carousel at the number declared.
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's
   identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by
   any brief.
