@@ -298,7 +298,9 @@ context)` is the `template-pack` point's one callable, and it is optional: a fol
 `manifest.yaml` and no `template.html` is built by it, by manifest name, through the same
 call-by-id mechanism and deadline as `exportFrame`. The host checks the frame against
 `frameSchema`, and a timeout, crash, throw or refused answer is `E_PLUGIN_TEMPLATE`, naming
-the plugin and the template, which costs that frame and is not fatal. The context crosses without
+the plugin and the template, which costs that frame and is not fatal. A frame may draw only the
+pictures the host sent that call — its own folder's, or one in the context — and any other
+`AssetRef` costs the frame as `E_PLUGIN_TEMPLATE_ASSET` (TYTO-479, ADR 0062). The context crosses without
 `measure`; the faces the manifest declares under `faces:` cross beside it, once per process,
 and the guest rebuilds `measure` over them with core's `measureText`, so it stays synchronous
 (ADR 0038). `report` is rebuilt there too, and what the template reported crosses back beside

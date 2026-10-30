@@ -136,6 +136,9 @@ external is a plugin that does not activate.
 - **The answer is checked.** A frame the Scene IR refuses, a throw and a call that takes more
   than 30 s are each `E_PLUGIN_TEMPLATE`, naming your plugin and the template. They cost that
   frame, and the render goes on.
+- **A frame draws only pictures it was handed.** Use the ref `context.files.image(...)` answers
+  or one the context carries, as it is. A ref you write yourself — an absolute `path`, an `id`
+  that leads out of the brief's folder — is `E_PLUGIN_TEMPLATE_ASSET` and costs that frame.
 - **`context.measure` answers from the faces your manifest declares.** It is synchronous, as it
   is in Tyto, so the faces have to reach your thread before the call. List every face the
   template measures in its `manifest.yaml`:
@@ -730,6 +733,7 @@ the desktop's plugins screen says so on that plugin's row (ADR 0045).
 | `E_PLUGIN_PACK_DIRECTORY`                 | `directory` is absolute, leaves the plugin, or is missing                                |
 | `E_PLUGIN_PACK_CODE`                      | a `template.ts` in the pack, or a code template without `build`                          |
 | `E_PLUGIN_TEMPLATE`                       | at render: a code template's `build` timed out, threw or answered a frame the IR refuses |
+| `E_PLUGIN_TEMPLATE_ASSET`                 | at render: a code template's frame drew a picture it was not handed                      |
 | `W_PLUGIN_FONT_WITHHELD`                  | a code template measures a face from this machine without `font:<family>`                |
 | `E_PLUGIN_LINK`                           | at install or load: a link in the folder leads out of it, or nowhere                     |
 | `E_PLUGIN_SANDBOX`                        | the plugin's process could not prove it is confined to its folder, so it was not run     |

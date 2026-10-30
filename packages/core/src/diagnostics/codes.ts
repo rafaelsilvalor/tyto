@@ -361,6 +361,18 @@ export const diagnosticCodes = {
     fatality:
       'It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025).',
   },
+  // The host reads an image's bytes on a frame's behalf, so a frame may only name pictures
+  // the host sent it; a path the plugin wrote itself could be any file on the disk (TYTO-479).
+  E_PLUGIN_TEMPLATE_ASSET: {
+    severity: 'error',
+    summary: 'An installed code template drew a picture Tyto did not hand it.',
+    template:
+      "Plugin '{plugin}' drew asset '{asset}' in template '{template}', which is not in the template's folder or the brief it was given.",
+    spec: 'docs/adr/0062-a-code-template-reads-its-own-folder-through-its-context.md',
+    fatal: false,
+    fatality:
+      'It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025).',
+  },
   // A link is copied as its target when it lands inside the plugin folder; any other is
   // refused before anything is written, rather than failing the copy halfway (TYTO-50). The
   // same check runs again at load, because the permission model follows a link out of the

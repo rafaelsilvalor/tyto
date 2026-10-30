@@ -51,6 +51,7 @@ non-zero.
 | `E_PLUGIN_PACK_DIRECTORY` | error | yes | A plugin's template pack names a folder outside the plugin's installed folder. |
 | `E_PLUGIN_PACK_CODE` | error | yes | A plugin's template pack holds a template that could not run in the plugin's process. |
 | `E_PLUGIN_TEMPLATE` | error | no | An installed code template did not answer a frame from its plugin's process. |
+| `E_PLUGIN_TEMPLATE_ASSET` | error | no | An installed code template drew a picture Tyto did not hand it. |
 | `E_PLUGIN_LINK` | error | yes | A plugin folder holds a link that leads outside it, or nowhere. |
 | `E_PLUGIN_SANDBOX` | error | yes | An installed plugin's process is not confined to its own folder, so it was not run. |
 | `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
@@ -244,6 +245,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_PACK_DIRECTORY` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_PACK_CODE` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_TEMPLATE` | no | It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025). |
+| `E_PLUGIN_TEMPLATE_ASSET` | no | It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025). |
 | `E_PLUGIN_LINK` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_SANDBOX` | yes | A plugin that did not load contributed no slot to skip. |
 | `E_PLUGIN_CRASHED` | no | One frame was waiting on the process; the frames other exporters draw survive (ADR 0025). |
@@ -801,6 +803,20 @@ Plugin '{plugin}' did not build a frame of template '{template}': {problem}
 ```
 
 Parameters: `plugin`, `template`, `problem`
+
+### `E_PLUGIN_TEMPLATE_ASSET`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0062-a-code-template-reads-its-own-folder-through-its-context.md`
+
+An installed code template drew a picture Tyto did not hand it.
+
+It costs the frame the call was for; the frames that did arrive are drawn (ADR 0025).
+
+```
+Plugin '{plugin}' drew asset '{asset}' in template '{template}', which is not in the template's folder or the brief it was given.
+```
+
+Parameters: `plugin`, `asset`, `template`
 
 ### `E_PLUGIN_LINK`
 
