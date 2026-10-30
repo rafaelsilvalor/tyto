@@ -39,6 +39,9 @@ carries the brief's `selo` (`seal.ts`) and one piece's composition for every bra
 publishes it (`compose.ts`, `table.ts`, `banner.ts`). A template imports it by name, so the
 same import works from a template in its own repository. The table's tokens are the subpath
 `@tyto/house-style/table-tokens`, because they reuse three names of the root's `tokens.ts`.
+The azul brand's tokens, presets, logo header and signed footer, which `agenda-semana` and
+`aprovados` share from their own repositories, are the subpath `@tyto/house-style/azul` for the
+same reason (TYTO-476).
 
 **A template that ships _with the application_ keeps that folder and adds one import.** Nothing
 resolves a path at runtime — running code that arrived in a folder is the plugin host's job
