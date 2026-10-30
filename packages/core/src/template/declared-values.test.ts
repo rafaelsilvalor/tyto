@@ -288,7 +288,7 @@ describe('compile hands a template its values', () => {
       values: { gap: { value: 500 }, paper: { value: '#000000' } },
     });
     // The refused 500 leaves the default, and the taken colour crosses. An image default is
-    // the template folder's, which a plugin's process has no files for (ADR 0062).
+    // the template folder's, and this deferred template was loaded with none (ADR 0062).
     expect(contexts[0]?.values).toEqual({
       gap: 20,
       drop: 0.15,
@@ -298,5 +298,31 @@ describe('compile hands a template its values', () => {
     expect(result.ok && result.diagnostics.map((item) => item.code)).toEqual([
       'W_TEMPLATE_VALUE_INVALID',
     ]);
+  });
+
+  it('resolves a deferred template’s image default against the files it was loaded with', async () => {
+    const contexts: TemplateContext[] = [];
+    const deferred: DeferredTemplate = {
+      manifest: MANIFEST,
+      files: FILES,
+      buildLater: (context) => {
+        contexts.push(context);
+        const built = frame({
+          format: context.format,
+          size: context.size,
+          idPrefix: context.idPrefix,
+        });
+        return Promise.resolve({ ok: true, value: built, diagnostics: [] });
+      },
+    };
+    const result = await compileDeferred(await resolvedFor(MANIFEST), deferred, {
+      formats: FORMATS,
+    });
+
+    // The host read the plugin's folder (TYTO-478), so the default is its file's ref, and
+    // the context's `files` is what `buildLater` sends across as data.
+    expect(result.ok).toBe(true);
+    expect(contexts[0]?.values?.['logo']).toBe(LOGO);
+    expect(contexts[0]?.files.image('assets/logo.png')).toBe(LOGO);
   });
 });

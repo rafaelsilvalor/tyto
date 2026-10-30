@@ -70,3 +70,32 @@ which answers the markup. Paths are relative to the template's folder, as `src=`
   `@tyto/io`.
 - Not measured: whether a markup frame that `extends` another can override an inherited
   `<image src>`. A markup template gives each format its own `src` in its own `<frame>`.
+
+## Note, 2026-10-30 — an installed plugin's own folder (TYTO-478)
+
+The open point is closed: **an installed plugin's code template reads its own folder**, the
+way its faces reach it (ADR 0048). `files` still does not cross, being functions. What it
+answers does:
+
+- The host reads the template's folder: the one `installedPacks` checked is inside the
+  installed plugin, after `realpath` (ADR 0046). `installedTemplateSource` takes the same
+  injected `readFiles` as `bundledTemplateSource`, and both apps pass `fileTemplateAssets` and
+  keep its `resources` for the exporters, as they do for a bundled template.
+- **What crosses is data, never an image's bytes**: `ShippedFiles`, each image as the
+  `AssetRef` the host minted and each SVG as its markup, keyed by folder-relative path, as a
+  fourth argument of `build`. The guest rebuilds `files` as a lookup over it, so `../x.png`,
+  an absolute path and a file the host did not read answer `undefined`, as a missing file
+  does. The card asked for a diagnostic naming the plugin there; the coordinator kept the
+  contract above instead, since a folder that leads out of the plugin is already refused as
+  `E_PLUGIN_PACK_DIRECTORY`.
+- `DeferredTemplate` gains an optional `files`, and `compileDeferred` resolves the declared
+  images' defaults (ADR 0153) against it instead of `noFiles`.
+- `fileTemplateAssets` skips a link whose real target is outside the folder, for every
+  caller. The plugin store already refuses such links at install and at load (ADR 0049);
+  this is the reader not depending on that.
+- The export resolves only the refs the reader minted (`byAbsolute`), so what a plugin can
+  embed is unchanged. A plugin minting its own absolute `AssetRef.path` is TYTO-479's
+  question and is not touched here.
+- **The protocol is 12** (ADR 0149 point 4): a guest on 11 refuses the fourth argument.
+
+Fonts in a plugin's own folder stay with TYTO-192.

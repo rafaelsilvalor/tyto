@@ -97,7 +97,8 @@ export interface TemplateContext {
    * An image comes back as an `AssetRef` whose bytes whoever loaded the template already
    * read, so the exporters can embed it; a template cannot mint one itself, because it has
    * no bytes to hash. **`undefined` means the folder has no such file**, and a template with
-   * no folder, or one running in a plugin's process, is handed {@link noFiles}.
+   * no folder is handed {@link noFiles}. One running in a plugin's process is handed what
+   * the host read from its folder inside the installed plugin (TYTO-478).
    *
    * One path per format is how a template gives each format its own background:
    * `context.files.image('assets/bg-' + context.format + '.png')`.
@@ -193,8 +194,9 @@ export function defineTemplate(
  * What crosses to a template that runs in another process: its context without `measure`,
  * `report` and `files`, which are functions and cannot be cloned (ADR 0048). The other end
  * rebuilds `measure` over the faces that crossed with the call, with the same `measureText`,
- * `report` as a list that crosses back beside the frame (ADR 0058), and `files` as
- * {@link noFiles}: a plugin's own folder is not read for its templates yet (ADR 0062).
+ * `report` as a list that crosses back beside the frame (ADR 0058), and `files` over the
+ * refs and markup the host read from the template's folder, which cross beside the call
+ * since protocol 12 (ADR 0062, TYTO-478).
  * `brand` is data and crosses as it is (ADR 0063), and so do `values` since protocol 10
  * (TYTO-439): colours, numbers, faces and the refs the host read an image as.
  */
@@ -224,6 +226,12 @@ export interface TemplateAnswer {
 export interface DeferredTemplate {
   readonly manifest: TemplateManifest;
   readonly buildLater: (context: TemplateContext) => Promise<Result<Frame, Diagnostics>>;
+  /**
+   * Its folder's files, as the host read them (TYTO-478). `compileDeferred` resolves the
+   * declared images' defaults against them and hands them on in the context, which
+   * `buildLater` sends across as data, since `files` itself does not cross.
+   */
+  readonly files?: TemplateFiles;
 }
 
 export function isDeferredTemplate(

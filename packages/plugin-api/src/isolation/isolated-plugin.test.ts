@@ -46,6 +46,7 @@ import {
 import { ASSET_SOURCE_MAX_BYTES } from '../sources.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
+import { NO_SHIPPED_FILES, type ShippedFiles } from './files.js';
 import { type IsolatedPlugin, connectIsolatedPlugin } from './isolated-plugin.js';
 import { RPC_PROTOCOL_VERSION, type SandboxReport } from './protocol.js';
 
@@ -418,7 +419,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 10 and this host speaks 11.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 11 and this host speaks 12.",
     );
   });
 
@@ -1302,7 +1303,7 @@ describe('an isolated template’s reports (ADR 0058)', () => {
     const [pack] = host.registry.templatePacks();
     // The proxy's calling convention is the wire's (`IsolatedPackBuild`), as `@tyto/io` reads it.
     const build = pack?.build as unknown as IsolatedPackBuild;
-    return build('demo', CALL, []);
+    return build('demo', CALL, [], NO_SHIPPED_FILES);
   }
 
   it('crosses back beside the frame, as the list the template made', async () => {
@@ -1341,17 +1342,36 @@ describe('an isolated template’s files (ADR 0062)', () => {
     brand: {},
   };
 
-  /**
-   * `files` is functions and does not cross, so the guest rebuilds it, as `measure`. A plugin's
-   * own folder is not read for its templates yet, so every path answers nothing — and a
-   * template that asks must get that answer, not a `TypeError` on a field that is not there.
-   */
-  it('hands the template no files, rather than no field', async () => {
+  // Invented: a ref as the host's reader mints one, and a one-path SVG.
+  const BG = {
+    id: 'assets/bg.png',
+    source: 'file',
+    path: '/plugins/demo/templates/demo/assets/bg.png',
+    hash: 'sha256:0123',
+  } as const;
+  const FILES: ShippedFiles = {
+    images: { 'assets/bg.png': BG },
+    svgs: { 'assets/mark.svg': '<svg><path d="M0 0H1V1Z"/></svg>' },
+  };
+
+  /** Builds once in a real guest, handing back what each asked path answered, as JSON. */
+  async function answersFor(
+    paths: readonly string[],
+    files: ShippedFiles,
+  ): Promise<Record<string, unknown>> {
     const pack: TemplatePack = {
       id: 'demo',
       templates: [],
       build: (_template, context) => ({
-        format: context.files.image('assets/bg.png') === undefined ? context.format : 'leaked',
+        // `format` is the one free string a frame carries back, so the answers ride in it.
+        format: JSON.stringify(
+          Object.fromEntries(
+            paths.map((path) => [
+              path,
+              context.files.image(path) ?? context.files.svg(path) ?? 'none',
+            ]),
+          ),
+        ),
         size: context.size,
         children: [],
       }),
@@ -1365,9 +1385,73 @@ describe('an isolated template’s files (ADR 0062)', () => {
     if (!activated.ok) throw new Error(activated.error[0]?.message);
     const build = host.registry.templatePacks()[0]?.build as unknown as IsolatedPackBuild;
 
-    const answer = await build('demo', CALL, []);
+    const answer = await build('demo', CALL, [], files);
+    if (!answer.ok) throw new Error(answer.error[0]?.message);
+    return JSON.parse(answer.value.frame.format) as Record<string, unknown>;
+  }
 
-    expect(answer.ok && answer.value.frame.format).toBe('feed');
+  /**
+   * `files` is functions and does not cross, so the guest rebuilds it over what the host read
+   * from the template's folder (TYTO-478): the refs and the markup, never an image's bytes.
+   */
+  it('answers the refs and markup the host read, as the template writes the path', async () => {
+    const answers = await answersFor(
+      ['assets/bg.png', './assets/bg.png', 'assets\\bg.png', 'assets/mark.svg'],
+      FILES,
+    );
+
+    expect(answers).toEqual({
+      'assets/bg.png': BG,
+      './assets/bg.png': BG,
+      'assets\\bg.png': BG,
+      'assets/mark.svg': '<svg><path d="M0 0H1V1Z"/></svg>',
+    });
+  });
+
+  it('answers nothing for a path out of the folder, an absolute one or one never read', async () => {
+    const answers = await answersFor(
+      [
+        '../assets/bg.png',
+        'assets/../../bg.png',
+        '/plugins/demo/templates/demo/assets/bg.png',
+        'C:\\plugins\\demo\\assets\\bg.png',
+        'assets/other.png',
+        '__proto__',
+      ],
+      FILES,
+    );
+
+    expect(Object.values(answers)).toEqual(['none', 'none', 'none', 'none', 'none', 'none']);
+  });
+
+  it('hands the template no files, rather than no field, when the host read none', async () => {
+    const answers = await answersFor(['assets/bg.png'], NO_SHIPPED_FILES);
+
+    expect(answers).toEqual({ 'assets/bg.png': 'none' });
+  });
+
+  // Checked in the guest, as every argument of a call is: the plugin's function never runs.
+  it('refuses files that are not refs, so a plugin cannot be handed a made-up shape', async () => {
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      build: (_template, context) => ({ format: context.format, size: context.size, children: [] }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const build = host.registry.templatePacks()[0]?.build as unknown as IsolatedPackBuild;
+
+    const answer = await build('demo', CALL, [], {
+      images: { 'assets/bg.png': 'not a ref' },
+      svgs: {},
+    } as unknown as ShippedFiles);
+
+    expect(answer.ok ? [] : answer.error.map((item) => item.code)).toEqual(['E_PLUGIN_CALL']);
   });
 });
 
@@ -1527,13 +1611,14 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
       brand: KIT,
     };
 
-    const withKit = await build('demo', call, []);
-    const withTonedKit = await build('demo', { ...call, brand: TONED_KIT }, []);
-    const withoutKit = await build('demo', { ...call, brand: {} }, []);
+    const withKit = await build('demo', call, [], NO_SHIPPED_FILES);
+    const withTonedKit = await build('demo', { ...call, brand: TONED_KIT }, [], NO_SHIPPED_FILES);
+    const withoutKit = await build('demo', { ...call, brand: {} }, [], NO_SHIPPED_FILES);
     const withColours = await build(
       'demo',
       { ...call, brand: { ...KIT, colors: { accent: '#5900a6' } } },
       [],
+      NO_SHIPPED_FILES,
     );
 
     expect(withKit.ok && withKit.value.frame.format).toBe(
@@ -1602,8 +1687,9 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
         },
       },
       [],
+      NO_SHIPPED_FILES,
     );
-    const bare = await build('demo', call, []);
+    const bare = await build('demo', call, [], NO_SHIPPED_FILES);
 
     expect(configured.ok ? configured.value.frame.format : configured.error[0]?.message).toBe(
       '#4b2a7b|8|Source Sans 3|TYTO_HOME/logo.png',

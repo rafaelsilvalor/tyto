@@ -185,6 +185,95 @@ describe('tyto plugin new --code', () => {
   }, 60_000);
 });
 
+/** A 1×1 PNG, and a different one, so the file the template drew is told from another. */
+const BG_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+  'base64',
+);
+const OUTSIDE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAEBgIApD5fRAAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/**
+ * A code template's `build` that draws `assets/bg.png` from its own folder full-bleed, and a
+ * rect named after what `../outside.png` and an absolute path answered, so the render says.
+ */
+function ownFolderEntry(name: string, absolute: string): string {
+  return `function node(kind, id, w, h, fields) {
+  return {
+    id, kind, size: { w, h },
+    transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, anchor: { x: 0, y: 0 } },
+    opacity: 1, blend: 'normal', visible: true, clip: false, effects: [], ...fields,
+  };
+}
+function build(template, context) {
+  const { w, h } = context.size;
+  const bg = context.files.image('assets/bg.png');
+  const escaped = [context.files.image('../outside.png'), context.files.image(${JSON.stringify(absolute)})];
+  const children = [
+    node('rect', context.idPrefix + '.escaped-' + escaped.filter((ref) => ref !== undefined).length, 1, 1, {
+      radius: [0, 0, 0, 0],
+      fill: { kind: 'solid', color: { r: 0, g: 0, b: 0, a: 1 } },
+    }),
+  ];
+  if (bg !== undefined) {
+    children.unshift(node('image', context.idPrefix + '.bg', w, h, { asset: bg, fit: 'cover' }));
+  }
+  return { format: context.format, size: context.size, children };
+}
+export function activate(host) {
+  host.registerTemplatePack({ id: '${name}', templates: [], directory: 'templates', build });
+}
+`;
+}
+
+describe("an installed code template's own folder (TYTO-478)", () => {
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it('draws a picture from its folder in tyto render, and nothing from outside it', async () => {
+    expect(
+      await run(['plugin', 'new', 'fundo', '--code', '--out', 'sources'], environment()),
+      stderr(),
+    ).toBe(EXIT_OK);
+    const folder = join(workspace, 'sources', 'fundo');
+    const template = join(folder, 'templates', 'fundo');
+    const outside = join(folder, 'templates', 'outside.png');
+    await mkdir(join(template, 'assets'), { recursive: true });
+    await writeFile(join(template, 'assets', 'bg.png'), BG_PNG);
+    await writeFile(outside, OUTSIDE_PNG);
+    await writeFile(join(folder, 'dist', 'index.js'), ownFolderEntry('fundo', outside));
+    expect(await run(['plugin', 'install', folder, '--yes'], environment()), stderr()).toBe(
+      EXIT_OK,
+    );
+
+    const out = join(workspace, 'out');
+    const code = await run(
+      [
+        'render',
+        join(template, 'examples', 'fundo.brief'),
+        '--out',
+        out,
+        '--formats-file',
+        join(folder, 'templates', 'formats.yaml'),
+        '--types',
+        'svg',
+      ],
+      environment(),
+    );
+    const result = JSON.parse(await readFile(join(out, 'result.json'), 'utf8')) as {
+      diagnostics: unknown[];
+    };
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(result.diagnostics).toEqual([]);
+    const svg = await readFile(join(out, 'grid-01.svg'), 'utf8');
+    // The bytes the host read from the installed folder, embedded; none from outside it.
+    expect(svg).toContain(`data:image/png;base64,${BG_PNG.toString('base64')}`);
+    expect(svg).not.toContain(OUTSIDE_PNG.toString('base64'));
+    expect(svg).toContain('escaped-0');
+  }, 60_000);
+});
+
 describe('agenda-semana, packed as a plugin', () => {
   // Starts a plugin's worker thread and bundles a template, which a full `pnpm check` can
   // hold past Vitest's 5 s.

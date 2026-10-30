@@ -2,10 +2,12 @@ import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import {
+  type AssetRef,
   type DeferredTemplate,
   type Diagnostic,
   type FontFace,
   type TemplateContext,
+  type TemplateFiles,
   type TemplateManifest,
   type TemplateRegistry,
   diagnostic,
@@ -13,7 +15,12 @@ import {
   ok,
 } from '@tyto/core';
 import { TEMPLATE_FILE, type TemplateSource } from '@tyto/pipeline';
-import type { IsolatedPackBuild, ShippedFace } from '@tyto/plugin-api';
+import {
+  type IsolatedPackBuild,
+  NO_SHIPPED_FILES,
+  type ShippedFace,
+  type ShippedFiles,
+} from '@tyto/plugin-api';
 
 import type { InstalledCodePack } from './installed-packs.js';
 
@@ -34,6 +41,11 @@ import type { InstalledCodePack } from './installed-packs.js';
  * file is handed to the plugin's process by the host, so the process's confinement to its
  * own folder does not stop it (ADR 0049). One it may not have measures as
  * `undefined` there, and the load says so with `W_PLUGIN_FONT_WITHHELD`.
+ *
+ * The call also carries what the host read from the template's own folder (ADR 0062,
+ * TYTO-478): each image as the ref it was read as, each SVG as its markup, never an image's
+ * bytes. The folder is the one `installedPacks` checked is inside the installed plugin, the
+ * reader skips links that lead out of it, and the bytes stay here for the export.
  */
 
 /** Where the bytes of a face come from, and whether they are this machine's. */
@@ -47,6 +59,18 @@ export interface InstalledTemplateSourceOptions {
   readonly packs: readonly InstalledCodePack[];
   readonly fonts: InstalledTemplateFonts;
   readonly next: TemplateSource;
+  /**
+   * Reads a code template's folder once per load, as `bundledTemplateSource`'s reader does;
+   * the composition root keeps the bytes for the exporters. Left out, nothing is read and
+   * the template is handed no files, as before TYTO-478.
+   */
+  readonly readFiles?: (directory: string) => Promise<ReadTemplateFiles>;
+}
+
+/** A template folder as `readFiles` read it: the answers, and every path they answer. */
+export interface ReadTemplateFiles {
+  readonly assets: TemplateFiles;
+  readonly paths: readonly string[];
 }
 
 /**
@@ -67,7 +91,7 @@ async function exists(path: string): Promise<boolean> {
 }
 
 export function installedTemplateSource(options: InstalledTemplateSourceOptions): TemplateSource {
-  const { registry, packs, fonts, next } = options;
+  const { registry, packs, fonts, next, readFiles } = options;
 
   return {
     async load(name) {
@@ -82,9 +106,23 @@ export function installedTemplateSource(options: InstalledTemplateSourceOptions)
       }
 
       const { faces, warnings } = facesFor(pack, manifest, fonts);
-      return ok(deferred(pack, manifest, faces, fonts), warnings);
+      const read = readFiles === undefined ? undefined : await readFiles(directory);
+      return ok(deferred(pack, manifest, faces, fonts, read), warnings);
     },
   };
+}
+
+/** What crosses for `files`: every path the folder answers, as data. */
+function shippedOf(read: ReadTemplateFiles): ShippedFiles {
+  const images: Record<string, AssetRef> = {};
+  const svgs: Record<string, string> = {};
+  for (const path of read.paths) {
+    const image = read.assets.image(path);
+    if (image !== undefined) images[path] = image;
+    const svg = read.assets.svg(path);
+    if (svg !== undefined) svgs[path] = svg;
+  }
+  return { images, svgs };
 }
 
 /** The declared faces this plugin may be sent, and a warning for each it may not. */
@@ -121,9 +159,13 @@ function deferred(
   manifest: TemplateManifest,
   allowed: readonly FontFace[],
   fonts: InstalledTemplateFonts,
+  read: ReadTemplateFiles | undefined,
 ): DeferredTemplate {
+  // Once per load: the folder does not change between the frames of one compile.
+  const files = read === undefined ? NO_SHIPPED_FILES : shippedOf(read);
   return {
     manifest,
+    ...(read === undefined ? {} : { files: read.assets }),
     async buildLater(context: TemplateContext) {
       const sent = sentTo.get(pack.build) ?? new Set<string>();
       sentTo.set(pack.build, sent);
@@ -141,7 +183,7 @@ function deferred(
 
       // Everything but the functions, which are rebuilt in the plugin.
       const { measure: _measure, report, files: _files, ...call } = context;
-      const answer = await pack.build(manifest.name, call, shipped);
+      const answer = await pack.build(manifest.name, call, shipped, files);
       if (answer.ok) {
         // The reports crossed as data the wire checked against the closed list; the
         // diagnostic, its range and its wording are written here, by `compile` (ADR 0058).
