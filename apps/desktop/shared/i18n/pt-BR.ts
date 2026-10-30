@@ -56,6 +56,8 @@ export const ptBR: Catalogue = {
     "Os arquivos de plugins pedem '{plugin}', que pede estas permissões. Carregar?",
   'pluginFiles.approve.load': 'Carregar',
   'pluginFiles.approve.skip': 'Agora não',
+  'cli.confirm.yes': 'Sim',
+  'cli.confirm.no': 'Não',
   'command.workspace.showProject': 'Pasta de trabalho: mostrar projeto',
   'workspace.banner.text':
     'Esta pasta não é confiável, então {count} das pastas, seções e arquivos de plugins que ela traz ficaram de fora.',

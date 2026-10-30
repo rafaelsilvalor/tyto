@@ -117,6 +117,8 @@ export interface Catalogue {
   readonly 'pluginFiles.approve.message': string;
   readonly 'pluginFiles.approve.load': string;
   readonly 'pluginFiles.approve.skip': string;
+  readonly 'cli.confirm.yes': string;
+  readonly 'cli.confirm.no': string;
   readonly 'command.workspace.showProject': string;
   readonly 'workspace.banner.text': string;
   readonly 'workspace.banner.trust': string;
@@ -823,6 +825,8 @@ export const CATALOGUE_KEYS = [
   'pluginFiles.approve.message',
   'pluginFiles.approve.load',
   'pluginFiles.approve.skip',
+  'cli.confirm.yes',
+  'cli.confirm.no',
   'command.workspace.showProject',
   'workspace.banner.text',
   'workspace.banner.trust',

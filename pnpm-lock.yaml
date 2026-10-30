@@ -81,6 +81,9 @@ importers:
       '@tyto/brief-lang':
         specifier: workspace:*
         version: link:../../packages/brief-lang
+      '@tyto/command-line':
+        specifier: workspace:*
+        version: link:../../packages/command-line
       '@tyto/core':
         specifier: workspace:*
         version: link:../../packages/core

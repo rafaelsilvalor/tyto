@@ -152,6 +152,7 @@ export async function renderCommand(
   brief: string,
   options: RenderCommandOptions,
   environment: CliEnvironment,
+  signal?: AbortSignal,
 ): Promise<ExitCode> {
   const { cwd } = environment;
   const briefPath = isAbsolute(brief) ? brief : resolve(cwd, brief);
@@ -305,6 +306,7 @@ export async function renderCommand(
         ...(run.formats === undefined ? {} : { formats: run.formats }),
         ...(rasterizer === undefined ? {} : { rasterizer }),
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
+        ...(signal === undefined ? {} : { signal }),
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),
         ...optionalSources(renderSources(environment.home, workspace?.loaded, options.section)),
         ...googleFontsOption(options.googleFonts, environment.variables),
