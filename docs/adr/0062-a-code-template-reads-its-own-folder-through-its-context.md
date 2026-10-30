@@ -99,3 +99,26 @@ answers does:
 - **The protocol is 12** (ADR 0149 point 4): a guest on 11 refuses the fourth argument.
 
 Fonts in a plugin's own folder stay with TYTO-192.
+
+## Note, 2026-10-30 — a frame draws only the pictures it was handed (TYTO-479)
+
+The point above left open is closed. Measured at `origin/main` 0164874: an installed plugin's
+`build` that answered an image node whose `AssetRef.path` was an absolute path outside every
+folder Tyto grants rendered with exit 0, no diagnostic, and that file's bytes in the SVG and
+its pixels in the PNG. The frame schema at the boundary accepts any `path`, and the brief's
+`fileResources` reads whatever path a scene names — the plugin's process could not read the
+file, but the host read it for the frame. A ref with no `path` leaked the same way through an
+`id` such as `../../x.png`, which is read against the brief's folder.
+
+- **Every `AssetRef` in an installed code template's answer must be one the host sent that
+  call**: an image of the template's own folder (`ShippedFiles`), or one anywhere in the
+  context (a slot's picture or a declared value; a brand kit's marks are shapes and carry no ref). It is matched by its resolved
+  `path`, or by `id` when it has none, whatever its `source`. Anything else refuses the frame
+  as `E_PLUGIN_TEMPLATE_ASSET`, naming the plugin, the template and the asset's `id`.
+- This is ADR 0042's rule — a plugin reaches only what crosses — applied to the one thing the
+  host reads on a frame's behalf. No new ADR.
+- The check is on the host's side of the boundary, in `installedTemplateSource`, so the CLI and
+  the window both get it. The schema is unchanged and **the protocol stays 12**.
+- Not changed: `fileResources` itself still reads any path a scene names, because a ref the host
+  minted (the source cache's, say) may live outside the brief's folder. A `FontRef.path` in a
+  frame is the same question for faces, and nothing loads a file face yet (TYTO-192).
