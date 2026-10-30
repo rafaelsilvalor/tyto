@@ -359,6 +359,45 @@ describe('the export service', () => {
     expect(second.diagnostics.filter((item) => item.code === 'W_LEFTOVER_REMOVED')).toHaveLength(2);
   }, 60_000);
 
+  it("copies a delivery's image from beside its brief into assets/, keeping a different one there (TYTO-499)", async () => {
+    // ADR 0161. The picture sits beside the brief in editaveis/, outside the delivery's
+    // assets/: the first export copies it, and a second finds the person's own file of that
+    // name, keeps it and says so.
+    const report = join(out, 'editaveis');
+    mkdirSync(report, { recursive: true });
+    writeFileSync(join(report, 'foto.png'), PNG);
+    const brief = exampleBrief('promo-curso', 'promo.brief').replace(
+      'tom: laranja\n',
+      'tom: laranja\nimagem: ./foto.png\n',
+    );
+    const exportOnce = async () =>
+      settled(
+        (
+          await service.start({
+            brief,
+            directory: out,
+            briefDirectory: report,
+            label: 'promo',
+            outputs: [{ kind: 'svg' }],
+            deliveryReport: report,
+          })
+        ).exportId,
+      );
+
+    const first = await exportOnce();
+
+    expect(first.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    expect(readdirSync(join(out, 'assets'))).toEqual(['foto.png']);
+    expect(readFileSync(join(out, 'assets', 'foto.png'))).toEqual(PNG);
+
+    writeFileSync(join(out, 'assets', 'foto.png'), 'the person’s own foto.png');
+    const second = await exportOnce();
+
+    expect(second.diagnostics.map((item) => item.code)).toContain('W_DELIVERY_ASSET_KEPT');
+    expect(readFileSync(join(out, 'assets', 'foto.png'), 'utf8')).toBe('the person’s own foto.png');
+    expect(readdirSync(report).sort()).toEqual(['foto.png', 'result.json', 'template.txt']);
+  }, 60_000);
+
   it('reports a brief that does not compile instead of throwing', async () => {
     const { exportId } = await service.start({
       brief: 'this is not a brief',

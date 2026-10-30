@@ -25,6 +25,7 @@ import {
   fsDeliveryExportOutput,
   fsTaskOutput,
   layeredExportResources,
+  recordingAssetResolver,
   renderResult,
   sourceCache,
 } from '@tyto/io';
@@ -93,7 +94,8 @@ export interface RenderTask {
    * `tyto render --delivery` (ADR 0157 §6, TYTO-490): {@link outDirectory} is the delivery's
    * `exports` and gets the artwork; `report`, the brief's folder, gets `result.json` and
    * `template.txt`. What the previous export of the delivery wrote and this one did not is
-   * removed (ADR 0054).
+   * removed (ADR 0054). The images the brief uses from outside the delivery are copied into
+   * its `assets/`, which only ever gains files (ADR 0161).
    */
   readonly delivery?: { readonly report: string };
   /**
@@ -366,7 +368,11 @@ export async function renderTask(
           ...(task.projectAssets === undefined ? {} : { projectAssets: task.projectAssets }),
         })
       : fileAssetResolver({ base: task.assetsOverride });
-  const assets = cache === undefined ? files : cache.assets(files);
+  const resolved = cache === undefined ? files : cache.assets(files);
+  // A delivery's export copies what the brief drew from into its `assets/` (ADR 0161), so it
+  // records each image as the run resolves it, after the source cache, which marks a fetch.
+  const recorder = delivery === undefined ? undefined : recordingAssetResolver(resolved);
+  const assets = recorder?.resolver ?? resolved;
 
   // The template the job loads, kept for the one question only its manifest answers: which
   // free families stand in for a face nobody can supply (ADR 0120).
@@ -475,6 +481,11 @@ export async function renderTask(
             : { description: job.value.template.description }),
         })
       : [];
+  // Only for a run that finished: a cancelled or broken one may not have drawn every image.
+  const copied =
+    delivery !== undefined && recorder !== undefined && job.ok && !job.value.cancelled
+      ? await delivery.deliverAssets(recorder.delivered())
+      : [];
 
   const diagnostics = [
     ...inherited,
@@ -483,6 +494,7 @@ export async function renderTask(
     ...produced,
     ...leftovers,
     ...described,
+    ...copied,
   ];
   const resultOf = (listed: Diagnostics): RenderResult =>
     renderResult({

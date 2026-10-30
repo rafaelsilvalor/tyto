@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -24,8 +25,10 @@ import { firstWindow } from './first-window.js';
  * delivery. The button beside "Open preview to the side" is enabled for the first and runs the
  * export into the export box with no dialog to fill: the artwork at the delivery's root,
  * `result.json` and `template.txt` beside the brief. For the second it is shown disabled with a
- * tooltip, and the command is refused. The unit suites hold the rules; this is what only the
- * window answers — that main's answer reaches the button, and a click reaches the disk.
+ * tooltip, and the command is refused. A second delivery, `mca-2`, draws a picture from the
+ * project's `art/` folder, which its export copies into `mca-2/assets/` (TYTO-499, ADR 0161).
+ * The unit suites hold the rules; this is what only the window answers — that main's answer
+ * reaches the button, and a click reaches the disk.
  *
  * Its own `--user-data-dir` and `TYTO_HOME` (TYTO-139), and `closeApp` at the end.
  */
@@ -39,8 +42,24 @@ if (!existsSync(built)) {
   );
 }
 
-const PROJECT = `{ "templates": ["tpl"] }
+const PROJECT = `{ "templates": ["tpl"], "assets": ["art"] }
 `;
+
+/** A real 1×1 PNG in the project's `art/`, outside every delivery's `assets/`. */
+const LOGO = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+const PICTURE_BRIEF = [
+  '---',
+  'template: promo-curso',
+  'formats: [grid-1x1]',
+  'imagem: logo.png',
+  '---',
+  '::titulo',
+  '  Com a foto do projeto',
+].join('\n');
 
 const BRIEF = [
   '---',
@@ -122,6 +141,10 @@ beforeAll(async () => {
   writeFileSync(join(work, '.tyto', 'project.json'), PROJECT, 'utf8');
   writeFileSync(join(delivery, 'editaveis', 'mca-1.brief'), BRIEF, 'utf8');
   writeFileSync(join(work, 'briefs', 'solto.brief'), BRIEF.replace('Lâmina 1', 'Solta'), 'utf8');
+  mkdirSync(join(work, 'art'), { recursive: true });
+  writeFileSync(join(work, 'art', 'logo.png'), LOGO);
+  mkdirSync(join(work, 'mca-2', 'editaveis'), { recursive: true });
+  writeFileSync(join(work, 'mca-2', 'editaveis', 'mca-2.brief'), PICTURE_BRIEF, 'utf8');
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
@@ -169,6 +192,26 @@ describe("a delivery's export in the window (TYTO-490, ADR 0157 §6)", () => {
       'result.json',
       'template.txt',
     ]);
+    await window.locator('.export__close').click();
+    await window.locator('.export__panel').waitFor({ state: 'hidden' });
+  }, 60_000);
+
+  it("copies a picture from the project's art/ into the delivery's assets/ (TYTO-499)", async () => {
+    const pictured = join(work, 'mca-2');
+    await openBrief(join(pictured, 'editaveis', 'mca-2.brief'), 'Com a foto do projeto');
+    await buttonDisabled(false);
+
+    await button().click();
+    await window.locator('.export__panel').waitFor({ state: 'visible' });
+    await window.waitForSelector('[data-testid="export-status"][data-state="finished"]', {
+      timeout: 40_000,
+    });
+
+    // The copy beside the artwork, and the project's own picture still where it was.
+    expect(readdirSync(join(pictured, 'assets'))).toEqual(['logo.png']);
+    expect(readFileSync(join(pictured, 'assets', 'logo.png'))).toEqual(LOGO);
+    expect(readdirSync(join(work, 'art'))).toEqual(['logo.png']);
+    expect(readdirSync(pictured).sort()).toEqual(['assets', 'editaveis', 'grid-1x1-01.png']);
     await window.locator('.export__close').click();
     await window.locator('.export__panel').waitFor({ state: 'hidden' });
   }, 60_000);

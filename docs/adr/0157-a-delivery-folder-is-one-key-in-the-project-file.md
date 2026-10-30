@@ -2,7 +2,8 @@
 
 Status: accepted · 2026-10-30 · TYTO-488 · amends ADR 0057 (the export box and an export preset
 no longer write `editaveis/` or `assets/`), adds a row to ADR 0111's table and a key to ADR
-0112's file; builds on ADR 0054, ADR 0114, ADR 0126 and ADR 0155
+0112's file; builds on ADR 0054, ADR 0114, ADR 0126 and ADR 0155 · decision 6 amended by ADR 0161
+(2026-10-30, TYTO-499: a delivery's export copies the brief's images into its `assets/`)
 
 ## Context
 
@@ -174,6 +175,9 @@ The command line and the window apply the same rule, from one function in `core`
   `W_LEFTOVER_REMOVED`.
 - **The brief is not copied, and the images are not copied, rewritten or removed.** They are the
   delivery's own files, already in place; the brief in `editaveis/` reads `../assets` (ADR 0057).
+  - 2026-10-30, amended by ADR 0161 (TYTO-499): the images the brief uses from outside the
+    delivery's `assets/` are copied into it. Nothing there is ever removed or replaced, and the
+    brief is still not copied or rewritten.
 - **Formats:** `delivery.formats` when a sheet writes it, otherwise the brief's own (its
   `formats:`, or its configuration's default), always inside the bound a configuration's
   `formats` restriction sets (ADR 0155): a format outside it is `E_UNKNOWN_FORMAT`, as anywhere.
