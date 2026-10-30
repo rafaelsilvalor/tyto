@@ -1,5 +1,14 @@
 # @tyto/recipe
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [fc3bee5]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+  - @tyto/core@0.35.0
+
 ## 0.1.5
 
 ### Patch Changes

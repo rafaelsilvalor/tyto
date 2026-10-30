@@ -1,5 +1,21 @@
 # @tyto/templates
 
+## 1.2.0
+
+### Minor Changes
+
+- fc3bee5: `banner-roxo` leaves the built-in pack (TYTO-436): the house's product banner lives in its own repository, `tyto-template-banner`, and reaches a machine through a plugin file (ADR 0151). In its place the pack ships `banner-teste`, a test code template drawn by the same `productBanner` from `@tyto/house-style` over invented flat backgrounds, so the tests of a template that is code, reads its own folder and measures its text keep a target. `BUILT_IN_TEMPLATE_NAMES` and `BUILT_IN_TEMPLATE_BUILDS` list `banner-teste`, `carrossel-lista` and `promo-curso`.
+
+### Patch Changes
+
+- Updated dependencies [fc3bee5]
+- Updated dependencies [04233fc]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+  - @tyto/core@0.35.0
+  - @tyto/house-style@0.4.1
+  - @tyto/template-kit@0.6.0
+
 ## 1.1.0
 
 ### Minor Changes

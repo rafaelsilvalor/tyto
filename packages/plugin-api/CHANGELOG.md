@@ -1,5 +1,20 @@
 # @tyto/plugin-api
 
+## 0.12.0
+
+### Minor Changes
+
+- 4168183: The gallery index (TYTO-503, ADR 0162). `parseGalleryIndex` reads `index.yaml`, tolerant per entry with ranged diagnostics; `galleryStatus` measures each entry against a folder's plugin files and lock (installed, update available, not installed, and whether its `engine` admits this Tyto); `sameRepository` compares two spellings of one git location. `addTemplateEntries`, `moveEntryRef` and `newPluginFileText` write a plugin file by splicing its own bytes, then refuse an edit that would change any entry it did not mean to.
+
+### Patch Changes
+
+- fc3bee5: Tests and comments stop naming the production templates as if they were built in (TYTO-436): a test's template name is invented or one of the pack's test templates, and a comment about a template in its own repository names the repository. No behaviour changes.
+- Updated dependencies [fc3bee5]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+  - @tyto/core@0.35.0
+  - @tyto/recipe@0.1.6
+
 ## 0.11.0
 
 ### Minor Changes

@@ -1,5 +1,45 @@
 # @tyto/desktop
 
+## 0.13.0
+
+### Minor Changes
+
+- 787c4ce: What a `tyto` command run in the window reports appears in the Problems panel: one section per run, under the command it ran, below the brief's own rows, for the last five runs. Each row shows the file and line the command printed. A row in a file a tab opens is a button, and main opens that file by run and row, never by a path the window names. A `render --types png` run from the window rasters through the export's own rasterizer. The panel to run commands from is TYTO-496.
+- a5a896a: Main runs `tyto` commands for the window (TYTO-495, ADR 0159). New channels: `cli:run` takes the words after `tyto` and answers with a run id, `cli:cancel` stops a run, and `cli:commands` describes the command tree. New events: `cli:output` carries the text, and `cli:state` carries running, waiting, finished with its exit code, or cancelled. A command uses the window's rasterizer, plugin launcher, `TYTO_HOME` and open folder. It asks its questions in a native box whose default is no. Three things are refused: `--trust`, an npm `plugin install` on Windows, and `watch` on the auto-run queue's folder. No panel shows any of this yet; TYTO-496 adds one.
+- 6881557: Exporting a delivery from its brief's tab now also copies the images the brief uses from outside the delivery's `assets/` into it (TYTO-499, ADR 0161). Nothing there is removed or replaced; a different file of the same name is kept, and the Export dialog lists `W_DELIVERY_ASSET_KEPT` for it.
+
+### Patch Changes
+
+- fc3bee5: The app and `tyto` come with `banner-teste` instead of `banner-roxo` (TYTO-436): the production banner is fetched from `tyto-template-banner` by a plugin file. The tests that drew `banner-roxo` draw `banner-teste`, and the manual's deliveries page starts its brief from `carrossel-lista`.
+- cd5e075: Tests only: the font fixtures four suites read moved with the CLI's command tree into `@tyto/command-line` (TYTO-495). Nothing in the app changes.
+- Updated dependencies [fc3bee5]
+- Updated dependencies [fc3bee5]
+- Updated dependencies [04233fc]
+- Updated dependencies [cd5e075]
+- Updated dependencies [787c4ce]
+- Updated dependencies [a5a896a]
+- Updated dependencies [6881557]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+- Updated dependencies [4168183]
+- Updated dependencies [4168183]
+- Updated dependencies [4168183]
+  - @tyto/templates@1.2.0
+  - @tyto/brief-lang@0.7.6
+  - @tyto/core@0.35.0
+  - @tyto/editor@0.12.1
+  - @tyto/fonts@0.4.1
+  - @tyto/plugin-api@0.12.0
+  - @tyto/template-lang@0.8.7
+  - @tyto/command-line@0.1.0
+  - @tyto/io@5.1.0
+  - @tyto/pipeline@0.12.4
+  - @tyto/export-html@0.7.8
+  - @tyto/export-svg@2.0.8
+  - @tyto/google-fonts@0.1.7
+  - @tyto/recipe@0.1.6
+  - @tyto/theme-pack@0.1.7
+
 ## 0.12.0
 
 ### Minor Changes

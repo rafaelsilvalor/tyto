@@ -1,5 +1,15 @@
 # @tyto/template-lang
 
+## 0.8.7
+
+### Patch Changes
+
+- 04233fc: TYTO-454: `@tyto/template-kit/testing` compiles a markup template (`template.html`) handed in as text, and `@tyto/template-lang` joins the published contract.
+- Updated dependencies [fc3bee5]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+  - @tyto/core@0.35.0
+
 ## 0.8.6
 
 ### Patch Changes

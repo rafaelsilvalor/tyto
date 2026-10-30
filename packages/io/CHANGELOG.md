@@ -1,5 +1,26 @@
 # @tyto/io
 
+## 5.1.0
+
+### Minor Changes
+
+- 6881557: A delivery's export copies the brief's images into its assets folder (TYTO-499, ADR 0161). `fsDeliveryExportOutput` gains `deliverAssets(assets)`: every image the brief resolved that is not already inside the assets folder the brief reads (`../assets` from `editaveis/`, otherwise `assets/` beside the brief, `deliveryAssetsFolder`) is copied there, a fetched one under ADR 0118's name. Nothing in that folder is removed or replaced: a same-named file with the same bytes is skipped in silence, one with other bytes is kept with `W_DELIVERY_ASSET_KEPT`. `recordingAssetResolver` and `DeliveredAsset` are back, to record what a run resolved.
+- 4168183: The gallery on a disk (TYTO-503, ADR 0162). `fetchGalleryIndex` reads `index.yaml` from a repository's default branch with the person's `git` and keeps the copy fetched last in `TYTO_HOME/cache/gallery/`, read with `W_GALLERY_INDEX_OFFLINE` when a fetch fails. `readGalleryRecord` and `writeGalleryRecord` keep `plugin-files/gallery.json`, what the gallery wrote; `writeFileAtomically` writes beside a name and renames into place.
+
+### Patch Changes
+
+- Updated dependencies [fc3bee5]
+- Updated dependencies [04233fc]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+- Updated dependencies [4168183]
+  - @tyto/core@0.35.0
+  - @tyto/plugin-api@0.12.0
+  - @tyto/template-lang@0.8.7
+  - @tyto/pipeline@0.12.4
+  - @tyto/export-html@0.7.8
+  - @tyto/export-svg@2.0.8
+
 ## 5.0.0
 
 ### Major Changes

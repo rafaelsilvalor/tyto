@@ -1,5 +1,23 @@
 # @tyto/cli
 
+## 0.10.0
+
+### Minor Changes
+
+- 6881557: `tyto render --delivery` now also copies the images the brief uses from outside the delivery's `assets/` into it (TYTO-499, ADR 0161). Nothing there is removed or replaced; a different file of the same name is kept, with a `W_DELIVERY_ASSET_KEPT` warning on stderr and in `result.json`.
+- 4168183: New commands: `tyto gallery list`, `tyto gallery install <id>` and `tyto gallery update <id>`, from a maintained index of templates and plugins (TYTO-503, ADR 0162).
+
+### Patch Changes
+
+- fc3bee5: The app and `tyto` come with `banner-teste` instead of `banner-roxo` (TYTO-436): the production banner is fetched from `tyto-template-banner` by a plugin file. The tests that drew `banner-roxo` draw `banner-teste`, and the manual's deliveries page starts its brief from `carrossel-lista`.
+- cd5e075: The CLI now composes `@tyto/command-line`: its own code is the terminal's environment (stdout and stderr, a `[y/N]` prompt, `fork` for a plugin's process, Playwright for a raster). Every command, option, output and exit code is unchanged.
+- Updated dependencies [cd5e075]
+- Updated dependencies [787c4ce]
+- Updated dependencies [a5a896a]
+- Updated dependencies [4168183]
+  - @tyto/command-line@0.1.0
+  - @tyto/raster@0.2.2
+
 ## 0.9.0
 
 ### Minor Changes
