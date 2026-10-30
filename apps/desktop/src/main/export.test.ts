@@ -164,7 +164,7 @@ describe('the export service', () => {
     expect(progress.diagnostics.map((item) => [item.code, item.message])).toEqual([
       [
         'E_DELIVERY_FOLDER_BLOCKED',
-        `'${picked}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.`,
+        `'${picked}' is a file, and Tyto needs a folder with that name. Rename or move the file, or export somewhere else.`,
       ],
     ]);
     expect(readdirSync(out)).toEqual(['escolhida']);
@@ -328,6 +328,35 @@ describe('the export service', () => {
     expect(readdirSync(out)).toContain('story-04.svg');
     expect(readdirSync(out)).not.toContain('result.json');
     expect(kept.diagnostics.map((item) => item.code)).not.toContain('W_LEFTOVER_REMOVED');
+  }, 60_000);
+
+  it('exports a delivery: artwork at its root, the report beside its brief, leftovers removed (TYTO-490)', async () => {
+    // ADR 0157 §6. Four slides then three into one delivery: the fourth goes, because this
+    // export keeps a result.json, in editaveis/, that says it was Tyto's.
+    const report = join(out, 'editaveis');
+    const four = exampleBrief('carrossel-lista', 'lista.brief');
+    const three = four.slice(0, four.lastIndexOf('::lamina'));
+    const exportInto = async (brief: string) =>
+      settled(
+        (
+          await service.start({
+            brief,
+            directory: out,
+            label: 'lista',
+            outputs: [{ kind: 'svg' }],
+            deliveryReport: report,
+          })
+        ).exportId,
+      );
+
+    await exportInto(four);
+    const second = await exportInto(three);
+
+    expect(second.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
+    expect(readdirSync(out)).not.toContain('story-04.svg');
+    expect(readdirSync(out)).not.toContain('result.json');
+    expect(readdirSync(report).sort()).toEqual(['result.json', 'template.txt']);
+    expect(second.diagnostics.filter((item) => item.code === 'W_LEFTOVER_REMOVED')).toHaveLength(2);
   }, 60_000);
 
   it('reports a brief that does not compile instead of throwing', async () => {

@@ -618,6 +618,83 @@ describe('tyto render --folder', () => {
 });
 
 /**
+ * `--delivery` (ADR 0157 §6, TYTO-490): the brief's own delivery decides where everything goes.
+ * No project file here, so the built-in layout, with the current folder as the parent.
+ */
+describe('tyto render --delivery', () => {
+  const NAME = 'mca-1_promo';
+  const delivery = (...segments: string[]) => join(workspace, NAME, ...segments);
+  const render = (...extra: string[]) =>
+    run(
+      ['render', `${NAME}/editaveis/${NAME}.brief`, '--delivery', '--types', 'svg', ...extra],
+      environment(),
+    );
+
+  beforeEach(async () => {
+    await mkdir(delivery('editaveis'), { recursive: true });
+    await mkdir(delivery('assets'), { recursive: true });
+    await writeFile(delivery('editaveis', `${NAME}.brief`), briefSource);
+    // The image in the delivery's assets/, which a brief in editaveis/ reads (ADR 0057).
+    await writeFile(delivery('assets', 'logo.png'), LOGO_PNG);
+  });
+
+  it('writes the artwork at the root and result.json and template.txt beside the brief', async () => {
+    const code = await render();
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await outFiles(NAME)).toEqual(['assets', 'editaveis', 'feed-01.svg', 'feed-02.svg']);
+    expect(await outFiles(NAME, 'editaveis')).toEqual([
+      `${NAME}.brief`,
+      'result.json',
+      'template.txt',
+    ]);
+    // The person's own files, untouched: the brief as written, the image not copied anywhere.
+    expect(await readFile(delivery('editaveis', `${NAME}.brief`), 'utf8')).toBe(briefSource);
+    expect(await outFiles(NAME, 'assets')).toEqual(['logo.png']);
+    expect(await readFile(delivery('editaveis', 'template.txt'), 'utf8')).toContain('cartaz 2.1.0');
+  });
+
+  it('removes the slide its previous export wrote and this one did not (ADR 0054)', async () => {
+    await writeFile(
+      delivery('editaveis', `${NAME}.brief`),
+      `${briefSource}
+::slide
+  Terceiro
+`,
+    );
+    await render();
+    await writeFile(delivery('editaveis', `${NAME}.brief`), briefSource);
+
+    const code = await render();
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await outFiles(NAME)).toEqual(['assets', 'editaveis', 'feed-01.svg', 'feed-02.svg']);
+    expect(stderr()).toContain("warning W_LEFTOVER_REMOVED Removed 'feed-03.svg'");
+  });
+
+  it('exits 1 for a brief in no delivery, naming where a delivery keeps its brief', async () => {
+    const code = await run(['render', 'task/brief.brief', '--delivery'], environment());
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(stderr()).toContain(
+      `error E_BRIEF_NOT_IN_DELIVERY '${join('task', 'brief.brief')}' is in no delivery: a delivery's brief is kept in its 'editaveis' folder`,
+    );
+    expect(await outFiles('task')).toEqual(['assets', 'brief.brief']);
+  });
+
+  it.each([['--out', 'saida'], ['--folder']])(
+    'refuses %s beside it, before anything runs',
+    async (...flag) => {
+      const code = await render(...flag);
+
+      expect(code).toBe(EXIT_DIAGNOSTICS);
+      expect(stderr()).toMatch(/cannot be used with option/u);
+      expect(await outFiles(NAME)).toEqual(['assets', 'editaveis']);
+    },
+  );
+});
+
+/**
  * TYTO-129: a file where `--folder` has to make a folder is exit 1, because retrying the same
  * invocation fails the same way until somebody moves the file. A folder that refuses the
  * write is still exit 2, the code the render contract says is worth retrying.
@@ -642,7 +719,7 @@ describe('tyto render --folder with a file in the way', () => {
 
     expect(code).toBe(EXIT_DIAGNOSTICS);
     expect(stderr()).toContain(
-      `error E_DELIVERY_FOLDER_BLOCKED '${join(workspace, 'entregas', NAME)}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.`,
+      `error E_DELIVERY_FOLDER_BLOCKED '${join(workspace, 'entregas', NAME)}' is a file, and Tyto needs a folder with that name. Rename or move the file, or export somewhere else.`,
     );
     expect(stderr()).not.toContain('internal failure');
     expect(stderr()).not.toMatch(/\n\s+at /u);

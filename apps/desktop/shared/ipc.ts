@@ -939,6 +939,33 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Whether the brief in the tab `documentId` is a delivery's (TYTO-490, ADR 0157 §6), for the
+   * export-delivery button and `delivery.export`: its name, or `null` for a brief in none, an
+   * unsaved one, or no open folder. Asked on every tab switch, so main answers from the layout
+   * the open folder already resolved and reads no disk.
+   */
+  'delivery:of': channel(
+    z.strictObject({ documentId }),
+    z.object({ name: z.string().min(1).nullable() }),
+  ),
+
+  /**
+   * The export of the delivery the brief in `documentId` belongs to (TYTO-490, ADR 0157 §6),
+   * into the export box like a preset's. **A text, never a path**, and a channel of its own
+   * rather than `export:start` with a flag, because `export:start` takes its folder from the
+   * window: here main resolves every folder from the tab's path and the open folder's layout,
+   * and accepts none. `directory` is where the artwork goes, for the box's **Open folder**. A
+   * brief in no delivery is refused with `E_BRIEF_NOT_IN_DELIVERY`, and nothing runs.
+   */
+  'delivery:export': channel(
+    z.strictObject({ documentId, brief: z.string().max(1_000_000) }),
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), exportId: z.string().min(1), directory: z.string().min(1) }),
+      z.object({ ok: z.literal(false), code: z.string().min(1), message: z.string() }),
+    ]),
+  ),
+
+  /**
    * The workspace folders opened before, newest first, for the title bar's popover (TYTO-487).
    * A folder that is gone is left out. **The id is main's**: the only thing the window sends
    * back; `pathLabel` is shown and never accepted anywhere (ADR 0086).

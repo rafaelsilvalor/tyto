@@ -24,8 +24,12 @@ describe('the IPC contract', () => {
       'brief:preview',
       'credentials:delete',
       'credentials:set',
+      // TYTO-490, ADR 0157 §6: a delivery's export; the window sends a text, main the folders.
+      'delivery:export',
       // TYTO-489, ADR 0157: Delivery: New…, a name and a text, never a path.
       'delivery:new',
+      // TYTO-490: whether the tab in front is a delivery's brief, for its button.
+      'delivery:of',
       'dialog:confirm',
       'dialog:save-changes',
       'editor:vim-mode',

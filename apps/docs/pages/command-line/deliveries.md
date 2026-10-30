@@ -43,6 +43,18 @@ error E_DELIVERY_BRIEF_EXISTS 'entregas\mca-66910_simule-sua-nota-da-2ª-fase\ed
 
 A delivery always stays inside the workspace folder. One that a shortcut inside the folder would carry outside it is refused with `E_DELIVERY_PATH_OUTSIDE`, and nothing is written.
 
+## Export a delivery
+
+`tyto render` with `--delivery` exports a delivery's brief into the delivery itself, with no folder to name:
+
+```
+tyto render entregas/mca-66910/editaveis/mca-66910.brief --delivery
+```
+
+The artwork goes to the delivery's root, or to its `exports` folder when the `delivery` key names one; `result.json` and `template.txt` go to `editaveis/`, beside the brief. The brief and the images are left as they are. Artwork an earlier export of the delivery wrote and this one did not is removed, with a `W_LEFTOVER_REMOVED` warning. It exports the brief's own sizes as PNG, unless the `delivery` key names `formats` or `types`; `--formats` and `--types` still choose for one run.
+
+`--delivery` cannot be used with `--out` or `--folder`: the delivery decides where the files go. A brief that is not in a delivery's `editaveis/` is refused with `E_BRIEF_NOT_IN_DELIVERY`, and nothing is rendered.
+
 ## Which names work
 
 The name becomes one folder's name, so it is refused, never changed, when a folder could not have it: empty, starting with a dot, holding `..`, `/`, `\` or one of `< > : " | ? *`, ending in a space or a dot, or a name Windows reserves such as `CON`. It can be up to 100 characters long, and any other letter is fine, `ª` and accents included.

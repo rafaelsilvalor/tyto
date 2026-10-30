@@ -1,6 +1,13 @@
 import { relative } from 'node:path';
 
-import { type ResolvedDelivery, planDelivery } from '@tyto/core';
+import {
+  type BriefDelivery,
+  type ResolvedDelivery,
+  BUILT_IN_DELIVERY,
+  deliveryOfBrief,
+  diagnostic,
+  planDelivery,
+} from '@tyto/core';
 import { createDelivery } from '@tyto/io';
 
 /**
@@ -26,8 +33,27 @@ export type DeliveryMade =
 /** What answers when no folder is open: not a diagnostic, since no file is at fault. */
 export const NO_FOLDER = 'no-folder';
 
+/** A brief's delivery, with what its export renders (ADR 0157 §6). */
+export interface FoundDelivery extends BriefDelivery {
+  /** `delivery.formats` when a sheet writes it; absent, the brief's own decide. */
+  readonly formats?: readonly string[];
+  /** `delivery.types`, or `png`, as for a preset (ADR 0126). */
+  readonly types: readonly string[];
+}
+
+/** The type a delivery's export writes when no sheet says, as for a preset (ADR 0126). */
+export const DEFAULT_DELIVERY_TYPES: readonly string[] = ['png'];
+
 export interface DeliveryService {
   create(name: string, brief: string): Promise<DeliveryMade>;
+  /**
+   * The delivery the brief at `path` belongs to in the open folder, or `undefined` (TYTO-490).
+   * Asked on every tab switch, so it reads no disk: the layout is the one the open folder
+   * already resolved, and the test is `deliveryOfBrief`'s, lexical.
+   */
+  of(path: string): FoundDelivery | undefined;
+  /** Why a brief at `path` (or an unsaved one) has no delivery export: for the status bar. */
+  notIn(path: string | undefined): { readonly code: string; readonly message: string };
 }
 
 export function createDeliveryService(options: {
@@ -46,7 +72,34 @@ export function createDeliveryService(options: {
       if (!made.ok) return refusal(made.error);
       return { ok: true, brief: plan.value.brief };
     },
+
+    of(path) {
+      const layout = options.layout();
+      if (layout === undefined) return undefined;
+      const found = deliveryOfBrief(layout.delivery, path);
+      if (found === undefined) return undefined;
+      return {
+        ...found,
+        ...(layout.delivery.formats === undefined ? {} : { formats: layout.delivery.formats }),
+        types: layout.delivery.types ?? DEFAULT_DELIVERY_TYPES,
+      };
+    },
+
+    notIn(path) {
+      const layout = options.layout();
+      const problem = diagnostic('E_BRIEF_NOT_IN_DELIVERY', {
+        path: path === undefined ? 'untitled' : shownIn(layout?.root, path),
+        folder: layout?.delivery.brief ?? BUILT_IN_DELIVERY.brief,
+        parent: layout === undefined ? '.' : shownIn(layout.root, layout.delivery.parent),
+      });
+      return { code: problem.code, message: problem.message };
+    },
   };
+}
+
+/** `path` relative to the open folder, as the status bar shows paths; `.` for the folder. */
+function shownIn(root: string | undefined, path: string): string {
+  return root === undefined ? path : relative(root, path) || '.';
 }
 
 function refusal(

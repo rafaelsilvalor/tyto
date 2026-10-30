@@ -740,6 +740,19 @@ const dependencies = () => {
             ? { ok: true as const, brief: '/work/promo/mca-1/editaveis/mca-1.brief' }
             : { ok: false as const, code: 'W_DELIVERY_NAME_INVALID', message: 'refused' },
         ),
+      // TYTO-490: document-1's path is the one brief in a delivery here.
+      of: (path: string) =>
+        path === '/recipes/weekly.recipe'
+          ? {
+              name: 'mca-1',
+              folder: '/work/mca-1',
+              exports: '/work/mca-1/final',
+              report: '/work/mca-1/editaveis',
+              formats: ['story'],
+              types: ['png', 'svg'],
+            }
+          : undefined,
+      notIn: () => ({ code: 'E_BRIEF_NOT_IN_DELIVERY', message: 'in no delivery' }),
     },
     exit: exitAnswers(),
     exports: exportService(),
@@ -1964,6 +1977,56 @@ describe('delivery:new', () => {
     const create = guard('delivery:new', createHandlers(dependencies())['delivery:new']);
     await expect(
       create({ documentId: 'document-9', name: 'mca-1', brief: '', path: 'C:\\x' } as never),
+    ).rejects.toThrow();
+  });
+});
+
+/** TYTO-490, ADR 0157 §6: a delivery's export, every folder main's. */
+describe('delivery:of and delivery:export', () => {
+  it('names the delivery of a tab in one, and answers null for a tab with no file', async () => {
+    const of = guard('delivery:of', createHandlers(dependencies())['delivery:of']);
+    await expect(of({ documentId: 'document-1' })).resolves.toEqual({ name: 'mca-1' });
+    await expect(of({ documentId: 'document-2' })).resolves.toEqual({ name: null });
+  });
+
+  it('starts the export into the delivery: artwork to exports, the report beside the brief', async () => {
+    const deps = dependencies();
+    const run = guard('delivery:export', createHandlers(deps)['delivery:export']);
+
+    await expect(run({ documentId: 'document-1', brief: 'title: unsaved' })).resolves.toEqual({
+      ok: true,
+      exportId: 'export-1',
+      directory: '/work/mca-1/final',
+    });
+    expect(deps.exports.started).toEqual([
+      {
+        brief: 'title: unsaved',
+        directory: '/work/mca-1/final',
+        briefDirectory: '/work/mca-1/editaveis',
+        label: 'promo',
+        outputs: [{ kind: 'png' }, { kind: 'svg' }],
+        formats: ['story'],
+        deliveryReport: '/work/mca-1/editaveis',
+      },
+    ]);
+  });
+
+  it('refuses a tab in no delivery, and starts nothing', async () => {
+    const deps = dependencies();
+    const run = guard('delivery:export', createHandlers(deps)['delivery:export']);
+
+    await expect(run({ documentId: 'document-2', brief: '' })).resolves.toEqual({
+      ok: false,
+      code: 'E_BRIEF_NOT_IN_DELIVERY',
+      message: 'in no delivery',
+    });
+    expect(deps.exports.started).toEqual([]);
+  });
+
+  it('refuses a request naming a folder, which main never takes from the window here', async () => {
+    const run = guard('delivery:export', createHandlers(dependencies())['delivery:export']);
+    await expect(
+      run({ documentId: 'document-1', brief: '', directory: '/elsewhere' } as never),
     ).rejects.toThrow();
   });
 });

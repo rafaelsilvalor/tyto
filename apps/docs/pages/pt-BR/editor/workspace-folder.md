@@ -69,6 +69,8 @@ Uma **entrega** é uma pasta para uma peça de trabalho, com o nome do card, `as
 
 **Arquivo ▸ Entrega: nova…**, ou o mesmo comando na barra de comandos, cria uma na pasta aberta. A barra pergunta o nome e diz, enquanto você digita, por que um nome não pode ser de uma pasta — um `:` ou uma `/`, por exemplo —, e o Enter não faz nada até poder. Depois ela lista os templates, como **Novo brief a partir de template…**, com **Sem template** primeiro. O brief da entrega abre numa aba nova e fica selecionado no Explorador: com um template, ele traz o esqueleto do template; sem nenhum, abre com o menu "/", onde escolher um template escreve o esqueleto dele. Um brief que já existe nunca é sobrescrito: a barra de status diz por que nada foi criado, e nada é escrito. O comando fica cinza enquanto nenhuma pasta está aberta, e pode ganhar uma tecla no [`keybindings.json`](../customize/keybindings-json.md) como `delivery.new`. [`tyto delivery new`](../command-line/deliveries.md) faz o mesmo pela linha de comando.
 
+**Exportar a entrega**: com o brief de uma entrega na frente, o botão ao lado de **Abrir a prévia ao lado**, na ponta direita da faixa de abas, exporta sem caixa para preencher. A janela Exportar abre já rodando, como numa predefinição. As artes vão para a raiz da entrega (a pasta `exports` dela), e o `result.json` e o `template.txt` vão para `editaveis/`, ao lado do brief; o brief e as imagens em `assets/` ficam como estão. Artes que uma exportação anterior da entrega gravou e esta não são removidas e listadas na caixa; arquivos seus nunca são tocados. Ela exporta os tamanhos do próprio brief, ou `formats` quando a chave `delivery` os nomeia, em PNG, ou `types` quando a chave os nomeia. Para um brief fora de entrega o botão fica cinza, e a dica dele diz por quê. O comando é **Entrega: exportar**, e pode ganhar uma tecla no `keybindings.json` como `delivery.export`; [`tyto render --delivery`](../command-line/deliveries.md#exportar-uma-entrega) faz o mesmo pela linha de comando.
+
 A chave `delivery` diz onde e como, e cada parte dela é opcional:
 
 ```jsonc
@@ -82,7 +84,7 @@ A chave `delivery` diz onde e como, e cada parte dela é opcional:
 }
 ```
 
-Os valores mostrados para `folders`, `brief` e `exports` são os que valem quando a chave é omitida. `parent` é relativo à pasta aberta; os outros três são relativos à entrega e precisam ficar dentro dela. `exports`, e `formats` e `types` (listas de tamanhos e de tipos de arquivo), servem para exportar uma entrega, o que esta versão ainda não faz: são lidos e conferidos, e nada os usa.
+Os valores mostrados para `folders`, `brief` e `exports` são os que valem quando a chave é omitida. `parent` é relativo à pasta aberta; os outros três são relativos à entrega e precisam ficar dentro dela. `exports` é onde a exportação de uma entrega grava as artes, e `formats` e `types` (listas de tamanhos e de tipos de arquivo) são o que ela exporta, quando escritos; omitidos, os tamanhos do próprio brief em PNG.
 
 Um perfil de trabalho também pode ter um `delivery`, e uma campanha é um perfil de trabalho: o `delivery` da própria pasta substitui uma parte de cada vez, então uma pasta que escreve só `"exports": "final"` mantém as `folders` do perfil. O `parent` de um perfil continua relativo à pasta aberta. Uma entrega sempre fica dentro da pasta aberta, confiável ou não: um `parent` que leva para fora aparece como `W_PROJECT_PATH_OUTSIDE` e vale o anterior. Uma parte que não é aceita aparece em **Problemas** e vale a anterior, ou a mostrada acima.
 

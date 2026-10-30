@@ -10,7 +10,7 @@ import { isInside } from './contain.js';
 import { fileResources } from './file-resources.js';
 import { fsInbox, renameRetryingLocks } from './fs-inbox.js';
 import { fileTemplateAssets } from './file-template-assets.js';
-import { fsArtworkOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
+import { fsArtworkOutput, fsDeliveryExportOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
 import { nodeFileSystem } from './node-file-system.js';
 import { pollSource } from './poll.js';
 import type { BriefSource, BriefTask } from './ports.js';
@@ -291,6 +291,91 @@ describe('fsArtworkOutput', () => {
     expect(opened.ok ? [] : opened.error.map((item) => item.code)).toEqual([
       'E_DELIVERY_FOLDER_BLOCKED',
     ]);
+  });
+});
+
+describe('fsDeliveryExportOutput', () => {
+  const delivery = () => join(workspace, 'mca-1');
+  const report = () => join(delivery(), 'editaveis');
+
+  /** One export into the delivery, the way `render-task.ts` and the desktop drive it. */
+  async function exportInto(names: readonly string[]) {
+    const opened = await fsDeliveryExportOutput({ artwork: delivery(), report: report() });
+    if (!opened.ok) throw new Error(opened.error.map((item) => item.message).join('\n'));
+    const artifacts = names.map((name) => artifactOf(name));
+    for (const artifact of artifacts) await opened.value.write(artifact);
+    const leftovers = await opened.value.removeLeftovers({
+      artifacts,
+      planned: artifacts.length,
+      cancelled: false,
+      failed: false,
+    });
+    const described = await opened.value.describeTemplate({
+      name: 'promo-curso',
+      version: '1.0.0',
+    });
+    await opened.value.finish(
+      renderResult({
+        cancelled: false,
+        planned: artifacts.length,
+        artifacts,
+        diagnostics: leftovers,
+        version: '0.0.0-test',
+        templates: [],
+      }),
+    );
+    return { leftovers, described };
+  }
+
+  it('writes the artwork at the root and the report beside the brief, touching neither brief nor images', async () => {
+    await mkdir(join(delivery(), 'assets'), { recursive: true });
+    await mkdir(report(), { recursive: true });
+    await writeFile(join(report(), 'mca-1.brief'), 'the person’s brief');
+    await writeFile(join(delivery(), 'assets', 'foto.png'), 'the person’s image');
+
+    const { described } = await exportInto(['feed-01.svg', 'feed-02.svg']);
+
+    expect(described).toEqual([]);
+    expect((await readdir(delivery())).sort()).toEqual([
+      'assets',
+      'editaveis',
+      'feed-01.svg',
+      'feed-02.svg',
+    ]);
+    expect((await readdir(report())).sort()).toEqual([
+      'mca-1.brief',
+      'result.json',
+      'template.txt',
+    ]);
+    expect(await readdir(join(delivery(), 'assets'))).toEqual(['foto.png']);
+  });
+
+  it('removes the slide its previous export wrote and this one did not (ADR 0054)', async () => {
+    await exportInto(['feed-01.svg', 'feed-02.svg', 'feed-03.svg', 'feed-04.svg']);
+    await writeFile(join(delivery(), 'leia-me.txt'), 'a note for the client');
+
+    const { leftovers } = await exportInto(['feed-01.svg', 'feed-02.svg', 'feed-03.svg']);
+
+    expect(leftovers.map((item) => item.code)).toEqual(['W_LEFTOVER_REMOVED']);
+    expect((await readdir(delivery())).sort()).toEqual([
+      'editaveis',
+      'feed-01.svg',
+      'feed-02.svg',
+      'feed-03.svg',
+      'leia-me.txt',
+    ]);
+  });
+
+  it('answers a file holding the report folder instead of throwing, and writes nothing', async () => {
+    await mkdir(delivery(), { recursive: true });
+    await writeFile(report(), 'not a folder');
+
+    const opened = await fsDeliveryExportOutput({ artwork: delivery(), report: report() });
+
+    expect(opened.ok ? [] : opened.error.map((item) => item.code)).toEqual([
+      'E_DELIVERY_FOLDER_BLOCKED',
+    ]);
+    expect(await readdir(delivery())).toEqual(['editaveis']);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   fileAssetResolver,
   fileResources,
   fsArtworkOutput,
+  fsDeliveryExportOutput,
   fsTaskOutput,
   layeredExportResources,
   renderResult,
@@ -95,6 +96,12 @@ export interface ExportRequest {
    * `outbox/<id>/out/` is the ADR 0011 contract's shape and keeps its report.
    */
   readonly artworkOnly?: boolean;
+  /**
+   * A delivery's export (ADR 0157 §6, TYTO-490): the artwork into {@link directory}, the
+   * delivery's `exports`, and `result.json` and `template.txt` into this folder, its brief's.
+   * What the previous export of the delivery wrote and this one did not is removed (ADR 0054).
+   */
+  readonly deliveryReport?: string;
   /**
    * Leave out an output no exporter in this run's host produces, with a
    * `W_QUEUE_KIND_UNAVAILABLE` each, instead of failing the run (ADR 0061). On for the queue,
@@ -421,10 +428,19 @@ export async function createExportService(options: ExportServiceOptions): Promis
         : { outputs: request.outputs, dropped: [] };
     // The export box and the presets write the artwork alone into the folder the person
     // picked (ADR 0157); the queue keeps the contract's `result.json` beside it (ADR 0011).
+    // A delivery's export writes its report beside the brief instead (ADR 0157 §6).
+    const forDelivery =
+      request.deliveryReport === undefined || request.artworkOnly === true
+        ? undefined
+        : await fsDeliveryExportOutput({
+            artwork: request.directory,
+            report: request.deliveryReport,
+            label: request.label,
+          });
     const opened =
       request.artworkOnly === true
         ? await fsArtworkOutput(request.directory, { label: request.label })
-        : undefined;
+        : forDelivery;
     // A file holding the folder's name, or a folder above it. A diagnostic in the dialog and
     // not `failure`, which is for what nobody can fix by moving a file (TYTO-129).
     if (opened !== undefined && !opened.ok) {
@@ -526,6 +542,18 @@ export async function createExportService(options: ExportServiceOptions): Promis
       cancelled,
       failed: hasErrors([...startup, ...produced]),
     });
+    // A folder holding `template.txt` is an error, and it goes in the `result.json` below.
+    const delivery = forDelivery?.ok === true ? forDelivery.value : undefined;
+    const described =
+      delivery !== undefined && job.ok && job.value.template !== undefined
+        ? await delivery.describeTemplate({
+            name: job.value.template.name,
+            version: job.value.template.version,
+            ...(job.value.template.description === undefined
+              ? {}
+              : { description: job.value.template.description }),
+          })
+        : [];
     run.diagnostics = [
       ...startup,
       ...skipped,
@@ -533,6 +561,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
       ...dropped,
       ...produced,
       ...leftovers,
+      ...described,
     ];
 
     run.result = renderResult({

@@ -189,6 +189,7 @@ export { DEFAULT_PRESET_TYPES, EXPORT_PRESETS_KEY, type ExportPreset } from './p
 
 export {
   BUILT_IN_DELIVERY,
+  type BriefDelivery,
   DELIVERY_BRIEF_EXTENSION,
   DELIVERY_KEY,
   type DeliveryPlan,
@@ -196,6 +197,7 @@ export {
   type ResolvedDelivery,
   builtInDelivery,
   deliveryNameOf,
+  deliveryOfBrief,
   planDelivery,
 } from './project/delivery.js';
 

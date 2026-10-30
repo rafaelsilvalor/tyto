@@ -57,3 +57,45 @@ describe('the delivery service', () => {
     expect(await closed.create('mca-1', '')).toEqual({ ok: false, code: NO_FOLDER, message: '' });
   });
 });
+
+/** TYTO-490, ADR 0157 §6: which delivery a brief is in, read with no disk. */
+describe('the delivery a brief belongs to', () => {
+  it('answers its folders, and png when no sheet names the types', () => {
+    const found = service().of(join(folder, 'mca-1', 'editaveis', 'mca-1.brief'));
+
+    expect(found).toEqual({
+      name: 'mca-1',
+      folder: join(folder, 'mca-1'),
+      exports: join(folder, 'mca-1'),
+      report: join(folder, 'mca-1', 'editaveis'),
+      types: ['png'],
+    });
+  });
+
+  it('carries the formats and types the layout names', () => {
+    const named = createDeliveryService({
+      layout: () => ({
+        root: folder,
+        delivery: { ...builtInDelivery(folder), formats: ['story'], types: ['svg'] },
+      }),
+    });
+    expect(named.of(join(folder, 'mca-1', 'editaveis', 'x.brief'))).toMatchObject({
+      formats: ['story'],
+      types: ['svg'],
+    });
+  });
+
+  it('answers nothing for a brief in no delivery, or with no folder open', () => {
+    expect(service().of(join(folder, 'solto.brief'))).toBeUndefined();
+    const closed = createDeliveryService({ layout: () => undefined });
+    expect(closed.of(join(folder, 'mca-1', 'editaveis', 'mca-1.brief'))).toBeUndefined();
+  });
+
+  it('says why, with paths relative to the open folder', () => {
+    expect(service().notIn(join(folder, 'solto.brief'))).toEqual({
+      code: 'E_BRIEF_NOT_IN_DELIVERY',
+      message:
+        "'solto.brief' is in no delivery: a delivery's brief is kept in its 'editaveis' folder, inside a folder in '.'. Make one with tyto delivery new, or export with --out.",
+    });
+  });
+});

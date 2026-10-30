@@ -26,7 +26,7 @@ Exportar transforma o brief da frente em arquivos: imagens PNG, JPEG ou WebP, de
 
 Cada arquivo leva o nome do tamanho e o número da arte: `grid-01.png`, `grid-02.png`, `story-01.png` e assim por diante, então um carrossel de quatro faz quatro de cada.
 
-Nada mais é gravado: nem cópia do brief, nem imagens, nem relatório. A caixa é o relatório da exportação. Um arquivo que já está na pasta com o mesmo nome é substituído, e todos os outros ficam como estão, inclusive artes que uma exportação anterior gravou e esta não. Para guardar o brief e as imagens ao lado das artes, faça uma [entrega](../editor/workspace-folder.md#entregas-uma-pasta-por-peca-de-trabalho).
+Nada mais é gravado: nem cópia do brief, nem imagens, nem relatório. A caixa é o relatório da exportação. Um arquivo que já está na pasta com o mesmo nome é substituído, e todos os outros ficam como estão, inclusive artes que uma exportação anterior gravou e esta não. Para guardar o brief e as imagens ao lado das artes, faça uma [entrega](../editor/workspace-folder.md#entregas-uma-pasta-por-peca-de-trabalho): o botão de exportar dela grava as artes nela, com o `result.json` ao lado do brief.
 
 ## Exportar com uma predefinição
 

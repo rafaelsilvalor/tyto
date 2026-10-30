@@ -184,3 +184,54 @@ describe('the pane shape (TYTO-288, ADR 0085)', () => {
     expect(shown[0]?.classList.contains('preview__bar')).toBe(true);
   });
 });
+
+/** TYTO-490, ADR 0157 §6: the delivery's export beside "Open preview to the side". */
+describe('the export-delivery button', () => {
+  async function strip(delivery: string | null) {
+    const made = new Map<string, EditorGroupElement>();
+    const { created } = arrangeGroups(container(), groupsOf(['a'], 'a'), made);
+    const group = created[0]!;
+    const clicks: string[] = [];
+    group.locale = 'en';
+    group.offerPreview = true;
+    group.offerDeliveryExport = true;
+    group.delivery = delivery;
+    group.exportDelivery = () => {
+      clicks.push('export');
+    };
+    await group.updateComplete;
+    const button = group.querySelector<HTMLButtonElement>('[data-action="delivery.export"]');
+    return { group, button, clicks };
+  }
+
+  it('sits right after the preview button and runs the export for a brief in a delivery', async () => {
+    const { group, button, clicks } = await strip('mca-1');
+
+    const actions = [...group.querySelectorAll('.pane__actions button')].map(
+      (item) => (item as HTMLElement).dataset['action'],
+    );
+    expect(actions).toEqual(['preview.openToSide', 'delivery.export']);
+    expect(button?.getAttribute('aria-disabled')).toBe('false');
+    expect(button?.title).toBe('Delivery: Export');
+    button?.click();
+    expect(clicks).toEqual(['export']);
+  });
+
+  it('is shown disabled, saying why, for a brief in no delivery, and a click does nothing', async () => {
+    const { button, clicks } = await strip(null);
+
+    expect(button?.getAttribute('aria-disabled')).toBe('true');
+    expect(button?.title).toBe(
+      "This brief is in no delivery: a delivery's brief is kept in its editaveis folder.",
+    );
+    button?.click();
+    expect(clicks).toEqual([]);
+  });
+
+  it('is not there for anything but a brief', async () => {
+    const made = new Map<string, EditorGroupElement>();
+    const { created } = arrangeGroups(container(), groupsOf(['a'], 'a'), made);
+    await created[0]!.updateComplete;
+    expect(created[0]!.querySelector('[data-action="delivery.export"]')).toBeNull();
+  });
+});

@@ -196,11 +196,77 @@ export async function fsArtworkOutput(
   );
 }
 
+/** A delivery's export, which can also say which template made the artwork. */
+export interface DeliveryExportOutput extends ReusableTaskOutput {
+  /**
+   * Writes {@link TEMPLATE_FILE} beside the report. Call it **before** `finish`, so
+   * `result.json` stays the last file to appear. Answers `E_OUTPUT_FILE_BLOCKED` when a folder
+   * holds the name, which belongs in that `result.json`.
+   */
+  describeTemplate(template: DeliveryTemplate): Promise<Diagnostics>;
+}
+
+export interface FsDeliveryExportOptions {
+  /** The delivery's `exports` folder: the artwork, and nothing else Tyto writes. */
+  readonly artwork: string;
+  /** The brief's folder (`editaveis/`): `result.json` and `template.txt`. */
+  readonly report: string;
+  /** Named in the schema-mismatch message, so a reader knows which export produced it. */
+  readonly label?: string;
+}
+
+/**
+ * A delivery's export (ADR 0157 §6, TYTO-490): the artwork into the delivery's `exports`
+ * folder, `result.json` and `template.txt` into its brief's folder.
+ *
+ * ```
+ * <delivery>/
+ *   <format>-<NN>.png             the artwork, at `exports` (the root by default)
+ *   editaveis/
+ *     <name>.brief                the person's own brief, never written here
+ *     result.json
+ *     template.txt
+ *   assets/                       the person's own images, never written here
+ * ```
+ *
+ * **ADR 0054's leftover rule applies to the artwork**, read from the previous `result.json`
+ * in the report folder: a file that export wrote and this one did not produce is removed by
+ * `removeLeftovers`, with `W_LEFTOVER_REMOVED`. The brief and the images are the delivery's own
+ * files and are not copied, rewritten or removed.
+ *
+ * Both folders are made with `makeFolder`, so a file holding either name is an
+ * `E_DELIVERY_FOLDER_BLOCKED` in the answer and nothing is written (TYTO-129).
+ */
+export async function fsDeliveryExportOutput(
+  options: FsDeliveryExportOptions,
+): Promise<Result<DeliveryExportOutput, Diagnostic[]>> {
+  const artwork = resolve(options.artwork);
+  const report = resolve(options.report);
+  for (const folder of [artwork, report]) {
+    const blocked = await makeFolder(folder);
+    if (blocked !== undefined) return err([blocked]);
+  }
+  const output = await taskOutput({
+    artifacts: artwork,
+    result: report,
+    label: options.label ?? artwork,
+    removeLeftovers: true,
+  });
+  return ok({
+    ...output,
+    async describeTemplate(template: DeliveryTemplate): Promise<Diagnostics> {
+      const blocked = await writeAtomic(join(report, TEMPLATE_FILE), templateNote(template));
+      return blocked === undefined ? [] : [blocked];
+    },
+  });
+}
+
 /**
  * Where a `TaskOutput` writes, and whether it keeps a report there.
  *
  * `fsTaskOutput` puts artifacts and `result.json` in one folder; `fsArtworkOutput` writes the
- * artwork and no report at all (ADR 0157). Everything else about writing — the atomic rename,
+ * artwork and no report at all; `fsDeliveryExportOutput` puts the report in the brief's folder,
+ * apart from the artwork (ADR 0157). Everything else about writing — the atomic rename,
  * a folder in the way answered rather than thrown — is identical, and this is the one copy of
  * it. Two adapters with their own copies would be two ways for a half-written PNG to reach a
  * watcher.
@@ -229,7 +295,7 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
       return removeLeftovers({
         previous,
         artifacts: directories.artifacts,
-        // The report sits beside the artwork whenever there is one, and it is never artwork.
+        // A report is never artwork, wherever it sits.
         protectedNames: directories.result === undefined ? [] : [RESULT_FILE],
         run,
       });
@@ -315,12 +381,9 @@ export async function makeFolder(
  * Portuguese for the sentence, like `editaveis/` itself and for the same reason: it is read
  * by whoever receives the folder. The description is the template author's own words and is
  * copied as written rather than translated.
- *
- * Exported from this module and not from the package: its last writer, the delivery output,
- * went with TYTO-490's first half, and the delivery's own export decides in its second half
- * whether a delivery still says which template made it.
+
  */
-export function templateNote(template: DeliveryTemplate): string {
+function templateNote(template: DeliveryTemplate): string {
   const lines = [`${template.name} ${template.version}`];
   if (template.description !== undefined) lines.push(template.description);
   lines.push(

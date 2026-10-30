@@ -1,4 +1,4 @@
-import { Command, CommanderError } from 'commander';
+import { Command, CommanderError, Option } from 'commander';
 
 import type { CliEnvironment } from './environment.js';
 import { deliveryNewCommand } from './delivery.js';
@@ -138,6 +138,16 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
       'write only the artwork into <out>/<brief-name>/ — no result.json, brief or assets/',
       false,
     )
+    // TYTO-490, ADR 0157 §6. Every folder comes from the delivery the brief is in, so a folder
+    // typed beside it would be a second answer to the same question: refused, not ignored.
+    .addOption(
+      new Option(
+        '--delivery',
+        "export into the brief's delivery: artwork into its exports folder, result.json and template.txt beside the brief",
+      )
+        .default(false)
+        .conflicts(['out', 'folder']),
+    )
     .option(
       '--assets <dir>',
       "what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder)",
@@ -162,6 +172,7 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
         ...render.opts(),
         templatesNamed: namedOnTheCommandLine(render, 'templates'),
         formatsNamed: namedOnTheCommandLine(render, 'formatsFile'),
+        typesNamed: namedOnTheCommandLine(render, 'types'),
       },
       environment,
     );

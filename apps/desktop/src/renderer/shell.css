@@ -871,6 +871,18 @@ textarea {
   color: var(--tyto-text);
 }
 
+/* The delivery's export for a brief in no delivery (TYTO-490): shown, dimmed, its tooltip
+   saying why. `aria-disabled` rather than `disabled`, so hovering still shows that tooltip. */
+.editor-group__action[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.editor-group__action[aria-disabled='true']:hover {
+  background: none;
+  color: var(--tyto-text-muted);
+}
+
 /*
  * The preview as a tab's content (TYTO-287, ADR 0084): its bar over its stage, in place of the
  * CodeMirror pane while a preview tab is in front. Focusable, so a click in it focuses its group.
