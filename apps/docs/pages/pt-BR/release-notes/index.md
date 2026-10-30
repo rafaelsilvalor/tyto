@@ -3,6 +3,7 @@
 O que mudou em cada versão do aplicativo, da mais nova para a mais antiga. Cada página é o texto
 publicado com aquela versão.
 
+- [Tyto 0.12.0](./desktop-v0.12.0) — uma pasta por entrega, exportada com um clique
 - [Tyto 0.10.0](./desktop-v0.10.0) — templates de repositório próprio, por arquivo de plugin
 - [Tyto 0.7.0](./desktop-v0.7.0) — o Tyto passa a se atualizar sozinho
 - [Tyto 0.6.0](./desktop-v0.6.0)
