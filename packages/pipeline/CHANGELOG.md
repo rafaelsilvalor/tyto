@@ -1,5 +1,22 @@
 # @tyto/pipeline
 
+## 0.12.3
+
+### Patch Changes
+
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+  - @tyto/plugin-api@0.11.0
+  - @tyto/core@0.34.0
+  - @tyto/brief-lang@0.7.5
+  - @tyto/raster@0.2.2
+  - @tyto/template-lang@0.8.6
+
 ## 0.12.2
 
 ### Patch Changes

@@ -1,5 +1,45 @@
 # @tyto/io
 
+## 5.0.0
+
+### Major Changes
+
+- 5494e98: `fsArtworkOutput(directory, { label? })` writes artwork into a folder and nothing beside it: no `result.json`, no copied brief, no `assets/` (TYTO-490, ADR 0157). It answers `Result<ReusableTaskOutput, Diagnostic[]>`, with `E_DELIVERY_FOLDER_BLOCKED` when a file holds the folder's name; its `removeLeftovers` removes nothing, because without a report no file is known to be Tyto's.
+
+  **Breaking for `@tyto/io` callers:** `fsDeliveryOutput`, `DeliveryOutput` and `FsDeliveryOutputOptions` are removed, and nothing writes ADR 0057's `editaveis/` + `assets/` layout any more. Use `fsArtworkOutput` for a folder a person picked, or `fsTaskOutput` where a `result.json` belongs. The render contract's exit-code text now says `--folder` writes no `result.json`.
+
+- cd14464: `fsDeliveryExportOutput({ artwork, report, label? })` writes a delivery's export (TYTO-490, ADR 0157 §6): the artwork into the delivery's `exports` folder, `result.json` and `template.txt` into its brief's folder. What its previous export wrote and this one did not is removed (ADR 0054). It answers `Result<DeliveryExportOutput, Diagnostic[]>`, with `E_DELIVERY_FOLDER_BLOCKED` when a file holds either folder.
+
+  **Breaking for `@tyto/io` callers:** `recordingAssetResolver` and `DeliveredAsset` are removed. Nothing has copied a brief's images since part A of TYTO-490.
+
+### Minor Changes
+
+- 503f924: An installed plugin's code template reads files from its own folder (TYTO-478, ADR 0062). `context.files.image` and `context.files.svg` answer what the host read from the template's folder inside the installed plugin, and a declared image value's default resolves against the same folder; `tyto render` and the desktop embed those bytes in the export. **Breaking for plugins: the protocol is 12** (ADR 0149 point 4), because a template's `build` now carries a fourth argument, `ShippedFiles`, which a guest on 11 refuses. A path out of the folder, an absolute one or a file the host did not read answers `undefined`, and the folder's reader skips a link that leads out of it.
+- eca9871: A template knows an image's width and height (TYTO-481, ADR 0158). `AssetRef` gains an optional `size: { w, h }`, read by the host off the header of a brief's image, a plugin-served image or a file in the template's own folder, and absent when no header parsed. `imageHeight(asset, width, fallback)` in `@tyto/template-kit` sizes a frame to it, so a frame follows the picture without a proportion written on the slide. **Breaking for plugins: the protocol is 13** (ADR 0149 point 4), because a guest on 12 refuses a ref that carries `size`.
+- 0164874: `tyto delivery new <name> [--template <name>]` makes a delivery: one folder per piece of work, named after its ticket, with `assets/`, `editaveis/` and the brief as `editaveis/<name>.brief` (TYTO-489, ADR 0157). The project file and a work profile gain the `delivery` key (`parent`, `folders`, `brief`, `exports`, `formats`, `types`), merged one subkey at a time; `parent` stays inside the workspace folder for every sheet. An existing delivery folder is reused, an existing brief is refused with `E_DELIVERY_BRIEF_EXISTS` and nothing written, and a name a folder cannot have is `W_DELIVERY_NAME_INVALID` (ADR 0114's profile rule, up to 100 characters, NFC). `@tyto/core` now holds `briefSkeleton` and `skeletonText`, which `@tyto/editor` re-exports unchanged.
+
+### Patch Changes
+
+- 6ccfc2e: A plugin file pinned to an annotated tag locks the commit the tag points at, not the tag object (TYTO-472, ADR 0151). A lock an earlier version wrote with a tag object's id keeps loading and is rewritten to the commit on the next sync that can reach the repository; nothing is reported as a moved ref.
+- 6d431f6: An installed plugin's code template can no longer make an export embed a file it was not handed (TYTO-479, ADR 0062). Before, a frame naming an image by an absolute `path`, or by an `id` leading out of the brief's folder, drew any image on the disk with no diagnostic. Every picture in such a frame must now be one the host sent that call — the template's own folder, or a ref in its context such as a slot's picture or a declared value — and any other costs the frame as the new `E_PLUGIN_TEMPLATE_ASSET`, naming the plugin, the template and the asset. The protocol stays 12.
+- b40dea8: **File ▸ Delivery: New…** (`delivery.new`) makes a delivery in the open folder from the window (TYTO-489, ADR 0157): the command bar asks for its name, saying as you type why a name cannot be a folder's, then for a template or none; main makes the folder and the brief, which opens in a new tab and is selected in the Explorer, with the "/" menu when no template was chosen. A refusal is said in the status bar. A delivery a link inside the workspace would carry outside it is now `E_DELIVERY_PATH_OUTSIDE` instead of `W_PROJECT_PATH_OUTSIDE`, whose text is about an untrusted folder's key.
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [993b9f6]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+- Updated dependencies [0d828d3]
+- Updated dependencies [0d828d3]
+  - @tyto/plugin-api@0.11.0
+  - @tyto/core@0.34.0
+  - @tyto/export-html@0.7.7
+  - @tyto/export-svg@2.0.7
+  - @tyto/pipeline@0.12.3
+  - @tyto/template-lang@0.8.6
+
 ## 4.3.1
 
 ### Patch Changes

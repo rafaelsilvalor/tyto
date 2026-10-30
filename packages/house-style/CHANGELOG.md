@@ -1,5 +1,23 @@
 # @tyto/house-style
 
+## 0.4.0
+
+### Minor Changes
+
+- a14d306: The azul brand's tokens, presets, logo header and signed footer are the subpath `@tyto/house-style/azul`, so `agenda-semana` and `aprovados` share one copy instead of each carrying its own.
+
+### Patch Changes
+
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+  - @tyto/core@0.34.0
+  - @tyto/template-kit@0.5.0
+
 ## 0.3.1
 
 ### Patch Changes

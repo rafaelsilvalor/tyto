@@ -1,5 +1,48 @@
 # @tyto/desktop
 
+## 0.12.0
+
+### Minor Changes
+
+- 35b8ea7: Recent project folders in the title bar (TYTO-487). A button after Help names the open folder and opens a popover of the folders opened before, newest first: type to filter, arrows and Enter to open, Escape to close, and Open Local Folder… at the foot. A folder chosen there opens through File ▸ Open Folder's own door, with the same trust rules (ADR 0111) and one folder per window (ADR 0113). The command `workspace.openRecent` opens the same popover and can be bound in `keybindings.json`. Main keeps the last ten folders in `recent-folders.json` beside the recent files and hands the window ids, never paths.
+- b40dea8: **File ▸ Delivery: New…** (`delivery.new`) makes a delivery in the open folder from the window (TYTO-489, ADR 0157): the command bar asks for its name, saying as you type why a name cannot be a folder's, then for a template or none; main makes the folder and the brief, which opens in a new tab and is selected in the Explorer, with the "/" menu when no template was chosen. A refusal is said in the status bar. A delivery a link inside the workspace would carry outside it is now `E_DELIVERY_PATH_OUTSIDE` instead of `W_PROJECT_PATH_OUTSIDE`, whose text is about an untrusted folder's key.
+- 5494e98: The export box and the export presets write only the artwork into the folder you pick: no `result.json`, no `editaveis/` with the brief, no `assets/` with its images (TYTO-490, ADR 0157). The dialog is the run's report. A file an earlier export wrote and this one did not produce now stays in the folder, and the leftovers list no longer appears. To keep the brief and its images beside the artwork, make a delivery (**File ▸ Delivery: New…**). The queue is unchanged.
+- cd14464: A button beside **Open preview to the side** exports the delivery the brief in front belongs to, with no dialog to fill (TYTO-490, ADR 0157 §6). The export box opens already running. The artwork goes to the delivery's root (its `exports` folder), and `result.json` and `template.txt` go beside the brief. For a brief in no delivery the button is greyed, with a tooltip saying why. The command is **Delivery: Export** (`delivery.export`), bindable in `keybindings.json`.
+
+### Patch Changes
+
+- d7c61ea: The app and `tyto` come with the test templates only (TYTO-436): `banner-roxo`, `carrossel-lista` and `promo-curso`. The house's production templates are fetched from their own repositories by a plugin file, which the manual's template gallery points to; without one, they are not listed. The tests that drew a removed template draw a remaining one.
+- 503f924: An installed plugin's code template reads files from its own folder (TYTO-478, ADR 0062). `context.files.image` and `context.files.svg` answer what the host read from the template's folder inside the installed plugin, and a declared image value's default resolves against the same folder; `tyto render` and the desktop embed those bytes in the export. **Breaking for plugins: the protocol is 12** (ADR 0149 point 4), because a template's `build` now carries a fourth argument, `ShippedFiles`, which a guest on 11 refuses. A path out of the folder, an absolute one or a file the host did not read answers `undefined`, and the folder's reader skips a link that leads out of it.
+- 6d431f6: An installed plugin's code template can no longer make an export embed a file it was not handed (TYTO-479, ADR 0062). Before, a frame naming an image by an absolute `path`, or by an `id` leading out of the brief's folder, drew any image on the disk with no diagnostic. Every picture in such a frame must now be one the host sent that call — the template's own folder, or a ref in its context such as a slot's picture or a declared value — and any other costs the frame as the new `E_PLUGIN_TEMPLATE_ASSET`, naming the plugin, the template and the asset. The protocol stays 12.
+- Updated dependencies [d7c61ea]
+- Updated dependencies [6ccfc2e]
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [993b9f6]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [5494e98]
+- Updated dependencies [cd14464]
+- Updated dependencies [cd14464]
+- Updated dependencies [0d828d3]
+- Updated dependencies [0d828d3]
+  - @tyto/templates@1.1.0
+  - @tyto/io@5.0.0
+  - @tyto/plugin-api@0.11.0
+  - @tyto/core@0.34.0
+  - @tyto/editor@0.12.0
+  - @tyto/export-html@0.7.7
+  - @tyto/export-svg@2.0.7
+  - @tyto/google-fonts@0.1.6
+  - @tyto/pipeline@0.12.3
+  - @tyto/theme-pack@0.1.6
+  - @tyto/brief-lang@0.7.5
+  - @tyto/fonts@0.4.0
+  - @tyto/recipe@0.1.5
+  - @tyto/template-lang@0.8.6
+
 ## 0.11.0
 
 ### Minor Changes
