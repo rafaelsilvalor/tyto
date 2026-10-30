@@ -63,6 +63,25 @@ Para dar uma tecla a uma predefinição, ligue o comando dela no [`keybindings.j
 
 Um perfil de trabalho também pode ter predefinições. Uma pasta que define uma predefinição com o mesmo nome substitui essa e mantém as outras do perfil. O `folder` de um perfil continua relativo à pasta aberta, então `"folder": "entregas"` é a `entregas` de cada campanha. Numa pasta em que você ainda não confiou, o `folder` de uma predefinição precisa ficar dentro dela: um que leva para fora aparece como `W_PROJECT_PATH_OUTSIDE` e essa predefinição fica de fora.
 
+## Entregas: uma pasta por peça de trabalho
+
+Uma **entrega** é uma pasta para uma peça de trabalho, com o nome do card, `assets/` e `editaveis/` dentro e o brief em `editaveis/`. [`tyto delivery new`](../command-line/deliveries.md) cria uma. A chave `delivery` diz onde e como, e cada parte dela é opcional:
+
+```jsonc
+{
+  "delivery": {
+    "parent": "entregas", // onde as entregas são criadas; a pasta aberta quando omitido
+    "folders": ["assets", "editaveis"], // criadas dentro de cada entrega nova
+    "brief": "editaveis", // a pasta em que o brief fica; "." é a própria entrega
+    "exports": ".", // onde a arte dela é gravada
+  },
+}
+```
+
+Os valores mostrados para `folders`, `brief` e `exports` são os que valem quando a chave é omitida. `parent` é relativo à pasta aberta; os outros três são relativos à entrega e precisam ficar dentro dela. `exports`, e `formats` e `types` (listas de tamanhos e de tipos de arquivo), servem para exportar uma entrega, o que esta versão ainda não faz: são lidos e conferidos, e nada os usa.
+
+Um perfil de trabalho também pode ter um `delivery`, e uma campanha é um perfil de trabalho: o `delivery` da própria pasta substitui uma parte de cada vez, então uma pasta que escreve só `"exports": "final"` mantém as `folders` do perfil. O `parent` de um perfil continua relativo à pasta aberta. Uma entrega sempre fica dentro da pasta aberta, confiável ou não: um `parent` que leva para fora aparece como `W_PROJECT_PATH_OUTSIDE` e vale o anterior. Uma parte que não é aceita aparece em **Problemas** e vale a anterior, ou a mostrada acima.
+
 ## Ver os arquivos dela: o Explorador
 
 Abrir uma pasta com **Arquivo ▸ Abrir pasta…** abre o **Explorador** na área esquerda, acima da fila. Ele lista os arquivos e pastas dela, pastas primeiro, e mostra o que há numa pasta quando você a abre. Um arquivo criado, renomeado ou apagado fora do Tyto aparece ou some sozinho, um instante depois.

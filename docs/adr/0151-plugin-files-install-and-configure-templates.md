@@ -345,6 +345,16 @@ plugin files, not here (ADR 0127 decision 4).
   configures nothing: its aliases do not load, the bare name renders the winner with the
   winner's own defaults, and `W_PLUGIN_FILE_TEMPLATE_SHADOWED` says so at the entry's name.
   The decision above is unchanged.
+- **2026-10-30, TYTO-472.** An annotated tag resolves to the commit it points at
+  (`FETCH_HEAD^{commit}`), as decision 3 already says. Earlier versions locked and cached it
+  by the tag object's id, and a copy without `.git` cannot tell a tag object's id from a
+  commit's, so each copy a fetch lands now has an empty `<commit>.commit` beside it. A pinned
+  entry whose cached copy has no such record is fetched once more by its locked id, never by
+  its ref: a tag object peels to its commit and the lock entry is rewritten to it, a commit
+  stays as it is. Neither is a moved ref, and nothing is reported. When that fetch fails, the
+  old copy loads as before and the next sync asks again; `tyto watch`, which never fetches,
+  loads it unchanged. The cleanup keeps a locked copy's record and drops the rest with their
+  copies. The decision above is unchanged.
 
 ## Rejected
 

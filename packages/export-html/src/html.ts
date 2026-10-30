@@ -36,6 +36,7 @@ import {
 } from '@tyto/core';
 
 import { cssIdSelector, escapeHtml, svgDataUri } from './escape.js';
+import { spreadShadowFilter } from './shadow-filter.js';
 import { type ShapeContext, type ShapeRegion, shapeDocument } from './svg-shapes.js';
 import {
   cssBackgroundSize,
@@ -104,6 +105,8 @@ interface Emit {
   readonly problems: Diagnostic[];
   /** Every node in the scene by id, with the matrix that puts it in its frame. */
   readonly nodes: ReadonlyMap<string, { node: SceneNode; transform: Matrix }>;
+  /** `<filter>` elements the stylesheet points at, for the shadows CSS cannot spread. */
+  readonly filters: string[];
 }
 
 function unsupported(emit: Emit, node: string, feature: string, detail: string): void {
@@ -182,8 +185,8 @@ function backgroundDeclarations(paint: Paint, emit: Emit, node: string): readonl
 
 function effectDeclarations(
   effects: readonly Effect[],
+  context: VisitContext,
   emit: Emit,
-  node: string,
 ): readonly string[] {
   const filters: string[] = [];
   const backdrops: string[] = [];
@@ -197,14 +200,21 @@ function effectDeclarations(
       backdrops.push(`blur(${cssLength(effect.radius)})`);
       continue;
     }
-    if (effect.spread !== 0) {
-      approximated(
-        emit,
-        node,
-        'a shadow with a spread',
-        `CSS drop-shadow() has no spread, so ${cssNumber(effect.spread)}px of it is not drawn`,
+    const inverse = effect.spread === 0 ? undefined : invertMatrix(context.transform);
+    if (inverse !== undefined) {
+      // Padded by everything that moves the shadow, so a node just outside the frame still
+      // casts into it — the region bounds what the filter reads as well as what it writes.
+      const reach =
+        Math.abs(effect.x) + Math.abs(effect.y) + Math.abs(effect.spread) + effect.blur * 2;
+      const id = `tyto-spread-${String(emit.filters.length)}`;
+      emit.filters.push(
+        spreadShadowFilter(effect, id, padRegion(frameRegion(inverse, emit.frame.size), reach)),
       );
+      filters.push(`url(#${id})`);
+      continue;
     }
+    // No spread, which `drop-shadow()` draws exactly — or a node scaled to nothing, which
+    // draws nothing, shadow included, and has no space to invert the frame into.
     filters.push(
       `drop-shadow(${cssLength(effect.x)} ${cssLength(effect.y)} ${cssLength(effect.blur)} ${cssColor(effect.color)})`,
     );
@@ -237,7 +247,11 @@ function maskRegion(node: SceneNode, inverse: Matrix, frame: Size): ShapeRegion 
         : node.size;
 
   if (box !== undefined) return { x: 0, y: 0, w: box.w, h: box.h };
+  return frameRegion(inverse, frame);
+}
 
+/** The frame mapped back into a node's own coordinates: everything of it that can show. */
+function frameRegion(inverse: Matrix, frame: Size): ShapeRegion {
   const corners = [
     { x: 0, y: 0 },
     { x: frame.w, y: 0 },
@@ -251,6 +265,15 @@ function maskRegion(node: SceneNode, inverse: Matrix, frame: Size): ShapeRegion 
   const minY = Math.min(...ys);
 
   return { x: minX, y: minY, w: Math.max(...xs) - minX, h: Math.max(...ys) - minY };
+}
+
+function padRegion(region: ShapeRegion, margin: number): ShapeRegion {
+  return {
+    x: region.x - margin,
+    y: region.y - margin,
+    w: region.w + margin * 2,
+    h: region.h + margin * 2,
+  };
 }
 
 function maskDeclarations(node: SceneNode, context: VisitContext, emit: Emit): readonly string[] {
@@ -326,7 +349,7 @@ function baseDeclarations(node: SceneNode, context: VisitContext, emit: Emit): s
     ...(node.blend === 'normal' ? [] : [`mix-blend-mode: ${node.blend}`]),
     ...(node.visible ? [] : ['display: none']),
     ...clipDeclarations(node, emit),
-    ...effectDeclarations(node.effects, emit, node.id),
+    ...effectDeclarations(node.effects, context, emit),
     ...maskDeclarations(node, context, emit),
   ];
 }
@@ -704,6 +727,8 @@ const RESET = [
   '.tyto-node > svg { display: block; width: 100%; height: 100%; }',
 ];
 
+const FILTERS_RULE = '.tyto-filters { position: absolute; }';
+
 const INDENT = '      ';
 
 function document(title: string, styles: readonly string[], body: string, pretty: boolean): string {
@@ -779,6 +804,7 @@ export function renderFrame(
     faces: new Map(),
     problems: [],
     nodes,
+    filters: [],
   };
 
   const visitor: SceneVisitor<string> = {
@@ -801,10 +827,17 @@ export function renderFrame(
     ...RESET,
     ...fontFaceRules(emit),
     `.tyto-frame { ${frameDeclarations(frame, emit).join('; ')}; }`,
+    ...(emit.filters.length === 0 ? [] : [FILTERS_RULE]),
     ...emit.rules,
   ];
 
-  const body = `<div class="tyto-frame">${children}</div>`;
+  // Before the frame and out of its flow, so it moves nothing. `display: none` would be
+  // simpler, and Firefox stops resolving `url(#…)` into an SVG that is not rendered.
+  const filters =
+    emit.filters.length === 0
+      ? ''
+      : `<svg class="tyto-filters" width="0" height="0" aria-hidden="true"><defs>${emit.filters.join('')}</defs></svg>`;
+  const body = `${filters}<div class="tyto-frame">${children}</div>`;
 
   return {
     html: document(frameId, styles, body, options.pretty ?? true),

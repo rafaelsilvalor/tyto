@@ -63,6 +63,25 @@ To give a preset a key, bind its command in [`keybindings.json`](../customize/ke
 
 A work profile can hold presets too. A folder that defines a preset of the same name replaces that one and keeps the profile's others. A profile's `folder` is still relative to the open folder, so `"folder": "entregas"` is each campaign's own `entregas`. In a folder you have not trusted, a preset's `folder` must stay inside it: one that leads outside is listed as `W_PROJECT_PATH_OUTSIDE` and that preset is left out.
 
+## Deliveries: one folder per piece of work
+
+A **delivery** is a folder for one piece of work, named after its ticket, with `assets/` and `editaveis/` inside and the brief in `editaveis/`. [`tyto delivery new`](../command-line/deliveries.md) makes one. The `delivery` key says where and how, and every part of it is optional:
+
+```jsonc
+{
+  "delivery": {
+    "parent": "entregas", // where deliveries are made; the open folder when left out
+    "folders": ["assets", "editaveis"], // made inside every new delivery
+    "brief": "editaveis", // the folder the brief is kept in; "." is the delivery itself
+    "exports": ".", // where its artwork is written
+  },
+}
+```
+
+The values shown for `folders`, `brief` and `exports` are what applies when the key is left out. `parent` is relative to the open folder; the other three are relative to the delivery and must stay inside it. `exports`, and `formats` and `types` (lists of sizes and file types), are for exporting a delivery, which this version does not do yet: they are read and checked, and nothing uses them.
+
+A work profile can hold a `delivery` too, and a campaign is a work profile: the folder's own `delivery` overrides one part at a time, so a folder that writes only `"exports": "final"` keeps the profile's `folders`. A profile's `parent` is still relative to the open folder. A delivery always stays inside the open folder, trusted or not: a `parent` that leads outside is listed as `W_PROJECT_PATH_OUTSIDE` and the one before it applies. A part that is not accepted is listed in **Problems** and the one before it, or the one shown above, applies.
+
 ## Browse its files: the Explorer
 
 Opening a folder with **File ▸ Open Folder…** opens the **Explorer** in the left area, above the queue. It lists the folder's files and folders, folders first, and shows a folder's contents when you open it. A file made, renamed or deleted outside Tyto appears or goes away on its own, a moment later.

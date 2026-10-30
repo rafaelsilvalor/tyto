@@ -161,6 +161,8 @@ non-zero.
 | `W_PROJECT_PROFILE_MISSING` | warning | no | The work profile the project file names is not there, so no profile is read. |
 | `W_PROFILE_NESTED` | warning | no | A work profile names another profile, which is ignored: profiles are one level deep. |
 | `W_PROJECT_PRESET_NO_FOLDER` | warning | no | An export preset names no folder and no sheet sets 'output', so the preset is left out. |
+| `W_DELIVERY_NAME_INVALID` | warning | no | A delivery name cannot be a folder name, so no delivery is made. |
+| `E_DELIVERY_BRIEF_EXISTS` | error | yes | A new delivery's brief would replace a brief that is already there. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 | `E_RECIPE_SYNTAX` | error | yes | A line of a recipe does not match the recipe format. |
 | `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
@@ -293,6 +295,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_SNIPPETS_SYNTAX` | no | The last file that read without one stays in effect. |
 | `E_THEME_INVALID` | no | The base theme of the same kind replaces it, so the window keeps every colour. |
 | `E_PROJECT_SYNTAX` | no | Every key that parsed still applies, and the brief renders without the rest. |
+| `E_DELIVERY_BRIEF_EXISTS` | yes | The run that refuses changes nothing: not even the folders the delivery lacks are made. |
 | `E_TRUST_FILE` | no | Every source opens restricted instead, which is what an absent approval means. |
 | `E_RECIPE_SYNTAX` | yes | A recipe that does not parse has no chain of cells to run. |
 | `E_RECIPE_PARAM` | yes | Every cell may read the parameter, so none of them can run without it. |
@@ -1513,6 +1516,20 @@ The project file cannot be read here: {problem}.
 
 Parameters: `problem`
 
+### `E_DELIVERY_BRIEF_EXISTS`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md`
+
+A new delivery's brief would replace a brief that is already there.
+
+The run that refuses changes nothing: not even the folders the delivery lacks are made.
+
+```
+'{path}' already exists, and a delivery's brief is never overwritten; nothing is written.
+```
+
+Parameters: `path`
+
 ### `E_TRUST_FILE`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md`
@@ -2718,6 +2735,20 @@ Export preset '{preset}' names no folder and the project sets no 'output'; it is
 ```
 
 Parameters: `preset`
+
+### `W_DELIVERY_NAME_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md`
+
+A delivery name cannot be a folder name, so no delivery is made.
+
+Nothing is written, and nothing else is affected: the name is the only thing refused.
+
+```
+The delivery name '{name}' {problem}; no delivery is made.
+```
+
+Parameters: `name`, `problem`
 
 ### `W_RECIPE_WHERE_EMPTY`
 

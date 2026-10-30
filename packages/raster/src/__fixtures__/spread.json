@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "spread",
+      "label": "A shadow's spread on every kind of node that can carry one (ADR 0156)",
+      "frames": [
+        {
+          "format": "square",
+          "size": { "w": 200, "h": 200 },
+          "background": { "kind": "solid", "color": { "r": 240, "g": 236, "b": 228 } },
+          "children": [
+            {
+              "kind": "rect",
+              "id": "card",
+              "name": "a rounded rect, the case box-shadow would also have drawn",
+              "transform": { "x": 24, "y": 24 },
+              "size": { "w": 64, "h": 44 },
+              "radius": [8, 8, 8, 8],
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } },
+              "effects": [
+                {
+                  "kind": "shadow",
+                  "x": 4,
+                  "y": 6,
+                  "blur": 8,
+                  "spread": 6,
+                  "color": { "r": 60, "g": 20, "b": 80, "a": 0.6 }
+                }
+              ]
+            },
+            {
+              "kind": "vector",
+              "id": "arrow",
+              "name": "a path, whose shadow follows the triangle and not its box",
+              "transform": { "x": 118, "y": 20 },
+              "geometry": { "kind": "path", "d": "M8 8 L52 30 L8 52 Z" },
+              "size": { "w": 60, "h": 60 },
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 89, "b": 0 } },
+              "effects": [
+                {
+                  "kind": "shadow",
+                  "x": 0,
+                  "y": 0,
+                  "blur": 0,
+                  "spread": 5,
+                  "color": { "r": 0, "g": 0, "b": 0, "a": 1 }
+                }
+              ]
+            },
+            {
+              "kind": "group",
+              "id": "pair",
+              "name": "a group, whose element is a 0×0 box the filter region cannot come from",
+              "transform": { "x": 28, "y": 120 },
+              "effects": [
+                {
+                  "kind": "shadow",
+                  "x": 3,
+                  "y": 3,
+                  "blur": 4,
+                  "spread": 4,
+                  "color": { "r": 0, "g": 90, "b": 160, "a": 0.8 }
+                }
+              ],
+              "children": [
+                {
+                  "kind": "rect",
+                  "id": "pair-left",
+                  "transform": { "x": 0, "y": 0 },
+                  "size": { "w": 24, "h": 48 },
+                  "radius": [0, 0, 0, 0],
+                  "fill": { "kind": "solid", "color": { "r": 0, "g": 200, "b": 180 } }
+                },
+                {
+                  "kind": "rect",
+                  "id": "pair-right",
+                  "transform": { "x": 36, "y": 12 },
+                  "size": { "w": 24, "h": 36 },
+                  "radius": [0, 0, 0, 0],
+                  "fill": { "kind": "solid", "color": { "r": 0, "g": 200, "b": 180 } }
+                }
+              ]
+            },
+            {
+              "kind": "rect",
+              "id": "inset",
+              "name": "a negative spread, which shrinks the shadow under a translucent fill",
+              "transform": { "x": 118, "y": 112 },
+              "size": { "w": 56, "h": 56 },
+              "radius": [0, 0, 0, 0],
+              "fill": { "kind": "solid", "color": { "r": 255, "g": 189, "b": 0, "a": 0.5 } },
+              "effects": [
+                {
+                  "kind": "shadow",
+                  "x": 0,
+                  "y": 10,
+                  "blur": 6,
+                  "spread": -8,
+                  "color": { "r": 0, "g": 0, "b": 0, "a": 0.9 }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fonts": [],
+  "assets": []
+}

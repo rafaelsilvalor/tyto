@@ -2,7 +2,7 @@
 
 Status: accepted · 2026-10-21 · TYTO-271 · fulfils the second trigger of ADR 0079, beside ADR
 0011, ADR 0032, ADR 0049 and ADR 0073; the gate TYTO-261, TYTO-278 and TYTO-347 pass; ADR 0126
-adds the export presets row to the table below
+adds the export presets row to the table below, and ADR 0157 the delivery folder row
 
 ## Context
 
@@ -61,6 +61,7 @@ per-source content joins it, or the inert list, in the pull request that adds it
 | Plugin-owned sections of `project.json` or a profile                        | gated     |
 | Asset, template, font and output folder keys of `project.json` or a profile | inert     |
 | Export presets of `project.json` or a profile (ADR 0126)                    | inert     |
+| The delivery folder key of `project.json` or a profile (ADR 0157)           | inert     |
 | Markup templates, fonts, images and briefs inside those folders             | inert     |
 | A `template.ts` anywhere in a source                                        | never run |
 
