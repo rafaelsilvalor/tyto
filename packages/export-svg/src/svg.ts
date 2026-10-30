@@ -58,8 +58,9 @@ import {
  * it is given: a node is a `<g>` carrying its own matrix, and the browser — or Figma, or
  * Illustrator — composes the rest. Where it differs from `export-html` is what the format
  * can say precisely. A stroke aligned `inside` is exact here and approximate there; a
- * shadow's spread is drawn here and reported there (ADR 0018). It runs the other way once:
- * SVG has no backdrop filter and no line breaking, and both are reported.
+ * shadow's spread is drawn by both, through the same filter primitives (ADR 0156). It runs
+ * the other way once: SVG has no backdrop filter and no line breaking, and both are
+ * reported.
  *
  * Masks are the one place the walk is not enough. A mask is resolved when the *masked*
  * node is visited and may name a node the walk has not reached yet, so every node's
