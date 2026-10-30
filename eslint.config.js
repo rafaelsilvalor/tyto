@@ -130,6 +130,15 @@ const NO_DOM_IN_PURE =
 
 const NO_DOM_IN_NODE = 'Node packages must not touch DOM globals; use a Rasterizer adapter.';
 
+const NO_COMMAND_LINE_IN_PURE =
+  'Pure packages must not import @tyto/command-line: it is the tyto command tree, a Node ' +
+  'composition layer both apps share (ADR 0159, note of 2026-10-30).';
+
+const COMMAND_LINE_CHOOSES_NO_ADAPTER =
+  '@tyto/command-line chooses no Chromium and no plugin launcher: the app fills ' +
+  '`environment.rasterizer()` and `environment.launch` (ADR 0159, note of 2026-10-30). ' +
+  '`fork` lives in plugins/plugin-process.ts alone, for apps/cli to choose.';
+
 const NO_NODE_GLOBALS_IN_PURE =
   'Pure packages (ADR 0010) must not touch Node globals. Take the value as an argument or through ' +
   'a port from @tyto/core.';
@@ -218,7 +227,9 @@ export default tseslint.config(
     files: sourcesIn([...PURE_PACKAGES, ...SHARED_PACKAGES]),
     languageOptions: { globals: {} },
     rules: {
-      ...restrictedImports(NO_NODE_IN_PURE),
+      ...restrictedImports(NO_NODE_IN_PURE, [
+        { name: '@tyto/command-line', message: NO_COMMAND_LINE_IN_PURE, allowTypeImports: false },
+      ]),
       ...restrictedGlobals([DOM_GLOBALS, NO_DOM_IN_PURE], [NODE_GLOBALS, NO_NODE_GLOBALS_IN_PURE]),
     },
   },
@@ -312,6 +323,37 @@ export default tseslint.config(
               message: NO_EXPORTERS_IN_PIPELINE,
               allowTypeImports: false,
             },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    name: 'boundary/command-line-chooses-no-adapter',
+    // Tests are exempt: they start real plugins through the launcher the package holds.
+    files: ['packages/command-line/src/**/*.ts'],
+    ignores: [
+      'packages/command-line/src/plugins/plugin-process.ts',
+      'packages/command-line/src/**/*.test.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'playwright', message: COMMAND_LINE_CHOOSES_NO_ADAPTER },
+            { name: 'playwright-core', message: COMMAND_LINE_CHOOSES_NO_ADAPTER },
+            {
+              name: '@tyto/raster',
+              importNames: ['createPlaywrightRasterizer'],
+              message: COMMAND_LINE_CHOOSES_NO_ADAPTER,
+            },
+            ...['node:child_process', 'child_process'].map((name) => ({
+              name,
+              importNames: ['fork'],
+              message: COMMAND_LINE_CHOOSES_NO_ADAPTER,
+            })),
           ],
         },
       ],
