@@ -81,6 +81,19 @@ describe('the folder list', () => {
     expect(rows[0]).toMatchObject({ name: 'promo', current: true });
   });
 
+  it('names a folder by its platform’s separators, whatever machine runs this', async () => {
+    // Injected rather than read from `node:path`: Linux CI must name a Windows path as Windows
+    // does, and a backslash in a posix name is part of the name.
+    const windows = service(new Set(['D:\\trabalho\\templates']), 'win32');
+    await windows.remember('D:\\trabalho\\templates');
+    expect((await windows.listing(null))[0]?.name).toBe('templates');
+
+    rmSync(file, { force: true });
+    const posix = service(new Set(['/srv/odd\\name']), 'linux');
+    await posix.remember('/srv/odd\\name');
+    expect((await posix.listing(null))[0]?.name).toBe('odd\\name');
+  });
+
   it('keeps case apart where the disk does', async () => {
     const present = new Set(['/work/Promo', '/work/promo']);
     const recent = service(present);
