@@ -1,7 +1,7 @@
 # Workspace folder
 
 ::: info How this page was checked
-Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, in a second folder whose `assets` led outside it, and on the same day in a folder naming a work profile kept in `~/.tyto/profiles/` and in one naming a profile file inside it whose `assets` led outside the profile's folder. Menus and labels below are the English window's. The Explorer's header buttons were checked on 2026-10-23 on a development build, in the light and the dark theme. Export presets were checked on 2026-10-23 on a development build, from the command bar and from a key bound in `keybindings.json`.
+Every step was followed on 2026-10-21 on a development build of Tyto on Windows 11, in a folder holding a `.tyto/project.json`, a template in `tpl/`, an image in `art/` and two briefs in `briefs/`, in a second folder whose `assets` led outside it, and on the same day in a folder naming a work profile kept in `~/.tyto/profiles/` and in one naming a profile file inside it whose `assets` led outside the profile's folder. Menus and labels below are the English window's. The Explorer's header buttons were checked on 2026-10-23 on a development build, in the light and the dark theme. Export presets were checked on 2026-10-23 on a development build, from the command bar and from a key bound in `keybindings.json`. **Delivery: New…** was checked on 2026-10-30 on a development build, with a name refused, a name accepted, **No template**, and a brief already there.
 :::
 
 A workspace folder is a project folder with a `.tyto/project.json` in it. The file says where the project keeps its templates, images and fonts, and where its exports go:
@@ -65,7 +65,11 @@ A work profile can hold presets too. A folder that defines a preset of the same 
 
 ## Deliveries: one folder per piece of work
 
-A **delivery** is a folder for one piece of work, named after its ticket, with `assets/` and `editaveis/` inside and the brief in `editaveis/`. [`tyto delivery new`](../command-line/deliveries.md) makes one. The `delivery` key says where and how, and every part of it is optional:
+A **delivery** is a folder for one piece of work, named after its ticket, with `assets/` and `editaveis/` inside and the brief in `editaveis/`.
+
+**File ▸ Delivery: New…**, or the same command from the command bar, makes one in the open folder. The command bar asks for its name, and says while you type why a name cannot be a folder's — a `:` or a `/`, say — so Enter does nothing until it can. Then it lists the templates, as **New brief from template…** does, with **No template** first. The delivery's brief opens in a new tab and is selected in the Explorer: with a template it holds the template's skeleton, and with none it opens with the "/" menu, where choosing a template writes its skeleton. A brief already there is never overwritten: the status bar says why nothing was made, and nothing is written. The command is greyed while no folder is open, and you can bind it in [`keybindings.json`](../customize/keybindings-json.md) as `delivery.new`. [`tyto delivery new`](../command-line/deliveries.md) does the same from the command line.
+
+The `delivery` key says where and how, and every part of it is optional:
 
 ```jsonc
 {

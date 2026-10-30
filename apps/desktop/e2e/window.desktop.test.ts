@@ -268,6 +268,9 @@ describe('the bridge', () => {
       'credentials:delete',
       // No `credentials:get` since TYTO-187: nothing in the renderer may read a secret back.
       'credentials:set',
+      // TYTO-489, ADR 0157: Delivery: New…, a name and a text, never a path. Exercised by
+      // `e2e/workspace.desktop.test.ts`.
+      'delivery:new',
       'dialog:confirm',
       'dialog:save-changes',
       // TYTO-333: "Editor: turn vim mode on or off", which writes the `vimMode` setting.
@@ -816,6 +819,15 @@ describe('switching the language', () => {
     // seconds. `e2e/format-brief.desktop.test.ts` runs it.
     'command.editor.formatBrief',
     'formatBrief.refused',
+    // TYTO-489: Delivery: New… in the bar, its two questions, and the refusals the status bar
+    // shows for a few seconds. `src/renderer/delivery-new.test.ts` drives them, and
+    // `e2e/workspace.desktop.test.ts` runs the command.
+    'command.delivery.new',
+    'delivery.name.placeholder',
+    'delivery.template.placeholder',
+    'delivery.template.none',
+    'delivery.refused',
+    'delivery.noFolder',
     'slash.section.templates',
     'slash.template.new',
     'slash.template.set',

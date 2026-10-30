@@ -222,6 +222,21 @@ export class ExplorerPanel extends DockedPanel {
     void this.relist(foldersToRelist(this.tree));
   }
 
+  /**
+   * Opens the folders on the way to an entry main just wrote and selects it (TYTO-489): `ids`
+   * run from the top of the folder down to the entry, as main answered them. The folders are
+   * listed again, so the new ones are on screen, and the focus stays where it is.
+   */
+  reveal(ids: readonly string[]): void {
+    const entry = ids[ids.length - 1];
+    if (entry === undefined || this.folderName === null || this.folderName === undefined) return;
+    const folders = ids.slice(0, -1);
+    let tree = this.tree;
+    for (const folder of folders) tree = withExpanded(tree, folder, true);
+    this.tree = withSelected(tree, entry);
+    void this.relist([null, ...folders]);
+  }
+
   /** The field of a new file or folder, where `startCreating` puts it. */
   startNew(kind: 'file' | 'folder', parent?: string | null): void {
     if (this.folderName === null || this.folderName === undefined) return;

@@ -4,7 +4,7 @@
 Cada comando foi executado em 2026-10-30 num build de desenvolvimento da branch que o criou (TYTO-489) no Windows 11, numa pasta de trabalho cujo `.tyto/project.json` era `{ "delivery": { "parent": "entregas" } }`. As saídas abaixo foram copiadas dessas execuções.
 :::
 
-Uma **entrega** é uma pasta por peça de trabalho, com o nome do card: o brief, as imagens dele e, depois, a arte final, guardados juntos dentro do projeto. `tyto delivery new` cria uma.
+Uma **entrega** é uma pasta por peça de trabalho, com o nome do card: o brief, as imagens dele e, depois, a arte final, guardados juntos dentro do projeto. `tyto delivery new` cria uma; na janela, **Arquivo ▸ Entrega: nova…** cria ([Pasta de trabalho](../editor/workspace-folder.md#entregas-uma-pasta-por-peça-de-trabalho)).
 
 ## Criar uma entrega
 
@@ -40,6 +40,8 @@ Um brief que já existe **nunca é sobrescrito**. O comando para, não escreve n
 $ tyto delivery new mca-66910_simule-sua-nota-da-2ª-fase
 error E_DELIVERY_BRIEF_EXISTS 'entregas\mca-66910_simule-sua-nota-da-2ª-fase\editaveis\mca-66910_simule-sua-nota-da-2ª-fase.brief' already exists, and a delivery's brief is never overwritten; nothing is written.
 ```
+
+Uma entrega sempre fica dentro da pasta de trabalho. Uma que um atalho dentro da pasta levaria para fora é recusada com `E_DELIVERY_PATH_OUTSIDE`, e nada é escrito.
 
 ## Que nomes funcionam
 

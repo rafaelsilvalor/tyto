@@ -385,6 +385,12 @@ export const ptBR: Catalogue = {
   'command.editor.formatBrief': 'Arrumar brief',
   'formatBrief.refused':
     'Arrumar brief: nada mudou, o brief tem um erro de sintaxe. Corrija (veja os problemas) e tente de novo.',
+  'command.delivery.new': 'Entrega: nova…',
+  'delivery.name.placeholder': 'O nome da entrega: a chave do card e um título',
+  'delivery.template.placeholder': 'Começar o brief dela de um template',
+  'delivery.template.none': 'Sem template',
+  'delivery.refused': 'Nenhuma entrega foi criada. {problem}',
+  'delivery.noFolder': 'Abra uma pasta antes: a entrega é criada dentro da pasta aberta.',
   'slash.section.templates': 'Templates',
   'slash.section.snippets': 'Trechos',
   'slash.template.new': 'novo brief com o esqueleto',

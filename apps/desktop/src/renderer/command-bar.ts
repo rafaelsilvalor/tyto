@@ -57,6 +57,21 @@ export interface CommandBarPick {
 }
 
 /**
+ * A line of text asked for, which the bar takes in place of the commands (TYTO-489): a new
+ * delivery's name. The same input and keys; Enter accepts what was typed. `check` answers why
+ * the text cannot be accepted, shown under the input as it is typed, and Enter does nothing
+ * while it answers something. The check is for the person: whoever receives the text checks it
+ * again.
+ */
+export interface CommandBarAsk {
+  readonly placeholder: string;
+  readonly check: (text: string) => string | undefined;
+  readonly accept: (text: string) => void;
+  /** The bar closed with nothing accepted: Escape, the bar's own key. */
+  readonly cancel: () => void;
+}
+
+/**
  * Loose matching, because a person types what they remember rather than what is written.
  *
  * Accents folded and case ignored, so `previa` finds "Prévia: aumentar" — on a Portuguese
@@ -91,6 +106,7 @@ export class CommandBar extends LitElement {
     query: { state: true },
     active: { state: true },
     picking: { state: true },
+    asking: { state: true },
   };
 
   declare open: boolean;
@@ -115,6 +131,8 @@ export class CommandBar extends LitElement {
   declare active: number;
   /** The list being chosen from, when the bar is a picker rather than the commands. */
   declare picking: CommandBarPick | undefined;
+  /** The text being asked for, when the bar is a question rather than a list. */
+  declare asking: CommandBarAsk | undefined;
 
   /** The entry the picker last reported as highlighted, so each move is reported once. */
   private highlighted: string | undefined;
@@ -132,6 +150,7 @@ export class CommandBar extends LitElement {
     this.query = '';
     this.active = 0;
     this.picking = undefined;
+    this.asking = undefined;
   }
 
   /** Light DOM, so `shell.css` styles it — the reasoning is in ADR 0024. */
@@ -161,7 +180,14 @@ export class CommandBar extends LitElement {
     this.query = '';
     this.active = 0;
     this.picking = undefined;
+    this.asking = undefined;
     this.open = true;
+  }
+
+  /** Opens the bar as a question: what is typed is the answer, once `check` lets it through. */
+  ask(request: CommandBarAsk): void {
+    this.show();
+    this.asking = request;
   }
 
   /**
@@ -182,12 +208,26 @@ export class CommandBar extends LitElement {
    */
   dismiss(): void {
     const picking = this.picking;
+    const asking = this.asking;
     this.picking = undefined;
+    this.asking = undefined;
     this.open = false;
     this.returnFocusTo?.focus();
     this.returnFocusTo = undefined;
     this.close();
     picking?.cancel();
+    asking?.cancel();
+  }
+
+  /** Enter on a question: the text goes to the asker, once nothing is wrong with it. */
+  private accept(): void {
+    const asking = this.asking;
+    if (asking === undefined || asking.check(this.query) !== undefined) return;
+    const text = this.query;
+    this.asking = undefined;
+    // Closed first, for `choose`'s reason: what the answer opens takes the focus.
+    this.dismiss();
+    asking.accept(text);
   }
 
   private choose(id: string): void {
@@ -207,6 +247,14 @@ export class CommandBar extends LitElement {
     if (event.key === 'Escape') {
       event.preventDefault();
       this.dismiss();
+      return;
+    }
+
+    if (this.asking !== undefined) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        this.accept();
+      }
       return;
     }
 
@@ -284,12 +332,56 @@ export class CommandBar extends LitElement {
     </li>`;
   }
 
+  /**
+   * A question's panel: the input and, while the text cannot be accepted, why. The reason is a
+   * live region, so a screen reader hears it as it changes without the focus leaving the input;
+   * nothing is shown for an empty input, which is not a mistake yet.
+   */
+  private renderAsk(asking: CommandBarAsk, placeholder: string): TemplateResult {
+    const problem = this.query === '' ? undefined : asking.check(this.query);
+    return html`<div
+      class="command-bar__panel command-bar__panel--ask"
+      role="dialog"
+      aria-modal="true"
+      aria-label=${placeholder}
+      @keydown=${(event: KeyboardEvent) => {
+        this.onKeyDown(event);
+      }}
+    >
+      <input
+        class="command-bar__input"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        aria-invalid=${problem === undefined ? 'false' : 'true'}
+        aria-describedby="command-bar-problem"
+        placeholder=${placeholder}
+        .value=${this.query}
+        @input=${(event: Event) => {
+          const input = event.target;
+          if (input instanceof HTMLInputElement) this.query = input.value;
+        }}
+      />
+      <p
+        class="command-bar__problem"
+        id="command-bar-problem"
+        role="status"
+        aria-live="polite"
+        data-empty=${problem === undefined ? 'true' : 'false'}
+      >
+        ${problem ?? nothing}
+      </p>
+    </div>`;
+  }
+
   protected override render(): unknown {
     if (!this.open) return nothing;
 
     const visible = this.visible;
     const say = translate.bind(null, this.locale);
-    const placeholder = this.picking?.placeholder ?? say('command.bar.placeholder');
+    const placeholder =
+      this.asking?.placeholder ?? this.picking?.placeholder ?? say('command.bar.placeholder');
+    if (this.asking !== undefined) return this.renderAsk(this.asking, placeholder);
 
     return html`<div
       class="command-bar__panel"

@@ -144,6 +144,18 @@ describe('listing the open folder', () => {
     expect(again?.id).toBe(slides?.id);
   });
 
+  it('answers the ids down to a file it just wrote, the ones a listing gives them (TYTO-489)', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+
+    const ids = explorer.idsTo(join(work, 'slides', 'capa.brief'));
+    const slides = await entryIdOf(explorer, 'slides');
+
+    expect(ids).toEqual([slides, await entryIdOf(explorer, 'capa.brief', slides)]);
+    expect(explorer.idsTo(join(scratch, 'elsewhere.brief'))).toBeUndefined();
+    expect(explorer.idsTo(work)).toBeUndefined();
+  });
+
   it('counts what it leaves out past the cap', async () => {
     const explorer = createExplorerService({
       onChange: () => undefined,

@@ -448,6 +448,13 @@ textarea {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  /*
+   * One line and at most half the bar (TYTO-489): a long notice wrapped, and at its full width it
+   * shrank the status bar's items to nothing, which then drew over it. The ellipsis cuts the
+   * rest, which the notice's title and the screen reader still have whole.
+   */
+  max-width: 50%;
+  white-space: nowrap;
   font-size: var(--tyto-text-sm);
 }
 
@@ -1563,6 +1570,29 @@ tyto-command-bar[open] {
   padding: var(--tyto-space-5);
   color: var(--tyto-text-muted);
   font-size: var(--tyto-text-sm);
+}
+
+/*
+ * A question (TYTO-489) is as tall as what it holds: the host stretches its panel, which a list
+ * fills and a single input does not, so without this the input sits on an empty box.
+ */
+.command-bar__panel--ask {
+  align-self: flex-start;
+}
+
+/*
+ * A question's reason the text is not accepted (TYTO-489). Empty, it takes no room but stays in
+ * the tree, so a screen reader hears the first reason that appears in it.
+ */
+.command-bar__problem {
+  margin: 0;
+  padding: var(--tyto-space-5);
+  color: var(--tyto-error);
+  font-size: var(--tyto-text-sm);
+}
+
+.command-bar__problem[data-empty='true'] {
+  padding: 0;
 }
 
 /*

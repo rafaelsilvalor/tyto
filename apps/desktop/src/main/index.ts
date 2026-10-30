@@ -102,6 +102,7 @@ import { createRecipeRunner } from './recipe-runner.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
+import { createDeliveryService } from './delivery.js';
 import { createExplorerService } from './explorer.js';
 import { createExitGuard, mayUnload } from './quit.js';
 import { createLiveTextFile } from './live-text-file.js';
@@ -1433,6 +1434,7 @@ async function start(): Promise<void> {
     },
     pluginFiles: { sync: (update) => syncPluginFiles(update) },
     explorer,
+    delivery: createDeliveryService({ layout: () => workspace.deliveryLayout() }),
     queue: {
       service: queue,
       // `createDirectory`, for the export's reason: a queue folder may not exist yet.

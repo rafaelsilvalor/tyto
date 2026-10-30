@@ -5,6 +5,7 @@ import {
   type Diagnostic,
   PROFILES_DIRECTORY,
   PROFILE_FILE_NAME,
+  type ResolvedDelivery,
   type Result,
   type TrustStore,
   createLineIndex,
@@ -117,6 +118,11 @@ export interface WorkspaceService {
    * plugin, and in a restricted folder, whose sections `loadWorkspace` already withheld.
    */
   sectionFor(recipeDirectory: string | undefined, plugin: string): unknown;
+  /**
+   * The open folder's delivery layout and the folder it must stay inside (TYTO-489, ADR 0157);
+   * `undefined` with nothing open, where the window makes no delivery.
+   */
+  deliveryLayout(): { readonly root: string; readonly delivery: ResolvedDelivery } | undefined;
 }
 
 /** The places of the resolved project: what a restricted folder refused is not among them. */
@@ -305,6 +311,12 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       if (!isInside(open.folder, recipeDirectory)) return undefined;
       const sections: Readonly<Record<string, unknown>> = open.project.sections;
       return Object.prototype.hasOwnProperty.call(sections, plugin) ? sections[plugin] : undefined;
+    },
+
+    deliveryLayout() {
+      return open === undefined
+        ? undefined
+        : { root: open.folder, delivery: open.project.delivery };
     },
   };
 }

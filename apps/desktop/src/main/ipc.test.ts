@@ -189,6 +189,8 @@ const explorerFiles = () => {
         : entryId === 'e-image'
           ? '/work/promo/foto.png'
           : undefined,
+    idsTo: (path: string) =>
+      path.startsWith('/work/promo/') ? ['e-mca', 'e-edit', 'e-brief'] : undefined,
   };
 };
 
@@ -730,6 +732,15 @@ const dependencies = () => {
     log: recordingLog(),
     credentials: keychain,
     documents: documents(),
+    // TYTO-489: its plan and its writes are `delivery.test.ts`'s; here it only has to be wired.
+    delivery: {
+      create: (name: string) =>
+        Promise.resolve(
+          name === 'mca-1'
+            ? { ok: true as const, brief: '/work/promo/mca-1/editaveis/mca-1.brief' }
+            : { ok: false as const, code: 'W_DELIVERY_NAME_INVALID', message: 'refused' },
+        ),
+    },
     exit: exitAnswers(),
     exports: exportService(),
     folders: folderDialogs(),
@@ -1924,6 +1935,37 @@ describe('the explorer image channel', () => {
         dataUrl: 'javascript:alert(1)',
       })) as never);
     await expect(leaky({ entryId: 'e-image' })).rejects.toThrow(/response does not match/u);
+  });
+});
+
+/** TYTO-489, ADR 0157 §5: a new delivery opens its brief and says where it is in the explorer. */
+describe('delivery:new', () => {
+  it('opens the brief in the tab it was given and answers the ids down to it', async () => {
+    const create = guard('delivery:new', createHandlers(dependencies())['delivery:new']);
+    await expect(
+      create({ documentId: 'document-9', name: 'mca-1', brief: '' }),
+    ).resolves.toMatchObject({
+      ok: true,
+      documentId: 'document-9',
+      document: { path: '/work/promo/mca-1/editaveis/mca-1.brief' },
+      reveal: ['e-mca', 'e-edit', 'e-brief'],
+    });
+  });
+
+  it('passes a refusal on as its code and message, opening nothing', async () => {
+    const create = guard('delivery:new', createHandlers(dependencies())['delivery:new']);
+    await expect(create({ documentId: 'document-9', name: 'mca:1', brief: '' })).resolves.toEqual({
+      ok: false,
+      code: 'W_DELIVERY_NAME_INVALID',
+      message: 'refused',
+    });
+  });
+
+  it('refuses a request with a key the contract does not name, such as a path', async () => {
+    const create = guard('delivery:new', createHandlers(dependencies())['delivery:new']);
+    await expect(
+      create({ documentId: 'document-9', name: 'mca-1', brief: '', path: 'C:\\x' } as never),
+    ).rejects.toThrow();
   });
 });
 

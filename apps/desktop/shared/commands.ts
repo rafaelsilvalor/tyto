@@ -41,6 +41,8 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'document.new', label: 'command.document.new' },
     // TYTO-275. Beside New: the same verb, with a template's skeleton in the tab.
     { id: 'document.newFromTemplate', label: 'command.document.newFromTemplate' },
+    // TYTO-489. Beside them: a new piece of work, its folder and its brief (ADR 0157).
+    { id: 'delivery.new', label: 'command.delivery.new' },
     { id: 'editor.open', label: 'command.file.open' },
     // TYTO-278. Beside Open: a folder is opened the way a file is (ADR 0113).
     { id: 'workspace.openFolder', label: 'command.workspace.openFolder' },

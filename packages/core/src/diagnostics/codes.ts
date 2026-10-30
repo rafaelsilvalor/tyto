@@ -1487,6 +1487,18 @@ export const diagnosticCodes = {
     fatality:
       'The run that refuses changes nothing: not even the folders the delivery lacks are made.',
   },
+  // ADR 0157 §3, after realpath: a link inside the workspace that lands outside. Its own code and
+  // not `W_PROJECT_PATH_OUTSIDE`, whose text is about an untrusted folder's key: a delivery is
+  // confined whether the folder is trusted or not, and this refuses a run, not a key (TYTO-489).
+  E_DELIVERY_PATH_OUTSIDE: {
+    severity: 'error',
+    summary: 'A new delivery would be made outside the workspace folder, through a link.',
+    template:
+      "'{path}' leads outside the workspace folder, where a delivery must stay; nothing is written.",
+    spec: 'docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md',
+    fatal: true,
+    fatality: 'Nothing is written: a delivery is part of the project, trusted or not.',
+  },
   E_TRUST_FILE: {
     severity: 'error',
     summary: 'TYTO_HOME/trust.json cannot be read or written.',
