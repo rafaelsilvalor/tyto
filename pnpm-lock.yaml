@@ -511,6 +511,9 @@ importers:
       '@tyto/export-html':
         specifier: workspace:*
         version: link:../export-html
+      '@tyto/template-lang':
+        specifier: workspace:*
+        version: link:../template-lang
 
   packages/template-lang:
     dependencies:

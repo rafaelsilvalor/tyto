@@ -4,9 +4,9 @@
  *
  * A plugin or a template in its own repository depends on `@tyto/plugin-api` and
  * `@tyto/template-kit`, and a template of the house on `@tyto/house-style` too (ADR 0151).
- * Those three are the contract; `@tyto/core`, `@tyto/recipe`, `@tyto/brief-lang` and
- * `@tyto/export-html` are what they import (the last two for `@tyto/template-kit/testing`,
- * ADR 0152), so they are published beside them rather than bundled into them — a bundled
+ * Those three are the contract; `@tyto/core`, `@tyto/recipe`, `@tyto/brief-lang`,
+ * `@tyto/template-lang` and `@tyto/export-html` are what they import (the last three for
+ * `@tyto/template-kit/testing`, ADR 0152), so they are published beside them rather than bundled into them — a bundled
  * core would be two copies of `Scene` the day a template installs both packages.
  *
  * **The workspace keeps `@tyto/*`; what is published is renamed.** GitHub Packages scopes a
@@ -52,6 +52,7 @@ export const CONTRACT_PACKAGES = [
   { name: '@tyto/recipe', directory: 'packages/recipe' },
   { name: '@tyto/plugin-api', directory: 'packages/plugin-api' },
   { name: '@tyto/brief-lang', directory: 'packages/brief-lang' },
+  { name: '@tyto/template-lang', directory: 'packages/template-lang' },
   { name: '@tyto/export-html', directory: 'packages/export-html' },
   { name: '@tyto/template-kit', directory: 'packages/template-kit' },
   { name: '@tyto/house-style', directory: 'packages/house-style' },
