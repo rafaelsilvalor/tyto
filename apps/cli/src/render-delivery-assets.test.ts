@@ -93,6 +93,18 @@ describe('tyto render --delivery copies the brief’s images (ADR 0161)', () => 
     expect(await listed('assets')).toEqual(['logo.png', 'outra.png']);
   });
 
+  it('copies nothing for a run whose frames failed (ADR 0054: it did not finish)', async () => {
+    // The image resolves before the frames are drawn; the rasterizer then refuses every one.
+    const code = await run(
+      ['render', `${NAME}/editaveis/${NAME}.brief`, '--delivery', '--types', 'png'],
+      environment(),
+    );
+
+    expect(code).not.toBe(EXIT_OK);
+    expect(errors.join('')).toContain('error');
+    expect(await listed()).not.toContain('assets');
+  });
+
   it('says nothing the second time, when assets/ already holds the same bytes', async () => {
     await render();
     errors = [];

@@ -481,9 +481,11 @@ export async function renderTask(
             : { description: job.value.template.description }),
         })
       : [];
-  // Only for a run that finished: a cancelled or broken one may not have drawn every image.
+  // Only for a run that finished without an error, ADR 0054's test for "the export did not
+  // finish": a cancelled or failed run leaves the delivery's `assets/` as it was (ADR 0161).
+  const finished = job.ok && !job.value.cancelled && !hasErrors([...inherited, ...produced]);
   const copied =
-    delivery !== undefined && recorder !== undefined && job.ok && !job.value.cancelled
+    delivery !== undefined && recorder !== undefined && finished
       ? await delivery.deliverAssets(recorder.delivered())
       : [];
 

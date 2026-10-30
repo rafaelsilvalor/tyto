@@ -398,6 +398,98 @@ describe('the export service', () => {
     expect(readdirSync(report).sort()).toEqual(['foto.png', 'result.json', 'template.txt']);
   }, 60_000);
 
+  describe("a delivery's run that did not finish leaves assets/ as it was (TYTO-499)", () => {
+    // ADR 0161, with ADR 0054's test for "did not finish". The picture is resolved in both runs
+    // (the frames are planned after it), so only the guard keeps it out of assets/.
+    const report = () => join(out, 'editaveis');
+    const pictured = (): string => {
+      mkdirSync(report(), { recursive: true });
+      writeFileSync(join(report(), 'foto.png'), PNG);
+      return exampleBrief('promo-curso', 'promo.brief').replace(
+        'tom: laranja\n',
+        'tom: laranja\nimagem: ./foto.png\n',
+      );
+    };
+
+    it('a failed run: the rasterizer refuses every frame', async () => {
+      const failing = await createExportService({
+        fileSystem: nodeFileSystem(),
+        sources: await createProjectSources({
+          fileSystem: nodeFileSystem(),
+          builtIn: packDirectory,
+        }),
+        version: '0.0.0-test',
+        rasterizer: { raster: () => Promise.reject(new Error('the tab crashed')) },
+      });
+      const { exportId } = await failing.start({
+        brief: pictured(),
+        directory: out,
+        briefDirectory: report(),
+        label: 'promo',
+        outputs: [{ kind: 'png' }],
+        deliveryReport: report(),
+      });
+
+      let progress = failing.progress(exportId);
+      for (
+        const begun = Date.now();
+        progress?.status === 'running';
+        progress = failing.progress(exportId)
+      ) {
+        if (Date.now() - begun > 30_000) throw new Error('the failed run never ended');
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      expect(progress?.failure).toBeUndefined();
+      expect(progress?.diagnostics.some((item) => item.severity === 'error')).toBe(true);
+      expect(readdirSync(out)).not.toContain('assets');
+    }, 60_000);
+
+    it('a cancelled run: cancelled from inside its first frame', async () => {
+      let started: (id: string) => void = () => undefined;
+      const exportId = new Promise<string>((resolve) => {
+        started = resolve;
+      });
+      const cancelling = await createExportService({
+        fileSystem: nodeFileSystem(),
+        sources: await createProjectSources({
+          fileSystem: nodeFileSystem(),
+          builtIn: packDirectory,
+        }),
+        version: '0.0.0-test',
+        // The first frame cancels the run and still answers, so the job stops at the next.
+        rasterizer: {
+          raster: async () => {
+            cancelling.cancel(await exportId);
+            return new TextEncoder().encode('png');
+          },
+        },
+      });
+      const { exportId: id } = await cancelling.start({
+        brief: pictured(),
+        directory: out,
+        briefDirectory: report(),
+        label: 'promo',
+        outputs: [{ kind: 'png' }],
+        deliveryReport: report(),
+      });
+      started(id);
+
+      let progress = cancelling.progress(id);
+      for (
+        const begun = Date.now();
+        progress?.status === 'running';
+        progress = cancelling.progress(id)
+      ) {
+        if (Date.now() - begun > 30_000) throw new Error('the cancelled run never ended');
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      expect(progress?.status).toBe('cancelled');
+      expect(readdirSync(out)).not.toContain('assets');
+    }, 60_000);
+  });
+
   it('reports a brief that does not compile instead of throwing', async () => {
     const { exportId } = await service.start({
       brief: 'this is not a brief',

@@ -25,9 +25,10 @@ about removal and replacement, not about adding a file, so this ADR adds files a
 
 1. **A delivery's export (`delivery.export`, `tyto render --delivery`) copies every image the
    brief resolved that is not already inside the delivery's assets folder into it**, after a run
-   that finished (not cancelled, not refused before drawing). What counts as "the images the brief
-   resolved" is recorded as the run resolves them (`recordingAssetResolver`), so the copy is
-   exactly what the artwork was drawn from.
+   that finished: not cancelled and with no error, ADR 0054's test for "the export did not
+   finish", so a cancelled or failed run leaves the assets folder as it was. What counts as
+   "the images the brief resolved" is recorded as the run resolves them
+   (`recordingAssetResolver`), so the copy is exactly what the artwork was drawn from.
 2. **Which assets folder: the one the brief reads, by ADR 0057's rule.** A brief in a folder
    named `editaveis` reads `../assets`; any other brief reads `assets/` beside it. So with the
    built-in layout (`"brief": "editaveis"`) the copy lands in the delivery's root `assets/`, and
