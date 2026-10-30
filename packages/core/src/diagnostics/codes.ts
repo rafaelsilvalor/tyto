@@ -589,6 +589,92 @@ export const diagnosticCodes = {
     fatality:
       'The commit locked before loads when there is one; otherwise nothing from that source does.',
   },
+  // The gallery (ADR 0162): a maintained index of templates and plugins, and the CLI verbs that
+  // write its entries into the machine's plugin files. Tolerant per entry, as a plugin file is.
+  E_GALLERY_INDEX_SYNTAX: {
+    severity: 'error',
+    summary: 'The gallery index could not be read or is not YAML of the shape it needs.',
+    template: "Gallery index '{index}' was not read: {problem}.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'The gallery lists nothing; templates and plugins already installed still load.',
+  },
+  E_GALLERY_INDEX_ENTRY: {
+    severity: 'error',
+    summary: 'An entry of the gallery index is refused, and the others stand.',
+    template: "Gallery index '{index}': entry {entry} was refused: {problem}.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'Only that entry is missing from the gallery.',
+  },
+  W_GALLERY_INDEX_KEY_UNKNOWN: {
+    severity: 'warning',
+    summary: 'The gallery index has a key Tyto does not know.',
+    template: "Gallery index '{index}': unknown key {path}; it is ignored.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'The key is ignored and the entry stands.',
+  },
+  E_GALLERY_INDEX_FETCH: {
+    severity: 'error',
+    summary: 'The gallery index could not be fetched, and no copy was fetched before.',
+    template: "Could not fetch the gallery index '{index}': {problem}.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'The gallery lists nothing; templates and plugins already installed still load.',
+  },
+  W_GALLERY_INDEX_OFFLINE: {
+    severity: 'warning',
+    summary: 'The gallery index could not be fetched, and the copy fetched before is shown.',
+    template:
+      "Could not fetch the gallery index '{index}': {problem}. Showing the copy from {fetched}.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'The earlier copy is read instead, and may miss a newer version.',
+  },
+  E_GALLERY_ENTRY_UNKNOWN: {
+    severity: 'error',
+    summary: 'A gallery command names an entry the index does not list.',
+    template: "The gallery index lists no entry '{entry}'.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'Nothing is written.',
+  },
+  E_GALLERY_ENGINE: {
+    severity: 'error',
+    summary: 'A gallery entry needs a plugin API this Tyto does not provide.',
+    template:
+      "'{entry}' needs plugin API {range}, and this Tyto provides {version}; update Tyto first.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'Nothing is written; the entry stays listed.',
+  },
+  E_GALLERY_NOT_INSTALLED: {
+    severity: 'error',
+    summary: 'tyto gallery update names an entry no machine plugin file holds.',
+    template: "'{entry}' is not in any plugin file of this machine; install it first.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'Nothing is written.',
+  },
+  E_GALLERY_ENTRY_EDITED: {
+    severity: 'error',
+    summary: 'The plugin file entry the gallery wrote was changed by hand since.',
+    template:
+      "'{entry}' in '{file}' was changed by hand since the gallery wrote it ({written} is now {found}); nothing was moved. Pass --force to move it anyway.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'Nothing is written.',
+  },
+  E_GALLERY_WRITE: {
+    severity: 'error',
+    summary:
+      'The gallery could not write an entry into a plugin file without changing the rest of it.',
+    template: "Could not write '{entry}' into '{file}': {problem}. The file was left as it was.",
+    spec: 'docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md',
+    fatal: false,
+    fatality: 'Nothing is written.',
+  },
   E_SCENE_SHAPE: {
     severity: 'error',
     summary: 'A scene does not match the IR schema.',
