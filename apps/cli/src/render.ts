@@ -50,7 +50,8 @@ export interface RenderCommandOptions {
   /** `--trust`: the brief's workspace is trusted for this run, never written down (ADR 0111). */
   readonly trust?: boolean;
   /**
-   * `--folder`: deliver into `<out>/<brief-name>/` instead of into `<out>` itself.
+   * `--folder`: write only the artwork into `<out>/<brief-name>/` instead of the artwork and
+   * `result.json` into `<out>` itself (ADR 0157, TYTO-490).
    *
    * Off by default and off for every caller that does not type it, which is what keeps the
    * ADR 0011 contract byte for byte what `docs/render-contract.md` publishes.
@@ -90,7 +91,7 @@ export interface RenderCommandOptions {
 }
 
 /**
- * Stripped from the brief's file name to get the delivery folder's, and nothing else.
+ * Stripped from the brief's file name to get the `--folder` folder's, and nothing else.
  *
  * A brief named something other than `.brief` keeps its whole name as the folder's, which is
  * the honest answer: `basename` removes a suffix only when it is there.
@@ -257,9 +258,7 @@ export async function renderCommand(
         outDirectory: out,
         // `basename` and nothing else. The name comes off a file that exists, so it is
         // already legal here, and a second sanitiser is what `artifact.ts` warns against.
-        ...(options.folder === true
-          ? { delivery: { name: basename(briefPath, BRIEF_SUFFIX) } }
-          : {}),
+        ...(options.folder === true ? { folder: { name: basename(briefPath, BRIEF_SUFFIX) } } : {}),
       },
       {
         outputs: outputRequests(options),

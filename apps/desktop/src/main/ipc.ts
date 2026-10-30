@@ -671,8 +671,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         brief,
         directory,
         // A tab that was never saved has no name to render under. `untitled` rather than a
-        // blank, because the label reaches `result.json` and a run filed under '' is a run
-        // nobody can find.
+        // blank, because the label names the run in its errors and a run filed under '' is a
+        // run nobody can find.
         label: documents.nameOf(documentId) ?? 'untitled',
         // Rebuilt field by field rather than spread, because `exactOptionalPropertyTypes`
         // distinguishes an absent key from an undefined one and Zod's `.optional()` gives
@@ -684,11 +684,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         })),
         ...(briefDirectory === undefined ? {} : { briefDirectory }),
         ...(formats === undefined ? {} : { formats: [...formats] }),
-        // The export box writes into a folder the person picked and will send as it is, so
-        // what an earlier export left there goes (ADR 0054). The queue does not come here.
-        removeLeftovers: true,
-        // And that folder is the delivery: artwork, editaveis/ and assets/ (ADR 0057).
-        delivery: true,
+        // The export box and the presets write only the artwork into the folder the person
+        // picked: no result.json, no brief, no assets/ (ADR 0157, TYTO-490). The queue does
+        // not come here, and keeps its report.
+        artworkOnly: true,
       });
     },
 

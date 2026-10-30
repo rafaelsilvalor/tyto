@@ -6,22 +6,9 @@ import type { Diagnostics } from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  type DeliveryOutput,
-  EDITABLE_DIR,
-  RESULT_FILE,
-  fsDeliveryOutput,
-  fsTaskOutput,
-} from './fs-outbox.js';
+import { RESULT_FILE, fsTaskOutput } from './fs-outbox.js';
 import type { ReusableTaskOutput } from './fs-outbox.js';
 import { renderResult } from './result.js';
-
-/** The delivery output, or a failed test naming why it could not be opened. */
-async function openDelivery(...args: Parameters<typeof fsDeliveryOutput>): Promise<DeliveryOutput> {
-  const opened = await fsDeliveryOutput(...args);
-  if (!opened.ok) throw new Error(opened.error.map((item) => item.message).join('\n'));
-  return opened.value;
-}
 
 /**
  * ADR 0054: a reused folder loses what Tyto wrote there last time and did not write this
@@ -37,8 +24,6 @@ beforeEach(async () => {
 afterEach(async () => {
   await rm(workspace, { recursive: true, force: true });
 });
-
-const BRIEF = new TextEncoder().encode('::titulo Oi\n');
 
 function artifactOf(name: string, bytes = `bytes of ${name}`): Artifact {
   return {
@@ -81,13 +66,18 @@ async function exportInto(output: ReusableTaskOutput, run: Export): Promise<Diag
   return warnings;
 }
 
+/**
+ * A reused folder with its report beside the artwork: the queue's `outbox/<id>/out/` (ADR
+ * 0059). Since TYTO-490 the folders a person picks keep no report, so this is the one layout
+ * left that removes leftovers.
+ */
 const delivery = (): Promise<ReusableTaskOutput> =>
-  openDelivery(join(workspace, 'entregas'), { name: 'campanha', brief: BRIEF });
+  fsTaskOutput(folder(), { removeLeftovers: true });
 
 const folder = (): string => join(workspace, 'entregas', 'campanha');
 
 async function artwork(): Promise<string[]> {
-  return (await readdir(folder())).filter((name) => name !== EDITABLE_DIR).sort();
+  return (await readdir(folder())).filter((name) => name !== RESULT_FILE).sort();
 }
 
 const codes = (warnings: Diagnostics): string[] =>
@@ -95,9 +85,9 @@ const codes = (warnings: Diagnostics): string[] =>
 
 /** A `result.json` as an older Tyto would have left it, written straight to disk. */
 async function previousResult(artifacts: readonly { name: string; bytes: number }[]) {
-  await mkdir(join(folder(), EDITABLE_DIR), { recursive: true });
+  await mkdir(folder(), { recursive: true });
   await writeFile(
-    join(folder(), EDITABLE_DIR, RESULT_FILE),
+    join(folder(), RESULT_FILE),
     JSON.stringify({
       status: 'ok',
       cancelled: false,
@@ -115,7 +105,7 @@ async function previousResult(artifacts: readonly { name: string; bytes: number 
   );
 }
 
-describe('a delivery folder that is exported into again', () => {
+describe('a reused folder that is exported into again', () => {
   it('removes the slide a carousel no longer has, and says so', async () => {
     await exportInto(await delivery(), { names: ['grid-01.svg', 'grid-02.svg', 'grid-03.svg'] });
 
@@ -126,9 +116,10 @@ describe('a delivery folder that is exported into again', () => {
       "W_LEFTOVER_REMOVED Removed 'grid-03.svg', which the previous export wrote and this one did not produce.",
     ]);
     // In the report the next reader opens, not only in this process's return value.
-    const written = JSON.parse(
-      await readFile(join(folder(), EDITABLE_DIR, RESULT_FILE), 'utf8'),
-    ) as { diagnostics: { code: string }[]; status: string };
+    const written = JSON.parse(await readFile(join(folder(), RESULT_FILE), 'utf8')) as {
+      diagnostics: { code: string }[];
+      status: string;
+    };
     expect(written.diagnostics.map((item) => item.code)).toEqual(['W_LEFTOVER_REMOVED']);
     expect(written.status).toBe('ok');
   });
@@ -178,7 +169,7 @@ describe('a delivery folder that is exported into again', () => {
   it.each([
     ['../outside.png', 'a parent folder'],
     ['..\\outside.png', 'a parent folder, Windows-spelled'],
-    ['editaveis/campanha.brief', 'the editable folder'],
+    ['editaveis/campanha.brief', 'a subfolder'],
     ['C:outside.png', 'a drive-relative path'],
   ])('refuses %s (%s) and deletes nothing outside the folder', async (name) => {
     // The target exists and has exactly the recorded size, so only the name rule stands
@@ -192,9 +183,6 @@ describe('a delivery folder that is exported into again', () => {
     const warnings = await exportInto(await delivery(), { names: ['grid-01.svg'] });
 
     expect(await readFile(outside, 'utf8')).toBe('precious');
-    expect(await readFile(join(folder(), EDITABLE_DIR, 'campanha.brief'), 'utf8')).toBe(
-      '::titulo Oi\n',
-    );
     expect(codes(warnings)).toEqual([
       expect.stringMatching(
         /^W_LEFTOVER_KEPT .*: refused, it names a path, not a file in this folder\.$/u,
@@ -224,7 +212,7 @@ describe('a delivery folder that is exported into again', () => {
 
   it('removes nothing, and warns, over a result.json it cannot read', async () => {
     await exportInto(await delivery(), { names: ['grid-01.svg', 'grid-02.svg'] });
-    await writeFile(join(folder(), EDITABLE_DIR, RESULT_FILE), '{ "artifacts": [ edited by hand');
+    await writeFile(join(folder(), RESULT_FILE), '{ "artifacts": [ edited by hand');
 
     const warnings = await exportInto(await delivery(), { names: ['grid-01.svg'] });
 

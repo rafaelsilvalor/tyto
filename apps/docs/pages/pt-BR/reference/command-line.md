@@ -26,8 +26,8 @@ tyto render [options] <brief>
 
 | Opção | O que faz | Padrão |
 | --- | --- | --- |
-| `-o, --out <dir>` | folder for the artifacts and result.json (default: the workspace's output folder) |  |
-| `--folder` | deliver into &lt;out>/&lt;brief-name>/ — artwork at the top, brief and result.json in editaveis/ |  |
+| `-o, --out <dir>` | folder for the artifacts and result.json, or the parent of --folder's (default: the workspace's output folder) |  |
+| `--folder` | write only the artwork into &lt;out>/&lt;brief-name>/ — no result.json, brief or assets/ |  |
 | `--assets <dir>` | what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder) |  |
 | `--trust` | trust the brief's workspace folder and its work profile for this run only; never written to trust.json |  |
 | `--section <plugin.key=value>` | set a key of a plugin's project section for this run, over .tyto/project.json; repeatable, value read as JSON or else as text |  |

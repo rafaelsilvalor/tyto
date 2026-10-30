@@ -53,7 +53,7 @@ A project file can name **export presets**: a set of sizes and file types, and t
 - `types` lists the file types — `png`, `jpeg`, `webp`, `svg` — and is `png` when left out.
 - `folder` is where the files go, relative to the open folder. Without it the preset uses `output`; with neither, the preset is left out and **Problems** says why. The folder is made if it is not there.
 
-Each preset is a command in the command bar, **Export: entregas**, for the brief in front. It opens the Export dialog already running, with the count, the problems and **Open folder** as usual, and writes what [Export](../export/index.md#what-is-written) writes: a file the previous export put there and this one did not is removed and listed, and files of your own in the folder are never touched.
+Each preset is a command in the command bar, **Export: entregas**, for the brief in front. It opens the Export dialog already running, with the count, the problems and **Open folder** as usual, and writes what [Export](../export/index.md#what-is-written) writes: the artwork and nothing else. A file of the same name is replaced, and every other file in the folder is left as it is.
 
 To give a preset a key, bind its command in [`keybindings.json`](../customize/keybindings-json.md):
 

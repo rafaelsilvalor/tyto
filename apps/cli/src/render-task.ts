@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import {
   type Diagnostics,
   type FaceCache,
@@ -19,10 +21,9 @@ import {
   briefAssetResolver,
   fileAssetResolver,
   fileResources,
-  fsDeliveryOutput,
+  fsArtworkOutput,
   fsTaskOutput,
   layeredExportResources,
-  recordingAssetResolver,
   renderResult,
   sourceCache,
 } from '@tyto/io';
@@ -80,19 +81,19 @@ export interface RenderTask {
   /**
    * When present, {@link outDirectory} is the **parent** and this names the folder inside it.
    *
-   * The delivery layout of `tyto render --folder` (TYTO-121): artwork at the top of
-   * `<outDirectory>/<name>/`, the brief and `result.json` under `editaveis/`. Absent is the
-   * ADR 0011 contract, where `--out` is the output folder and nothing is nested — and absent
-   * is what `tyto watch` and Jacurutu always pass, which is why this is an extra field rather
-   * than a change to the one above.
+   * `tyto render --folder` (TYTO-121): the artwork alone in `<outDirectory>/<name>/`, with no
+   * `result.json`, brief or `assets/` beside it (ADR 0157, TYTO-490). Absent is the ADR 0011
+   * contract, where `--out` is the output folder, nothing is nested and `result.json` is
+   * written — and absent is what `tyto watch` and Jacurutu always pass, which is why this is
+   * an extra field rather than a change to the one above.
    */
-  readonly delivery?: { readonly name: string };
+  readonly folder?: { readonly name: string };
   /**
    * Remove what the previous run in {@link outDirectory} listed and this one did not
    * produce (ADR 0054's rule). `tyto watch` sets it, because its `outbox/<id>/out/` is the
    * folder the desktop queue already tidies (ADR 0059, ADR 0060); `tyto render --out` does
-   * not, because that folder belongs to the caller and `--out` removes nothing, ever. A
-   * `--folder` delivery always removes, so this is ignored there.
+   * not, because that folder belongs to the caller and `--out` removes nothing, ever.
+   * Ignored with {@link folder}, which keeps no report to tell Tyto's files apart.
    */
   readonly removeLeftovers?: boolean;
 }
@@ -144,7 +145,8 @@ export interface RenderTaskReport {
   readonly diagnostics: Diagnostics;
   /**
    * The document that was written, so a caller can print it without reading it back — or,
-   * when a file held the delivery folder, the one there was nowhere to write.
+   * for `--folder`, the one that is printed and not written, and when a file held that
+   * folder, the one there was nowhere to write.
    */
   readonly result: RenderResult;
   /** False when anything in `diagnostics` is an error, which is what exit 1 means. */
@@ -245,8 +247,8 @@ function exportResources(
 }
 
 /**
- * A `--folder` delivery whose folder a file is holding: nothing rendered and nothing written,
- * not even `result.json`, because there is nowhere to write it. Exit 1 and not 2, because
+ * A `--folder` render whose folder a file is holding: nothing rendered and nothing written,
+ * because there is nowhere to write it. Exit 1 and not 2, because
  * the same invocation fails the same way until somebody moves the file (TYTO-129).
  */
 function blockedReport(
@@ -279,24 +281,15 @@ export async function renderTask(
     outlines: (face) => taskFonts.fonts.source.outlines(face),
     fromMachine: (face) => taskFonts.fonts.fromMachine(face),
   });
-  // Typed as the wider one where there is one, because the template it used is only known
-  // once the job has run and `TaskOutput` has nowhere to put that.
+  // `--folder` writes the artwork alone (ADR 0157); everything else keeps the contract's
+  // `result.json` beside it (ADR 0011).
   const opened =
-    task.delivery === undefined
+    task.folder === undefined
       ? undefined
-      : await fsDeliveryOutput(task.outDirectory, {
-          name: task.delivery.name,
-          // The source this run actually compiled, not a second read of the file. A brief
-          // edited between the read and the copy would otherwise put text in `editaveis/`
-          // that did not produce the artwork beside it, which is the one thing the folder
-          // exists to promise.
-          brief: new TextEncoder().encode(task.brief),
-          label: task.id,
-        });
+      : await fsArtworkOutput(join(task.outDirectory, task.folder.name), { label: task.id });
   if (opened !== undefined && !opened.ok) return blockedReport(opened.error, inherited, options);
-  const delivery = opened?.value;
   const output =
-    delivery ??
+    opened?.value ??
     (await fsTaskOutput(task.outDirectory, {
       label: task.id,
       removeLeftovers: task.removeLeftovers ?? false,
@@ -327,10 +320,7 @@ export async function renderTask(
   // this task's `result.json`.
   const brandKits = host.registry.brandKitsByBrand();
 
-  // Recorded as the brief resolves, so a `--folder` delivery copies into `assets/` exactly
-  // the files the artwork was drawn from (ADR 0057). `--out` never reads the record.
   // A plugin's images and faces, fetched once into `TYTO_HOME` and read from there (ADR 0117).
-  // Inside the recorder, so a delivery copies a fetched image like any other (ADR 0118).
   const sources = options.sources;
   const cache =
     sources === undefined
@@ -355,7 +345,7 @@ export async function renderTask(
           ...(task.projectAssets === undefined ? {} : { projectAssets: task.projectAssets }),
         })
       : fileAssetResolver({ base: task.assetsOverride });
-  const assets = recordingAssetResolver(cache === undefined ? files : cache.assets(files));
+  const assets = cache === undefined ? files : cache.assets(files);
 
   // The template the job loads, kept for the one question only its manifest answers: which
   // free families stand in for a face nobody can supply (ADR 0120).
@@ -397,7 +387,7 @@ export async function renderTask(
       registry: context.registry,
       configurations: context.configurations,
       templates,
-      assets: assets.resolver,
+      assets,
       exporters: host.registry.exporters,
       directives: directiveResolverOf(() => host.registry.directives()),
       formats: context.formats,
@@ -441,9 +431,9 @@ export async function renderTask(
   registerOrigin(produced, { path: task.briefPath, source: task.brief });
 
   const artifacts = job.ok ? job.value.artifacts : [];
-  // A `--folder` delivery and a watched task remove what their last run left; `--out` was
-  // opened without the rule and answers nothing, because its reader reconciles against
-  // `result.json` itself (ADR 0054, ADR 0060).
+  // A watched task removes what its last run left; `--out` was opened without the rule and
+  // answers nothing, because its reader reconciles against `result.json` itself (ADR 0054,
+  // ADR 0060), and `--folder` keeps no report to tell Tyto's files apart (ADR 0157).
   const leftovers = await output.removeLeftovers({
     artifacts,
     planned: job.ok ? job.value.planned : 0,
@@ -451,32 +441,12 @@ export async function renderTask(
     failed: hasErrors([...inherited, ...produced]),
   });
 
-  // Before `result.json`, whose warnings include what it removed from `assets/`.
-  const delivered = delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
-
-  // Before `finish`, so `result.json` is still the last file to appear, and before the result
-  // is built, because a folder holding `template.txt` is an error that belongs in it. A run
-  // that never loaded a template names none — a brief that does not parse has no template to
-  // point at, and inventing one would be the delivery claiming something the run did not do.
-  const described =
-    delivery !== undefined && job.ok && job.value.template !== undefined
-      ? await delivery.describeTemplate({
-          name: job.value.template.name,
-          version: job.value.template.version,
-          ...(job.value.template.description === undefined
-            ? {}
-            : { description: job.value.template.description }),
-        })
-      : [];
-
   const diagnostics = [
     ...inherited,
     ...pluginWarnings,
     ...brandKits.diagnostics,
     ...produced,
     ...leftovers,
-    ...delivered,
-    ...described,
   ];
   const resultOf = (listed: Diagnostics): RenderResult =>
     renderResult({
@@ -489,8 +459,8 @@ export async function renderTask(
     });
   const result = resultOf(diagnostics);
 
-  // Written even for a failed run: `result.json` is the only thing the other side of ADR
-  // 0011 reads, and a task that produced nothing but errors has to say so in the one file
+  // Written even for a failed run, except under `--folder`, which writes none (ADR 0157):
+  // `result.json` is the only thing the other side of ADR 0011 reads, and a task that produced nothing but errors has to say so in the one file
   // its reader is watching for. A throw here is an internal failure — the document we
   // were about to write does not match its own schema — and is left to escape. A folder
   // holding the name is answered instead (TYTO-243): it is reported here, exit 1, because

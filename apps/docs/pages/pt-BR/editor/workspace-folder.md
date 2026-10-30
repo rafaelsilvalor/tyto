@@ -53,7 +53,7 @@ Um arquivo de projeto pode nomear **predefinições de exportação**: um conjun
 - `types` lista os tipos de arquivo — `png`, `jpeg`, `webp`, `svg` — e é `png` quando fica de fora.
 - `folder` é para onde vão os arquivos, relativo à pasta aberta. Sem ele a predefinição usa `output`; sem nenhum dos dois, a predefinição fica de fora e **Problemas** diz por quê. A pasta é criada se não existir.
 
-Cada predefinição é um comando na barra de comandos, **Exportar: entregas**, para o brief da frente. Ele abre a janela Exportar já rodando, com a contagem, os problemas e **Abrir pasta** como sempre, e grava o que [Exportar](../export/index.md#o-que-e-gravado) grava: um arquivo que a exportação anterior pôs lá e esta não gerou é removido e listado, e arquivos seus na pasta nunca são tocados.
+Cada predefinição é um comando na barra de comandos, **Exportar: entregas**, para o brief da frente. Ele abre a janela Exportar já rodando, com a contagem, os problemas e **Abrir pasta** como sempre, e grava o que [Exportar](../export/index.md#o-que-e-gravado) grava: as artes e nada mais. Um arquivo de mesmo nome é substituído, e todos os outros arquivos da pasta ficam como estão.
 
 Para dar uma tecla a uma predefinição, ligue o comando dela no [`keybindings.json`](../customize/keybindings-json.md):
 

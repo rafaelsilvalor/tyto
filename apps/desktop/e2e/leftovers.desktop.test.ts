@@ -10,11 +10,12 @@ import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 
 /**
- * A second export from the window into the same folder (TYTO-127, ADR 0054).
+ * A second export from the window into the same folder (TYTO-127, ADR 0054; TYTO-490, ADR 0157).
  *
- * The unit tests hold the rule; this is the half only a window can answer — that the export
- * box asks for leftovers to go, and that **the person sees what went**, in a list that is on
- * screen and not only in a `result.json` nobody opens before sending the folder.
+ * Until TYTO-490 the export box removed what its previous export wrote and listed it on
+ * screen. Since then it writes the artwork alone, with no `result.json` to say which files are
+ * Tyto's, so nothing goes and no list appears. The unit tests hold the rule; this is the half
+ * only a window can answer — that the box the person clicks really does leave the folder be.
  *
  * Its own `--user-data-dir` and `TYTO_HOME`, so neither this machine's layout nor its
  * installed plugins can decide the outcome.
@@ -115,8 +116,8 @@ afterAll(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-describe('exporting from the window into a folder used before (ADR 0054)', () => {
-  it('removes the slide the brief no longer has, keeps a person’s file, and shows it', async () => {
+describe('exporting from the window into a folder used before (ADR 0157)', () => {
+  it('writes the artwork alone, and removes nothing: not the old slide, not a person’s file', async () => {
     const out = join(scratch, 'entrega');
     const three = join(scratch, 'tres.brief');
     const two = join(scratch, 'duas.brief');
@@ -133,21 +134,17 @@ describe('exporting from the window into a folder used before (ADR 0054)', () =>
     await openBrief(two, 'versão curta');
     await exportInto(out);
 
+    // No result.json, no editaveis/: and so no record that the third slide was Tyto's.
     expect(readdirSync(out).sort()).toEqual([
-      'editaveis',
       'grid-1x1-01.svg',
       'grid-1x1-02.svg',
+      'grid-1x1-03.svg',
       'leia-me.txt',
     ]);
-
-    // On screen, and big enough to read: jsdom can say the list exists and not that it shows.
-    const list = window.locator('[data-testid="export-leftovers"]');
-    await list.waitFor({ state: 'visible' });
-    const box = await list.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.height).toBeGreaterThan(20);
-    expect(await list.textContent()).toContain('In the folder, from the previous export:');
-    expect(await list.textContent()).toContain("Removed 'grid-1x1-03.svg'");
+    expect(await window.locator('[data-testid="export-status"]').getAttribute('data-state')).toBe(
+      'finished',
+    );
+    expect(await window.locator('[data-testid="export-leftovers"]').count()).toBe(0);
 
     // For a person to look at the real window; off in CI, where nobody would.
     const shot = process.env['TYTO_LEFTOVERS_SHOT'];

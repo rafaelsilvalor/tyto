@@ -69,6 +69,21 @@ let window: Page;
 let scratch: string;
 let delivery: string;
 
+/**
+ * The diagnostics of the run the export box is showing, read off the element itself: the box
+ * writes no `result.json` since TYTO-490 (ADR 0157), so the dialog is the run's report.
+ */
+const shownDiagnostics = (): Promise<{ code: string; severity: string }[]> =>
+  window.evaluate(() => {
+    const box = document.querySelector('tyto-export-dialog') as {
+      progress?: { diagnostics: { code?: string; severity?: string }[] };
+    } | null;
+    return (box?.progress?.diagnostics ?? []).map((item) => ({
+      code: item.code ?? '',
+      severity: item.severity ?? '',
+    }));
+  });
+
 async function answerPickers(paths: { file?: string; directory?: string }): Promise<void> {
   await app.evaluate(
     ({ dialog }, chosen) => {
@@ -178,7 +193,7 @@ describe('a brief opened from a delivery-shaped folder (ADR 0056)', () => {
     expect(html).not.toContain(IN_ASSETS.toString('base64'));
   }, 60_000);
 
-  it('exports ./calendario.png from assets/ with no diagnostic in result.json', async () => {
+  it('exports ./calendario.png from assets/ with no diagnostic in the box', async () => {
     const path = join(delivery, 'fallback.brief');
     await openBrief(path, 'Pelo fallback');
     const out = join(scratch, 'entrega');
@@ -202,22 +217,13 @@ describe('a brief opened from a delivery-shaped folder (ADR 0056)', () => {
       timeout: 60_000,
     });
 
-    const result = JSON.parse(readFileSync(join(out, 'editaveis', 'result.json'), 'utf8')) as {
-      status: string;
-      artifacts: { name: string }[];
-      diagnostics: { code: string }[];
-    };
-    expect(result.diagnostics.map((item) => item.code)).not.toContain('E_ASSET_NOT_FOUND');
-    expect(result.status).toBe('ok');
-    const svg = readFileSync(join(out, result.artifacts[0]!.name), 'utf8');
+    const shown = await shownDiagnostics();
+    expect(shown.map((item) => item.code)).not.toContain('E_ASSET_NOT_FOUND');
+    expect(shown.filter((item) => item.severity === 'error')).toEqual([]);
+    // The artwork alone, with the image drawn into it and not copied beside it (ADR 0157).
+    const written = readdirSync(out);
+    expect(written.every((name) => name.endsWith('.svg'))).toBe(true);
+    const svg = readFileSync(join(out, written[0]!), 'utf8');
     expect(svg).toContain(IN_ASSETS.toString('base64'));
-
-    // The folder picked is the delivery (ADR 0057): the image the brief used in assets/, and
-    // the copied brief naming that copy, so it renders again from editaveis/.
-    expect(readdirSync(join(out, 'assets'))).toEqual(['calendario.png']);
-    expect(readFileSync(join(out, 'assets', 'calendario.png')).equals(IN_ASSETS)).toBe(true);
-    expect(readFileSync(join(out, 'editaveis', 'fallback.brief'), 'utf8')).toContain(
-      'imagem: calendario.png',
-    );
   }, 120_000);
 });

@@ -53,7 +53,7 @@ leave sizes out but never add one. On a brief that lists none, the flag is the l
 | Code | Means | Detail | Worth retrying |
 | --- | --- | --- | --- |
 | `0` | ok | Nothing went wrong. `result.json` has `status: "ok"`. | no |
-| `1` | error diagnostics | The brief, the template or a frame produced an error — or the command line was refused, or a `--folder` delivery found a file where its folder or `editaveis/` has to go (`E_DELIVERY_FOLDER_BLOCKED`), or a folder where a file it writes has to go (`E_OUTPUT_FILE_BLOCKED`). `result.json` has `status: "error"` and lists what went wrong, except when the command line was refused or the delivery folder, `editaveis/` or the copied brief was held, where no run started, and when `result.json` itself was held: then no `result.json` was written. | no |
+| `1` | error diagnostics | The brief, the template or a frame produced an error — or the command line was refused, or `--folder` found a file where its folder has to go (`E_DELIVERY_FOLDER_BLOCKED`), or a folder where a file it writes has to go (`E_OUTPUT_FILE_BLOCKED`). `result.json` has `status: "error"` and lists what went wrong, except when the command line was refused or the `--folder` folder was held, where no run started, when `result.json` itself was held, and under `--folder`, which writes no `result.json` (ADR 0157): then no `result.json` was written. | no |
 | `2` | internal failure | Something threw that is not about this brief: a browser that will not launch, an unwritable output folder, an output file another program holds open (ADR 0108). `result.json` may be absent. | **yes** |
 
 **Only `2` is worth retrying.** That is the whole reason there are two non-zero codes: a

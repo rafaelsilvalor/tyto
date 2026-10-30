@@ -47,7 +47,7 @@ Boundary rules:
 | Command                        | Does                                                                                |
 | ------------------------------ | ----------------------------------------------------------------------------------- |
 | `tyto render <brief> --out`    | one brief → artifacts + `result.json` in `--out`. The contract above                |
-| `tyto render … --folder`       | the same, delivered as `<out>/<brief-name>/` with the brief kept beside the artwork |
+| `tyto render … --folder`       | the artwork alone in `<out>/<brief-name>/`: no `result.json`, brief or `assets/`    |
 | `tyto watch <folder>`          | `<folder>/inbox/<id>/` → `<folder>/outbox/<id>/out/`, forever. `--once` for a sweep |
 | `tyto template check <folder>` | manifest, then markup (or, for a code body, the manifest and a `not checked` line)  |
 | `tyto template new <name>`     | scaffolds a template folder from `docs/template-authoring.md`                       |
@@ -60,75 +60,47 @@ raster ones, and `--types svg` never launches a browser at all.
 
 **`--folder` is the one flag that changes what `--out` means, and it is off by default**
 (TYTO-121). Without it, `--out` **is** the output folder — the contract above, which Jacurutu
-reads and which nothing here may move. With it, `--out` becomes the parent and Tyto writes:
+reads and which nothing here may move. With it, `--out` becomes the parent and Tyto writes
+the artwork alone (ADR 0157, TYTO-490):
 
 ```
 <out>/<brief-name>/
-  <format>-<NN>.png             artwork at this level, beside the two folders
-  editaveis/
-    <brief-name>.brief          the brief that produced the files above, its image paths
-                                pointing at assets/
-    template.txt                which template made it — a pointer, never a copy
-    result.json
-  assets/
-    <image>                     every image the brief used, by its own file name (ADR 0057)
+  <format>-<NN>.png             artwork, and nothing beside it
 ```
 
-`assets/` holds what the brief brought — `imagem:`, `selo:` — and nothing else: not the fonts
-(a commercial face is licensed to a machine, not to a folder) and not the marks a template draws
-from its own code (the owl, the speech balloon). The copied brief's frontmatter values that
-named those images now name the copies, so `editaveis/<brief-name>.brief` renders again from
-where it sits, to the same bytes.
+No `result.json`, no copy of the brief, no `assets/`: the folder is meant to be sent as it is,
+and the report is what the command prints (one JSON document under `--json`). Until TYTO-490 it
+also held `editaveis/` with the brief, `template.txt` and `result.json`, and `assets/` with the
+images the brief used (ADR 0057); keeping the brief and its images beside the artwork is now a
+delivery's job (`tyto delivery new`, ADR 0157), and nothing else writes that layout.
 
 `<brief-name>` is the brief's own file name without `.brief`, used as it is: it names a file
 that already exists on this filesystem, so a second sanitiser beside `artifactName`'s would
-only be a second opinion about what to call the same folder. The top level holds artwork alone
-because the folder is meant to be dropped into a delivery, and `result.json` is the one file
-somebody would otherwise have to delete first.
+only be a second opinion about what to call the same folder.
 
-**A flag rather than a second command**, because `render` carries ten options a delivery needs
+**A flag rather than a second command**, because `render` carries ten options this needs
 every one of, and a sibling would be a second copy of that surface, its help and its tests.
-**An existing folder is reused, and only what Tyto wrote there last time leaves it**
-(TYTO-127, ADR 0054). The export reads the previous `editaveis/result.json` before it writes
-anything, and once the artwork is written it removes each file that report listed and this
-export did not produce: the third slide of a brief edited down to two, or `lamina-1-grid.png`
-after ADR 0053 renamed it. A file the report did not list is never touched, so a note or a
-logo somebody dropped beside the artwork stays. Each removal is a `W_LEFTOVER_REMOVED` warning
-on stderr and in the new `result.json`. A listed file is kept, with a `W_LEFTOVER_KEPT` naming
-why, when its size is no longer the one recorded (somebody replaced it by hand), when its name
-is not one file in the folder (refused), when this export failed, was cancelled or wrote
-fewer files than planned, or when the operating system refuses the removal. A report that
-cannot be read removes nothing (`W_PREVIOUS_RESULT_UNREADABLE`), and a folder with no report
-yet removes nothing and says nothing. `--out` removes nothing, ever: see below.
+**An existing folder is reused, and nothing leaves it.** A file of the same name is replaced;
+every other file stays, including the third slide of a brief since edited down to two. Without
+a report there is no record of which files are Tyto's, so a file Tyto wrote last time and a
+note somebody dropped beside the artwork cannot be told apart, and both are kept.
 
-The same rule reaches `assets/`: an image the previous delivery's brief pointed at there and
-this one does not is removed, with a `W_LEFTOVER_REMOVED`, and a file the brief never named is
-left alone.
+**The desktop's export box and the export presets write the same, one level up**: the folder
+a person picks receives the artwork alone, because that person already chose where it goes.
+**`tyto render --folder` keeps its `<out>/<brief-name>/` level**, because `--out` there names a
+parent that many briefs share. The two differ on purpose; neither is a bug.
 
-**The desktop's export box delivers the same layout, one level up** (ADR 0057): the folder a
-person picks **is** the delivery — artwork at its top, `editaveis/` and `assets/` beside it —
-because that person already chose where it goes. **`tyto render --folder` keeps its
-`<out>/<brief-name>/` level**, because `--out` there names a parent that many briefs share. The
-two differ on purpose; neither is a bug. The queue panel and `tyto watch` deliver nothing: their
-`out/` is the contract above.
-
-**`template.txt` names the template and does not carry it.** One line — `promo-curso 1.0.0`
-— plus the template's own description and a sentence saying where the template actually
-lives. A copy per delivery would fill a remote with duplicates of a file that has one home,
-and turn "which version is the real one" into a question; what a delivery owes its reader is
-the identity of the version that produced these exact files.
-
-It is written because **nothing else in the folder always answers it**. The copied brief
-names the template in its frontmatter only when the author wrote it there — a run that took
-the template from the `--template` fallback leaves no trace of it — and `result.json`'s
-`tyto.templates` lists every template that was on the search path, which is a different
-question and answers two names on a project with two templates. `JobReport.template` is the
-one thing that knows, because resolving that name is the job's own rule.
-
-Portuguese in `editaveis/` is deliberate and is the only user-facing name in the repository
-that is: it is read by whoever receives the folder rather than by a program (`docs/git-workflow.md`
-keeps everything else English), and it is spelled without the accent because a folder name
-travels through zip tools and browsers that still disagree about one.
+**The queue panel and `tyto watch` keep the contract above**, `result.json` and all, in their
+`outbox/<id>/out/`, and only there is what the previous run wrote removed (TYTO-127, ADR 0054,
+ADR 0060). The run reads the previous `result.json` before it writes anything, and once the
+artwork is written it removes each file that report listed and this run did not produce. A
+file the report did not list is never touched. Each removal is a `W_LEFTOVER_REMOVED` warning
+in the new `result.json`. A listed file is kept, with a `W_LEFTOVER_KEPT` naming why, when its
+size is no longer the one recorded (somebody replaced it by hand), when its name is not one
+file in the folder (refused), when this run failed, was cancelled or wrote fewer files than
+planned, or when the operating system refuses the removal. A report that cannot be read
+removes nothing (`W_PREVIOUS_RESULT_UNREADABLE`), and a folder with no report yet removes
+nothing and says nothing. `--out` removes nothing, ever: see below.
 
 **`--template` is a fallback, not an override; `--formats` narrows** (ADR 0107).
 `--template` is used only when the brief's frontmatter names no template. `--formats` picks

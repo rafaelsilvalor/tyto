@@ -1,12 +1,8 @@
-import { copyFile, lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { lstat, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 
 import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
-
-import { frontmatterValues, rewriteFrontmatterValues } from './delivery-brief.js';
-import type { DeliveredAsset } from './file-assets.js';
-import { ASSETS_DIR } from './fs-inbox.js';
 
 import { type LeftoverRun, readPreviousDelivery, removeLeftovers } from './leftovers.js';
 import type { OutputSink, TaskOutput } from './ports.js';
@@ -36,9 +32,6 @@ export const RESULT_FILE = 'result.json';
  */
 export const EDITABLE_DIR = 'editaveis';
 
-/** Without the dot, and matching `BRIEF_FILE`'s. */
-const BRIEF_EXTENSION = 'brief';
-
 /** Where a delivery says which template made it. Beside the brief, because it is about it. */
 export const TEMPLATE_FILE = 'template.txt';
 
@@ -56,17 +49,10 @@ export interface DeliveryTemplate {
 }
 
 /**
- * A `TaskOutput` that can also say which template produced the artwork.
- *
- * Separate from `write` because the answer is not known when the output is opened: the job
- * resolves the template from the brief's frontmatter or the `--template` fallback while it
- * runs, so the delivery learns it between the last artifact and `finish`.
- */
-/**
  * A `TaskOutput` over a folder a person reuses, which can tidy what an earlier export left.
  *
- * Separate from `finish` for `describeTemplate`'s reason: the warnings it returns belong in
- * the `result.json` that `finish` writes, so the caller needs them first.
+ * Separate from `finish` because the warnings it returns belong in the `result.json` that
+ * `finish` writes, so the caller needs them first.
  */
 export interface ReusableTaskOutput extends TaskOutput {
   /**
@@ -76,51 +62,6 @@ export interface ReusableTaskOutput extends TaskOutput {
    * nothing unless the output was opened with `removeLeftovers`.
    */
   removeLeftovers(run: LeftoverRun): Promise<Diagnostics>;
-}
-
-export interface DeliveryOutput extends ReusableTaskOutput {
-  /**
-   * Writes {@link TEMPLATE_FILE}. Call it **before** `finish`, so `result.json` stays the
-   * last file to appear and keeps meaning "this delivery is complete". Answers
-   * `E_OUTPUT_FILE_BLOCKED` when a folder holds the name, which belongs in that `result.json`.
-   */
-  describeTemplate(template: DeliveryTemplate): Promise<Diagnostics>;
-
-  /**
-   * Copies every image the brief resolved into `assets/` beside the artwork, points the
-   * copied brief's frontmatter at them, and removes what the previous delivery's brief
-   * pointed at there and this one does not (ADR 0057). Returns one warning per file
-   * removed or kept. Call it **before** `finish`, for {@link describeTemplate}'s reason.
-   *
-   * A file already holding the name `assets` is an `E_DELIVERY_FOLDER_BLOCKED` in the
-   * answer, not a throw: nothing is copied and the run is an error, as when the delivery
-   * folder itself is held (TYTO-129).
-   */
-  deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics>;
-}
-
-export interface FsDeliveryOutputOptions {
-  /**
-   * The folder's name, and the copied brief's. `basename(briefPath, '.brief')` at the caller.
-   *
-   * One path segment: a `/` in it would silently deliver somewhere else.
-   */
-  readonly name: string;
-  /**
-   * The brief that produced the artwork, copied into {@link EDITABLE_DIR} as written until
-   * {@link DeliveryOutput.deliverAssets} points its image paths at `assets/`.
-   */
-  readonly brief: Uint8Array;
-  /**
-   * `'named'`, the default, delivers into `<destination>/<name>/`: `tyto render --folder`.
-   * `'destination'` delivers into `destination` itself: the desktop export box, where the
-   * person picked the folder that is the delivery (ADR 0057).
-   */
-  readonly folder?: 'named' | 'destination';
-  /** See {@link FsOutboxOptions.validate}. On by default. */
-  readonly validate?: boolean;
-  /** Named in the schema-mismatch message, so a reader knows which task produced it. */
-  readonly label?: string;
 }
 
 export interface FsOutboxOptions {
@@ -148,11 +89,6 @@ async function writeAtomic(
   bytes: Uint8Array | string,
 ): Promise<Diagnostic | undefined> {
   return placeAtomic(path, (temporary) => writeFile(temporary, bytes));
-}
-
-/** `writeAtomic` for a file that is already on disk: copied to `.part`, then renamed. */
-async function copyAtomic(from: string, to: string): Promise<Diagnostic | undefined> {
-  return placeAtomic(to, (temporary) => copyFile(from, temporary));
 }
 
 /**
@@ -231,18 +167,48 @@ export async function fsTaskOutput(
   });
 }
 
+export interface FsArtworkOutputOptions {
+  /** Named in errors, so a reader knows which export produced them. */
+  readonly label?: string;
+}
+
 /**
- * The two directories a `TaskOutput` writes into, which are the same one until they are not.
+ * One folder as a `TaskOutput` that holds the artwork and nothing else (ADR 0157, TYTO-490).
  *
- * `fsTaskOutput` puts artifacts and `result.json` in one folder; `fsDeliveryOutput` puts the
- * artwork at the top and the report underneath. Everything else about writing — the atomic
- * rename, the schema check, `result.json` going last — is identical, and this is the one copy
- * of it. Two adapters with their own copies would be two ways for a half-written PNG to
- * reach a watcher.
+ * The export box, an export preset and `tyto render --folder` write here: a folder a person
+ * picked to receive the files, so no `result.json`, no copied brief and no `assets/` appear
+ * beside them. Without a report there is no record of which files an earlier export wrote,
+ * so `removeLeftovers` removes nothing — a file this export does not produce stays, and is
+ * the person's to delete. Overwriting by name is the only thing done to what was there.
+ *
+ * The folder is made with `makeFolder`, so a file holding a name the path needs is an
+ * `E_DELIVERY_FOLDER_BLOCKED` in the answer, not a throw (TYTO-129).
+ */
+export async function fsArtworkOutput(
+  directory: string,
+  options: FsArtworkOutputOptions = {},
+): Promise<Result<ReusableTaskOutput, Diagnostic[]>> {
+  const full = resolve(directory);
+  const blocked = await makeFolder(full);
+  if (blocked !== undefined) return err([blocked]);
+  return ok(
+    await taskOutput({ artifacts: full, label: options.label ?? full, removeLeftovers: false }),
+  );
+}
+
+/**
+ * Where a `TaskOutput` writes, and whether it keeps a report there.
+ *
+ * `fsTaskOutput` puts artifacts and `result.json` in one folder; `fsArtworkOutput` writes the
+ * artwork and no report at all (ADR 0157). Everything else about writing — the atomic rename,
+ * a folder in the way answered rather than thrown — is identical, and this is the one copy of
+ * it. Two adapters with their own copies would be two ways for a half-written PNG to reach a
+ * watcher.
  */
 interface TaskOutputDirectories {
   readonly artifacts: string;
-  readonly result: string;
+  /** The folder `result.json` goes to, or none: the artwork is then the whole output. */
+  readonly result?: string;
   readonly validate?: boolean;
   readonly label: string;
   readonly removeLeftovers: boolean;
@@ -252,17 +218,19 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
   const validate = directories.validate ?? true;
   // Read when the output opens, before this export can write a byte: the previous report is
   // the one record of which files in the folder are Tyto's, and `finish` replaces it.
-  const previous = directories.removeLeftovers
-    ? await readPreviousDelivery(join(directories.result, RESULT_FILE))
-    : ({ kind: 'none' } as const);
+  // No report, nothing to read: without one, Tyto cannot tell its files from anybody else's.
+  const previous =
+    directories.removeLeftovers && directories.result !== undefined
+      ? await readPreviousDelivery(join(directories.result, RESULT_FILE))
+      : ({ kind: 'none' } as const);
 
   return {
     async removeLeftovers(run: LeftoverRun): Promise<Diagnostics> {
       return removeLeftovers({
         previous,
         artifacts: directories.artifacts,
-        // Only when the report sits beside the artwork, and then it is never artwork.
-        protectedNames: directories.artifacts === directories.result ? [RESULT_FILE] : [],
+        // The report sits beside the artwork whenever there is one, and it is never artwork.
+        protectedNames: directories.result === undefined ? [] : [RESULT_FILE],
         run,
       });
     },
@@ -275,6 +243,7 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
     },
 
     async finish(result: RenderResult): Promise<Diagnostics> {
+      if (directories.result === undefined) return [];
       if (validate) {
         const parsed = renderResultSchema.safeParse(result);
         if (!parsed.success) {
@@ -295,128 +264,6 @@ async function taskOutput(directories: TaskOutputDirectories): Promise<ReusableT
       return blocked === undefined ? [] : [blocked];
     },
   };
-}
-
-/**
- * The folder a person sends out: `<destination>/<name>/`, artwork at the top, the rest under
- * {@link EDITABLE_DIR}.
- *
- * ```
- * <destination>/<name>/
- *   <format>-<NN>.png             nothing but artwork at this level
- *   editaveis/
- *     <name>.brief                the brief that produced the files above
- *     template.txt                which template made it — a pointer, never a copy
- *     result.json
- * ```
- *
- * **The top level holds artwork and nothing else, and that is the whole point of the
- * layout.** A folder with a report in it is a folder somebody has to tidy before dropping it
- * into a delivery, and the one file they would have to delete is the one file Tyto's own
- * contract says never to move (ADR 0011). So it goes down a level instead, where it is still
- * exactly where a reader of `editaveis/` expects to find it.
- *
- * **This is not `--out`.** `tyto render --out <dir>` writes into exactly the directory named
- * and that is published behaviour Jacurutu reads (`docs/render-contract.md`); this is a
- * second layout that a caller opts into, under which the directory named becomes the parent.
- *
- * ## The name is the brief's, unsanitised, on purpose
- *
- * `name` comes from a file that already exists on disk, so it is already legal for this
- * filesystem. Running it through the `fileSafe` of `artifactName` would be a second
- * sanitiser with its own opinion, and two sanitisers is how one folder ends up named two
- * things.
- *
- ## An existing folder is reused, and only Tyto's own leftovers leave it
- *
- * Exporting the same brief twice reuses the folder and overwrites by name. A file the
- * previous export wrote and this one does not produce — `grid-03.png` after a brief went
- * from three slides to two, or `lamina-1-grid.png` after ADR 0053 renamed it — is removed
- * by `removeLeftovers`, and only if the previous `editaveis/result.json` listed it and its
- * size is still the one recorded there (ADR 0054). Nothing else in the folder is touched,
- * and every removal is a warning in the new `result.json`.
- */
-export async function fsDeliveryOutput(
-  destination: string,
-  options: FsDeliveryOutputOptions,
-): Promise<Result<DeliveryOutput, Diagnostic[]>> {
-  // Refused, not rewritten. A guard is not the second sanitiser the doc comment argues
-  // against: it changes no name, it declines one that would put the delivery somewhere the
-  // caller did not name. `basename` at the caller already guarantees this; an embedder
-  // calling the port directly does not.
-  if (options.name === '' || options.name !== basename(options.name)) {
-    throw new TypeError(
-      `A delivery folder's name is one path segment, got '${options.name}'. It is the brief's ` +
-        "own file name without the extension — basename(briefPath, '.brief').",
-    );
-  }
-
-  const folder =
-    options.folder === 'destination'
-      ? resolve(destination)
-      : join(resolve(destination), options.name);
-  const editable = join(folder, EDITABLE_DIR);
-  const briefPath = join(editable, `${options.name}.${BRIEF_EXTENSION}`);
-  // One `mkdir -p` makes both: `editaveis/` is inside the folder it is created under.
-  const blocked = await makeFolder(editable);
-  if (blocked !== undefined) return err([blocked]);
-
-  // Read before it is replaced: the previous delivery's brief is the one record of which
-  // files in `assets/` an earlier export put there (ADR 0057).
-  const previousAssets = await readFile(briefPath, 'utf8').then(frontmatterValues, () => []);
-
-  // Before any artifact, so a run that dies half way still shows what it was rendering.
-  // `result.json` is the finished signal and is still the last thing written.
-  const briefBlocked = await writeAtomic(briefPath, options.brief);
-  if (briefBlocked !== undefined) return err([briefBlocked]);
-
-  return ok({
-    ...(await taskOutput({
-      artifacts: folder,
-      result: editable,
-      ...(options.validate === undefined ? {} : { validate: options.validate }),
-      label: options.label ?? folder,
-      // Always, because this layout exists to be sent as it is (ADR 0054).
-      removeLeftovers: true,
-    })),
-
-    async describeTemplate(template: DeliveryTemplate): Promise<Diagnostics> {
-      const blocked = await writeAtomic(join(editable, TEMPLATE_FILE), templateNote(template));
-      return blocked === undefined ? [] : [blocked];
-    },
-
-    async deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics> {
-      const directory = join(folder, ASSETS_DIR);
-      const names = deliveredNames(assets);
-      if (names.size > 0) {
-        const held = await makeFolder(directory);
-        if (held !== undefined) return [held];
-      }
-      const blocked: Diagnostic[] = [];
-      const copied = new Set<string>();
-      for (const [path, name] of names) {
-        const held = await copyAtomic(path, join(directory, name));
-        if (held === undefined) copied.add(path);
-        else blocked.push(held);
-      }
-
-      // Only what reached `assets/`: an image a folder kept out keeps the path that resolved,
-      // rather than the copied brief naming a file that is not there.
-      const renames = new Map<string, string>();
-      for (const asset of assets) {
-        const name = names.get(asset.path);
-        if (name !== undefined && copied.has(asset.path)) renames.set(asset.reference, name);
-      }
-      const source = new TextDecoder().decode(options.brief);
-      const rewritten = await writeAtomic(briefPath, rewriteFrontmatterValues(source, renames));
-      if (rewritten !== undefined) blocked.push(rewritten);
-
-      return [
-        ...blocked,
-        ...(await removeAssetLeftovers(directory, previousAssets, new Set(names.values()))),
-      ];
-    },
-  });
 }
 
 /**
@@ -456,88 +303,6 @@ export async function makeFolder(
   }
 }
 
-/** Names Windows reserves for a device, with or without an extension. */
-const DEVICE_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/iu;
-const LONGEST_FETCHED_STEM = 64;
-
-/**
- * The stem a fetched image is copied under, from its reference (ADR 0118).
- *
- * Its cached file is named by a hash, which says nothing to the person opening `assets/`,
- * and the reference — `test:logo`, `drive:pasta/Logo Final` — is not a file name on every
- * system. So the text after the reference's last `/`, `\` or `:` is kept, with every
- * character outside `[A-Za-z0-9._-]` turned into `-`, its own extension dropped (the cached
- * type gives the extension), leading and trailing dots removed, and at most 64 characters.
- * A device name gains `-image`. Nothing left is the scheme, which is always a name.
- *
- * The reference is text from a brief, and this is the only place it becomes part of a path:
- * nothing it holds can name a folder, because every separator is cut before it is used.
- */
-function fetchedStem(reference: string): string {
-  const scheme = reference.slice(0, reference.indexOf(':'));
-  const last = reference.split(/[/\\:]/u).pop() ?? '';
-  const safe = last.replace(/[^A-Za-z0-9._-]/gu, '-');
-  const stem = basename(safe, extname(safe))
-    .replace(/^\.+|\.+$/gu, '')
-    .slice(0, LONGEST_FETCHED_STEM);
-  const name = stem === '' ? scheme : stem;
-  return DEVICE_NAME.test(name) ? `${name}-image` : name;
-}
-
-/**
- * Each image's name in `assets/`: its own file name, and `-2`, `-3`… before the extension
- * when two different files share one. The same file named twice by the brief is copied once.
- * Compared without case, because a delivery is opened on filesystems that ignore it. An
- * image a plugin supplied is named after its reference instead of its cached file.
- */
-function deliveredNames(assets: readonly DeliveredAsset[]): Map<string, string> {
-  const names = new Map<string, string>();
-  const taken = new Set<string>();
-  for (const { path, reference, fetched } of assets) {
-    if (names.has(path)) continue;
-    const extension = extname(path);
-    const stem = fetched === true ? fetchedStem(reference) : basename(path, extension);
-    let name = `${stem}${extension}`;
-    for (let count = 2; taken.has(name.toLowerCase()); count += 1) {
-      name = `${stem}-${String(count)}${extension}`;
-    }
-    taken.add(name.toLowerCase());
-    names.set(path, name);
-  }
-  return names;
-}
-
-/**
- * What the previous delivery's brief pointed at in `assets/` and this one does not: removed,
- * with a warning each (ADR 0054's rule, carried to `assets/` by ADR 0057).
- *
- * Only a bare file name counts, the only shape a delivered brief writes, so nothing outside
- * `assets/` can be named, and a file somebody else put there is left alone.
- */
-async function removeAssetLeftovers(
-  directory: string,
-  previous: readonly string[],
-  current: ReadonlySet<string>,
-): Promise<Diagnostics> {
-  const warnings: Diagnostic[] = [];
-  for (const name of new Set(previous)) {
-    const bare = name !== '' && name === basename(name) && !name.startsWith('.');
-    if (!bare || current.has(name)) continue;
-    const path = join(directory, name);
-    const found = await lstat(path).catch(() => undefined);
-    if (found?.isFile() !== true) continue;
-    try {
-      await rm(path);
-      warnings.push(diagnostic('W_LEFTOVER_REMOVED', { file: `${ASSETS_DIR}/${name}` }));
-    } catch (cause) {
-      warnings.push(
-        diagnostic('W_LEFTOVER_KEPT', { file: `${ASSETS_DIR}/${name}`, reason: String(cause) }),
-      );
-    }
-  }
-  return warnings;
-}
-
 /**
  * Three lines naming the template, and a sentence saying it is not here.
  *
@@ -550,8 +315,12 @@ async function removeAssetLeftovers(
  * Portuguese for the sentence, like `editaveis/` itself and for the same reason: it is read
  * by whoever receives the folder. The description is the template author's own words and is
  * copied as written rather than translated.
+ *
+ * Exported from this module and not from the package: its last writer, the delivery output,
+ * went with TYTO-490's first half, and the delivery's own export decides in its second half
+ * whether a delivery still says which template made it.
  */
-function templateNote(template: DeliveryTemplate): string {
+export function templateNote(template: DeliveryTemplate): string {
   const lines = [`${template.name} ${template.version}`];
   if (template.description !== undefined) lines.push(template.description);
   lines.push(

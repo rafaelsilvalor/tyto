@@ -1,4 +1,4 @@
-import { open, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { open, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,18 +10,11 @@ import { isInside } from './contain.js';
 import { fileResources } from './file-resources.js';
 import { fsInbox, renameRetryingLocks } from './fs-inbox.js';
 import { fileTemplateAssets } from './file-template-assets.js';
-import { type DeliveryOutput, fsDeliveryOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
+import { fsArtworkOutput, fsOutbox, fsTaskOutput } from './fs-outbox.js';
 import { nodeFileSystem } from './node-file-system.js';
 import { pollSource } from './poll.js';
 import type { BriefSource, BriefTask } from './ports.js';
 import { type RenderResult, parseRenderResult, renderResult } from './result.js';
-
-/** The delivery output, or a failed test naming why it could not be opened. */
-async function openDelivery(...args: Parameters<typeof fsDeliveryOutput>): Promise<DeliveryOutput> {
-  const opened = await fsDeliveryOutput(...args);
-  if (!opened.ok) throw new Error(opened.error.map((item) => item.message).join('\n'));
-  return opened.value;
-}
 
 let workspace: string;
 
@@ -235,118 +228,69 @@ describe('fsTaskOutput', () => {
   });
 });
 
-describe('fsDeliveryOutput', () => {
-  const BRIEF = new TextEncoder().encode('::titulo Inscrições\n');
-
-  /** A valid empty report: these tests are about where files land, not what is in them. */
-  const emptyResult = (): RenderResult =>
+describe('fsArtworkOutput', () => {
+  /** A valid report, which this output is handed and does not write (ADR 0157, TYTO-490). */
+  const resultOf = (artifacts: readonly Artifact[]): RenderResult =>
     renderResult({
       cancelled: false,
-      planned: 0,
-      artifacts: [],
+      planned: artifacts.length,
+      artifacts,
       diagnostics: [],
       version: '0.0.0-test',
       templates: [],
     });
 
-  it('puts artwork at the top and the brief and result.json under editaveis/', async () => {
-    const output = await openDelivery(join(workspace, 'entregas'), {
-      name: 'campanha',
-      brief: BRIEF,
+  /** One export into `folder`, the way `render-task.ts` and the desktop drive it. */
+  async function exportInto(folder: string, names: readonly string[]) {
+    const opened = await fsArtworkOutput(folder);
+    if (!opened.ok) throw new Error(opened.error.map((item) => item.message).join('\n'));
+    const artifacts = names.map((name) => artifactOf(name));
+    for (const artifact of artifacts) await opened.value.write(artifact);
+    const leftovers = await opened.value.removeLeftovers({
+      artifacts,
+      planned: artifacts.length,
+      cancelled: false,
+      failed: false,
     });
-    await output.write(artifactOf('slide-1-feed.png'));
-    await output.finish(emptyResult());
+    const finished = await opened.value.finish(resultOf(artifacts));
+    return { leftovers, finished };
+  }
 
-    const folder = join(workspace, 'entregas', 'campanha');
-    // The top level is the delivery. A `result.json` here is the one file somebody would
-    // have to delete before sending the folder on, which is what the layout is avoiding.
-    expect((await readdir(folder)).sort()).toEqual(['editaveis', 'slide-1-feed.png']);
-    expect((await readdir(join(folder, 'editaveis'))).sort()).toEqual([
-      'campanha.brief',
-      'result.json',
+  it('writes the artwork and nothing beside it: no result.json, no editaveis/, no assets/', async () => {
+    const folder = join(workspace, 'escolhida');
+
+    const { finished } = await exportInto(folder, ['feed-01.svg', 'feed-02.svg']);
+
+    expect(finished).toEqual([]);
+    expect((await readdir(folder)).sort()).toEqual(['feed-01.svg', 'feed-02.svg']);
+  });
+
+  it('keeps a file the previous export wrote and this one did not, and says nothing', async () => {
+    // With no report there is no record of which files are Tyto's, so the fourth slide of an
+    // earlier export is as much the person's as a note they left there.
+    const folder = join(workspace, 'escolhida');
+    await exportInto(folder, ['feed-01.svg', 'feed-02.svg', 'feed-03.svg', 'feed-04.svg']);
+
+    const { leftovers } = await exportInto(folder, ['feed-01.svg', 'feed-02.svg', 'feed-03.svg']);
+
+    expect(leftovers).toEqual([]);
+    expect((await readdir(folder)).sort()).toEqual([
+      'feed-01.svg',
+      'feed-02.svg',
+      'feed-03.svg',
+      'feed-04.svg',
     ]);
   });
 
-  it('copies the brief unchanged, bytes and all', async () => {
-    const output = await openDelivery(join(workspace, 'entregas'), {
-      name: 'campanha',
-      brief: BRIEF,
-    });
-    await output.finish(emptyResult());
+  it('answers a file in the way of the folder instead of throwing (TYTO-129)', async () => {
+    const folder = join(workspace, 'escolhida');
+    await writeFile(folder, 'not a folder');
 
-    const copied = await readFile(
-      join(workspace, 'entregas', 'campanha', 'editaveis', 'campanha.brief'),
-    );
-    expect(copied.equals(Buffer.from(BRIEF))).toBe(true);
-  });
+    const opened = await fsArtworkOutput(folder);
 
-  it('writes the brief before any artifact, so a run that dies says what it was rendering', async () => {
-    // The factory is where it happens, and that is the claim: the folder is never a set of
-    // images with nothing to explain them. `result.json` is still last — it is the finished
-    // signal — so the brief cannot wait for `finish`.
-    await openDelivery(join(workspace, 'entregas'), { name: 'campanha', brief: BRIEF });
-
-    expect(await readdir(join(workspace, 'entregas', 'campanha', 'editaveis'))).toEqual([
-      'campanha.brief',
+    expect(opened.ok ? [] : opened.error.map((item) => item.code)).toEqual([
+      'E_DELIVERY_FOLDER_BLOCKED',
     ]);
-  });
-
-  it('names the template that made the artwork, and says it is not in the folder', async () => {
-    const output = await openDelivery(join(workspace, 'entregas'), {
-      name: 'campanha',
-      brief: BRIEF,
-    });
-    await output.describeTemplate({
-      name: 'promo-curso',
-      version: '1.0.0',
-      description: 'Course promotion with a teacher photo.',
-    });
-    await output.finish(emptyResult());
-
-    const note = await readFile(
-      join(workspace, 'entregas', 'campanha', 'editaveis', 'template.txt'),
-      'utf8',
-    );
-    // The identity, which is what a delivery owes its reader — the name alone would not say
-    // which version drew these files, and two runs a month apart are two versions.
-    expect(note).toContain('promo-curso 1.0.0');
-    expect(note).toContain('Course promotion with a teacher photo.');
-    // And the sentence that stops somebody looking for a template that was never copied.
-    expect(note).toContain('não está nesta pasta');
-  });
-
-  it('leaves the pointer out when nothing named a template', async () => {
-    // A brief that does not parse never loads one, and a delivery that invented a name would
-    // be claiming something the run did not do.
-    const output = await openDelivery(join(workspace, 'entregas'), {
-      name: 'campanha',
-      brief: BRIEF,
-    });
-    await output.finish(emptyResult());
-
-    expect((await readdir(join(workspace, 'entregas', 'campanha', 'editaveis'))).sort()).toEqual([
-      'campanha.brief',
-      'result.json',
-    ]);
-  });
-
-  it('refuses a name that is not one path segment, rather than delivering elsewhere', async () => {
-    // Refused, not rewritten. `artifact.ts`'s `fileSafe` would turn this into a folder with a
-    // different name; a second sanitiser is how one delivery ends up called two things.
-    await expect(
-      fsDeliveryOutput(join(workspace, 'entregas'), { name: '../escaped', brief: BRIEF }),
-    ).rejects.toThrow(/one path segment/u);
-  });
-
-  it('validates result.json the same way the task output does', async () => {
-    const output = await openDelivery(join(workspace, 'entregas'), {
-      name: 'campanha',
-      brief: BRIEF,
-    });
-
-    await expect(output.finish({ status: 'ok' } as never)).rejects.toThrow(
-      /does not match its schema/u,
-    );
   });
 });
 

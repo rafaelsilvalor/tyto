@@ -47,13 +47,13 @@ export const EXIT_CODES: readonly {
     name: 'error diagnostics',
     meaning:
       'The brief, the template or a frame produced an error — or the command line was ' +
-      'refused, or a `--folder` delivery found a file where its folder or `editaveis/` ' +
-      'has to go ' +
+      'refused, or `--folder` found a file where its folder has to go ' +
       '(`E_DELIVERY_FOLDER_BLOCKED`), or a folder where a file it writes has to go ' +
       '(`E_OUTPUT_FILE_BLOCKED`). `result.json` has `status: "error"` and lists what ' +
-      'went wrong, except when the command line was refused or the delivery folder, ' +
-      '`editaveis/` or the copied brief was held, where no run started, and when ' +
-      '`result.json` itself was held: then no `result.json` was written.',
+      'went wrong, except when the command line was refused or the `--folder` folder ' +
+      'was held, where no run started, when `result.json` itself was held, and under ' +
+      '`--folder`, which writes no `result.json` (ADR 0157): then no `result.json` was ' +
+      'written.',
     retry: false,
   },
   {

@@ -40,15 +40,16 @@ const packDirectory = join(dirname(require_.resolve('@tyto/templates/package.jso
 const exampleBrief = (template: string, file: string): string =>
   readFileSync(join(packDirectory, template, 'examples', file), 'utf8');
 
-/** A 1×1 PNG: the picture the delivery copies into `assets/`. */
+/** A 1×1 PNG: a picture the brief draws, which an artwork-only export does not copy. */
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
   'base64',
 );
 
 /**
- * `promo-curso`'s example with a picture beside it, in `examples` — what a delivery copies:
- * the brief into `editaveis/`, the picture into `assets/`.
+ * `promo-curso`'s example with a picture beside it, in `examples`: what the export box once
+ * copied into the picked folder, the brief into `editaveis/` and the picture into `assets/`
+ * (ADR 0057), and since TYTO-490 does not (ADR 0157).
  */
 function promoWithPicture(): string {
   mkdirSync(join(examples, 'assets'), { recursive: true });
@@ -120,49 +121,40 @@ describe('the export service', () => {
     expect(files.filter((name) => name.endsWith('.svg')).length).toBeGreaterThan(0);
   }, 60_000);
 
-  it('delivers into the picked folder: artwork on top, editaveis/ and assets/ (TYTO-205)', async () => {
+  it('writes only the artwork into the picked folder: no result.json, editaveis/ or assets/ (TYTO-490)', async () => {
     const { exportId } = await service.start({
       brief: promoWithPicture(),
       directory: out,
       briefDirectory: examples,
       label: 'promo',
       outputs: [{ kind: 'svg' }],
-      removeLeftovers: true,
-      delivery: true,
+      artworkOnly: true,
     });
 
     const progress = await settled(exportId);
 
     expect(progress.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
-    // No level named after the brief: the folder the person picked is the delivery.
-    expect(readdirSync(out).sort()).toEqual([
-      'assets',
-      'editaveis',
+    // No level named after the brief, and nothing beside the artwork (ADR 0157).
+    expect(readdirSync(out).sort()).toEqual(['grid-1x1-01.svg', 'story-01.svg']);
+    // The report still reaches the dialog; it is only not written to the folder.
+    expect(progress.result?.artifacts.map((artifact) => artifact.name).sort()).toEqual([
       'grid-1x1-01.svg',
       'story-01.svg',
     ]);
-    expect(readdirSync(join(out, 'editaveis')).sort()).toEqual([
-      'promo.brief',
-      'result.json',
-      'template.txt',
-    ]);
-    expect(readdirSync(join(out, 'assets'))).toEqual(['foto.png']);
-    expect(readFileSync(join(out, 'editaveis', 'promo.brief'), 'utf8')).toContain(
-      'imagem: foto.png\n',
-    );
   }, 60_000);
 
-  it('answers a file named editaveis in the picked folder with a diagnostic, not a failure', async () => {
-    // Was `failure: "ENOTDIR … mkdir '…\editaveis'"` in the dialog: the operating system's
-    // wording for something the person fixes by renaming a file (TYTO-129).
-    writeFileSync(join(out, 'editaveis'), 'nao sou pasta');
+  it('answers a file holding the picked folder with a diagnostic, not a failure', async () => {
+    // Was `failure: "ENOTDIR … mkdir"` in the dialog: the operating system's wording for
+    // something the person fixes by renaming a file (TYTO-129).
+    const picked = join(out, 'escolhida');
+    writeFileSync(picked, 'nao sou pasta');
     const { exportId } = await service.start({
       brief: promoWithPicture(),
-      directory: out,
+      directory: picked,
       briefDirectory: examples,
       label: 'promo',
       outputs: [{ kind: 'svg' }],
-      delivery: true,
+      artworkOnly: true,
     });
 
     const progress = await settled(exportId);
@@ -172,80 +164,42 @@ describe('the export service', () => {
     expect(progress.diagnostics.map((item) => [item.code, item.message])).toEqual([
       [
         'E_DELIVERY_FOLDER_BLOCKED',
-        `'${join(out, 'editaveis')}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.`,
+        `'${picked}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.`,
       ],
     ]);
-    expect(readdirSync(out)).toEqual(['editaveis']);
+    expect(readdirSync(out)).toEqual(['escolhida']);
   }, 60_000);
 
-  it('answers a file named assets with an error beside the artwork it did write', async () => {
-    writeFileSync(join(out, 'assets'), 'nao sou pasta');
+  // TYTO-243: a folder where the export writes a file. Was `E_OUTPUT_WRITE Could not write
+  // 'grid-01.svg': …` until ADR 0108.
+  it('answers a folder holding an artwork file with a diagnostic, not a failure', async () => {
+    const held = join(out, 'grid-1x1-01.svg');
+    mkdirSync(held, { recursive: true });
     const { exportId } = await service.start({
       brief: promoWithPicture(),
       directory: out,
       briefDirectory: examples,
       label: 'promo',
       outputs: [{ kind: 'svg' }],
-      delivery: true,
+      artworkOnly: true,
     });
 
     const progress = await settled(exportId);
 
     expect(progress.failure).toBeUndefined();
-    // Errors only: this run renders, and a machine without the template's faces adds a
-    // W_FONT_SUBSTITUTED per weight beside it, as the CI's Linux does.
+    expect(progress.status).toBe('finished');
+    // Errors only, for the W_FONT_SUBSTITUTED the CI's Linux adds beside a run that renders.
     expect(
-      progress.diagnostics.filter((item) => item.severity === 'error').map((item) => item.code),
-    ).toEqual(['E_DELIVERY_FOLDER_BLOCKED']);
-    expect(progress.result?.status).toBe('error');
-    expect(readdirSync(out).sort()).toEqual([
-      'assets',
-      'editaveis',
-      'grid-1x1-01.svg',
-      'story-01.svg',
+      progress.diagnostics
+        .filter((item) => item.severity === 'error')
+        .map((item) => [item.code, item.message]),
+    ).toEqual([
+      [
+        'E_OUTPUT_FILE_BLOCKED',
+        `'${held}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.`,
+      ],
     ]);
   }, 60_000);
-
-  // TYTO-243: a folder where the delivery writes a file. Was `failure: "EPERM … rename"`.
-  it.each([
-    ['the copied brief', ['editaveis', 'promo.brief']],
-    ['template.txt', ['editaveis', 'template.txt']],
-    ['an image in assets/', ['assets', 'foto.png']],
-    ['result.json', ['editaveis', 'result.json']],
-    // Was `E_OUTPUT_WRITE Could not write 'grid-01.svg': …` until ADR 0108.
-    ['an artwork file', ['grid-1x1-01.svg']],
-  ])(
-    'answers a folder holding %s with a diagnostic, not a failure',
-    async (_, segments) => {
-      const held = join(out, ...segments);
-      mkdirSync(held, { recursive: true });
-      const { exportId } = await service.start({
-        brief: promoWithPicture(),
-        directory: out,
-        briefDirectory: examples,
-        label: 'promo',
-        outputs: [{ kind: 'svg' }],
-        delivery: true,
-      });
-
-      const progress = await settled(exportId);
-
-      expect(progress.failure).toBeUndefined();
-      expect(progress.status).toBe('finished');
-      // Errors only, for the W_FONT_SUBSTITUTED the CI's Linux adds beside a run that renders.
-      expect(
-        progress.diagnostics
-          .filter((item) => item.severity === 'error')
-          .map((item) => [item.code, item.message]),
-      ).toEqual([
-        [
-          'E_OUTPUT_FILE_BLOCKED',
-          `'${held}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.`,
-        ],
-      ]);
-    },
-    60_000,
-  );
 
   // ADR 0108: what the sink cannot explain ends the run, as a lock does, and is the dialog's
   // failure rather than a diagnostic. A folder at the scratch name stands in for the lock,
@@ -258,7 +212,6 @@ describe('the export service', () => {
       briefDirectory: examples,
       label: 'promo',
       outputs: [{ kind: 'svg' }],
-      delivery: true,
     });
 
     const progress = await settled(exportId);
@@ -266,7 +219,8 @@ describe('the export service', () => {
     expect(progress.status).toBe('finished');
     expect(progress.failure).toBeDefined();
     expect(progress.diagnostics.map((item) => item.code)).not.toContain('E_OUTPUT_WRITE');
-    expect(readdirSync(join(out, 'editaveis'))).not.toContain('result.json');
+    // The queue's layout, the one that keeps a report: a run that ended this way leaves none.
+    expect(readdirSync(out)).not.toContain('result.json');
   }, 60_000);
 
   it('answers with a plan before it answers with files', async () => {
@@ -347,6 +301,33 @@ describe('the export service', () => {
     );
     // In the report on disk too, which is what somebody opening the folder later reads.
     expect(removed.result?.diagnostics.map((item) => item.code)).toContain('W_LEFTOVER_REMOVED');
+  }, 60_000);
+
+  it('removes nothing from the picked folder, because it keeps no report (TYTO-490)', async () => {
+    // With no result.json, Tyto cannot tell the fourth slide it wrote last time from a file
+    // the person put there, so it stays (ADR 0157).
+    const four = exampleBrief('carrossel-lista', 'lista.brief');
+    const three = four.slice(0, four.lastIndexOf('::lamina'));
+    const exportInto = async (brief: string) =>
+      settled(
+        (
+          await service.start({
+            brief,
+            directory: out,
+            label: 'lista',
+            outputs: [{ kind: 'svg' }],
+            removeLeftovers: true,
+            artworkOnly: true,
+          })
+        ).exportId,
+      );
+
+    await exportInto(four);
+    const kept = await exportInto(three);
+
+    expect(readdirSync(out)).toContain('story-04.svg');
+    expect(readdirSync(out)).not.toContain('result.json');
+    expect(kept.diagnostics.map((item) => item.code)).not.toContain('W_LEFTOVER_REMOVED');
   }, 60_000);
 
   it('reports a brief that does not compile instead of throwing', async () => {

@@ -193,7 +193,8 @@ delivery now keeps the editable side, and an export is what it says.
   folder they chose. A delivery's export keeps the rule, because its record has a place to live.
 - **Unchanged:** `tyto render --out`, the queue and `tyto watch`, whose `result.json` is the ADR
   0011 contract; `tyto render --folder`, the command line's ADR 0057 layout, which this ADR leaves
-  as it is; and the `../assets` folder a brief in `editaveis/` reads (ADR 0057), which a delivery
+  as it is (superseded on 2026-10-30, TYTO-490: `--folder` writes only artwork too, see "Not
+  decided" below); and the `../assets` folder a brief in `editaveis/` reads (ADR 0057), which a delivery
   depends on.
 
 ### 8. A campaign is a work profile
@@ -212,13 +213,18 @@ measured that a profile cannot hold.
   (ADR 0101), and adds its codes to `docs/diagnostic-codes.md`.
 - Once TYTO-490 turns ADR 0057's layout off in the window, `fsDeliveryOutput` keeps one caller,
   `tyto render --folder`, and its name no longer matches the word: renaming it belongs with
-  whatever is decided for `--folder`.
+  whatever is decided for `--folder`. (Superseded on 2026-10-30, TYTO-490: `--folder` went to
+  artwork only as well, so `fsDeliveryOutput` lost its last caller and was removed;
+  `fsArtworkOutput` writes for the export box, the presets and `--folder`.)
 - A person who relied on the export box to hand over a self-contained folder (brief and images
   beside the artwork) now gets that from a delivery, not from the box.
 - Not measured: how a delivery folder synchronised by Drive or OneDrive behaves when `tyto
 delivery new` reuses it while another machine is writing into it.
 - Not decided: whether `tyto render --folder` follows the export box to artwork only; a list of
   deliveries in the window; renaming a delivery.
+  - 2026-10-30, decided by the maintainer (TYTO-490): `tyto render --folder` writes only the
+    artwork too, in the `<out>/<brief-name>/` folder it already made. Nothing writes ADR 0057's
+    layout any more but a delivery's own folder.
 
 ## Rejected
 
