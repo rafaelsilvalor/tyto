@@ -265,6 +265,10 @@ describe('the bridge', () => {
       'app:info',
       'app:locale',
       'brief:preview',
+      // TYTO-495, ADR 0159: a tyto command run in main. Driven by `e2e/cli-runner.desktop.test.ts`.
+      'cli:cancel',
+      'cli:commands',
+      'cli:run',
       'credentials:delete',
       // No `credentials:get` since TYTO-187: nothing in the renderer may read a secret back.
       'credentials:set',
@@ -495,6 +499,9 @@ describe('switching the language', () => {
     'pluginFiles.approve.message',
     'pluginFiles.approve.load',
     'pluginFiles.approve.skip',
+    // TYTO-495: the native box a `tyto` command run in the window asks through (ADR 0159).
+    'cli.confirm.yes',
+    'cli.confirm.no',
     'workspace.banner.text',
     'workspace.banner.trust',
     'workspace.banner.problems',

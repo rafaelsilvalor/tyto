@@ -79,11 +79,19 @@ export interface CliEnvironment {
    * it is printed as `error: <sentence>` and the command line exits 1, as a command line the
    * parser refused does, and the command never starts.
    *
-   * Absent in a terminal, which refuses nothing. The window refuses what ADR 0159 decision 2
-   * lists (`--trust`, an npm install on Windows, `watch` on the auto-run queue's folder), and
-   * those rules are the window's, so they live in `apps/desktop` and not here.
+   * Absent in a terminal, which refuses nothing. The window refuses `--trust` and `watch` on
+   * the auto-run queue's folder (ADR 0159 decision 2), and those rules are the window's, so they
+   * live in `apps/desktop` and not here. An npm install on Windows is refused where the shell
+   * would start instead (`shellRefusal`), so no command has to be named for it.
    */
   readonly refuse?: (invocation: CommandInvocation) => Promise<string | undefined>;
+  /**
+   * Set when this run may not start a shell (ADR 0159 decision 8): the sentence a step that would
+   * start one fails with, at that step, before the shell exists. The CLI's one shell is `npm` on
+   * Windows (`plugins/fetch.ts`), so the window refuses an npm install there and nothing else.
+   * Absent in a terminal, whose person already has a shell.
+   */
+  readonly shellRefusal?: string;
 }
 
 /** A command about to run: `['plugin', 'install']`, its arguments and its parsed options. */

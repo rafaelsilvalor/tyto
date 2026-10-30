@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@tyto/brief-lang": "workspace:*",
+    "@tyto/command-line": "workspace:*",
     "@tyto/core": "workspace:*",
     "@tyto/editor": "workspace:*",
     "@tyto/export-html": "workspace:*",

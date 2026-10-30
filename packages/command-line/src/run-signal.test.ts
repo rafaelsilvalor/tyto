@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { commandTree } from './commands.js';
 import type { CliEnvironment, CommandInvocation } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK } from './exit.js';
-import { pluginSourceKind } from './plugins/fetch.js';
+import { fetchPlugin } from './plugins/fetch.js';
 import { run } from './program.js';
 
 import briefSource from './__fixtures__/cartaz.brief?raw';
@@ -197,13 +197,41 @@ describe('the command tree as data', () => {
   });
 });
 
-describe('which source a plugin spec is', () => {
-  it('is a folder when one exists there, git by its URL, and npm otherwise', async () => {
-    expect(await pluginSourceKind('task', workspace)).toBe('folder');
-    expect(await pluginSourceKind('git+https://example.test/x.git', workspace)).toBe('git');
-    expect(await pluginSourceKind('tyto-plugin-pdf@1', workspace)).toBe('npm');
-    // A tarball on this disk is still `npm pack`'s, handed over as `file:`.
-    await writeFile(join(workspace, 'x.tgz'), '');
-    expect(await pluginSourceKind('x.tgz', workspace)).toBe('npm');
+describe('a run that may not start a shell', () => {
+  // On Windows `npm` is `npm.cmd`, which only a shell starts (`runNpm`). The refusal is keyed on
+  // that step and not on a command, so whatever reaches npm there is refused the same way.
+  it('refuses npm on Windows at the step that would start the shell, naming the reason', async () => {
+    const fetched = await fetchPlugin('tyto-plugin-pdf@1', workspace, {
+      platform: 'win32',
+      shellRefusal: 'No shell in the window.',
+    });
+
+    expect(fetched.ok).toBe(false);
+    if (fetched.ok) return;
+    expect(fetched.error.map((found) => found.code)).toEqual(['E_PLUGIN_FETCH']);
+    expect(fetched.error[0]?.message).toContain('No shell in the window.');
+  });
+
+  // The whole way from the command line, where the platform cannot be simulated: Windows only.
+  it.runIf(process.platform === 'win32')(
+    'refuses tyto plugin install of an npm package, through run, on this Windows',
+    async () => {
+      const code = await run(
+        ['plugin', 'install', 'tyto-plugin-pdf@1', '--yes'],
+        environment({ home: join(workspace, 'home'), shellRefusal: 'No shell in the window.' }),
+      );
+
+      expect(code).toBe(EXIT_DIAGNOSTICS);
+      expect(stderr()).toContain('No shell in the window.');
+    },
+  );
+
+  it('leaves a folder alone, which starts nothing', async () => {
+    const fetched = await fetchPlugin('task', workspace, {
+      platform: 'win32',
+      shellRefusal: 'No shell in the window.',
+    });
+
+    expect(fetched.ok).toBe(true);
   });
 });

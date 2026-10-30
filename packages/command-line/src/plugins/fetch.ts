@@ -68,10 +68,17 @@ function problemOf(cause: unknown): string {
  * line the shell reads. Every argument is quoted, and one that could close its quote or
  * reach `cmd.exe`'s own expansion is refused before the shell sees it rather than escaped.
  */
-async function runNpm(args: readonly string[], cwd: string): Promise<string> {
-  if (process.platform !== 'win32') {
+async function runNpm(
+  args: readonly string[],
+  cwd: string,
+  options: FetchOptions,
+): Promise<string> {
+  if ((options.platform ?? process.platform) !== 'win32') {
     return (await run('npm', [...args], { cwd })).stdout;
   }
+  // Refused here, where the shell would start, and not by the command that led here: whatever
+  // reaches `npm` on Windows is covered, `plugin install` today and any command after it.
+  if (options.shellRefusal !== undefined) throw new Error(options.shellRefusal);
   if (args.some((arg) => /["%^&|<>]/u.test(arg))) {
     throw new Error('an npm spec on Windows may not contain " % ^ & | < or >');
   }
@@ -88,13 +95,18 @@ async function fetchGit(url: string, scratch: string): Promise<string> {
   return checkout;
 }
 
-async function fetchNpm(spec: string, cwd: string, scratch: string): Promise<string> {
+async function fetchNpm(
+  spec: string,
+  cwd: string,
+  scratch: string,
+  options: FetchOptions,
+): Promise<string> {
   // `npm pack` is the one npm command that fetches a package and installs nothing: it
   // resolves a name, a version range, a tarball path or a URL exactly as `npm install`
   // would, and leaves one `.tgz` behind.
   const packed = join(scratch, 'packed');
   await mkdir(packed);
-  await runNpm(['pack', spec, '--pack-destination', packed, '--silent'], cwd);
+  await runNpm(['pack', spec, '--pack-destination', packed, '--silent'], cwd, options);
 
   const [tarball] = (await readdir(packed)).filter((name) => name.endsWith('.tgz'));
   if (tarball === undefined) throw new Error('npm pack produced no tarball');
@@ -109,14 +121,11 @@ async function fetchNpm(spec: string, cwd: string, scratch: string): Promise<str
   return join(extracted, 'package');
 }
 
-/**
- * Which of the three sources `spec` is, without fetching it: the rule {@link fetchPlugin}
- * follows. `npm` is the one that runs `npm pack`, through a shell on Windows (`runNpm`), which
- * is what the window refuses there (ADR 0159 decision 2).
- */
-export async function pluginSourceKind(spec: string, cwd: string): Promise<PluginSourceKind> {
-  if (await isDirectory(isAbsolute(spec) ? spec : resolve(cwd, spec))) return 'folder';
-  return gitUrlOf(spec) === undefined ? 'npm' : 'git';
+export interface FetchOptions {
+  /** `environment.shellRefusal`: set, a step that would start a shell fails with it. */
+  readonly shellRefusal?: string;
+  /** The platform whose rules apply; this one's unless a test simulates another. */
+  readonly platform?: NodeJS.Platform;
 }
 
 /**
@@ -128,6 +137,7 @@ export async function pluginSourceKind(spec: string, cwd: string): Promise<Plugi
 export async function fetchPlugin(
   spec: string,
   cwd: string,
+  options: FetchOptions = {},
 ): Promise<Result<FetchedPlugin, Diagnostics>> {
   const local = isAbsolute(spec) ? spec : resolve(cwd, spec);
   if (await isDirectory(local)) {
@@ -145,7 +155,7 @@ export async function fetchPlugin(
     const npmSpec = (await isFile(local)) ? `file:${local}` : spec;
     const directory =
       gitUrl === undefined
-        ? await fetchNpm(npmSpec, cwd, scratch)
+        ? await fetchNpm(npmSpec, cwd, scratch, options)
         : await fetchGit(gitUrl, scratch);
     return ok({ kind: gitUrl === undefined ? 'npm' : 'git', directory, cleanup });
   } catch (cause) {

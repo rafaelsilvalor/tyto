@@ -27,6 +27,7 @@ import { type VimPlugins } from '../../shared/vim-plugins.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
 import { type LineNumbersLook } from '../../shared/line-numbers.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
+import { type CliRunner } from './cli-runner.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
@@ -251,6 +252,8 @@ export interface IpcDependencies {
   >;
   /** A new delivery in the open folder (TYTO-489, ADR 0157): planned and written by main. */
   readonly delivery: DeliveryService;
+  /** `tyto` commands run in main for the window (TYTO-495, ADR 0159). */
+  readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands'>;
   /**
    * A native context menu of the window's items at a point, settling with the id picked or
    * `null` (TYTO-352, ADR 0121). A function for the reason `confirm` is one: `Menu.popup` is
@@ -429,6 +432,7 @@ type Handlers = {
 export function createHandlers(dependencies: IpcDependencies): Handlers {
   const {
     askToSave,
+    cli,
     confirm,
     contextMenu,
     credentials,
@@ -737,6 +741,15 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         },
       });
     },
+
+    'cli:run': ({ argv }) => Promise.resolve(cli.start(argv)),
+
+    'cli:cancel': ({ runId }) => {
+      cli.cancel(runId);
+      return Promise.resolve({});
+    },
+
+    'cli:commands': () => Promise.resolve({ tree: cli.commands() }),
 
     'export:cancel': ({ exportId }) => {
       exports.cancel(exportId);

@@ -57,6 +57,8 @@ import {
   steppedZoom,
   typographyExample,
 } from '../../shared/typography.js';
+import { confirmInABox, createCliRunner } from './cli-runner.js';
+import { SHELL_REFUSED, windowRefusals } from './cli-refusals.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
 import { openDocumentation } from './documentation.js';
@@ -691,6 +693,9 @@ async function start(): Promise<void> {
       ),
     home: () => app.getPath('home'),
   });
+  // Stops every `tyto` command running in main (ADR 0159 decision 3): a `watch` ends when the
+  // window opens another folder. Bound once the runner exists, below the queue.
+  let stopCommands = (): void => {};
   const workspace = createWorkspaceService({
     trustStore: fsTrustStore({ home: pluginsHome }),
     home: pluginsHome,
@@ -698,6 +703,7 @@ async function start(): Promise<void> {
       await sources.setWorkspaceFolders(folders);
     },
     onFolder: async (folder, places) => {
+      stopCommands();
       await explorer.setRoot(folder, places);
       if (folder !== undefined) await recentFolders.remember(folder);
       // Not awaited: a fetch may take a while, and the folder is open meanwhile. The templates
@@ -1012,6 +1018,65 @@ async function start(): Promise<void> {
   });
   app.on('will-quit', () => {
     queue.close();
+  });
+
+  // **`tyto` commands in main** (TYTO-495, ADR 0159): the CLI's own command tree, run with the
+  // window's instances — the rasterizer the export uses, the bundled-Node launcher, this
+  // `TYTO_HOME` and the open folder — so a command and the window share one of each.
+  const commandRasterizer = host.registry.rasterizers<Rasterizer>()[0]?.value;
+  const cli = createCliRunner({
+    environment: () => ({
+      version: app.getVersion(),
+      cwd: workspace.state().folder ?? pluginsHome,
+      home: pluginsHome,
+      variables: process.env,
+      shellRefusal: SHELL_REFUSED,
+      launch,
+      rasterizer: () => {
+        if (commandRasterizer === undefined) throw new Error('This window has no rasterizer.');
+        return commandRasterizer;
+      },
+    }),
+    refuse: windowRefusals({ platform: process.platform, queue: () => queue.view() }),
+    confirm: confirmInABox(
+      (box) => {
+        const options = { ...box, buttons: [...box.buttons] };
+        return mainWindow === undefined
+          ? dialog.showMessageBox(options)
+          : dialog.showMessageBox(mainWindow, options);
+      },
+      (key) => translate(uiLocale, key),
+    ),
+    output: (output) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'cli:output', output);
+    },
+    state: (change) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'cli:state', change);
+    },
+    // The commands with a window twin leave the window as its own twin would (decision 3).
+    afterRun: async ([command, subcommand], code) => {
+      if (code !== 0) return;
+      if (command === 'plugin' && subcommand === 'sync') await syncPluginFiles(false);
+      if (command === 'delivery' && subcommand === 'new') {
+        const contents = mainWindow?.webContents;
+        if (contents !== undefined && !contents.isDestroyed()) {
+          sendIpcEvent(contents, 'explorer:changed', {});
+        }
+      }
+      // A revoke applies the next time the folder opens (ADR 0111), so only a grant re-reads.
+      const open = workspace.state().folder;
+      if (command === 'trust' && subcommand === 'add' && open !== null) await workspace.open(open);
+    },
+  });
+  stopCommands = () => {
+    cli.cancelAll();
+  };
+  app.on('will-quit', () => {
+    cli.cancelAll();
   });
 
   // **Live settings** (TYTO-206): a save of `settings.json` from the tab or any editor applies
@@ -1433,6 +1498,7 @@ async function start(): Promise<void> {
       },
     },
     pluginFiles: { sync: (update) => syncPluginFiles(update) },
+    cli,
     explorer,
     delivery: createDeliveryService({ layout: () => workspace.deliveryLayout() }),
     queue: {

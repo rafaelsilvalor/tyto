@@ -103,6 +103,39 @@ const pluginCredential = {
  * catalogue's business; a renderer that pinned it would stop compiling every time a
  * diagnostic was added, which is the opposite of what a contract is for.
  */
+/** One node of `tyto`'s command tree, as `@tyto/command-line`'s `commandTree` describes it. */
+interface CommandDescriptionShape {
+  readonly name: string;
+  readonly description: string;
+  readonly arguments: readonly {
+    readonly name: string;
+    readonly required: boolean;
+    readonly description: string;
+  }[];
+  readonly options: readonly { readonly flags: string; readonly description: string }[];
+  readonly commands: readonly CommandDescriptionShape[];
+}
+
+const commandDescription: z.ZodType<CommandDescriptionShape> = z.lazy(() =>
+  z.object({
+    name: z.string().max(200),
+    description: z.string().max(2000),
+    arguments: z
+      .array(
+        z.object({
+          name: z.string().max(200),
+          required: z.boolean(),
+          description: z.string().max(2000),
+        }),
+      )
+      .max(50),
+    options: z
+      .array(z.object({ flags: z.string().max(200), description: z.string().max(2000) }))
+      .max(100),
+    commands: z.array(commandDescription).max(100),
+  }),
+);
+
 const diagnostic = z.object({
   severity: z.enum(['error', 'warning', 'info']),
   code: z.string(),
@@ -2199,6 +2232,26 @@ export const IPC_CHANNELS = {
     z.object({}),
     z.object({ verbs: z.array(z.string().max(200)).max(5000) }),
   ),
+
+  /**
+   * Runs a `tyto` command in main (TYTO-495, ADR 0159). `argv` is the words after `tyto`, an
+   * array and never a command line: nothing reads `|`, `>`, `&&`, `$VAR` or a glob, and a word
+   * that looks like one is an argument like any other (decision 8). Answers at once with the
+   * run's id; what it prints and how it ends arrive on `cli:output` and `cli:state`.
+   */
+  'cli:run': channel(
+    z.object({ argv: z.array(z.string().max(4096)).max(256) }),
+    z.object({ runId: z.string().min(1) }),
+  ),
+
+  /**
+   * Fires the run's `AbortSignal` (decision 6). Answers nothing: `cli:state` says `cancelled`
+   * at once, and a command that cannot stop part of the way through says it is finishing.
+   */
+  'cli:cancel': channel(z.object({ runId: z.string().min(1) }), z.object({})),
+
+  /** The command tree, for help and completion: the same program `cli:run` parses. */
+  'cli:commands': channel(z.object({}), z.object({ tree: commandDescription })),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
@@ -2224,6 +2277,28 @@ export type IpcResponse<Name extends IpcChannelName> = z.infer<IpcChannels[Name]
  * that need them.
  */
 export const IPC_EVENTS = {
+  /**
+   * What a `tyto` command run in main printed (TYTO-495, ADR 0159 decision 5): text only, as a
+   * terminal would show it, tagged with the stream and the run.
+   */
+  'cli:output': z.object({
+    runId: z.string().min(1),
+    stream: z.enum(['out', 'err']),
+    text: z.string().max(1_000_000),
+  }),
+
+  /**
+   * Where a run stands. `waiting` carries the question a native box is asking (decision 4);
+   * `finished` carries the CLI's exit code; `cancelled` carries none, because the CLI defines
+   * none for it (decision 6).
+   */
+  'cli:state': z.object({
+    runId: z.string().min(1),
+    state: z.enum(['running', 'waiting', 'finished', 'cancelled']),
+    code: z.number().int().min(0).max(255).optional(),
+    question: z.string().max(4000).optional(),
+  }),
+
   /**
    * The app is trying to exit and wants to know whether the window minds (TYTO-123).
    *

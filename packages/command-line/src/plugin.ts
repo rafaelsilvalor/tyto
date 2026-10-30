@@ -336,7 +336,11 @@ export async function pluginInstallCommand(
   const state = stateOf(installed, environment);
   if (state === undefined) return EXIT_DIAGNOSTICS;
 
-  const fetched = await fetchPlugin(spec, environment.cwd);
+  const fetched = await fetchPlugin(
+    spec,
+    environment.cwd,
+    environment.shellRefusal === undefined ? {} : { shellRefusal: environment.shellRefusal },
+  );
   if (!fetched.ok) return fail(fetched.error, environment);
 
   try {

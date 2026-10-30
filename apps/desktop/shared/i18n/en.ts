@@ -56,6 +56,8 @@ export const en: Catalogue = {
     "The plugin files name '{plugin}', which asks for these permissions. Load it?",
   'pluginFiles.approve.load': 'Load it',
   'pluginFiles.approve.skip': 'Not now',
+  'cli.confirm.yes': 'Yes',
+  'cli.confirm.no': 'No',
   'command.workspace.showProject': 'Workspace: Show Project',
   'workspace.banner.text':
     'This folder is not trusted, so {count} of the folders, sections and plugin files it ships were left out.',
