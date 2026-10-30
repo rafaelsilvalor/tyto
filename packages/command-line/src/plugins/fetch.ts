@@ -110,6 +110,16 @@ async function fetchNpm(spec: string, cwd: string, scratch: string): Promise<str
 }
 
 /**
+ * Which of the three sources `spec` is, without fetching it: the rule {@link fetchPlugin}
+ * follows. `npm` is the one that runs `npm pack`, through a shell on Windows (`runNpm`), which
+ * is what the window refuses there (ADR 0159 decision 2).
+ */
+export async function pluginSourceKind(spec: string, cwd: string): Promise<PluginSourceKind> {
+  if (await isDirectory(isAbsolute(spec) ? spec : resolve(cwd, spec))) return 'folder';
+  return gitUrlOf(spec) === undefined ? 'npm' : 'git';
+}
+
+/**
  * Fetches `spec` into a temp folder, or points at it when it is already a folder.
  *
  * A folder wins over the other two: `./pdf.git` that exists on disk is somebody's folder

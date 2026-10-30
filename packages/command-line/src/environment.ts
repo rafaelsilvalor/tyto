@@ -74,6 +74,23 @@ export interface CliEnvironment {
    * must never hand a plugin a secret from the machine it runs on.
    */
   readonly variables?: Readonly<Record<string, string | undefined>>;
+  /**
+   * Asked before every command runs, with the words that reached it. A sentence is a refusal:
+   * it is printed as `error: <sentence>` and the command line exits 1, as a command line the
+   * parser refused does, and the command never starts.
+   *
+   * Absent in a terminal, which refuses nothing. The window refuses what ADR 0159 decision 2
+   * lists (`--trust`, an npm install on Windows, `watch` on the auto-run queue's folder), and
+   * those rules are the window's, so they live in `apps/desktop` and not here.
+   */
+  readonly refuse?: (invocation: CommandInvocation) => Promise<string | undefined>;
+}
+
+/** A command about to run: `['plugin', 'install']`, its arguments and its parsed options. */
+export interface CommandInvocation {
+  readonly path: readonly string[];
+  readonly args: readonly string[];
+  readonly options: Readonly<Record<string, unknown>>;
 }
 
 /**
