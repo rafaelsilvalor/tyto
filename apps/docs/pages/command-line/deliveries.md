@@ -1,7 +1,7 @@
 # Deliveries
 
 ::: info How this page was checked
-Every command was run on 2026-10-30 on a development build of the branch that added it (TYTO-489) on Windows 11, in a workspace folder whose `.tyto/project.json` was `{ "delivery": { "parent": "entregas" } }`. The outputs below are copied from those runs.
+Every command was run on 2026-10-30 on a development build of the branch that added it (TYTO-489) on Windows 11, in a workspace folder whose `.tyto/project.json` was `{ "delivery": { "parent": "entregas" } }`. The outputs below are copied from those runs; the `--template` one was run again on 2026-10-30 on the branch of TYTO-436, once the template it named had left the app.
 :::
 
 A **delivery** is one folder per piece of work, named after its ticket: the brief, its images and, later, the finished artwork, kept together inside the project. `tyto delivery new` makes one; in the window, **File ▸ Delivery: New…** does ([Workspace folder](../editor/workspace-folder.md#deliveries-one-folder-per-piece-of-work)).
@@ -24,8 +24,8 @@ Outside any workspace folder the delivery is made in the folder you are in, with
 `--template` (or `-t`) writes the template's skeleton into the brief instead of leaving it empty: the same text **New brief from template…** writes in the window, with the template's required slots and its sizes.
 
 ```
-$ tyto delivery new mca-66911_aprovados -t aprovados
-entregas\mca-66911_aprovados\editaveis\mca-66911_aprovados.brief
+$ tyto delivery new mca-66911_carrossel -t carrossel-lista
+entregas\mca-66911_carrossel\editaveis\mca-66911_carrossel.brief
 ```
 
 The name can be a template, or an alias a [plugin file](./plugins.md#configurations-and-aliases) defines; a configuration's own skeleton is used when it has one. In a folder you have not trusted, the plugin files the folder brings are not loaded; `--trust` trusts the folder and its work profile for this run only, as on `tyto render`.

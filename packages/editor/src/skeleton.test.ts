@@ -15,7 +15,7 @@ const manifestOf = (yaml: string): TemplateManifest => {
 
 /** The agenda's manifest as the built-in pack declares it, comments left out. */
 const AGENDA = manifestOf(`
-name: agenda-semana
+name: agenda-diaria
 version: 4.2.0
 formats: [grid]
 slots:
@@ -48,7 +48,7 @@ describe('briefSkeleton', () => {
     expect(briefSkeleton(AGENDA)).toBe(
       [
         '---',
-        'template: agenda-semana',
+        'template: agenda-diaria',
         'formats: [grid]',
         '---',
         '',
@@ -250,7 +250,7 @@ describe('a configured skeleton (TYTO-440)', () => {
     ).toBe(
       [
         '---',
-        'template: agenda-semana',
+        'template: agenda-diaria',
         'formats: [story]',
         '---',
         '',
@@ -273,10 +273,10 @@ describe('a configured skeleton (TYTO-440)', () => {
       skeletonText(
         briefSkeleton({ ...AGENDA, configured: { skeleton: '---\nformats: [grid]\n---\n' } }),
       ),
-    ).toBe('---\ntemplate: agenda-semana\nformats: [grid]\n---\n');
+    ).toBe('---\ntemplate: agenda-diaria\nformats: [grid]\n---\n');
     expect(
       skeletonText(briefSkeleton({ ...AGENDA, configured: { skeleton: '::titulo Oi\n' } })),
-    ).toBe('---\ntemplate: agenda-semana\n---\n\n::titulo Oi\n');
+    ).toBe('---\ntemplate: agenda-diaria\n---\n\n::titulo Oi\n');
   });
 
   it('ends a configured skeleton with the cursor after its text', () => {

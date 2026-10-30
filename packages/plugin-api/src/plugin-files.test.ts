@@ -128,12 +128,12 @@ describe('a plugin file', () => {
     // So every configuration names the plugin it was written for, and binds to its template
     // rather than to a built-in or a folder template of the same name (TYTO-462).
     const read = parsePluginFile(
-      'version: 1\ntemplates:\n  tabela-roxo:\n    configurations: { escura: { values: {} } }\n',
+      'version: 1\ntemplates:\n  tabela-nova:\n    configurations: { escura: { values: {} } }\n',
       'built-in.yaml',
     );
 
     expect(codes(read)).toEqual(['E_PLUGIN_FILE_ENTRY']);
-    expect(read.diagnostics[0]?.message).toContain("'templates.tabela-roxo.source'");
+    expect(read.diagnostics[0]?.message).toContain("'templates.tabela-nova.source'");
     expect(read.value?.templates).toEqual([]);
   });
 

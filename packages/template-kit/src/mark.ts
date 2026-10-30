@@ -7,7 +7,7 @@ import { type Block, block } from './blocks.js';
  * the `d` itself. **No colour**: the fill is decided where the mark is placed
  * (`docs/template-conventions.md`, "Geometry in, colour out").
  *
- * Moved here from `agenda-semana/parts.ts` by TYTO-185, and declared in `@tyto/core` since
+ * Moved here from the weekly agenda's `parts.ts` by TYTO-185, and declared in `@tyto/core` since
  * TYTO-223, because a brand kit carries one and a template's context carries the kit (ADR
  * 0063). A local alias rather than a re-export, because tsup's declaration build
  * drops the `type` modifier of a re-export and the `.d.ts` would promise a value.

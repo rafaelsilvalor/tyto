@@ -206,22 +206,22 @@ describe('the "/" menu', () => {
 
     expect(rows).toContainEqual(
       expect.stringMatching(
-        /^banner-roxo \/ (switches the template \(current: promo-curso\)|troca o template \(atual: promo-curso\))$/u,
+        /^banner-teste \/ (switches the template \(current: promo-curso\)|troca o template \(atual: promo-curso\))$/u,
       ),
     );
     expect(rows).toContainEqual(expect.stringMatching(/^promo-curso \/ (current|template atual)/u));
     await shoot('list-switch-light');
 
-    await page.keyboard.type('banner-r');
+    await page.keyboard.type('banner-t');
     await page.waitForTimeout(150);
     await page.keyboard.press('Enter');
 
-    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: banner-roxo');
-    expect(await editorText()).toBe('---\ntemplate: banner-roxo\n---\n\n::titulo Olá\n');
+    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: banner-teste');
+    expect(await editorText()).toBe('---\ntemplate: banner-teste\n---\n\n::titulo Olá\n');
 
     await page.keyboard.press('Control+z');
     await expect.poll(editorText, { timeout: 10_000 }).toContain('template: promo-curso');
-    expect(await editorText()).not.toContain('banner-roxo');
+    expect(await editorText()).not.toContain('banner-teste');
   }, 60_000);
 
   it('opens from a keybindings.json entry with no "/" typed, and Escape closes it', async () => {

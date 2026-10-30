@@ -28,7 +28,7 @@ import { waitForWindowTemplates } from './window-templates.js';
  *
  * Two plugins, installed by the built CLI into this suite's own `TYTO_HOME`:
  *
- * - `banner-plugin` is `banner-roxo`, bundled with every import inlined the way an author
+ * - `banner-plugin` is `banner-teste`, bundled with every import inlined the way an author
  *   bundles one, its backgrounds beside its manifest. Its preview and its export are compared
  *   with the in-repo template's, byte for byte, in the same window.
  * - `cartaz` is a template whose frame says where it was built: a rect 777 wide off Electron
@@ -41,7 +41,16 @@ import { waitForWindowTemplates } from './window-templates.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const built = join(here, '..', 'out', 'main', 'index.js');
 const cli = resolve(here, '..', '..', 'cli', 'dist', 'index.js');
-const BANNER = resolve(here, '..', '..', '..', 'packages', 'templates', 'templates', 'banner-roxo');
+const BANNER = resolve(
+  here,
+  '..',
+  '..',
+  '..',
+  'packages',
+  'templates',
+  'templates',
+  'banner-teste',
+);
 
 for (const file of [built, cli]) {
   if (!existsSync(file)) {
@@ -53,7 +62,7 @@ for (const file of [built, cli]) {
 // needs no folder for the brief.
 const BANNER_BRIEF = readFileSync(join(BANNER, 'examples', 'agencia.brief'), 'utf8');
 const briefNaming = (template: string): string =>
-  BANNER_BRIEF.replace(/^template: banner-roxo$/mu, `template: ${template}`);
+  BANNER_BRIEF.replace(/^template: banner-teste$/mu, `template: ${template}`);
 const CARTAZ_BRIEF = ['---', 'template: cartaz', 'formats: [grid-1x1]', '---', ''].join('\n');
 
 let scratch: string;
@@ -107,7 +116,7 @@ function bannerPlugin(): string {
   mkdirSync(template, { recursive: true });
   cpSync(join(BANNER, 'assets'), join(template, 'assets'), { recursive: true });
   const manifest = readFileSync(join(BANNER, 'manifest.yaml'), 'utf8').replace(
-    /^name: banner-roxo$/mu,
+    /^name: banner-teste$/mu,
     'name: banner-plugin',
   );
   writeFileSync(
@@ -240,13 +249,13 @@ describe('an installed code template in the window', () => {
     expect(answer.frames[0]?.html).not.toContain('111');
   }, 60_000);
 
-  it('previews banner-roxo from its plugin exactly as the in-repo template, and times it', async () => {
+  it('previews banner-teste from its plugin exactly as the in-repo template, and times it', async () => {
     // The in-repo template first, so the main process has parsed its own faces and the first
     // plugin preview's extra is what crosses: the faces' bytes and the guest's parse.
-    const firstInRepo = await timed(briefNaming('banner-roxo'));
+    const firstInRepo = await timed(briefNaming('banner-teste'));
     const first = await timed(briefNaming('banner-plugin'));
     const plugin = await preview(briefNaming('banner-plugin'));
-    const inRepo = await preview(briefNaming('banner-roxo'));
+    const inRepo = await preview(briefNaming('banner-teste'));
 
     expect(plugin.frames.length).toBeGreaterThan(0);
     expect(plugin.frames.map((frame) => frame.html)).toEqual(
@@ -262,11 +271,11 @@ describe('an installed code template in the window', () => {
     const warmCartaz: number[] = [];
     for (let round = 0; round < 20; round++) {
       warmPlugin.push(await timed(briefNaming('banner-plugin')));
-      warmInRepo.push(await timed(briefNaming('banner-roxo')));
+      warmInRepo.push(await timed(briefNaming('banner-teste')));
       warmCartaz.push(await timed(CARTAZ_BRIEF));
     }
     process.stdout.write(
-      `MEASURE desktop preview, banner-roxo example (3 frames): ` +
+      `MEASURE desktop preview, banner-teste example (3 frames): ` +
         `first in-repo ${firstInRepo.toFixed(1)} ms, then first through the plugin ${first.toFixed(1)} ms; ` +
         `warm median n=20: plugin ${median(warmPlugin).toFixed(1)} ms, ` +
         `in-repo ${median(warmInRepo).toFixed(1)} ms; ` +
@@ -274,11 +283,11 @@ describe('an installed code template in the window', () => {
     );
   }, 120_000);
 
-  it('exports banner-roxo from its plugin byte for byte as the in-repo template', async () => {
+  it('exports banner-teste from its plugin byte for byte as the in-repo template', async () => {
     const fromPlugin = join(scratch, 'export-plugin');
     const fromRepo = join(scratch, 'export-repo');
     await exported(briefNaming('banner-plugin'), fromPlugin);
-    await exported(briefNaming('banner-roxo'), fromRepo);
+    await exported(briefNaming('banner-teste'), fromRepo);
 
     const svgs = (folder: string): string[] =>
       readdirSync(folder)

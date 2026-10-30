@@ -83,7 +83,7 @@ const broken = Object.entries(FIXTURES).filter(([, source]) => hasSyntaxError(so
 describe('formatBrief on a messy brief', () => {
   const MESSY = [
     '---',
-    'template: agenda-semana  ',
+    'template: agenda-diaria  ',
     'formats: [grid]',
     '---   ',
     '',
@@ -110,7 +110,7 @@ describe('formatBrief on a messy brief', () => {
     expect(formatted(MESSY)).toBe(
       [
         '---',
-        'template: agenda-semana',
+        'template: agenda-diaria',
         'formats: [grid]',
         '---',
         '',

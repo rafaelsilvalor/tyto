@@ -110,7 +110,7 @@ const promoCurso: Template = defineTemplate(MANIFEST, (context) => {
               }),
             ],
           }),
-          // Guarded, the way `agenda-semana` guards its own cover. A required slot the
+          // Guarded, the way a template guards its own cover. A required slot the
           // brief left unset reaches a template as an absent slot, and a `text` node with
           // no runs is `E_SCENE_EMPTY_TEXT` — which is fatal, and would replace the gap
           // stamp with a scene that does not parse (ADR 0035).

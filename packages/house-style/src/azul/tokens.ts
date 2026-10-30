@@ -4,8 +4,8 @@
  * Everything here is a constant a designer changes without reading the rest of a template.
  * Colours, the type scale, the slide's frame, the chrome's sizes and the arrow's geometry.
  * Shared by every azul template through `presets.ts` and `parts.ts`, which is why it sits
- * here rather than inside one template (ADR 0047): `agenda-semana` and `aprovados` live in
- * repositories of their own and both import it as `@tyto/house-style/azul` (TYTO-476).
+ * here rather than inside one template (ADR 0047): `tyto-template-agenda-semana` and
+ * `tyto-template-aprovados` both import it as `@tyto/house-style/azul` (TYTO-476).
  *
  * ## Geometry in, colour out
  *
@@ -135,9 +135,9 @@ export const CHROME = {
 
 /** The block on a carousel's first slide: an optional illustration over the cover words. */
 /**
- * The approved list (`aprovados`), measured on the maintainer's reference of 2026-09-27 in
- * pixels of a 1080 × 1350 export. Font sizes are read from glyph heights, so they are good to
- * a point or two; the boxes are good to a pixel or two.
+ * The approved list (`tyto-template-aprovados`), measured on the maintainer's reference of
+ * 2026-09-27 in pixels of a 1080 × 1350 export. Font sizes are read from glyph heights, so
+ * they are good to a point or two; the boxes are good to a pixel or two.
  */
 export const APPROVED = {
   /** The emblem over the words: 205 × 147 as published; `contain` keeps any other ratio. */
