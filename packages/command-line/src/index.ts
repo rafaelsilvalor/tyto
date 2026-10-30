@@ -7,7 +7,13 @@
  * package may use Node, as `@tyto/io` does, and chooses no adapter on an app's behalf.
  */
 
-export type { CliConsole, CliEnvironment, CliRasterizer } from './environment.js';
+export { type CommandDescription, commandTree } from './commands.js';
+export type {
+  CliConsole,
+  CliEnvironment,
+  CliRasterizer,
+  CommandInvocation,
+} from './environment.js';
 export { EXIT_CODES, EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 export { type CloseableRasterizer } from './plugins/rasterizer.js';
 export {

@@ -1,6 +1,6 @@
 import { Command, CommanderError, Option } from 'commander';
 
-import type { CliEnvironment } from './environment.js';
+import type { CliEnvironment, CommandInvocation } from './environment.js';
 import { deliveryNewCommand } from './delivery.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import { galleryInstallCommand, galleryListCommand, galleryUpdateCommand } from './gallery.js';
@@ -97,7 +97,37 @@ function namedOnTheCommandLine(command: Command, option: string): boolean {
   return command.getOptionValueSource(option) === 'cli';
 }
 
-export function createProgram(environment: CliEnvironment, captured: Captured): Command {
+/**
+ * The words from `tyto` down to `command`: `['plugin', 'install']`. The root is left out, so
+ * the path is the same whatever name the program was given.
+ */
+function commandPath(command: Command): string[] {
+  const path: string[] = [];
+  for (let at: Command | null = command; at?.parent != null; at = at.parent) {
+    path.unshift(at.name());
+  }
+  return path;
+}
+
+/** What `environment.refuse` is asked about, read off the command commander is about to run. */
+function invocationOf(command: Command): CommandInvocation {
+  return {
+    path: commandPath(command),
+    args: command.args,
+    options: command.opts(),
+  };
+}
+
+/**
+ * `signal` reaches the two commands that can stop part of the way through (ADR 0159 decision
+ * 6): `watch` stops between sweeps, and `render` between frames, a frame in flight finishing.
+ * Every other command runs to its end, as it does in a terminal, which has no way to ask.
+ */
+export function createProgram(
+  environment: CliEnvironment,
+  captured: Captured,
+  signal?: AbortSignal,
+): Command {
   const program = new Command();
 
   program
@@ -176,6 +206,7 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
         typesNamed: namedOnTheCommandLine(render, 'types'),
       },
       environment,
+      signal,
     );
   });
 
@@ -201,6 +232,7 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
         formatsNamed: namedOnTheCommandLine(watch, 'formatsFile'),
       },
       environment,
+      signal,
     );
   });
 
@@ -406,6 +438,19 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
   // `exitOverride()` on the root alone would leave `tyto render --nope` calling
   // `process.exit` and taking a test process with it.
   exitOverrideDeep(program);
+
+  // Before the action and after the parse, so the refusal reads the options commander
+  // understood rather than guessing at words: `--trust` as an option, never as a value.
+  const { refuse } = environment;
+  if (refuse !== undefined) {
+    program.hook('preAction', async (_program, command) => {
+      const refusal = await refuse(invocationOf(command));
+      if (refusal === undefined) return;
+      environment.console.err(`error: ${refusal}
+`);
+      throw new CommanderError(EXIT_DIAGNOSTICS, 'tyto.refused', refusal);
+    });
+  }
   return program;
 }
 
@@ -423,9 +468,13 @@ function exitOverrideDeep(command: Command): void {
  * schema. Jacurutu retries those and does not retry a brief that will not compile, which
  * is the whole reason ADR 0011 fixes two non-zero codes instead of one.
  */
-export async function run(argv: readonly string[], environment: CliEnvironment): Promise<ExitCode> {
+export async function run(
+  argv: readonly string[],
+  environment: CliEnvironment,
+  signal?: AbortSignal,
+): Promise<ExitCode> {
   const captured: Captured = { code: EXIT_OK };
-  const program = createProgram(environment, captured);
+  const program = createProgram(environment, captured, signal);
 
   // `tyto` with nothing after it is somebody asking what this is, not an error.
   if (argv.length === 0) {

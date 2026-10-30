@@ -724,6 +724,11 @@ const recipeRunner = () => {
 const dependencies = () => {
   const keychain = credentials();
   return {
+    cli: {
+      start: () => ({ runId: 'cli-1' }),
+      cancel: () => {},
+      commands: () => ({ name: 'tyto', description: '', arguments: [], options: [], commands: [] }),
+    },
     confirm: () => Promise.resolve(true),
     // The system's menu picks the second item, whatever was offered (TYTO-352).
     contextMenu: (request: { items: readonly { id: string }[] }) =>
@@ -2206,5 +2211,49 @@ describe('the context menu channel', () => {
     await expect(
       context({ x: 0, y: 0, items: [{ ...items[0], role: 'quit' }] }),
     ).rejects.toBeInstanceOf(IpcContractError);
+  });
+});
+
+/** TYTO-495, ADR 0159 decision 5: a command is words to main, and Stop is an id. */
+describe('cli:run, cli:cancel and cli:commands', () => {
+  it('hand the words, the id and the tree through unchanged', async () => {
+    const started: (readonly string[])[] = [];
+    const cancelled: string[] = [];
+    const handlers = createHandlers({
+      ...dependencies(),
+      cli: {
+        start: (argv) => {
+          started.push(argv);
+          return { runId: 'cli-7' };
+        },
+        cancel: (runId) => cancelled.push(runId),
+        commands: () => ({
+          name: 'tyto',
+          description: 'd',
+          arguments: [],
+          options: [],
+          commands: [],
+        }),
+      },
+    });
+
+    await expect(
+      guard('cli:run', handlers['cli:run'])({ argv: ['render', 'a b.brief', '|', 'x'] }),
+    ).resolves.toEqual({ runId: 'cli-7' });
+    await guard('cli:cancel', handlers['cli:cancel'])({ runId: 'cli-7' });
+    const { tree } = await guard('cli:commands', handlers['cli:commands'])({});
+
+    // A word that looks like a pipe is a word: nothing in main reads a command line.
+    expect(started).toEqual([['render', 'a b.brief', '|', 'x']]);
+    expect(cancelled).toEqual(['cli-7']);
+    expect(tree.name).toBe('tyto');
+  });
+
+  it('refuse a command line given as one string', async () => {
+    const handlers = createHandlers(dependencies());
+
+    await expect(
+      guard('cli:run', handlers['cli:run'])({ argv: 'render a.brief' } as never),
+    ).rejects.toThrow();
   });
 });

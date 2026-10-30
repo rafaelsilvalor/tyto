@@ -22,6 +22,10 @@ describe('the IPC contract', () => {
       'app:info',
       'app:locale',
       'brief:preview',
+      // TYTO-495, ADR 0159: a tyto command run in main, stopped, and the tree for help.
+      'cli:cancel',
+      'cli:commands',
+      'cli:run',
       'credentials:delete',
       'credentials:set',
       // TYTO-490, ADR 0157 §6: a delivery's export; the window sends a text, main the folders.
@@ -136,6 +140,9 @@ describe('the event table', () => {
   it('names every event exactly once, and nothing else', () => {
     expect([...IPC_EVENT_NAMES].sort()).toEqual([
       'app:exit-requested',
+      // TYTO-495, ADR 0159: what a command prints, and where its run stands.
+      'cli:output',
+      'cli:state',
       'command:run',
       // TYTO-279. The open folder changed on disk; the explorer lists again.
       'explorer:changed',
@@ -438,6 +445,8 @@ describe('what the contract does not promise', () => {
       'update:act',
       // TYTO-244. "What is in the menu" names nothing: there is one installed menu.
       'menu:model',
+      // TYTO-495. Nor "which commands does tyto have": there is one command tree.
+      'cli:commands',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {
