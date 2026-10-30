@@ -1,11 +1,15 @@
-import { lstat, mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { copyFile, lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 
 import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
 
+import { isInside } from './contain.js';
+import type { DeliveredAsset } from './file-assets.js';
+import { ASSETS_DIR } from './fs-inbox.js';
 import { type LeftoverRun, readPreviousDelivery, removeLeftovers } from './leftovers.js';
 import type { OutputSink, TaskOutput } from './ports.js';
+import { realOfNearest } from './real-paths.js';
 import { type RenderResult, renderResultSchema } from './result.js';
 
 /**
@@ -204,6 +208,17 @@ export interface DeliveryExportOutput extends ReusableTaskOutput {
    * holds the name, which belongs in that `result.json`.
    */
   describeTemplate(template: DeliveryTemplate): Promise<Diagnostics>;
+  /**
+   * Copies every image the brief resolved that is not already inside the delivery's assets
+   * folder ({@link deliveryAssetsFolder}) into it (ADR 0161). Call it **before** `finish`, for
+   * {@link describeTemplate}'s reason, and only for a run that finished.
+   *
+   * Nothing in that folder is ever removed or replaced, and the brief is not rewritten: a file
+   * already holding a copy's name is skipped in silence when its bytes are the image's, and
+   * kept with `W_DELIVERY_ASSET_KEPT` when they are not. A file holding the name `assets` is
+   * `E_DELIVERY_FOLDER_BLOCKED`, and a folder holding a copy's name `E_OUTPUT_FILE_BLOCKED`.
+   */
+  deliverAssets(assets: readonly DeliveredAsset[]): Promise<Diagnostics>;
 }
 
 export interface FsDeliveryExportOptions {
@@ -217,7 +232,8 @@ export interface FsDeliveryExportOptions {
 
 /**
  * A delivery's export (ADR 0157 §6, TYTO-490): the artwork into the delivery's `exports`
- * folder, `result.json` and `template.txt` into its brief's folder.
+ * folder, `result.json` and `template.txt` into its brief's folder, and the images the brief
+ * uses from elsewhere into its assets folder (ADR 0161).
  *
  * ```
  * <delivery>/
@@ -226,13 +242,13 @@ export interface FsDeliveryExportOptions {
  *     <name>.brief                the person's own brief, never written here
  *     result.json
  *     template.txt
- *   assets/                       the person's own images, never written here
+ *   assets/                       the person's images; the brief's others are copied in
  * ```
  *
  * **ADR 0054's leftover rule applies to the artwork**, read from the previous `result.json`
  * in the report folder: a file that export wrote and this one did not produce is removed by
- * `removeLeftovers`, with `W_LEFTOVER_REMOVED`. The brief and the images are the delivery's own
- * files and are not copied, rewritten or removed.
+ * `removeLeftovers`, with `W_LEFTOVER_REMOVED`. The brief is the delivery's own file and is not
+ * copied or rewritten; `assets/` only ever gains files (`deliverAssets`, ADR 0161).
  *
  * Both folders are made with `makeFolder`, so a file holding either name is an
  * `E_DELIVERY_FOLDER_BLOCKED` in the answer and nothing is written (TYTO-129).
@@ -258,7 +274,134 @@ export async function fsDeliveryExportOutput(
       const blocked = await writeAtomic(join(report, TEMPLATE_FILE), templateNote(template));
       return blocked === undefined ? [] : [blocked];
     },
+    deliverAssets: (assets) => deliverAssets(deliveryAssetsFolder(report), assets),
   });
+}
+
+/**
+ * The assets folder of the delivery whose brief is kept in `briefDirectory` (ADR 0161): the
+ * folder that brief already reads its images from by ADR 0057's rule. A brief in a folder
+ * named `editaveis` reads `../assets`, so that one; any other reads `assets/` beside it, which
+ * for a brief kept at the delivery's root (`"brief": "."`) is the root's `assets/`.
+ *
+ * Derived from the brief's folder rather than the delivery's root because a copy is worth
+ * making only where the brief finds it: a brief in a custom `brief` folder such as `x/y`
+ * gains `x/y/assets/`, the folder it searches, and not a root `assets/` it never reads.
+ */
+export function deliveryAssetsFolder(briefDirectory: string): string {
+  const full = resolve(briefDirectory);
+  return basename(full) === EDITABLE_DIR ? join(full, '..', ASSETS_DIR) : join(full, ASSETS_DIR);
+}
+
+/** `writeAtomic` for a file that is already on disk: copied to `.part`, then renamed. */
+async function copyAtomic(from: string, to: string): Promise<Diagnostic | undefined> {
+  return placeAtomic(to, (temporary) => copyFile(from, temporary));
+}
+
+/**
+ * ADR 0161's copy. An image whose real path is already inside `directory`, at any depth, is
+ * the person's and is left where it is; every other one is copied under
+ * {@link deliveredNames}'s name, unless a file there already holds that name.
+ *
+ * Real paths on both sides, so a brief that reaches `assets/` through `../assets`, a junction
+ * or a differently spelt path is still recognised as inside, and a link inside `assets/` that
+ * leads out is copied rather than trusted to stay.
+ */
+async function deliverAssets(
+  directory: string,
+  assets: readonly DeliveredAsset[],
+): Promise<Diagnostics> {
+  const real = await realOfNearest(directory);
+  const outside: DeliveredAsset[] = [];
+  for (const asset of assets) {
+    if (!isInside(real, await realOfNearest(asset.path))) outside.push(asset);
+  }
+  const names = deliveredNames(outside);
+  if (names.size === 0) return [];
+  const held = await makeFolder(directory);
+  if (held !== undefined) return [held];
+
+  const answers: Diagnostic[] = [];
+  for (const [path, { name, source }] of names) {
+    const target = join(directory, name);
+    const there = await sameFile(path, target);
+    // The same bytes under the same name: already delivered, by an earlier export or by hand.
+    if (there === 'same') continue;
+    // The person's file, never replaced: theirs is the one they work from (ADR 0161).
+    if (there === 'different') {
+      answers.push(diagnostic('W_DELIVERY_ASSET_KEPT', { path: target, source }));
+      continue;
+    }
+    const blocked = await copyAtomic(path, target);
+    if (blocked !== undefined) answers.push(blocked);
+  }
+  return answers;
+}
+
+/**
+ * Whether `target` holds `source`'s bytes. `absent` covers anything that is not a plain file,
+ * so a folder in the way reaches `copyAtomic` and is answered there with its own code.
+ * Sizes first, because a different size settles it without reading either image.
+ */
+async function sameFile(source: string, target: string): Promise<'absent' | 'same' | 'different'> {
+  const found = await lstat(target).catch(() => undefined);
+  if (found === undefined || !found.isFile()) return 'absent';
+  if (found.size !== (await stat(source)).size) return 'different';
+  const [left, right] = await Promise.all([readFile(source), readFile(target)]);
+  return left.equals(right) ? 'same' : 'different';
+}
+
+const DEVICE_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/iu;
+const LONGEST_FETCHED_STEM = 64;
+
+/**
+ * The stem a fetched image is copied under, from its reference (ADR 0118).
+ *
+ * Its cached file is named by a hash, which says nothing to the person opening `assets/`,
+ * and the reference — `test:logo`, `drive:pasta/Logo Final` — is not a file name on every
+ * system. So the text after the reference's last `/`, `\` or `:` is kept, with every
+ * character outside `[A-Za-z0-9._-]` turned into `-`, its own extension dropped (the cached
+ * type gives the extension), leading and trailing dots removed, and at most 64 characters.
+ * A device name gains `-image`. Nothing left is the scheme, which is always a name.
+ *
+ * The reference is text from a brief, and this is the only place it becomes part of a path:
+ * nothing it holds can name a folder, because every separator is cut before it is used.
+ */
+function fetchedStem(reference: string): string {
+  const scheme = reference.slice(0, reference.indexOf(':'));
+  const last = reference.split(/[/\\:]/u).pop() ?? '';
+  const safe = last.replace(/[^A-Za-z0-9._-]/gu, '-');
+  const stem = basename(safe, extname(safe))
+    .replace(/^\.+|\.+$/gu, '')
+    .slice(0, LONGEST_FETCHED_STEM);
+  const name = stem === '' ? scheme : stem;
+  return DEVICE_NAME.test(name) ? `${name}-image` : name;
+}
+
+/**
+ * Each image's name in `assets/`, and what a warning calls it: its own file name, and `-2`,
+ * `-3`… before the extension when two different files of this run share one. The same file
+ * named twice by the brief is copied once. Compared without case, because a delivery is
+ * opened on filesystems that ignore it. An image a plugin supplied is named after its
+ * reference instead of its cached file, and a warning names it by that reference too.
+ */
+function deliveredNames(
+  assets: readonly DeliveredAsset[],
+): Map<string, { readonly name: string; readonly source: string }> {
+  const names = new Map<string, { readonly name: string; readonly source: string }>();
+  const taken = new Set<string>();
+  for (const { path, reference, fetched } of assets) {
+    if (names.has(path)) continue;
+    const extension = extname(path);
+    const stem = fetched === true ? fetchedStem(reference) : basename(path, extension);
+    let name = `${stem}${extension}`;
+    for (let count = 2; taken.has(name.toLowerCase()); count += 1) {
+      name = `${stem}-${String(count)}${extension}`;
+    }
+    taken.add(name.toLowerCase());
+    names.set(path, { name, source: fetched === true ? reference : path });
+  }
+  return names;
 }
 
 /**

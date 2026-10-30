@@ -166,6 +166,7 @@ non-zero.
 | `E_DELIVERY_BRIEF_EXISTS` | error | yes | A new delivery's brief would replace a brief that is already there. |
 | `E_DELIVERY_PATH_OUTSIDE` | error | yes | A new delivery would be made outside the workspace folder, through a link. |
 | `E_BRIEF_NOT_IN_DELIVERY` | error | yes | A delivery's export was asked of a brief that is in no delivery. |
+| `W_DELIVERY_ASSET_KEPT` | warning | no | A delivery's assets folder already holds a different file under the name an image would be copied to. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 | `E_RECIPE_SYNTAX` | error | yes | A line of a recipe does not match the recipe format. |
 | `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
@@ -2797,6 +2798,20 @@ The delivery name '{name}' {problem}; no delivery is made.
 ```
 
 Parameters: `name`, `problem`
+
+### `W_DELIVERY_ASSET_KEPT`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0161-a-deliverys-export-copies-the-briefs-images-into-its-assets.md`
+
+A delivery's assets folder already holds a different file under the name an image would be copied to.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Kept '{path}', which differs from the image '{source}' the brief uses; that image was not copied.
+```
+
+Parameters: `path`, `source`
 
 ### `W_RECIPE_WHERE_EMPTY`
 
