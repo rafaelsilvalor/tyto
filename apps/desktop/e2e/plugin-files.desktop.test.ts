@@ -147,8 +147,8 @@ describe('the plugin files in the window', () => {
         `    source: { git: '${packUrl}', ref: 'v1' }`,
         '    configurations:',
         '      laranja: { alias: aviso-laranja }',
-        // A built-in template's name until TYTO-436: refused, and the template stands.
-        '      roxo: { alias: tabela-roxo }',
+        // A built-in template's name: refused, and the template stands.
+        '      roxo: { alias: promo-curso }',
         // TYTO-471: a brand no started plugin's kit offers, a row at its line, the eighth.
         '      marca: { brand: nonexistent }',
         '',
@@ -186,7 +186,7 @@ describe('the plugin files in the window', () => {
       ),
     );
     expect(offered).toContain('aviso-laranja');
-    expect(offered.filter((label) => label === 'tabela-roxo')).toHaveLength(1);
+    expect(offered.filter((label) => label === 'promo-curso')).toHaveLength(1);
 
     // TYTO-467: the highlighted alias says what it stands for on its line, and the panel
     // CodeMirror opens beside it names the plugin file. Matched without the words around them,

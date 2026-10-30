@@ -130,7 +130,7 @@ These are the rules it enforces beyond the shape:
   A code template reads them with `numberValue(context, 'title-gap', TITLE.gap)`,
   `colorValue`, `faceValue` and `imageValue` from `@tyto/core/template`. The last argument is
   its own constant, drawn when the context carries no values; pin it to the manifest's default
-  in a test, as `tabela-roxo/template.test.ts` does. A value supplied with a name the template
+  in a test, as `src/template.test.ts` in the `tyto-template-tabela` repository does. A value supplied with a name the template
   did not declare is `W_TEMPLATE_VALUE_UNKNOWN`; one of the wrong kind or outside its limits is
   `W_TEMPLATE_VALUE_INVALID`. Both are warnings, and the default is drawn. Nothing reads a
   plugin file's configuration yet (TYTO-439).
@@ -155,7 +155,7 @@ template a name means does not depend on the order the filesystem listed them in
 `roots` is a list in precedence order and **earlier wins** (ADR 0020). The CLI passes
 `--templates <dir>` first and the built-in pack second, so:
 
-- `tyto render` finds `agenda-semana`, `promo-curso` and `carrossel-lista` with no flag at all. The pack is
+- `tyto render` finds `banner-roxo`, `promo-curso` and `carrossel-lista` with no flag at all. The pack is
   `@tyto/templates`' own `templates/` folder, located by resolving that package's
   `package.json` — which is right in a workspace, in a published install, and inside an
   Electron `asar`.
@@ -677,17 +677,17 @@ checked.** It takes a folder along the route a render would (TYTO-170): a manife
 build ships code for, with no `template.html` beside it, is a code template.
 
 ```
-$ node apps/cli/dist/index.js template check packages/templates/templates/agenda-semana
-packages\templates\templates\agenda-semana: manifest: no problems found
-packages\templates\templates\agenda-semana: not checked: the template body — 'agenda-semana' is code compiled into this build, and check does not run code (ADR 0007). The manifest is what a render checks every brief against.
+$ node apps/cli/dist/index.js template check packages/templates/templates/banner-roxo
+packages\templates\templates\banner-roxo: manifest: no problems found
+packages\templates\templates\banner-roxo: not checked: the template body — 'banner-roxo' is code compiled into this build, and check does not run code (ADR 0007). The manifest is what a render checks every brief against.
 ```
 
-| Folder                                             | What `check` does                                                                | Exit                |
-| -------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------- |
-| `template.html`, name not shipped                  | parses the manifest, compiles the markup against it                              | 1 on any error      |
-| no `template.html`, name shipped (`agenda-semana`) | parses the manifest; says the body was **not checked**                           | 0 if manifest clean |
-| `template.html` **and** name shipped               | `E_TEMPLATE_AMBIGUOUS`, the error a render gives                                 | 1                   |
-| `template.ts` only, name not shipped               | `E_INPUT_READ` for `template.html`, with a hint that folder code is never loaded | 1                   |
+| Folder                                           | What `check` does                                                                | Exit                |
+| ------------------------------------------------ | -------------------------------------------------------------------------------- | ------------------- |
+| `template.html`, name not shipped                | parses the manifest, compiles the markup against it                              | 1 on any error      |
+| no `template.html`, name shipped (`banner-roxo`) | parses the manifest; says the body was **not checked**                           | 0 if manifest clean |
+| `template.html` **and** name shipped             | `E_TEMPLATE_AMBIGUOUS`, the error a render gives                                 | 1                   |
+| `template.ts` only, name not shipped             | `E_INPUT_READ` for `template.html`, with a hint that folder code is never loaded | 1                   |
 
 **Exit 0 on a code template means the manifest is clean, not that the template is.** ADR
 0011 fixes three exit codes and none means "partly checked", so the difference is in the
@@ -776,7 +776,7 @@ frame({
 ## Previewing a template while you write it
 
 ```bash
-pnpm template:preview agenda-semana
+pnpm template:preview banner-roxo
 ```
 
 **Each image on the page is the file `tyto render` wrote, byte for byte — Playwright's
@@ -795,7 +795,7 @@ tool draws nothing: every render is `node apps/cli/dist/index.js render <brief> 
 in a child process, and the page is an `<img>` per file that command wrote, served as the
 bytes on disk. `no-renderer-of-its-own.test.ts` holds it to that by its imports — no `@tyto/*`
 package at all — and `preview.visual.test.ts` compares the sha256 of every image the server
-sends with a separate `tyto render` of the same brief, for `agenda-semana` and `promo-curso`.
+sends with a separate `tyto render` of the same brief, for `banner-roxo` and `promo-curso`.
 Breaking the CLI's render path breaks the page with it, which is the point.
 
 What a save does depends on the file:
@@ -808,12 +808,12 @@ What a save does depends on the file:
   `dist/index.js` a full `pnpm build` does and takes under a second instead of eleven. About
   2.5 s from save to image. A `template.ts` in a folder of your own stays inert, exactly as
   `tyto render` leaves it (ADR 0007), and the page shows the diagnostic `tyto render` gives.
-- **A brand module beside a compiled template** (`templates/_azul/`, ADR 0047) —
+- **A brand module beside a compiled template** (a sibling folder with no manifest, ADR 0047) —
   the same rebuild of `@tyto/templates`, because the template imports it (TYTO-181). The
   whole pack folder is watched for that reason; a save to _another_ template of it is ignored.
 - **A `.ts` in `packages/template-kit/src`** — `@tyto/template-kit` is rebuilt first, the same
   fast way, because `@tyto/templates` imports the kit's `dist/` rather than bundling it
-  (TYTO-181). Measured on `aprovados`: 3.4 s from a kit save to the image (0.7 s of it the kit
+  (TYTO-181). Measured on `aprovados`, a built-in then: 3.4 s from a kit save to the image (0.7 s of it the kit
   build), and 2.2 s back to the original bytes when the change was reverted. A kit save does
   nothing for a markup template, which does not import the kit.
 - **The brief, wherever it is** — one render. A brief on another drive than the pack is

@@ -8,6 +8,10 @@ const WORDS = {
     title: 'Template gallery',
     intro: (templates: number, formats: number) =>
       `The templates that come with Tyto: ${String(templates)}, in ${String(formats)} formats. ` +
+      'They are there to try Tyto and to test it with. The templates a team publishes with live ' +
+      'in their own repositories, and a plugin file names them so Tyto fetches them: ' +
+      '[Fetch templates from their own repositories](../command-line/plugins.md#fetch-templates-from-their-own-repositories) ' +
+      'shows how. ' +
       'Each picture is the template drawing the example brief kept beside it, in the first ' +
       "format it lists, drawn without a brand kit: a plain shape stands where a brand's logo " +
       'goes and `@assinatura` where its signature goes. A brief names one of these in its ' +
@@ -49,6 +53,11 @@ const WORDS = {
     title: 'Galeria de templates',
     intro: (templates: number, formats: number) =>
       `Os templates que vêm com o Tyto: ${String(templates)}, em ${String(formats)} formatos. ` +
+      'Eles servem para experimentar o Tyto e para testá-lo. Os templates com que uma equipe ' +
+      'publica ficam nos seus próprios repositórios, e um arquivo de plugin os nomeia para o ' +
+      'Tyto buscá-los: ' +
+      '[Buscar templates nos seus próprios repositórios](../command-line/plugins.md#buscar-templates-nos-seus-proprios-repositorios) ' +
+      'mostra como. ' +
       'Cada imagem é o template desenhando o brief de exemplo guardado junto dele, no primeiro ' +
       'formato que ele lista, desenhado sem kit de marca: uma forma simples ocupa o lugar do ' +
       'logo da marca e `@assinatura` o da assinatura. Um brief escolhe um deles na linha `template:` e preenche os slots ' +

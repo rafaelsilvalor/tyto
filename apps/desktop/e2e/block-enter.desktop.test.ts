@@ -23,7 +23,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const built = join(here, '..', 'out', 'main', 'index.js');
 const shots = process.env['TYTO_BLOCK_ENTER_SHOTS'];
 
-const FRONTMATTER = '---\ntemplate: agenda-semana\n---\n';
+const FRONTMATTER = '---\ntemplate: carrossel-lista\n---\n';
 
 /** Rafael's second example, as the file must hold it. */
 const LAMINA = [

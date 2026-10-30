@@ -138,7 +138,7 @@ beforeAll(async () => {
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
-  await waitForWindowTemplates(page, ['agenda-semana'], 15_000);
+  await waitForWindowTemplates(page, ['carrossel-lista'], 15_000);
   // Every key that reaches the page, counted in the capture phase so nothing can hide one.
   await page.evaluate(() => {
     const keys: number[] = [];

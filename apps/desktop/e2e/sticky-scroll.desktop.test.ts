@@ -39,7 +39,7 @@ const LAMINA_LINE = 6;
 const LAST_BODY_LINE = 86;
 const BRIEF = [
   '---',
-  'template: agenda-semana',
+  'template: carrossel-lista',
   '---',
   '::titulo',
   '  AGENDA DA SEMANA',

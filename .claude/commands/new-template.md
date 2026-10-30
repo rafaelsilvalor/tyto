@@ -126,7 +126,7 @@ git clone https://github.com/rafaelsilvalor/tyto-template-<name>.git C:/projects
 `contract.yml` installs `@latest` for every `@tyto/*` package the template depends on: remove
 `@tyto/house-style` from it and from its version line when the template is neutral.
 
-**The four tests are the same four as tabela's**, adapted, and none of them needs Tyto:
+**Five tests: tabela's four, adapted, and the faces test**; none of them needs Tyto:
 
 - `src/template.test.ts` — the composition's rules on the `Scene`: every text inside its box,
   the formats it declares, what it does at the limits of its slots.
@@ -136,6 +136,9 @@ git clone https://github.com/rafaelsilvalor/tyto-template-<name>.git C:/projects
   back to, and one value set in a test found in the HTML (ADR 0153).
 - `tests/plugin.test.ts` — the built `dist/index.js` through `testPlugin`
   (`@tyto/plugin-api/testing`), drawing the template across the isolation protocol.
+- `tests/faces.test.ts` — the faces the manifest lists under `faces:` are every face the
+  example briefs' scenes set, and no other. Copy it from `tyto-template-agenda-semana`;
+  `docs/plugin-authoring.md` › A code template has the reason.
 
 Install with the token from the user-level `~/.npmrc`, never from the repository:
 
@@ -285,5 +288,10 @@ PSD's text, kept in the scratchpad, and say that is what the number measures.
   wants Windows paths (`C:/…`), not `/c/…`.
 - The repository's `.npmrc` never holds a token: pnpm 11 expands no variable in a committed
   `.npmrc`'s credentials, and a public repository would publish it.
+- **A code template declares `faces:` in its manifest**, every face it measures (TYTO-436).
+  Installed, it runs in its plugin's process, where `measure` knows only the faces listed; a
+  face left out measures as nothing, and nothing but `tests/faces.test.ts` notices. A built-in
+  moved out without it shrank agenda-semana's long title to 17.16 px instead of wrapping it, and
+  simulados-semana differed in 28 of 28 files.
 - Do not edit Tyto's repository for the template. If the template needs something from the
   contract that does not exist, stop, say so, and it becomes a card in E18.

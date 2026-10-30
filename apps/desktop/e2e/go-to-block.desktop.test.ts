@@ -45,7 +45,7 @@ const lamina = (name: string): string[] => [
 
 const LINES = [
   '---',
-  'template: agenda-semana',
+  'template: carrossel-lista',
   '---',
   '::titulo AGENDA DA SEMANA',
   '',
@@ -209,7 +209,7 @@ describe('Go to Block', () => {
     await openBlocks();
     const listed = await rows();
     expect(listed).toEqual([
-      expect.stringMatching(/^(cabeçalho|header) \/ template: agenda-semana$/u),
+      expect.stringMatching(/^(cabeçalho|header) \/ template: carrossel-lista$/u),
       '::titulo / AGENDA DA SEMANA',
       '::lamina 1 / FARMÁCIA',
       '::lamina 2 / NUTRIÇÃO',

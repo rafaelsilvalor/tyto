@@ -431,24 +431,21 @@ describe('where a run may fetch (ADR 0118)', () => {
 describe('a --folder delivery of a fetched image (ADR 0118)', () => {
   /**
    * A built-in template, so the copy can be rendered where no plugin is installed at all:
-   * the plugin here only supplies the image. `aprovados` has an optional image slot.
+   * the plugin here only supplies the image. `promo-curso` has an optional image slot.
    */
-  const APROVADOS = [
+  const PROMO = [
     '---',
-    'template: aprovados',
-    'formats: [grid]',
+    'template: promo-curso',
+    'formats: [grid-1x1]',
     'imagem: test:logo',
     '---',
     '',
     '::titulo',
     '  TESTE',
     '',
-    '::lamina',
-    '  1º | Pessoa Inventada',
-    '',
   ].join('\n');
 
-  async function renderAprovados(
+  async function renderPromo(
     path: string,
     out: string,
     extra: readonly string[],
@@ -474,10 +471,10 @@ describe('a --folder delivery of a fetched image (ADR 0118)', () => {
       const folder = join(workspace, 'loose');
       await mkdir(folder, { recursive: true });
       const path = join(folder, 'entrega.brief');
-      await writeFile(path, APROVADOS);
+      await writeFile(path, PROMO);
       const out = join(workspace, 'delivered');
 
-      const delivered = await renderAprovados(path, out, ['--folder'], home);
+      const delivered = await renderPromo(path, out, ['--folder'], home);
       expect(delivered.code, stderr()).toBe(EXIT_OK);
       expect(requests).toContain('/image/logo');
 
@@ -492,7 +489,7 @@ describe('a --folder delivery of a fetched image (ADR 0118)', () => {
       // (ADR 0057), and nothing is asked of anybody.
       const before = requests.length;
       const bare = join(workspace, 'bare-home', '.tyto');
-      const again = await renderAprovados(copy, join(workspace, 'again'), [], bare);
+      const again = await renderPromo(copy, join(workspace, 'again'), [], bare);
       expect(again.code, stderr()).toBe(EXIT_OK);
       expect(again.diagnostics.filter(({ code }) => code.startsWith('E_'))).toEqual([]);
       expect(requests).toHaveLength(before);

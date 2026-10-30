@@ -1,10 +1,4 @@
-import { build as agendaSemana } from '../templates/agenda-semana/template.js';
-import { build as aprovados } from '../templates/aprovados/template.js';
 import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
-import { build as simuladosSemanaOcre } from '../templates/simulados-semana-ocre/template.js';
-import { build as simuladosSemanaRoxo } from '../templates/simulados-semana-roxo/template.js';
-import { build as simuladosSemanaVinho } from '../templates/simulados-semana-vinho/template.js';
-import { build as tabelaRoxo } from '../templates/tabela-roxo/template.js';
 
 import type { TemplateBuild } from '@tyto/core';
 
@@ -47,15 +41,9 @@ export const BUILT_IN_TEMPLATES_DIRECTORY = 'templates';
 
 /** The names this pack ships, for a caller that wants them without reading a disk. */
 export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
-  'agenda-semana',
-  'aprovados',
   'banner-roxo',
   'carrossel-lista',
   'promo-curso',
-  'simulados-semana-ocre',
-  'simulados-semana-roxo',
-  'simulados-semana-vinho',
-  'tabela-roxo',
 ];
 
 /**
@@ -67,18 +55,14 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
  * imports a path — running code that arrived in a folder is the plugin host's job, with
  * its permissions and its isolation (ADR 0007).
  *
- * `agenda-semana` is the first entry (TYTO-167). Its manifest sits beside the other two in
- * `templates/agenda-semana/`, next to the code that draws it, so a designer opening the
- * folder finds the whole template; what makes it *bundled* is this import, which puts the
- * build function in the application's own module graph rather than on a path somebody
- * resolves at runtime.
+ * A code template's manifest sits in `templates/<name>/`, next to the code that draws it, so
+ * a designer opening the folder finds the whole template; what makes it *bundled* is this
+ * import, which puts the build function in the application's own module graph rather than
+ * on a path somebody resolves at runtime.
+ *
+ * The production templates live in their own repositories and reach a machine through a
+ * plugin file (ADR 0151, TYTO-436); what stays here is what the tests draw.
  */
 export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {
-  'agenda-semana': agendaSemana,
-  aprovados,
   'banner-roxo': bannerRoxo,
-  'simulados-semana-ocre': simuladosSemanaOcre,
-  'simulados-semana-roxo': simuladosSemanaRoxo,
-  'simulados-semana-vinho': simuladosSemanaVinho,
-  'tabela-roxo': tabelaRoxo,
 };
