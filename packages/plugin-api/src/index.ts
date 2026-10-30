@@ -182,6 +182,7 @@ export {
 } from './isolation/protocol.js';
 
 export { type GuestFaces, type ShippedFace, guestFaces } from './isolation/faces.js';
+export { NO_SHIPPED_FILES, type ShippedFiles, guestFiles } from './isolation/files.js';
 export { runGuest } from './isolation/guest.js';
 
 export {

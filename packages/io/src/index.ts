@@ -87,6 +87,7 @@ export {
 export {
   type InstalledTemplateFonts,
   type InstalledTemplateSourceOptions,
+  type ReadTemplateFiles,
   installedTemplateSource,
 } from './installed-templates.js';
 

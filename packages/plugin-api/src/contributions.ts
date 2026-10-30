@@ -14,6 +14,7 @@ import type {
 } from '@tyto/core';
 
 import type { ShippedFace } from './isolation/faces.js';
+import type { ShippedFiles } from './isolation/files.js';
 
 /**
  * The extension points of `docs/plugin-api.md`, as types. `configuration` lives in
@@ -168,7 +169,8 @@ export interface TemplatePack extends Contribution {
 
 /**
  * `TemplatePack.build` as the host's proxy of it is called (ADR 0048): the context crosses
- * without `measure` and `report`, the faces it measures cross beside it, and the answer is a
+ * without `measure`, `report` and `files`, the faces it measures and what the host read from
+ * its own folder (ADR 0062) cross beside it, and the answer is a
  * result, because a timeout, a crash and a frame the IR schema refuses arrive as values.
  * What succeeds is the frame and the reports the template made building it (ADR 0058),
  * which the host hands to its own `report`.
@@ -177,6 +179,7 @@ export type IsolatedPackBuild = (
   template: string,
   call: TemplateCall,
   faces: readonly ShippedFace[],
+  files: ShippedFiles,
 ) => Promise<Result<TemplateAnswer, Diagnostics>>;
 
 /* ------------------------------------------------------------------------ brand-kit -- */

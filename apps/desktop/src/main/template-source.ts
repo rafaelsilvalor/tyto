@@ -97,6 +97,13 @@ export function templateSourceOf(
         fromMachine: (face) => library.fromMachine(face),
       },
       next: builtIn,
+      // An installed plugin's template reads its own folder the same way (TYTO-478): the
+      // refs cross to the plugin's process, the bytes stay in `loaded` for the export.
+      readFiles: async (directory) => {
+        const own = await readTemplateAssets({ base: directory });
+        loaded.push(own.resources);
+        return { assets: own.assets, paths: own.paths };
+      },
     }),
     resources,
   };

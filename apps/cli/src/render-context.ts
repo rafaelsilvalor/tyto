@@ -379,6 +379,14 @@ export function templateWiring(
           packs: context.codePacks,
           fonts,
           next: builtIn,
+          // The same reader for a template in an installed plugin's folder, which
+          // `installedPacks` checked is inside the plugin; its refs cross to the plugin's
+          // process as data and its bytes stay in `loaded` for the export (TYTO-478).
+          readFiles: async (directory) => {
+            const { assets, resources, paths } = await fileTemplateAssets({ base: directory });
+            loaded.push(resources);
+            return { assets, paths };
+          },
         });
 
   // `loaded` is empty here and read on every call, so the loads above are seen. The SVG

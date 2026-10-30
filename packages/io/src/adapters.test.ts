@@ -1,4 +1,4 @@
-import { open, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { open, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -397,6 +397,46 @@ describe('fileTemplateAssets', () => {
 
     // A `.psd` beside the logo is a working file, not an oversight to report.
     expect(assets.image?.('assets/source.psd')).toBeUndefined();
+  });
+
+  it('lists every path it answers, which is what crosses to a plugin (TYTO-478)', async () => {
+    const { paths } = await fileTemplateAssets({ base: await installTemplate() });
+
+    expect([...paths].sort()).toEqual(['assets/logo.png', 'assets/mark.svg']);
+  });
+
+  /**
+   * A file link, which Windows lets a person make only with developer mode on; the CI's Linux
+   * always can. Without one the test has nothing to measure, and says so by skipping.
+   */
+  async function linkFile(target: string, link: string): Promise<boolean> {
+    return symlink(target, link, 'file').then(
+      () => true,
+      () => false,
+    );
+  }
+
+  it('skips a link to a file outside the folder, so a plugin cannot embed it (TYTO-478)', async (context) => {
+    const directory = await installTemplate();
+    const outside = join(workspace, 'secret.png');
+    await writeFile(outside, PNG_1X1);
+    if (!(await linkFile(outside, join(directory, 'assets', 'bg.png')))) context.skip();
+
+    const { assets, paths } = await fileTemplateAssets({ base: directory });
+
+    expect(assets.image?.('assets/bg.png')).toBeUndefined();
+    expect(paths).not.toContain('assets/bg.png');
+  });
+
+  it('reads a link to a file that stays inside the folder', async (context) => {
+    const directory = await installTemplate();
+    if (!(await linkFile(join(directory, 'assets', 'logo.png'), join(directory, 'bg.png')))) {
+      context.skip();
+    }
+
+    const { assets } = await fileTemplateAssets({ base: directory });
+
+    expect(assets.image?.('bg.png')?.hash).toBe(assets.image?.('assets/logo.png')?.hash);
   });
 
   it('answers nothing for a folder that is not there, rather than throwing', async () => {
