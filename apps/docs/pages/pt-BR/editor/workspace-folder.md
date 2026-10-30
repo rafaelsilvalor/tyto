@@ -21,6 +21,12 @@ Toda chave é opcional, e o arquivo também: uma pasta sem ele abre sem nada dec
 
 **Arquivo ▸ Abrir pasta…** escolhe a pasta. Há uma pasta aberta por janela, e ela volta aberta na próxima vez que o Tyto abrir. **Arquivo ▸ Fechar pasta** fecha. Com uma pasta aberta, a barra de título mostra o nome dela entre o arquivo e o app: `logo.brief — promo — Tyto`.
 
+### Trocar entre pastas recentes
+
+A barra de título tem um botão depois de **Ajuda** com o nome da pasta aberta, ou _Sem pasta_. Clique nele, ou rode **Abrir pasta recente…** na barra de comandos ou no menu **Arquivo**, para ver as pastas que você abriu antes, a mais recente primeiro, com o lugar de cada uma. Digite para filtrar a lista por nome ou lugar, mova com as setas e aperte **Enter** para abrir a pasta destacada; **Esc** fecha a lista. A pasta aberta aparece na lista marcada como _aberta_. **Abrir pasta local…**, no pé da lista, é o **Arquivo ▸ Abrir pasta…**.
+
+Uma pasta escolhida aqui abre exatamente como pelo **Arquivo ▸ Abrir pasta…**: na mesma janela, no lugar da pasta aberta agora, e confiável só se você já tiver confiado nela. A lista guarda as últimas dez pastas, e uma pasta que não está mais no disco fica de fora. O id do comando é `workspace.openRecent`, então o `keybindings.json` pode pô-lo numa tecla.
+
 Enquanto ela está aberta:
 
 - os templates dela aparecem ao lado dos seus e dos internos, depois da [sua pasta de templates](../templates/templates-folder.md);

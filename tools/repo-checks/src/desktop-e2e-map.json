@@ -644,8 +644,21 @@
     },
     {
       "paths": ["apps/desktop/src/main/recent-files.ts"],
-      "e2e": ["documents.desktop.test.ts", "menu.desktop.test.ts", "quit.desktop.test.ts"],
-      "why": "reviewed: recent files, in the File menu"
+      "e2e": [
+        "documents.desktop.test.ts",
+        "menu.desktop.test.ts",
+        "quit.desktop.test.ts",
+        "workspace.desktop.test.ts"
+      ],
+      "why": "reviewed: recent files, in the File menu, and the recent folders list on the same code (TYTO-487)"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/recent-folders.ts",
+        "apps/desktop/src/renderer/recent-folders.ts"
+      ],
+      "e2e": ["workspace.desktop.test.ts"],
+      "why": "reviewed: the recent workspace folders, the title bar's button and popover (TYTO-487)"
     },
     {
       "paths": ["apps/desktop/src/main/seed-files.ts"],

@@ -44,6 +44,8 @@ export const FILE_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'editor.open', label: 'command.file.open' },
     // TYTO-278. Beside Open: a folder is opened the way a file is (ADR 0113).
     { id: 'workspace.openFolder', label: 'command.workspace.openFolder' },
+    // TYTO-487. Beside Open Folder: the folders opened before, in the title bar's popover.
+    { id: 'workspace.openRecent', label: 'command.workspace.openRecent' },
   ],
   [
     // `editor.save` is `@tyto/editor`'s own id, not this app's: the editor ships the binding

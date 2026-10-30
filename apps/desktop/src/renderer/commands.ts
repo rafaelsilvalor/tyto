@@ -149,6 +149,11 @@ export const TEMPLATES_CLEAR_FOLDER = 'templates.clearFolder';
  */
 export const WORKSPACE_OPEN_FOLDER = 'workspace.openFolder';
 export const WORKSPACE_CLOSE_FOLDER = 'workspace.closeFolder';
+/**
+ * TYTO-487. The title bar's recent folders popover, from a key or the bar: bindable in
+ * `keybindings.json`, with no default key. A folder chosen opens as Open Folder opens one.
+ */
+export const WORKSPACE_OPEN_RECENT = 'workspace.openRecent';
 /** TYTO-278. The open folder's trust, in a small dialog of its own (ADR 0111). */
 export const WORKSPACE_MANAGE_TRUST = 'workspace.manageTrust';
 /**
@@ -322,6 +327,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
   [WORKSPACE_OPEN_FOLDER]: 'command.workspace.openFolder',
   [WORKSPACE_CLOSE_FOLDER]: 'command.workspace.closeFolder',
+  [WORKSPACE_OPEN_RECENT]: 'command.workspace.openRecent',
   [WORKSPACE_MANAGE_TRUST]: 'command.workspace.manageTrust',
   [PLUGIN_FILES_SYNC]: 'command.pluginFiles.sync',
   [PLUGIN_FILES_UPDATE]: 'command.pluginFiles.update',
@@ -441,6 +447,8 @@ export interface DesktopActions {
   chooseTemplateFolder(): void;
   clearTemplateFolder(): void;
   openWorkspaceFolder(): void;
+  /** TYTO-487. Opens the recent folders popover under the title bar's folder button. */
+  openRecentFolders(): void;
   closeWorkspaceFolder(): void;
   manageTrust(): void;
   /** TYTO-433. Syncs the plugin files; `update` moves every ref. */
@@ -601,6 +609,10 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
 
   add(WORKSPACE_OPEN_FOLDER, () => {
     actions.openWorkspaceFolder();
+  });
+
+  add(WORKSPACE_OPEN_RECENT, () => {
+    actions.openRecentFolders();
   });
 
   add(WORKSPACE_CLOSE_FOLDER, () => {

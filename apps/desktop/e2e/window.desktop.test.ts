@@ -379,6 +379,10 @@ describe('the bridge', () => {
       // TYTO-278, ADR 0113: the workspace folder, opened only by main's picker. Exercised by
       // `e2e/workspace.desktop.test.ts`.
       'workspace:folder',
+      // TYTO-487: the title bar's recent folders, chosen by main's id. Exercised by
+      // `e2e/workspace.desktop.test.ts`.
+      'workspace:open-recent',
+      'workspace:recent',
       'workspace:set-folder',
       // TYTO-278: the banner's and Manage Trust's one channel, on main's open folder only.
       'workspace:trust',
@@ -469,6 +473,12 @@ describe('switching the language', () => {
     // TYTO-278: the workspace folder's commands, File menu and command bar only.
     'command.workspace.openFolder',
     'command.workspace.closeFolder',
+    // TYTO-487: the recent folders' command, and the popover's words, closed at load. The
+    // title bar's "No folder" is on screen, written by `paintTitle` beside the title rather
+    // than by the `[data-i18n]` pass; `shell.test.ts` holds it in both languages.
+    'command.workspace.openRecent',
+    'titleBar.noFolder',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('recentFolders.')),
     // TYTO-278: the trust banner and the Manage Trust dialog, painted from main's answer.
     'command.workspace.manageTrust',
     // TYTO-433: the plugin files' commands, command bar only, and the native box main shows

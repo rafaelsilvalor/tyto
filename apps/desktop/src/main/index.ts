@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { realpathSync, watch } from 'node:fs';
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 
@@ -72,7 +72,8 @@ import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
 import { findTopLevel, projectMenu } from './menu-model.js';
 import { newKeybindingsFile, newSnippetsFile } from './seed-files.js';
-import { fileRecentFiles } from './recent-files.js';
+import { fileRecentFiles, fileRecentFolders } from './recent-files.js';
+import { createRecentFoldersService } from './recent-folders.js';
 import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import desktopManifest from './desktop.tyto-plugin.json';
@@ -678,6 +679,17 @@ async function start(): Promise<void> {
       log.error('The plugin files could not be synced.', cause);
     });
   };
+  // TYTO-487: every folder that opens is remembered, whichever door it came through — the
+  // picker, the popover, the session brought back at launch.
+  const recentFolders = createRecentFoldersService({
+    list: fileRecentFolders(join(app.getPath('userData'), 'recent-folders.json')),
+    exists: (folder) =>
+      stat(folder).then(
+        (found) => found.isDirectory(),
+        () => false,
+      ),
+    home: () => app.getPath('home'),
+  });
   const workspace = createWorkspaceService({
     trustStore: fsTrustStore({ home: pluginsHome }),
     home: pluginsHome,
@@ -686,6 +698,7 @@ async function start(): Promise<void> {
     },
     onFolder: async (folder, places) => {
       await explorer.setRoot(folder, places);
+      if (folder !== undefined) await recentFolders.remember(folder);
       // Not awaited: a fetch may take a while, and the folder is open meanwhile. The templates
       // it brings arrive with `templates:changed` (ADR 0151 decision 3).
       pluginFilesSoon(false);
@@ -1399,6 +1412,13 @@ async function start(): Promise<void> {
         // Main's picker, never a path from the window (ADR 0113). Dismissed, nothing changes.
         const answer = await dialog.showOpenDialog({ properties: ['openDirectory'] });
         const chosen = answer.canceled ? undefined : answer.filePaths[0];
+        if (chosen !== undefined) await workspace.open(chosen);
+        return workspace.state();
+      },
+      recent: async () => ({ folders: await recentFolders.listing(workspace.state().folder) }),
+      openRecent: async (id) => {
+        // Main finds the folder in the list it wrote; then the picker's own door (ADR 0113).
+        const chosen = await recentFolders.chosen(id, workspace.state().folder);
         if (chosen !== undefined) await workspace.open(chosen);
         return workspace.state();
       },
