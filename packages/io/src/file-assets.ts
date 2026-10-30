@@ -7,6 +7,7 @@ import { isInside } from './contain.js';
 import { ASSETS_DIR } from './fs-inbox.js';
 import { EDITABLE_DIR } from './fs-outbox.js';
 import { hashOf } from './hash.js';
+import { sizeFieldOf } from './image-size.js';
 
 /**
  * `core`'s `AssetResolver` port, on a real disk.
@@ -103,6 +104,9 @@ export function fileAssetResolver(options: FileAssetResolverOptions): AssetResol
         // the bytes' (ADR 0003), so one image renders the same from either place.
         path: found.path,
         hash: hashOf(found.bytes),
+        // Read off the bytes already in hand, so a template can size a frame to the
+        // picture without a second read (ADR 0158).
+        ...sizeFieldOf(found.bytes),
       };
     },
   };

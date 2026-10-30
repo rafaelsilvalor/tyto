@@ -7,7 +7,7 @@ import type { ExportResources } from './export-resources.js';
 
 import { isInside } from './contain.js';
 import { hashOf } from './hash.js';
-import { imageSize } from './image-size.js';
+import { imageSize, sizeFieldOf } from './image-size.js';
 import { EMBEDDABLE_MIME, dataUri } from './mime.js';
 
 /**
@@ -169,6 +169,7 @@ export async function fileTemplateAssets(
         source: 'file',
         path: entry.absolute,
         hash: hashOf(entry.bytes),
+        ...sizeFieldOf(entry.bytes),
       };
     },
   };
