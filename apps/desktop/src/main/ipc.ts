@@ -230,6 +230,10 @@ export interface IpcDependencies {
       trusted: boolean,
       source: IpcRequest<'workspace:trust'>['source'],
     ) => Promise<IpcResponse<'workspace:trust'>>;
+    /** The folders opened before, by id (TYTO-487). */
+    recent: () => Promise<IpcResponse<'workspace:recent'>>;
+    /** Opens one of them by the id `recent` minted; anything else changes nothing. */
+    openRecent: (id: string) => Promise<IpcResponse<'workspace:folder'>>;
   };
   /**
    * The plugin files' sync (TYTO-433, ADR 0151): the composition root knows the open folder,
@@ -516,6 +520,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     }),
 
     'workspace:trust': ({ trusted, source }) => workspace.setTrust(trusted, source),
+
+    'workspace:recent': () => workspace.recent(),
+
+    // TYTO-487: the same relabelling as `workspace:set-folder`, for the same reason.
+    'workspace:open-recent': async ({ id }) => ({
+      ...(await workspace.openRecent(id)),
+      relabelled: documents.relabel(),
+    }),
 
     'plugin-files:sync': async ({ update }) => {
       await pluginFiles.sync(update);

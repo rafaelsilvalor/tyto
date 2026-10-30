@@ -27,8 +27,8 @@ const shots = process.env['TYTO_COLUMN_SHOTS'];
 
 const BRIEF = [
   '---',
-  'template: agenda-semana',
-  'formats: [grid]',
+  'template: carrossel-lista',
+  'formats: [grid-1x1]',
   '---',
   '::titulo AGENDA DA SEMANA | 15 a 19/09',
   '',

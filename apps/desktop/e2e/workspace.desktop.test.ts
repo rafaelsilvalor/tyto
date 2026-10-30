@@ -354,3 +354,19 @@ describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
     expect(trusted).not.toContain('"path": ' + JSON.stringify(shop));
   }, 60_000);
 });
+
+describe('the recent folders in the title bar (TYTO-487)', () => {
+  it('switches the workspace to a folder chosen from the popover, by keys alone', async () => {
+    const button = window.locator('.title-bar__project');
+    // Four folders were opened above; the last, `loja`, is open now.
+    await expect.poll(() => button.textContent(), { timeout: 10_000 }).toBe('loja');
+
+    await button.click();
+    await window.locator('.recent-folders__search').waitFor({ state: 'visible' });
+    await window.keyboard.type('promo');
+    await window.keyboard.press('Enter');
+
+    await expect.poll(() => button.textContent(), { timeout: 10_000 }).toBe('promo');
+    await expect.poll(problemsText, { timeout: 10_000 }).toContain('W_PROJECT_PATH_OUTSIDE');
+  }, 30_000);
+});

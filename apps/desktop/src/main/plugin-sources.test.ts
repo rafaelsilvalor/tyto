@@ -24,7 +24,7 @@ import type { SourceTrust } from './workspace.js';
  *
  * Against the real preview and export services and the pack the app ships, with a plugin in
  * process whose `fetch` counts its calls: every number asserted here is a call the plugin
- * received. `aprovados` has an optional image slot, which is all a `test:` reference needs.
+ * received. `promo-curso` has an optional image slot, which is all a `test:` reference needs.
  */
 
 const require_ = createRequire(import.meta.url);
@@ -60,16 +60,13 @@ const LOGO = solidPng([12, 35, 64]);
 const briefNaming = (reference: string): string =>
   [
     '---',
-    'template: aprovados',
-    'formats: [grid]',
+    'template: promo-curso',
+    'formats: [grid-1x1]',
     `imagem: ${reference}`,
     '---',
     '',
     '::titulo',
     '  TESTE',
-    '',
-    '::lamina',
-    '  1º | Pessoa Inventada',
     '',
   ].join('\n');
 
@@ -234,13 +231,13 @@ describe('the export, with the same cache', () => {
     const service = await exportWith(await sources());
     const brief = briefNaming('test:logo');
     const out = join(folder, 'out');
-    writeFileSync(join(folder, 'aprovados.brief'), brief);
+    writeFileSync(join(folder, 'promo.brief'), brief);
 
     const queued = await service.run({
       brief,
       directory: out,
       briefDirectory: folder,
-      label: 'aprovados',
+      label: 'promo',
       outputs: [{ kind: 'svg' }],
       queued: true,
     });
@@ -251,7 +248,7 @@ describe('the export, with the same cache', () => {
       brief,
       directory: out,
       briefDirectory: folder,
-      label: 'aprovados',
+      label: 'promo',
       outputs: [{ kind: 'svg' }],
     });
     expect(asked).toEqual(['test:logo']);
@@ -262,7 +259,7 @@ describe('the export, with the same cache', () => {
       brief,
       directory: out,
       briefDirectory: folder,
-      label: 'aprovados',
+      label: 'promo',
       outputs: [{ kind: 'svg' }],
       queued: true,
     });

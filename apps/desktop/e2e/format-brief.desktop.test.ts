@@ -31,8 +31,8 @@ const shots = process.env['TYTO_FORMAT_BRIEF_SHOTS'];
 
 const MESSY = [
   '---',
-  'template: agenda-semana   ',
-  'formats: [grid]',
+  'template: carrossel-lista   ',
+  'formats: [grid-1x1]',
   '---',
   '::titulo   ',
   '\tAGENDA DA SEMANA  ',
@@ -57,8 +57,8 @@ const MESSY = [
 const canonical = (indent: string): string =>
   [
     '---',
-    'template: agenda-semana',
-    'formats: [grid]',
+    'template: carrossel-lista',
+    'formats: [grid-1x1]',
     '---',
     '::titulo',
     `${indent}AGENDA DA SEMANA`,

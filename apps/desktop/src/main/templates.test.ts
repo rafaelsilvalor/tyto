@@ -95,7 +95,7 @@ describe('the template catalogue', () => {
 
     const formats = (await catalogue.list()).templates.flatMap((template) => template.formats);
     expect(formats).toContainEqual({ id: 'grid-1x1', label: 'Grid 1:1' });
-    expect(formats).toContainEqual({ id: 'grid', label: 'Grid' });
+    expect(formats).toContainEqual({ id: 'banner-1x1', label: 'Banner 1:1' });
     expect(formats).toContainEqual({ id: 'story', label: 'Story' });
   });
 
@@ -345,14 +345,14 @@ describe('the template catalogue', () => {
 
     const { templates } = await catalogue.list();
     const chosen = templates.find((item) => item.name === 'with-preview');
-    const agenda = templates.find((item) => item.name === 'agenda-semana');
+    const lista = templates.find((item) => item.name === 'carrossel-lista');
 
     expect(chosen?.root).toBe(basename(scratch));
     expect(chosen?.slots).toEqual({
       titulo: { type: 'rich-text', required: false, repeat: false },
     });
-    expect(agenda?.root).toBeNull();
-    expect(agenda?.slots['lamina']).toMatchObject({ repeat: true, min: 1 });
+    expect(lista?.root).toBeNull();
+    expect(lista?.slots['lamina']).toMatchObject({ repeat: true, min: 1 });
   });
 
   it('answers an empty list for a folder that is not there', async () => {

@@ -24,6 +24,10 @@ agenda-semana/
   examples/*.brief  what the template is checked against
 ```
 
+The tree is the one `agenda-semana` and `_azul/` had in the built-in pack. Since TYTO-436 both
+live in the template's own repository, `tyto-template-agenda-semana`, with the brand module
+trimmed into its `src/azul/`; the arrangement inside them is the same.
+
 Same folder as the markup route, with `template.ts` where `template.html` would be. A
 folder holds one or the other, never both. A template folder holds a `tokens.ts` or a
 `parts.ts` of its own only for what no other template of its brand draws.

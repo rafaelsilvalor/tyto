@@ -24,7 +24,7 @@ Os nomes desta página são os que o resto do manual usa. A imagem mostra um bri
   ]"
 />
 
-1. **Barra de título** — os menus (**Arquivo**, **Editar**, **Exibir**, **Janela**, **Ajuda**) e o nome do arquivo que está na frente. No macOS os menus e o título são os do sistema, no alto da tela.
+1. **Barra de título** — os menus (**Arquivo**, **Editar**, **Exibir**, **Janela**, **Ajuda**), o nome da pasta aberta, que lista as [pastas abertas antes](../editor/workspace-folder.md#trocar-entre-pastas-recentes), e o nome do arquivo que está na frente. No macOS os menus e o título são os do sistema, no alto da tela.
 2. **Aba** — uma para cada arquivo aberto. Uma aba com alterações ainda não salvas avisa; fechá-la pergunta antes. Pare o ponteiro sobre uma aba para ver onde o arquivo está: dentro da pasta aberta o caminho começa pelo nome da pasta, como `promo\briefs\capa.brief`, e fora dela a sua pasta pessoal aparece como `~`.
 3. **Trilha** — onde o cursor está no brief: `cabeçalho` nas linhas entre os dois `---`, ou o bloco em que ele está. Parar o ponteiro sobre a linha dela mostra onde o arquivo está, como na aba.
 4. **Grupo de editores** — uma fileira de abas e o arquivo da frente. **Dividir editor à direita** (**Ctrl+\\**) divide um grupo em dois, e o botão no fim da fileira de abas abre a prévia num grupo só dela; a imagem tem dois grupos lado a lado.

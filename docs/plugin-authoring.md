@@ -150,6 +150,52 @@ external is a plugin that does not activate.
 
   A face left out measures as `undefined`, and your template falls back to its own guess.
 
+  **A code template that leaves the built-in pack declares `faces:`, and a test pins them**
+  (TYTO-436). Built in, it measured in Tyto's process with every face, so its manifest never
+  needed the list; installed, it measures nothing without it. Nothing else catches the drop:
+  the snapshot test and `testPlugin` both run without faces. Moving `agenda-semana` without the
+  list shrank a long session title to 17.16 px instead of wrapping it, and `simulados-semana`
+  differed in 28 of its 28 files until the list was there. So the repository adds
+  `tests/faces.test.ts`: the faces the manifest declares are every face the example brief's
+  scene sets, and no other.
+
+  ```ts
+  /** Every `family weight` a text span in the value sets, wherever it sits. */
+  function facesIn(value: unknown, found = new Set<string>()): Set<string> {
+    if (Array.isArray(value)) {
+      for (const item of value) facesIn(item, found);
+    } else if (typeof value === 'object' && value !== null) {
+      const record = value as Record<string, unknown>;
+      const font = record['font'] as { family?: unknown } | undefined;
+      if (record['kind'] === 'text' && typeof font?.family === 'string') {
+        found.add(`${font.family} ${String(record['weight'])}`);
+      }
+      for (const item of Object.values(record)) facesIn(item, found);
+    }
+    return found;
+  }
+
+  it('declares every face the example brief sets, and no other', async () => {
+    const manifest = valueOf(
+      parseManifest(read('../templates/meu/manifest.yaml'), 'manifest.yaml'),
+    );
+    const compiled = valueOf(
+      await compileTemplate({
+        brief: read('../templates/meu/examples/meu.brief'),
+        template: defineTemplate(manifest, build, { svg: () => undefined, image: refAt }),
+        formats: valueOf(parseFormats(read('../templates/formats.yaml'), 'formats.yaml')),
+        assets: { base: '(faces test)', resolve: (reference) => Promise.resolve(refAt(reference)) },
+      }),
+    );
+
+    const declared = (manifest.faces ?? []).map((face) => `${face.family} ${face.weight}`);
+    expect([...facesIn(compiled.scene)].sort()).toEqual(declared.sort());
+  });
+  ```
+
+  `tyto-template-agenda-semana`, `tyto-template-aprovados` and `tyto-template-simulados-semana`
+  each have the whole file.
+
 - **A face installed on the person's machine needs `font:<family>`.** Faces Tyto ships are sent
   freely. A face installed on the machine, such as a licensed CircularXX, is sent only if your
   manifest's `permissions` has `font:CircularXX` and the person approved it at install. Without
@@ -234,7 +280,7 @@ When a plugin cannot be used, the render goes on without it and says why in `res
 $ tyto plugin disable meu-pack
 Disabled meu-pack.
 $ tyto render meu-pack/templates/meu-pack/examples/meu-pack.brief --types svg --out out2
-meu-pack/templates/meu-pack/examples/meu-pack.brief:2:1: error E_UNKNOWN_TEMPLATE No template named 'meu-pack'. Available: agenda-semana, carrossel-lista, promo-curso.
+meu-pack/templates/meu-pack/examples/meu-pack.brief:2:1: error E_UNKNOWN_TEMPLATE No template named 'meu-pack'. Available: banner-roxo, carrossel-lista, promo-curso.
 $ tyto plugin enable meu-pack
 Enabled meu-pack.
 ```

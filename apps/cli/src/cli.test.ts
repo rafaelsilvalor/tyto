@@ -1139,60 +1139,42 @@ describe('tyto watch --once', () => {
   });
 });
 
-describe('tyto render, where a slide runs off the grid (TYTO-202)', () => {
-  const day = (date: string): string =>
-    `  Domingo ${date} | Aplicação às 08h30 & correção às 14h\n` +
-    [1, 2, 3].map((exam) => `  ${String(exam)}º Simulado TX QC - Pós-edital (Juiz)\n`).join('');
-
-  // The first slide is two days of three exams: more than the grid holds, less than the story
-  // does. The second is the example's own last slide, which fits both.
+describe('tyto render, where an artwork runs off its format (TYTO-202)', () => {
+  // One word wider than the banner's text box at its floor size: the template draws it at the
+  // floor and reports by how much it overflows. The range that ties a repeated slide's report
+  // to its directive is `compile`'s, pinned in `packages/core/src/brief/compile.test.ts`.
   const BRIEF = `---
-template: simulados-semana-ocre
-formats: [grid, story]
+template: banner-roxo
+formats: [banner]
 ---
 ::titulo
-  Agenda de Simulados
-
-::lamina
-${day('26/10')}${day('27/10')}
-::lamina
-  Domingo 02/11 | Aplicação às 08h30 & correção às 14h
-  1º Simulado Promotor MP RJ - Pós-edital
+  Pneumoultramicroscopicossilicovulcanoconiotico
 `;
 
   beforeEach(async () => {
-    // The built-in pack is sized for `grid`, which the cartaz project does not define.
-    await writeFile(
-      join(workspace, 'formats.yaml'),
-      'grid: { w: 1080, h: 1350, kind: grid }\nstory: { w: 1080, h: 1920, kind: story }\n',
-    );
-    await writeFile(join(workspace, 'task', 'simulados.brief'), BRIEF);
+    // The built-in pack's banner, which the cartaz project does not define.
+    await writeFile(join(workspace, 'formats.yaml'), 'banner: { w: 1200, h: 628, kind: banner }\n');
+    await writeFile(join(workspace, 'task', 'banner.brief'), BRIEF);
   });
 
-  it('warns on stderr, naming the slide and the format, on the lamina’s line', async () => {
+  it('warns on stderr, naming the artwork and the format', async () => {
     const code = await run(
-      ['render', 'task/simulados.brief', '--out', 'task/out', '--types', 'svg'],
+      ['render', 'task/banner.brief', '--out', 'task/out', '--types', 'svg'],
       environment(),
     );
 
-    // A warning, not a failure: every frame is still written.
+    // A warning, not a failure: the frame is still written.
     expect(code, stderr()).toBe(EXIT_OK);
-    expect(await outFiles('task', 'out')).toEqual([
-      'grid-01.svg',
-      'grid-02.svg',
-      'result.json',
-      'story-01.svg',
-      'story-02.svg',
-    ]);
+    expect(await outFiles('task', 'out')).toEqual(['banner-01.svg', 'result.json']);
     const warnings = stderr()
       .split('\n')
       .filter((line) => line.includes('W_TEMPLATE_OVERFLOW'));
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(
-      /simulados\.brief:8:1: warning W_TEMPLATE_OVERFLOW Artwork 'lamina-1' does not fit format 'grid': its content runs \d+px past/,
+      /banner\.brief: warning W_TEMPLATE_OVERFLOW Artwork 'artwork-1' does not fit format 'banner': its content runs \d+px past/,
     );
 
-    // Only the overflow is this card's. The simulados draw in CircularXX, a face licensed to a
+    // Only the overflow is this card's. The banner draws in CircularXX, a face licensed to a
     // machine and never shipped (ADR 0037), so a machine without it — CI's runner — also reports
     // one W_FONT_UNAVAILABLE per weight (W_FONT_SUBSTITUTED with Google Fonts off, ADR 0120).
     // Those are about the machine, not the brief.
@@ -1202,8 +1184,6 @@ ${day('26/10')}${day('27/10')}
       (item) => item.code === 'W_TEMPLATE_OVERFLOW',
     );
     expect(overflows).toHaveLength(1);
-    expect(overflows[0]?.message).toMatch(/^Artwork 'lamina-1' does not fit format 'grid':/);
-    // On the first `::lamina`, the directive the slide came from.
-    expect(overflows[0]?.range?.start).toBe(BRIEF.indexOf('::lamina'));
+    expect(overflows[0]?.message).toMatch(/^Artwork 'artwork-1' does not fit format 'banner':/);
   });
 });

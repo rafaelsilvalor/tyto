@@ -128,7 +128,7 @@ beforeAll(async () => {
   await page.waitForSelector('#editor .cm-content');
   // The rows are filled by `templates:list` after the window paints; an empty list here would
   // make "the rows come back" below vacuously true.
-  await waitForWindowTemplates(page, ['agenda-semana'], 15_000);
+  await waitForWindowTemplates(page, ['carrossel-lista'], 15_000);
   builtIn = await pickerRows();
 });
 
