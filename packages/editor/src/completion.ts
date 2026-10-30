@@ -61,6 +61,9 @@ const slotOption = (name: string, manifest: TemplateManifest): Completion => {
     slot?.type,
     slot?.required === true ? 'required' : undefined,
     slot?.repeat === true ? 'repeat' : undefined,
+    // Said in the list because nothing else on the line says it: `::imagem` belongs to the
+    // `::lamina` written before it (ADR 0160).
+    slot?.per === undefined ? undefined : `per ${slot.per}`,
   ].filter((note): note is string => note !== undefined);
   return { label: name, type: 'property', detail: notes.join(' · ') };
 };
@@ -153,7 +156,8 @@ const completeFrontmatter = (
   const scalar = /^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*([a-zA-Z0-9_-]*)$/u.exec(before);
   if (scalar) {
     const slot = manifest.slots[scalar[1] ?? ''];
-    if (slot?.type === 'enum' && slot.values !== undefined) {
+    // A slide's own slot is never a frontmatter key (ADR 0160), so it offers nothing there.
+    if (slot?.type === 'enum' && slot.values !== undefined && slot.per === undefined) {
       const written = at(scalar, 2);
       const options = slot.values.map(valueOption);
       // A value that is selected — a skeleton's field (TYTO-275) — is one about to be

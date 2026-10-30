@@ -63,6 +63,11 @@ export const slotSchema = z
     required: z.boolean().default(false),
     /** Each occurrence becomes an `Artwork`; at most one slot in a manifest may repeat. */
     repeat: z.boolean().default(false),
+    /**
+     * The repeatable slot this one belongs to (ADR 0160): `imagem: { type: image, per: lamina }`
+     * takes one value per slide, written as `::imagem` after that slide's `::lamina`.
+     */
+    per: z.string().min(1).optional(),
     min: z.number().int().nonnegative().optional(),
     max: z.number().int().positive().optional(),
     /** The accepted values of an `enum` slot, and nothing else's. */
@@ -306,6 +311,34 @@ export const templateManifestSchema = z
           code: 'custom',
           path: ['slots', name, 'repeat'],
           message: `only one slot may repeat, and '${repeatable[0]?.[0]}' already does`,
+        });
+      }
+    }
+
+    // A slide's own slot hangs off the one occurrence it follows, so it has to name the slot
+    // that has occurrences, and it cannot have one of its own or a value nobody wrote.
+    for (const [name, slot] of Object.entries(manifest.slots)) {
+      if (slot.per === undefined) continue;
+      const owner = manifest.slots[slot.per];
+      if (owner?.repeat !== true) {
+        context.addIssue({
+          code: 'custom',
+          path: ['slots', name, 'per'],
+          message: `per names '${slot.per}', which is not the manifest's repeatable slot`,
+        });
+      }
+      if (slot.repeat) {
+        context.addIssue({
+          code: 'custom',
+          path: ['slots', name, 'repeat'],
+          message: 'a slot that belongs to each slide does not repeat itself',
+        });
+      }
+      if (slot.default !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['slots', name, 'default'],
+          message: 'a slot that belongs to each slide takes no default',
         });
       }
     }
