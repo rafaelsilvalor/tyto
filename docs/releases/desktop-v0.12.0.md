@@ -89,9 +89,6 @@ que diz os dois números: atualize-o para a `plugin-api` nova. O que muda para u
 **É preciso ter o Git instalado** para buscar templates por arquivo de plugin. Sem ele, a busca falha e o painel de
 problemas diz qual repositório não veio.
 
-**O carrossel de concursos abertos sai com a coruja e a assinatura provisórias**, até a marca `marinho` entrar no kit de
-marcas.
-
 **Uma entrega só se cria dentro de uma pasta de trabalho aberta.** Sem pasta aberta, **Entrega: nova…** pede que você abra
 uma antes.
 
