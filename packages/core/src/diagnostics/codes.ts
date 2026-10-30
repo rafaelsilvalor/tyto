@@ -1453,6 +1453,28 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // ADR 0157: a delivery's name is refused, never rewritten, by ADR 0114's profile rule. A
+  // warning as a refused profile name is: it costs the delivery that was asked for and nothing
+  // else, and the command that asked exits 1 because it made nothing.
+  W_DELIVERY_NAME_INVALID: {
+    severity: 'warning',
+    summary: 'A delivery name cannot be a folder name, so no delivery is made.',
+    template: "The delivery name '{name}' {problem}; no delivery is made.",
+    spec: 'docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md',
+    fatal: false,
+    fatality:
+      'Nothing is written, and nothing else is affected: the name is the only thing refused.',
+  },
+  E_DELIVERY_BRIEF_EXISTS: {
+    severity: 'error',
+    summary: "A new delivery's brief would replace a brief that is already there.",
+    template:
+      "'{path}' already exists, and a delivery's brief is never overwritten; nothing is written.",
+    spec: 'docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md',
+    fatal: true,
+    fatality:
+      'The run that refuses changes nothing: not even the folders the delivery lacks are made.',
+  },
   E_TRUST_FILE: {
     severity: 'error',
     summary: 'TYTO_HOME/trust.json cannot be read or written.',

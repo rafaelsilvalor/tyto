@@ -1,6 +1,7 @@
 import { Command, CommanderError } from 'commander';
 
 import type { CliEnvironment } from './environment.js';
+import { deliveryNewCommand } from './delivery.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import {
   parseFormatList,
@@ -216,6 +217,28 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     ])
     .action(async (name: string) => {
       captured.code = await templateNewCommand(name, scaffold.opts(), environment);
+    });
+
+  /* ------------------------------------------------------------------------- delivery -- */
+
+  const delivery = program
+    .command('delivery')
+    .description("make the folders a piece of work is kept in (the project's delivery key)");
+
+  const deliveryNew = delivery
+    .command('new')
+    .description(
+      'make <name>/ with assets/ and editaveis/, and its brief in editaveis/<name>.brief; prints the brief',
+    )
+    .argument('<name>', "the delivery's folder name, usually the ticket key and a title")
+    .option('-t, --template <name>', "start the brief from this template's skeleton")
+    .option(
+      '--trust',
+      'trust the workspace folder and its work profile for this run only; never written to trust.json',
+      false,
+    )
+    .action(async (name: string) => {
+      captured.code = await deliveryNewCommand(name, deliveryNew.opts(), environment);
     });
 
   /* --------------------------------------------------------------------------- plugin -- */

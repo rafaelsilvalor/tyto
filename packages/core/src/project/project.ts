@@ -1,6 +1,14 @@
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import type { Trust } from '../ports/trust-store.js';
 import type { SourceRange } from '../source/range.js';
+import {
+  DELIVERY_KEY,
+  type ResolvedDelivery,
+  type SheetDelivery,
+  deliveryParentPath,
+  mergeDelivery,
+  readDelivery,
+} from './delivery.js';
 import { isInsidePath, resolvePath } from './paths.js';
 import {
   EXPORT_PRESETS_KEY,
@@ -106,6 +114,11 @@ export interface ResolvedProject {
    */
   readonly exportPresets: readonly ExportPreset[];
   /**
+   * The delivery layout, merged one subkey at a time, each with its origin (TYTO-489, ADR
+   * 0157). Always answered: a subkey no sheet sets has its built-in value.
+   */
+  readonly delivery: ResolvedDelivery;
+  /**
    * Which kind of sheet each value came from, so the window can say "from the profile" or
    * "from this folder" (TYTO-347). A key no sheet set has no origin.
    */
@@ -131,6 +144,7 @@ const KNOWN_KEYS = new Set<string>([
   'profile',
   'plugins',
   EXPORT_PRESETS_KEY,
+  DELIVERY_KEY,
 ]);
 
 /** What one sheet sets; a key it does not set, or sets to nothing usable, is absent. */
@@ -141,6 +155,7 @@ interface LayerValues {
   output?: string;
   sections?: Readonly<Record<string, unknown>>;
   presets?: ReadonlyMap<string, SheetPreset | null>;
+  delivery?: SheetDelivery;
 }
 
 /**
@@ -161,6 +176,7 @@ export function resolveProject(
   const origins: { -readonly [Key in ListKey | 'output']?: ProjectLayer['kind'] } = {};
   const sectionOrigins: Record<string, ProjectLayer['kind']> = {};
   const presets = new Map<string, { preset: SheetPreset; layer: number }>();
+  const deliveries: { delivery: SheetDelivery; kind: ProjectLayer['kind'] }[] = [];
   const workspace = workspaceOf(layers);
   const diagnostics = layers.map((layer, index) => {
     const found: Diagnostic[] = [];
@@ -184,6 +200,8 @@ export function resolveProject(
       if (preset === null) presets.delete(name);
       else presets.set(name, { preset, layer: index });
     }
+    if (values.delivery !== undefined)
+      deliveries.push({ delivery: values.delivery, kind: layer.kind });
     return found;
   });
   const exportPresets: ExportPreset[] = [];
@@ -211,6 +229,7 @@ export function resolveProject(
     output: merged.output,
     sections,
     exportPresets,
+    delivery: mergeDelivery(workspace.root, deliveries),
     origins: { ...origins, sections: sectionOrigins },
     diagnostics,
   };
@@ -234,6 +253,12 @@ export function projectPaths(
           paths.push({ layer: index, path, root: workspace.root });
         }
       }
+    }
+    // A delivery's parent is confined to the workspace folder for every sheet (ADR 0157).
+    for (const entry of layer.entries) {
+      if (entry.key !== DELIVERY_KEY) continue;
+      const path = deliveryParentPath(entry, workspace.root);
+      if (path !== undefined) paths.push({ layer: index, path, root: workspace.root });
     }
     if (layer.trust === 'trusted') return;
     for (const entry of layer.entries) {
@@ -315,6 +340,19 @@ function readLayer(
         found,
       );
       if (presets !== undefined) values.presets = presets;
+    } else if (entry.key === DELIVERY_KEY) {
+      const leadsOutside = options.leadsOutside;
+      values.delivery = readDelivery(
+        entry,
+        {
+          workspaceRoot: workspace.root,
+          leadsOutside:
+            leadsOutside === undefined
+              ? undefined
+              : (path) => leadsOutside(index, path, workspace.root),
+        },
+        found,
+      );
     } else if (entry.key === 'plugins') {
       const sections = sectionsOf(layer, entry, found);
       if (sections !== undefined) values.sections = sections;

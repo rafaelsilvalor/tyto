@@ -130,6 +130,12 @@ export {
 export type { LoadedProfile } from './profile.js';
 
 export {
+  type CreateDeliveryOptions,
+  type CreatedDelivery,
+  createDelivery,
+} from './delivery-folder.js';
+
+export {
   type WorkspaceDataOptions,
   DATA_FILE_MAX_BYTES,
   workspaceDataResolver,
