@@ -1332,7 +1332,7 @@ function openExportDialog(): void {
 /**
  * The delivery each brief tab belongs to, as main answered `delivery:of` (TYTO-490), keyed by the
  * tab's document and where its file is, so a Save As or a rename asks again. `null` is "in no
- * delivery"; a key not here is being asked. Emptied when the open folder changes its layout.
+ * delivery"; a key not here is being asked. Emptied on every answer about the open folder.
  */
 const deliveries = new Map<string, string | null>();
 
@@ -3273,10 +3273,9 @@ async function changeWorkspaceFolder(
 function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   state.workspaceOutput = answer.output;
   state.workspaceName = answer.name;
-  // A folder opened, reread or closed may lay its deliveries out differently (TYTO-490).
-  if (workspaceShown?.folder !== answer.folder || workspaceShown.trust !== answer.trust) {
-    deliveries.clear();
-  }
+  // A folder opened, reread or closed may lay its deliveries out differently (TYTO-490):
+  // asked again, which is cheap, rather than compared key by key.
+  deliveries.clear();
   workspaceShown = answer;
   showExportPresets(answer.exportPresets);
   panel.installation = withWorkspaceRows(panel.installation, answer.problems);
