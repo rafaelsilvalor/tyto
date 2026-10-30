@@ -11,7 +11,6 @@ import {
   err,
   frameSchema,
   manifestFaceSchema,
-  noFiles,
   ok,
   sceneSchema,
   sizeSchema,
@@ -27,6 +26,7 @@ import { settingFormSchema } from '../setting-form.js';
 import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
 import { THEME_KINDS, isThemePath } from '../theme.js';
 import type { GuestFaces, ShippedFace } from './faces.js';
+import { type ShippedFiles, guestFiles } from './files.js';
 import { resultSchema } from './protocol.js';
 
 /**
@@ -229,6 +229,16 @@ const shippedFaceSchema = z.strictObject({
   bytes: z.instanceof(Uint8Array),
 });
 
+/**
+ * `ShippedFiles`: the refs and markup the host read from the template's own folder (ADR
+ * 0062). Bounded, because they ride every call; the host reads a template's folder, which is
+ * a handful of pictures, and a ref is a few hundred characters.
+ */
+const shippedFilesSchema = z.strictObject({
+  images: z.record(z.string().min(1).max(1024), assetRefSchema),
+  svgs: z.record(z.string().min(1).max(1024), z.string()),
+});
+
 const fontFaceSchema = z.strictObject({
   family: z.string().min(1),
   weight: z.number(),
@@ -333,24 +343,34 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       directory: z.string().min(1).optional(),
     }),
     callables: {
-      // `build(template, call, faces)` on the host's side; the plugin's own function is
-      // `build(template, context)` and returns a frame, which crosses as a result so a
+      // `build(template, call, faces, files)` on the host's side; the plugin's own function
+      // is `build(template, context)` and returns a frame, which crosses as a result so a
       // throw and an answer arrive in one shape (ADR 0048) — beside the reports the
       // template made while it built (ADR 0058).
       build: {
-        args: z.tuple([z.string().min(1), templateCallSchema, z.array(shippedFaceSchema)]),
-        send: ([template, call, faces]) => [template, call, faces ?? []],
+        args: z.tuple([
+          z.string().min(1),
+          templateCallSchema,
+          z.array(shippedFaceSchema),
+          shippedFilesSchema,
+        ]),
+        send: ([template, call, faces, files]) => [
+          template,
+          call,
+          faces ?? [],
+          files ?? { images: {}, svgs: {} },
+        ],
         result: resultSchema(templateAnswerSchema),
         failed: (problems) => err(problems),
         optional: true,
-        receive: ([template, call, faces], guest) => {
+        receive: ([template, call, faces, files], guest) => {
           guest.faces.add(faces as readonly ShippedFace[]);
           const reports: TemplateReport[] = [];
           const context = {
             ...(call as object),
             measure: guest.faces.measure,
-            // The plugin's own folder is not read for its templates yet (ADR 0062).
-            files: noFiles,
+            // What the host read from the template's own folder (ADR 0062, TYTO-478).
+            files: guestFiles(files as ShippedFiles),
             report: (report: TemplateReport) => {
               reports.push(report);
             },
