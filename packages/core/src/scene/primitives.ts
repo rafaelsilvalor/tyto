@@ -83,6 +83,13 @@ export const assetRefSchema = z.strictObject({
   path: z.string().min(1).optional(),
   /** Content hash: same brief plus same assets must produce the same bytes. */
   hash: z.string().min(1),
+  /**
+   * The picture's own width and height in pixels, as the host read them off its header
+   * when it found the file (ADR 0158). A template sizes a frame to it, since it cannot open
+   * the file itself. Absent on a hand-built ref and on a header nothing parsed: an answer
+   * the host guessed would place the picture with confidence, in the wrong frame.
+   */
+  size: sizeSchema.optional(),
 });
 export type AssetRef = z.infer<typeof assetRefSchema>;
 

@@ -600,6 +600,19 @@ template reads its own folder inside the installed plugin the same way: the host
 sends the refs with the call, and a path out of the folder answers `undefined` (ADR 0062,
 TYTO-478). A context built by hand in a test is handed `noFiles`.
 
+**A picture's ref carries its pixel size**, so a frame can follow the image the brief supplies
+(ADR 0158). The host reads `size: { w, h }` off the header when it finds the file — a slot's
+image, a declared image value, or one of the template's own files — and
+`imageHeight(asset, width, fallback)` from `@tyto/template-kit` answers how tall a frame
+`width` wide must be to hold it. `fallback` is the height used when the ref has no size: a ref
+built by hand, or a header the host could not parse.
+
+```ts
+const value = context.slots.imagem?.value;
+const asset = value?.kind === 'image' ? value.asset : undefined;
+const height = imageHeight(asset, 920, 520); // 1600×900 → 517.5, 600×1200 → 1840
+```
+
 **One path per format gives each format its own background.** A banner in three sizes keeps
 three files and lets the format pick:
 

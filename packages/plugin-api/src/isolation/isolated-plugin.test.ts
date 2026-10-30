@@ -419,7 +419,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 11 and this host speaks 12.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 12 and this host speaks 13.",
     );
   });
 
@@ -1406,6 +1406,59 @@ describe('an isolated template’s files (ADR 0062)', () => {
       'assets\\bg.png': BG,
       'assets/mark.svg': '<svg><path d="M0 0H1V1Z"/></svg>',
     });
+  });
+
+  // A guest on 12 refused this: `size` is a field its strict ref schema did not know, in a
+  // shipped image and in a declared value alike (ADR 0158, protocol 13).
+  it('keeps an image’s pixel size on its own picture, a slot’s and a declared value’s', async () => {
+    const sized = (w: number, h: number) => ({ ...BG, size: { w, h } });
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      build: (_template, context) => {
+        const slot = context.slots.capa?.value;
+        return {
+          format: JSON.stringify([
+            context.files.image('assets/bg.png')?.size,
+            slot?.kind === 'image' ? slot.asset.size : undefined,
+            imageValue(context, 'logo')?.size,
+          ]),
+          size: context.size,
+          children: [],
+        };
+      },
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const build = host.registry.templatePacks()[0]?.build as unknown as IsolatedPackBuild;
+
+    const answer = await build(
+      'demo',
+      {
+        ...CALL,
+        slots: {
+          capa: {
+            name: 'capa',
+            value: { kind: 'image', asset: sized(600, 1200) },
+            adjustments: [],
+          },
+        },
+        values: { logo: sized(300, 100) },
+      },
+      [],
+      { images: { 'assets/bg.png': sized(1600, 900) }, svgs: {} },
+    );
+
+    expect(answer.ok ? JSON.parse(answer.value.frame.format) : answer.error[0]?.message).toEqual([
+      { w: 1600, h: 900 },
+      { w: 600, h: 1200 },
+      { w: 300, h: 100 },
+    ]);
   });
 
   it('answers nothing for a path out of the folder, an absolute one or one never read', async () => {

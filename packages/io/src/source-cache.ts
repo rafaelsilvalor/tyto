@@ -21,6 +21,7 @@ import {
 } from '@tyto/plugin-api';
 
 import { hashOf } from './hash.js';
+import { sizeFieldOf } from './image-size.js';
 import { EMBEDDABLE_MIME } from './mime.js';
 
 /**
@@ -289,7 +290,7 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
             return missed(said(`its cached copy at ${path} cannot be read`));
           }
           failures.delete(reference);
-          return { id: reference, source: 'url', path, hash: hashOf(bytes) };
+          return { id: reference, source: 'url', path, hash: hashOf(bytes), ...sizeFieldOf(bytes) };
         },
 
         explain(reference: string): Diagnostic | undefined {
