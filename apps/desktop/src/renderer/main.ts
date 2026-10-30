@@ -79,6 +79,7 @@ import {
 } from './export-presets.js';
 import { WORKSPACE_BANNER, paintWorkspaceBanner } from './workspace-banner.js';
 import { type TrustDialog, TRUST_DIALOG_TAG } from './trust-dialog.js';
+import { type RecentFolders, RECENT_FOLDERS_TAG } from './recent-folders.js';
 import { canvasMeasure, missingFamilyRows, withFontRows } from './typography.js';
 import { DEFAULT_TYPOGRAPHY, type Typography } from '../../shared/typography.js';
 import { offeredFormats, templateOf } from './frontmatter.js';
@@ -144,6 +145,7 @@ import {
   FILE_EXPORT,
   PLUGINS_SHOW,
   SETTINGS_OPEN,
+  WORKSPACE_OPEN_RECENT,
   builtInKeybindings,
   builtInTable,
   createDesktopRegistry,
@@ -293,7 +295,7 @@ import {
 import { searchPhrasesFor } from './search-phrases.js';
 import { type SessionGroups, type TemplateSnapshot, sessionOf } from './session.js';
 import { paintUpdateNotice } from './update-notice.js';
-import { type ShellState, paint, paintTitle } from './shell.js';
+import { type ShellState, TITLE_BAR_PROJECT, paint, paintTitle } from './shell.js';
 import { AltTap, MenuRow, altLettersTaken, isMenuLetterStroke } from './menu-row.js';
 import {
   type ImagePreviewState,
@@ -763,6 +765,8 @@ function resolveElements() {
     workspaceBanner: byId<HTMLDivElement>(WORKSPACE_BANNER),
     // TYTO-278. Workspace: Manage Trust, by tag like the plugins screen.
     trustDialog: document.querySelector<TrustDialog>(TRUST_DIALOG_TAG),
+    // TYTO-487. The recent folders popover, under the title bar's folder button.
+    recentFolders: document.querySelector<RecentFolders>(RECENT_FOLDERS_TAG),
     // TYTO-297. A line the window says for a few seconds; hidden the rest of the time.
     statusNotice: byId<HTMLOutputElement>('status-notice'),
     // TYTO-248. Outside the docks, like the command bar: the bar belongs to the window.
@@ -1455,6 +1459,9 @@ const registry: CommandRegistry = withCommandGate(
     },
     openWorkspaceFolder: () => {
       void setWorkspaceFolder(true);
+    },
+    openRecentFolders: () => {
+      toggleRecentFolders();
     },
     closeWorkspaceFolder: () => {
       void setWorkspaceFolder(false);
@@ -3070,9 +3077,26 @@ async function setTemplateFolder(choose: boolean): Promise<void> {
  * templates, and every open brief's preview, whose assets and fonts may now come from it.
  */
 async function setWorkspaceFolder(choose: boolean): Promise<void> {
+  await changeWorkspaceFolder((bridge) => bridge['workspace:set-folder']({ choose }), choose);
+}
+
+/**
+ * Opens a folder from the recent list by the id main minted for it (TYTO-487): main finds the
+ * folder and opens it through Open Folder's own door, and the window takes the answer as it
+ * takes the picker's.
+ */
+async function openRecentFolder(id: string): Promise<void> {
+  await changeWorkspaceFolder((bridge) => bridge['workspace:open-recent']({ id }), true);
+}
+
+/** What both doors share: main's answer painted, the tabs relabelled, the explorer opened. */
+async function changeWorkspaceFolder(
+  ask: (bridge: TytoBridge) => Promise<IpcResponse<'workspace:set-folder'>>,
+  choose: boolean,
+): Promise<void> {
   await withBridge(async (bridge) => {
     const before = workspaceShown?.folder ?? null;
-    const answer = await bridge['workspace:set-folder']({ choose });
+    const answer = await ask(bridge);
     // A label inside the open folder is relative to it (TYTO-274, ADR 0125): main labels every
     // open tab again, and they take it as they take a rename.
     workspace = withMovedDocuments(workspace, answer.relabelled);
@@ -3100,6 +3124,9 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   if (elements.trustDialog) elements.trustDialog.view = answer;
   if (elements.projectPanel) elements.projectPanel.view = answer;
   showExplorerFolder(answer);
+  // The title bar's folder button and the title name the folder (TYTO-487): painted with the
+  // answer itself, so neither waits on whatever repaints the window next.
+  paintTitle(document, shellState());
 }
 
 /** The folder the explorer lists, by main's real path; another one starts the tree afresh. */
@@ -3238,6 +3265,42 @@ async function setWorkspaceTrust(
     showWorkspace(await bridge['workspace:trust']({ trusted, source }));
     if (trusted) await afterTemplatesReread(bridge);
     else repaint();
+  });
+}
+
+/**
+ * The recent folders popover (TYTO-487), from the title bar's button or `workspace.openRecent`:
+ * open asks main for the list and shows it under the button; open already, it closes, so the
+ * button toggles as a menu name does. Focus goes back where it was when it closes.
+ */
+function toggleRecentFolders(): void {
+  const popover = elements.recentFolders;
+  if (popover === null || popover === undefined) return;
+  if (popover.open) {
+    popover.close();
+    return;
+  }
+  const button = document.querySelector<HTMLElement>(TITLE_BAR_PROJECT);
+  const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  popover.anchor = button ?? undefined;
+  popover.locale = state.locale;
+  popover.onChoose = (id) => {
+    void openRecentFolder(id);
+  };
+  popover.onOpenLocal = () => {
+    void setWorkspaceFolder(true);
+  };
+  popover.onClose = () => {
+    button?.setAttribute('aria-expanded', 'false');
+    before?.focus();
+  };
+  void withBridge(async (bridge) => {
+    popover.folders = (await bridge['workspace:recent']({})).folders;
+    // Under the button where it is drawn; macOS hides the bar, and the CSS default applies.
+    const left = button?.getBoundingClientRect().left ?? 0;
+    popover.style.left = left > 0 ? `${String(Math.round(left))}px` : '';
+    popover.show();
+    button?.setAttribute('aria-expanded', 'true');
   });
 }
 
@@ -4381,6 +4444,7 @@ function applyLocale(next: Locale): void {
   }
   if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
   if (elements.trustDialog) elements.trustDialog.locale = next;
+  if (elements.recentFolders) elements.recentFolders.locale = next;
   // The docked panels were handed the locale only when the dock was arranged, so a panel open
   // across a switch kept the old language — the explorer's menu and delete question among
   // them (TYTO-352).
@@ -5310,6 +5374,10 @@ async function load(): Promise<void> {
   if (bridge !== undefined) void loadSettingsOutline(bridge);
   wireKeybindingDispatcher();
   if (bridge !== undefined) await drawMenuRow(bridge);
+  // TYTO-487. The open folder's button, between the menu row and the title.
+  document.querySelector(TITLE_BAR_PROJECT)?.addEventListener('click', () => {
+    runCommand(WORKSPACE_OPEN_RECENT);
+  });
   wireSplitters(document, () => layout, {
     locale: state.locale,
     onClose: (panelId) => {

@@ -140,6 +140,21 @@ describe('the titles with a workspace folder open (TYTO-278)', () => {
   });
 });
 
+describe('the title bar’s folder button (TYTO-487)', () => {
+  it('names the open folder, and says there is none in the window’s language', () => {
+    document.body.innerHTML = '<header><button class="title-bar__project"></button></header>';
+    const button = document.querySelector('.title-bar__project')!;
+
+    paintTitle(document, { ...state('en'), workspaceName: 'campanha' });
+    expect(button.textContent).toBe('campanha');
+    expect(button.hasAttribute('data-empty')).toBe(false);
+
+    paintTitle(document, { ...state('pt-BR'), workspaceName: null });
+    expect(button.textContent).toBe('Sem pasta');
+    expect(button.hasAttribute('data-empty')).toBe(true);
+  });
+});
+
 describe('titleBarText (TYTO-244)', () => {
   it('names the app and the file in front', () => {
     expect(titleBarText('pt-BR', 'campanha.brief')).toBe('Tyto — campanha.brief');

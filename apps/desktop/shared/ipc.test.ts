@@ -94,6 +94,8 @@ describe('the IPC contract', () => {
       'update:status',
       'window:zoom',
       'workspace:folder',
+      'workspace:open-recent',
+      'workspace:recent',
       'workspace:set-folder',
       'workspace:trust',
     ]);
@@ -392,6 +394,8 @@ describe('what the contract does not promise', () => {
       'templates:folder',
       // TYTO-278. "Which workspace is open" too: one window, one folder, main's.
       'workspace:folder',
+      // TYTO-487. "Which folders were open before" too: the list is main's, and so are its ids.
+      'workspace:recent',
       // TYTO-44, ADR 0039. "This page can hear the question" names nothing: there is one
       // window, and the page saying it is the page it is about.
       'app:exit-listening',

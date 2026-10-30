@@ -99,6 +99,19 @@ export interface Catalogue {
   readonly 'command.workspace.openFolder': string;
   readonly 'command.workspace.closeFolder': string;
   readonly 'command.workspace.manageTrust': string;
+  /**
+   * TYTO-487. The recent folders: the command, the title bar's button when no folder is open,
+   * and the popover it opens.
+   */
+  readonly 'command.workspace.openRecent': string;
+  readonly 'titleBar.noFolder': string;
+  readonly 'recentFolders.label': string;
+  readonly 'recentFolders.search': string;
+  readonly 'recentFolders.heading': string;
+  readonly 'recentFolders.empty': string;
+  readonly 'recentFolders.noMatch': string;
+  readonly 'recentFolders.current': string;
+  readonly 'recentFolders.openLocal': string;
   readonly 'command.pluginFiles.sync': string;
   readonly 'command.pluginFiles.update': string;
   readonly 'pluginFiles.approve.message': string;
@@ -780,6 +793,15 @@ export const CATALOGUE_KEYS = [
   'command.workspace.openFolder',
   'command.workspace.closeFolder',
   'command.workspace.manageTrust',
+  'command.workspace.openRecent',
+  'titleBar.noFolder',
+  'recentFolders.label',
+  'recentFolders.search',
+  'recentFolders.heading',
+  'recentFolders.empty',
+  'recentFolders.noMatch',
+  'recentFolders.current',
+  'recentFolders.openLocal',
   'command.pluginFiles.sync',
   'command.pluginFiles.update',
   'pluginFiles.approve.message',

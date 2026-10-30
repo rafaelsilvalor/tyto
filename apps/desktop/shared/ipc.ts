@@ -914,6 +914,39 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The workspace folders opened before, newest first, for the title bar's popover (TYTO-487).
+   * A folder that is gone is left out. **The id is main's**: the only thing the window sends
+   * back; `pathLabel` is shown and never accepted anywhere (ADR 0086).
+   */
+  'workspace:recent': channel(
+    z.object({}),
+    z.object({
+      folders: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            name: z.string().min(1),
+            pathLabel: z.string().min(1),
+            /** The folder open now: listed, and choosing it changes nothing. */
+            current: z.boolean(),
+          }),
+        )
+        .max(50),
+    }),
+  ),
+
+  /**
+   * Opens a folder from that list by its id, through the door File ▸ Open Folder uses (ADR
+   * 0111, ADR 0113), and answers as `workspace:set-folder` does. **Strict, and an id only**: a
+   * request carrying a path is refused, and an id main never minted, a folder that is gone and
+   * the folder already open each answer what is open, unchanged.
+   */
+  'workspace:open-recent': channel(
+    z.strictObject({ id: z.string().min(1).max(64) }),
+    workspaceState.extend({ relabelled: z.array(movedDocument) }),
+  ),
+
+  /**
    * The children of one folder of the open workspace, for the explorer (TYTO-279, ADR 0115):
    * `entryId: null` is the folder itself. **Strict, and it names no path**: an entry is an id
    * main minted when it listed the folder above it, and means nothing once that folder closes.
