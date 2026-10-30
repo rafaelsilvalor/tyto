@@ -24,7 +24,8 @@ import { firstWindow } from './first-window.js';
  * into `entregas/` — and a `keybindings.json` that binds `ctrl+e` to it **before the folder is
  * open**, so the binding only works if the key table is resolved again when the preset's
  * command arrives. The preset runs from Ctrl+K and from the key, each time into a folder that
- * does not exist yet, and a later run over a bigger delivery shows what it removed (ADR 0054).
+ * does not exist yet, and a later run over a bigger export removes nothing, since the preset
+ * writes the artwork alone and keeps no report to tell Tyto's files apart (ADR 0157).
  *
  * Its own `--user-data-dir` and `TYTO_HOME` (TYTO-139), and `closeApp` at the end.
  */
@@ -205,7 +206,7 @@ describe('an export preset in the window (TYTO-270, ADR 0126)', () => {
     await closeBox();
   }, 120_000);
 
-  it('removes what a bigger earlier delivery left, and keeps a person’s file', async () => {
+  it('keeps what a bigger earlier export left, and a person’s file (TYTO-490)', async () => {
     await openBrief(join(work, 'briefs', 'tres.brief'), 'Lâmina 3');
     await run('export.preset:entregas');
     await finishedInto(out);
@@ -217,10 +218,12 @@ describe('an export preset in the window (TYTO-270, ADR 0126)', () => {
     await window.click('#editor .cm-content');
     await window.keyboard.press('Control+e');
     await finishedInto(out);
-    expect(pngs()).toEqual(['grid-1x1-01.png', 'story-01.png']);
+    // Overwritten by name, and nothing removed: the six of the bigger export remain.
+    expect(pngs()).toHaveLength(6);
     expect(readdirSync(out)).toContain('leia-me.txt');
-    expect(await shownCodes()).toContain('W_LEFTOVER_REMOVED');
-    await window.locator('[data-testid="export-leftovers"]').waitFor({ state: 'visible' });
+    expect(readdirSync(out)).not.toContain('result.json');
+    expect(await shownCodes()).not.toContain('W_LEFTOVER_REMOVED');
+    expect(await window.locator('[data-testid="export-leftovers"]').count()).toBe(0);
     await closeBox();
   }, 180_000);
 });

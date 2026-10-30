@@ -1,7 +1,8 @@
 # 0118 — Where the CLI fetches from a plugin, and how a fetched image is delivered
 
 Status: accepted · 2026-10-22 · TYTO-280 · under ADR 0117 and ADR 0111 · amends ADR 0057 on
-the name a delivered image is copied under
+the name a delivered image is copied under · amended by ADR 0157 (2026-10-30, TYTO-490):
+`--folder` no longer copies images, so decision 3 has no writer left
 
 ## Context
 

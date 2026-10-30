@@ -1069,10 +1069,9 @@ describe('the export handlers (E9.4)', () => {
         label: 'promo',
         briefDirectory: '/briefs',
         outputs: [{ kind: 'svg' }],
-        // The export box is the one caller that asks for this; the queue does not (ADR 0054).
-        removeLeftovers: true,
-        // And the one that delivers: artwork, editaveis/ and assets/ (ADR 0057).
-        delivery: true,
+        // The export box writes the artwork alone, and removes nothing (ADR 0157, TYTO-490).
+        // The queue does not come here: it keeps its report and its leftovers rule (ADR 0054).
+        artworkOnly: true,
       },
     ]);
   });

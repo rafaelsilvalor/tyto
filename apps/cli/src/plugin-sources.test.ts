@@ -2,7 +2,7 @@ import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crc32, deflateSync } from 'node:zlib';
 
@@ -428,10 +428,10 @@ describe('where a run may fetch (ADR 0118)', () => {
   );
 });
 
-describe('a --folder delivery of a fetched image (ADR 0118)', () => {
+describe('a --folder render of a fetched image (ADR 0118, ADR 0157)', () => {
   /**
-   * A built-in template, so the copy can be rendered where no plugin is installed at all:
-   * the plugin here only supplies the image. `promo-curso` has an optional image slot.
+   * A built-in template, so the plugin here only supplies the image. `promo-curso` has an
+   * optional image slot.
    */
   const PROMO = [
     '---',
@@ -445,28 +445,8 @@ describe('a --folder delivery of a fetched image (ADR 0118)', () => {
     '',
   ].join('\n');
 
-  async function renderPromo(
-    path: string,
-    out: string,
-    extra: readonly string[],
-    tytoHome: string,
-  ): Promise<{ readonly code: number; readonly diagnostics: readonly Diagnostic[] }> {
-    const code = await run(
-      ['render', path, '--out', out, '--formats-file', PACK_FORMATS, '--types', 'svg', ...extra],
-      environment(tytoHome),
-    );
-    // A delivery keeps `result.json` beside the copied brief, in `<out>/<name>/editaveis/`.
-    const folder = extra.includes('--folder')
-      ? join(out, basename(path, '.brief'), 'editaveis')
-      : out;
-    const result = JSON.parse(await readFile(join(folder, 'result.json'), 'utf8')) as {
-      diagnostics: Diagnostic[];
-    };
-    return { code, diagnostics: result.diagnostics };
-  }
-
   it(
-    'copies it under its reference’s name, and the copied brief renders with no plugin',
+    'draws it, and writes the artwork alone: no assets/ copy since TYTO-490',
     async () => {
       const folder = join(workspace, 'loose');
       await mkdir(folder, { recursive: true });
@@ -474,25 +454,28 @@ describe('a --folder delivery of a fetched image (ADR 0118)', () => {
       await writeFile(path, PROMO);
       const out = join(workspace, 'delivered');
 
-      const delivered = await renderPromo(path, out, ['--folder'], home);
-      expect(delivered.code, stderr()).toBe(EXIT_OK);
+      const code = await run(
+        [
+          'render',
+          path,
+          '--out',
+          out,
+          '--folder',
+          '--formats-file',
+          PACK_FORMATS,
+          '--types',
+          'svg',
+        ],
+        environment(home),
+      );
+
+      expect(code, stderr()).toBe(EXIT_OK);
       expect(requests).toContain('/image/logo');
-
-      // Named after `test:logo`, not after the cache's hash, and the copy points at it.
-      const delivery = join(out, 'entrega');
-      expect(await readdir(join(delivery, 'assets'))).toEqual(['logo.png']);
-      expect(await readFile(join(delivery, 'assets', 'logo.png'))).toEqual(LOGO);
-      const copy = join(delivery, 'editaveis', 'entrega.brief');
-      expect(await readFile(copy, 'utf8')).toContain('imagem: logo.png\n');
-
-      // A home with no plugin installed: the copy's image is the delivery's `../assets`
-      // (ADR 0057), and nothing is asked of anybody.
-      const before = requests.length;
-      const bare = join(workspace, 'bare-home', '.tyto');
-      const again = await renderPromo(copy, join(workspace, 'again'), [], bare);
-      expect(again.code, stderr()).toBe(EXIT_OK);
-      expect(again.diagnostics.filter(({ code }) => code.startsWith('E_'))).toEqual([]);
-      expect(requests).toHaveLength(before);
+      // The fetched image is in the artwork, and nowhere else in the folder (ADR 0157).
+      const written = await readdir(join(out, 'entrega'));
+      expect(written).toEqual(['grid-1x1-01.svg']);
+      const svg = await readFile(join(out, 'entrega', 'grid-1x1-01.svg'), 'utf8');
+      expect(embeds(svg, LOGO)).toBe(true);
     },
     SLOW,
   );

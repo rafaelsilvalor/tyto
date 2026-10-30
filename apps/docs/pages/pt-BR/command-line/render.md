@@ -34,9 +34,9 @@ story-01.webp
 
 (As quatro primeiras linhas de dezesseis.)
 
-## Entregar numa pasta própria
+## Gravar numa pasta própria
 
-`--folder` põe os arquivos numa subpasta com o nome do brief, com o brief, o `result.json` e o `template.txt` em `editaveis/` ao lado — o mesmo arranjo que a exportação da janela grava:
+`--folder` põe os arquivos numa subpasta com o nome do brief, sem nada ao lado — nem `result.json`, nem cópia do brief, nem imagens —, como faz a exportação da janela. O relatório da execução é o que o comando imprime, e `--json` o imprime como um só documento:
 
 ```
 deliveries/
@@ -44,11 +44,9 @@ deliveries/
     grid-01.png
     grid-02.png
     …
-    editaveis/
-      carousel.brief
-      result.json
-      template.txt
 ```
+
+Um arquivo que já está lá com o mesmo nome é substituído, e todos os outros ficam como estão.
 
 ## Renderizar dentro de uma pasta de trabalho
 

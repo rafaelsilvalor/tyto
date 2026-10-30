@@ -2,7 +2,8 @@
 
 Status: accepted · 2026-10-23 · TYTO-270 · amends ADR 0112 ("it names places and nothing else")
 and adds a row to ADR 0111's table; builds on ADR 0054, ADR 0057, ADR 0074, ADR 0079 and ADR
-0114
+0114 · amended by ADR 0157 decision 7 (2026-10-30, TYTO-490): a preset writes only artwork,
+removes nothing, and the notes below say where that changes what they describe
 
 ## Context
 
@@ -13,7 +14,8 @@ need had no home.
 
 **What exists at `origin/main` fb2b470, read in the code.** `export:start` already takes
 `formats`, `outputs` and `directory` from the window, and main delivers into the directory with
-`removeLeftovers` and `delivery` on (ADR 0054, ADR 0057). The project file and the work profile
+`removeLeftovers` and `delivery` on (ADR 0054, ADR 0057). (Since TYTO-490, `artworkOnly` instead:
+ADR 0157.) The project file and the work profile
 are two sheets merged key by key, with plugin sections merged per plugin id (ADR 0112, ADR 0114).
 `keybindings.json` entries are `{ key, command, when? }`: a key names a command id and nothing
 else (ADR 0074). The key table is resolved by `resolveWith` in the renderer against the commands
@@ -48,7 +50,8 @@ An object keyed by name, the key and the form Rafael approved:
   **`png` when left out**, which is what the export box starts with.
 - `folder`: optional; where the files go.
 - **No `delivery` key.** The window's export always delivers (ADR 0057); a preset that could turn
-  it off would be a second export path, not a name for the first.
+  it off would be a second export path, not a name for the first. (Since TYTO-490 the window's
+  export never delivers, ADR 0157; still no key, for the same reason.)
 
 **Presets merge by name**, as plugin sections merge by plugin id (ADR 0112): a folder that writes
 `entregas` replaces the profile's `entregas` whole and inherits the profile's other presets.
@@ -102,7 +105,9 @@ folder's presets are offered like its `output` is.
 - **An existing destination follows ADR 0054**: overwrite by name, remove only what the previous
   `result.json` listed and this run did not produce (`W_LEFTOVER_REMOVED`), never the person's
   own files. A destination that does not exist is made: the delivery's `mkdir -p` of `editaveis/`
-  already makes it, measured by the e2e, which starts each run with no `entregas/`.
+  already makes it, measured by the e2e, which starts each run with no `entregas/`. (Since
+  TYTO-490, ADR 0157: overwrite by name and remove nothing, as there is no `result.json`; the
+  folder is made by the artwork output's own `mkdir -p`.)
 - **The key table is resolved again after every workspace answer that changed the presets**, when
   a layer above the built-in one exists. Without it, a binding to a preset read before the folder
   opened stayed `W_KEYBINDING_UNKNOWN_COMMAND` until `keybindings.json` was next saved; the e2e

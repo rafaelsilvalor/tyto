@@ -4,7 +4,12 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { type DeliveryOutput, fsDeliveryOutput, fsTaskOutput, placeAtomic } from './fs-outbox.js';
+import {
+  type ReusableTaskOutput,
+  fsArtworkOutput,
+  fsTaskOutput,
+  placeAtomic,
+} from './fs-outbox.js';
 import { renderResult } from './result.js';
 
 /**
@@ -23,10 +28,6 @@ afterEach(async () => {
   await rm(workspace, { recursive: true, force: true });
 });
 
-const BRIEF = new TextEncoder().encode(
-  '---\ntemplate: agenda-semana\nimagem: ./marca/selo.png\nfundo: ./marca/fundo.png\n---\n',
-);
-
 const emptyResult = () =>
   renderResult({
     cancelled: false,
@@ -40,13 +41,9 @@ const emptyResult = () =>
 const sentence = (path: string): string =>
   `'${path}' is a folder, and Tyto needs to write a file with that name. Rename or move the folder, or write somewhere else.`;
 
-async function openDelivery(picked: string): Promise<DeliveryOutput> {
-  const opened = await fsDeliveryOutput(picked, {
-    name: 'agenda',
-    brief: BRIEF,
-    folder: 'destination',
-  });
-  if (!opened.ok) throw new Error(`expected the delivery to open: ${opened.error[0]?.message}`);
+async function openArtwork(picked: string): Promise<ReusableTaskOutput> {
+  const opened = await fsArtworkOutput(picked);
+  if (!opened.ok) throw new Error(`expected the folder to open: ${opened.error[0]?.message}`);
   return opened.value;
 }
 
@@ -60,55 +57,7 @@ async function expectUntouched(path: string): Promise<void> {
   expect(await readFile(join(path, 'dentro.txt'), 'utf8')).toBe('kept');
 }
 
-describe('a folder where the delivery writes a file', () => {
-  it('refuses to open when a folder holds the copied brief, and writes nothing beside it', async () => {
-    const picked = join(workspace, 'escolhida');
-    const held = join(picked, 'editaveis', 'agenda.brief');
-    await holdWithFolder(held);
-
-    const opened = await fsDeliveryOutput(picked, {
-      name: 'agenda',
-      brief: BRIEF,
-      folder: 'destination',
-    });
-
-    if (opened.ok) throw new Error('expected the delivery to be refused');
-    expect(opened.error.map((item) => [item.code, item.severity, item.message])).toEqual([
-      ['E_OUTPUT_FILE_BLOCKED', 'error', sentence(held)],
-    ]);
-    await expectUntouched(held);
-    // No `.part` left pretending to be output.
-    expect(await readdir(join(picked, 'editaveis'))).toEqual(['agenda.brief']);
-  });
-
-  it('answers a folder holding template.txt', async () => {
-    const picked = join(workspace, 'escolhida');
-    const held = join(picked, 'editaveis', 'template.txt');
-    await holdWithFolder(held);
-    const output = await openDelivery(picked);
-
-    const answered = await output.describeTemplate({ name: 'agenda-semana', version: '1.0.0' });
-
-    expect(answered.map((item) => [item.code, item.message])).toEqual([
-      ['E_OUTPUT_FILE_BLOCKED', sentence(held)],
-    ]);
-    await expectUntouched(held);
-  });
-
-  it('answers a folder holding result.json, after the artwork is written', async () => {
-    const picked = join(workspace, 'escolhida');
-    const held = join(picked, 'editaveis', 'result.json');
-    await holdWithFolder(held);
-    const output = await openDelivery(picked);
-
-    const answered = await output.finish(emptyResult());
-
-    expect(answered.map((item) => [item.code, item.message])).toEqual([
-      ['E_OUTPUT_FILE_BLOCKED', sentence(held)],
-    ]);
-    await expectUntouched(held);
-  });
-
+describe('a folder where the output writes a file', () => {
   it('answers a folder holding result.json under --out too, which shares the writer', async () => {
     const out = join(workspace, 'out');
     const held = join(out, 'result.json');
@@ -124,7 +73,7 @@ describe('a folder where the delivery writes a file', () => {
     const picked = join(workspace, 'escolhida');
     const held = join(picked, 'grid-01.svg');
     await holdWithFolder(held);
-    const output = await openDelivery(picked);
+    const output = await openArtwork(picked);
 
     const answered = await output.write({
       name: 'grid-01.svg',
@@ -141,32 +90,6 @@ describe('a folder where the delivery writes a file', () => {
       ['E_OUTPUT_FILE_BLOCKED', 'error', sentence(held)],
     ]);
     await expectUntouched(held);
-  });
-
-  it('copies the images it can, and leaves the held one pointed at its own path', async () => {
-    const briefs = join(workspace, 'briefs');
-    await mkdir(briefs);
-    await writeFile(join(briefs, 'selo.png'), 'seal bytes');
-    await writeFile(join(briefs, 'fundo.png'), 'background bytes');
-    const picked = join(workspace, 'escolhida');
-    const held = join(picked, 'assets', 'selo.png');
-    await holdWithFolder(held);
-    const output = await openDelivery(picked);
-
-    const answered = await output.deliverAssets([
-      { reference: './marca/selo.png', path: join(briefs, 'selo.png') },
-      { reference: './marca/fundo.png', path: join(briefs, 'fundo.png') },
-    ]);
-
-    expect(answered.map((item) => [item.code, item.severity, item.message])).toEqual([
-      ['E_OUTPUT_FILE_BLOCKED', 'error', sentence(held)],
-    ]);
-    await expectUntouched(held);
-    expect(await readFile(join(picked, 'assets', 'fundo.png'), 'utf8')).toBe('background bytes');
-    // The copied brief points at what reached `assets/`, and does not claim `selo.png` did.
-    const copied = await readFile(join(picked, 'editaveis', 'agenda.brief'), 'utf8');
-    expect(copied).toContain('fundo: fundo.png\n');
-    expect(copied).toContain('imagem: ./marca/selo.png\n');
   });
 });
 

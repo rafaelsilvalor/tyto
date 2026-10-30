@@ -500,7 +500,8 @@ describe('tyto render, where an asset is found', () => {
 });
 
 /**
- * `--folder`: the delivery layout of TYTO-121.
+ * `--folder`: a folder named after the brief, of TYTO-121, holding only the artwork since
+ * TYTO-490 (ADR 0157).
  *
  * The acceptance criterion is a **shape on disk**, so these read the disk rather than the
  * report. The brief used here is deliberately not `task/brief.brief`: its name would make the
@@ -515,141 +516,33 @@ describe('tyto render --folder', () => {
     await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
   });
 
-  it('puts the artwork at the top and the brief underneath, in a folder named after it', async () => {
+  it('writes only the artwork, in a folder named after the brief (ADR 0157, TYTO-490)', async () => {
     const code = await run(
       ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
       environment(),
     );
 
     expect(code, stderr()).toBe(EXIT_OK);
-    // Artwork, and the two folders beside it — the whole point of the layout. A `result.json`
-    // here would be the one file somebody has to delete before sending the folder on.
-    expect(await outFiles('entregas', NAME)).toEqual([
-      'assets',
-      'editaveis',
+    // No result.json, no editaveis/ with the brief, no assets/ with the image it drew: the
+    // folder holds what a person sends, and a delivery's own folder holds the rest.
+    expect(await outFiles('entregas', NAME)).toEqual(['feed-01.svg', 'feed-02.svg']);
+  });
+
+  it('prints under --json the report it does not write', async () => {
+    const code = await run(
+      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg', '--json'],
+      environment(),
+    );
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    const report = JSON.parse(stdout()) as { status: string; artifacts: { name: string }[] };
+    expect(report.status).toBe('ok');
+    // The names are the same names `--out` produces; only the folder around them differs.
+    expect(report.artifacts.map((artifact) => artifact.name)).toEqual([
       'feed-01.svg',
       'feed-02.svg',
     ]);
-    // The image the brief used, and nothing it did not (TYTO-205).
-    expect(await outFiles('entregas', NAME, 'assets')).toEqual(['logo.png']);
-    expect(await outFiles('entregas', NAME, 'editaveis')).toEqual([
-      `${NAME}.brief`,
-      'result.json',
-      'template.txt',
-    ]);
-  });
-
-  it('names the template that made the artwork, without copying it', async () => {
-    await run(
-      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
-      environment(),
-    );
-
-    const note = await readFile(
-      join(workspace, 'entregas', NAME, 'editaveis', 'template.txt'),
-      'utf8',
-    );
-
-    // Name **and** version. `result.json`'s `tyto.templates` lists every template that was on
-    // the search path — two, on this fixture — so it cannot answer which one drew these files.
-    // The job reports the one it loaded, and that is what lands here.
-    expect(note).toContain('cartaz 2.1.0');
-    // Nothing of the template itself. A folder per delivery holding a copy of a template that
-    // lives in a repository is the thing this deliberately does not do.
-    expect(await outFiles('entregas', NAME)).not.toContain('template.html');
-    expect(await outFiles('entregas', NAME, 'editaveis')).not.toContain('manifest.yaml');
-  });
-
-  it('names the template the --template fallback chose, which the brief does not record', async () => {
-    // The case the copied brief cannot cover on its own: the frontmatter names no template, so
-    // the only thing that knows which one was used is the run itself.
-    // The `cartaz` fixture's own slot, and no frontmatter at all — so the template can only
-    // come from the flag.
-    await writeFile(join(workspace, 'task', 'sem-frontmatter.brief'), '::slide\n  Primeiro\n');
-
-    const code = await run(
-      [
-        'render',
-        'task/sem-frontmatter.brief',
-        '--out',
-        'entregas',
-        '--folder',
-        '--template',
-        'cartaz',
-        '--types',
-        'svg',
-      ],
-      environment(),
-    );
-
-    expect(code, stderr()).toBe(EXIT_OK);
-    expect(
-      await readFile(
-        join(workspace, 'entregas', 'sem-frontmatter', 'editaveis', 'template.txt'),
-        'utf8',
-      ),
-    ).toContain('cartaz 2.1.0');
-  });
-
-  it('keeps the brief byte for byte but for its image paths, which point at assets/', async () => {
-    await run(
-      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
-      environment(),
-    );
-
-    // Read as bytes rather than as a string: a copy that normalised CR LF or dropped a BOM
-    // would compare equal as text and be a different file, and a CR LF brief is supported
-    // input (TYTO-64). The one change is the image path (ADR 0057).
-    const copied = await readFile(join(workspace, 'entregas', NAME, 'editaveis', `${NAME}.brief`));
-    expect(
-      copied.equals(
-        Buffer.from(briefSource.replace('imagem: ./logo.png', 'imagem: logo.png'), 'utf8'),
-      ),
-    ).toBe(true);
-  });
-
-  it('renders the copied brief from editaveis/ to the same bytes (TYTO-205)', async () => {
-    await run(
-      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
-      environment(),
-    );
-
-    const code = await run(
-      [
-        'render',
-        join('entregas', NAME, 'editaveis', `${NAME}.brief`),
-        '--out',
-        'de-novo',
-        '--types',
-        'svg',
-      ],
-      environment(),
-    );
-
-    expect(code, stderr()).toBe(EXIT_OK);
-    for (const file of ['feed-01.svg', 'feed-02.svg']) {
-      const delivered = await readFile(join(workspace, 'entregas', NAME, file));
-      const again = await readFile(join(workspace, 'de-novo', file));
-      expect(again.equals(delivered), file).toBe(true);
-    }
-  });
-
-  it('writes a result.json its own schema accepts, one level down', async () => {
-    await run(
-      ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
-      environment(),
-    );
-
-    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
-    if (!parsed.ok) throw new Error(parsed.error.join('; '));
-
-    expect(parsed.value.status).toBe('ok');
-    // The names are the same names `--out` produces. Only the folder around them moved, and
-    // an artifact list that suddenly carried a path would be a change to the ADR 0011 schema.
-    expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual([
-      'feed-01.svg',
-      'feed-02.svg',
-    ]);
+    expect(await outFiles('entregas', NAME)).not.toContain('result.json');
   });
 
   it('leaves --out alone when the flag is absent, which is what Jacurutu relies on', async () => {
@@ -664,7 +557,7 @@ describe('tyto render --folder', () => {
     expect(await outFiles('entregas')).toEqual(['feed-01.svg', 'feed-02.svg', 'result.json']);
   });
 
-  it('removes the slide a brief no longer has, and says so on stderr (ADR 0054)', async () => {
+  it('keeps the slide a brief no longer has, because it keeps no report to tell (TYTO-490)', async () => {
     const render = (): Promise<number> =>
       run(
         ['render', `task/${NAME}.brief`, '--out', 'entregas', '--folder', '--types', 'svg'],
@@ -685,19 +578,12 @@ describe('tyto render --folder', () => {
     const code = await render();
 
     expect(code, stderr()).toBe(EXIT_OK);
-    expect(await outFiles('entregas', NAME)).toEqual([
-      'assets',
-      'editaveis',
-      'feed-01.svg',
-      'feed-02.svg',
-    ]);
-    expect(stderr()).toContain("warning W_LEFTOVER_REMOVED Removed 'feed-03.svg'");
-    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
-    if (!parsed.ok) throw new Error(parsed.error.join('; '));
-    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['W_LEFTOVER_REMOVED']);
+    // Without a result.json, the third slide is as much the person's as a note they left.
+    expect(await outFiles('entregas', NAME)).toEqual(['feed-01.svg', 'feed-02.svg', 'feed-03.svg']);
+    expect(stderr()).not.toContain('W_LEFTOVER');
   });
 
-  it('keeps a file the previous result.json did not list, even one named like artwork', async () => {
+  it('keeps a file a person put there, even one named like artwork', async () => {
     // A folder Tyto has no report for: nothing in it is known to be Tyto's, so nothing goes.
     const delivery = join(workspace, 'entregas', NAME);
     await mkdir(delivery, { recursive: true });
@@ -749,7 +635,7 @@ describe('tyto render --folder with a file in the way', () => {
     await mkdir(join(workspace, 'entregas'));
   });
 
-  it('exits 1 naming the file that holds the delivery folder, with no stack trace', async () => {
+  it('exits 1 naming the file that holds the --folder folder, with no stack trace', async () => {
     await writeFile(join(workspace, 'entregas', NAME), 'nao sou pasta');
 
     const code = await render();
@@ -776,30 +662,6 @@ describe('tyto render --folder with a file in the way', () => {
     };
     expect(report.status).toBe('error');
     expect(report.diagnostics.map((item) => item.code)).toEqual(['E_DELIVERY_FOLDER_BLOCKED']);
-  });
-
-  it('exits 1 when only assets/ is held, with the artwork written and result.json saying error', async () => {
-    await mkdir(join(workspace, 'entregas', NAME));
-    await writeFile(join(workspace, 'entregas', NAME, 'assets'), 'nao sou pasta');
-
-    const code = await render();
-
-    expect(code).toBe(EXIT_DIAGNOSTICS);
-    expect(stderr()).toContain(
-      `error E_DELIVERY_FOLDER_BLOCKED '${join(workspace, 'entregas', NAME, 'assets')}' is a file`,
-    );
-    expect(await outFiles('entregas', NAME)).toEqual([
-      'assets',
-      'editaveis',
-      'feed-01.svg',
-      'feed-02.svg',
-    ]);
-    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
-    if (!parsed.ok) throw new Error(parsed.error.join('; '));
-    expect(parsed.value.status).toBe('error');
-    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual([
-      'E_DELIVERY_FOLDER_BLOCKED',
-    ]);
   });
 
   it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
@@ -835,62 +697,6 @@ describe('tyto render --folder with a folder where a file goes', () => {
     await writeFile(join(workspace, 'task', `${NAME}.brief`), briefSource);
   });
 
-  it('exits 1 naming the folder that holds the copied brief, and renders nothing', async () => {
-    await mkdir(delivery('editaveis', `${NAME}.brief`), { recursive: true });
-
-    const code = await render();
-
-    expect(code).toBe(EXIT_DIAGNOSTICS);
-    expect(stderr()).toContain(
-      `error E_OUTPUT_FILE_BLOCKED ${sentence(delivery('editaveis', `${NAME}.brief`))}.`,
-    );
-    expect(stderr()).not.toContain('internal failure');
-    expect(stderr()).not.toMatch(/\n\s+at /u);
-    expect(await outFiles('entregas', NAME)).toEqual(['editaveis']);
-  });
-
-  it('exits 1 for a folder holding result.json, with the artwork written and no report', async () => {
-    await mkdir(delivery('editaveis', 'result.json'), { recursive: true });
-
-    const code = await render();
-
-    expect(code).toBe(EXIT_DIAGNOSTICS);
-    expect(stderr()).toContain(
-      `error E_OUTPUT_FILE_BLOCKED ${sentence(delivery('editaveis', 'result.json'))}.`,
-    );
-    expect(stderr()).not.toContain('internal failure');
-    expect(await outFiles('entregas', NAME)).toEqual([
-      'assets',
-      'editaveis',
-      'feed-01.svg',
-      'feed-02.svg',
-    ]);
-  });
-
-  it('exits 1 for a folder holding template.txt, and result.json says so', async () => {
-    await mkdir(delivery('editaveis', 'template.txt'), { recursive: true });
-
-    expect(await render()).toBe(EXIT_DIAGNOSTICS);
-
-    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
-    if (!parsed.ok) throw new Error(parsed.error.join('; '));
-    expect(parsed.value.status).toBe('error');
-    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['E_OUTPUT_FILE_BLOCKED']);
-  });
-
-  it('exits 1 for a folder holding an image in assets/, and result.json says so', async () => {
-    await mkdir(delivery('assets', 'logo.png'), { recursive: true });
-
-    expect(await render()).toBe(EXIT_DIAGNOSTICS);
-
-    expect(stderr()).toContain(
-      `error E_OUTPUT_FILE_BLOCKED ${sentence(delivery('assets', 'logo.png'))}.`,
-    );
-    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
-    if (!parsed.ok) throw new Error(parsed.error.join('; '));
-    expect(parsed.value.diagnostics.map((item) => item.code)).toEqual(['E_OUTPUT_FILE_BLOCKED']);
-  });
-
   it('exits 1 for a folder holding an artwork file, naming the folder, and writes the rest', async () => {
     await mkdir(delivery('feed-01.svg'), { recursive: true });
 
@@ -900,10 +706,8 @@ describe('tyto render --folder with a folder where a file goes', () => {
     expect(stderr()).not.toContain('E_OUTPUT_WRITE');
     expect(stderr()).not.toContain('EPERM');
     expect(stderr()).not.toContain('EISDIR');
-    // One frame of two: the other artwork and the report that names the missing one.
-    const parsed = parseRenderResult(await resultAt('entregas', NAME, 'editaveis'));
-    if (!parsed.ok) throw new Error(parsed.error.join('; '));
-    expect(parsed.value.artifacts.map((artifact) => artifact.name)).toEqual(['feed-02.svg']);
+    // One frame of two: the other artwork is written, beside the folder that was in the way.
+    expect(await outFiles('entregas', NAME)).toEqual(['feed-01.svg', 'feed-02.svg']);
   });
 
   it('exits 2 for an artwork write nobody explained, and writes no result.json', async () => {
@@ -917,8 +721,8 @@ describe('tyto render --folder with a folder where a file goes', () => {
 
     expect(stderr()).toContain('internal failure');
     expect(stderr()).not.toContain('E_OUTPUT_WRITE');
-    // Absent rather than wrong: a caller that retries reads the next run's report.
-    await expect(resultAt('entregas', NAME, 'editaveis')).rejects.toThrow(/ENOENT/u);
+    // No report either way: `--folder` writes none (ADR 0157).
+    expect(await outFiles('entregas', NAME)).not.toContain('result.json');
   });
 });
 

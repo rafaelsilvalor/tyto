@@ -100,6 +100,21 @@ let scratch: string;
 let templates: string;
 let briefPath: string;
 
+/**
+ * The diagnostics of the run the export box is showing, read off the element itself: the box
+ * writes no `result.json` since TYTO-490 (ADR 0157), so the dialog is the run's report.
+ */
+const shownDiagnostics = (): Promise<{ code: string; severity: string }[]> =>
+  window.evaluate(() => {
+    const box = document.querySelector('tyto-export-dialog') as {
+      progress?: { diagnostics: { code?: string; severity?: string }[] };
+    } | null;
+    return (box?.progress?.diagnostics ?? []).map((item) => ({
+      code: item.code ?? '',
+      severity: item.severity ?? '',
+    }));
+  });
+
 async function answerPickers(paths: { file?: string; directory?: string }): Promise<void> {
   await app.evaluate(
     ({ dialog }, chosen) => {
@@ -233,11 +248,7 @@ describe("a template's own folder, in the window and the CLI (TYTO-176)", () => 
       timeout: 60_000,
     });
 
-    const result = JSON.parse(
-      readFileSync(join(fromWindow, 'editaveis', 'result.json'), 'utf8'),
-    ) as { status: string; diagnostics: { code: string }[] };
-    expect(result.diagnostics.map((item) => item.code)).toEqual([]);
-    expect(result.status).toBe('ok');
+    expect((await shownDiagnostics()).map((item) => item.code)).toEqual([]);
 
     // **Against the artwork the markup describes, not against the CLI's PNG.** The CLI
     // rasterizes through Playwright's browser, which the desktop job does not install (measured

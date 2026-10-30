@@ -103,6 +103,21 @@ let window: Page;
 let scratch: string;
 let briefPath: string;
 
+/**
+ * The diagnostics of the run the export box is showing, read off the element itself: the box
+ * writes no `result.json` since TYTO-490 (ADR 0157), so the dialog is the run's report.
+ */
+const shownDiagnostics = (): Promise<{ code: string; severity: string }[]> =>
+  window.evaluate(() => {
+    const box = document.querySelector('tyto-export-dialog') as {
+      progress?: { diagnostics: { code?: string; severity?: string }[] };
+    } | null;
+    return (box?.progress?.diagnostics ?? []).map((item) => ({
+      code: item.code ?? '',
+      severity: item.severity ?? '',
+    }));
+  });
+
 async function answerPickers(paths: { file?: string; directory?: string }): Promise<void> {
   await app.evaluate(
     ({ dialog }, chosen) => {
@@ -223,15 +238,12 @@ describe("banner-roxo's backgrounds in the window and the CLI (TYTO-210)", () =>
       timeout: 90_000,
     });
 
-    const result = JSON.parse(
-      readFileSync(join(fromWindow, 'editaveis', 'result.json'), 'utf8'),
-    ) as { status: string; diagnostics: { code: string }[] };
+    const shown = await shownDiagnostics();
     // CI has no CircularXX, so there every house render says it drew the substitute
     // (W_FONT_SUBSTITUTED); that is the machine, not the template. Anything else is not.
-    expect(
-      result.diagnostics.map((item) => item.code).filter((code) => code !== 'W_FONT_SUBSTITUTED'),
-    ).toEqual([]);
-    expect(result.status).toBe('ok');
+    expect(shown.map((item) => item.code).filter((code) => code !== 'W_FONT_SUBSTITUTED')).toEqual(
+      [],
+    );
 
     const fromCli = join(scratch, 'from-cli');
     execFileSync(process.execPath, [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg'], {

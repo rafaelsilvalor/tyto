@@ -126,16 +126,16 @@ export function createProgram(environment: CliEnvironment, captured: Captured): 
     // `output` folder goes there. Typed, it wins and is not confined (ADR 0111).
     .option(
       '-o, --out <dir>',
-      "folder for the artifacts and result.json (default: the workspace's output folder)",
+      "folder for the artifacts and result.json, or the parent of --folder's (default: the workspace's output folder)",
     )
     // A flag on `render` rather than a command beside it, and the choice is worth one line:
-    // `render` carries ten options that a delivery needs every one of, so a sibling command
-    // would be a second copy of the whole surface, its help, its docs and its tests. Off by
-    // default is what keeps `--out` exactly what `docs/render-contract.md` publishes —
-    // Jacurutu never types this (TYTO-121).
+    // `render` carries ten options that this needs every one of, so a sibling command would
+    // be a second copy of the whole surface, its help, its docs and its tests. Off by default
+    // is what keeps `--out` exactly what `docs/render-contract.md` publishes — Jacurutu never
+    // types this (TYTO-121). Artwork only since TYTO-490 (ADR 0157).
     .option(
       '--folder',
-      'deliver into <out>/<brief-name>/ — artwork at the top, brief and result.json in editaveis/',
+      'write only the artwork into <out>/<brief-name>/ — no result.json, brief or assets/',
       false,
     )
     .option(

@@ -34,9 +34,9 @@ story-01.webp
 
 (The first four lines of sixteen.)
 
-## Deliver into a folder of its own
+## Write into a folder of its own
 
-`--folder` puts the files in a subfolder named after the brief, with the brief, `result.json` and `template.txt` in `editaveis/` beside them — the same layout the window's export writes:
+`--folder` puts the files in a subfolder named after the brief, with nothing beside them — no `result.json`, no copy of the brief, no images — as the window's export does. The run's report is what the command prints, and `--json` prints it as one document:
 
 ```
 deliveries/
@@ -44,11 +44,9 @@ deliveries/
     grid-01.png
     grid-02.png
     …
-    editaveis/
-      carousel.brief
-      result.json
-      template.txt
 ```
+
+A file already there with the same name is replaced, and every other file is left as it is.
 
 ## Render inside a workspace folder
 

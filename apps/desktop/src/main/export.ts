@@ -14,10 +14,9 @@ import {
   briefAssetResolver,
   fileAssetResolver,
   fileResources,
-  fsDeliveryOutput,
+  fsArtworkOutput,
   fsTaskOutput,
   layeredExportResources,
-  recordingAssetResolver,
   renderResult,
 } from '@tyto/io';
 import {
@@ -85,17 +84,17 @@ export interface ExportRequest {
   readonly formats?: readonly string[];
   /**
    * Remove what the previous export wrote into {@link directory} and this one did not
-   * (ADR 0054). On for the export box, where a person picked the folder and will send it,
-   * and for the queue, whose `outbox/<id>/out/` a retry reuses (ADR 0059).
+   * (ADR 0054). On for the queue, whose `outbox/<id>/out/` a retry reuses (ADR 0059).
+   * Ignored with {@link artworkOnly}, which keeps no report to tell Tyto's files apart.
    */
   readonly removeLeftovers?: boolean;
   /**
-   * Deliver into {@link directory} itself: the artwork at the top, the brief in
-   * `editaveis/` and the images it used in `assets/` (ADR 0057). On for the export box, where
-   * the folder the person picked is the delivery; off for the queue, whose
-   * `outbox/<id>/out/` is the ADR 0011 contract's shape. `label` names the copied brief.
+   * Write only the artwork into {@link directory}: no `result.json`, no copied brief, no
+   * `assets/` (ADR 0157, TYTO-490). On for the export box and the export presets, where a
+   * person picked the folder that receives the files; off for the queue, whose
+   * `outbox/<id>/out/` is the ADR 0011 contract's shape and keeps its report.
    */
-  readonly delivery?: boolean;
+  readonly artworkOnly?: boolean;
   /**
    * Leave out an output no exporter in this run's host produces, with a
    * `W_QUEUE_KIND_UNAVAILABLE` each, instead of failing the run (ADR 0061). On for the queue,
@@ -420,35 +419,25 @@ export async function createExportService(options: ExportServiceOptions): Promis
       request.dropUnavailableKinds === true
         ? availableOutputs(request.outputs, host.registry.exporters)
         : { outputs: request.outputs, dropped: [] };
-    // The export box delivers into the folder the person picked; `tyto render --folder`
-    // adds a level named after the brief, and the two differ on purpose (ADR 0057).
+    // The export box and the presets write the artwork alone into the folder the person
+    // picked (ADR 0157); the queue keeps the contract's `result.json` beside it (ADR 0011).
     const opened =
-      request.delivery === true
-        ? await fsDeliveryOutput(request.directory, {
-            name: request.label,
-            // The editor's text, the one this run renders, not a second read of the file.
-            brief: new TextEncoder().encode(request.brief),
-            folder: 'destination',
-            label: request.label,
-          })
+      request.artworkOnly === true
+        ? await fsArtworkOutput(request.directory, { label: request.label })
         : undefined;
-    // A file named `editaveis` in the folder the person picked. A diagnostic in the dialog
-    // and not `failure`, which is for what nobody can fix by moving a file (TYTO-129); and no
-    // `result.json`, because the folder it goes in is the one that could not be made.
+    // A file holding the folder's name, or a folder above it. A diagnostic in the dialog and
+    // not `failure`, which is for what nobody can fix by moving a file (TYTO-129).
     if (opened !== undefined && !opened.ok) {
       run.status = 'finished';
       run.diagnostics = [...startup, ...skipped, ...opened.error];
       return;
     }
-    const delivery = opened?.value;
     const sink =
-      delivery ??
+      opened?.value ??
       (await fsTaskOutput(request.directory, {
         label: request.label,
         removeLeftovers: request.removeLeftovers ?? false,
       }));
-    // Recorded as the brief resolves, so a delivery copies exactly what was drawn — a fetched
-    // image under a name from its reference (ADR 0118).
     const files =
       request.briefDirectory === undefined
         ? fileAssetResolver({ base: request.directory })
@@ -456,9 +445,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
             briefDirectory: request.briefDirectory,
             projectAssets: places.assets,
           });
-    const assets = recordingAssetResolver(
-      pluginSources === undefined ? files : pluginSources.cache.assets(files, call),
-    );
+    const assets = pluginSources === undefined ? files : pluginSources.cache.assets(files, call);
 
     const job = await runJob(
       {
@@ -476,7 +463,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
         // `confine` stays on, its default: a brief is often written by something else
         // (ADR 0011), and `../../../.ssh/id_rsa` embedded in an exported PNG is a real way
         // to leak a file.
-        assets: assets.resolver,
+        assets,
         exporters: host.registry.exporters,
         // The run's own host, which the installed plugins were activated into above: a
         // directive resolves through the same activation that the run reports refusals of.
@@ -532,26 +519,13 @@ export async function createExportService(options: ExportServiceOptions): Promis
     const planned = job.ok ? job.value.planned : 0;
     const artifacts = job.ok ? job.value.artifacts : [];
     // Before `finish`, which replaces the `result.json` that says which files are Tyto's.
+    // Nothing, for an artwork-only export: with no report, no file is known to be Tyto's.
     const leftovers = await sink.removeLeftovers({
       artifacts,
       planned,
       cancelled,
       failed: hasErrors([...startup, ...produced]),
     });
-    // Before `result.json`, whose warnings include what it removed from `assets/`.
-    const delivered =
-      delivery === undefined ? [] : await delivery.deliverAssets(assets.delivered());
-    // A folder holding `template.txt` is an error, and it goes in the `result.json` below.
-    const described =
-      delivery !== undefined && job.ok && job.value.template !== undefined
-        ? await delivery.describeTemplate({
-            name: job.value.template.name,
-            version: job.value.template.version,
-            ...(job.value.template.description === undefined
-              ? {}
-              : { description: job.value.template.description }),
-          })
-        : [];
     run.diagnostics = [
       ...startup,
       ...skipped,
@@ -559,8 +533,6 @@ export async function createExportService(options: ExportServiceOptions): Promis
       ...dropped,
       ...produced,
       ...leftovers,
-      ...delivered,
-      ...described,
     ];
 
     run.result = renderResult({
@@ -577,8 +549,9 @@ export async function createExportService(options: ExportServiceOptions): Promis
           : [],
     });
 
-    // Written even for a failed run, and last: `result.json` is what the other side of ADR
-    // 0011 reads, so a run that produced nothing but errors still has to say so.
+    // For the queue, written even for a failed run, and last: `result.json` is what the other
+    // side of ADR 0011 reads, so a run that produced nothing but errors still has to say so.
+    // An artwork-only export writes nothing here; its report is the dialog (ADR 0157).
     // A folder holding `result.json` is answered, not thrown (TYTO-243): shown in the dialog
     // as a diagnostic, because the file it would have gone in is the one that was not written.
     const unwritten = await sink.finish(run.result);

@@ -86,7 +86,7 @@ The dialog counts `6 / 6` and says **Export finished**; **Open folder** opens th
 | `banner-1x1-01.png`     | 600 × 600   |
 | `banner-345x146-01.png` | 345 × 146   |
 
-and an `editaveis` folder holding a copy of the brief, `template.txt` (the template's name and version) and `result.json` (what the export wrote).
+and nothing else: the folder holds the images alone.
 
 ## Where to go next
 

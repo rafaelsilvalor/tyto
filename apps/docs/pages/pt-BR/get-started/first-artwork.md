@@ -86,7 +86,7 @@ A caixa conta `6 / 6` e diz **Exportação concluída**; **Abrir pasta** abre o 
 | `banner-1x1-01.png`     | 600 × 600   |
 | `banner-345x146-01.png` | 345 × 146   |
 
-e uma pasta `editaveis` com uma cópia do brief, o `template.txt` (nome e versão do template) e o `result.json` (o que a exportação gravou).
+e nada mais: a pasta guarda só as imagens.
 
 ## Para onde ir agora
 

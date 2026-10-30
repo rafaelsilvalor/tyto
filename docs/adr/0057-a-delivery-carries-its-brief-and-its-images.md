@@ -2,7 +2,9 @@
 
 Status: accepted · 2026-09-29 · TYTO-205 · extends TYTO-121's delivery layout, ADR 0054's
 leftover rule and ADR 0056's asset rule · amended by ADR 0118 (the name of an image a plugin supplied) · amended by ADR 0157 (the export
-box and an export preset write only artwork; a delivery folder keeps the brief and the images)
+box and an export preset write only artwork; a delivery folder keeps the brief and the images) ·
+and, on 2026-10-30 by TYTO-490 under ADR 0157, `tyto render --folder` writes only artwork too:
+nothing writes this layout any more but a delivery's own folder
 
 ## Context
 

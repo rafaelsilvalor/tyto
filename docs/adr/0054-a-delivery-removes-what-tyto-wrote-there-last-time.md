@@ -1,6 +1,9 @@
 # 0054 — A delivery removes what Tyto wrote there last time, and nothing else
 
-Status: accepted · 2026-09-28 · TYTO-127 · amends TYTO-121's "an existing folder is written into and not cleared"
+Status: accepted · 2026-09-28 · TYTO-127 · amends TYTO-121's "an existing folder is written into and not cleared" ·
+amended by ADR 0157 (2026-10-30, TYTO-490: the export box, an export preset and `tyto render
+--folder` write only artwork and keep no report, so they remove nothing; the queue and `tyto
+watch` keep this rule)
 
 ## Context
 
