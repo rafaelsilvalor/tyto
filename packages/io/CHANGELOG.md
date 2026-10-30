@@ -1,5 +1,19 @@
 # @tyto/io
 
+## 4.3.1
+
+### Patch Changes
+
+- f612e26: TYTO-462: a plugin file's configuration applies only to the template its entry fetched. When a project folder template, the built-in pack or another plugin wins the name, the entry configures nothing (its aliases do not load, the bare name renders with the winner's own defaults) and `W_PLUGIN_FILE_TEMPLATE_SHADOWED` says so at the entry's name in the file. In `@tyto/core`, a `TemplateRoot` may carry an `origin`, answered by the registry's `originOf`, and a `ConfiguredTemplate` may carry the `plugin` it was fetched from and its `range`. In `@tyto/plugin-api`, a `PluginFileTemplate` carries its `range`. `@tyto/io` tags each configured template with the plugin whose copy fetched it, and leaves out one no copy fetched.
+- Updated dependencies [f612e26]
+- Updated dependencies [096f80e]
+  - @tyto/core@0.33.0
+  - @tyto/plugin-api@0.10.0
+  - @tyto/export-html@0.7.6
+  - @tyto/export-svg@2.0.6
+  - @tyto/pipeline@0.12.2
+  - @tyto/template-lang@0.8.5
+
 ## 4.3.0
 
 ### Minor Changes

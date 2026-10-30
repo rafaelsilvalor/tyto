@@ -1,6 +1,6 @@
 {
   "name": "@tyto/theme-pack",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "description": "Well-known colour themes for the window, shipped as a theme plugin.",
   "license": "UNLICENSED",

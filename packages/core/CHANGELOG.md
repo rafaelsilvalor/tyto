@@ -1,5 +1,12 @@
 # @tyto/core
 
+## 0.33.0
+
+### Minor Changes
+
+- f612e26: TYTO-462: a plugin file's configuration applies only to the template its entry fetched. When a project folder template, the built-in pack or another plugin wins the name, the entry configures nothing (its aliases do not load, the bare name renders with the winner's own defaults) and `W_PLUGIN_FILE_TEMPLATE_SHADOWED` says so at the entry's name in the file. In `@tyto/core`, a `TemplateRoot` may carry an `origin`, answered by the registry's `originOf`, and a `ConfiguredTemplate` may carry the `plugin` it was fetched from and its `range`. In `@tyto/plugin-api`, a `PluginFileTemplate` carries its `range`. `@tyto/io` tags each configured template with the plugin whose copy fetched it, and leaves out one no copy fetched.
+- 096f80e: A plugin file's configuration may restrict its formats with `formats:` beside `brand:` (TYTO-475, ADR 0155 decision 6). A brief, a run's `--formats` or the Export dialog asking that configuration for another format gets `E_UNKNOWN_FORMAT` under the name the brief wrote, with a hint naming the configuration; a configuration without one takes its entry `default`'s. A format the template does not render, a list with nothing left, or a `brief.formats` default outside the restriction is the new `W_CONFIGURATION_FORMATS_INVALID`. The desktop's template list offers a restricted configuration only its formats.
+
 ## 0.32.0
 
 ### Minor Changes

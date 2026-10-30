@@ -1,5 +1,34 @@
 # @tyto/desktop
 
+## 0.11.0
+
+### Minor Changes
+
+- 4a1455e: TYTO-467: "New brief from template…" and the "/" menu say when a name is an alias. The row's line reads what it stands for, `aviso · laranja` (in the "/" menu, before what choosing it does), and the plugin file that declares it is on hover in the bar and in the panel CodeMirror opens beside the highlighted "/" row. `templates:list`'s `alias` carries that `file`. In `@tyto/editor`, a `SlashItem` may carry `info`, passed to the completion as CodeMirror's own. A template that is not an alias shows as before.
+- 835edfd: A plugin file's configuration that names a brand no started plugin's kit offers is now a `W_BRAND_KIT_MISSING` row in the problems panel, placed at its `brand:` line, as `tyto render` already says it (TYTO-471, ADR 0155). It is said once the installed plugins have started, and again after every sync of the plugin files.
+
+### Patch Changes
+
+- f612e26: TYTO-462: a plugin file's configuration applies only to the template its entry fetched. When a project folder template, the built-in pack or another plugin wins the name, the entry configures nothing (its aliases do not load, the bare name renders with the winner's own defaults) and `W_PLUGIN_FILE_TEMPLATE_SHADOWED` says so at the entry's name in the file. In `@tyto/core`, a `TemplateRoot` may carry an `origin`, answered by the registry's `originOf`, and a `ConfiguredTemplate` may carry the `plugin` it was fetched from and its `range`. In `@tyto/plugin-api`, a `PluginFileTemplate` carries its `range`. `@tyto/io` tags each configured template with the plugin whose copy fetched it, and leaves out one no copy fetched.
+- 096f80e: A plugin file's configuration may restrict its formats with `formats:` beside `brand:` (TYTO-475, ADR 0155 decision 6). A brief, a run's `--formats` or the Export dialog asking that configuration for another format gets `E_UNKNOWN_FORMAT` under the name the brief wrote, with a hint naming the configuration; a configuration without one takes its entry `default`'s. A format the template does not render, a list with nothing left, or a `brief.formats` default outside the restriction is the new `W_CONFIGURATION_FORMATS_INVALID`. The desktop's template list offers a restricted configuration only its formats.
+- Updated dependencies [f612e26]
+- Updated dependencies [4a1455e]
+- Updated dependencies [096f80e]
+  - @tyto/core@0.33.0
+  - @tyto/plugin-api@0.10.0
+  - @tyto/io@4.3.1
+  - @tyto/editor@0.11.0
+  - @tyto/brief-lang@0.7.4
+  - @tyto/export-html@0.7.6
+  - @tyto/export-svg@2.0.6
+  - @tyto/fonts@0.4.0
+  - @tyto/google-fonts@0.1.5
+  - @tyto/pipeline@0.12.2
+  - @tyto/recipe@0.1.4
+  - @tyto/template-lang@0.8.5
+  - @tyto/templates@1.0.7
+  - @tyto/theme-pack@0.1.5
+
 ## 0.10.0
 
 ### Minor Changes
