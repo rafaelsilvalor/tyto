@@ -137,3 +137,68 @@ describe('compileTemplate', () => {
     );
   });
 });
+
+/** The same poster written as `template.html` (TYTO-454): what a markup repository hands in. */
+const MARKUP = `<frame format="grid" bg="#0c2340">
+  <text slot="titulo" class="title" />
+</frame>
+
+<frame format="story" extends="grid" />
+
+<style>
+  .title { x: 80; y: 80; w: 920; font: 700 96px/1.05 "Inter"; color: white }
+</style>
+`;
+
+const cartazMarkup = { markup: MARKUP, manifest: MANIFEST };
+
+describe('compileTemplate with a markup template', () => {
+  it('compiles the markup and then the brief, one HTML document per frame', async () => {
+    const result = await compileTemplate({
+      brief: BRIEF,
+      template: cartazMarkup,
+      formats: FORMATS,
+    });
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    expect(result.value.frames.map(({ format }) => format)).toEqual(['grid', 'story']);
+    expect(result.value.frames[0]?.html).toMatchSnapshot();
+    expect(result.value.frames[0]?.html).toContain('Turma nova de Direito');
+    expect(result.value.frames[0]?.html).toContain('tyto-test-font:Inter-700-normal');
+  });
+
+  it("answers the markup's own error, at its line, before reading the brief", async () => {
+    const result = await compileTemplate({
+      brief: BRIEF,
+      template: { markup: MARKUP.replace('<text slot', '<texto slot'), manifest: MANIFEST },
+      formats: FORMATS,
+    });
+
+    expect(result.ok).toBe(false);
+    const said = result.ok ? [] : result.error;
+    expect(said.length).toBeGreaterThan(0);
+    expect(said.every((item) => item.range !== undefined)).toBe(true);
+  });
+
+  it('warns about a filled slot the markup never reads, as the app does', async () => {
+    const manifest = manifestOf(`name: cartaz
+version: 1.0.0
+formats: [grid, story]
+slots:
+  titulo: { type: rich-text, required: true }
+  rodape: { type: rich-text }
+`);
+    const brief = `${BRIEF}
+::rodape
+  Inscrições abertas
+`;
+    const result = await compileTemplate({
+      brief,
+      template: { markup: MARKUP, manifest },
+      formats: FORMATS,
+    });
+
+    const said = result.ok ? result.diagnostics : result.error;
+    expect(said.filter((item) => item.code === 'W_UNUSED_SLOT')).toHaveLength(1);
+  });
+});

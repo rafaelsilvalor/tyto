@@ -463,7 +463,7 @@ It replaces the checkout, not the bundle. The installed folder still has no `nod
 
 ### Test a template's output without Tyto
 
-`@tyto/template-kit/testing` compiles a brief against one code template the way the app does
+`@tyto/template-kit/testing` compiles a brief against one template the way the app does
 (ADR 0152): the real `parseBrief`, `resolve`, `compile` and HTML exporter, in the preview's
 order, and answers the `Scene` and one HTML document per frame — or every diagnostic that stopped
 it. You pass the formats your template renders; the kit ships no catalogue of sizes.
@@ -492,7 +492,22 @@ the lines your template produced, and every face is written as a placeholder
 (`tyto-test-font:Inter-700-normal`) rather than a font file. The snapshot changes when your
 template does, not when a machine has another font. Pass `faces` and `font` for the measured
 layout, and `values` (`{ 'title-gap': { value: 32 } }`) to compile with what a configuration
-would set (ADR 0153). A markup template (`template.html`) is not covered yet, and neither is the PNG.
+would set (ADR 0153). The PNG is not covered.
+
+A markup template is handed over as its files' text instead of a `defineTemplate` (TYTO-454);
+the kit compiles it with `@tyto/template-lang`, as the app does, and reads no folder itself:
+
+```ts
+const result = await compileTemplate({
+  brief: read('./examples/tres-colunas.brief'),
+  template: { markup: read('./template.html'), manifest: manifest.value },
+  formats: formatCatalogue({ grid: { w: 1080, h: 1350, kind: 'grid' } }),
+});
+```
+
+A markup error comes back as diagnostics at its line in `template.html`, before the brief is
+read. Images and SVGs that `src=` names go in `assets: { image, svg }`, as the app's template
+pack resolves them.
 
 ### Move onto a new contract when it passes
 

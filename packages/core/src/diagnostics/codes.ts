@@ -1511,6 +1511,19 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'Nothing is rendered: there is no delivery to write into.',
   },
+  // ADR 0161: a delivery's export copies the brief's images into its `assets/`, and a file of
+  // the same name with other bytes is the person's. A warning, because the artwork is exactly
+  // what the brief asked for; it exists so the copy that did not happen is never silent.
+  W_DELIVERY_ASSET_KEPT: {
+    severity: 'warning',
+    summary:
+      "A delivery's assets folder already holds a different file under the name an image would be copied to.",
+    template:
+      "Kept '{path}', which differs from the image '{source}' the brief uses; that image was not copied.",
+    spec: 'docs/adr/0161-a-deliverys-export-copies-the-briefs-images-into-its-assets.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   E_TRUST_FILE: {
     severity: 'error',
     summary: 'TYTO_HOME/trust.json cannot be read or written.',

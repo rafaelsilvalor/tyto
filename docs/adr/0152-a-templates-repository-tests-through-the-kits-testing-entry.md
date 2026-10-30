@@ -79,3 +79,24 @@ Read in the code at `origin/main` 6e3d05f5:
   the fonts a machine has — the CI has no CircularXX.
 - **A package of its own, `@tyto/template-testing`.** It is nothing but the contract composed,
   as ADR 0150 said of the plugin harness, and it versions with the kit it tests.
+
+## Amendment — 2026-10-30 · TYTO-454
+
+**A markup template is covered too; decision 2 no longer stands alone.** `compileTemplate`
+takes `template: Template | MarkupTemplate`, where a `MarkupTemplate` is
+`{ markup, manifest, assets? }`: the text of `template.html`, the parsed manifest and the
+`svg`/`image` resolvers for the files its `src=` names. The field `markup` tells the two apart;
+a code `Template` never has one. The test reads the files and hands them in, so the kit still
+reads no folder (ADR 0010), which is what decision 2 meant by "a folder reader".
+
+The markup is compiled with `@tyto/template-lang`'s `compileTemplate`, as the app's render job
+compiles it; its diagnostics stop the run before the brief is read, and its `renderedSlots`
+reach `resolve`, so a brief that fills a slot the markup never reads gets `W_UNUSED_SLOT` in
+the test as in the app.
+
+**The contract grows by `@tyto/template-lang`** (decision 5). Its closure is `@tyto/core` and
+the Lezer runtime (`@lezer/common`, `@lezer/highlight`, `@lezer/lr`, public on npm); it is pure
+and already checked as such by `pure-export-conditions.test.ts`. `CONTRACT_PACKAGES` is now
+core, recipe, plugin-api, brief-lang, template-lang, export-html, template-kit, house-style.
+Every template repository installs it with the kit, code templates included — one more small
+pure package, against a second testing entry for one import.

@@ -18,6 +18,7 @@ import {
   fsDeliveryExportOutput,
   fsTaskOutput,
   layeredExportResources,
+  recordingAssetResolver,
   renderResult,
 } from '@tyto/io';
 import {
@@ -100,6 +101,8 @@ export interface ExportRequest {
    * A delivery's export (ADR 0157 §6, TYTO-490): the artwork into {@link directory}, the
    * delivery's `exports`, and `result.json` and `template.txt` into this folder, its brief's.
    * What the previous export of the delivery wrote and this one did not is removed (ADR 0054).
+   * The images the brief uses from outside the delivery are copied into its `assets/`, which
+   * only ever gains files (ADR 0161).
    */
   readonly deliveryReport?: string;
   /**
@@ -461,7 +464,11 @@ export async function createExportService(options: ExportServiceOptions): Promis
             briefDirectory: request.briefDirectory,
             projectAssets: places.assets,
           });
-    const assets = pluginSources === undefined ? files : pluginSources.cache.assets(files, call);
+    const resolved = pluginSources === undefined ? files : pluginSources.cache.assets(files, call);
+    // A delivery's export copies what the brief drew from into its `assets/` (ADR 0161), so it
+    // records each image as the run resolves it, after the source cache, which marks a fetch.
+    const recorder = forDelivery?.ok === true ? recordingAssetResolver(resolved) : undefined;
+    const assets = recorder?.resolver ?? resolved;
 
     const job = await runJob(
       {
@@ -554,6 +561,13 @@ export async function createExportService(options: ExportServiceOptions): Promis
               : { description: job.value.template.description }),
           })
         : [];
+    // Only for a run that finished without an error, ADR 0054's test for "the export did not
+    // finish": a cancelled or failed run leaves the delivery's `assets/` as it was (ADR 0161).
+    const finished = job.ok && !cancelled && !hasErrors([...startup, ...produced]);
+    const copied =
+      delivery !== undefined && recorder !== undefined && finished
+        ? await delivery.deliverAssets(recorder.delivered())
+        : [];
     run.diagnostics = [
       ...startup,
       ...skipped,
@@ -562,6 +576,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
       ...produced,
       ...leftovers,
       ...described,
+      ...copied,
     ];
 
     run.result = renderResult({
