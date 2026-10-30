@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -42,6 +42,7 @@ import {
  *   *.yaml                          the plugin files
  *   plugin-files.lock.json          the commit each source resolved to; the tool writes it
  * TYTO_HOME/cache/plugin-files/<sha256(git)>/<commit>/   one copy per commit, without .git
+ * TYTO_HOME/cache/plugin-files/<sha256(git)>/<commit>.commit   empty: the name is a commit
  * ```
  *
  * **The network is `git`'s** (ADR 0011, ADR 0127): the person's own configuration, credential
@@ -149,6 +150,24 @@ export async function cachedCopy(
   }
 }
 
+/**
+ * Beside each copy a fetch lands, an empty `<commit>.commit` says the folder's name is a
+ * commit. Before TYTO-472 an annotated tag was locked and cached by the tag object's id, and a
+ * copy without `.git` cannot tell the two apart; a copy without the record is fetched once more
+ * by its locked id to find out (ADR 0151, 2026-10-30).
+ */
+function commitRecord(home: string, git: string, commit: string): string {
+  return join(sourceFolder(home, git), `${commit}.commit`);
+}
+
+async function isKnownCommit(home: string, git: string, commit: string): Promise<boolean> {
+  try {
+    return (await stat(commitRecord(home, git, commit))).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function problemOf(cause: unknown): string {
   const stderr = (cause as { readonly stderr?: unknown } | undefined)?.stderr;
   if (typeof stderr === 'string' && stderr.trim() !== '') {
@@ -184,7 +203,9 @@ export async function fetchToCache(
   try {
     await git(['init', '--quiet'], staging);
     await git(['fetch', '--depth', '1', '--quiet', url, want], staging);
-    const commit = (await git(['rev-parse', 'FETCH_HEAD'], staging)).trim();
+    // `^{commit}`: for an annotated tag FETCH_HEAD is the tag object, which is no commit a
+    // person can check out or find in the repository's history (TYTO-472).
+    const commit = (await git(['rev-parse', 'FETCH_HEAD^{commit}'], staging)).trim();
     // The commit's bytes as committed: a person's `core.autocrlf` would otherwise give two
     // machines that lock one commit two different copies of it.
     await git(
@@ -207,6 +228,7 @@ export async function fetchToCache(
     if ((await cachedCopy(home, url, commit)) === undefined) {
       await rename(staging, directory);
     }
+    await writeFile(commitRecord(home, url, commit), '', 'utf8');
     return ok({ commit, directory });
   } catch (cause) {
     return err(problemOf(cause));
@@ -332,14 +354,23 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
     }
 
     if (!step.resolve && locked !== undefined) {
-      if (lockedCopy !== undefined) {
+      if (lockedCopy !== undefined && (await isKnownCommit(home, location, locked.commit))) {
         keepLocked();
         continue;
       }
+      // The locked id, fetched again, never the ref: a pinned source does not move. A lock
+      // written before TYTO-472 may name an annotated tag's object, which peels to the commit
+      // it points at, and the lock is rewritten to it; a commit stays as it is.
       const fetched = await fetchToCache(home, location, locked.commit);
-      lock.push(locked);
-      if (fetched.ok) copies.push(copyOf(locked, fetched.value.directory));
-      else failed(source, fetched.error);
+      if (!fetched.ok) {
+        // A copy from before the record loads as it always did; the next sync asks again.
+        if (lockedCopy === undefined) failed(source, fetched.error);
+        keepLocked();
+        continue;
+      }
+      const entry = { ...locked, commit: fetched.value.commit };
+      lock.push(entry);
+      copies.push(copyOf(entry, fetched.value.directory));
       continue;
     }
 
@@ -399,9 +430,10 @@ export async function cleanPluginFilesCache(
 ): Promise<string[]> {
   const keep = new Set(
     locks.flatMap(({ directory, lock }) =>
-      lock.sources.map((entry) =>
-        join(sourceFolder(home, locationOf(entry.git, directory)), entry.commit),
-      ),
+      lock.sources.flatMap((entry) => {
+        const copy = join(sourceFolder(home, locationOf(entry.git, directory)), entry.commit);
+        return [copy, `${copy}.commit`];
+      }),
     ),
   );
   const cache = join(home, PLUGIN_FILES_CACHE);
@@ -424,7 +456,8 @@ export async function cleanPluginFilesCache(
       const path = join(folder, commit);
       if (keep.has(path)) continue;
       await rm(path, { recursive: true, force: true });
-      removed.push(path);
+      // A copy's record goes with it, and is not a copy to report.
+      if (!commit.endsWith('.commit')) removed.push(path);
     }
     if ((await readdir(folder)).length === 0) await rm(folder, { recursive: true, force: true });
   }
