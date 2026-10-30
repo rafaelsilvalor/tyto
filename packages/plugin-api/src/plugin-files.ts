@@ -1,6 +1,7 @@
 import {
   type ConfigurationBrief,
   type ConfigurationEditorRule,
+  type ConfigurationFormats,
   type ConfiguredTemplate,
   type Diagnostic,
   type Diagnostics,
@@ -12,7 +13,7 @@ import {
   ok,
   sourceRange,
 } from '@tyto/core';
-import { type Document, isMap, isNode, isScalar, parseDocument } from 'yaml';
+import { type Document, isMap, isNode, isScalar, isSeq, parseDocument } from 'yaml';
 import { z } from 'zod';
 
 /**
@@ -55,6 +56,11 @@ export interface PluginFileConfiguration {
   readonly brief: ConfigurationBrief;
   /** The brand whose kit the configuration draws, as written; checked in core (ADR 0155). */
   readonly brand?: SuppliedValue;
+  /**
+   * The formats the configuration restricts itself to, each item with its range; checked
+   * against the manifest in core (ADR 0155 decision 6).
+   */
+  readonly formats?: ConfigurationFormats;
 }
 
 export interface PluginFileTemplate {
@@ -101,6 +107,12 @@ function at(node: Node): { range?: SourceRange } {
 function supplied(node: Node): SuppliedValue {
   const data: unknown = isNode(node) ? node.toJSON() : node;
   return { value: data, ...at(node) };
+}
+
+/** A list as a whole and item by item, so a refused item is a warning at that item. */
+function suppliedList(node: Node): ConfigurationFormats {
+  if (!isSeq(node)) return supplied(node);
+  return { ...supplied(node), entries: node.items.map((item) => supplied(item)) };
 }
 
 /** A mapping's entries as `[key, value node, key node]`, or `undefined` when it is not one. */
@@ -213,7 +225,7 @@ class FileReader {
   }
 
   configuration(path: string, node: Node, nameNode: Node): PluginFileConfiguration | undefined {
-    const keys = this.keys(path, node, ['alias', 'brand', 'values', 'brief']);
+    const keys = this.keys(path, node, ['alias', 'brand', 'formats', 'values', 'brief']);
     if (keys === undefined) return this.refuse(path, 'a configuration is a mapping', node);
     const aliasNode = keys.get('alias');
     let alias: string | undefined;
@@ -233,6 +245,7 @@ class FileReader {
     const aliasRange = rangeOf(aliasNode);
     const range = rangeOf(nameNode);
     const brandNode = keys.get('brand');
+    const formatsNode = keys.get('formats');
     return {
       ...(alias === undefined ? {} : { alias }),
       ...(alias === undefined || aliasRange === undefined ? {} : { aliasRange }),
@@ -240,6 +253,7 @@ class FileReader {
       values,
       brief,
       ...(brandNode === undefined ? {} : { brand: supplied(brandNode) }),
+      ...(formatsNode === undefined ? {} : { formats: suppliedList(formatsNode) }),
     };
   }
 
@@ -518,6 +532,7 @@ export function configuredTemplates(
         values: configuration.values,
         brief: configuration.brief,
         ...(configuration.brand === undefined ? {} : { brand: configuration.brand }),
+        ...(configuration.formats === undefined ? {} : { formats: configuration.formats }),
       })),
     }));
 }

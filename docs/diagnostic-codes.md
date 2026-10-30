@@ -121,6 +121,7 @@ non-zero.
 | `W_BRAND_KIT_SHADOWED` | warning | no | Two plugins contribute a kit for the same brand; the earlier plugin is the one used. |
 | `W_BRAND_KIT_MISSING` | warning | no | A configuration names a brand that no installed brand kit offers. |
 | `W_CONFIGURATION_BRAND_INVALID` | warning | no | A configuration's brand is not spelled as a brand id. |
+| `W_CONFIGURATION_FORMATS_INVALID` | warning | no | A configuration's formats restriction, or its brief's default formats, names what it cannot. |
 | `W_TEMPLATE_SHADOWED` | warning | no | Two template sources declare the same name; the earlier source is the one used. |
 | `W_SLOT_VOCABULARY` | warning | no | A manifest names a slot against the standard slot vocabulary: a known synonym, a reserved name with the wrong shape, or a repeatable slot not named lamina. |
 | `W_PLUGIN_SKIPPED` | warning | no | An installed plugin was not activated for this run, and the run went on without it. |
@@ -2227,6 +2228,20 @@ The brand of configuration '{configuration}' of template '{template}' must be lo
 ```
 
 Parameters: `configuration`, `template`
+
+### `W_CONFIGURATION_FORMATS_INVALID`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0155-a-configuration-picks-its-brand-and-restricts-its-formats.md`
+
+A configuration's formats restriction, or its brief's default formats, names what it cannot.
+
+A warning never replaces a value (ADR 0013).
+
+```
+In configuration '{configuration}' of template '{template}', {problem}.
+```
+
+Parameters: `configuration`, `template`, `problem`
 
 ### `W_TEMPLATE_SHADOWED`
 

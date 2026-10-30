@@ -281,6 +281,61 @@ describe('the template catalogue', () => {
     });
   });
 
+  it('offers only the formats a configuration restricts itself to (ADR 0155)', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'tyto-templates-restricted-'));
+    try {
+      const template = join(folder, 'two-formats');
+      mkdirSync(template, { recursive: true });
+      writeFileSync(
+        join(template, 'manifest.yaml'),
+        [
+          'name: two-formats',
+          'version: 1.0.0',
+          'formats: [feed, story]',
+          'slots:',
+          '  titulo:',
+          '    type: rich-text',
+        ].join('\n'),
+      );
+      const sources = await sourcesOver(folder);
+      await sources.setFetched({
+        packs: NO_INSTALLED_PACKS,
+        only: new Map(),
+        replaces: new Set(),
+        problems: [],
+        configured: {
+          project: [],
+          machine: [
+            {
+              template: 'two-formats',
+              file: 'cores.yaml',
+              directory: folder,
+              configurations: [
+                { name: 'roxo', values: {}, formats: { value: ['story'] } },
+                { name: 'ocre', values: {} },
+              ],
+            },
+          ],
+        },
+        images: NO_PLUGIN_FILES.images,
+        texts: new Map(),
+      });
+
+      const { templates } = await (await createTemplateCatalogue({ sources })).list();
+      const offered = Object.fromEntries(
+        templates.map((row) => [row.name, row.formats.map((format) => format.id)]),
+      );
+
+      expect(offered).toEqual({
+        'two-formats': ['feed', 'story'],
+        'two-formats-ocre': ['feed', 'story'],
+        'two-formats-roxo': ['story'],
+      });
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
   it('carries each manifest’s slots and names the folder a template came from', async () => {
     // TYTO-275: the skeleton is built from the slots in the window, and the picker says whose
     // template it is — `null` is the built-in pack, which the window names in its language.

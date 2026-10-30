@@ -242,6 +242,7 @@ export {
 export {
   type ConfigurationDiagnostic,
   type ConfigurationEntry,
+  type ConfigurationFormats,
   type ConfigurationImage,
   type ConfigurationImageResolver,
   type ConfigurationScope,

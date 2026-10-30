@@ -50,6 +50,16 @@ export interface ConfigurationEntry {
   readonly brief?: ConfigurationBrief;
   /** The brand whose kit the configuration draws, as written (ADR 0155). */
   readonly brand?: SuppliedValue;
+  /** The formats the configuration renders, a subset of the manifest's, as written (ADR 0155). */
+  readonly formats?: ConfigurationFormats;
+}
+
+/**
+ * A configuration's `formats:` as written. `entries` is each item of the list with its own
+ * range, when the file wrote a list, so a format the template lacks is a warning at that item.
+ */
+export interface ConfigurationFormats extends SuppliedValue {
+  readonly entries?: readonly SuppliedValue[];
 }
 
 /** The name a brief reaches a configuration by: its alias, or `<template>-<configuration>`. */
@@ -105,6 +115,12 @@ export interface TemplateSelection {
    * neither names one, and the manifest's `brand` stands.
    */
   readonly brand?: string;
+  /**
+   * The formats the configuration restricts itself to, its own or its `default`'s (ADR 0155
+   * decision 6): what a brief or a run may ask for in place of the manifest's. Absent when
+   * neither restricts, and the manifest's formats stand.
+   */
+  readonly formats?: readonly string[];
 }
 
 /** An alias that loads, for a list or a picker. */
@@ -163,6 +179,7 @@ interface Checked {
   readonly values: SuppliedValues;
   readonly brief: BriefDefaults;
   readonly brand?: string;
+  readonly formats?: readonly string[];
 }
 
 interface Candidate extends Placed {
@@ -298,17 +315,27 @@ export async function resolveTemplateConfigurations(
     // The default is checked once, as itself, so a value it refuses is said once.
     const base = entry.configurations.find((item) => item.name === entry.default);
     const brand = checkBrand(manifest, entry, configuration, input.kitBrands, report);
-    const own: Checked = { values, brief, ...(brand === undefined ? {} : { brand }) };
-    let result = own;
+    const formats = checkFormats(manifest, entry, configuration, report);
+    let result: Checked = {
+      values,
+      brief,
+      ...(brand === undefined ? {} : { brand }),
+      ...(formats === undefined ? {} : { formats }),
+    };
+    let briefFormatsRange = configuration.brief?.formats?.range;
     if (base !== undefined && base !== configuration) {
       const from = await checkedOf({ entry, scope }, base);
-      const inherited = brand ?? from.brand;
+      const inheritedBrand = brand ?? from.brand;
+      const inheritedFormats = formats ?? from.formats;
+      briefFormatsRange ??= base.brief?.formats?.range;
       result = {
         values: { ...from.values, ...values },
         brief: overlayBrief(from.brief, brief),
-        ...(inherited === undefined ? {} : { brand: inherited }),
+        ...(inheritedBrand === undefined ? {} : { brand: inheritedBrand }),
+        ...(inheritedFormats === undefined ? {} : { formats: inheritedFormats }),
       };
     }
+    result = boundBriefFormats(manifest, entry, configuration, result, briefFormatsRange, report);
     checked.set(configuration, result);
     return result;
   };
@@ -316,13 +343,14 @@ export async function resolveTemplateConfigurations(
     placed: Placed,
     configuration: ConfigurationEntry,
   ): Promise<TemplateSelection> => {
-    const { values, brief, brand } = await checkedOf(placed, configuration);
+    const { values, brief, brand, formats } = await checkedOf(placed, configuration);
     return {
       template: placed.entry.template,
       configuration: configuration.name,
       values,
       brief,
       ...(brand === undefined ? {} : { brand }),
+      ...(formats === undefined ? {} : { formats }),
     };
   };
 
@@ -395,6 +423,103 @@ function checkBrand(
     );
   }
   return brand;
+}
+
+/**
+ * A configuration's own `formats:` restriction (ADR 0155 decision 6), checked against the
+ * manifest: a format the template does not render is a warning at its item and is left out,
+ * and a list with nothing left, or one that is not a list, is a warning at the key and the
+ * configuration restricts nothing of its own.
+ */
+function checkFormats(
+  manifest: TemplateManifest,
+  entry: ConfiguredTemplate,
+  configuration: ConfigurationEntry,
+  report: (file: string, item: Diagnostic) => void,
+): readonly string[] | undefined {
+  const supplied = configuration.formats;
+  if (supplied === undefined) return undefined;
+  const warn = (problem: string, range: SourceRange | undefined): undefined => {
+    report(
+      entry.file,
+      diagnostic(
+        'W_CONFIGURATION_FORMATS_INVALID',
+        { configuration: configuration.name, template: manifest.name, problem },
+        atRange(range),
+      ),
+    );
+    return undefined;
+  };
+  // `formats: story` is a list of one, as it is in a brief's frontmatter.
+  const written: unknown = supplied.value;
+  const items: readonly SuppliedValue[] =
+    supplied.entries ??
+    (Array.isArray(written) ? written : [written]).map((value: unknown) => ({
+      value,
+      ...atRange(supplied.range),
+    }));
+  if (!items.every((item) => typeof item.value === 'string')) {
+    return warn(
+      "formats is not a list of formats; it is ignored and the template's formats stand",
+      supplied.range,
+    );
+  }
+  const kept: string[] = [];
+  for (const item of items) {
+    const format = item.value as string;
+    if (manifest.formats.includes(format)) {
+      if (!kept.includes(format)) kept.push(format);
+      continue;
+    }
+    warn(
+      `formats names '${format}', which the template does not render (it renders ${manifest.formats.join(', ')}); it is left out`,
+      item.range ?? supplied.range,
+    );
+  }
+  if (kept.length === 0) {
+    return warn(
+      "formats lists no format the template renders; the template's formats stand",
+      supplied.range,
+    );
+  }
+  return kept;
+}
+
+/**
+ * `brief.formats` is a default inside the restriction, never past it (ADR 0155 decision 6):
+ * a format outside is a warning and is left out of the default, and a default with nothing
+ * left is dropped, so a brief that lists none renders the restriction itself.
+ */
+function boundBriefFormats(
+  manifest: TemplateManifest,
+  entry: ConfiguredTemplate,
+  configuration: ConfigurationEntry,
+  checked: Checked,
+  range: SourceRange | undefined,
+  report: (file: string, item: Diagnostic) => void,
+): Checked {
+  const restriction = checked.formats;
+  const suggested = checked.brief.formats;
+  if (restriction === undefined || suggested === undefined) return checked;
+  const outside = suggested.filter((format) => !restriction.includes(format));
+  if (outside.length === 0) return checked;
+  const inside = suggested.filter((format) => restriction.includes(format));
+  const named = outside.map((format) => `'${format}'`).join(', ');
+  const left = inside.length === 0 ? 'no default is left' : 'they are left out of the default';
+  report(
+    entry.file,
+    diagnostic(
+      'W_CONFIGURATION_FORMATS_INVALID',
+      {
+        configuration: configuration.name,
+        template: manifest.name,
+        problem: `brief.formats names ${named}, outside the configuration's formats (${restriction.join(', ')}); ${left}`,
+      },
+      atRange(range),
+    ),
+  );
+  const { formats: _outside, ...brief } = checked.brief;
+  return { ...checked, brief: inside.length === 0 ? brief : { ...brief, formats: inside } };
 }
 
 /**

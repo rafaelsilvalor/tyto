@@ -217,6 +217,34 @@ grid-1x1-01.svg
 story-01.svg
 ```
 
+### Quais formatos uma configuração renderiza
+
+Uma configuração pode ficar com só alguns dos formatos do template, com `formats:`. Um brief que chega nela não pode pedir outro, nem no próprio `formats:` nem com `--formats`: o Tyto recusa o formato com o nome que o brief escreveu e diz qual configuração o restringe. Um brief sem formatos renderiza os que a configuração mantém. Uma configuração sem `formats:` fica com os do `default`, e depois com os do próprio template. No diálogo de exportação, um nome restrito oferece só os formatos dele.
+
+```yaml
+# ~/.tyto/plugin-files/simulados.yaml
+version: 1
+templates:
+  simulados-semana:
+    source:
+      git: https://github.com/rafaelsilvalor/tyto-template-simulados-semana.git
+      ref: v1.0.0
+    configurations:
+      roxo:
+        brand: roxo
+        formats: [story] # roxo não publica grid: um brief que pede um é recusado
+      ocre:
+        brand: ocre
+```
+
+<!-- Executado em 2026-10-30 num build da branch feat/TYTO-475-configuration-formats-restriction, no Windows 11, com TYTO_HOME=home, nenhum kit de marca instalado e o arquivo de plugin do README daquele repositório na v1.0.0 (o YAML acima é parte dele). Os três templates internos simulados-semana foram tirados desse build para o apelido chegar ao template do arquivo de plugin; as três linhas W_BRAND_KIT_MISSING que a execução também imprimiu ficaram de fora. O brief é o exemplo roxo daquele repositório com `template: simulados-semana-roxo` e `formats: [grid]`. -->
+
+```
+$ tyto render roxo-grid.brief --out out --types svg --formats-file formats.yaml
+roxo-grid.brief:3:1: error E_UNKNOWN_FORMAT Format 'grid' is not rendered by template 'simulados-semana-roxo'. It renders: story.
+    Configuration 'roxo' of template 'simulados-semana' restricts its formats to story.
+```
+
 ## Começar o seu
 
 `tyto plugin new my-pack` grava uma pasta de plugin com um template dentro, pronta para instalar; o [guia de autoria de plugins](../extend/) continua dali. Cada opção de cada comando `plugin` está na [Linha de comando](../reference/command-line.md#tyto-plugin-list) da Referência.

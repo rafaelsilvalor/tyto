@@ -217,6 +217,34 @@ grid-1x1-01.svg
 story-01.svg
 ```
 
+### Which formats a configuration renders
+
+A configuration can keep to some of its template's formats with `formats:`. A brief that reaches it cannot ask for another, in its own `formats:` or with `--formats`: Tyto refuses that format under the name the brief wrote and says which configuration restricts it. A brief that lists no formats renders the ones the configuration keeps. A configuration without `formats:` takes its `default`'s, and then the template's own. In the Export dialog, a restricted name offers only its formats.
+
+```yaml
+# ~/.tyto/plugin-files/simulados.yaml
+version: 1
+templates:
+  simulados-semana:
+    source:
+      git: https://github.com/rafaelsilvalor/tyto-template-simulados-semana.git
+      ref: v1.0.0
+    configurations:
+      roxo:
+        brand: roxo
+        formats: [story] # roxo publishes no grid: a brief asking for one is refused
+      ocre:
+        brand: ocre
+```
+
+<!-- Run on 2026-10-30 on a build of the branch feat/TYTO-475-configuration-formats-restriction, on Windows 11, with TYTO_HOME=home, no brand kit installed and the plugin file from that repository's README at v1.0.0 (the YAML above is part of it). The three built-in simulados-semana templates were removed from that build so the alias reached the plugin file's template; the three W_BRAND_KIT_MISSING lines the run also printed are left out. The brief is that repository's roxo example with `template: simulados-semana-roxo` and `formats: [grid]`. -->
+
+```
+$ tyto render roxo-grid.brief --out out --types svg --formats-file formats.yaml
+roxo-grid.brief:3:1: error E_UNKNOWN_FORMAT Format 'grid' is not rendered by template 'simulados-semana-roxo'. It renders: story.
+    Configuration 'roxo' of template 'simulados-semana' restricts its formats to story.
+```
+
 ## Start your own
 
 `tyto plugin new my-pack` writes a plugin folder with one template in it, ready to install; the [plugin author's guide](../extend/plugin-authoring.md) goes on from there. Every option of every `plugin` command is in the Reference's [Command line](../reference/command-line.md#tyto-plugin-list).
