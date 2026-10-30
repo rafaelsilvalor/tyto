@@ -30,8 +30,8 @@ const shots = process.env['TYTO_INDENT_GUIDE_SHOTS'];
 /** Two levels, a blank line inside a block (line 10) and blank lines between blocks. */
 const BRIEF = [
   '---', //                                                           0
-  'template: agenda-semana', //                                       1
-  'formats: [grid]', //                                               2
+  'template: carrossel-lista', //                                       1
+  'formats: [grid-1x1]', //                                               2
   '---', //                                                           3
   '::titulo', //                                                      4
   '  AGENDA DA SEMANA', //                                            5
