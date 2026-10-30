@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "tracked",
+      "label": "Tracked lines aligned by their ink, not by the spacing after the last glyph (TYTO-491)",
+      "frames": [
+        {
+          "format": "band",
+          "size": {
+            "w": 1080,
+            "h": 300
+          },
+          "background": {
+            "kind": "solid",
+            "color": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            }
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "signature",
+              "name": "the card's scene: centred, 4.9 of tracking at 24.4",
+              "transform": {
+                "x": 0,
+                "y": 10
+              },
+              "box": {
+                "w": 1080
+              },
+              "align": "center",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 4.9,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "@estrategia.educacao",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 24.4,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "signature-untracked",
+              "name": "the same line untracked: where its own side bearings put the ink",
+              "transform": {
+                "x": 0,
+                "y": 60
+              },
+              "box": {
+                "w": 1080
+              },
+              "align": "center",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "@estrategia.educacao",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 24.4,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "signature-right",
+              "name": "the tracked line against the right edge",
+              "transform": {
+                "x": 0,
+                "y": 110
+              },
+              "box": {
+                "w": 1080
+              },
+              "align": "right",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 4.9,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "@estrategia.educacao",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 24.4,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "signature-right-untracked",
+              "name": "and untracked",
+              "transform": {
+                "x": 0,
+                "y": 160
+              },
+              "box": {
+                "w": 1080
+              },
+              "align": "right",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "@estrategia.educacao",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 24.4,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "kicker",
+              "name": "wide tracking, where the gap was 13.8 px",
+              "transform": {
+                "x": 0,
+                "y": 210
+              },
+              "box": {
+                "w": 1080
+              },
+              "align": "center",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 27.6,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "RUBRICA",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 24.4,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "kicker-untracked",
+              "name": "and untracked",
+              "transform": {
+                "x": 0,
+                "y": 260
+              },
+              "box": {
+                "w": 1080
+              },
+              "align": "center",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "RUBRICA",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 24.4,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fonts": [
+    {
+      "family": "Source Sans 3",
+      "source": "bundled"
+    }
+  ],
+  "assets": []
+}

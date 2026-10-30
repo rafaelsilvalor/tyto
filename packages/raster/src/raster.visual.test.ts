@@ -18,6 +18,7 @@ import alphaFixture from './__fixtures__/alpha.json';
 import shapesFixture from './__fixtures__/shapes.json';
 import spreadFixture from './__fixtures__/spread.json';
 import textFixture from './__fixtures__/text.json';
+import trackedFixture from './__fixtures__/tracked.json';
 
 /**
  * The pixels. This is the suite the card's acceptance criteria are about, and the reason
@@ -690,5 +691,129 @@ describe('a shadow spread', () => {
     expect(fraction, `${(fraction * 100).toFixed(4)}% of pixels differ`).toBeLessThanOrEqual(
       TOLERANCE,
     );
+  });
+});
+
+/**
+ * Where the ink of one horizontal band starts and ends, to a fraction of a pixel.
+ *
+ * A column's darkness on white is how much of it a glyph covers, so the first inked column
+ * contributes only its covered part and the last one likewise: an antialiased edge read as
+ * a whole pixel would put the measured centre half a pixel off, the size of the tolerance.
+ */
+function inkExtent(
+  png: PNG,
+  top: number,
+  bottom: number,
+): { readonly left: number; readonly right: number } {
+  const coverage: number[] = [];
+  for (let x = 0; x < png.width; x += 1) {
+    let darkest = 0;
+    for (let y = top; y < bottom; y += 1) {
+      darkest = Math.max(darkest, 1 - (png.data[(y * png.width + x) * 4] ?? 255) / 255);
+    }
+    coverage.push(darkest);
+  }
+
+  const first = coverage.findIndex((value) => value > 0);
+  let last = coverage.length - 1;
+  while (last > first && (coverage[last] ?? 0) === 0) last -= 1;
+  if (first === -1) throw new Error(`No ink between rows ${String(top)} and ${String(bottom)}.`);
+  return { left: first + 1 - (coverage[first] ?? 0), right: last + (coverage[last] ?? 0) };
+}
+
+/**
+ * Tracked lines, each beside the same text untracked (`tracked.json`, one 50 px band per node).
+ *
+ * The untracked twin is the reference rather than the box's centre or edge, because a
+ * line's ink is narrower than its advance by the glyphs' own side bearings — here `@` and
+ * `o` put the ink about a pixel right of centre and a pixel short of the edge with no
+ * tracking at all. Tracking moves every glyph after the first and none of the bearings, so
+ * a line aligned by its ink lands exactly where its untracked twin does. Before TYTO-491
+ * the tracked line sat half its spacing left of that (2.45 px at 4.9, 13.8 px at 27.6),
+ * or its whole spacing short of the right edge, in both exporters.
+ */
+describe('a tracked line', () => {
+  const rendered = documentsOf(trackedFixture)[0];
+  if (rendered === undefined) throw new Error('The tracked fixture rendered no frames.');
+  const document: Document = rendered;
+
+  const BAND = 50;
+  /** Tracked node's band, then its untracked twin's, in the fixture's order. */
+  const PAIRS = { signature: [0, 1], signatureRight: [2, 3], kicker: [4, 5] } as const;
+
+  /** Within half a pixel, the card's acceptance. */
+  const INK_TOLERANCE = 0.5;
+
+  async function renders(): Promise<readonly (readonly [string, PNG])[]> {
+    const exported = exportSvg(sceneOf(trackedFixture), { resources: { font: bundledFont } });
+    if (!exported.ok) throw new Error('export-svg failed on the tracked fixture.');
+    const svg = exported.value[0]?.svg ?? '';
+    const size = { width: document.width, height: document.height };
+
+    return [
+      ['export-html', PNG.sync.read(Buffer.from(await render(document)))],
+      [
+        'export-svg',
+        PNG.sync.read(
+          Buffer.from(
+            await rasterizer.raster(
+              `<!doctype html><html><body style="margin:0">${svg}</body></html>`,
+              size,
+            ),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  function band(png: PNG, index: number): { readonly left: number; readonly right: number } {
+    return inkExtent(png, index * BAND, (index + 1) * BAND);
+  }
+
+  it('is centred by its ink, not by the spacing after its last glyph (TYTO-491)', async () => {
+    for (const [exporter, png] of await renders()) {
+      for (const [name, [tracked, untracked]] of [
+        ['signature', PAIRS.signature],
+        ['kicker', PAIRS.kicker],
+      ] as const) {
+        const centre = (extent: { left: number; right: number }): number =>
+          (extent.left + extent.right) / 2;
+        const offset = centre(band(png, tracked)) - centre(band(png, untracked));
+        expect
+          .soft(
+            Math.abs(offset),
+            `${exporter}, ${name}: ${offset.toFixed(2)} px from its untracked twin`,
+          )
+          .toBeLessThanOrEqual(INK_TOLERANCE);
+      }
+    }
+  });
+
+  it('is the ink export-html draws, in the same face (TYTO-491)', async () => {
+    // An SVG whose font-family the browser drops draws the fallback face, about 13 px
+    // narrower on the signature, and every comparison above would still pass against a
+    // twin drawn in that same wrong face. The HTML render is the one that loads the font.
+    const [[, fromHtml], [, fromSvg]] = (await renders()) as [[string, PNG], [string, PNG]];
+    for (let index = 0; index < 6; index += 1) {
+      const html = band(fromHtml, index);
+      const svg = band(fromSvg, index);
+      expect
+        .soft(
+          Math.max(Math.abs(svg.left - html.left), Math.abs(svg.right - html.right)),
+          `band ${String(index)}: svg ${svg.left.toFixed(2)}..${svg.right.toFixed(2)}, html ${html.left.toFixed(2)}..${html.right.toFixed(2)}`,
+        )
+        .toBeLessThanOrEqual(INK_TOLERANCE);
+    }
+  });
+
+  it('ends at the right edge with its ink, not with the spacing after it (TYTO-491)', async () => {
+    for (const [exporter, png] of await renders()) {
+      const offset =
+        band(png, PAIRS.signatureRight[0]).right - band(png, PAIRS.signatureRight[1]).right;
+      expect
+        .soft(Math.abs(offset), `${exporter}: ${offset.toFixed(2)} px from its untracked twin`)
+        .toBeLessThanOrEqual(INK_TOLERANCE);
+    }
   });
 });

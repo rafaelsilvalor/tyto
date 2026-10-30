@@ -512,3 +512,71 @@ describe('inline SVG markup outside the subset (ADR 0068)', () => {
     expect(result.value[0]?.html).not.toContain('cls-1');
   });
 });
+
+/** One tracked line in a 1080 box: the signature TYTO-491 measured 2.5 px left of centre. */
+function trackedScene(align: string, letterSpacing: number): Scene {
+  return sceneOf({
+    version: 1,
+    fonts: [{ family: 'Source Sans 3', source: 'bundled' }],
+    assets: [],
+    artworks: [
+      {
+        id: 'tracked',
+        frames: [
+          {
+            format: 'feed',
+            size: { w: 1080, h: 120 },
+            children: [
+              {
+                kind: 'text',
+                id: 'signature',
+                transform: { x: 0, y: 30 },
+                box: { w: 1080 },
+                align,
+                valign: 'top',
+                lineHeight: 1.2,
+                letterSpacing,
+                overflow: 'clip',
+                runs: [
+                  {
+                    kind: 'text',
+                    text: '@estrategia.educacao',
+                    font: { family: 'Source Sans 3', source: 'bundled' },
+                    size: 24.4,
+                    weight: 400,
+                    style: 'normal',
+                    color: { kind: 'solid', color: { r: 0, g: 0, b: 0 } },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+describe('a tracked line is aligned by its ink (TYTO-491)', () => {
+  // The pixels are measured in raster's `tracked.json` suite; these pin the markup.
+  it('gives a centred line back the spacing after its last glyph', () => {
+    const [html = ''] = htmlOf(trackedScene('center', 4.9));
+    expect(html).toContain('<div style="margin-right: -4.9px"><span');
+  });
+
+  it('does the same for a right-aligned line, and the opposite for negative tracking', () => {
+    expect(htmlOf(trackedScene('right', 4.9))[0]).toContain('<div style="margin-right: -4.9px">');
+    expect(htmlOf(trackedScene('center', -0.5))[0]).toContain('<div style="margin-right: 0.5px">');
+  });
+
+  it('leaves a left, a justified and an untracked line exactly as they were', () => {
+    for (const html of [
+      htmlOf(trackedScene('left', 4.9))[0],
+      htmlOf(trackedScene('justify', 4.9))[0],
+      htmlOf(trackedScene('center', 0))[0],
+    ]) {
+      expect(html).toContain('class="tyto-node"><div><span');
+      expect(html).not.toContain('margin-right');
+    }
+  });
+});
