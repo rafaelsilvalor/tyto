@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 15. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 16. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -109,6 +109,27 @@ tyto template new [options] <name>
 | --- | --- | --- |
 | `--out <dir>` | where the folder is created | `"templates"` |
 | `--formats <ids>` | comma-separated format ids the template renders | `["grid"]` |
+
+## tyto delivery new
+
+make &lt;name>/ with assets/ and editaveis/, and its brief in editaveis/&lt;name>.brief; prints the brief
+
+```sh
+tyto delivery new [options] <name>
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<name>` | the delivery's folder name, usually the ticket key and a title |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `-t, --template <name>` | start the brief from this template's skeleton |  |
+| `--trust` | trust the workspace folder and its work profile for this run only; never written to trust.json |  |
 
 ## tyto plugin list
 

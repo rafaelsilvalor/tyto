@@ -1,6 +1,6 @@
 # 0018 — What an exporter does where the IR left a question open
 
-Status: accepted · 2026-09-08 · fills in `docs/ir-schema.md` for E5
+Status: accepted · 2026-09-08 · fills in `docs/ir-schema.md` for E5 · amended by ADR 0156
 
 ## Context
 
@@ -37,6 +37,11 @@ CSS `drop-shadow()` has no spread; SVG can build one with `feMorphology`. `expor
 draws the shadow with spread 0 and emits `W_EXPORT_APPROXIMATED` carrying the number it
 dropped. Approximating it — widening the blur by the spread, say — would make the two
 exporters disagree by an amount nobody could predict, and silently.
+
+> **Amended by ADR 0156 (TYTO-483).** HTML turned out to have one: `export-html` now draws
+> a spread through an inline SVG `<filter>` with the primitives `export-svg` uses, named
+> from the CSS filter list, and no longer warns. The rule above stands; the fact about
+> HTML under it does not.
 
 **Bytes reach an exporter through a port, never through a path.** `FontRef` and `AssetRef`
 carry a path and a hash, not content, and every exporter package is pure (ADR 0010): none

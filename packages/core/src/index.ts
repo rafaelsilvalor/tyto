@@ -188,11 +188,24 @@ export { isAbsolutePath, isInsidePath, resolvePath } from './project/paths.js';
 export { DEFAULT_PRESET_TYPES, EXPORT_PRESETS_KEY, type ExportPreset } from './project/presets.js';
 
 export {
+  BUILT_IN_DELIVERY,
+  DELIVERY_BRIEF_EXTENSION,
+  DELIVERY_KEY,
+  type DeliveryPlan,
+  MAXIMUM_DELIVERY_NAME_LENGTH,
+  type ResolvedDelivery,
+  builtInDelivery,
+  deliveryNameOf,
+  planDelivery,
+} from './project/delivery.js';
+
+export {
   PROFILES_DIRECTORY,
   PROFILE_FILE_NAME,
   type ProfileReference,
   type ProfileReferenceRead,
   isPathShaped,
+  problemWithFolderName,
   problemWithName,
   profileReferenceOf,
 } from './project/profile.js';
@@ -231,6 +244,14 @@ export {
 } from './template/manifest.js';
 
 export { checkSlotVocabulary } from './template/slot-vocabulary.js';
+
+export {
+  type ConfiguredSkeleton,
+  type SkeletonManifest,
+  briefSkeleton,
+  inSkeleton,
+  skeletonText,
+} from './template/skeleton.js';
 
 export {
   type TemplateFailure,

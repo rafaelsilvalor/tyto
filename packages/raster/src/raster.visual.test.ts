@@ -16,6 +16,7 @@ import type { RasterFormat } from './rasterizer.js';
 
 import alphaFixture from './__fixtures__/alpha.json';
 import shapesFixture from './__fixtures__/shapes.json';
+import spreadFixture from './__fixtures__/spread.json';
 import textFixture from './__fixtures__/text.json';
 
 /**
@@ -292,6 +293,7 @@ function documentsOf(fixture: unknown, perPlatform = false): readonly Document[]
 
 const SHAPES = documentsOf(shapesFixture);
 const ALPHA = documentsOf(alphaFixture);
+const SPREAD = documentsOf(spreadFixture);
 const TEXT = documentsOf(textFixture, true);
 
 /**
@@ -427,7 +429,9 @@ describe('reference renders', () => {
   // Titled by the reference file rather than the fixture: for a per-platform fixture those
   // are different names, and the failing test should say which file it compared against.
   it.each(
-    [...SHAPES, ...ALPHA, ...TEXT].map((document) => [referenceFile(document), document] as const),
+    [...SHAPES, ...ALPHA, ...SPREAD, ...TEXT].map(
+      (document) => [referenceFile(document), document] as const,
+    ),
   )('%s matches its committed reference', async (_file, document) => {
     const fraction = mismatchFraction(document, await render(document));
 
@@ -649,5 +653,42 @@ describe('the browser', () => {
     const second = await render(document);
 
     expect(Buffer.from(second).equals(Buffer.from(first))).toBe(true);
+  });
+});
+
+describe('a shadow spread', () => {
+  const document = SPREAD[0];
+  if (document === undefined) throw new Error('The spread fixture rendered no frames.');
+
+  it('is the picture export-svg draws, through the same filter (ADR 0156)', async () => {
+    const exported = exportSvg(sceneOf(spreadFixture));
+    if (!exported.ok) throw new Error('export-svg failed on the spread fixture.');
+    const svg = exported.value[0]?.svg ?? '';
+
+    const fromSvg = PNG.sync.read(
+      Buffer.from(
+        await rasterizer.raster(
+          `<!doctype html><html><body style="margin:0">${svg}</body></html>`,
+          {
+            width: document.width,
+            height: document.height,
+          },
+        ),
+      ),
+    );
+    const fromHtml = PNG.sync.read(Buffer.from(await render(document)));
+
+    const differing = pixelmatch(
+      fromSvg.data,
+      fromHtml.data,
+      undefined,
+      document.width,
+      document.height,
+      { threshold: PIXEL_THRESHOLD },
+    );
+    const fraction = differing / (document.width * document.height);
+    expect(fraction, `${(fraction * 100).toFixed(4)}% of pixels differ`).toBeLessThanOrEqual(
+      TOLERANCE,
+    );
   });
 });

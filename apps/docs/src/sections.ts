@@ -110,6 +110,7 @@ export const SECTIONS: readonly Section[] = [
       { slug: 'render', title: { en: 'Render a brief', 'pt-BR': 'Renderizar um brief' } },
       { slug: 'watch', title: { en: 'Watch a folder', 'pt-BR': 'Vigiar uma pasta' } },
       { slug: 'templates', title: { en: 'Templates', 'pt-BR': 'Templates' } },
+      { slug: 'deliveries', title: { en: 'Deliveries', 'pt-BR': 'Entregas' } },
       { slug: 'plugins', title: { en: 'Plugins', 'pt-BR': 'Plugins' } },
     ],
   },

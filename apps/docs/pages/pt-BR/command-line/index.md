@@ -40,4 +40,5 @@ O `tyto` ainda não vem no instalador do aplicativo. Ele roda a partir de uma c�
 - [Renderizar um brief](./render.md) — arquivos a partir de um brief.
 - [Vigiar uma pasta](./watch.md) — renderizar o que chegar numa pasta de fila.
 - [Templates](./templates.md) — conferir um template e começar um novo.
+- [Entregas](./deliveries.md) — criar a pasta em que uma peça de trabalho fica.
 - [Plugins](./plugins.md) — instalar, listar, desligar e remover.

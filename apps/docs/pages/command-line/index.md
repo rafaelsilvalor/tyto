@@ -40,4 +40,5 @@ The `tyto` command does from a terminal what the window does: render a brief, wa
 - [Render a brief](./render.md) — files from one brief.
 - [Watch a folder](./watch.md) — render whatever arrives in a queue folder.
 - [Templates](./templates.md) — check a template and start a new one.
+- [Deliveries](./deliveries.md) — make the folder a piece of work is kept in.
 - [Plugins](./plugins.md) — install, list, switch off and remove.
