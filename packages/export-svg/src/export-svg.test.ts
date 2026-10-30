@@ -477,3 +477,77 @@ describe('inline SVG markup outside the subset (ADR 0068)', () => {
     await expect(feed).toMatchFileSnapshot('./__snapshots__/two-icons.feed.svg');
   });
 });
+
+/** One tracked line in a 1080 box, in a family whose last word is a digit. */
+function trackedScene(align: string, letterSpacing: number, family = 'Source Sans 3'): Scene {
+  return sceneOf({
+    version: 1,
+    fonts: [{ family, source: 'bundled' }],
+    assets: [],
+    artworks: [
+      {
+        id: 'tracked',
+        frames: [
+          {
+            format: 'feed',
+            size: { w: 1080, h: 120 },
+            children: [
+              {
+                kind: 'text',
+                id: 'signature',
+                transform: { x: 0, y: 30 },
+                box: { w: 1080 },
+                align,
+                valign: 'top',
+                lineHeight: 1.2,
+                letterSpacing,
+                overflow: 'clip',
+                runs: [
+                  {
+                    kind: 'text',
+                    text: '@estrategia.educacao',
+                    font: { family, source: 'bundled' },
+                    size: 24.4,
+                    weight: 400,
+                    style: 'normal',
+                    color: { kind: 'solid', color: { r: 0, g: 0, b: 0 } },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+}
+
+function anchorXOf(svg: string): string | undefined {
+  return /<text x="([-\d.]+)"/u.exec(svg)?.[1];
+}
+
+describe('a tracked line is aligned by its ink (TYTO-491)', () => {
+  // `text-anchor` measures the spacing after the last glyph too; the pixels are measured in
+  // raster's `tracked.json` suite, and these pin the anchor that compensates for it.
+  it('moves a centred anchor by half the spacing and an end anchor by all of it', () => {
+    expect(anchorXOf(svgOf(trackedScene('center', 4.9))[0] ?? '')).toBe('542.45');
+    expect(anchorXOf(svgOf(trackedScene('right', 4.9))[0] ?? '')).toBe('1084.9');
+    expect(anchorXOf(svgOf(trackedScene('center', -0.5))[0] ?? '')).toBe('539.75');
+  });
+
+  it('leaves a left and an untracked line where they were', () => {
+    expect(anchorXOf(svgOf(trackedScene('left', 4.9))[0] ?? '')).toBe('0');
+    expect(anchorXOf(svgOf(trackedScene('center', 0))[0] ?? '')).toBe('540');
+  });
+});
+
+describe('a font family is a valid CSS font-family (TYTO-491)', () => {
+  it('quotes a family with a word that is not an identifier, which the browser drops unquoted', () => {
+    expect(svgOf(trackedScene('left', 0))[0]).toContain('font-family="&quot;Source Sans 3&quot;"');
+  });
+
+  it('leaves a family of plain words unquoted, so its bytes do not move', () => {
+    expect(svgOf(trackedScene('left', 0, 'CircularXX'))[0]).toContain('font-family="CircularXX"');
+    expect(svgOf(trackedScene('left', 0, 'Open Sans'))[0]).toContain('font-family="Open Sans"');
+  });
+});

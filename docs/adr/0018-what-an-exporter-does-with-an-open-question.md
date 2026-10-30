@@ -73,3 +73,16 @@ argument `docs/ir-schema.md` already makes for `SceneVisitor` owning the recursi
 
 Nothing above changes the IR. If one of these turns out to be wrong, the scene, the brief
 and the template are all unaffected; what changes is a visitor and a snapshot.
+
+## Note, 2026-10-30 — alignment is of the ink, not of the letter-spacing (TYTO-491)
+
+A fifth question the IR leaves open: where `letterSpacing` ends. Both browsers' models add
+it after every glyph, the last one too, so `text-align` and `text-anchor` centre a tracked
+line with that much empty space at its end — the ink sat half the spacing left of centre
+(2.5 px at 4.9, 13.8 px at 27.6) and its whole spacing short of a right edge, in both
+exporters, and a template compensated by hand. **A centred or right-aligned line is
+aligned by its ink:** `export-html` gives the line block a right margin of `-letterSpacing`
+and `export-svg` moves the anchor by half of it or all of it. Left and justified lines start
+where their ink starts and are unchanged. The raster fixture `tracked.json` checks each
+line against its untracked twin, within half a pixel, and the SVG render against the HTML
+one; text drawn as paths is not covered, since no resolver of glyph outlines ships yet.
