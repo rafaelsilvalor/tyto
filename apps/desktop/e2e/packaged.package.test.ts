@@ -375,17 +375,7 @@ describe('the packaged app', () => {
       ).tyto['app:info']({}),
     );
 
-    expect(info.templates).toEqual([
-      'agenda-semana',
-      'aprovados',
-      'banner-roxo',
-      'carrossel-lista',
-      'promo-curso',
-      'simulados-semana-ocre',
-      'simulados-semana-roxo',
-      'simulados-semana-vinho',
-      'tabela-roxo',
-    ]);
+    expect(info.templates).toEqual(['banner-roxo', 'carrossel-lista', 'promo-curso']);
   });
 
   it('reports its own version, which is the one the tag has to name', async () => {

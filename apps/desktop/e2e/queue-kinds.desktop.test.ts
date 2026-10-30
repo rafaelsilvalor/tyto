@@ -43,8 +43,8 @@ if (!existsSync(built)) {
 /** An official template, one format, two slides: small enough to render quickly. */
 const BRIEF = [
   '---',
-  'template: agenda-semana',
-  'formats: [grid]',
+  'template: carrossel-lista',
+  'formats: [grid-1x1]',
   '---',
   '::titulo',
   '  AGENDA DA SEMANA',
@@ -229,7 +229,7 @@ describe("a queue folder's file types", () => {
     const text = files.find((name) => name.endsWith('.txt'));
     expect(text).toBeDefined();
     expect(readFileSync(join(queueFolder, 'outbox', 'do-plugin', 'out', text!), 'utf8')).toMatch(
-      /^\S+ grid$/u,
+      /^\S+ grid-1x1$/u,
     );
   }, 120_000);
 

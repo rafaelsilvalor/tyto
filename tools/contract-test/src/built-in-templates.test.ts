@@ -52,7 +52,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * assertion is about text that was actually measured.
  *
  * Through the same library the CLI uses, but as a machine with no fonts installed
- * (ADR 0037): `agenda-semana` asks the machine for CircularXX, and a suite that found it on
+ * (ADR 0037): `banner-roxo` asks the machine for CircularXX, and a suite that found it on
  * one laptop and not on CI would measure two different artworks. With no folders to read,
  * every machine measures the substitute CI draws.
  */
@@ -93,43 +93,6 @@ const EXAMPLES: readonly Example[] = [
     brief: 'examples/lista.brief',
     body: 'markup',
     formats: ['grid-1x1', 'story'],
-  },
-  // 4:5 only, since TYTO-173: the published carousel is cut to Instagram's portrait post.
-  { template: 'agenda-semana', brief: 'examples/agenda.brief', body: 'code', formats: ['grid'] },
-  // The second azul template, and the first built only from the kit and the brand (TYTO-185).
-  { template: 'aprovados', brief: 'examples/aprovados.brief', body: 'code', formats: ['grid'] },
-  // The weekly mock-exam agenda, one composition in three brands (TYTO-200). roxo has no grid.
-  {
-    template: 'simulados-semana-roxo',
-    brief: 'examples/simulados.brief',
-    body: 'code',
-    formats: ['story'],
-  },
-  {
-    template: 'simulados-semana-ocre',
-    brief: 'examples/simulados.brief',
-    body: 'code',
-    formats: ['grid', 'story'],
-  },
-  {
-    template: 'simulados-semana-vinho',
-    brief: 'examples/simulados.brief',
-    body: 'code',
-    formats: ['grid', 'story'],
-  },
-  // The one-image table (TYTO-218): sized by measuring, so these are the cases where the
-  // measured fit and the drawn text have to agree.
-  {
-    template: 'tabela-roxo',
-    brief: 'examples/quatro-colunas.brief',
-    body: 'code',
-    formats: ['grid'],
-  },
-  {
-    template: 'tabela-roxo',
-    brief: 'examples/tres-colunas.brief',
-    body: 'code',
-    formats: ['grid'],
   },
   // The product banner (TYTO-210): one text over a background from the template's own folder,
   // in three sizes, its breaks chosen by measuring.
@@ -260,12 +223,8 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
       expect(texts.reduce((total, count) => total + count, 0)).toBeGreaterThan(0);
 
       // Never a file beside the template. Bundled — the repository ships one copy in
-      // `fonts/` — except the agenda, whose brand face is read from the machine (ADR 0037).
+      // `fonts/` — except the house's, whose brand face is read from the machine (ADR 0037).
       const expected =
-        name === 'agenda-semana' ||
-        name === 'aprovados' ||
-        name.startsWith('simulados-semana-') ||
-        name === 'tabela-roxo' ||
         name === 'banner-roxo'
           ? { family: 'CircularXX', source: 'system' }
           : { family: 'Source Sans 3', source: 'bundled' };
@@ -307,7 +266,7 @@ function textNodes(nodes: readonly SceneNode[]): TextNode[] {
  * handed it, which is exactly the question a template sizing a box around its text would
  * ask. Measured against the substitute CI draws, like the rest of this file.
  */
-describe.each(['agenda-semana', 'promo-curso'])(
+describe.each(['banner-roxo', 'promo-curso'])(
   '%s: the height a template is told is the height that is laid out',
   (name) => {
     it('agrees on lines and height for every text node, in every format', async () => {
@@ -346,24 +305,6 @@ describe.each(['agenda-semana', 'promo-curso'])(
     }, 60_000);
   },
 );
-
-/**
- * `aprovados` across several slides (TYTO-190), through the whole pipeline: the example brief
- * writes two `::lamina`, and the scene has to come out as two artworks with the title on the
- * first alone and the arrow on every one but the last.
- */
-describe('aprovados across its example’s two laminas', () => {
-  const example = EXAMPLES.find((each) => each.template === 'aprovados')!;
-
-  it('draws one artwork per lamina, the title on the first only, the arrow on all but the last', async () => {
-    const { scene } = await build(example);
-    const frames = scene.artworks.map((artwork) => artwork.frames[0]?.children ?? []);
-
-    expect(frames).toHaveLength(2);
-    expect(frames.map((children) => named(children, 'result-title').length)).toEqual([1, 0]);
-    expect(frames.map((children) => named(children, 'arrow').length)).toEqual([1, 0]);
-  }, 60_000);
-});
 
 describe('a mark the template never declared', () => {
   const PROMO = join(PACK, 'promo-curso');
@@ -438,12 +379,12 @@ describe('a mark the template never declared', () => {
  * Deep-equal on the whole `Scene`, which carries no source ranges: whatever an exporter
  * draws is a function of this value alone, so equal Scenes are equal HTML, SVG and pixels.
  */
-describe('blank lines inside an agenda-semana lamina', () => {
-  const AGENDA = join(PACK, 'agenda-semana');
+describe('blank lines inside a carrossel-lista lamina', () => {
+  const LISTA = join(PACK, 'carrossel-lista');
   const FIXTURES = join(HERE, 'fixture/blank-lines');
 
   const sceneOf = async (source: string): Promise<Scene> =>
-    (await buildSource(source, 'agenda-semana', AGENDA)).scene;
+    (await buildSource(source, 'carrossel-lista', LISTA)).scene;
 
   it('compiles to the same Scene as the brief written without them', async () => {
     const without = await readFile(join(FIXTURES, 'without-blank-lines.brief'), 'utf8');
@@ -479,7 +420,7 @@ describe('blank lines inside an agenda-semana lamina', () => {
  * has to be the brief without it, down to one break run in the title.
  */
 describe('a backslash ending a line of an indented title', () => {
-  const AGENDA = join(PACK, 'agenda-semana');
+  const LISTA = join(PACK, 'carrossel-lista');
   const FIXTURES = join(HERE, 'fixture/blank-lines');
 
   const titleBreaks = (scene: Scene): number[] =>
@@ -500,12 +441,12 @@ describe('a backslash ending a line of an indented title', () => {
     const trailing = without.replace('  AGENDA DA SEMANA', '  AGENDA DA \\\n  SEMANA');
     expect(split).not.toEqual(without);
 
-    const control = await buildSource(split, 'agenda-semana', AGENDA);
-    const backslashed = await buildSource(trailing, 'agenda-semana', AGENDA);
+    const control = await buildSource(split, 'carrossel-lista', LISTA);
+    const backslashed = await buildSource(trailing, 'carrossel-lista', LISTA);
 
-    // Frames without the title count zero; the one that draws it has the single break.
-    expect(titleBreaks(control.scene).filter((count) => count > 0)).toEqual([1]);
-    expect(titleBreaks(backslashed.scene).filter((count) => count > 0)).toEqual([1]);
+    // The list's title is on every slide, and each has the single break.
+    expect(titleBreaks(control.scene)).toEqual([1, 1]);
+    expect(titleBreaks(backslashed.scene)).toEqual([1, 1]);
     expect(backslashed.scene).toEqual(control.scene);
   }, 60_000);
 });
@@ -630,7 +571,7 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
 );
 
 describe('the contract fixtures, through Format Brief (TYTO-297)', () => {
-  const AGENDA = join(PACK, 'agenda-semana');
+  const LISTA = join(PACK, 'carrossel-lista');
 
   it.each(['blank-lines/with-blank-lines.brief', 'blank-lines/without-blank-lines.brief'])(
     '%s compiles to the same Scene formatted',
@@ -640,7 +581,7 @@ describe('the contract fixtures, through Format Brief (TYTO-297)', () => {
       expect(formatted.ok).toBe(true);
       if (!formatted.ok) return;
       const sceneOf = async (text: string) =>
-        (await buildSource(text, 'agenda-semana', AGENDA)).scene;
+        (await buildSource(text, 'carrossel-lista', LISTA)).scene;
       expect(await sceneOf(formatted.value)).toEqual(await sceneOf(source));
     },
     60_000,
@@ -656,100 +597,10 @@ describe('the contract fixtures, through Format Brief (TYTO-297)', () => {
       .replace('AGENDA DA SEMANA\n', 'AGENDA DA SEMANA \t\n');
     expect(spaced).not.toEqual(source);
     const sceneOf = async (text: string) =>
-      (await buildSource(text, 'agenda-semana', AGENDA)).scene;
+      (await buildSource(text, 'carrossel-lista', LISTA)).scene;
     expect(await sceneOf(spaced)).toEqual(await sceneOf(source));
   }, 60_000);
 });
-
-/**
- * The pill that grows with its copy (TYTO-184, ADR 0038).
- *
- * `agenda-semana` measures a session's title and professor before it places them, so a
- * title too long for one line wraps onto a second and the grey pill — and the date pill on
- * its end — grows to hold it. Until TYTO-184 the title shrank into a fixed pill instead,
- * because a template could not measure (TYTO-173).
- *
- * The long title is the reference's own `Portaria CVS 3/2026…`, which is two lines in the
- * substitute this file measures against and in CircularXX alike. The card named `Sistema de
- * Garantia dos Direitos da Criança e do Adolescente`, measured one line in both — so it is
- * not the one that says anything about wrapping.
- */
-describe('the pill that grows with its copy', () => {
-  const AGENDA = join(PACK, 'agenda-semana');
-
-  const briefWith = (titulo: string) =>
-    `---
-template: agenda-semana
-formats: [grid]
----
-` +
-    `::titulo
-  AGENDA DA SEMANA
-
-` +
-    `::lamina
-  NUTRIÇÃO
-  23/08 - 19:00 | ${titulo} | Profª. Alice Moreno
-`;
-
-  /** The session's title node, its pill and its date pill, as the scene came out. */
-  const sessionOf = async (titulo: string) => {
-    const { scene, warnings } = await buildSource(briefWith(titulo), 'agenda-semana', AGENDA);
-    const children = scene.artworks.flatMap((artwork) => artwork.frames)[0]?.children ?? [];
-    const title = named(children, 'session-title')[0];
-    const heightOf = (name: string) => {
-      const shape = named(children, name)[0];
-      const rect = shape?.kind === 'group' ? shape.children[0] : undefined;
-      return rect?.kind === 'rect' ? rect.size.h : undefined;
-    };
-    const sizes =
-      title?.kind === 'text'
-        ? title.runs.flatMap((run) => (run.kind === 'text' ? [run.size] : []))
-        : [];
-    const lines =
-      title?.kind === 'text' ? title.runs.filter((run) => run.kind === 'break').length + 1 : 0;
-    return {
-      sizes,
-      lines,
-      pill: heightOf('session-pill'),
-      date: heightOf('date-pill'),
-      overflow: warnings.filter((item) => item.code === 'W_TEXT_OVERFLOW'),
-    };
-  };
-
-  const SHORT = 'Fundamentos da Nutrição';
-  const LONG = 'Portaria CVS 3/2026: Regulamento de Boas Práticas para Serviços de Alimentação';
-
-  it('keeps a title that fits on one line, in the published 86px pill', async () => {
-    const short = await sessionOf(SHORT);
-
-    expect(short.overflow.map((item) => item.message)).toEqual([]);
-    expect(short.lines).toBe(1);
-    expect(short.pill).toBe(86);
-    expect(short.date).toBe(86);
-  }, 60_000);
-
-  it('wraps a long title onto two lines at its declared size, and grows both pills', async () => {
-    const short = await sessionOf(SHORT);
-    const long = await sessionOf(LONG);
-
-    expect(long.overflow.map((item) => item.message)).toEqual([]);
-    expect(long.lines).toBe(2);
-    // Not shrunk: the long title is drawn at the size the short one is.
-    expect(new Set([...long.sizes, ...short.sizes]).size).toBe(1);
-    expect(long.pill).toBeGreaterThan(86);
-    // One shape: the date pill is as tall as the grey pill it sits on.
-    expect(long.date).toBe(long.pill);
-  }, 60_000);
-});
-
-/** Every node below `nodes` with this name, groups included. */
-function named(nodes: readonly SceneNode[], name: string): SceneNode[] {
-  return nodes.flatMap((node) => [
-    ...(node.name === name ? [node] : []),
-    ...(node.kind === 'group' ? named(node.children, name) : []),
-  ]);
-}
 
 describe('tyto template check', () => {
   /**
@@ -808,15 +659,9 @@ describe('the pack as a whole', () => {
     expect(
       Object.fromEntries(registry.value.list().map((manifest) => [manifest.name, manifest.brand])),
     ).toEqual({
-      'agenda-semana': 'azul',
-      aprovados: 'azul',
       'banner-roxo': 'roxo',
       'carrossel-lista': 'tyto-demo',
       'promo-curso': 'tyto-demo',
-      'simulados-semana-ocre': 'ocre',
-      'simulados-semana-roxo': 'roxo',
-      'simulados-semana-vinho': 'vinho',
-      'tabela-roxo': 'roxo',
     });
   });
 
@@ -835,16 +680,10 @@ describe('the pack as a whole', () => {
         ]),
     );
     expect(kinds).toEqual({
-      'agenda-semana': ['carrossel'],
-      aprovados: ['carrossel'],
       // One piece per format: three sizes of one banner read as three banners.
       'banner-roxo': ['banner', 'banner', 'banner'],
       'carrossel-lista': ['carrossel', 'stories'],
       'promo-curso': ['grid', 'story'],
-      'simulados-semana-ocre': ['carrossel', 'stories'],
-      'simulados-semana-roxo': ['stories'],
-      'simulados-semana-vinho': ['carrossel', 'stories'],
-      'tabela-roxo': ['grid'],
     });
   });
 
@@ -857,17 +696,7 @@ describe('the pack as a whole', () => {
         .list()
         .map((entry) => entry.name)
         .sort(),
-    ).toEqual([
-      'agenda-semana',
-      'aprovados',
-      'banner-roxo',
-      'carrossel-lista',
-      'promo-curso',
-      'simulados-semana-ocre',
-      'simulados-semana-roxo',
-      'simulados-semana-vinho',
-      'tabela-roxo',
-    ]);
+    ).toEqual(['banner-roxo', 'carrossel-lista', 'promo-curso']);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
     expect(registry.value.failures).toEqual([]);
@@ -1004,41 +833,40 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
   }, 120_000);
 
   /**
-   * ADR 0037, through the binary: `agenda-semana` asks the machine for CircularXX. Which
+   * ADR 0037, through the binary: `banner-roxo` asks the machine for CircularXX. Which
    * branch runs depends on the machine, and each branch asserts the whole of its own
    * outcome — the maintainer's laptop has the face, CI has not, so both are exercised.
    */
-  it('renders agenda-semana in the installed CircularXX, or in the substitute and says so', async () => {
-    const agenda = join(project, 'agenda');
-    await mkdir(join(agenda, 'assets'), { recursive: true });
-    await writeFile(join(agenda, 'formats.yaml'), await readFile(join(PACK, 'formats.yaml')));
-    const examples = join(PACK, 'agenda-semana/examples');
-    await writeFile(join(agenda, 'agenda.brief'), await readFile(join(examples, 'agenda.brief')));
+  it('renders banner-roxo in the installed CircularXX, or in the substitute and says so', async () => {
+    const banner = join(project, 'banner');
+    await mkdir(banner, { recursive: true });
+    await writeFile(join(banner, 'formats.yaml'), await readFile(join(PACK, 'formats.yaml')));
     await writeFile(
-      join(agenda, 'assets/calendario.png'),
-      await readFile(join(examples, 'assets/calendario.png')),
+      join(banner, 'agencia.brief'),
+      await readFile(join(PACK, 'banner-roxo/examples/agencia.brief')),
     );
 
     await runBinary(
       process.execPath,
-      [CLI, 'render', 'agenda.brief', '--out', 'out', '--types', 'svg'],
+      [CLI, 'render', 'agencia.brief', '--out', 'out', '--types', 'svg'],
       {
-        cwd: agenda,
+        cwd: banner,
       },
     );
 
-    // TYTO-197: two laminas in one format are grid-01 and grid-02, in slide order.
-    expect((await readdir(join(agenda, 'out'))).sort()).toEqual([
-      'grid-01.svg',
-      'grid-02.svg',
+    // TYTO-197: one file per format, each named by its format and number.
+    expect((await readdir(join(banner, 'out'))).sort()).toEqual([
+      'banner-01.svg',
+      'banner-1x1-01.svg',
+      'banner-345x146-01.svg',
       'result.json',
     ]);
-    const svg = await readFile(join(agenda, 'out/grid-01.svg'), 'utf8');
+    const svg = await readFile(join(banner, 'out/banner-01.svg'), 'utf8');
     const sha = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
     const embedded = [...svg.matchAll(/url\("data:font\/[a-z0-9]+;base64,([A-Za-z0-9+/=]+)"\)/g)]
       .map((match) => sha(Buffer.from(match[1] ?? '', 'base64')))
       .sort();
-    const result = JSON.parse(await readFile(join(agenda, 'out/result.json'), 'utf8')) as {
+    const result = JSON.parse(await readFile(join(banner, 'out/result.json'), 'utf8')) as {
       diagnostics?: { code: string; message: string }[];
     };
     // `W_FONT_UNAVAILABLE` since TYTO-281 (ADR 0120): the binary runs with Google Fonts on, its
@@ -1051,7 +879,7 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
     expect(substituted.every((item) => item.code === 'W_FONT_UNAVAILABLE')).toBe(true);
 
     const machine = createFontLibrary({ describe: describeFace });
-    const weights = [300, 500, 900];
+    const weights = [400, 700];
     const asked = weights.map(
       (weight) =>
         ({
@@ -1067,21 +895,21 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
       })
       .sort();
 
-    // Three weights, three `@font-face` rules — Light, Medium, Black — whatever drew them.
+    // Two weights, two `@font-face` rules — Book and Bold — whatever drew them.
     expect(embedded).toEqual(expected);
 
     if (machine.substitutions(asked).length === 0) {
       expect(substituted).toEqual([]);
-      // The installed files, not the substitute: three different faces.
-      expect(new Set(embedded).size).toBe(3);
+      // The installed files, not the substitute: two different faces.
+      expect(new Set(embedded).size).toBe(2);
     } else {
-      // One per face the runs draw, in the order the scene is walked, and no fourth for the
-      // declaration: a `400` nobody draws is not a substitution anybody sees.
+      // One per face the runs draw, and none for a face the scene declares and no run draws:
+      // that is not a substitution anybody sees.
       expect(
         substituted.map((item) => /'CircularXX (\d+)'/.exec(item.message)?.[1]).sort(),
-      ).toEqual(['300', '500', '900']);
+      ).toEqual(['400', '700']);
       expect(substituted.every((item) => item.message.includes("'Source Sans 3'"))).toBe(true);
-      // Light and Medium both land on the bundled Regular, Black on the Bold.
+      // Book lands on the bundled Regular, Bold on the Bold.
       expect(new Set(embedded).size).toBe(2);
     }
   }, 120_000);

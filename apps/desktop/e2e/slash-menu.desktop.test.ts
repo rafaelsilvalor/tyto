@@ -12,7 +12,7 @@ import { firstWindow } from './first-window.js';
 /**
  * The "/" menu, through the real window (TYTO-276).
  *
- * A "/" at the start of a line in a brief lists the templates; "agen" filters to the agenda and
+ * A "/" at the start of a line in a brief lists the templates; "carr" filters to the list and
  * Enter writes its skeleton in place of the "/". A "/" in the middle of a line is a "/". On a
  * brief with content the row says it switches the template, and choosing it does — the "/"
  * going in the same edit, so one Ctrl+Z takes both back. And `editor.insertMenu`, which ships
@@ -136,7 +136,7 @@ beforeAll(async () => {
     const rows = (await listRows()) ?? [];
     await page.keyboard.press('Escape');
     await page.keyboard.press('Backspace');
-    if (rows.some((row) => row.startsWith('agenda-semana /'))) break;
+    if (rows.some((row) => row.startsWith('carrossel-lista /'))) break;
     if (Date.now() > deadline) throw new Error('the "/" menu never listed the templates');
     await page.waitForTimeout(250);
   }
@@ -151,29 +151,31 @@ afterAll(async () => {
 });
 
 describe('the "/" menu', () => {
-  it('writes the agenda skeleton for "/" + "agen" + Enter in an empty brief', async () => {
+  it('writes the list skeleton for "/" + "carr" + Enter in an empty brief', async () => {
     await newBrief();
     await page.keyboard.type('/');
     const rows = await waitForList();
 
-    expect(rows).toHaveLength(9);
-    expect(rows).toContainEqual(expect.stringMatching(/^agenda-semana \/ (new brief|novo brief)/u));
+    expect(rows).toHaveLength(3);
+    expect(rows).toContainEqual(
+      expect.stringMatching(/^carrossel-lista \/ (new brief|novo brief)/u),
+    );
     expect(await sectionHeadings()).toEqual(['Templates']);
 
-    await page.keyboard.type('agen');
+    await page.keyboard.type('carr');
     await expect
       .poll(listRows, { timeout: 5_000 })
-      .toEqual([expect.stringMatching(/^agenda-semana \//u)]);
+      .toEqual([expect.stringMatching(/^carrossel-lista \//u)]);
     await page.waitForTimeout(150);
-    await shoot('list-agen-light');
+    await shoot('list-carr-light');
     await page.keyboard.press('Enter');
 
     await expect.poll(editorText, { timeout: 10_000 }).toContain('::titulo titulo');
     expect(await editorText()).toBe(
       [
         '---',
-        'template: agenda-semana',
-        'formats: [grid]',
+        'template: carrossel-lista',
+        'formats: [grid-1x1, story]',
         '---',
         '',
         '::titulo titulo',
@@ -204,22 +206,22 @@ describe('the "/" menu', () => {
 
     expect(rows).toContainEqual(
       expect.stringMatching(
-        /^tabela-roxo \/ (switches the template \(current: promo-curso\)|troca o template \(atual: promo-curso\))$/u,
+        /^banner-roxo \/ (switches the template \(current: promo-curso\)|troca o template \(atual: promo-curso\))$/u,
       ),
     );
     expect(rows).toContainEqual(expect.stringMatching(/^promo-curso \/ (current|template atual)/u));
     await shoot('list-switch-light');
 
-    await page.keyboard.type('tabela-r');
+    await page.keyboard.type('banner-r');
     await page.waitForTimeout(150);
     await page.keyboard.press('Enter');
 
-    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: tabela-roxo');
-    expect(await editorText()).toBe('---\ntemplate: tabela-roxo\n---\n\n::titulo Olá\n');
+    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: banner-roxo');
+    expect(await editorText()).toBe('---\ntemplate: banner-roxo\n---\n\n::titulo Olá\n');
 
     await page.keyboard.press('Control+z');
     await expect.poll(editorText, { timeout: 10_000 }).toContain('template: promo-curso');
-    expect(await editorText()).not.toContain('tabela-roxo');
+    expect(await editorText()).not.toContain('banner-roxo');
   }, 60_000);
 
   it('opens from a keybindings.json entry with no "/" typed, and Escape closes it', async () => {
@@ -228,7 +230,7 @@ describe('the "/" menu', () => {
     await page.keyboard.press('Control+Alt+y');
     const rows = await waitForList();
 
-    expect(rows).toHaveLength(9);
+    expect(rows).toHaveLength(3);
     expect(await editorText()).toBe('::titulo Olá');
 
     await page.keyboard.press('Escape');
@@ -252,9 +254,9 @@ describe('in dark', () => {
       .toBe(true);
     await page.waitForTimeout(500);
     await newBrief();
-    await page.keyboard.type('/agen');
+    await page.keyboard.type('/carr');
     await waitForList();
-    await shoot('list-agen-dark');
+    await shoot('list-carr-dark');
     await page.keyboard.press('Escape');
   }, 60_000);
 });

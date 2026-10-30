@@ -215,7 +215,11 @@ describe('the preview service with a plugin directive (TYTO-49)', () => {
 });
 
 describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
-  it('draws the template the alias reaches, with its configuration over the defaults', async () => {
+  // No template left in the pack declares `values` (TYTO-436), so the configuration shows
+  // itself through its brief side (TYTO-440): a subtitle the brief leaves unset.
+  const SUBTITLE = 'Vagas limitadas';
+
+  it('draws the template the alias reaches, with its configuration under the brief', async () => {
     const sources = await createProjectSources({
       fileSystem: nodeFileSystem(),
       builtIn: packDirectory,
@@ -229,11 +233,16 @@ describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
         project: [],
         machine: [
           {
-            template: 'tabela-roxo',
-            file: 'tabelas.yaml',
+            template: 'promo-curso',
+            file: 'promos.yaml',
             directory: packDirectory,
             configurations: [
-              { name: 'sepia', alias: 'tabela-sepia', values: { paper: { value: '#f4e9d0' } } },
+              {
+                name: 'turma',
+                alias: 'promo-turma',
+                values: {},
+                brief: { slots: { subtitulo: { value: SUBTITLE } } },
+              },
             ],
           },
         ],
@@ -242,16 +251,17 @@ describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
       texts: new Map(),
     });
     const withAlias = await createPreviewService({ fileSystem: nodeFileSystem(), sources });
-    const brief = exampleBrief('tabela-roxo', 'tres-colunas.brief');
+    const example = exampleBrief('promo-curso', 'promo.brief');
+    const brief = example.slice(0, example.indexOf('::subtitulo'));
 
     const plain = await withAlias.preview(brief);
     const aliased = await withAlias.preview(
-      brief.replace('template: tabela-roxo', 'template: tabela-sepia'),
+      brief.replace('template: promo-curso', 'template: promo-turma'),
     );
 
     expect(aliased.diagnostics.map((item) => item.code)).not.toContain('E_UNKNOWN_TEMPLATE');
     expect(aliased.frames.length).toBe(plain.frames.length);
-    expect(aliased.frames[0]?.html.toLowerCase()).toContain('#f4e9d0');
-    expect(plain.frames[0]?.html.toLowerCase()).not.toContain('#f4e9d0');
+    expect(aliased.frames[0]?.html).toContain(SUBTITLE);
+    expect(plain.frames[0]?.html).not.toContain(SUBTITLE);
   });
 });

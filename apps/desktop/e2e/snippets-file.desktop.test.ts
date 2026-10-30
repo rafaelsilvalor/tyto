@@ -216,7 +216,7 @@ describe('the snippets file', () => {
     const labels = await waitForList();
 
     expect(labels).toContain('aula');
-    expect(labels).toContain('agenda-semana');
+    expect(labels).toContain('carrossel-lista');
     // Templates first, in the order the window hands the sources over, in either language.
     expect(await sectionHeadings()).toEqual([
       'Templates',
