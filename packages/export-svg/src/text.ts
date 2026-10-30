@@ -113,9 +113,25 @@ function verticalOffset(node: TextNode, lines: readonly Line[], sink: Sink): num
   return node.valign === 'middle' ? (height - total) / 2 : height - total;
 }
 
+/** One word a CSS font-family may leave unquoted: an identifier, so not led by a digit. */
+const IDENTIFIER = /^-?[_a-zA-Z\u0080-\uFFFF][-_a-zA-Z0-9\u0080-\uFFFF]*$/u;
+
+/**
+ * A family as the `font-family` property reads it, quoted only when it has to be.
+ *
+ * An unquoted family is a list of identifiers, and `3` is not one: `font-family="Source
+ * Sans 3"` is an invalid declaration, which the browser drops and draws the fallback face
+ * instead (TYTO-491 found it, `document.fonts` reporting the embedded face never loaded).
+ * A family of plain words keeps its bytes, which is every family that rendered correctly.
+ */
+function cssFamily(family: string): string {
+  const plain = family.split(' ').every((word) => IDENTIFIER.test(word) && !word.startsWith('--'));
+  return plain ? family : `"${family.replaceAll(/["\\]/gu, (character) => `\\${character}`)}"`;
+}
+
 function runAttributes(run: TextSpan, node: TextNode, sink: Sink): string {
   return [
-    attribute('font-family', escapeXml(run.font.family)),
+    attribute('font-family', escapeXml(cssFamily(run.font.family))),
     attribute('font-size', svgNumber(run.size)),
     attribute('font-weight', svgNumber(run.weight)),
     run.style === 'normal' ? '' : attribute('font-style', run.style),
@@ -147,7 +163,14 @@ function remember(run: TextSpan, sink: Sink): void {
  * designer would get for it is an empty layer to delete.
  */
 function textElement(node: TextNode, lines: readonly Line[], sink: Sink): string {
-  const { x, anchor } = anchorOf(node, sink);
+  const { x: anchorX, anchor } = anchorOf(node, sink);
+  // `letter-spacing` follows every glyph, the last one too, and `text-anchor` measures the
+  // line with it, so a tracked line would sit half its spacing left of centre, or its whole
+  // spacing short of the edge (TYTO-491). Moving the anchor by that space aligns the ink,
+  // which is what export-html aligns. A line drawn from the start needs nothing.
+  const trailing = node.letterSpacing;
+  const x =
+    anchor === 'middle' ? anchorX + trailing / 2 : anchor === 'end' ? anchorX + trailing : anchorX;
   let top = verticalOffset(node, lines, sink);
   const drawn: string[] = [];
 

@@ -498,6 +498,22 @@ function textDeclarations(node: TextNode, emit: Emit, context: VisitContext): st
   ];
 }
 
+/**
+ * The line block's own style: room for the spacing a browser adds after a line's last glyph.
+ *
+ * CSS letter-spacing follows every glyph, the last one too, so a centred tracked line is
+ * centred with `letterSpacing` of empty space at its end and its ink sits half of that to
+ * the left; a right-aligned one stops that much short of the edge (TYTO-491, measured at
+ * 2.5 px for 4.9). A negative right margin on the block, which the column flex stretches
+ * across the box, widens every line — the ones the browser wraps too — by exactly that
+ * space, so the ink is what gets aligned. Left alignment starts where the ink starts and
+ * needs nothing, and a wider block would change where it wraps.
+ */
+function lineBlockStyle(node: TextNode): string {
+  if (node.letterSpacing === 0 || (node.align !== 'center' && node.align !== 'right')) return '';
+  return ` style="margin-right: ${cssLength(-node.letterSpacing)}"`;
+}
+
 function textHtml(node: TextNode, emit: Emit): string {
   const spans = node.runs
     .map((run) =>
@@ -506,7 +522,7 @@ function textHtml(node: TextNode, emit: Emit): string {
         : `<span style="${escapeHtml(runDeclarations(run, node.id, emit).join('; '))}">${escapeHtml(run.text)}</span>`,
     )
     .join('');
-  return `<div>${spans}</div>`;
+  return `<div${lineBlockStyle(node)}>${spans}</div>`;
 }
 
 /* ------------------------------------------------------------------- the node kinds -- */
