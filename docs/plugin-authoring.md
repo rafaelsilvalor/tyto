@@ -8,7 +8,7 @@ bug.
 
 Every command below was run as written against this repository's CLI, on 2026-09-27. The
 output shown is what it printed, with the Windows `\` separators turned into `/`. The first
-half, from `plugin new` to `render`, is also run by `apps/cli/src/plugin-pack.test.ts` on
+half, from `plugin new` to `render`, is also run by `packages/command-line/src/plugin-pack.test.ts` on
 every check.
 
 ## What a plugin is

@@ -53,6 +53,9 @@
 'pkg:io':
   - changed-files:
       - any-glob-to-any-file: 'packages/io/**'
+'pkg:command-line':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/command-line/**'
 'pkg:editor':
   - changed-files:
       - any-glob-to-any-file: 'packages/editor/**'

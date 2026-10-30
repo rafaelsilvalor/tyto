@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK } from './exit.js';
+import { launchPluginProcess } from './plugins/plugin-process.js';
 import { run } from './program.js';
 
 /**
@@ -45,6 +46,7 @@ function environment(): CliEnvironment {
     version: '0.0.0-test',
     cwd: workspace,
     home,
+    launch: launchPluginProcess,
     rasterizer: () => {
       throw new Error('these renders are svg and never raster');
     },

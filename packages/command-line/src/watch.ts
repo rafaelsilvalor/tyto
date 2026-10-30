@@ -87,6 +87,7 @@ export async function watchCommand(
     environment.console.err(formatDiagnostics(pluginFiles.diagnostics));
   }
   const loaded = await loadInstalledPlugins(environment.home, {
+    launch: environment.launch,
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto watch',

@@ -17,14 +17,12 @@ import {
   startInstalledPlugins,
 } from '@tyto/plugin-api';
 
-import { launchPluginProcess } from './plugin-process.js';
-
 /**
  * Installed plugins, from `~/.tyto` into a host (E11.1, `docs/plugin-api.md` Lifecycle).
  *
  * The rules are `@tyto/plugin-api`'s (`installed.ts`), shared with the desktop; what this
- * module adds is the CLI's composition: the store on `<home>`, a child process per plugin
- * under Node's permission model, and a file check for `dist/index.js`. The CLI requires the
+ * module adds is the commands' composition: the store on `<home>`, a child process per plugin
+ * through the app's launcher, and a file check for `dist/index.js`. The CLI requires the
  * sandbox: a plugin whose process cannot prove it is confined to its folder is refused before
  * its code is imported (ADR 0049).
  */
@@ -38,8 +36,12 @@ export function readInstalledPlugins(home: string): Promise<InstalledPlugins> {
 }
 
 export interface LoadOptions {
-  /** How a plugin's process is started. A confined child process, unless a test says otherwise. */
-  readonly launch?: PluginProcessLauncher;
+  /**
+   * How a plugin's process is started: the environment's `launch` (ADR 0159). Absent, a plugin
+   * that would start is an internal failure, because an app that runs commands against a
+   * `home` and chose no launcher is a composition that was never finished.
+   */
+  readonly launch?: PluginProcessLauncher | undefined;
   /** What `host.fetch` and `host.credentials` reach, once a plugin's permissions allow it. */
   readonly capabilities?: HostCapabilities;
   /** The plugin files' copies, loaded before the installed plugins and over their names. */
@@ -51,6 +53,14 @@ function storeOf(home: string, copies: readonly PluginFilesCopyOnDisk[] = []) {
   return copies.length === 0 ? fsPluginStore(home) : pluginStoreWithCopies(home, copies);
 }
 
+/** What starts a plugin when the environment chose nothing: it refuses, by name. */
+const noLauncher: PluginProcessLauncher = (request) => {
+  throw new Error(
+    `No plugin launcher in this environment, so '${request.name}' cannot start. ` +
+      'The app that runs the commands sets `launch` beside `home`.',
+  );
+};
+
 /** Starts every enabled plugin under `home` that passed its checks, once per process. */
 export async function loadInstalledPlugins(
   home: string | undefined,
@@ -59,7 +69,7 @@ export async function loadInstalledPlugins(
   if (home === undefined) return NO_PLUGINS;
   const store = storeOf(home, options.copies);
   return startInstalledPlugins(store, {
-    launch: options.launch ?? launchPluginProcess,
+    launch: options.launch ?? noLauncher,
     requireSandbox: true,
     entryOf: async (folder) => {
       const path = join(store.directoryOf(folder), PLUGIN_ENTRY);

@@ -1,6 +1,7 @@
+import { launchPluginProcess } from '@tyto/command-line';
 import { describe, expect, it } from 'vitest';
 
-import { defaultEnvironment, tytoHome } from './environment.js';
+import { defaultEnvironment, defaultRasterizer, tytoHome } from './environment.js';
 
 /** Where `tyto plugin install` writes. The desktop reads the same variable, and must agree. */
 describe('tytoHome', () => {
@@ -22,5 +23,19 @@ describe('tytoHome', () => {
       if (previous === undefined) delete process.env['TYTO_HOME'];
       else process.env['TYTO_HOME'] = previous;
     }
+  });
+});
+
+/**
+ * The two ports a window fills differently (ADR 0159). The command tree chooses neither, so a
+ * terminal that forgot one would start no plugin or raster nothing, and only here is it said.
+ */
+describe('defaultEnvironment', () => {
+  it("starts a plugin's process with the terminal's fork launcher", () => {
+    expect(defaultEnvironment().launch).toBe(launchPluginProcess);
+  });
+
+  it("rasters through Playwright's Chromium", () => {
+    expect(defaultEnvironment().rasterizer).toBe(defaultRasterizer);
   });
 });

@@ -43,6 +43,9 @@ const NODE_PACKAGES = [
   // Adapter, not data (ADR 0021): it answers `FontSource` and the exporters' `font` port,
   // and reading bytes off a disk is what answering those means.
   'packages/fonts',
+  // The `tyto` command tree both apps run (ADR 0159): it reaches the disk through `io` and
+  // starts a plugin's process, so it is Node's, and the pure packages may not import it.
+  'packages/command-line',
   'apps/cli',
   // Main and preload only. The renderer is a browser and is listed under DOM_PACKAGES
   // below — `apps/desktop` is the one workspace that is two runtimes, and writing it out
@@ -265,7 +268,7 @@ export default tseslint.config(
      * plugin's `net:` permissions.
      */
     name: 'boundary/cli-plugin-fetch',
-    files: ['apps/cli/src/plugins/capabilities.ts'],
+    files: ['packages/command-line/src/plugins/capabilities.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
 

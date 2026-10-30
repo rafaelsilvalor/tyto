@@ -1,5 +1,4 @@
-import type { CliEnvironment } from '../../../../apps/cli/src/environment.js';
-import { createProgram } from '../../../../apps/cli/src/program.js';
+import { type CliEnvironment, createProgram } from '@tyto/command-line';
 import { type Locale, code, generatedHeader, page, prose, table } from './markdown.js';
 
 type Command = ReturnType<typeof createProgram>;
@@ -110,7 +109,7 @@ export function renderCliPage(locale: Locale): string {
   const words = WORDS[locale];
   const leaves = leafCommands();
   return page([
-    generatedHeader('apps/cli/src/program.ts'),
+    generatedHeader('packages/command-line/src/program.ts'),
     `# ${words.title}`,
     words.intro(leaves.length),
     words.note,
