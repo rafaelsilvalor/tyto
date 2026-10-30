@@ -268,7 +268,14 @@ import {
   toggleStrip,
 } from './editor-groups.js';
 import { type PreviewPane, previewElementsOf } from './preview-pane.js';
-import { type ProblemsPanel, PROBLEMS_TAG } from './problems-panel.js';
+import {
+  type CommandProblemRow,
+  type CommandProblems,
+  type ProblemsPanel,
+  PROBLEMS_TAG,
+  offsetAt,
+  withCommandProblems,
+} from './problems-panel.js';
 import { arrange, wireSplitters } from './dock.js';
 import './panels.js';
 import {
@@ -540,6 +547,9 @@ const panel = {
  * its own rows while the problems panel is not on screen, cleared when it comes on screen.
  */
 let problemsMark: ProblemsMark = UNLIT;
+
+/** What `tyto` commands run from the window reported, a section per run (TYTO-495). */
+let commandProblems: readonly CommandProblems[] = [];
 
 /**
  * Which tab or path a save-failure or missing-file row is about, so the save or open that fixes
@@ -899,6 +909,7 @@ function paintPanel(): void {
       locale: state.locale,
       // A preview tab's `active()` is the brief it follows, so "this brief" is right there.
       kind: current.kind ?? 'brief',
+      commands: commandProblems,
     };
   }
 }
@@ -5347,7 +5358,30 @@ function wirePanelControls(): void {
   // range into two `data-` attributes so that one listener here could read them back with
   // `closest()`; the element calls this with the range object itself, and the round trip
   // through the DOM is gone (ADR 0024).
-  if (elements.problems !== null) elements.problems.reveal = reveal;
+  if (elements.problems !== null) {
+    elements.problems.reveal = reveal;
+    elements.problems.open = openCommandProblem;
+  }
+}
+
+/**
+ * A command's Problems row (TYTO-495, ADR 0159 decision 7): main opens its file by run and row,
+ * like an explorer entry, and the cursor goes to the line the command printed, in the text the
+ * tab now shows.
+ */
+function openCommandProblem(runId: string, row: CommandProblemRow): void {
+  void withBridge(async (bridge) => {
+    const wanted = nextDocumentId();
+    const opened = await bridge['cli:open-diagnostic']({
+      documentId: wanted,
+      runId,
+      index: row.index,
+    });
+    adopt(opened.document, opened.documentId, wanted);
+    if (opened.document === null || row.line === undefined) return;
+    const at = offsetAt(active().brief, row.line, row.column ?? 1);
+    reveal({ start: at, end: at });
+  });
 }
 
 /**
@@ -5564,6 +5598,12 @@ async function load(): Promise<void> {
 
     // The queue changed (TYTO-45). Heard whether or not the panel is open, and ignored while
     // it is closed: the panel asks once when it opens, so nothing is lost by not listening.
+    // A `tyto` command run from the window reported diagnostics (TYTO-495): its section grows.
+    bridge.on('cli:diagnostics', (pushed) => {
+      commandProblems = withCommandProblems(commandProblems, pushed);
+      paintPanel();
+    });
+
     bridge.on('queue:changed', () => {
       if (elements.queuePanel !== null) void refreshQueue();
     });

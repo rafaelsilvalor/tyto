@@ -27,7 +27,6 @@ import {
   withoutRefused,
 } from '@tyto/io';
 import { NO_PLUGINS, type ThemeKind, createPluginHost } from '@tyto/plugin-api';
-import type { Rasterizer } from '@tyto/raster';
 
 import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
 import {
@@ -57,7 +56,7 @@ import {
   steppedZoom,
   typographyExample,
 } from '../../shared/typography.js';
-import { confirmInABox, createCliRunner } from './cli-runner.js';
+import { confirmInABox, createCliRunner, registeredRasterizer } from './cli-runner.js';
 import { SHELL_REFUSED, windowRefusals } from './cli-refusals.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
@@ -969,6 +968,9 @@ async function start(): Promise<void> {
   const panels = createPanelService(contributed, capabilities);
   servePluginPages(contributed, (name) => pluginStore.directoryOf(name));
 
+  // The one rasterizer the export and a `tyto` command share (ADR 0159 decision 3), so their
+  // captures queue on one adapter under its deadline (ADR 0030).
+  const windowRasterizer = registeredRasterizer(host.registry);
   const exports_ = await createExportService({
     fileSystem,
     log,
@@ -981,9 +983,7 @@ async function start(): Promise<void> {
     places: (directory) => workspace.placesFor(directory),
     pluginSources,
     version: app.getVersion(),
-    ...(host.registry.rasterizers<Rasterizer>()[0]?.value === undefined
-      ? {}
-      : { rasterizer: host.registry.rasterizers<Rasterizer>()[0]!.value }),
+    ...(windowRasterizer === undefined ? {} : { rasterizer: windowRasterizer }),
   });
 
   // The local queue (TYTO-45), composed here for the reason the export is: the inbox is
@@ -1023,7 +1023,6 @@ async function start(): Promise<void> {
   // **`tyto` commands in main** (TYTO-495, ADR 0159): the CLI's own command tree, run with the
   // window's instances — the rasterizer the export uses, the bundled-Node launcher, this
   // `TYTO_HOME` and the open folder — so a command and the window share one of each.
-  const commandRasterizer = host.registry.rasterizers<Rasterizer>()[0]?.value;
   const cli = createCliRunner({
     environment: () => ({
       version: app.getVersion(),
@@ -1033,8 +1032,8 @@ async function start(): Promise<void> {
       shellRefusal: SHELL_REFUSED,
       launch,
       rasterizer: () => {
-        if (commandRasterizer === undefined) throw new Error('This window has no rasterizer.');
-        return commandRasterizer;
+        if (windowRasterizer === undefined) throw new Error('This window has no rasterizer.');
+        return windowRasterizer;
       },
     }),
     refuse: windowRefusals({ platform: process.platform, queue: () => queue.view() }),
@@ -1056,6 +1055,11 @@ async function start(): Promise<void> {
       const contents = mainWindow?.webContents;
       if (contents === undefined || contents.isDestroyed()) return;
       sendIpcEvent(contents, 'cli:state', change);
+    },
+    diagnostics: (rows) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'cli:diagnostics', { ...rows, diagnostics: [...rows.diagnostics] });
     },
     // The commands with a window twin leave the window as its own twin would (decision 3).
     afterRun: async ([command, subcommand], code) => {

@@ -25,6 +25,7 @@ describe('the IPC contract', () => {
       // TYTO-495, ADR 0159: a tyto command run in main, stopped, and the tree for help.
       'cli:cancel',
       'cli:commands',
+      'cli:open-diagnostic',
       'cli:run',
       'credentials:delete',
       'credentials:set',
@@ -141,6 +142,7 @@ describe('the event table', () => {
     expect([...IPC_EVENT_NAMES].sort()).toEqual([
       'app:exit-requested',
       // TYTO-495, ADR 0159: what a command prints, and where its run stands.
+      'cli:diagnostics',
       'cli:output',
       'cli:state',
       'command:run',

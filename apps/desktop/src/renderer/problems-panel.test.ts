@@ -2,7 +2,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { type Diagnostic } from './panel.js';
-import { type ProblemsPanel, type ProblemsState, PROBLEMS_TAG } from './problems-panel.js';
+import {
+  type CommandProblemRow,
+  type CommandProblems,
+  type ProblemsPanel,
+  type ProblemsState,
+  PROBLEMS_TAG,
+  SHOWN_RUNS,
+  offsetAt,
+  withCommandProblems,
+} from './problems-panel.js';
 
 /**
  * The problems panel, now that it is an element rather than a painter (ADR 0024).
@@ -200,5 +209,138 @@ describe('an update keeps the rows it did not change', () => {
     const rows = panel.querySelectorAll('.problems__row');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toBe(secondBefore);
+  });
+});
+
+/** TYTO-495, ADR 0159 decision 7: what a `tyto` command reported, under the brief's rows. */
+describe("a command's section", () => {
+  const command = (over: Partial<CommandProblemRow> = {}): CommandProblemRow => ({
+    index: 0,
+    severity: 'error',
+    code: 'E_ASSET_NOT_FOUND',
+    message: "Asset './logo.png' was not found.",
+    where: 'task/brief.brief',
+    line: 5,
+    column: 1,
+    openable: true,
+    ...over,
+  });
+
+  it('lists its rows under the command, after the brief, with the file and line it printed', async () => {
+    const panel = mount({
+      diagnostics: [problem()],
+      commands: [
+        { runId: 'cli-1', label: 'tyto render task/brief.brief', diagnostics: [command()] },
+      ],
+    });
+    await panel.updateComplete;
+
+    const headers = [...panel.querySelectorAll('.problems__command')];
+    const rows = [...panel.querySelectorAll('.problems__row')];
+    expect(headers.map((header) => header.textContent)).toEqual(['tyto render task/brief.brief']);
+    expect(rows).toHaveLength(2);
+    // The brief's row first, then the command's, which names its own file.
+    expect(rows[0]?.querySelector('.problems__where')?.textContent).toBe('4:1');
+    expect(rows[1]?.querySelector('.problems__where')?.textContent).toBe('task/brief.brief:5:1');
+    expect(rows[1]?.querySelector('.problems__code')?.textContent).toBe('E_ASSET_NOT_FOUND');
+  });
+
+  it('shows with an empty brief too, below what the empty panel says', async () => {
+    const panel = mount({
+      commands: [{ runId: 'cli-1', label: 'tyto plugin list', diagnostics: [command()] }],
+    });
+    await panel.updateComplete;
+
+    expect(panel.querySelector('.problems__empty')).not.toBeNull();
+    expect(panel.querySelectorAll('.problems__row')).toHaveLength(1);
+  });
+
+  it('opens a row by its run and row, never by the path it shows', async () => {
+    const opened: [string, number][] = [];
+    const panel = mount({
+      commands: [
+        {
+          runId: 'cli-4',
+          label: 'tyto render a',
+          diagnostics: [command({ index: 3 })],
+        },
+      ],
+    });
+    panel.open = (runId, row) => opened.push([runId, row.index]);
+    await panel.updateComplete;
+
+    panel.querySelector<HTMLElement>('button.problems__row')?.click();
+
+    expect(opened).toEqual([['cli-4', 3]]);
+  });
+
+  it('is not a button for a row main says it cannot open, a template file among them', async () => {
+    const panel = mount({
+      commands: [
+        {
+          runId: 'cli-1',
+          label: 'tyto render a',
+          diagnostics: [
+            command({
+              index: 0,
+              where: 'templates/x/template.html',
+              line: 2,
+              column: 3,
+              openable: false,
+            }),
+            command({ index: 1, openable: false, code: 'W_PLUGIN_FILE_FETCH' }),
+          ],
+        },
+      ],
+    });
+    await panel.updateComplete;
+
+    expect(panel.querySelectorAll('button.problems__row')).toHaveLength(0);
+    expect(
+      [...panel.querySelectorAll('.problems__where')].map((where) => where.textContent),
+    ).toEqual(['templates/x/template.html:2:3', 'task/brief.brief:5:1']);
+  });
+});
+
+describe('the command sections the window keeps', () => {
+  const push = (runId: string, ...indexes: number[]): CommandProblems => ({
+    runId,
+    label: `tyto render ${runId}`,
+    diagnostics: indexes.map((index) => ({
+      index,
+      severity: 'error' as const,
+      code: 'E_X',
+      message: 'm',
+      openable: false,
+    })),
+  });
+
+  it("add a run's later rows to its own section", () => {
+    const sections = withCommandProblems(withCommandProblems([], push('a', 0)), push('a', 1));
+
+    expect(sections.map((section) => section.diagnostics.map((row) => row.index))).toEqual([
+      [0, 1],
+    ]);
+  });
+
+  it(`keep the last ${String(SHOWN_RUNS)} runs, the newest last`, () => {
+    let sections: readonly CommandProblems[] = [];
+    for (const runId of ['1', '2', '3', '4', '5', '6']) {
+      sections = withCommandProblems(sections, push(runId, 0));
+    }
+
+    expect(sections.map((section) => section.runId)).toEqual(['2', '3', '4', '5', '6']);
+  });
+});
+
+describe('a line and column as an offset', () => {
+  it('counts lines from 1 and holds the answer inside the text', () => {
+    const text = 'abc\ndef\nghi';
+
+    expect(offsetAt(text, 1, 1)).toBe(0);
+    expect(offsetAt(text, 2, 2)).toBe(5);
+    expect(offsetAt(text, 3, 1)).toBe(8);
+    expect(offsetAt(text, 9, 1)).toBe(text.length);
+    expect(offsetAt(text, 1, 99)).toBe(text.length);
   });
 });

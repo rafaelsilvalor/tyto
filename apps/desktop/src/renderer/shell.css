@@ -1479,6 +1479,19 @@ button.problems__row:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* A `tyto` command's section (TYTO-495): the command it ran, over the rows it reported. */
+.problems__command {
+  margin: 0;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding: var(--tyto-space-3) var(--tyto-space-5);
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /*
  * The command bar (E9.12).
  *
