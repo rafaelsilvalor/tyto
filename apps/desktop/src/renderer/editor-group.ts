@@ -43,6 +43,9 @@ export class EditorGroupElement extends LitElement {
     showing: { attribute: false },
     offerPreview: { attribute: false },
     openPreview: { attribute: false },
+    offerDeliveryExport: { attribute: false },
+    delivery: { attribute: false },
+    exportDelivery: { attribute: false },
     breadcrumb: { attribute: false },
     breadcrumbTitle: { attribute: false },
   };
@@ -59,6 +62,15 @@ export class EditorGroupElement extends LitElement {
   /** Whether the strip offers "Open preview to the side": a brief is in front. */
   declare offerPreview: boolean;
   declare openPreview: () => void;
+  /** Whether the strip shows the export-delivery button: a brief's own tab is in front. */
+  declare offerDeliveryExport: boolean;
+  /**
+   * The delivery the brief in front belongs to (TYTO-490, ADR 0157 §6), or `null`: then the
+   * button is shown disabled, with a tooltip saying why, rather than hidden, so a person learns
+   * where it would work.
+   */
+  declare delivery: string | null;
+  declare exportDelivery: () => void;
   /**
    * Where the caret of this group's pane is in its brief (TYTO-273, ADR 0098): `::lamina 2`,
    * `cabeçalho › template`, or empty. Text the window writes, worded already; plain, not a link.
@@ -82,6 +94,9 @@ export class EditorGroupElement extends LitElement {
     this.showing = 'editor';
     this.offerPreview = false;
     this.openPreview = () => undefined;
+    this.offerDeliveryExport = false;
+    this.delivery = null;
+    this.exportDelivery = () => undefined;
     this.breadcrumb = '';
     this.breadcrumbTitle = undefined;
   }
@@ -169,6 +184,7 @@ export class EditorGroupElement extends LitElement {
                 </button>`
               : nothing
           }
+          ${this.offerDeliveryExport ? this.deliveryButton() : nothing}
         </div>
       </div>
       <div
@@ -179,6 +195,30 @@ export class EditorGroupElement extends LitElement {
       >
         <div class="pane__breadcrumb" data-breadcrumb>${this.breadcrumb}</div>
       </div>`;
+  }
+
+  /** Beside "Open preview to the side": the delivery's export, disabled for a brief in none. */
+  private deliveryButton(): unknown {
+    const enabled = this.delivery !== null;
+    const label = translate(
+      this.locale,
+      enabled ? 'command.delivery.export' : 'delivery.export.notInDelivery',
+    );
+    // `aria-disabled` and not `disabled`, so the tooltip still shows on hover: a disabled
+    // button takes no pointer events in Chromium.
+    return html`<button
+      type="button"
+      class="editor-group__action"
+      data-action="delivery.export"
+      aria-disabled=${enabled ? 'false' : 'true'}
+      title=${label}
+      aria-label=${label}
+      @click=${() => {
+        if (enabled) this.exportDelivery();
+      }}
+    >
+      ${icon('folderOutput')}
+    </button>`;
   }
 }
 

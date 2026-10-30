@@ -577,6 +577,32 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return { ok: true, ...opened, reveal: [...(explorer.idsTo(made.brief) ?? [])] };
     },
 
+    // TYTO-490, ADR 0157 §6: the folders are main's, from the tab's path and the open layout.
+    'delivery:of': ({ documentId }) => {
+      const path = documents.pathOf(documentId);
+      const found = path === undefined ? undefined : delivery.of(path);
+      return Promise.resolve({ name: found?.name ?? null });
+    },
+
+    'delivery:export': ({ documentId, brief }) => {
+      const path = documents.pathOf(documentId);
+      const found = path === undefined ? undefined : delivery.of(path);
+      // The button is disabled for such a brief; a key bound to the command still gets here.
+      if (path === undefined || found === undefined) {
+        return Promise.resolve({ ok: false, ...delivery.notIn(path) });
+      }
+      const started = exports.start({
+        brief,
+        directory: found.exports,
+        briefDirectory: found.report,
+        label: documents.nameOf(documentId) ?? found.name,
+        outputs: found.types.map((kind) => ({ kind })),
+        ...(found.formats === undefined ? {} : { formats: [...found.formats] }),
+        deliveryReport: found.report,
+      });
+      return started.then(({ exportId }) => ({ ok: true, exportId, directory: found.exports }));
+    },
+
     'explorer:rename': async ({ entryId, name }) => {
       const renamed = await explorer.rename(entryId, name);
       if (!renamed.ok) return renamed;

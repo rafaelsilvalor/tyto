@@ -2,7 +2,7 @@
 
 # Commands
 
-Everything the window can be told to do, by title as the command bar shows it: 82. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
+Everything the window can be told to do, by title as the command bar shows it: 83. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
 
 The window adds more while it runs, which this list cannot show: a toggle for each panel, including a plugin's, an entry for each recently opened file, and one for each export preset of the open folder, `export.preset:<name>`.
 
@@ -36,6 +36,7 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | New brief | `document.new` | `Ctrl+n` | `⌘n` |
 | New brief from template… | `document.newFromTemplate` |  |  |
 | Delivery: New… | `delivery.new` |  |  |
+| Delivery: Export | `delivery.export` |  |  |
 | Open… | `editor.open` | `Ctrl+o` | `⌘o` |
 | Save | `editor.save` | `Ctrl+s` | `⌘s` |
 | Save as… | `editor.saveAs` | `Ctrl+Shift+s` | `⌘⇧s` |

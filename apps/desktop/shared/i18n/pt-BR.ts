@@ -391,6 +391,10 @@ export const ptBR: Catalogue = {
   'delivery.template.none': 'Sem template',
   'delivery.refused': 'Nenhuma entrega foi criada. {problem}',
   'delivery.noFolder': 'Abra uma pasta antes: a entrega é criada dentro da pasta aberta.',
+  'command.delivery.export': 'Entrega: exportar',
+  'delivery.export.notInDelivery':
+    'Este brief não está numa entrega: o brief de uma entrega fica na pasta editaveis dela.',
+  'delivery.export.refused': 'Nada foi exportado. {problem}',
   'slash.section.templates': 'Templates',
   'slash.section.snippets': 'Trechos',
   'slash.template.new': 'novo brief com o esqueleto',

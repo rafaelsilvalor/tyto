@@ -694,6 +694,14 @@ export interface Catalogue {
   /** `{problem}` is the diagnostic's own sentence, which says why. */
   readonly 'delivery.refused': string;
   readonly 'delivery.noFolder': string;
+  /**
+   * TYTO-490, ADR 0157 §6: the delivery's export — the command and the strip's button, the
+   * button's tooltip while the brief in front is in no delivery, and the refusal.
+   */
+  readonly 'command.delivery.export': string;
+  readonly 'delivery.export.notInDelivery': string;
+  /** `{problem}` is the diagnostic's own sentence, which says why. */
+  readonly 'delivery.export.refused': string;
   readonly 'slash.section.templates': string;
   /** TYTO-277. The heading over the person's snippets in the same menu. */
   readonly 'slash.section.snippets': string;
@@ -1121,6 +1129,9 @@ export const CATALOGUE_KEYS = [
   'delivery.template.none',
   'delivery.refused',
   'delivery.noFolder',
+  'command.delivery.export',
+  'delivery.export.notInDelivery',
+  'delivery.export.refused',
   'slash.section.templates',
   'slash.section.snippets',
   'slash.template.new',

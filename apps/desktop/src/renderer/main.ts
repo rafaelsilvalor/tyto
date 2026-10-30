@@ -138,6 +138,7 @@ import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
   COMMAND_LABELS,
+  DELIVERY_EXPORT,
   DELIVERY_NEW,
   DOCUMENT_SLOTS,
   PREVIEW_ZOOM_FIT,
@@ -948,6 +949,15 @@ function paintTabs(): void {
     element.openPreview = () => {
       runCommand(PREVIEW_OPEN_TO_SIDE);
     };
+    // The delivery's export beside it, for a brief's own tab (TYTO-490, ADR 0157 §6).
+    element.offerDeliveryExport = frontDocument !== undefined && isBrief(frontDocument.kind);
+    element.delivery =
+      front === undefined || frontDocument === undefined
+        ? null
+        : deliveryOf(front.documentId, frontDocument);
+    element.exportDelivery = () => {
+      runCommand(DELIVERY_EXPORT);
+    };
     paintBreadcrumb(group.id);
     element.tabs = group.tabs.flatMap((tab) => {
       if (isPreview(tab)) return [previewEntry(tab)];
@@ -1320,6 +1330,64 @@ function openExportDialog(): void {
 }
 
 /**
+ * The delivery each brief tab belongs to, as main answered `delivery:of` (TYTO-490), keyed by the
+ * tab's document and where its file is, so a Save As or a rename asks again. `null` is "in no
+ * delivery"; a key not here is being asked. Emptied when the open folder changes its layout.
+ */
+const deliveries = new Map<string, string | null>();
+
+/** The delivery of the brief in `documentId`, or `null` while main has not said it has one. */
+function deliveryOf(
+  documentId: string,
+  document_: { readonly pathLabel?: string | undefined },
+): string | null {
+  // A brief that was never saved has no folder, so no delivery.
+  if (document_.pathLabel === undefined) return null;
+  const key = `${documentId}|${document_.pathLabel}`;
+  const known = deliveries.get(key);
+  if (known !== undefined || deliveries.has(key)) return known ?? null;
+  deliveries.set(key, null);
+  void withBridge(async (bridge) => {
+    const answer = await bridge['delivery:of']({ documentId });
+    if (answer.name === null) return;
+    deliveries.set(key, answer.name);
+    paintTabs();
+    paintCommandBar();
+  });
+  return null;
+}
+
+/**
+ * Exports the brief in front into its delivery (TYTO-490, ADR 0157 §6): main resolves the
+ * folders, formats and types from the open folder's layout, and the export box opens already
+ * running, as for a preset. A refusal is said in the status bar, with no box.
+ */
+function exportDelivery(): void {
+  const documentId = active().id;
+  void withBridge(async (bridge) => {
+    const answer = await bridge['delivery:export']({ documentId, brief: activeText() });
+    if (!answer.ok) {
+      showNoticeText(
+        translate(state.locale, 'delivery.export.refused').replace('{problem}', answer.message),
+      );
+      return;
+    }
+    openExportDialog();
+    presetDirectory = answer.directory;
+    exportId = answer.exportId;
+    paintExport({
+      status: 'running',
+      total: 0,
+      done: 0,
+      failed: 0,
+      directory: answer.directory,
+      diagnostics: [],
+    });
+    watchExport();
+  });
+}
+
+/**
  * Runs an export preset on the brief in front (TYTO-270, ADR 0126): the export box opens
  * already running, so progress, problems and the leftovers list are the ones a person knows.
  * The request is the box's own channel with the preset's formats, types and folder, and main
@@ -1371,8 +1439,14 @@ function showExportPresets(presets: readonly ExportPresetView[]): void {
  * Lazy, so it reads the workspace at the moment a command is listed or run.
  */
 // A delivery is made only inside the open folder (ADR 0157 §3), so its command waits for one.
-const offeredNow = (id: string): boolean =>
-  id === DELIVERY_NEW ? deliveryOffered(workspaceShown) : commandOffered(activeKind(), id);
+const offeredNow = (id: string): boolean => {
+  if (id === DELIVERY_NEW) return deliveryOffered(workspaceShown);
+  // And the delivery's export only for a brief main said is in one (TYTO-490).
+  if (id === DELIVERY_EXPORT) {
+    return commandOffered(activeKind(), id) && deliveryOf(active().id, active()) !== null;
+  }
+  return commandOffered(activeKind(), id);
+};
 
 const registry: CommandRegistry = withCommandGate(
   createDesktopRegistry({
@@ -1566,6 +1640,10 @@ const registry: CommandRegistry = withCommandGate(
 
     newDelivery: () => {
       newDelivery();
+    },
+
+    exportDelivery: () => {
+      exportDelivery();
     },
 
     openInsertMenu: () => {
@@ -3195,6 +3273,10 @@ async function changeWorkspaceFolder(
 function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   state.workspaceOutput = answer.output;
   state.workspaceName = answer.name;
+  // A folder opened, reread or closed may lay its deliveries out differently (TYTO-490).
+  if (workspaceShown?.folder !== answer.folder || workspaceShown.trust !== answer.trust) {
+    deliveries.clear();
+  }
   workspaceShown = answer;
   showExportPresets(answer.exportPresets);
   panel.installation = withWorkspaceRows(panel.installation, answer.problems);

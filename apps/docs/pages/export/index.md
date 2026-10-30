@@ -26,7 +26,7 @@ Exporting turns the brief in front into files: PNG, JPEG or WebP images, SVG dra
 
 Each file is named after its size and the artwork's number: `grid-01.png`, `grid-02.png`, `story-01.png` and so on, so a carousel of four makes four of each.
 
-Nothing else is written: no copy of the brief, no images, no report. The dialog is the run's report. A file already in the folder with the same name is replaced, and every other file is left as it is, including artwork an earlier export wrote and this one did not. To keep the brief and its images beside the artwork, make a [delivery](../editor/workspace-folder.md#deliveries-one-folder-per-piece-of-work).
+Nothing else is written: no copy of the brief, no images, no report. The dialog is the run's report. A file already in the folder with the same name is replaced, and every other file is left as it is, including artwork an earlier export wrote and this one did not. To keep the brief and its images beside the artwork, make a [delivery](../editor/workspace-folder.md#deliveries-one-folder-per-piece-of-work): its own export button writes the artwork into it, with `result.json` beside its brief.
 
 ## Export with a preset
 

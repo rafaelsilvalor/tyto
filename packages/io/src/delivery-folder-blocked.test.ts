@@ -40,7 +40,7 @@ describe('fsArtworkOutput with a file in the way', () => {
     const messages = await blockedPaths(picked);
 
     expect(messages).toEqual([
-      `'${picked}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.`,
+      `'${picked}' is a file, and Tyto needs a folder with that name. Rename or move the file, or export somewhere else.`,
     ]);
     expect(await readFile(picked, 'utf8')).toBe(HELD);
   });

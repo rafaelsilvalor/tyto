@@ -105,7 +105,7 @@ non-zero.
 | `W_FONT_SOURCE_FAILED` | warning | no | A plugin that serves a font family could not supply a face the scene asks for. |
 | `E_RENDER_FAILED` | error | no | A frame could not be turned into bytes by the exporter or the rasterizer. |
 | `E_OUTPUT_WRITE` | error | no | No longer produced since ADR 0108. An artifact was rendered but could not be written to the output. |
-| `E_DELIVERY_FOLDER_BLOCKED` | error | yes | A delivery needs a folder at a path where a file already is. |
+| `E_DELIVERY_FOLDER_BLOCKED` | error | yes | An export needs a folder at a path where a file already is. |
 | `E_OUTPUT_FILE_BLOCKED` | error | no | Tyto needs to write a file at a path where a folder already is. |
 | `E_FONT_FACE_UNAVAILABLE` | error | no | Text asks for a face the fonts Tyto can read do not have, so it cannot be exported. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
@@ -165,6 +165,7 @@ non-zero.
 | `W_DELIVERY_NAME_INVALID` | warning | no | A delivery name cannot be a folder name, so no delivery is made. |
 | `E_DELIVERY_BRIEF_EXISTS` | error | yes | A new delivery's brief would replace a brief that is already there. |
 | `E_DELIVERY_PATH_OUTSIDE` | error | yes | A new delivery would be made outside the workspace folder, through a link. |
+| `E_BRIEF_NOT_IN_DELIVERY` | error | yes | A delivery's export was asked of a brief that is in no delivery. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 | `E_RECIPE_SYNTAX` | error | yes | A line of a recipe does not match the recipe format. |
 | `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
@@ -289,7 +290,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_EXPORT_UNSUPPORTED` | no | Every producer of this code now leaves the node visible rather than leaving it out (ADR 0035): a mask that cannot be built is dropped instead of hiding what it was applied to, and text that cannot be drawn as outlines is drawn as text. Inline SVG markup outside the subset is the one exception: the node keeps its box and draws nothing, because drawing that markup is the harm (ADR 0068). |
 | `E_RENDER_FAILED` | no | One frame of twelve. The others are already written, and a file that is missing from `result.json` is visible in a way a hole inside an artwork is not. |
 | `E_OUTPUT_WRITE` | no | One artifact that did not reach the output, counted against `planned`. Since ADR 0108 a folder in the way is `E_OUTPUT_FILE_BLOCKED` and anything else the sink rejects with ends the run as an internal failure (exit 2). |
-| `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it. |
+| `E_DELIVERY_FOLDER_BLOCKED` | yes | Fatal when the folder the artwork or `result.json` goes in is held: there is nowhere to write it, so nothing is. |
 | `E_OUTPUT_FILE_BLOCKED` | no | Depends on the file, and nothing that is drawn is lost. The copied brief: the delivery is not opened, so nothing is rendered. An artwork file: that one artifact is missing and the others are written. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 | `E_FONT_FACE_UNAVAILABLE` | no | The frame is still built and previewed, with the text laid out from the lines the brief wrote; it is an error because the export is certain to fail, and saying so while the brief is written is the point. |
 | `E_TEMPLATE_ALIAS_TAKEN` | no | Only that alias is missing; the template of that name renders as before. |
@@ -300,6 +301,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PROJECT_SYNTAX` | no | Every key that parsed still applies, and the brief renders without the rest. |
 | `E_DELIVERY_BRIEF_EXISTS` | yes | The run that refuses changes nothing: not even the folders the delivery lacks are made. |
 | `E_DELIVERY_PATH_OUTSIDE` | yes | Nothing is written: a delivery is part of the project, trusted or not. |
+| `E_BRIEF_NOT_IN_DELIVERY` | yes | Nothing is rendered: there is no delivery to write into. |
 | `E_TRUST_FILE` | no | Every source opens restricted instead, which is what an absent approval means. |
 | `E_RECIPE_SYNTAX` | yes | A recipe that does not parse has no chain of cells to run. |
 | `E_RECIPE_PARAM` | yes | Every cell may read the parameter, so none of them can run without it. |
@@ -1410,14 +1412,14 @@ Parameters: `artifact`, `problem`
 
 ### `E_DELIVERY_FOLDER_BLOCKED`
 
-**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md`
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md`
 
-A delivery needs a folder at a path where a file already is.
+An export needs a folder at a path where a file already is.
 
-Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is already written and the images are not copied beside it.
+Fatal when the folder the artwork or `result.json` goes in is held: there is nowhere to write it, so nothing is.
 
 ```
-'{path}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.
+'{path}' is a file, and Tyto needs a folder with that name. Rename or move the file, or export somewhere else.
 ```
 
 Parameters: `path`
@@ -1561,6 +1563,20 @@ Nothing is written: a delivery is part of the project, trusted or not.
 ```
 
 Parameters: `path`
+
+### `E_BRIEF_NOT_IN_DELIVERY`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md`
+
+A delivery's export was asked of a brief that is in no delivery.
+
+Nothing is rendered: there is no delivery to write into.
+
+```
+'{path}' is in no delivery: a delivery's brief is kept in its '{folder}' folder, inside a folder in '{parent}'. Make one with tyto delivery new, or export with --out.
+```
+
+Parameters: `path`, `folder`, `parent`
 
 ### `E_TRUST_FILE`
 

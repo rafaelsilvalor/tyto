@@ -238,6 +238,12 @@ export const DOCUMENT_NEW_FROM_TEMPLATE = 'document.newFromTemplate';
  * default, bindable in `keybindings.json`.
  */
 export const DELIVERY_NEW = 'delivery.new';
+/**
+ * The export of the delivery the brief in front belongs to (TYTO-490, ADR 0157 §6): no dialog to
+ * fill, main resolves the folders, and the export box opens already running. Offered only for a
+ * brief in a delivery; no key by default, bindable in `keybindings.json`.
+ */
+export const DELIVERY_EXPORT = 'delivery.export';
 export const DOCUMENT_CLOSE = 'document.close';
 export const DOCUMENT_NEXT = 'document.next';
 export const DOCUMENT_PREVIOUS = 'document.previous';
@@ -312,6 +318,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [DOCUMENT_NEW]: 'command.document.new',
   [DOCUMENT_NEW_FROM_TEMPLATE]: 'command.document.newFromTemplate',
   [DELIVERY_NEW]: 'command.delivery.new',
+  [DELIVERY_EXPORT]: 'command.delivery.export',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
@@ -400,6 +407,8 @@ export interface DesktopActions {
   newDocumentFromTemplate(): void;
   /** TYTO-489. Asks the name and a template in the bar; main makes the delivery. */
   newDelivery(): void;
+  /** TYTO-490. Exports the brief in front into its delivery; main resolves the folders. */
+  exportDelivery(): void;
   openDocument(): void;
   saveDocument(saveAs: boolean): void;
   /** E9.10. Puts every panel back where ADR 0024 says it goes. */
@@ -552,6 +561,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(DELIVERY_NEW, () => {
     actions.newDelivery();
+  });
+  add(DELIVERY_EXPORT, () => {
+    actions.exportDelivery();
   });
   add(EDITOR_OPEN, () => {
     actions.openDocument();
@@ -726,6 +738,7 @@ export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_SHOW_ONE_SLIDE,
   PREVIEW_SHOW_ALL_SLIDES,
   FILE_EXPORT,
+  DELIVERY_EXPORT,
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,
   EDITOR_FORMAT_BRIEF,

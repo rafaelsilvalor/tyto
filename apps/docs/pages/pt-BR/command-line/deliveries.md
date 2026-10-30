@@ -43,6 +43,18 @@ error E_DELIVERY_BRIEF_EXISTS 'entregas\mca-66910_simule-sua-nota-da-2ª-fase\ed
 
 Uma entrega sempre fica dentro da pasta de trabalho. Uma que um atalho dentro da pasta levaria para fora é recusada com `E_DELIVERY_PATH_OUTSIDE`, e nada é escrito.
 
+## Exportar uma entrega
+
+`tyto render` com `--delivery` exporta o brief de uma entrega para dentro da própria entrega, sem pasta para nomear:
+
+```
+tyto render entregas/mca-66910/editaveis/mca-66910.brief --delivery
+```
+
+As artes vão para a raiz da entrega, ou para a pasta `exports` dela quando a chave `delivery` nomeia uma; o `result.json` e o `template.txt` vão para `editaveis/`, ao lado do brief. O brief e as imagens ficam como estão. Artes que uma exportação anterior da entrega gravou e esta não são removidas, com um aviso `W_LEFTOVER_REMOVED`. Ela exporta os tamanhos do próprio brief em PNG, a não ser que a chave `delivery` nomeie `formats` ou `types`; `--formats` e `--types` ainda escolhem para uma execução.
+
+`--delivery` não pode ser usado com `--out` nem `--folder`: a entrega decide para onde os arquivos vão. Um brief que não está no `editaveis/` de uma entrega é recusado com `E_BRIEF_NOT_IN_DELIVERY`, e nada é renderizado.
+
 ## Que nomes funcionam
 
 O nome vira o nome de uma pasta, então é recusado, nunca alterado, quando uma pasta não poderia tê-lo: vazio, começando com ponto, contendo `..`, `/`, `\` ou um de `< > : " | ? *`, terminando em espaço ou ponto, ou um nome que o Windows reserva, como `CON`. Pode ter até 100 caracteres, e qualquer outra letra serve, `ª` e acentos incluídos.

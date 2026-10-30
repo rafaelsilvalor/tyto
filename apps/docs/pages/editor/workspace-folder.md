@@ -69,6 +69,8 @@ A **delivery** is a folder for one piece of work, named after its ticket, with `
 
 **File ▸ Delivery: New…**, or the same command from the command bar, makes one in the open folder. The command bar asks for its name, and says while you type why a name cannot be a folder's — a `:` or a `/`, say — so Enter does nothing until it can. Then it lists the templates, as **New brief from template…** does, with **No template** first. The delivery's brief opens in a new tab and is selected in the Explorer: with a template it holds the template's skeleton, and with none it opens with the "/" menu, where choosing a template writes its skeleton. A brief already there is never overwritten: the status bar says why nothing was made, and nothing is written. The command is greyed while no folder is open, and you can bind it in [`keybindings.json`](../customize/keybindings-json.md) as `delivery.new`. [`tyto delivery new`](../command-line/deliveries.md) does the same from the command line.
 
+**Export the delivery**: with a delivery's brief in front, the button beside **Open preview to the side**, at the right end of the tab strip, exports it with no dialog to fill. The Export dialog opens already running, as for a preset. The artwork goes to the delivery's root (its `exports` folder), and `result.json` and `template.txt` go to `editaveis/` beside the brief; the brief and the images in `assets/` are left as they are. Artwork an earlier export of the delivery wrote and this one did not is removed and listed in the dialog; files of your own are never touched. It exports the brief's own sizes, or `formats` when the `delivery` key names them, as PNG, or `types` when the key names them. For a brief in no delivery the button is greyed, and its tooltip says why. The command is **Delivery: Export**, and you can bind it in `keybindings.json` as `delivery.export`; [`tyto render --delivery`](../command-line/deliveries.md#export-a-delivery) does the same from the command line.
+
 The `delivery` key says where and how, and every part of it is optional:
 
 ```jsonc
@@ -82,7 +84,7 @@ The `delivery` key says where and how, and every part of it is optional:
 }
 ```
 
-The values shown for `folders`, `brief` and `exports` are what applies when the key is left out. `parent` is relative to the open folder; the other three are relative to the delivery and must stay inside it. `exports`, and `formats` and `types` (lists of sizes and file types), are for exporting a delivery, which this version does not do yet: they are read and checked, and nothing uses them.
+The values shown for `folders`, `brief` and `exports` are what applies when the key is left out. `parent` is relative to the open folder; the other three are relative to the delivery and must stay inside it. `exports` is where a delivery's export writes its artwork, and `formats` and `types` (lists of sizes and file types) are what it exports, when they are written; left out, the brief's own sizes as PNG.
 
 A work profile can hold a `delivery` too, and a campaign is a work profile: the folder's own `delivery` overrides one part at a time, so a folder that writes only `"exports": "final"` keeps the profile's `folders`. A profile's `parent` is still relative to the open folder. A delivery always stays inside the open folder, trusted or not: a `parent` that leads outside is listed as `W_PROJECT_PATH_OUTSIDE` and the one before it applies. A part that is not accepted is listed in **Problems** and the one before it, or the one shown above, applies.
 

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename, isAbsolute, relative, resolve } from 'node:path';
 
-import type { Diagnostics } from '@tyto/core';
+import { type Diagnostics, builtInDelivery, deliveryOfBrief, diagnostic } from '@tyto/core';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
@@ -57,6 +57,14 @@ export interface RenderCommandOptions {
    * ADR 0011 contract byte for byte what `docs/render-contract.md` publishes.
    */
   readonly folder?: boolean;
+  /**
+   * `--delivery`: export the brief into the delivery it is the brief of (ADR 0157 §6, TYTO-490):
+   * the artwork into its `exports`, `result.json` and `template.txt` beside the brief. Exclusive
+   * with `--out` and `--folder`, which commander refuses before this runs.
+   */
+  readonly delivery?: boolean;
+  /** True when `--types` was typed: then it wins over the delivery's `types`. */
+  readonly typesNamed?: boolean;
   readonly template?: string;
   readonly formats?: readonly string[];
   readonly types: readonly OutputKind[];
@@ -97,6 +105,9 @@ export interface RenderCommandOptions {
  * the honest answer: `basename` removes a suffix only when it is there.
  */
 const BRIEF_SUFFIX = '.brief';
+
+/** What a delivery exports when no sheet says, as for a preset (ADR 0126, ADR 0157 §6). */
+const DELIVERY_TYPES = ['png'] as const;
 
 /** What `loadRenderContext` needs to search installed packs, when there is a home to read. */
 export function installedOption(
@@ -161,7 +172,33 @@ export async function renderCommand(
   );
   const projectDiagnostics = workspace?.diagnostics ?? [];
   const project = workspace?.loaded.project;
-  const out = options.out === undefined ? project?.output : resolve(cwd, options.out);
+
+  // A delivery decides the folders and, unless typed, what is exported (ADR 0157 §6). Outside a
+  // workspace the built-in layout, with the current folder as the parent (ADR 0157 §3).
+  const layout =
+    options.delivery === true ? (project?.delivery ?? builtInDelivery(resolve(cwd))) : undefined;
+  const delivery = layout === undefined ? undefined : deliveryOfBrief(layout, briefPath);
+  if (layout !== undefined && delivery === undefined) {
+    const refused = diagnostic('E_BRIEF_NOT_IN_DELIVERY', {
+      path: shownBrief,
+      folder: layout.brief,
+      parent: displayPath(cwd, layout.parent),
+    });
+    return reportFailure([...projectDiagnostics, refused], options, environment);
+  }
+  const run: RenderCommandOptions =
+    layout === undefined
+      ? options
+      : {
+          ...options,
+          types: options.typesNamed === true ? options.types : (layout.types ?? DELIVERY_TYPES),
+          ...(options.formats === undefined && layout.formats !== undefined
+            ? { formats: layout.formats }
+            : {}),
+        };
+
+  const out =
+    delivery?.exports ?? (options.out === undefined ? project?.output : resolve(cwd, options.out));
   if (out === undefined) {
     if (projectDiagnostics.length > 0)
       environment.console.err(formatDiagnostics(projectDiagnostics));
@@ -231,7 +268,7 @@ export async function renderCommand(
 
   const plugins = withoutRefused(loaded, context.value.refusedPlugins);
   const { exporters, warnings: skipped } = reachableExporters(plugins);
-  const unavailable = unavailableTypes(options.types, exporters);
+  const unavailable = unavailableTypes(run.types, exporters);
   if (unavailable !== undefined) {
     // The skipped plugins first: when a kind is missing, the reason is usually one of them.
     if (skipped.length > 0) environment.console.err(formatDiagnostics(skipped));
@@ -241,9 +278,7 @@ export async function renderCommand(
     return EXIT_DIAGNOSTICS;
   }
 
-  const rasterizer = needsRasterizer(options.types, exporters)
-    ? environment.rasterizer()
-    : undefined;
+  const rasterizer = needsRasterizer(run.types, exporters) ? environment.rasterizer() : undefined;
 
   try {
     const report = await renderTask(
@@ -259,13 +294,14 @@ export async function renderCommand(
         // `basename` and nothing else. The name comes off a file that exists, so it is
         // already legal here, and a second sanitiser is what `artifact.ts` warns against.
         ...(options.folder === true ? { folder: { name: basename(briefPath, BRIEF_SUFFIX) } } : {}),
+        ...(delivery === undefined ? {} : { delivery: { report: delivery.report } }),
       },
       {
-        outputs: outputRequests(options),
+        outputs: outputRequests(run),
         version: environment.version,
         plugins,
         ...(options.template === undefined ? {} : { template: options.template }),
-        ...(options.formats === undefined ? {} : { formats: options.formats }),
+        ...(run.formats === undefined ? {} : { formats: run.formats }),
         ...(rasterizer === undefined ? {} : { rasterizer }),
         ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),

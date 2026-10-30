@@ -893,15 +893,16 @@ export const diagnosticCodes = {
   // it, so retrying the same invocation fails the same way every time (TYTO-129).
   E_DELIVERY_FOLDER_BLOCKED: {
     severity: 'error',
-    summary: 'A delivery needs a folder at a path where a file already is.',
+    summary: 'An export needs a folder at a path where a file already is.',
+    // Worded for every writer since TYTO-490: the export box, a preset, `--folder` and a
+    // delivery's export all make their folder this way, and only the last is a delivery.
     template:
-      "'{path}' is a file, and the delivery needs a folder with that name. Rename or move the file, or deliver somewhere else.",
-    spec: 'docs/adr/0057-a-delivery-carries-its-brief-and-its-images.md',
+      "'{path}' is a file, and Tyto needs a folder with that name. Rename or move the file, or export somewhere else.",
+    spec: 'docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md',
     fatal: true,
     fatality:
-      'Fatal when the delivery folder or `editaveis/` is held: there is nowhere to write the ' +
-      'artwork or `result.json`, so nothing is. When only `assets/` is held, the artwork is ' +
-      'already written and the images are not copied beside it.',
+      'Fatal when the folder the artwork or `result.json` goes in is held: there is nowhere ' +
+      'to write it, so nothing is.',
   },
   // The mirror of the one above, and a code of its own because the fix is the inverse and the
   // catalogue has one sentence per code. "Output" and not "delivery": `result.json` and the
@@ -1498,6 +1499,17 @@ export const diagnosticCodes = {
     spec: 'docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md',
     fatal: true,
     fatality: 'Nothing is written: a delivery is part of the project, trusted or not.',
+  },
+  // ADR 0157 §6: `tyto render --delivery` on a brief that is in no delivery. The window never
+  // gets here: its button is disabled for such a brief (TYTO-490).
+  E_BRIEF_NOT_IN_DELIVERY: {
+    severity: 'error',
+    summary: "A delivery's export was asked of a brief that is in no delivery.",
+    template:
+      "'{path}' is in no delivery: a delivery's brief is kept in its '{folder}' folder, inside a folder in '{parent}'. Make one with tyto delivery new, or export with --out.",
+    spec: 'docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md',
+    fatal: true,
+    fatality: 'Nothing is rendered: there is no delivery to write into.',
   },
   E_TRUST_FILE: {
     severity: 'error',

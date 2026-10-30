@@ -662,8 +662,8 @@
     },
     {
       "paths": ["apps/desktop/src/main/delivery.ts", "apps/desktop/src/renderer/delivery-new.ts"],
-      "e2e": ["workspace.desktop.test.ts"],
-      "why": "reviewed: Delivery: New…, a delivery made in the open folder and its brief opened (TYTO-489)"
+      "e2e": ["export-delivery.desktop.test.ts", "workspace.desktop.test.ts"],
+      "why": "reviewed: Delivery: New…, a delivery made in the open folder and its brief opened (TYTO-489); Delivery: Export, the strip's button and the delivery's export (TYTO-490)"
     },
     {
       "paths": ["apps/desktop/src/main/seed-files.ts"],

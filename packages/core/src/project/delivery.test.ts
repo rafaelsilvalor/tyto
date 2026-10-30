@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { sourceRange } from '../source/range.js';
-import { builtInDelivery, deliveryNameOf, planDelivery } from './delivery.js';
+import { builtInDelivery, deliveryNameOf, deliveryOfBrief, planDelivery } from './delivery.js';
 import { type ProjectEntry, type ProjectLayer, projectPaths, resolveProject } from './project.js';
 
 /**
@@ -197,5 +197,53 @@ describe('planDelivery', () => {
 
   it('stops at a refused name', () => {
     expect(planDelivery(builtInDelivery('/work'), '..')).toMatchObject({ ok: false });
+  });
+});
+
+describe('deliveryOfBrief', () => {
+  const layout = builtInDelivery('/work');
+
+  it('finds the delivery of a brief in its editaveis/, with exports at its root', () => {
+    expect(deliveryOfBrief(layout, '/work/mca-1_promo/editaveis/mca-1_promo.brief')).toEqual({
+      name: 'mca-1_promo',
+      folder: '/work/mca-1_promo',
+      exports: '/work/mca-1_promo',
+      report: '/work/mca-1_promo/editaveis',
+    });
+  });
+
+  it('follows the layout in force: another parent, brief folder and exports', () => {
+    const custom = { ...layout, parent: '/work/entregas', brief: 'src', exports: 'final' };
+    expect(deliveryOfBrief(custom, '/work/entregas/mca-2/src/qualquer.brief')).toEqual({
+      name: 'mca-2',
+      folder: '/work/entregas/mca-2',
+      exports: '/work/entregas/mca-2/final',
+      report: '/work/entregas/mca-2/src',
+    });
+  });
+
+  it('answers a brief kept at the delivery root when brief is "."', () => {
+    expect(deliveryOfBrief({ ...layout, brief: '.' }, '/work/mca-3/mca-3.brief')).toMatchObject({
+      folder: '/work/mca-3',
+      report: '/work/mca-3',
+    });
+  });
+
+  it.each([
+    ['a brief at the parent itself', '/work/solto.brief'],
+    ['a brief in the delivery root, not in editaveis/', '/work/mca-1/mca-1.brief'],
+    ['a brief one folder too deep', '/work/mca-1/editaveis/rascunhos/mca-1.brief'],
+    ['a brief outside the parent', '/elsewhere/mca-1/editaveis/mca-1.brief'],
+    ['a folder name no delivery could have', '/work/.oculta/editaveis/x.brief'],
+    ['a relative path', 'mca-1/editaveis/mca-1.brief'],
+  ])('answers nothing for %s', (_, path) => {
+    expect(deliveryOfBrief(layout, path)).toBeUndefined();
+  });
+
+  it('compares without case on a Windows-shaped parent, as that file system does', () => {
+    const windows = builtInDelivery('D:\\Work');
+    expect(deliveryOfBrief(windows, 'd:\\work\\MCA-1\\Editaveis\\a.brief')).toMatchObject({
+      name: 'MCA-1',
+    });
   });
 });
