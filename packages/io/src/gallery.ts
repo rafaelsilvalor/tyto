@@ -1,12 +1,12 @@
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { promisify } from 'node:util';
 
 import { type Diagnostics, diagnostic } from '@tyto/core';
 import { GALLERY_INDEX_FILE } from '@tyto/plugin-api';
 import { z } from 'zod';
+
+import { git, problemOf } from './plugin-files.js';
 
 /**
  * The gallery on a disk (ADR 0162): fetching the index with the person's `git`, keeping the
@@ -18,33 +18,14 @@ import { z } from 'zod';
  * ```
  *
  * **The network is `git`'s** (ADR 0011, ADR 0127): any location the person's `git` reads,
- * with their credentials, and no provider named. `GIT_TERMINAL_PROMPT=0`, as a sync runs it,
- * so a missing credential fails rather than waiting on a prompt the window cannot show.
+ * with their credentials, and no provider named. It runs through the plugin files' own `git`
+ * (`plugin-files.ts`), so the gallery adds no process path (ADR 0159) and a missing credential
+ * fails rather than waiting on a prompt the window cannot show.
  */
 
 export const GALLERY_CACHE = join('cache', 'gallery');
 /** Beside the plugin files and not one of them: the reader takes `*.yaml` only. */
 export const GALLERY_RECORD_FILE = 'gallery.json';
-
-const run = promisify(execFile);
-
-async function git(args: readonly string[], cwd: string): Promise<string> {
-  const { stdout } = await run('git', [...args], {
-    cwd,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-    maxBuffer: 16 * 1024 * 1024,
-  });
-  return stdout;
-}
-
-/** git's first line of complaint, which is the line that says what went wrong. */
-function problemOf(cause: unknown): string {
-  const stderr = (cause as { readonly stderr?: unknown } | undefined)?.stderr;
-  if (typeof stderr === 'string' && stderr.trim() !== '') {
-    return stderr.trim().split('\n')[0]?.trim() ?? '';
-  }
-  return cause instanceof Error ? (cause.message.split('\n')[0] ?? cause.message) : String(cause);
-}
 
 /** Writes beside the name and renames into place, so a reader never sees half a file. */
 export async function writeFileAtomically(path: string, text: string): Promise<void> {

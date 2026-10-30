@@ -69,6 +69,12 @@ pinned is each entry's tag, in the plugin file.
 Only `index.yaml` is read out of the fetched commit (`git show FETCH_HEAD:index.yaml`); nothing
 of the index repository is checked out.
 
+**The gallery adds no process path** (ADR 0159). The index is fetched through the same `git`
+runner `@tyto/io`'s plugin-file sync uses, and install and update hand the machine's folder to
+that same sync, so a fetched plugin's permissions are asked through `CliEnvironment.confirm`
+(or taken from `--yes`) exactly as `tyto plugin sync` asks them. Nothing here prompts on its
+own, and nothing runs `npm`.
+
 In the CLI the location is `--index <git>`, or `TYTO_GALLERY_INDEX` when that is absent. **Not
 `settings.json`**, which the CLI never reads (ADR 0145 decision 5); the window's own setting is
 TYTO-504's. **There is no built-in default in this card**: which list a machine trusts is a
