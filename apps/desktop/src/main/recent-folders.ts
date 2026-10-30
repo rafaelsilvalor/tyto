@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { basename } from 'node:path';
+import { posix, win32 } from 'node:path';
 
 import type { IpcResponse } from '../../shared/ipc.js';
 import { pathLabelOf } from './path-label.js';
@@ -57,7 +57,10 @@ export function createRecentFoldersService(options: RecentFoldersOptions): Recen
 
   return {
     remember: async (folder) => {
-      await options.list.remember({ path: folder, name: basename(folder) || folder });
+      // The platform's own separators, as `pathLabelOf` reads them: `c:\work\promo` is
+      // `promo` on Windows whatever machine the code runs on.
+      const name = (windows ? win32 : posix).basename(folder);
+      await options.list.remember({ path: folder, name: name || folder });
     },
 
     listing: async (current) =>
