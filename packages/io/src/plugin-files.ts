@@ -168,7 +168,8 @@ async function isKnownCommit(home: string, git: string, commit: string): Promise
   }
 }
 
-function problemOf(cause: unknown): string {
+/** git's first line of complaint. Shared with the gallery's fetch (ADR 0162). */
+export function problemOf(cause: unknown): string {
   const stderr = (cause as { readonly stderr?: unknown } | undefined)?.stderr;
   if (typeof stderr === 'string' && stderr.trim() !== '') {
     return stderr.trim().split('\n')[0]?.trim() ?? '';
@@ -176,7 +177,11 @@ function problemOf(cause: unknown): string {
   return cause instanceof Error ? (cause.message.split('\n')[0] ?? cause.message) : String(cause);
 }
 
-async function git(args: readonly string[], cwd: string): Promise<string> {
+/**
+ * The one way `@tyto/io` runs the person's `git`: no shell, no prompt. The gallery's index
+ * fetch goes through here too (ADR 0162), so there is one process path to audit (ADR 0159).
+ */
+export async function git(args: readonly string[], cwd: string): Promise<string> {
   const { stdout } = await run('git', [...args], {
     cwd,
     env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },

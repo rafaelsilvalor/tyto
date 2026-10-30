@@ -75,6 +75,16 @@ non-zero.
 | `W_PLUGIN_FILE_REPLACES_INSTALLED` | warning | no | A plugin from the plugin files has the name of one installed with tyto plugin install. |
 | `W_PLUGIN_FILE_FETCH` | warning | no | A source the plugin files name could not be fetched. |
 | `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A commit a plugin file names was fetched and could not be loaded as a plugin. |
+| `E_GALLERY_INDEX_SYNTAX` | error | no | The gallery index could not be read or is not YAML of the shape it needs. |
+| `E_GALLERY_INDEX_ENTRY` | error | no | An entry of the gallery index is refused, and the others stand. |
+| `W_GALLERY_INDEX_KEY_UNKNOWN` | warning | no | The gallery index has a key Tyto does not know. |
+| `E_GALLERY_INDEX_FETCH` | error | no | The gallery index could not be fetched, and no copy was fetched before. |
+| `W_GALLERY_INDEX_OFFLINE` | warning | no | The gallery index could not be fetched, and the copy fetched before is shown. |
+| `E_GALLERY_ENTRY_UNKNOWN` | error | no | A gallery command names an entry the index does not list. |
+| `E_GALLERY_ENGINE` | error | no | A gallery entry needs a plugin API this Tyto does not provide. |
+| `E_GALLERY_NOT_INSTALLED` | error | no | tyto gallery update names an entry no machine plugin file holds. |
+| `E_GALLERY_ENTRY_EDITED` | error | no | The plugin file entry the gallery wrote was changed by hand since. |
+| `E_GALLERY_WRITE` | error | no | The gallery could not write an entry into a plugin file without changing the rest of it. |
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | yes | The same id is used more than once in one scene. |
 | `E_SCENE_MASK_NOT_FOUND` | error | yes | A mask references a node the scene does not contain. |
@@ -266,6 +276,14 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_FILE_ENTRY` | no | Only that entry is missing; the rest of the file loads. |
 | `E_PLUGIN_FILE_DUPLICATE` | no | Only that name is missing; a brief that needs it says so on its own. |
 | `E_PLUGIN_FILE_SOURCE_REFUSED` | no | The commit locked before loads when there is one; otherwise nothing from that source does. |
+| `E_GALLERY_INDEX_SYNTAX` | no | The gallery lists nothing; templates and plugins already installed still load. |
+| `E_GALLERY_INDEX_ENTRY` | no | Only that entry is missing from the gallery. |
+| `E_GALLERY_INDEX_FETCH` | no | The gallery lists nothing; templates and plugins already installed still load. |
+| `E_GALLERY_ENTRY_UNKNOWN` | no | Nothing is written. |
+| `E_GALLERY_ENGINE` | no | Nothing is written; the entry stays listed. |
+| `E_GALLERY_NOT_INSTALLED` | no | Nothing is written. |
+| `E_GALLERY_ENTRY_EDITED` | no | Nothing is written. |
+| `E_GALLERY_WRITE` | no | Nothing is written. |
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_MASK_NOT_FOUND` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -1060,6 +1078,118 @@ The commit locked before loads when there is one; otherwise nothing from that so
 ```
 
 Parameters: `git`, `ref`, `commit`, `problem`, `outcome`
+
+### `E_GALLERY_INDEX_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+The gallery index could not be read or is not YAML of the shape it needs.
+
+The gallery lists nothing; templates and plugins already installed still load.
+
+```
+Gallery index '{index}' was not read: {problem}.
+```
+
+Parameters: `index`, `problem`
+
+### `E_GALLERY_INDEX_ENTRY`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+An entry of the gallery index is refused, and the others stand.
+
+Only that entry is missing from the gallery.
+
+```
+Gallery index '{index}': entry {entry} was refused: {problem}.
+```
+
+Parameters: `index`, `entry`, `problem`
+
+### `E_GALLERY_INDEX_FETCH`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+The gallery index could not be fetched, and no copy was fetched before.
+
+The gallery lists nothing; templates and plugins already installed still load.
+
+```
+Could not fetch the gallery index '{index}': {problem}.
+```
+
+Parameters: `index`, `problem`
+
+### `E_GALLERY_ENTRY_UNKNOWN`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+A gallery command names an entry the index does not list.
+
+Nothing is written.
+
+```
+The gallery index lists no entry '{entry}'.
+```
+
+Parameters: `entry`
+
+### `E_GALLERY_ENGINE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+A gallery entry needs a plugin API this Tyto does not provide.
+
+Nothing is written; the entry stays listed.
+
+```
+'{entry}' needs plugin API {range}, and this Tyto provides {version}; update Tyto first.
+```
+
+Parameters: `entry`, `range`, `version`
+
+### `E_GALLERY_NOT_INSTALLED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+tyto gallery update names an entry no machine plugin file holds.
+
+Nothing is written.
+
+```
+'{entry}' is not in any plugin file of this machine; install it first.
+```
+
+Parameters: `entry`
+
+### `E_GALLERY_ENTRY_EDITED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+The plugin file entry the gallery wrote was changed by hand since.
+
+Nothing is written.
+
+```
+'{entry}' in '{file}' was changed by hand since the gallery wrote it ({written} is now {found}); nothing was moved. Pass --force to move it anyway.
+```
+
+Parameters: `entry`, `file`, `written`, `found`
+
+### `E_GALLERY_WRITE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+The gallery could not write an entry into a plugin file without changing the rest of it.
+
+Nothing is written.
+
+```
+Could not write '{entry}' into '{file}': {problem}. The file was left as it was.
+```
+
+Parameters: `entry`, `file`, `problem`
 
 ### `E_SCENE_SHAPE`
 
@@ -2042,6 +2172,34 @@ Could not fetch '{git}' at '{ref}': {problem}. {outcome}
 ```
 
 Parameters: `git`, `ref`, `problem`, `outcome`
+
+### `W_GALLERY_INDEX_KEY_UNKNOWN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+The gallery index has a key Tyto does not know.
+
+The key is ignored and the entry stands.
+
+```
+Gallery index '{index}': unknown key {path}; it is ignored.
+```
+
+Parameters: `index`, `path`
+
+### `W_GALLERY_INDEX_OFFLINE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0162-a-gallery-index-lists-templates-and-plugins.md`
+
+The gallery index could not be fetched, and the copy fetched before is shown.
+
+The earlier copy is read instead, and may miss a newer version.
+
+```
+Could not fetch the gallery index '{index}': {problem}. Showing the copy from {fetched}.
+```
+
+Parameters: `index`, `problem`, `fetched`
 
 ### `W_EXPORT_APPROXIMATED`
 

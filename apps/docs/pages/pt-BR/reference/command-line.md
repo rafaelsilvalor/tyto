@@ -2,7 +2,7 @@
 
 # Linha de comando
 
-Todos os comandos que o `tyto` aceita: 16. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
+Todos os comandos que o `tyto` aceita: 19. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
 
 ::: info Ajuda em inglês
 A ajuda da linha de comando existe só em inglês, e esta página a mostra como o terminal a imprime.
@@ -274,6 +274,63 @@ tyto plugin enable [options] <name>
 | Argumento | O que faz |
 | --- | --- |
 | `<name>` | the plugin's name, as tyto plugin list prints it |
+
+## tyto gallery list
+
+list every entry: installed, not installed or update available, and where
+
+```sh
+tyto gallery list [options]
+```
+
+**Opções**
+
+| Opção | O que faz | Padrão |
+| --- | --- | --- |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+
+## tyto gallery install
+
+write an entry into the machine's plugin files at its latest tag, then sync
+
+```sh
+tyto gallery install [options] <id>
+```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `<id>` | the entry, as tyto gallery list prints it |
+
+**Opções**
+
+| Opção | O que faz | Padrão |
+| --- | --- | --- |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+| `-y, --yes` | approve the fetched plugin's permissions without asking |  |
+
+## tyto gallery update
+
+move an installed entry's ref to the index's latest tag, then sync
+
+```sh
+tyto gallery update [options] <id>
+```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `<id>` | the entry, as tyto gallery list prints it |
+
+**Opções**
+
+| Opção | O que faz | Padrão |
+| --- | --- | --- |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+| `-y, --yes` | approve the fetched plugin's permissions without asking |  |
+| `--force` | move a ref changed by hand since the gallery wrote it |  |
 
 ## tyto trust add
 

@@ -3,6 +3,7 @@ import { Command, CommanderError, Option } from 'commander';
 import type { CliEnvironment, CommandInvocation } from './environment.js';
 import { deliveryNewCommand } from './delivery.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
+import { galleryInstallCommand, galleryListCommand, galleryUpdateCommand } from './gallery.js';
 import {
   parseFormatList,
   parsePositiveInteger,
@@ -358,6 +359,48 @@ export function createProgram(
         captured.code = await pluginStateCommand(change, name, environment);
       });
   }
+
+  /* -------------------------------------------------------------------------- gallery -- */
+
+  const gallery = program
+    .command('gallery')
+    .description(
+      'list, install and update templates and plugins from a maintained index (ADR 0162); writes ~/.tyto/plugin-files',
+    );
+  const indexOption = (): Option =>
+    new Option(
+      '--index <git>',
+      'the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX)',
+    );
+
+  const galleryList = gallery
+    .command('list')
+    .description('list every entry: installed, not installed or update available, and where')
+    .addOption(indexOption())
+    .action(async () => {
+      captured.code = await galleryListCommand(galleryList.opts(), environment);
+    });
+
+  const galleryInstall = gallery
+    .command('install')
+    .description("write an entry into the machine's plugin files at its latest tag, then sync")
+    .argument('<id>', 'the entry, as tyto gallery list prints it')
+    .addOption(indexOption())
+    .option('-y, --yes', "approve the fetched plugin's permissions without asking", false)
+    .action(async (id: string) => {
+      captured.code = await galleryInstallCommand(id, galleryInstall.opts(), environment);
+    });
+
+  const galleryUpdate = gallery
+    .command('update')
+    .description("move an installed entry's ref to the index's latest tag, then sync")
+    .argument('<id>', 'the entry, as tyto gallery list prints it')
+    .addOption(indexOption())
+    .option('-y, --yes', "approve the fetched plugin's permissions without asking", false)
+    .option('--force', 'move a ref changed by hand since the gallery wrote it', false)
+    .action(async (id: string) => {
+      captured.code = await galleryUpdateCommand(id, galleryUpdate.opts(), environment);
+    });
 
   /* ---------------------------------------------------------------------------- trust -- */
 

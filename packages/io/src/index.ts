@@ -191,3 +191,14 @@ export {
   projectPluginFiles,
   syncPluginFiles,
 } from './plugin-files-sync.js';
+export {
+  type FetchedGalleryIndex,
+  type GalleryRecord,
+  type GalleryWrite,
+  GALLERY_CACHE,
+  GALLERY_RECORD_FILE,
+  fetchGalleryIndex,
+  readGalleryRecord,
+  writeFileAtomically,
+  writeGalleryRecord,
+} from './gallery.js';

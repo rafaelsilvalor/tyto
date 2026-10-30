@@ -260,3 +260,20 @@ export {
   sameSource,
   serializePluginFilesLock,
 } from './plugin-files.js';
+
+export { addTemplateEntries, moveEntryRef, newPluginFileText } from './plugin-file-edit.js';
+
+export {
+  type GalleryEntry,
+  type GalleryFolder,
+  type GalleryIndex,
+  type GalleryIndexRead,
+  type GalleryKind,
+  type GalleryPlacement,
+  type GalleryState,
+  type GalleryStatus,
+  GALLERY_INDEX_FILE,
+  galleryStatus,
+  parseGalleryIndex,
+  sameRepository,
+} from './gallery-index.js';
