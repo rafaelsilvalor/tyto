@@ -159,6 +159,38 @@ textarea {
   text-decoration: underline;
 }
 
+/*
+ * The open folder's name (TYTO-487), between the menu row and the title: Zed's project button.
+ * It opens the recent folders popover, so `no-drag` like the menu; it gives way before the
+ * menu does, cut with an ellipsis, and never wider than a long name needs.
+ */
+.title-bar__project {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 16em;
+  flex-shrink: 1;
+  border: 0;
+  border-radius: var(--tyto-radius-sm);
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  background: transparent;
+  color: var(--tyto-text);
+  font: inherit;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.title-bar__project:hover,
+.title-bar__project:focus-visible,
+.title-bar__project[aria-expanded='true'] {
+  background: var(--tyto-hover);
+}
+
+.title-bar__project[data-empty] {
+  color: var(--tyto-text-muted);
+}
+
 .title-bar__title {
   overflow: hidden;
   min-width: 0;
@@ -2365,6 +2397,125 @@ tyto-trust-dialog[open] {
   display: flex;
   justify-content: flex-end;
   gap: var(--tyto-space-3);
+}
+
+/*
+ * The recent folders popover (TYTO-487): under the title bar's folder button, at the `left` the
+ * window writes inline from it, with no scrim — a menu, not a dialog over the work. macOS draws
+ * no title bar, so there it sits at the top of the window.
+ */
+tyto-recent-folders {
+  display: contents;
+}
+
+tyto-recent-folders[open] {
+  position: fixed;
+  top: calc(env(titlebar-area-height, var(--tyto-title-bar-height)) + var(--tyto-space-1));
+  left: var(--tyto-space-4);
+  z-index: 10;
+  display: block;
+}
+
+:root[data-platform='darwin'] tyto-recent-folders[open] {
+  top: var(--tyto-space-4);
+}
+
+.recent-folders__panel {
+  display: flex;
+  width: min(var(--tyto-dialog-width-sm), calc(100vw - 2 * var(--tyto-space-4)));
+  max-height: 60vh;
+  flex-direction: column;
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  font-size: var(--tyto-text-sm);
+}
+
+.recent-folders__search {
+  border: 0;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  border-radius: var(--tyto-radius-md) var(--tyto-radius-md) 0 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  padding: var(--tyto-space-4) var(--tyto-space-5);
+}
+
+.recent-folders__search:focus {
+  outline: none;
+}
+
+.recent-folders__heading {
+  padding: var(--tyto-space-3) var(--tyto-space-5) var(--tyto-space-1);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
+}
+
+.recent-folders__list {
+  overflow: auto;
+  margin: 0;
+  padding: 0 var(--tyto-space-2) var(--tyto-space-2);
+  list-style: none;
+}
+
+/* Name and badge on the first line, the label under them, as Zed lists a project. */
+.recent-folders__row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 1fr;
+  align-items: baseline;
+  column-gap: var(--tyto-space-3);
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  border-radius: var(--tyto-radius-sm);
+  cursor: default;
+}
+
+.recent-folders__row--on {
+  background: var(--tyto-hover);
+}
+
+.recent-folders__name {
+  overflow: hidden;
+  color: var(--tyto-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-folders__current {
+  justify-self: start;
+  color: var(--tyto-accent);
+  font-size: var(--tyto-text-xs);
+}
+
+.recent-folders__path {
+  overflow: hidden;
+  grid-column: 1 / -1;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-folders__empty {
+  margin: 0;
+  padding: var(--tyto-space-3) var(--tyto-space-5);
+  color: var(--tyto-text-muted);
+}
+
+.recent-folders__open-local {
+  border: 0;
+  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  border-radius: 0 0 var(--tyto-radius-md) var(--tyto-radius-md);
+  padding: var(--tyto-space-3) var(--tyto-space-5);
+  background: transparent;
+  color: var(--tyto-text);
+  font: inherit;
+  text-align: left;
+}
+
+.recent-folders__open-local:hover,
+.recent-folders__open-local:focus-visible {
+  background: var(--tyto-hover);
 }
 
 /*

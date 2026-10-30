@@ -37,11 +37,19 @@
         Linux: the system's minimise, maximise and close buttons sit over its right end, and the
         whole bar drags the window. `menu` is the menu row (PR B): `menu-row.ts` draws the
         application menu's top-level names into it, and each opens that menu's native list.
-        `shell.ts` writes the title; macOS keeps its native frame and hides this bar.
+        `shell.ts` writes the title; macOS keeps its native frame and hides this bar. `project`
+        is the open folder's name, between the menu and the title (TYTO-487): it opens the recent
+        folders popover, `tyto-recent-folders` below.
       -->
       <header class="title-bar" data-font-area="titleBar">
         <div class="title-bar__area">
           <div class="title-bar__menu"></div>
+          <button
+            class="title-bar__project"
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+          ></button>
           <span class="title-bar__title"></span>
         </div>
       </header>
@@ -143,6 +151,8 @@
     -->
     <tyto-plugins-dialog></tyto-plugins-dialog>
     <tyto-trust-dialog></tyto-trust-dialog>
+    <!-- TYTO-487. Under the title bar's folder button; renders nothing while closed. -->
+    <tyto-recent-folders></tyto-recent-folders>
 
     <!--
       The template mode (TYTO-44), outside `.shell` because it covers the window. Unlike the

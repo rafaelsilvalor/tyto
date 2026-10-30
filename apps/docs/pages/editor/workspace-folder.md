@@ -21,6 +21,12 @@ Every key is optional, and so is the file: a folder without one opens with nothi
 
 **File ▸ Open Folder…** picks the folder. One folder is open per window, and it is open again the next time Tyto starts. **File ▸ Close Folder** closes it. While a folder is open, the title bar names it between the file and the app: `logo.brief — promo — Tyto`.
 
+### Switching between recent folders
+
+The title bar has a button after **Help** with the open folder's name, or _No folder_. Click it, or run **Open Recent Folder…** from the command bar or the **File** menu, to list the folders you opened before, newest first, with where each one is. Type to filter the list by name or place, move with the arrow keys and press **Enter** to open the highlighted folder; **Esc** closes the list. The open folder is listed and marked _open_. **Open Local Folder…** at the foot is **File ▸ Open Folder…**.
+
+A folder chosen here opens exactly as **File ▸ Open Folder…** opens it: in the same window, replacing the folder open now, and trusted only if you trusted it before. The list keeps the last ten folders, and a folder that is no longer on disk is left out. `workspace.openRecent` is the command's id, so `keybindings.json` can put it on a key.
+
 While it is open:
 
 - its templates are offered beside yours and the built-in ones, after [your templates folder](../templates/templates-folder.md);
