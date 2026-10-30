@@ -2,7 +2,7 @@
 
 # Comandos
 
-Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 81. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
+Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 82. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
 
 A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, um para cada arquivo aberto recentemente, e um para cada predefinição de exportação da pasta aberta, `export.preset:<nome>`.
 
@@ -35,6 +35,7 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Arrumar brief | `editor.formatBrief` | `Alt+Shift+f` | `⌥⇧f` |
 | Novo brief | `document.new` | `Ctrl+n` | `⌘n` |
 | Novo brief a partir de template… | `document.newFromTemplate` |  |  |
+| Entrega: nova… | `delivery.new` |  |  |
 | Abrir… | `editor.open` | `Ctrl+o` | `⌘o` |
 | Salvar | `editor.save` | `Ctrl+s` | `⌘s` |
 | Salvar como… | `editor.saveAs` | `Ctrl+Shift+s` | `⌘⇧s` |

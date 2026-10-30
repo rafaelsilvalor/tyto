@@ -164,6 +164,7 @@ non-zero.
 | `W_PROJECT_PRESET_NO_FOLDER` | warning | no | An export preset names no folder and no sheet sets 'output', so the preset is left out. |
 | `W_DELIVERY_NAME_INVALID` | warning | no | A delivery name cannot be a folder name, so no delivery is made. |
 | `E_DELIVERY_BRIEF_EXISTS` | error | yes | A new delivery's brief would replace a brief that is already there. |
+| `E_DELIVERY_PATH_OUTSIDE` | error | yes | A new delivery would be made outside the workspace folder, through a link. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 | `E_RECIPE_SYNTAX` | error | yes | A line of a recipe does not match the recipe format. |
 | `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
@@ -298,6 +299,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_THEME_INVALID` | no | The base theme of the same kind replaces it, so the window keeps every colour. |
 | `E_PROJECT_SYNTAX` | no | Every key that parsed still applies, and the brief renders without the rest. |
 | `E_DELIVERY_BRIEF_EXISTS` | yes | The run that refuses changes nothing: not even the folders the delivery lacks are made. |
+| `E_DELIVERY_PATH_OUTSIDE` | yes | Nothing is written: a delivery is part of the project, trusted or not. |
 | `E_TRUST_FILE` | no | Every source opens restricted instead, which is what an absent approval means. |
 | `E_RECIPE_SYNTAX` | yes | A recipe that does not parse has no chain of cells to run. |
 | `E_RECIPE_PARAM` | yes | Every cell may read the parameter, so none of them can run without it. |
@@ -1542,6 +1544,20 @@ The run that refuses changes nothing: not even the folders the delivery lacks ar
 
 ```
 '{path}' already exists, and a delivery's brief is never overwritten; nothing is written.
+```
+
+Parameters: `path`
+
+### `E_DELIVERY_PATH_OUTSIDE`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0157-a-delivery-folder-is-one-key-in-the-project-file.md`
+
+A new delivery would be made outside the workspace folder, through a link.
+
+Nothing is written: a delivery is part of the project, trusted or not.
+
+```
+'{path}' leads outside the workspace folder, where a delivery must stay; nothing is written.
 ```
 
 Parameters: `path`
