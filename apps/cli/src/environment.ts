@@ -3,81 +3,29 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
-import { type CloseableRasterizer, defaultRasterizer } from './plugins/rasterizer.js';
+import { type CliEnvironment, type CliRasterizer, launchPluginProcess } from '@tyto/command-line';
+import { createPlaywrightRasterizer } from '@tyto/raster';
 
 /**
- * Everything the commands reach for that is not a pure function of their arguments.
+ * The terminal's environment for `@tyto/command-line`'s commands (ADR 0159).
  *
- * A CLI is a composition root (ADR 0010), and a composition root that reads
- * `process.stdout` and launches Chromium from inside its command handlers is one no test
- * can drive. So the two capabilities are values here: a place to write, and a way to make
- * a rasterizer. `defaultEnvironment()` fills them in with the real ones, and the tests
- * pass a buffer and a fake.
- *
- * Nothing else belongs in here. The filesystem is reached through `@tyto/io`'s adapters,
- * which are already injectable by being arguments.
+ * A CLI is a composition root (ADR 0010): this is where each port the command tree declares
+ * gets the adapter a terminal has. `process.stdout` and `process.stderr` for the console, a
+ * `[y/N]` line when there is a terminal to ask, `fork` on the running Node for a plugin's
+ * process, and Playwright's Chromium for a raster. The window fills the same ports with its
+ * own (`apps/desktop`), and the tests with a buffer and a fake.
  */
-
-/** Where a command writes. Two streams, because a pipe should get the output and not the noise. */
-export interface CliConsole {
-  /** The answer: artifact names, `--json`, scaffolded paths. */
-  out(text: string): void;
-  /** Diagnostics and progress. */
-  err(text: string): void;
-}
-
-export interface CliEnvironment {
-  readonly console: CliConsole;
-  /**
-   * `tyto`'s own version, as it reaches `result.json`'s `tyto.version`.
-   *
-   * A value rather than a call, so a test can pin it: a document asserted against a
-   * version that changes every release is a document asserted against nothing.
-   */
-  readonly version: string;
-  /** Relative paths on the command line resolve against this. */
-  readonly cwd: string;
-  /**
-   * Built on demand, and only by a command that has a raster output to produce.
-   *
-   * A factory rather than a `Rasterizer`, so `tyto render --types svg` never pays for a
-   * browser and `tyto template check` never mentions one. It may throw — a machine
-   * without `playwright` installed is exactly that — and a throw here is an internal
-   * failure (exit 2) rather than a diagnostic about anybody's brief.
-   */
-  rasterizer(): CliRasterizer;
-  /**
-   * `~/.tyto`, where `tyto plugin install` puts plugins and records what it approved.
-   *
-   * Optional, and absent means **no installed plugins at all**: a test that does not name a
-   * folder of its own must never read the real one, and a missing field is the one default
-   * that cannot leak somebody's machine into a snapshot.
-   */
-  readonly home?: string;
-  /**
-   * Asks a yes-or-no question on the terminal. Absent when nobody is there to answer — a
-   * pipe, a CI job — and then `install` needs `--yes` rather than guessing.
-   */
-  readonly confirm?: (question: string) => Promise<boolean>;
-  /**
-   * The environment an installed plugin's `host.credentials` reads, as
-   * `TYTO_PLUGIN_<NAME>_<KEY>` (ADR 0042).
-   *
-   * Optional, and absent means **no credentials at all**, for the reason `home` is: a test
-   * must never hand a plugin a secret from the machine it runs on.
-   */
-  readonly variables?: Readonly<Record<string, string | undefined>>;
-}
 
 /**
- * A `Rasterizer` that may own a browser.
+ * Playwright's Chromium, unlaunched, and the only place in this app that names a Chromium.
  *
- * `close` is optional because the port does not have one — a fake in a test holds nothing
- * to release — and a `tyto render` that left Chromium running would be a command that
- * never returns to the shell. Declared beside the registration module that builds one, so
- * `@tyto/raster`'s adapter is named in exactly one file (ADR 0007, ADR 0010).
+ * A factory rather than an instance, so a command with nothing to raster never pays for a
+ * browser. It may throw — a machine without `playwright` installed is exactly that — and
+ * that throw is an internal failure (exit 2), not a diagnostic about anybody's brief.
  */
-export type CliRasterizer = CloseableRasterizer;
+export function defaultRasterizer(): CliRasterizer {
+  return createPlaywrightRasterizer();
+}
 
 /** `tyto`'s own version, for `result.json`'s `tyto.version` and `--version`. */
 export function cliVersion(): string {
@@ -130,5 +78,6 @@ export function defaultEnvironment(): CliEnvironment {
     version: cliVersion(),
     cwd: process.cwd(),
     rasterizer: defaultRasterizer,
+    launch: launchPluginProcess,
   };
 }

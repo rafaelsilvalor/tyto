@@ -240,6 +240,7 @@ export async function renderCommand(
   const leftOut = await leftOutPluginFiles(pluginFilesWorkspace, 'loaded', environment);
   if (leftOut !== '') environment.console.err(leftOut);
   const loaded = await loadInstalledPlugins(environment.home, {
+    launch: environment.launch,
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto render',

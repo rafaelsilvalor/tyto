@@ -140,7 +140,7 @@ export {
 } from './external.js';
 export { withoutRefused } from '@tyto/io';
 export { credentialVariable, pluginCapabilities } from './capabilities.js';
-export { type CloseableRasterizer, defaultRasterizer, rasterizerPlugin } from './rasterizer.js';
+export { type CloseableRasterizer, rasterizerPlugin } from './rasterizer.js';
 export {
   type TemplatePackOptions,
   builtInTemplatesDirectory,

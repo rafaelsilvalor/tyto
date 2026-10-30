@@ -872,7 +872,7 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
     // `W_FONT_UNAVAILABLE` since TYTO-281 (ADR 0120): the binary runs with Google Fonts on, its
     // default, and CircularXX is not Google's, so the one line per face is that code, still
     // naming the substitute. Nothing is fetched for it. The old code is what a run with
-    // `TYTO_GOOGLE_FONTS=off` says, which `apps/cli/src/google-fonts.test.ts` asserts.
+    // `TYTO_GOOGLE_FONTS=off` says, which `packages/command-line/src/google-fonts.test.ts` asserts.
     const substituted = (result.diagnostics ?? []).filter((item) =>
       ['W_FONT_SUBSTITUTED', 'W_FONT_UNAVAILABLE'].includes(item.code),
     );

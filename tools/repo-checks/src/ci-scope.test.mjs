@@ -24,6 +24,11 @@ describe('the desktop scope', () => {
     ['a package the app bundles, two hops away', ['packages/core/src/index.ts'], true],
     ['raster, which the e2e suites also import', ['packages/raster/src/index.ts'], true],
     ['the CLI the e2e suites compare against', ['apps/cli/src/main.ts'], true],
+    [
+      'the command tree, whose fixtures two suites read',
+      ['packages/command-line/src/render.ts'],
+      true,
+    ],
     ['the app itself', ['apps/desktop/src/main/index.ts'], true],
     ['a root tsconfig', ['tsconfig.base.json'], true],
     ['the lockfile', ['pnpm-lock.yaml'], true],

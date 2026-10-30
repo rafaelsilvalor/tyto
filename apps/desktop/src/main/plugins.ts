@@ -26,7 +26,7 @@ import { BUILT_IN_VIM_PLUGINS } from '../../shared/vim-plugins.js';
  * *what a built-in is*, which is why both go through `createPluginHost`.
  *
  * **This is the second copy of the template pack plugin**, the first being
- * `apps/cli/src/plugins/templates.ts`. Two is the point at which duplication is cheaper
+ * `packages/command-line/src/plugins/templates.ts`. Two is the point at which duplication is cheaper
  * than the package it would take to share it — the shared part is a manifest and four lines
  * of resolver, and a `@tyto/built-ins` package to hold them would be a new runtime boundary
  * to argue about. A third copy is not: whoever writes it should extract these instead.
@@ -115,7 +115,7 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
   // which is the shape ADR 0007 rules out.
   host.activate(templatePack);
 
-  // The second copy of the CLI's `chromium` plugin (`apps/cli/src/plugins/rasterizer.ts`),
+  // The second copy of the CLI's `chromium` plugin (`packages/command-line/src/plugins/rasterizer.ts`),
   // and deliberately not shared with it: the id and the extension point are the same, the
   // adapter behind them is not. The CLI launches Playwright's Chromium; this app captures
   // the one it is already running in. Two apps making different choices about which adapter

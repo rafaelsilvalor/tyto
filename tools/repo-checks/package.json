@@ -12,6 +12,7 @@
   "devDependencies": {
     "@types/semver": "^7.7.1",
     "@tyto/brief-lang": "workspace:*",
+    "@tyto/command-line": "workspace:*",
     "@tyto/core": "workspace:*",
     "@tyto/editor": "workspace:*",
     "@tyto/export-html": "workspace:*",

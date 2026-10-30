@@ -158,3 +158,64 @@ describe('the editor has one reader of the syntax tree', () => {
     expect(ruleIds(messages)).not.toContain(RESTRICTED_IMPORTS);
   });
 });
+
+/**
+ * `@tyto/command-line` is the command tree both apps share (ADR 0159, note of 2026-10-30). It
+ * builds `io`'s adapters itself, and in exchange it chooses nothing where the terminal and the
+ * window differ: the Chromium and the plugin launcher come in through the environment.
+ */
+describe('the command line chooses no adapter', () => {
+  const FORK = `import { fork } from 'node:child_process';\nexport const f = fork;\n`;
+
+  it('is refused to a pure package', async () => {
+    const messages = await lint(
+      'packages/core/src/scratch.ts',
+      `import { run } from '@tyto/command-line';\nexport const r = run;\n`,
+    );
+
+    const violation = messages.find((message) => message.ruleId === RESTRICTED_IMPORTS);
+    expect(violation?.message).toContain('ADR 0159');
+  });
+
+  it('refuses Playwright inside the package', async () => {
+    const messages = await lint(
+      'packages/command-line/src/scratch.ts',
+      `import { chromium } from 'playwright';\nexport const c = chromium;\n`,
+    );
+
+    expect(ruleIds(messages)).toContain(RESTRICTED_IMPORTS);
+  });
+
+  it("refuses @tyto/raster's Playwright adapter, and allows its port", async () => {
+    const adapter = await lint(
+      'packages/command-line/src/scratch.ts',
+      `import { createPlaywrightRasterizer } from '@tyto/raster';\nexport const c = createPlaywrightRasterizer;\n`,
+    );
+    const port = await lint(
+      'packages/command-line/src/scratch.ts',
+      `import type { Rasterizer } from '@tyto/raster';\nexport type R = Rasterizer;\n`,
+    );
+
+    expect(ruleIds(adapter)).toContain(RESTRICTED_IMPORTS);
+    expect(ruleIds(port)).not.toContain(RESTRICTED_IMPORTS);
+  });
+
+  it('refuses fork outside the launcher, and allows the execFile git and npm run on', async () => {
+    const fork = await lint('packages/command-line/src/scratch.ts', FORK);
+    const execFile = await lint(
+      'packages/command-line/src/scratch.ts',
+      `import { execFile } from 'node:child_process';\nexport const e = execFile;\n`,
+    );
+
+    expect(fork.find((message) => message.ruleId === RESTRICTED_IMPORTS)?.message).toContain(
+      'environment.launch',
+    );
+    expect(ruleIds(execFile)).not.toContain(RESTRICTED_IMPORTS);
+  });
+
+  it('allows fork in plugins/plugin-process.ts, the launcher apps/cli chooses', async () => {
+    const messages = await lint('packages/command-line/src/plugins/plugin-process.ts', FORK);
+
+    expect(ruleIds(messages)).not.toContain(RESTRICTED_IMPORTS);
+  });
+});

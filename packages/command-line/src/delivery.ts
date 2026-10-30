@@ -116,6 +116,7 @@ async function skeletonOf(
         );
   registerUnplaced(pluginFiles.diagnostics);
   const loaded = await loadInstalledPlugins(environment.home, {
+    launch: environment.launch,
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto delivery new',

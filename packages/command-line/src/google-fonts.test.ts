@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CliEnvironment } from './environment.js';
 import { EXIT_OK } from './exit.js';
 import { GOOGLE_FONTS_BASE, GOOGLE_FONTS_SWITCH } from './google-fonts.js';
+import { launchPluginProcess } from './plugins/plugin-process.js';
 import { run } from './program.js';
 
 /**
@@ -75,6 +76,7 @@ function environment(variables: Record<string, string> = { [GOOGLE_FONTS_BASE]: 
     cwd: workspace,
     home,
     variables,
+    launch: launchPluginProcess,
     rasterizer: () => {
       throw new Error('these renders are svg and never raster');
     },

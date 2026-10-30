@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@tyto/cli": "workspace:*",
+    "@tyto/command-line": "workspace:*",
     "vitest": "^5.0.1"
   }
 }

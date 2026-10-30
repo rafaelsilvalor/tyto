@@ -6,11 +6,12 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { parseRenderResult } from '@tyto/io';
-import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
+import { PLUGIN_API_VERSION, type PluginProcessLauncher } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { CliEnvironment } from './environment.js';
-import { EXIT_DIAGNOSTICS, EXIT_OK } from './exit.js';
+import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK } from './exit.js';
+import { launchPluginProcess } from './plugins/plugin-process.js';
 import { run } from './program.js';
 
 import briefSource from './__fixtures__/cartaz.brief?raw';
@@ -56,6 +57,7 @@ function environment(overrides: Partial<CliEnvironment> = {}): CliEnvironment {
     version: '0.0.0-test',
     cwd: workspace,
     home,
+    launch: launchPluginProcess,
     rasterizer: () => {
       throw new Error('nothing here rasters');
     },
@@ -362,6 +364,32 @@ describe('an installed exporter at render', () => {
       'slide-1 feed',
     );
   }, 60_000);
+
+  // The window starts plugins on the bundled Node, not with `fork` (ADR 0159): the command
+  // must start them through whatever the environment hands it, and through nothing else.
+  it("starts the plugin through the environment's launcher", async () => {
+    await run(['plugin', 'install', await pluginFolder(), '--yes'], environment());
+    const started: string[] = [];
+    const launch: PluginProcessLauncher = (request) => {
+      started.push(request.name);
+      return launchPluginProcess(request);
+    };
+
+    const code = await run(renderArguments('txt'), environment({ launch }));
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(started).toEqual(['texto']);
+  }, 60_000);
+
+  it('is an internal failure naming the plugin when the environment has no launcher', async () => {
+    await run(['plugin', 'install', await pluginFolder(), '--yes'], environment());
+    const { launch: _launch, ...withoutLauncher } = environment();
+
+    const code = await run(renderArguments('txt'), withoutLauncher);
+
+    expect(code).toBe(EXIT_INTERNAL);
+    expect(stderr()).toContain("No plugin launcher in this environment, so 'texto' cannot start.");
+  });
 
   it('is not activated once disabled, so its kind cannot be asked for', async () => {
     await run(['plugin', 'install', await pluginFolder(), '--yes'], environment());

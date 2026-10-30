@@ -46,15 +46,15 @@ Unknown keys are refused, one complaint per stray key rather than one for the ob
 
 So every built-in ships a real file:
 
-| Plugin               | File                                                       |
-| -------------------- | ---------------------------------------------------------- |
-| `html`               | `packages/export-html/tyto-plugin.json`                    |
-| `svg`                | `packages/export-svg/tyto-plugin.json`                     |
-| `built-in-templates` | `apps/cli/src/plugins/built-in-templates.tyto-plugin.json` |
-| `chromium`           | `apps/cli/src/plugins/chromium.tyto-plugin.json`           |
-| `fs-inbox`           | `apps/cli/src/plugins/fs-inbox.tyto-plugin.json`           |
-| `fs-outbox`          | `apps/cli/src/plugins/fs-outbox.tyto-plugin.json`          |
-| `desktop`            | `apps/desktop/src/main/desktop.tyto-plugin.json`           |
+| Plugin               | File                                                                    |
+| -------------------- | ----------------------------------------------------------------------- |
+| `html`               | `packages/export-html/tyto-plugin.json`                                 |
+| `svg`                | `packages/export-svg/tyto-plugin.json`                                  |
+| `built-in-templates` | `packages/command-line/src/plugins/built-in-templates.tyto-plugin.json` |
+| `chromium`           | `packages/command-line/src/plugins/chromium.tyto-plugin.json`           |
+| `fs-inbox`           | `packages/command-line/src/plugins/fs-inbox.tyto-plugin.json`           |
+| `fs-outbox`          | `packages/command-line/src/plugins/fs-outbox.tyto-plugin.json`          |
+| `desktop`            | `apps/desktop/src/main/desktop.tyto-plugin.json`                        |
 
 The last five are named `<id>.tyto-plugin.json` and that is the one place a built-in differs from a third party. A plugin package puts the file at its root; those five have no package of their own — they are the composition root's wiring around `@tyto/raster`, `@tyto/io`, `@tyto/templates` and the desktop app's own settings — and five files cannot share one name in one folder. The document is the same document, validated by the same schema, and the day one of them gets a package the file moves to that package's root under the ordinary name.
 
@@ -688,7 +688,7 @@ host (CLI process)                               guest (plugin's process)
 
 **The desktop shows the same list** (File ▸ _Show plugins_), read through one channel, `plugins:list`: main composes `fsPluginStore` and runs every installed folder through `checkStoredPlugin`, the renderer only draws the rows. It is read-only — install, remove and disable are the CLI's — and it opens with the notice that each plugin's process contains a crash but is not a sandbox, and that `net:` and `credentials:` filter only `host.fetch` and `host.credentials` (ADR 0041, ADR 0042). A plugin whose process ended unasked is listed as `crashed`, with the same `W_PLUGIN_CRASHED` sentence `tyto plugin list` prints, until it is enabled or installed again. The rows are read by the same `readInstalledPlugins` the loaders use.
 
-**Three sources, fetched by the programs the person already has.** A folder is used where it is. A git URL — `git+https://…`, `git@host:…`, `git://…`, anything ending `.git` — is `git clone --depth 1`. Anything else is an npm spec — a name, `name@range`, a tarball — and is `npm pack` followed by `tar`; a spec that names a file on this disk is handed to npm as `file:<absolute path>`, because npm reads a bare `packed/x.tgz` as the GitHub shorthand `user/repo` and tries to clone it. Tyto opens no connection of its own, so git's and npm's credentials, proxy and registry configuration apply unchanged, and nothing about who fetched what reaches Tyto (ADR 0011). It is also what makes the three testable offline: `apps/cli/src/plugin-install.test.ts` clones a `file://` repository and packs a local tarball through exactly the commands a real URL and a real name take.
+**Three sources, fetched by the programs the person already has.** A folder is used where it is. A git URL — `git+https://…`, `git@host:…`, `git://…`, anything ending `.git` — is `git clone --depth 1`. Anything else is an npm spec — a name, `name@range`, a tarball — and is `npm pack` followed by `tar`; a spec that names a file on this disk is handed to npm as `file:<absolute path>`, because npm reads a bare `packed/x.tgz` as the GitHub shorthand `user/repo` and tries to clone it. Tyto opens no connection of its own, so git's and npm's credentials, proxy and registry configuration apply unchanged, and nothing about who fetched what reaches Tyto (ADR 0011). It is also what makes the three testable offline: `packages/command-line/src/plugin-install.test.ts` clones a `file://` repository and packs a local tarball through exactly the commands a real URL and a real name take.
 
 **Both files drop the keys they do not know rather than refusing** (ADR 0041), so a newer CLI or desktop can add a field without costing the older one its plugins. **The approval is recorded apart from the files.** A folder under `plugins/` says a plugin's files are here; it does not say anybody agreed to run them. So `plugins.json` holds what `install` asked and was told, and the loader reads both: **a folder with no entry is not installed** — one copied in by hand has had no question asked — and an entry whose plugin now declares a permission nobody approved is refused (`E_PLUGIN_PERMISSIONS_CHANGED`) until it is installed again. Installing a name that is already installed replaces it; that is how an update lands. A built-in's name is never available. **A link in the folder is copied as its target when the target is inside the folder, and refused otherwise** (`E_PLUGIN_LINK`, exit 1, naming the file): `PluginStore.add` answers a `Result`, because copying a link as a link was an `EPERM` on Windows without an administrator and reached the person as an internal failure.
 
@@ -717,7 +717,7 @@ pdf                 1.0.0  external  disabled  exporter
 
 ### Plugin files (ADR 0151)
 
-A plugin file names a source to fetch, `{ git, ref }`, for one plugin or for several templates. The machine's are `TYTO_HOME/plugin-files/*.yaml`; a workspace's are `.tyto/plugin-files/*.yaml`, read only once the folder is trusted. The parser, the lock's schema and the rules for which folder wins a name are `@tyto/plugin-api`'s `plugin-files.ts`; reading the folders, running `git` and the cache are `@tyto/io`'s `plugin-files.ts`, and both folders' sync is its `syncPluginFiles` (`plugin-files-sync.ts`), which takes what only an app knows as parameters: the built-in plugins' names, how a path is shown, and who answers a permission prompt. The CLI composes it in `apps/cli/src/plugin-files.ts` (TYTO-432) and the desktop in `apps/desktop/src/main/plugin-files.ts` (TYTO-433).
+A plugin file names a source to fetch, `{ git, ref }`, for one plugin or for several templates. The machine's are `TYTO_HOME/plugin-files/*.yaml`; a workspace's are `.tyto/plugin-files/*.yaml`, read only once the folder is trusted. The parser, the lock's schema and the rules for which folder wins a name are `@tyto/plugin-api`'s `plugin-files.ts`; reading the folders, running `git` and the cache are `@tyto/io`'s `plugin-files.ts`, and both folders' sync is its `syncPluginFiles` (`plugin-files-sync.ts`), which takes what only an app knows as parameters: the built-in plugins' names, how a path is shown, and who answers a permission prompt. The CLI composes it in `packages/command-line/src/plugin-files.ts` (TYTO-432) and the desktop in `apps/desktop/src/main/plugin-files.ts` (TYTO-433).
 
 ```
 TYTO_HOME/

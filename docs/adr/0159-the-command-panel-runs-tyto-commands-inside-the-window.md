@@ -360,3 +360,12 @@ panel's channels are not reused for a byte stream.
   as possible, and a long-running command is what Stop is for.
 - **Approvals drawn by the renderer** (decision 4).
 - **A new exit code for "cancelled"** (decision 6).
+
+**Note, 2026-10-30 (TYTO-495, first pull request): `@tyto/command-line` composes `io`'s adapters.**
+The package is the body both apps share, a composition layer, and the one package allowed to build
+`@tyto/io` and `@tyto/fonts` adapters and call `fetch`, because the terminal and the window would
+pass identical values for them (30 constructions, counted). Where the two differ it takes a port
+and chooses nothing: it never names a Chromium or Playwright, and it holds the `fork` launcher in
+one file (`plugins/plugin-process.ts`, for its own tests and for `apps/cli` to choose) and starts
+it only through `environment.launch`. `git` and `npm` stay the commands' own, as decision 8 says.
+No pure package may import it. `eslint.config.js` enforces the last three.

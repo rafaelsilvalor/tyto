@@ -15,7 +15,7 @@ import { createProjectSources } from './project.js';
 
 /**
  * A bundled code template draws the files in its own folder, in the window (TYTO-214,
- * ADR 0062) — the CLI half is `apps/cli/src/code-template-assets.test.ts`, with the same
+ * ADR 0062) — the CLI half is `packages/command-line/src/code-template-assets.test.ts`, with the same
  * fixture shape.
  *
  * `faixa` is written here and added to the build's own list, which is the only way a code
