@@ -1,5 +1,44 @@
 # @tyto/cli
 
+## 0.9.0
+
+### Minor Changes
+
+- 0164874: `tyto delivery new <name> [--template <name>]` makes a delivery: one folder per piece of work, named after its ticket, with `assets/`, `editaveis/` and the brief as `editaveis/<name>.brief` (TYTO-489, ADR 0157). The project file and a work profile gain the `delivery` key (`parent`, `folders`, `brief`, `exports`, `formats`, `types`), merged one subkey at a time; `parent` stays inside the workspace folder for every sheet. An existing delivery folder is reused, an existing brief is refused with `E_DELIVERY_BRIEF_EXISTS` and nothing written, and a name a folder cannot have is `W_DELIVERY_NAME_INVALID` (ADR 0114's profile rule, up to 100 characters, NFC). `@tyto/core` now holds `briefSkeleton` and `skeletonText`, which `@tyto/editor` re-exports unchanged.
+- 5494e98: `tyto render --folder` writes only the artwork into `<out>/<brief-name>/`: no `result.json`, no `editaveis/` with the brief and `template.txt`, no `assets/` with the brief's images (TYTO-490, ADR 0157). The run's report is what the command prints, one document under `--json`. A file that an earlier run wrote and this one did not produce is no longer removed, since there is no report to say it was Tyto's. `--out` and `tyto watch` are unchanged.
+- cd14464: `tyto render <brief> --delivery` exports a delivery's brief into the delivery (TYTO-490, ADR 0157 §6). The artwork goes to its `exports` folder (the root by default), and `result.json` and `template.txt` go beside the brief. Artwork the previous export wrote and this one did not is removed. It renders the delivery's `formats` and `types` when the project names them, else the brief's own sizes as PNG. `--delivery` cannot be used with `--out` or `--folder`. A brief in no delivery is `E_BRIEF_NOT_IN_DELIVERY`, exit 1.
+
+### Patch Changes
+
+- d7c61ea: The app and `tyto` come with the test templates only (TYTO-436): `banner-roxo`, `carrossel-lista` and `promo-curso`. The house's production templates are fetched from their own repositories by a plugin file, which the manual's template gallery points to; without one, they are not listed. The tests that drew a removed template draw a remaining one.
+- 503f924: An installed plugin's code template reads files from its own folder (TYTO-478, ADR 0062). `context.files.image` and `context.files.svg` answer what the host read from the template's folder inside the installed plugin, and a declared image value's default resolves against the same folder; `tyto render` and the desktop embed those bytes in the export. **Breaking for plugins: the protocol is 12** (ADR 0149 point 4), because a template's `build` now carries a fourth argument, `ShippedFiles`, which a guest on 11 refuses. A path out of the folder, an absolute one or a file the host did not read answers `undefined`, and the folder's reader skips a link that leads out of it.
+- 6d431f6: An installed plugin's code template can no longer make an export embed a file it was not handed (TYTO-479, ADR 0062). Before, a frame naming an image by an absolute `path`, or by an `id` leading out of the brief's folder, drew any image on the disk with no diagnostic. Every picture in such a frame must now be one the host sent that call — the template's own folder, or a ref in its context such as a slot's picture or a declared value — and any other costs the frame as the new `E_PLUGIN_TEMPLATE_ASSET`, naming the plugin, the template and the asset. The protocol stays 12.
+- Updated dependencies [d7c61ea]
+- Updated dependencies [6ccfc2e]
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [993b9f6]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [5494e98]
+- Updated dependencies [cd14464]
+- Updated dependencies [cd14464]
+- Updated dependencies [0d828d3]
+- Updated dependencies [0d828d3]
+  - @tyto/templates@1.1.0
+  - @tyto/io@5.0.0
+  - @tyto/plugin-api@0.11.0
+  - @tyto/core@0.34.0
+  - @tyto/export-html@0.7.7
+  - @tyto/export-svg@2.0.7
+  - @tyto/google-fonts@0.1.6
+  - @tyto/pipeline@0.12.3
+  - @tyto/fonts@0.4.0
+  - @tyto/raster@0.2.2
+  - @tyto/template-lang@0.8.6
+
 ## 0.8.1
 
 ### Patch Changes

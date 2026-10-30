@@ -1,5 +1,25 @@
 # @tyto/templates
 
+## 1.1.0
+
+### Minor Changes
+
+- d7c61ea: The production templates leave the built-in pack (TYTO-436): `agenda-semana`, `aprovados`, `simulados-semana-roxo`, `simulados-semana-ocre`, `simulados-semana-vinho` and `tabela-roxo` are gone, with the `_azul` brand module only the first two drew. Each lives in its own repository and reaches a machine through a plugin file (ADR 0151), and with the built-ins out of the way the plugin file's aliases `tabela-roxo` and `simulados-semana-roxo`, `-ocre` and `-vinho` load, and `agenda-semana` and `aprovados` are no longer shadowed. `BUILT_IN_TEMPLATE_NAMES` and `BUILT_IN_TEMPLATE_BUILDS` list what stays: `banner-roxo`, `carrossel-lista` and `promo-curso`.
+
+### Patch Changes
+
+- Updated dependencies [a14d306]
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+  - @tyto/house-style@0.4.0
+  - @tyto/core@0.34.0
+  - @tyto/template-kit@0.5.0
+
 ## 1.0.7
 
 ### Patch Changes

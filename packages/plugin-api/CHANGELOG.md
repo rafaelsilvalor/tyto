@@ -1,5 +1,24 @@
 # @tyto/plugin-api
 
+## 0.11.0
+
+### Minor Changes
+
+- 503f924: An installed plugin's code template reads files from its own folder (TYTO-478, ADR 0062). `context.files.image` and `context.files.svg` answer what the host read from the template's folder inside the installed plugin, and a declared image value's default resolves against the same folder; `tyto render` and the desktop embed those bytes in the export. **Breaking for plugins: the protocol is 12** (ADR 0149 point 4), because a template's `build` now carries a fourth argument, `ShippedFiles`, which a guest on 11 refuses. A path out of the folder, an absolute one or a file the host did not read answers `undefined`, and the folder's reader skips a link that leads out of it.
+- eca9871: A template knows an image's width and height (TYTO-481, ADR 0158). `AssetRef` gains an optional `size: { w, h }`, read by the host off the header of a brief's image, a plugin-served image or a file in the template's own folder, and absent when no header parsed. `imageHeight(asset, width, fallback)` in `@tyto/template-kit` sizes a frame to it, so a frame follows the picture without a proportion written on the slide. **Breaking for plugins: the protocol is 13** (ADR 0149 point 4), because a guest on 12 refuses a ref that carries `size`.
+
+### Patch Changes
+
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+  - @tyto/core@0.34.0
+  - @tyto/recipe@0.1.5
+
 ## 0.10.0
 
 ### Minor Changes

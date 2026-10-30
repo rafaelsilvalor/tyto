@@ -1,5 +1,26 @@
 # @tyto/template-kit
 
+## 0.5.0
+
+### Minor Changes
+
+- eca9871: A template knows an image's width and height (TYTO-481, ADR 0158). `AssetRef` gains an optional `size: { w, h }`, read by the host off the header of a brief's image, a plugin-served image or a file in the template's own folder, and absent when no header parsed. `imageHeight(asset, width, fallback)` in `@tyto/template-kit` sizes a frame to it, so a frame follows the picture without a proportion written on the slide. **Breaking for plugins: the protocol is 13** (ADR 0149 point 4), because a guest on 12 refuses a ref that carries `size`.
+
+### Patch Changes
+
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [993b9f6]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+- Updated dependencies [0d828d3]
+  - @tyto/core@0.34.0
+  - @tyto/export-html@0.7.7
+  - @tyto/brief-lang@0.7.5
+
 ## 0.4.3
 
 ### Patch Changes
