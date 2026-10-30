@@ -389,6 +389,10 @@ export const en: Catalogue = {
   'delivery.template.none': 'No template',
   'delivery.refused': 'No delivery was made. {problem}',
   'delivery.noFolder': 'Open a folder first: a delivery is made inside the open folder.',
+  'command.delivery.export': 'Delivery: Export',
+  'delivery.export.notInDelivery':
+    "This brief is in no delivery: a delivery's brief is kept in its editaveis folder.",
+  'delivery.export.refused': 'Nothing was exported. {problem}',
   'slash.section.templates': 'Templates',
   'slash.section.snippets': 'Snippets',
   'slash.template.new': 'new brief from its skeleton',

@@ -1,5 +1,21 @@
 # @tyto/export-html
 
+## 0.7.7
+
+### Patch Changes
+
+- 993b9f6: A shadow's `spread` is drawn instead of dropped with a warning (TYTO-483, ADR 0156). The document carries an inline SVG `<filter>` with the primitives `export-svg` draws a spread with, and the CSS filter list names it, so the HTML, the raster and the SVG export draw the same shadow on any node — a rect, a path, a group, or a translucent fill. A shadow with no spread keeps `drop-shadow()`, and its output is unchanged.
+- 0d828d3: A centred or right-aligned line with letter-spacing is aligned by its ink (TYTO-491). CSS adds the spacing after the last glyph too, so such a line used to sit half its spacing left of centre, or its whole spacing short of the right edge — 2.5 px on a signature tracked at 4.9. The line block now gives that space back with a negative right margin. Left and justified text, and text with no letter-spacing, produce the same bytes as before.
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+  - @tyto/plugin-api@0.11.0
+  - @tyto/core@0.34.0
+
 ## 0.7.6
 
 ### Patch Changes

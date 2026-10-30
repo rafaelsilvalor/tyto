@@ -318,6 +318,49 @@ export function planDelivery(
   });
 }
 
+/** The delivery a brief belongs to, every path absolute (ADR 0157 §6). */
+export interface BriefDelivery {
+  /** The delivery's folder name, as it is on disk. */
+  readonly name: string;
+  /** The delivery's own folder. */
+  readonly folder: string;
+  /** Where its artwork is written: the layout's `exports`, inside the delivery. */
+  readonly exports: string;
+  /** Where its `result.json` and `template.txt` are written: the brief's folder. */
+  readonly report: string;
+}
+
+/**
+ * The delivery `briefPath` is the brief of, or `undefined` when it is in none: a brief whose
+ * folder is `<parent>/<name>/<brief>` under the layout in force, with a `name` a delivery could
+ * have (ADR 0157 §4). The brief's own file name is not checked, so a second brief saved beside
+ * the first exports into the same delivery.
+ *
+ * Lexical, like the rest of this file, and so cheap enough to ask on every tab switch: it reads
+ * no disk, and a link that leads out is the I/O side's to refuse.
+ */
+export function deliveryOfBrief(
+  delivery: ResolvedDelivery,
+  briefPath: string,
+): BriefDelivery | undefined {
+  if (!isAbsolutePath(briefPath) || !isInsidePath(delivery.parent, briefPath)) return undefined;
+  const parentDepth = segmentsOf(delivery.parent).length;
+  const name = segmentsOf(briefPath)[parentDepth];
+  if (name === undefined || !deliveryNameOf(name).ok) return undefined;
+  const folder = resolvePath(delivery.parent, name);
+  const report = resolvePath(folder, delivery.brief);
+  if (!samePath(report, resolvePath(briefPath, '..'))) return undefined;
+  return { name, folder, exports: resolvePath(folder, delivery.exports), report };
+}
+
+function segmentsOf(path: string): string[] {
+  return resolvePath(path, '.').split(/[\\/]/u).filter(Boolean);
+}
+
+function samePath(left: string, right: string): boolean {
+  return isInsidePath(left, right) && isInsidePath(right, left);
+}
+
 function at(range: SourceRange | undefined): { range?: SourceRange } {
   return range === undefined ? {} : { range };
 }

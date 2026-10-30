@@ -48,6 +48,7 @@ Boundary rules:
 | ------------------------------ | ----------------------------------------------------------------------------------- |
 | `tyto render <brief> --out`    | one brief → artifacts + `result.json` in `--out`. The contract above                |
 | `tyto render … --folder`       | the artwork alone in `<out>/<brief-name>/`: no `result.json`, brief or `assets/`    |
+| `tyto render … --delivery`     | into the brief's delivery: artwork to `exports`, `result.json` beside the brief     |
 | `tyto watch <folder>`          | `<folder>/inbox/<id>/` → `<folder>/outbox/<id>/out/`, forever. `--once` for a sweep |
 | `tyto template check <folder>` | manifest, then markup (or, for a code body, the manifest and a `not checked` line)  |
 | `tyto template new <name>`     | scaffolds a template folder from `docs/template-authoring.md`                       |

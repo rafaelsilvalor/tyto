@@ -98,6 +98,7 @@ const actions = () =>
     newDocument: vi.fn<() => void>(),
     newDocumentFromTemplate: vi.fn<() => void>(),
     newDelivery: vi.fn<() => void>(),
+    exportDelivery: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
     saveDocument: vi.fn<(saveAs: boolean) => void>(),
     restoreLayout: vi.fn<() => void>(),

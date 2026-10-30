@@ -22,6 +22,7 @@ import {
   fileAssetResolver,
   fileResources,
   fsArtworkOutput,
+  fsDeliveryExportOutput,
   fsTaskOutput,
   layeredExportResources,
   renderResult,
@@ -88,6 +89,13 @@ export interface RenderTask {
    * an extra field rather than a change to the one above.
    */
   readonly folder?: { readonly name: string };
+  /**
+   * `tyto render --delivery` (ADR 0157 §6, TYTO-490): {@link outDirectory} is the delivery's
+   * `exports` and gets the artwork; `report`, the brief's folder, gets `result.json` and
+   * `template.txt`. What the previous export of the delivery wrote and this one did not is
+   * removed (ADR 0054).
+   */
+  readonly delivery?: { readonly report: string };
   /**
    * Remove what the previous run in {@link outDirectory} listed and this one did not
    * produce (ADR 0054's rule). `tyto watch` sets it, because its `outbox/<id>/out/` is the
@@ -288,8 +296,21 @@ export async function renderTask(
       ? undefined
       : await fsArtworkOutput(join(task.outDirectory, task.folder.name), { label: task.id });
   if (opened !== undefined && !opened.ok) return blockedReport(opened.error, inherited, options);
+  const forDelivery =
+    task.delivery === undefined
+      ? undefined
+      : await fsDeliveryExportOutput({
+          artwork: task.outDirectory,
+          report: task.delivery.report,
+          label: task.id,
+        });
+  if (forDelivery !== undefined && !forDelivery.ok) {
+    return blockedReport(forDelivery.error, inherited, options);
+  }
+  const delivery = forDelivery?.value;
   const output =
     opened?.value ??
+    delivery ??
     (await fsTaskOutput(task.outDirectory, {
       label: task.id,
       removeLeftovers: task.removeLeftovers ?? false,
@@ -431,7 +452,7 @@ export async function renderTask(
   registerOrigin(produced, { path: task.briefPath, source: task.brief });
 
   const artifacts = job.ok ? job.value.artifacts : [];
-  // A watched task removes what its last run left; `--out` was opened without the rule and
+  // A watched task and a delivery's export remove what their last run left; `--out` was opened without the rule and
   // answers nothing, because its reader reconciles against `result.json` itself (ADR 0054,
   // ADR 0060), and `--folder` keeps no report to tell Tyto's files apart (ADR 0157).
   const leftovers = await output.removeLeftovers({
@@ -441,12 +462,27 @@ export async function renderTask(
     failed: hasErrors([...inherited, ...produced]),
   });
 
+  // Before `finish`, so `result.json` is still the last file to appear, and before the result
+  // is built, because a folder holding `template.txt` is an error that belongs in it. A run
+  // that never loaded a template names none, rather than the delivery claiming one.
+  const described =
+    delivery !== undefined && job.ok && job.value.template !== undefined
+      ? await delivery.describeTemplate({
+          name: job.value.template.name,
+          version: job.value.template.version,
+          ...(job.value.template.description === undefined
+            ? {}
+            : { description: job.value.template.description }),
+        })
+      : [];
+
   const diagnostics = [
     ...inherited,
     ...pluginWarnings,
     ...brandKits.diagnostics,
     ...produced,
     ...leftovers,
+    ...described,
   ];
   const resultOf = (listed: Diagnostics): RenderResult =>
     renderResult({
