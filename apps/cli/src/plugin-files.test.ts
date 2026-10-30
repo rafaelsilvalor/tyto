@@ -398,10 +398,10 @@ describe('what a sync refuses', () => {
 /* ------------------------------------------------------- configurations and aliases -- */
 
 describe('configurations and aliases (TYTO-439)', () => {
-  const TABELA_ROXO = resolve(
+  const PROMO_CURSO = resolve(
     dirname(fileURLToPath(import.meta.url)),
-    ...['..', '..', '..', 'packages', 'templates', 'templates', 'tabela-roxo', 'examples'],
-    'tres-colunas.brief',
+    ...['..', '..', '..', 'packages', 'templates', 'templates', 'promo-curso', 'examples'],
+    'promo.brief',
   );
 
   /** `aviso`'s brief, naming `template` instead, in the workspace. */
@@ -518,7 +518,7 @@ describe('configurations and aliases (TYTO-439)', () => {
     async () => {
       const builtIn = async (): Promise<Rendered> => {
         const code = await run(
-          ['render', TABELA_ROXO, '--out', 'out', '--types', 'svg'],
+          ['render', PROMO_CURSO, '--out', 'out', '--types', 'svg'],
           environment(),
         );
         const result = JSON.parse(
@@ -542,7 +542,7 @@ describe('configurations and aliases (TYTO-439)', () => {
           `    source: { git: '${urlOf(pack)}', ref: v1 }`,
           '    configurations:',
           '      roxo:',
-          '        alias: tabela-roxo',
+          '        alias: promo-curso',
           '',
         ].join('\n'),
       );

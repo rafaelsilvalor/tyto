@@ -222,6 +222,16 @@ const workspaceFolder = () => {
       trust = trusted ? 'trusted' : 'revoked';
       return Promise.resolve(state());
     },
+    recentAsked: [] as string[],
+    recent: () =>
+      Promise.resolve({
+        folders: [{ id: 'f-1', name: 'promo', pathLabel: '~/promo', current: folder !== null }],
+      }),
+    openRecent(id: string) {
+      this.recentAsked.push(id);
+      if (id === 'f-1') folder = '/work/promo';
+      return Promise.resolve(state());
+    },
   };
 };
 
@@ -1464,6 +1474,35 @@ describe('the workspace folder channels (TYTO-278)', () => {
     ).rejects.toBeInstanceOf(IpcContractError);
     await expect(guarded({ choose: true, path: '/etc' })).rejects.toBeInstanceOf(IpcContractError);
     expect(workspace.asked).toEqual([]);
+  });
+
+  it('lists the recent folders and opens one by its id, relabelling the tabs (TYTO-487)', async () => {
+    const workspace = workspaceFolder();
+    const handlers = createHandlers({ ...dependencies(), workspace });
+
+    expect((await handlers['workspace:recent']({})).folders).toEqual([
+      { id: 'f-1', name: 'promo', pathLabel: '~/promo', current: false },
+    ]);
+    const opened = await handlers['workspace:open-recent']({ id: 'f-1' });
+    expect(opened).toMatchObject({ folder: '/work/promo' });
+    expect(opened.relabelled).toEqual([
+      { documentId: 'document-9', name: 'capa.brief', pathLabel: 'promo/capa.brief' },
+    ]);
+    expect(workspace.recentAsked).toEqual(['f-1']);
+  });
+
+  it('refuses an open-recent request that names a path, so only ids main minted open anything', async () => {
+    const workspace = workspaceFolder();
+    const guarded = guard(
+      'workspace:open-recent',
+      createHandlers({ ...dependencies(), workspace })['workspace:open-recent'],
+    );
+
+    await expect(guarded({ id: 'f-1', path: 'C:/Users/someone' })).rejects.toBeInstanceOf(
+      IpcContractError,
+    );
+    await expect(guarded({ folder: '/etc' })).rejects.toBeInstanceOf(IpcContractError);
+    expect(workspace.recentAsked).toEqual([]);
   });
 
   it('trusts the open folder and takes it back, each through main', async () => {

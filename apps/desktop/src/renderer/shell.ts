@@ -98,6 +98,9 @@ export function titleBarText(
 /** The element the drawn title bar writes its text into. */
 export const TITLE_BAR_TITLE = '.title-bar__title';
 
+/** The open folder's button between the menu row and the title (TYTO-487). */
+export const TITLE_BAR_PROJECT = '.title-bar__project';
+
 /**
  * The window's name alone, which is the one thing in the shell that moves per keystroke.
  *
@@ -114,6 +117,14 @@ export function paintTitle(root: ParentNode, state: ShellState): void {
   const bar = root.querySelector(TITLE_BAR_TITLE);
   if (bar !== null) {
     bar.textContent = titleBarText(state.locale, state.document.name, state.workspaceName);
+  }
+  // The folder's name, or "No folder" in the window's language: the button is there either
+  // way, because with nothing open it is the way to a folder opened before (TYTO-487).
+  const project = root.querySelector(TITLE_BAR_PROJECT);
+  if (project !== null) {
+    const name = state.workspaceName ?? null;
+    project.textContent = name ?? translate(state.locale, 'titleBar.noFolder');
+    project.toggleAttribute('data-empty', name === null);
   }
 }
 

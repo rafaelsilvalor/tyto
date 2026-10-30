@@ -342,24 +342,22 @@ describe('a brief that stops compiling', () => {
  * window level had ever asked it to serve a build function — so "the preview draws a code
  * template" was a claim resting on two composition roots being spelled the same way.
  *
- * `agenda-semana` is also the first built-in with more than one artwork, which is what makes
- * the slide picker appear: the assertion above says it stays hidden for a single-artwork
- * brief, and this is the other half of that pair.
+ * `banner-roxo` is the pack's code template since the production ones left it (TYTO-436).
  */
 describe('a template whose body is code', () => {
-  const AGENDA = join(packDirectory, 'agenda-semana', 'examples', 'agenda.brief');
+  const BANNER = join(packDirectory, 'banner-roxo', 'examples', 'agencia.brief');
 
   beforeAll(async () => {
     await page.click('#editor .cm-content');
     await page.keyboard.press('Control+a');
-    await page.keyboard.insertText(readFileSync(AGENDA, 'utf8'));
+    await page.keyboard.insertText(readFileSync(BANNER, 'utf8'));
 
     // Spelled out rather than `expect.poll`, which Vitest only allows inside a test. The
     // wait is still on the condition and never on a duration: the round trip goes through
     // a debounce, an IPC hop and a compile, and a fixed pause would be a flake with a
     // number on it.
     const deadline = Date.now() + 20_000;
-    while (Date.now() < deadline && !(await shown()).includes('Farmacologia Geral')) {
+    while (Date.now() < deadline && !(await shown()).includes('AFVVA')) {
       await page.waitForTimeout(200);
     }
   }, 60_000);
@@ -367,20 +365,11 @@ describe('a template whose body is code', () => {
   it('draws the brief it was given, through the bundled build function', async () => {
     const html = await shown();
 
-    // The brief's own words, and the signature the *template* supplies — the placeholder,
-    // since this launch installs no brand kit (ADR 0065). The second is what says a build
-    // function ran, since no directive in the brief writes it.
-    // A session title from the example's first slide, which TYTO-173 rewrote to the
-    // published carousel: the brief it replaced said `Clínica`, and this suite, which runs
-    // only when a PR touches the desktop, kept asking for it after the merge.
-    expect(html).toContain('Farmacologia Geral');
-    expect(html).toContain('@assinatura');
-  });
-
-  it('offers the slide strip, because the brief made more than one artwork', async () => {
-    await expect
-      .poll(() => page.locator('tyto-preview-pane:not([hidden]) [data-preview-strip]').isVisible())
-      .toBe(true);
+    // The brief's own words, and the background the *template* supplies from its own folder
+    // (TYTO-478). The second is what says a build function ran, since no directive in the
+    // brief names a picture.
+    expect(html).toContain('AFVVA');
+    expect(html).toContain('data:image/png;base64,');
   });
 
   it('paints the frame, and not only the markup of it', async () => {
@@ -393,7 +382,32 @@ describe('a template whose body is code', () => {
         // The face the template declares, CircularXX (ADR 0037) — drawn from the machine's
         // file where it is installed and from the bundled substitute on CI, under the same
         // family name either way.
-        .evaluate(() => document.fonts.check('500 48px "CircularXX"')),
+        .evaluate(() => document.fonts.check('400 48px "CircularXX"')),
     ).toBe(true);
+  });
+});
+
+/**
+ * A brief with more than one artwork makes the slide picker appear: the assertion above says
+ * it stays hidden for a single-artwork brief, and this is the other half of that pair.
+ */
+describe('a brief that makes more than one artwork', () => {
+  const LISTA = join(packDirectory, 'carrossel-lista', 'examples', 'lista.brief');
+
+  beforeAll(async () => {
+    await page.click('#editor .cm-content');
+    await page.keyboard.press('Control+a');
+    await page.keyboard.insertText(readFileSync(LISTA, 'utf8'));
+
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline && !(await shown()).includes('Como estudar')) {
+      await page.waitForTimeout(200);
+    }
+  }, 60_000);
+
+  it('offers the slide strip', async () => {
+    await expect
+      .poll(() => page.locator('tyto-preview-pane:not([hidden]) [data-preview-strip]').isVisible())
+      .toBe(true);
   });
 });

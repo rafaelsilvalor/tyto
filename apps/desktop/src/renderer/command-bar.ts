@@ -63,7 +63,7 @@ export interface CommandBarPick {
  * keyboard the accent is two keystrokes and nobody types it into a search box. The id is
  * matched as well as the label, which is how `preview.zoomIn` finds it in either language.
  */
-const fold = (value: string): string =>
+export const fold = (value: string): string =>
   value
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')

@@ -409,6 +409,7 @@ describe('the File submenu', () => {
       'document.newFromTemplate',
       'editor.open',
       'workspace.openFolder',
+      'workspace.openRecent',
       '—',
       'editor.save',
       'editor.saveAs',

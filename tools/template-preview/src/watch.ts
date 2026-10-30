@@ -16,7 +16,7 @@ import type { PreviewSession, PreviewTarget } from './session.ts';
  * metadata touch), so events are gathered for a short quiet period and answered once.
  *
  * **What a code template draws with is wider than its folder.** Its parts import a brand
- * module (`_azul/`, a sibling folder with no manifest — ADR 0047), the kit and the house's
+ * module (a sibling folder with no manifest — ADR 0047), the kit and the house's
  * package, and a save to any of them used to leave the page drawing the build from before. All
  * are watched now; the kit and the house's package ask for their own rebuild, because
  * `@tyto/templates` imports their `dist/` rather than bundling them.

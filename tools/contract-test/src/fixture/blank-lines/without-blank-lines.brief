@@ -1,6 +1,6 @@
 ---
-template: agenda-semana
-formats: [grid]
+template: carrossel-lista
+formats: [grid-1x1]
 ---
 ::titulo
   AGENDA DA SEMANA

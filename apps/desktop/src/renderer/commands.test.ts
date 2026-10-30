@@ -59,6 +59,7 @@ import {
   WORKSPACE_MANAGE_TRUST,
   WORKSPACE_SHOW_PROJECT,
   WORKSPACE_OPEN_FOLDER,
+  WORKSPACE_OPEN_RECENT,
   TEMPLATE_EDIT,
   TEMPLATE_NEW,
   SHELL_TOGGLE_LOCALE,
@@ -118,6 +119,7 @@ const actions = () =>
     chooseTemplateFolder: vi.fn<() => void>(),
     clearTemplateFolder: vi.fn<() => void>(),
     openWorkspaceFolder: vi.fn<() => void>(),
+    openRecentFolders: vi.fn<() => void>(),
     closeWorkspaceFolder: vi.fn<() => void>(),
     manageTrust: vi.fn<() => void>(),
     syncPluginFiles: vi.fn<(update: boolean) => void>(),
@@ -268,6 +270,16 @@ describe('the ids the window registers', () => {
     // TYTO-347.
     expect(registry.run(WORKSPACE_SHOW_PROJECT, NO_VIEW)).toBe(true);
     expect(spies.showProject).toHaveBeenCalledOnce();
+  });
+
+  it('runs Open Recent Folder to the popover, under an id keybindings.json can name (TYTO-487)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(WORKSPACE_OPEN_RECENT).toBe('workspace.openRecent');
+    expect(registry.run(WORKSPACE_OPEN_RECENT, NO_VIEW)).toBe(true);
+    expect(spies.openRecentFolders).toHaveBeenCalledOnce();
+    expect(spies.openWorkspaceFolder).not.toHaveBeenCalled();
   });
 
   it('runs the two plugin files commands, the update moving the refs (TYTO-433)', () => {

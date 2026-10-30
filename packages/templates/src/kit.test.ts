@@ -1,13 +1,7 @@
 import { measureNothing, noBrandKit, noFiles, reportNothing } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
-import { build as agendaSemana } from '../templates/agenda-semana/template.js';
-import { build as aprovados } from '../templates/aprovados/template.js';
 import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
-import { build as simuladosOcre } from '../templates/simulados-semana-ocre/template.js';
-import { build as simuladosRoxo } from '../templates/simulados-semana-roxo/template.js';
-import { build as simuladosVinho } from '../templates/simulados-semana-vinho/template.js';
-import { build as tabelaRoxo } from '../templates/tabela-roxo/template.js';
 import { PLACEHOLDER_LOGO, PLACEHOLDER_SIGNATURE } from '@tyto/house-style';
 
 import type {
@@ -54,50 +48,7 @@ interface Case {
   readonly signs: boolean;
 }
 
-const LAMINA = 'Domingo 25/10 | Aplicação às 08h30\n1º Simulado';
-const PORTRAIT = { w: 1080, h: 1350 };
-
 const CASES: readonly Case[] = [
-  {
-    name: 'agenda-semana',
-    build: agendaSemana,
-    format: 'grid',
-    size: PORTRAIT,
-    slots: { lamina: 'FARMÁCIA\n16/09 - 14:00 | Farmacologia | Profª. Marcela Rocha' },
-    signs: true,
-  },
-  {
-    name: 'aprovados',
-    build: aprovados,
-    format: 'grid',
-    size: PORTRAIT,
-    slots: { lamina: 'ENDODONTIA\n1º | Ana Souza' },
-    signs: true,
-  },
-  {
-    name: 'simulados-semana-ocre',
-    build: simuladosOcre,
-    format: 'grid',
-    size: PORTRAIT,
-    slots: { titulo: 'TÍTULO', lamina: LAMINA },
-    signs: true,
-  },
-  {
-    name: 'simulados-semana-vinho',
-    build: simuladosVinho,
-    format: 'grid',
-    size: PORTRAIT,
-    slots: { titulo: 'TÍTULO', lamina: LAMINA },
-    signs: true,
-  },
-  {
-    name: 'tabela-roxo',
-    build: tabelaRoxo,
-    format: 'grid',
-    size: PORTRAIT,
-    slots: { titulo: 'TÍTULO', tabela: 'Concurso | Vagas\nTribunal | 10' },
-    signs: true,
-  },
   {
     name: 'banner-roxo',
     build: bannerRoxo,
@@ -171,23 +122,5 @@ describe.each(CASES)('$name', (each) => {
 
     expect(logoPaths(nodes)).toEqual([PLACEHOLDER_LOGO.d]);
     expect(signatures(nodes)).toEqual(each.signs ? [TEST_SIGNATURE] : []);
-  });
-});
-
-describe('simulados-semana-roxo', () => {
-  it('signs its story with its own note, kit or no kit, and draws no logo there', () => {
-    const story = {
-      name: 'simulados-semana-roxo',
-      build: simuladosRoxo,
-      format: 'story',
-      size: { w: 1080, h: 1920 },
-      slots: { titulo: 'TÍTULO', lamina: LAMINA },
-      signs: false,
-    };
-    const nodes = draw(story, TEST_KIT);
-
-    expect(logoPaths(nodes)).toEqual([]);
-    expect(signatures(nodes)).toEqual([]);
-    expect(nodes.some((node) => node.kind === 'text' && node.name === 'note')).toBe(true);
   });
 });

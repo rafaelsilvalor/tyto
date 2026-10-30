@@ -7,8 +7,8 @@ import { UsageError, parseArguments, resolveTarget } from './target.ts';
 
 describe('parseArguments', () => {
   it('reads a template and the options, and skips the `--` pnpm passes along', () => {
-    expect(parseArguments(['--', 'agenda-semana', '--types', 'png,svg', '--port', '0'])).toEqual({
-      template: 'agenda-semana',
+    expect(parseArguments(['--', 'banner-roxo', '--types', 'png,svg', '--port', '0'])).toEqual({
+      template: 'banner-roxo',
       types: ['png', 'svg'],
       port: 0,
     });
@@ -23,10 +23,10 @@ describe('parseArguments', () => {
 
 describe('resolveTarget', () => {
   it('finds a pack template by name, its first example and the pack formats', () => {
-    const target = resolveTarget({ template: 'agenda-semana' }, REPOSITORY_ROOT);
+    const target = resolveTarget({ template: 'banner-roxo' }, REPOSITORY_ROOT);
     expect(target).toMatchObject({
-      template: 'agenda-semana',
-      brief: join(BUILT_IN_PACK, 'agenda-semana', 'examples', 'agenda.brief'),
+      template: 'banner-roxo',
+      brief: join(BUILT_IN_PACK, 'banner-roxo', 'examples', 'agencia.brief'),
       templates: BUILT_IN_PACK,
       formatsFile: BUILT_IN_FORMATS,
       types: ['png'],

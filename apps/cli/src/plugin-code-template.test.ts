@@ -15,8 +15,8 @@ import { run } from './program.js';
  * An installed code template, from `tyto plugin install` to `tyto render` (TYTO-189,
  * ADR 0048) — against a real temp disk and the real, confined plugin process.
  *
- * The template is `agenda-semana`, the first production template written in TypeScript,
- * bundled the way a plugin author bundles one: every import inlined into `dist/index.js`,
+ * The template is `banner-roxo`, the built-in pack's code template, which draws its
+ * background from its own folder (TYTO-478), bundled the way a plugin author bundles one: every import inlined into `dist/index.js`,
  * `@tyto/*` included, so the installed folder runs on its own. The folder lives under the
  * system's temp directory, where no `node_modules` is above it; the one test that leaves a
  * `@tyto` package external is the proof that nothing else is resolving it.
@@ -27,9 +27,9 @@ import { run } from './program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACK = resolve(HERE, '..', '..', '..', 'packages', 'templates', 'templates');
-const AGENDA = join(PACK, 'agenda-semana');
+const BANNER = join(PACK, 'banner-roxo');
 const FORMATS = join(PACK, 'formats.yaml');
-const NAME = 'agenda-plugin';
+const NAME = 'banner-plugin';
 
 let workspace: string;
 let home: string;
@@ -61,10 +61,11 @@ afterEach(async () => {
 
 /**
  * The plugin's folder: its manifest, the bundle, and the template's folder with the
- * manifest renamed and its faces declared — and no `template.ts`, which a pack may not hold.
+ * manifest renamed, its faces declared and its backgrounds beside it — and no `template.ts`,
+ * which a pack may not hold.
  */
-async function packedAgenda(options: { readonly external?: readonly string[] } = {}) {
-  const folder = join(workspace, 'agenda-plugin');
+async function packedBanner(options: { readonly external?: readonly string[] } = {}) {
+  const folder = join(workspace, NAME);
   await bundle({
     stdin: {
       contents: `import { build } from './template.ts';
@@ -77,7 +78,7 @@ export function activate(host) {
   });
 }
 `,
-      resolveDir: AGENDA,
+      resolveDir: BANNER,
       loader: 'ts',
     },
     bundle: true,
@@ -99,26 +100,27 @@ export function activate(host) {
   );
   const template = join(folder, 'templates', NAME);
   await mkdir(template, { recursive: true });
-  const manifest = (await readFile(join(AGENDA, 'manifest.yaml'), 'utf8')).replace(
-    /^name: agenda-semana$/mu,
+  await cp(join(BANNER, 'assets'), join(template, 'assets'), { recursive: true });
+  const manifest = (await readFile(join(BANNER, 'manifest.yaml'), 'utf8')).replace(
+    /^name: banner-roxo$/mu,
     `name: ${NAME}`,
   );
   await writeFile(
     join(template, 'manifest.yaml'),
     `${manifest}faces:\n` +
-      [300, 500, 900]
+      [400, 700]
         .map((weight) => `  - { family: CircularXX, weight: ${String(weight)} }\n`)
         .join(''),
   );
   return folder;
 }
 
-/** The example brief and its assets, in a folder of its own, naming `template`. */
+/** An example brief, in a folder of its own, naming `template`. */
 async function briefFor(template: string, into: string): Promise<string> {
-  await cp(join(AGENDA, 'examples'), into, { recursive: true });
-  const path = join(into, 'agenda.brief');
+  await cp(join(BANNER, 'examples'), into, { recursive: true });
+  const path = join(into, 'agencia.brief');
   const source = await readFile(path, 'utf8');
-  await writeFile(path, source.replace(/^template: agenda-semana$/mu, `template: ${template}`));
+  await writeFile(path, source.replace(/^template: banner-roxo$/mu, `template: ${template}`));
   return path;
 }
 
@@ -274,17 +276,17 @@ describe("an installed code template's own folder (TYTO-478)", () => {
   }, 60_000);
 });
 
-describe('agenda-semana, packed as a plugin', () => {
+describe('banner-roxo, packed as a plugin', () => {
   // Starts a plugin's worker thread and bundles a template, which a full `pnpm check` can
   // hold past Vitest's 5 s.
   it('renders from tyto render exactly as the in-repo template does', async () => {
-    const plugin = await packedAgenda();
+    const plugin = await packedBanner();
     expect(await run(['plugin', 'install', plugin, '--yes'], environment()), stderr()).toBe(
       EXIT_OK,
     );
 
     const inRepo = await render(
-      await briefFor('agenda-semana', join(workspace, 'in-repo')),
+      await briefFor('banner-roxo', join(workspace, 'in-repo')),
       join(workspace, 'out-in-repo'),
     );
     const installed = await render(
@@ -306,7 +308,7 @@ describe('agenda-semana, packed as a plugin', () => {
   // out of the bundle and the plugin cannot even activate, because nothing above the temp
   // folder has a `node_modules` to find it in.
   it('does not activate when a @tyto package is left out of its bundle', async () => {
-    const plugin = await packedAgenda({ external: ['@tyto/template-kit'] });
+    const plugin = await packedBanner({ external: ['@tyto/house-style'] });
     expect(await run(['plugin', 'install', plugin, '--yes'], environment()), stderr()).toBe(
       EXIT_OK,
     );
@@ -321,6 +323,6 @@ describe('agenda-semana, packed as a plugin', () => {
     expect(codes).toContain('E_UNKNOWN_TEMPLATE');
     expect(
       installed.diagnostics.find((item) => item.code === 'W_PLUGIN_SKIPPED')?.message,
-    ).toContain('@tyto/template-kit');
+    ).toContain('@tyto/house-style');
   }, 120_000);
 });

@@ -48,11 +48,11 @@ const GOOD = ['---', 'template: promo-curso', '---', '::titulo Da fila'].join('\
 const BROKEN = ['---', 'template: nenhum-template', '---', '::titulo Quebrada'].join('\n');
 
 /** An official template whose one repeating slot is one slide per occurrence. */
-const agenda = (slides: number): string =>
+const lista = (slides: number): string =>
   [
     '---',
-    'template: agenda-semana',
-    'formats: [grid]',
+    'template: carrossel-lista',
+    'formats: [grid-1x1]',
     '---',
     '::titulo',
     '  AGENDA DA SEMANA',
@@ -277,14 +277,14 @@ describe('the local queue panel', () => {
     // `brief.brief` in it, the done/ listing does not take it for a task.
     mkdirSync(join(queueFolder, 'done', id), { recursive: true });
     writeFileSync(join(queueFolder, 'done', id, 'in-the-way.txt'), 'in the way', 'utf8');
-    drop(id, agenda(4));
+    drop(id, lista(4));
     await waitForStatus(id, 'pending', 10_000);
     await task(id).locator('.queue__run').click();
     await waitForStatus(id, 'error');
     expect(pngs()).toHaveLength(4);
 
     rmSync(join(queueFolder, 'done', id), { recursive: true });
-    writeFileSync(brief, agenda(3), 'utf8');
+    writeFileSync(brief, lista(3), 'utf8');
     await expect
       .poll(async () => (await task(id).locator('.queue__run').textContent())?.trim())
       .toBe('Try again');

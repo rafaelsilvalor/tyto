@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -27,9 +28,9 @@ import { waitForWindowTemplates } from './window-templates.js';
  *
  * Two plugins, installed by the built CLI into this suite's own `TYTO_HOME`:
  *
- * - `agenda-plugin` is `agenda-semana`, bundled with every import inlined the way an author
- *   bundles one. Its preview and its export are compared with the in-repo template's, byte
- *   for byte, in the same window.
+ * - `banner-plugin` is `banner-roxo`, bundled with every import inlined the way an author
+ *   bundles one, its backgrounds beside its manifest. Its preview and its export are compared
+ *   with the in-repo template's, byte for byte, in the same window.
  * - `cartaz` is a template whose frame says where it was built: a rect 777 wide off Electron
  *   process, 111 anywhere else. It is the in-process path made observable.
  *
@@ -40,16 +41,7 @@ import { waitForWindowTemplates } from './window-templates.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const built = join(here, '..', 'out', 'main', 'index.js');
 const cli = resolve(here, '..', '..', 'cli', 'dist', 'index.js');
-const AGENDA = resolve(
-  here,
-  '..',
-  '..',
-  '..',
-  'packages',
-  'templates',
-  'templates',
-  'agenda-semana',
-);
+const BANNER = resolve(here, '..', '..', '..', 'packages', 'templates', 'templates', 'banner-roxo');
 
 for (const file of [built, cli]) {
   if (!existsSync(file)) {
@@ -57,14 +49,11 @@ for (const file of [built, cli]) {
   }
 }
 
-// The example brief without its illustration: the preview is asked with no folder, so the
-// file could not resolve for either template, and the comparison would be of two failures.
-const AGENDA_BRIEF = readFileSync(join(AGENDA, 'examples', 'agenda.brief'), 'utf8').replace(
-  /^(?:ilustracao|imagem): .*\n/mu,
-  '',
-);
+// The example brief: its backgrounds are the template's own files (TYTO-478), so the preview
+// needs no folder for the brief.
+const BANNER_BRIEF = readFileSync(join(BANNER, 'examples', 'agencia.brief'), 'utf8');
 const briefNaming = (template: string): string =>
-  AGENDA_BRIEF.replace(/^template: agenda-semana$/mu, `template: ${template}`);
+  BANNER_BRIEF.replace(/^template: banner-roxo$/mu, `template: ${template}`);
 const CARTAZ_BRIEF = ['---', 'template: cartaz', 'formats: [grid-1x1]', '---', ''].join('\n');
 
 let scratch: string;
@@ -95,17 +84,17 @@ function writePlugin(folder: string, name: string, permissions: readonly string[
   );
 }
 
-function agendaPlugin(): string {
-  const folder = join(scratch, 'sources', 'agenda-plugin');
-  writePlugin(folder, 'agenda-plugin', ['font:CircularXX']);
+function bannerPlugin(): string {
+  const folder = join(scratch, 'sources', 'banner-plugin');
+  writePlugin(folder, 'banner-plugin', ['font:CircularXX']);
   buildSync({
     stdin: {
       contents:
         "import { build } from './template.ts';\n" +
         'export function activate(host) {\n' +
-        "  host.registerTemplatePack({ id: 'agenda-plugin', templates: [], directory: 'templates', build: (template, context) => build(context) });\n" +
+        "  host.registerTemplatePack({ id: 'banner-plugin', templates: [], directory: 'templates', build: (template, context) => build(context) });\n" +
         '}\n',
-      resolveDir: AGENDA,
+      resolveDir: BANNER,
       loader: 'ts',
     },
     bundle: true,
@@ -114,16 +103,17 @@ function agendaPlugin(): string {
     outfile: join(folder, 'dist', 'index.js'),
     logLevel: 'silent',
   });
-  const template = join(folder, 'templates', 'agenda-plugin');
+  const template = join(folder, 'templates', 'banner-plugin');
   mkdirSync(template, { recursive: true });
-  const manifest = readFileSync(join(AGENDA, 'manifest.yaml'), 'utf8').replace(
-    /^name: agenda-semana$/mu,
-    'name: agenda-plugin',
+  cpSync(join(BANNER, 'assets'), join(template, 'assets'), { recursive: true });
+  const manifest = readFileSync(join(BANNER, 'manifest.yaml'), 'utf8').replace(
+    /^name: banner-roxo$/mu,
+    'name: banner-plugin',
   );
   writeFileSync(
     join(template, 'manifest.yaml'),
     `${manifest}faces:\n` +
-      [300, 500, 900]
+      [400, 700]
         .map((weight) => `  - { family: CircularXX, weight: ${String(weight)} }\n`)
         .join(''),
   );
@@ -218,7 +208,7 @@ beforeAll(async () => {
   home = join(scratch, 'tyto-home');
   queueFolder = join(scratch, 'fila');
   mkdirSync(queueFolder);
-  install(agendaPlugin());
+  install(bannerPlugin());
   install(cartazPlugin());
 
   app = await _electron.launch({
@@ -232,7 +222,7 @@ beforeAll(async () => {
   // The plugins start after the window opens (ADR 0044); the window's templates are asked
   // again once they have, and both installed code templates are among them then. Read through
   // "New brief from template…" since the header picker left the window (TYTO-288).
-  await waitForWindowTemplates(page, ['agenda-plugin', 'cartaz'], 60_000);
+  await waitForWindowTemplates(page, ['banner-plugin', 'cartaz'], 60_000);
 }, 180_000);
 
 afterAll(async () => {
@@ -250,13 +240,13 @@ describe('an installed code template in the window', () => {
     expect(answer.frames[0]?.html).not.toContain('111');
   }, 60_000);
 
-  it('previews agenda-semana from its plugin exactly as the in-repo template, and times it', async () => {
+  it('previews banner-roxo from its plugin exactly as the in-repo template, and times it', async () => {
     // The in-repo template first, so the main process has parsed its own faces and the first
     // plugin preview's extra is what crosses: the faces' bytes and the guest's parse.
-    const firstInRepo = await timed(briefNaming('agenda-semana'));
-    const first = await timed(briefNaming('agenda-plugin'));
-    const plugin = await preview(briefNaming('agenda-plugin'));
-    const inRepo = await preview(briefNaming('agenda-semana'));
+    const firstInRepo = await timed(briefNaming('banner-roxo'));
+    const first = await timed(briefNaming('banner-plugin'));
+    const plugin = await preview(briefNaming('banner-plugin'));
+    const inRepo = await preview(briefNaming('banner-roxo'));
 
     expect(plugin.frames.length).toBeGreaterThan(0);
     expect(plugin.frames.map((frame) => frame.html)).toEqual(
@@ -271,12 +261,12 @@ describe('an installed code template in the window', () => {
     const warmInRepo: number[] = [];
     const warmCartaz: number[] = [];
     for (let round = 0; round < 20; round++) {
-      warmPlugin.push(await timed(briefNaming('agenda-plugin')));
-      warmInRepo.push(await timed(briefNaming('agenda-semana')));
+      warmPlugin.push(await timed(briefNaming('banner-plugin')));
+      warmInRepo.push(await timed(briefNaming('banner-roxo')));
       warmCartaz.push(await timed(CARTAZ_BRIEF));
     }
     process.stdout.write(
-      `MEASURE desktop preview, agenda-semana example (2 frames, 16 measurements): ` +
+      `MEASURE desktop preview, banner-roxo example (3 frames): ` +
         `first in-repo ${firstInRepo.toFixed(1)} ms, then first through the plugin ${first.toFixed(1)} ms; ` +
         `warm median n=20: plugin ${median(warmPlugin).toFixed(1)} ms, ` +
         `in-repo ${median(warmInRepo).toFixed(1)} ms; ` +
@@ -284,11 +274,11 @@ describe('an installed code template in the window', () => {
     );
   }, 120_000);
 
-  it('exports agenda-semana from its plugin byte for byte as the in-repo template', async () => {
+  it('exports banner-roxo from its plugin byte for byte as the in-repo template', async () => {
     const fromPlugin = join(scratch, 'export-plugin');
     const fromRepo = join(scratch, 'export-repo');
-    await exported(briefNaming('agenda-plugin'), fromPlugin);
-    await exported(briefNaming('agenda-semana'), fromRepo);
+    await exported(briefNaming('banner-plugin'), fromPlugin);
+    await exported(briefNaming('banner-roxo'), fromRepo);
 
     const svgs = (folder: string): string[] =>
       readdirSync(folder)
@@ -331,7 +321,7 @@ describe('an installed code template in the window', () => {
       'plugins:list',
       {},
     );
-    expect(plugins.find((row) => row.name === 'agenda-plugin')?.permissions).toEqual([
+    expect(plugins.find((row) => row.name === 'banner-plugin')?.permissions).toEqual([
       'font:CircularXX',
     ]);
   });
