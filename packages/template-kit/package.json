@@ -29,6 +29,7 @@
   "dependencies": {
     "@tyto/brief-lang": "workspace:*",
     "@tyto/core": "workspace:*",
-    "@tyto/export-html": "workspace:*"
+    "@tyto/export-html": "workspace:*",
+    "@tyto/template-lang": "workspace:*"
   }
 }

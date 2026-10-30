@@ -11,6 +11,7 @@ import {
   type SceneFontFace,
   type SuppliedValues,
   type Template,
+  type TemplateManifest,
   type TemplateRegistry,
   compile,
   err,
@@ -18,6 +19,7 @@ import {
   resolve,
 } from '@tyto/core';
 import { exportHtml } from '@tyto/export-html';
+import { type TemplateAssets, compileTemplate as compileMarkup } from '@tyto/template-lang';
 
 /**
  * `@tyto/template-kit/testing` — a brief compiled against one template the way the app
@@ -35,7 +37,8 @@ import { exportHtml } from '@tyto/export-html';
  * `faces` and `font`.
  *
  * Pure like the rest of the kit (ADR 0010): the caller hands over the template, the formats
- * and any bytes; nothing here reads a folder.
+ * and any bytes; nothing here reads a folder. A markup template is handed over as its text
+ * (TYTO-454), and compiled here by `@tyto/template-lang` as the app compiles it.
  */
 
 /** What `resolve` finds for an asset when the caller gave no resolver: nothing. */
@@ -54,11 +57,30 @@ export function placeholderFont(face: SceneFontFace): string {
   return `tyto-test-font:${face.font.family}-${String(face.weight)}-${face.style}`;
 }
 
+/**
+ * A markup template as its files say it: the text of `template.html`, its manifest and the
+ * files beside it that its `src=` attributes name.
+ *
+ * Text and not a folder, so the kit reads nothing: the test reads the files the way its
+ * repository keeps them and hands them in. The `markup` field is what tells it from a code
+ * `Template`, which never has one.
+ */
+export interface MarkupTemplate {
+  readonly markup: string;
+  /** `parseManifest(yaml).value`, as for a code template. */
+  readonly manifest: TemplateManifest;
+  /** The `svg` and `image` files `src=` names; a template with no `src` needs none. */
+  readonly assets?: TemplateAssets;
+}
+
 export interface CompileTemplateOptions {
   /** The brief's text. A brief whose frontmatter names no template is compiled against this one. */
   readonly brief: string;
-  /** The template under test: `defineTemplate(parseManifest(yaml).value, build, files?)`. */
-  readonly template: Template;
+  /**
+   * The template under test: a code template, `defineTemplate(parseManifest(yaml).value,
+   * build, files?)`, or a markup one, `{ markup, manifest, assets? }`.
+   */
+  readonly template: Template | MarkupTemplate;
   /**
    * The sizes the brief's formats stand for — `formatCatalogue({ grid: { w: 1080, … } })` or
    * `parseFormats(yaml)`. The caller's, because a canvas is a brand's choice and the kit makes
@@ -115,7 +137,22 @@ function registryOf(template: Template): TemplateRegistry {
 export async function compileTemplate(
   options: CompileTemplateOptions,
 ): Promise<Result<CompiledTemplate, Diagnostics>> {
-  const { template } = options;
+  const given = options.template;
+  let template: Template;
+  // The slots the markup reads, so `resolve` warns about a filled slot the template ignores
+  // exactly as the app's render job does; a code template cannot say, and stays silent.
+  let renderedSlots: readonly string[] | undefined;
+  if ('markup' in given) {
+    const compiled = compileMarkup(given.markup, {
+      manifest: given.manifest,
+      ...(given.assets === undefined ? {} : { assets: given.assets }),
+    });
+    if (!compiled.ok) return compiled;
+    template = compiled.value;
+    renderedSlots = compiled.value.renderedSlots;
+  } else {
+    template = given;
+  }
 
   const ast = parseBrief(options.brief);
   if (!ast.ok) return ast;
@@ -124,6 +161,7 @@ export async function compileTemplate(
     registry: registryOf(template),
     assets: options.assets ?? noAssets,
     template: template.manifest.name,
+    ...(renderedSlots === undefined ? {} : { renderedSlots }),
   });
   if (!resolved.ok) return err([...ast.diagnostics, ...resolved.error]);
 
