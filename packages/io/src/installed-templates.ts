@@ -1,5 +1,5 @@
 import { access } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import {
   type AssetRef,
@@ -10,6 +10,7 @@ import {
   type TemplateFiles,
   type TemplateManifest,
   type TemplateRegistry,
+  assetRefSchema,
   diagnostic,
   err,
   ok,
@@ -46,6 +47,15 @@ import type { InstalledCodePack } from './installed-packs.js';
  * TYTO-478): each image as the ref it was read as, each SVG as its markup, never an image's
  * bytes. The folder is the one `installedPacks` checked is inside the installed plugin, the
  * reader skips links that lead out of it, and the bytes stay here for the export.
+ *
+ * **A frame draws only the pictures it was handed** (TYTO-479). The IR's `AssetRef.path` is
+ * free text, and the export reads whatever path a scene names, so a frame that wrote its own
+ * absolute path would embed any image on the disk — the plugin's process cannot read the
+ * file, but the host would read it for it. Every ref in the answer must be one the host sent
+ * that call: an image of the template's own folder, or one in the context (a slot's picture or
+ * a declared value; a brand kit's marks are shapes and carry no ref). Anything else is `E_PLUGIN_TEMPLATE_ASSET`, which costs
+ * the frame. It is ADR 0042's rule, that a plugin reaches only what crosses, applied to the
+ * one thing the host reads on a frame's behalf.
  */
 
 /** Where the bytes of a face come from, and whether they are this machine's. */
@@ -154,6 +164,35 @@ function facesFor(
   return { faces, warnings };
 }
 
+/**
+ * What an export reads a ref as: its resolved `path`, else its `id` read against the brief's
+ * folder (`fileResources`). Both are keyed, and `source` is not, because the reader ignores
+ * it: a `url` ref with a path is read from that path all the same.
+ */
+function keyOfRef(ref: AssetRef): string {
+  return ref.path === undefined ? `id:${ref.id}` : `path:${resolve(ref.path)}`;
+}
+
+/**
+ * Every `AssetRef` in a value that crossed the wire, at any depth: an image node's `asset`,
+ * an image paint's, a slot's picture, a declared value. Found by shape rather than by field,
+ * so a ref the IR gains a new place for is not missed by a list of places written today.
+ */
+function assetRefsIn(value: unknown, into: AssetRef[] = []): AssetRef[] {
+  if (Array.isArray(value)) {
+    for (const item of value) assetRefsIn(item, into);
+  } else if (typeof value === 'object' && value !== null) {
+    const parsed = assetRefSchema.safeParse(value);
+    if (parsed.success) into.push(parsed.data);
+    else for (const item of Object.values(value)) assetRefsIn(item, into);
+  }
+  return into;
+}
+
+function grantedKeys(handed: readonly unknown[]): Set<string> {
+  return new Set(assetRefsIn(handed).map(keyOfRef));
+}
+
 function deferred(
   pack: InstalledCodePack,
   manifest: TemplateManifest,
@@ -185,6 +224,17 @@ function deferred(
       const { measure: _measure, report, files: _files, ...call } = context;
       const answer = await pack.build(manifest.name, call, shipped, files);
       if (answer.ok) {
+        const granted = grantedKeys([call, files.images]);
+        const foreign = assetRefsIn(answer.value.frame).find((ref) => !granted.has(keyOfRef(ref)));
+        if (foreign !== undefined) {
+          return err([
+            diagnostic('E_PLUGIN_TEMPLATE_ASSET', {
+              plugin: pack.plugin,
+              template: manifest.name,
+              asset: foreign.id,
+            }),
+          ]);
+        }
         // The reports crossed as data the wire checked against the closed list; the
         // diagnostic, its range and its wording are written here, by `compile` (ADR 0058).
         for (const reported of answer.value.reports) report(reported);

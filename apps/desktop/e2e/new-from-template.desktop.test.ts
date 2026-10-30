@@ -13,7 +13,7 @@ import { openPreviewBeside } from './preview-pane.js';
 /**
  * "New brief from template…", through the real window (TYTO-275).
  *
- * Ctrl+K lists the templates with the folder each came from; choosing `agenda-semana` opens a
+ * Ctrl+K lists the templates with the folder each came from; choosing `carrossel-lista` opens a
  * new tab holding its skeleton with the first field selected. Typing fills it, Tab moves to the
  * next field, and the brief that results compiles with no error. Then the second door: choosing
  * a template in the "/" menu on an empty brief writes the same skeleton (the header's picker,
@@ -73,7 +73,7 @@ async function openPicker(): Promise<string[]> {
   await page.waitForFunction(
     () =>
       [...document.querySelectorAll('.command-bar__label')].some(
-        (label) => label.textContent === 'agenda-semana',
+        (label) => label.textContent === 'carrossel-lista',
       ),
     undefined,
     { timeout: 30_000 },
@@ -137,11 +137,12 @@ afterAll(async () => {
 describe('New brief from template…', () => {
   it('lists every built-in template with the folder it came from', async () => {
     const rows = await openPicker();
-    const agenda = rows.find((row) => row.startsWith('agenda-semana / '));
+    const lista = rows.find((row) => row.startsWith('carrossel-lista / '));
 
-    expect(rows).toHaveLength(9);
+    // The test templates the pack keeps since the production ones left it (TYTO-436).
+    expect(rows).toHaveLength(3);
     // The built-in pack's name, in the window's language, before the description.
-    expect(agenda).toMatch(/^agenda-semana \/ (built-in|embutido) · The week's agenda/u);
+    expect(lista).toMatch(/^carrossel-lista \/ (built-in|embutido) · A list carousel/u);
     await shoot('picker-light');
     await page.keyboard.press('Escape');
   }, 60_000);
@@ -149,7 +150,7 @@ describe('New brief from template…', () => {
   it('opens the skeleton in a new tab, and Tab walks its fields to a brief that compiles', async () => {
     const before = await tabCount();
     await openPicker();
-    await page.keyboard.type('agenda-semana');
+    await page.keyboard.type('carrossel-lista');
     await page.waitForTimeout(100);
     await page.keyboard.press('Enter');
 
@@ -158,8 +159,8 @@ describe('New brief from template…', () => {
     expect(await editorText()).toBe(
       [
         '---',
-        'template: agenda-semana',
-        'formats: [grid]',
+        'template: carrossel-lista',
+        'formats: [grid-1x1, story]',
         '---',
         '',
         '::titulo titulo',
@@ -204,12 +205,12 @@ describe('New brief from template…', () => {
     await page.click('#editor .cm-content');
     await page.keyboard.type('/');
     await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
-    await page.keyboard.type('tabela-r');
+    await page.keyboard.type('banner-r');
     await page.waitForTimeout(150);
     await page.keyboard.press('Enter');
 
-    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: tabela-roxo');
-    expect(await editorText()).toContain('::titulo titulo\n\n::tabela tabela');
+    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: banner-roxo');
+    expect(await editorText()).toContain('::titulo titulo\n');
     expect(await selectedText()).toBe('titulo');
   }, 60_000);
 });
@@ -230,7 +231,7 @@ describe('in dark', () => {
     await page.waitForTimeout(500);
     await openPicker();
     await shoot('picker-dark');
-    await page.keyboard.type('agenda-semana');
+    await page.keyboard.type('carrossel-lista');
     await page.waitForTimeout(100);
     await page.keyboard.press('Enter');
     await expect.poll(selectedText, { timeout: 10_000 }).toBe('titulo');

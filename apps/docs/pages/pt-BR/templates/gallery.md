@@ -2,7 +2,7 @@
 
 # Galeria de templates
 
-Os templates que vêm com o Tyto: 9, em 6 formatos. Cada imagem é o template desenhando o brief de exemplo guardado junto dele, no primeiro formato que ele lista, desenhado sem kit de marca: uma forma simples ocupa o lugar do logo da marca e `@assinatura` o da assinatura. Um brief escolhe um deles na linha `template:` e preenche os slots listados abaixo dele. As descrições vêm escritas nos próprios templates, em inglês.
+Os templates que vêm com o Tyto: 3, em 6 formatos. Eles servem para experimentar o Tyto e para testá-lo. Os templates com que uma equipe publica ficam nos seus próprios repositórios, e um arquivo de plugin os nomeia para o Tyto buscá-los: [Buscar templates nos seus próprios repositórios](../command-line/plugins.md#buscar-templates-nos-seus-proprios-repositorios) mostra como. Cada imagem é o template desenhando o brief de exemplo guardado junto dele, no primeiro formato que ele lista, desenhado sem kit de marca: uma forma simples ocupa o lugar do logo da marca e `@assinatura` o da assinatura. Um brief escolhe um deles na linha `template:` e preenche os slots listados abaixo dele. As descrições vêm escritas nos próprios templates, em inglês.
 
 ## Formatos
 
@@ -16,42 +16,6 @@ Os tamanhos que um brief pode pedir na linha `formats:`. Um template só desenha
 | `banner` | 1200 × 628 | `banner` | Banner |
 | `banner-1x1` | 600 × 600 | `banner` | Banner 1:1 |
 | `banner-345x146` | 345 × 146 | `banner` | Banner 345×146 |
-
-## agenda-semana
-
-![agenda-semana, desenhando examples/agenda.brief no formato grid](/template-gallery/agenda-semana.png)
-
-The week's agenda as a carousel — a cover on the first slide, several disciplines to a slide.
-
-**Marca** `azul` · **Faz** carrossel · **Formatos** `grid` (1080 × 1350)
-
-**Slots**
-
-| Slot | Tipo |  | Aceita |
-| --- | --- | --- | --- |
-| `titulo` | `rich-text` | obrigatório | texto; no máximo 40 caracteres |
-| `imagem` | `image` | opcional | o caminho de uma imagem |
-| `selo` | `image` | opcional | o caminho de uma imagem |
-| `lamina` | `rich-text` | opcional | texto; repete: uma arte para cada; no mínimo 1; no máximo 12 |
-
-## aprovados
-
-![aprovados, desenhando examples/aprovados.brief no formato grid](/template-gallery/aprovados.png)
-
-An exam's approved list as a carousel — an emblem and the exam's name on the first slide, and the approved grouped by specialty on every slide.
-
-**Marca** `azul` · **Faz** carrossel · **Formatos** `grid` (1080 × 1350)
-
-**Slots**
-
-| Slot | Tipo |  | Aceita |
-| --- | --- | --- | --- |
-| `imagem` | `image` | opcional | o caminho de uma imagem |
-| `chamada` | `rich-text` | opcional | texto; no máximo 40 caracteres |
-| `subtitulo` | `rich-text` | opcional | texto; no máximo 60 caracteres |
-| `titulo` | `rich-text` | obrigatório | texto; no máximo 30 caracteres |
-| `selo` | `image` | opcional | o caminho de uma imagem |
-| `lamina` | `rich-text` | opcional | texto; repete: uma arte para cada; no mínimo 1; no máximo 12 |
 
 ## banner-roxo
 
@@ -106,67 +70,3 @@ Course promotion with a teacher photo, a headline and a colour variant.
 | `subtitulo` | `rich-text` | opcional | texto; no máximo 140 caracteres |
 | `imagem` | `image` | opcional | o caminho de uma imagem |
 | `tom` | `enum` | opcional | um de `azul`, `laranja`, `verde` (padrão `azul`) |
-
-## simulados-semana-ocre
-
-![simulados-semana-ocre, desenhando examples/simulados.brief no formato grid](/template-gallery/simulados-semana-ocre.png)
-
-ocre's mock exams of the week as a carousel and as stories — the title, then each day's schedule and its exams; the last grid asks for a comment.
-
-**Marca** `ocre` · **Faz** carrossel, stories · **Formatos** `grid` (1080 × 1350), `story` (1080 × 1920)
-
-**Slots**
-
-| Slot | Tipo |  | Aceita |
-| --- | --- | --- | --- |
-| `titulo` | `rich-text` | obrigatório | texto; no máximo 60 caracteres |
-| `chamada` | `rich-text` | opcional | texto; no máximo 60 caracteres |
-| `selo` | `image` | opcional | o caminho de uma imagem |
-| `lamina` | `rich-text` | opcional | texto; repete: uma arte para cada; no mínimo 1; no máximo 12 |
-
-## simulados-semana-roxo
-
-![simulados-semana-roxo, desenhando examples/simulados.brief no formato story](/template-gallery/simulados-semana-roxo.png)
-
-roxo's mock exams of the week as stories — the title, then each day's schedule and its exams, one story per slide.
-
-**Marca** `roxo` · **Faz** stories · **Formatos** `story` (1080 × 1920)
-
-**Slots**
-
-| Slot | Tipo |  | Aceita |
-| --- | --- | --- | --- |
-| `titulo` | `rich-text` | obrigatório | texto; no máximo 60 caracteres |
-| `lamina` | `rich-text` | opcional | texto; repete: uma arte para cada; no mínimo 1; no máximo 12 |
-
-## simulados-semana-vinho
-
-![simulados-semana-vinho, desenhando examples/simulados.brief no formato grid](/template-gallery/simulados-semana-vinho.png)
-
-vinho's mock exams of the week as a carousel and as stories — the title, then each day's schedule and its exams; the last grid asks for a comment.
-
-**Marca** `vinho` · **Faz** carrossel, stories · **Formatos** `grid` (1080 × 1350), `story` (1080 × 1920)
-
-**Slots**
-
-| Slot | Tipo |  | Aceita |
-| --- | --- | --- | --- |
-| `titulo` | `rich-text` | obrigatório | texto; no máximo 60 caracteres |
-| `chamada` | `rich-text` | opcional | texto; no máximo 60 caracteres |
-| `selo` | `image` | opcional | o caminho de uma imagem |
-| `lamina` | `rich-text` | opcional | texto; repete: uma arte para cada; no mínimo 1; no máximo 12 |
-
-## tabela-roxo
-
-![tabela-roxo, desenhando examples/quatro-colunas.brief no formato grid](/template-gallery/tabela-roxo.png)
-
-roxo's table in one image — a title over the whole table, sized by measuring so every row fits one 1080×1350 post.
-
-**Marca** `roxo` · **Faz** grid · **Formatos** `grid` (1080 × 1350)
-
-**Slots**
-
-| Slot | Tipo |  | Aceita |
-| --- | --- | --- | --- |
-| `titulo` | `rich-text` | obrigatório | texto; no máximo 120 caracteres |
-| `tabela` | `rich-text` | obrigatório | texto |

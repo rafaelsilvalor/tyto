@@ -45,7 +45,7 @@ const lamina = (name: string): string[] => [
 
 const LINES = [
   '---',
-  'template: agenda-semana',
+  'template: carrossel-lista',
   '---',
   '::titulo AGENDA DA SEMANA',
   '// uma nota',

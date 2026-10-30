@@ -35,8 +35,8 @@ const shots = process.env['TYTO_TYPOGRAPHY_SHOTS'];
 
 const BRIEF = [
   '---',
-  'template: agenda-semana',
-  'formats: [grid]',
+  'template: carrossel-lista',
+  'formats: [grid-1x1]',
   '---',
   '::titulo',
   '  AGENDA DA SEMANA',

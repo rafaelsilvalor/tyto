@@ -29,7 +29,7 @@ packages/
   export-html    Scene → HTML/CSS (SceneVisitor)
   export-svg     Scene → SVG (SceneVisitor)
   raster         Rasterizer port + chromium adapter (Electron offscreen or Playwright)
-  templates      built-in templates (template-pack plugin)
+  templates      the built-in test templates (template-pack plugin); production templates live in their own repositories (TYTO-436)
   template-kit   what a TypeScript template composes with: arrangement and configurable components (pillTable)
   house-style    the house's tokens, presets and shared parts its templates are drawn with (ADR 0151)
   theme-pack     well-known colour themes (Dracula, Nord, Solarized…) as a theme plugin, bundled into main

@@ -38,10 +38,10 @@ beforeAll(async () => {
 });
 
 describe('a built-in template’s skeleton', () => {
-  it('is checked for all nine built-in templates', () => {
+  it('is checked for all three built-in templates', () => {
     // A count, so a folder that stopped being found reads as a failure rather than as fewer
     // green cases.
-    expect(builtInNames).toHaveLength(9);
+    expect(builtInNames).toHaveLength(3);
   });
 
   it.each(builtInNames)('compiles with its placeholders as they are: %s', async (name) => {

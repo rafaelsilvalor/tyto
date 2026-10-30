@@ -14,30 +14,11 @@ import { exportSvg } from '@tyto/export-svg';
 import { compileTemplate, placeholderFont } from '@tyto/template-kit/testing';
 import { describe, expect, it } from 'vitest';
 
-import agendaBrief from '../templates/agenda-semana/examples/agenda.brief?raw';
-import agendaManifest from '../templates/agenda-semana/manifest.yaml?raw';
-import { build as agendaSemana } from '../templates/agenda-semana/template.js';
-import aprovadosBrief from '../templates/aprovados/examples/aprovados.brief?raw';
-import aprovadosManifest from '../templates/aprovados/manifest.yaml?raw';
-import { build as aprovados } from '../templates/aprovados/template.js';
 import agenciaBrief from '../templates/banner-roxo/examples/agencia.brief?raw';
 import prefeituraBrief from '../templates/banner-roxo/examples/prefeitura.brief?raw';
 import bannerManifest from '../templates/banner-roxo/manifest.yaml?raw';
 import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
 import formatsYaml from '../templates/formats.yaml?raw';
-import simuladosOcreBrief from '../templates/simulados-semana-ocre/examples/simulados.brief?raw';
-import simuladosOcreManifest from '../templates/simulados-semana-ocre/manifest.yaml?raw';
-import { build as simuladosOcre } from '../templates/simulados-semana-ocre/template.js';
-import simuladosRoxoBrief from '../templates/simulados-semana-roxo/examples/simulados.brief?raw';
-import simuladosRoxoManifest from '../templates/simulados-semana-roxo/manifest.yaml?raw';
-import { build as simuladosRoxo } from '../templates/simulados-semana-roxo/template.js';
-import simuladosVinhoBrief from '../templates/simulados-semana-vinho/examples/simulados.brief?raw';
-import simuladosVinhoManifest from '../templates/simulados-semana-vinho/manifest.yaml?raw';
-import { build as simuladosVinho } from '../templates/simulados-semana-vinho/template.js';
-import quatroColunasBrief from '../templates/tabela-roxo/examples/quatro-colunas.brief?raw';
-import tresColunasBrief from '../templates/tabela-roxo/examples/tres-colunas.brief?raw';
-import tabelaManifest from '../templates/tabela-roxo/manifest.yaml?raw';
-import { build as tabelaRoxo } from '../templates/tabela-roxo/template.js';
 
 /**
  * The bytes every built-in code template writes for its own example briefs (TYTO-453).
@@ -130,44 +111,9 @@ function svgOf(scene: Scene): readonly string[] {
   return valueOf(exported).map((frame) => frame.svg);
 }
 
-describe('agenda-semana', () => {
-  snapshotsOf(templateOf(agendaManifest, agendaSemana), [{ name: 'agenda', brief: agendaBrief }]);
-});
-
-describe('aprovados', () => {
-  snapshotsOf(templateOf(aprovadosManifest, aprovados), [
-    { name: 'aprovados', brief: aprovadosBrief },
-  ]);
-});
-
 describe('banner-roxo', () => {
   snapshotsOf(templateOf(bannerManifest, bannerRoxo), [
     { name: 'agencia', brief: agenciaBrief },
     { name: 'prefeitura', brief: prefeituraBrief },
-  ]);
-});
-
-describe('simulados-semana-ocre', () => {
-  snapshotsOf(templateOf(simuladosOcreManifest, simuladosOcre), [
-    { name: 'simulados', brief: simuladosOcreBrief },
-  ]);
-});
-
-describe('simulados-semana-roxo', () => {
-  snapshotsOf(templateOf(simuladosRoxoManifest, simuladosRoxo), [
-    { name: 'simulados', brief: simuladosRoxoBrief },
-  ]);
-});
-
-describe('simulados-semana-vinho', () => {
-  snapshotsOf(templateOf(simuladosVinhoManifest, simuladosVinho), [
-    { name: 'simulados', brief: simuladosVinhoBrief },
-  ]);
-});
-
-describe('tabela-roxo', () => {
-  snapshotsOf(templateOf(tabelaManifest, tabelaRoxo), [
-    { name: 'quatro-colunas', brief: quatroColunasBrief },
-    { name: 'tres-colunas', brief: tresColunasBrief },
   ]);
 });

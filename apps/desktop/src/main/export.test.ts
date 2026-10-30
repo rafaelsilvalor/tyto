@@ -40,11 +40,32 @@ const packDirectory = join(dirname(require_.resolve('@tyto/templates/package.jso
 const exampleBrief = (template: string, file: string): string =>
   readFileSync(join(packDirectory, template, 'examples', file), 'utf8');
 
+/** A 1×1 PNG: the picture the delivery copies into `assets/`. */
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/**
+ * `promo-curso`'s example with a picture beside it, in `examples` — what a delivery copies:
+ * the brief into `editaveis/`, the picture into `assets/`.
+ */
+function promoWithPicture(): string {
+  mkdirSync(join(examples, 'assets'), { recursive: true });
+  writeFileSync(join(examples, 'assets', 'foto.png'), PNG);
+  return exampleBrief('promo-curso', 'promo.brief').replace(
+    'tom: laranja\n',
+    'tom: laranja\nimagem: ./foto.png\n',
+  );
+}
+
 let service: ExportService;
 let out: string;
+let examples: string;
 
 beforeEach(async () => {
   out = mkdtempSync(join(tmpdir(), 'tyto-export-'));
+  examples = mkdtempSync(join(tmpdir(), 'tyto-export-brief-'));
   service = await createExportService({
     fileSystem: nodeFileSystem(),
     sources: await createProjectSources({
@@ -57,6 +78,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   rmSync(out, { recursive: true, force: true });
+  rmSync(examples, { recursive: true, force: true });
 });
 
 /** Polls until the run is over, or throws with the state it got stuck in. */
@@ -99,12 +121,11 @@ describe('the export service', () => {
   }, 60_000);
 
   it('delivers into the picked folder: artwork on top, editaveis/ and assets/ (TYTO-205)', async () => {
-    const examples = join(packDirectory, 'agenda-semana', 'examples');
     const { exportId } = await service.start({
-      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      brief: promoWithPicture(),
       directory: out,
       briefDirectory: examples,
-      label: 'agenda',
+      label: 'promo',
       outputs: [{ kind: 'svg' }],
       removeLeftovers: true,
       delivery: true,
@@ -114,15 +135,20 @@ describe('the export service', () => {
 
     expect(progress.diagnostics.filter((item) => item.severity === 'error')).toEqual([]);
     // No level named after the brief: the folder the person picked is the delivery.
-    expect(readdirSync(out).sort()).toEqual(['assets', 'editaveis', 'grid-01.svg', 'grid-02.svg']);
+    expect(readdirSync(out).sort()).toEqual([
+      'assets',
+      'editaveis',
+      'grid-1x1-01.svg',
+      'story-01.svg',
+    ]);
     expect(readdirSync(join(out, 'editaveis')).sort()).toEqual([
-      'agenda.brief',
+      'promo.brief',
       'result.json',
       'template.txt',
     ]);
-    expect(readdirSync(join(out, 'assets'))).toEqual(['calendario.png']);
-    expect(readFileSync(join(out, 'editaveis', 'agenda.brief'), 'utf8')).toContain(
-      'imagem: calendario.png\n',
+    expect(readdirSync(join(out, 'assets'))).toEqual(['foto.png']);
+    expect(readFileSync(join(out, 'editaveis', 'promo.brief'), 'utf8')).toContain(
+      'imagem: foto.png\n',
     );
   }, 60_000);
 
@@ -131,10 +157,10 @@ describe('the export service', () => {
     // wording for something the person fixes by renaming a file (TYTO-129).
     writeFileSync(join(out, 'editaveis'), 'nao sou pasta');
     const { exportId } = await service.start({
-      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      brief: promoWithPicture(),
       directory: out,
-      briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
-      label: 'agenda',
+      briefDirectory: examples,
+      label: 'promo',
       outputs: [{ kind: 'svg' }],
       delivery: true,
     });
@@ -155,10 +181,10 @@ describe('the export service', () => {
   it('answers a file named assets with an error beside the artwork it did write', async () => {
     writeFileSync(join(out, 'assets'), 'nao sou pasta');
     const { exportId } = await service.start({
-      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      brief: promoWithPicture(),
       directory: out,
-      briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
-      label: 'agenda',
+      briefDirectory: examples,
+      label: 'promo',
       outputs: [{ kind: 'svg' }],
       delivery: true,
     });
@@ -172,27 +198,32 @@ describe('the export service', () => {
       progress.diagnostics.filter((item) => item.severity === 'error').map((item) => item.code),
     ).toEqual(['E_DELIVERY_FOLDER_BLOCKED']);
     expect(progress.result?.status).toBe('error');
-    expect(readdirSync(out).sort()).toEqual(['assets', 'editaveis', 'grid-01.svg', 'grid-02.svg']);
+    expect(readdirSync(out).sort()).toEqual([
+      'assets',
+      'editaveis',
+      'grid-1x1-01.svg',
+      'story-01.svg',
+    ]);
   }, 60_000);
 
   // TYTO-243: a folder where the delivery writes a file. Was `failure: "EPERM … rename"`.
   it.each([
-    ['the copied brief', ['editaveis', 'agenda.brief']],
+    ['the copied brief', ['editaveis', 'promo.brief']],
     ['template.txt', ['editaveis', 'template.txt']],
-    ['an image in assets/', ['assets', 'calendario.png']],
+    ['an image in assets/', ['assets', 'foto.png']],
     ['result.json', ['editaveis', 'result.json']],
     // Was `E_OUTPUT_WRITE Could not write 'grid-01.svg': …` until ADR 0108.
-    ['an artwork file', ['grid-01.svg']],
+    ['an artwork file', ['grid-1x1-01.svg']],
   ])(
     'answers a folder holding %s with a diagnostic, not a failure',
     async (_, segments) => {
       const held = join(out, ...segments);
       mkdirSync(held, { recursive: true });
       const { exportId } = await service.start({
-        brief: exampleBrief('agenda-semana', 'agenda.brief'),
+        brief: promoWithPicture(),
         directory: out,
-        briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
-        label: 'agenda',
+        briefDirectory: examples,
+        label: 'promo',
         outputs: [{ kind: 'svg' }],
         delivery: true,
       });
@@ -220,12 +251,12 @@ describe('the export service', () => {
   // failure rather than a diagnostic. A folder at the scratch name stands in for the lock,
   // which Node cannot take; the real one was measured by hand for the PR.
   it('answers an artwork write nobody explained with a failure, not a diagnostic', async () => {
-    mkdirSync(join(out, 'grid-01.svg.part', 'dentro'), { recursive: true });
+    mkdirSync(join(out, 'grid-1x1-01.svg.part', 'dentro'), { recursive: true });
     const { exportId } = await service.start({
-      brief: exampleBrief('agenda-semana', 'agenda.brief'),
+      brief: promoWithPicture(),
       directory: out,
-      briefDirectory: join(packDirectory, 'agenda-semana', 'examples'),
-      label: 'agenda',
+      briefDirectory: examples,
+      label: 'promo',
       outputs: [{ kind: 'svg' }],
       delivery: true,
     });
@@ -545,9 +576,9 @@ describe('a queue kind whose exporter is gone (TYTO-188)', () => {
 
   it('drops it in a real run, and result.json says so beside the files it lists', async () => {
     const progress = await service.run({
-      brief: exampleBrief('aprovados', 'aprovados.brief'),
+      brief: exampleBrief('promo-curso', 'promo.brief'),
       directory: out,
-      label: 'aprovados',
+      label: 'promo',
       outputs: [{ kind: 'svg' }, { kind: 'txt' }],
       dropUnavailableKinds: true,
     });
@@ -566,9 +597,9 @@ describe('a queue kind whose exporter is gone (TYTO-188)', () => {
 
   it('still refuses an unknown kind from the export box, which never asks to drop one', async () => {
     const progress = await service.run({
-      brief: exampleBrief('aprovados', 'aprovados.brief'),
+      brief: exampleBrief('promo-curso', 'promo.brief'),
       directory: out,
-      label: 'aprovados',
+      label: 'promo',
       outputs: [{ kind: 'txt' }],
     });
 
@@ -577,6 +608,22 @@ describe('a queue kind whose exporter is gone (TYTO-188)', () => {
 });
 
 describe("the export of a plugin file's alias (TYTO-433, ADR 0151)", () => {
+  // No template left in the pack declares `values` (TYTO-436), so the configuration shows
+  // itself through its brief side (TYTO-440): a subtitle the brief leaves unset.
+  const SUBTITLE = 'Vagas limitadas';
+  const ALIASED = {
+    name: 'turma',
+    alias: 'promo-turma',
+    values: {},
+    brief: { slots: { subtitulo: { value: SUBTITLE } } },
+  };
+  const briefOfAlias = (): string => {
+    const example = exampleBrief('promo-curso', 'promo.brief');
+    return example
+      .slice(0, example.indexOf('::subtitulo'))
+      .replace('template: promo-curso', 'template: promo-turma');
+  };
+
   it('exports the template the alias reaches, with its configuration', async () => {
     const sources = await createProjectSources({
       fileSystem: nodeFileSystem(),
@@ -591,12 +638,10 @@ describe("the export of a plugin file's alias (TYTO-433, ADR 0151)", () => {
         project: [],
         machine: [
           {
-            template: 'tabela-roxo',
-            file: 'tabelas.yaml',
+            template: 'promo-curso',
+            file: 'promos.yaml',
             directory: packDirectory,
-            configurations: [
-              { name: 'sepia', alias: 'tabela-sepia', values: { paper: { value: '#f4e9d0' } } },
-            ],
+            configurations: [ALIASED],
           },
         ],
       },
@@ -610,12 +655,9 @@ describe("the export of a plugin file's alias (TYTO-433, ADR 0151)", () => {
     });
 
     const { exportId } = await aliased.start({
-      brief: exampleBrief('tabela-roxo', 'tres-colunas.brief').replace(
-        'template: tabela-roxo',
-        'template: tabela-sepia',
-      ),
+      brief: briefOfAlias(),
       directory: out,
-      label: 'sepia',
+      label: 'turma',
       outputs: [{ kind: 'svg' }],
     });
     for (;;) {
@@ -628,6 +670,6 @@ describe("the export of a plugin file's alias (TYTO-433, ADR 0151)", () => {
     }
 
     const svg = readdirSync(out).find((name) => name.endsWith('.svg')) ?? '';
-    expect(readFileSync(join(out, svg), 'utf8').toLowerCase()).toContain('#f4e9d0');
+    expect(readFileSync(join(out, svg), 'utf8')).toContain(SUBTITLE);
   }, 60_000);
 });

@@ -39,8 +39,8 @@ const BODY = Array.from(
 /** Two levels of indent and a block long enough to scroll inside. */
 const BRIEF = [
   '---', //                      0
-  'template: agenda-semana', //  1
-  'formats: [grid]', //          2
+  'template: carrossel-lista', // 1
+  'formats: [grid-1x1]', //      2
   '---', //                      3
   '::titulo', //                 4
   '  AGENDA DA SEMANA', //       5
