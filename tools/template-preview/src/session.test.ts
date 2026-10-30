@@ -180,6 +180,31 @@ describe('PreviewSession', () => {
     expect(session.current().status).toBe('ok');
   });
 
+  it('installs a repository before every render, and renders from its private home (TYTO-485)', async () => {
+    const script = fresh();
+    const target = { ...TARGET, repository: { folder: '/repo', plugin: 'sample' } };
+    const session = new PreviewSession(target, root, ports(script));
+
+    await session.request({ rebuild: false });
+
+    expect(script.rebuilt).toEqual([{ kit: false, templates: false }]);
+    expect(script.renders[0]).toMatchObject({
+      templates: join(root, 'no-templates'),
+      home: join(root, 'home'),
+    });
+  });
+
+  it('renders a pack template with the person’s home and its own templates', async () => {
+    const script = fresh();
+    const session = new PreviewSession(TARGET, root, ports(script));
+
+    await session.request({ rebuild: false });
+
+    expect(script.rebuilt).toEqual([]);
+    expect(script.renders[0]?.templates).toBe('/templates');
+    expect(script.renders[0]?.home).toBeUndefined();
+  });
+
   it('collapses a burst of requests into the one running and one more', async () => {
     const script = fresh();
     const session = new PreviewSession(TARGET, root, ports(script));

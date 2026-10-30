@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { type TemplateRepository, repositoryScratch } from './repository.ts';
 import {
   type PreviewDiagnostic,
   type RebuildOutcome,
@@ -29,6 +30,12 @@ export interface PreviewTarget {
   readonly types: readonly string[];
   /** True when a saved `.ts` has to be rebuilt into `@tyto/templates` before a render. */
   readonly compiled: boolean;
+  /**
+   * Set for a template in its own repository (TYTO-485): `templates` is that repository's
+   * `templates/`, every render is preceded by the plugin's install into a private home, and the
+   * render reads that home rather than `templates` (`repository.ts`).
+   */
+  readonly repository?: TemplateRepository;
 }
 
 export interface PreviewImage {
@@ -178,7 +185,10 @@ export class PreviewSession {
       kit: job.kit || this.broken.kit,
       templates: job.rebuild || this.broken.templates,
     };
-    if (this.target.compiled && (packages.kit || packages.templates)) {
+    // A repository's plugin is staged and installed before every render, since a manifest or
+    // an example is as much its package as the build is; whether it builds is `templates`.
+    const repository = this.target.repository !== undefined;
+    if (this.target.compiled && (packages.kit || packages.templates || repository)) {
       this.publish({ ...this.state, status: 'building' });
       const started = this.ports.now();
       const built = await this.ports.rebuild(packages);
@@ -209,12 +219,14 @@ export class PreviewSession {
     await mkdir(folder, { recursive: true });
 
     const started = this.ports.now();
+    const scratch = repository ? repositoryScratch(this.outputRoot) : undefined;
     const outcome = await this.ports.render({
       brief: this.target.brief,
       out: folder,
-      templates: this.target.templates,
+      templates: scratch?.noTemplates ?? this.target.templates,
       formatsFile: this.target.formatsFile,
       types: this.target.types,
+      ...(scratch === undefined ? {} : { home: scratch.home }),
     });
     const renderMs = Math.round(this.ports.now() - started);
 

@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { TYTO_BINARY } from './paths.ts';
+import { repositoryRebuild } from './repository.ts';
 import { startPreviewServer } from './server.ts';
-import { PreviewSession } from './session.ts';
+import { type PreviewPorts, PreviewSession } from './session.ts';
+import { rebuildPackages, renderWithTyto } from './tyto.ts';
 import { DEFAULT_PORT, UsageError, parseArguments, resolveTarget } from './target.ts';
 import { watchTarget } from './watch.ts';
 
@@ -41,7 +43,17 @@ async function main(): Promise<void> {
   }
 
   const outputRoot = await mkdtemp(join(tmpdir(), 'tyto-preview-'));
-  const session = new PreviewSession(target, outputRoot);
+  // A template in its own repository renders as an installed plugin, from a home of this run's
+  // own inside `outputRoot`, so it goes when the preview does (TYTO-485, `repository.ts`).
+  const rebuild: PreviewPorts['rebuild'] =
+    target.repository === undefined
+      ? rebuildPackages
+      : await repositoryRebuild(target.repository, outputRoot);
+  const session = new PreviewSession(target, outputRoot, {
+    render: renderWithTyto,
+    rebuild,
+    now: () => performance.now(),
+  });
   const server = await startPreviewServer(session, port);
   const stopWatching = watchTarget(target, session);
 

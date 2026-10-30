@@ -58,6 +58,22 @@ export interface ResolvedSlot {
 export interface ResolvedArtwork {
   readonly index: number;
   readonly slot: ResolvedSlot;
+  /**
+   * The slots declared `per` the repeatable one that this occurrence was given, by name
+   * (ADR 0160): the `::imagem` written after this `::lamina`. Each keeps its own range, so
+   * where it sat among the slide's lines is still known.
+   */
+  readonly slots: Readonly<Record<string, ResolvedSlot>>;
+  /** The required `per` slots this occurrence left unset; `compile` stamps only its frames. */
+  readonly missingRequiredSlots: readonly string[];
+}
+
+/** An occurrence while the brief is still being read: its own slots arrive after it. */
+interface OpenArtwork {
+  readonly index: number;
+  readonly slot: ResolvedSlot;
+  readonly slots: Record<string, ResolvedSlot>;
+  readonly missingRequiredSlots: string[];
 }
 
 export interface ResolvedBrief {
@@ -240,7 +256,7 @@ function scalarCandidate(name: string, value: string, range: SourceRange): Candi
 class Resolver {
   private readonly problems: Diagnostic[] = [];
   private readonly slots = new Map<string, ResolvedSlot>();
-  private readonly artworks: ResolvedArtwork[] = [];
+  private readonly artworks: OpenArtwork[] = [];
   private readonly assets = new Map<string, AssetRef>();
   private readonly missingRequired: string[] = [];
 
@@ -270,6 +286,17 @@ class Resolver {
       return;
     }
 
+    if (slot.per !== undefined && fromFrontmatter) {
+      this.report(
+        badValue(
+          candidate.name,
+          `belongs to each '${slot.per}' and is written as a ::directive after it, not in the frontmatter`,
+          candidate.range,
+        ),
+      );
+      return;
+    }
+
     if (slot.repeat && fromFrontmatter) {
       this.report(
         badValue(
@@ -293,7 +320,17 @@ class Resolver {
     };
 
     if (slot.repeat) {
-      this.artworks.push({ index: this.artworks.length, slot: resolved });
+      this.artworks.push({
+        index: this.artworks.length,
+        slot: resolved,
+        slots: {},
+        missingRequiredSlots: [],
+      });
+      return;
+    }
+
+    if (slot.per !== undefined) {
+      this.takeForOccurrence(resolved, slot.per);
       return;
     }
 
@@ -308,6 +345,37 @@ class Resolver {
       return;
     }
     this.slots.set(candidate.name, resolved);
+  }
+
+  /**
+   * A `per` slot's value goes to the occurrence written last before it (ADR 0160).
+   *
+   * Checked after the value, on purpose: a missing file is reported at this line whether or
+   * not the line also has no slide to belong to, so one pass names both problems.
+   */
+  private takeForOccurrence(resolved: ResolvedSlot, owner: string): void {
+    const occurrence = this.artworks[this.artworks.length - 1];
+    if (occurrence === undefined) {
+      this.report(
+        badValue(
+          resolved.name,
+          `belongs to a '${owner}' and is written after one, and no '${owner}' comes before it`,
+          resolved.range,
+        ),
+      );
+      return;
+    }
+    if (resolved.name in occurrence.slots) {
+      this.report(
+        badValue(
+          resolved.name,
+          `is set more than once for ${owner} ${occurrence.index + 1}, and each '${owner}' takes one`,
+          resolved.range,
+        ),
+      );
+      return;
+    }
+    occurrence.slots[resolved.name] = resolved;
   }
 
   private checkAdjustments(candidate: Candidate, slot: Slot): readonly ResolvedAdjustment[] {
@@ -515,6 +583,10 @@ class Resolver {
   /** Manifest defaults, the required slots nobody set, and the repeat count. */
   finish(fallbackRange: SourceRange | undefined): void {
     for (const [name, slot] of Object.entries(this.manifest.slots)) {
+      if (slot.per !== undefined) {
+        this.finishPerOccurrence(name, slot);
+        continue;
+      }
       if (slot.default !== undefined && !this.slots.has(name) && !slot.repeat) {
         this.slots.set(name, {
           name,
@@ -565,7 +637,8 @@ class Resolver {
 
     const rendered = this.options.renderedSlots;
     if (rendered !== undefined) {
-      for (const [name, resolved] of this.slots) {
+      const perOccurrence = this.artworks.flatMap((artwork) => Object.entries(artwork.slots));
+      for (const [name, resolved] of [...this.slots, ...perOccurrence]) {
         if (rendered.includes(name)) continue;
         this.report(
           diagnostic(
@@ -575,6 +648,27 @@ class Resolver {
           ),
         );
       }
+    }
+  }
+
+  /**
+   * A required `per` slot is required on every occurrence, and the hole is that slide's: the
+   * diagnostic points at its `::lamina` and only its frames are stamped (ADR 0035, ADR 0160).
+   * With no occurrence at all there is no slide to be missing anything, and the repeatable
+   * slot's own `min` or `required` says so.
+   */
+  private finishPerOccurrence(name: string, slot: Slot): void {
+    if (!slot.required) return;
+    for (const occurrence of this.artworks) {
+      if (name in occurrence.slots) continue;
+      occurrence.missingRequiredSlots.push(name);
+      this.report(
+        diagnostic(
+          'E_MISSING_REQUIRED_SLOT',
+          { template: this.manifest.name, slot: name },
+          occurrence.slot.range === undefined ? {} : { range: occurrence.slot.range },
+        ),
+      );
     }
   }
 

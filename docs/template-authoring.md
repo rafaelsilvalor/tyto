@@ -98,6 +98,13 @@ These are the rules it enforces beyond the shape:
   `repeat: true` and the same pair counts occurrences, which is meaningful for every type.
 - **At most one slot may repeat.** Each occurrence becomes an `Artwork`, so a second
   repeatable slot would leave the number of artworks undefined.
+- **`per: lamina` gives each slide a slot of its own** (ADR 0160):
+  `imagem: { type: image, per: lamina }` takes one value per slide, written as `::imagem`
+  after that slide's `::lamina`, and the template reads `slots.imagem` as this slide's
+  picture — the same way it reads `slots.lamina`. `per` names the repeatable slot, and a
+  `per` slot neither repeats nor takes a `default`. Several may belong to one slide
+  (`imagem` and `foto`). This replaces numbered slots (`imagem-1` … `imagem-4`) picked with
+  an adjustment, which capped the carousel at the number declared.
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's
   identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by
   any brief.
@@ -833,6 +840,39 @@ What a save does depends on the file:
   watched too; it used not to be, because a relative path between two drives is absolute and
   was read as "inside the template folder" (TYTO-181).
 
+### A template in its own repository
+
+```bash
+pnpm template:preview C:/projects/tyto/templates/tyto-template-questao-estrategica
+```
+
+The argument may also be a repository — the folder with the `tyto-plugin.json` (ADR 0151) — or
+`templates/<name>` inside one (TYTO-485). Its template has no `template.ts` beside the manifest:
+the code is the plugin's `dist/index.js`. So handing its `templates/` to `tyto render` as
+`--templates` reads it as a project template with no code (`E_TEMPLATE_READ`), and the preview
+loads it **the way an installed plugin loads** instead:
+
+1. `src/` is built with the repository's own `tsup.config.ts` into a staging folder — never into
+   the repository's committed `dist/`, which stays the author's to rebuild and commit. The
+   repository needs its `pnpm install`, because the bundle takes `@tyto/*` from its
+   `node_modules/`. A repository with no `src/` ships its `dist/` as written, and the preview
+   builds from that.
+2. The files its `package.json` publishes (`files`) are copied beside the build, and
+   `tyto plugin install <stage> --yes` installs the stage into a `TYTO_HOME` of the preview's
+   own, inside its output folder and deleted with it. Installing the repository folder itself
+   copies `node_modules/`: 48 s on `questao-estrategica`, where the stage takes 0.6 s.
+3. `tyto render` runs with that home and an empty `--templates`, and the brief's formats are the
+   repository's `templates/formats.yaml`.
+
+**The person's other installed plugins are copied into that home**, folder and approval, so a
+brand kit draws the logo as `tyto render` on the same machine does. The plugin files' cached
+copies (`plugin-files/`) are not: one of the same name, fetched from the published repository,
+would load over the one being written. A save under `src/` builds and installs; one under
+`templates/`, or to `tyto-plugin.json` or `package.json`, installs alone. Measured on
+`questao-estrategica` on the maintainer's machine: 7.1 s to the first picture, 9.7 s from a
+`src/` save to the picture (4.7 s build and install, 5.0 s render), 8.4 s from an example save.
+A failed install shows `PREVIEW_INSTALL_FAILED` with the CLI's words.
+
 **A failure shows its diagnostics and no image.** A build error is esbuild's message at its
 file, line and column; a markup or template error is what `tyto render --json` printed. The
 picture from before the failure is removed from the page and its URL answers 404, so a stale
@@ -884,7 +924,8 @@ is the question ADR 0020 exists to prevent.
 
 **Markup only.** A folder whose layout is a `template.ts` opens as one sentence saying it cannot
 be edited here: running code that arrived in a folder is the plugin host's job (ADR 0007).
-`pnpm template:preview` is where a code template is watched while it is written.
+`pnpm template:preview` is where a code template is watched while it is written, in the
+built-in pack or in its own repository.
 
 Unsaved template work counts for the quit question as one more unsaved document, and closing the
 mode over it asks first.

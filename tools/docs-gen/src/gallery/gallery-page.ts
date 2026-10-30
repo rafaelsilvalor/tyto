@@ -40,6 +40,7 @@ const WORDS = {
     required: 'required',
     optional: 'optional',
     repeats: 'repeats: one artwork each',
+    per: (slot: string) => `per ${slot}: one on each slide, after its \`::${slot}\``,
     atMost: (count: number, unit: string) => `at most ${String(count)}${unit}`,
     atLeast: (count: number, unit: string) => `at least ${String(count)}${unit}`,
     characters: ' characters',
@@ -86,6 +87,7 @@ const WORDS = {
     required: 'obrigatório',
     optional: 'opcional',
     repeats: 'repete: uma arte para cada',
+    per: (slot: string) => `per ${slot}: um em cada slide, depois do \`::${slot}\` dele`,
     atMost: (count: number, unit: string) => `no máximo ${String(count)}${unit}`,
     atLeast: (count: number, unit: string) => `no mínimo ${String(count)}${unit}`,
     characters: ' caracteres',
@@ -114,6 +116,7 @@ function slotAccepts(words: Words, slot: Slot): string {
   if (slot.type === 'enum') parts.push(values(words, slot.values ?? [], slot.default));
   else parts.push(slot.type === 'image' ? words.image : words.text);
   if (slot.repeat) parts.push(words.repeats);
+  if (slot.per !== undefined) parts.push(words.per(slot.per));
   // On a repeating slot the bounds count artworks, which "repeats: one artwork each" has
   // already said; on any other they count characters (docs/template-authoring.md).
   const unit = slot.repeat ? '' : words.characters;

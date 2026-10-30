@@ -35,6 +35,16 @@ slots:
   imagem: { type: image }
 `);
 
+const QUESTAO = manifestOf(`
+name: questao
+version: 1.0.0
+formats: [feed]
+slots:
+  lamina: { type: rich-text, repeat: true, min: 1 }
+  imagem: { type: image, per: lamina }
+  tom: { type: enum, values: [claro, escuro], per: lamina }
+`);
+
 const analysisOf = (manifest?: TemplateManifest): BriefAnalysis => ({
   source: '',
   diagnostics: [],
@@ -133,6 +143,20 @@ describe('completeBrief', () => {
 
     expect(titulo?.detail).toBe('rich-text · required');
     expect(item?.detail).toBe('rich-text · repeat');
+  });
+
+  it('says which slide slot a per-slide slot belongs to (ADR 0160)', () => {
+    const doc = ['---', 'template: questao', '---', '::lamina', '  Um', '::|'].join('\n');
+    const result = completeAt(doc, analysisOf(QUESTAO));
+    const imagem = result?.options.find((option) => option.label === 'imagem');
+
+    expect(imagem?.detail).toBe('image · per lamina');
+  });
+
+  it('offers no frontmatter value for a per-slide enum, which is never a key there', () => {
+    const doc = ['---', 'template: questao', 'tom: |', '---'].join('\n');
+
+    expect(completeAt(doc, analysisOf(QUESTAO))).toBeNull();
   });
 
   it('swaps the whole list when the frontmatter names another template', () => {

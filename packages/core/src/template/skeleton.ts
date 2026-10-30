@@ -104,10 +104,14 @@ export function briefSkeleton(manifest: SkeletonManifest): string {
 
   const scalars: string[] = [];
   const directives: string[] = [];
+  // A slide's own required slots (ADR 0160) are written under every slide, never on their own.
+  const perOccurrence = Object.entries(manifest.slots).filter(
+    ([name, slot]) => slot.per !== undefined && slot.required && !filled.has(name),
+  );
 
   for (const [name, slot] of Object.entries(manifest.slots)) {
     // A slot the configuration fills is not one the brief cannot do without.
-    if (!inSkeleton(slot) || filled.has(name)) continue;
+    if (!inSkeleton(slot) || filled.has(name) || slot.per !== undefined) continue;
 
     if (slot.repeat) {
       for (let occurrence = 0; occurrence < occurrencesOf(slot); occurrence += 1) {
@@ -118,6 +122,11 @@ export function briefSkeleton(manifest: SkeletonManifest): string {
             ? `::${name}\n\t${field(take(), name)}`
             : `::${name} ${field(take(), scalarOf(name, slot))}`,
         );
+        for (const [own, ownSlot] of perOccurrence) {
+          directives.push(
+            `::${own} ${field(take(), ownSlot.type === 'rich-text' ? placeholderOf(own, ownSlot) : scalarOf(own, ownSlot))}`,
+          );
+        }
       }
     } else if (slot.type === 'rich-text') {
       directives.push(`::${name} ${field(take(), placeholderOf(name, slot))}`);
