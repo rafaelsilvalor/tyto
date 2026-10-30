@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import {
   type Diagnostic,
   type Diagnostics,
@@ -86,24 +88,77 @@ function indexer(): (source: string) => LineIndex {
   };
 }
 
-/** `path:line:col: error E_CODE Message.` plus an indented hint when there is one. */
-export function formatDiagnostics(items: Diagnostics, options: ReportOptions = {}): string {
+/** A diagnostic with the file and the line it points at, as `--json` and the sink carry it. */
+export interface LocatedDiagnostic {
+  readonly severity: string;
+  readonly code: string;
+  readonly message: string;
+  readonly path?: string;
+  readonly line?: number;
+  readonly column?: number;
+  readonly hint?: string;
+}
+
+/**
+ * Where each diagnostic points, sorted: the one reading both the printed text and the
+ * `--json` document are made from, so the two can never place a diagnostic differently.
+ */
+function locate(items: Diagnostics, options: ReportOptions): LocatedDiagnostic[] {
   const indexOf = indexer();
 
-  return sortDiagnostics(items)
-    .map((item) => {
-      const origin = originOf(item, options);
-      const position =
-        item.range === undefined || origin === undefined
-          ? undefined
-          : lineColumnAtIndex(indexOf(origin.source), item.range.start);
+  return sortDiagnostics(items).map((item) => {
+    const origin = originOf(item, options);
+    const position =
+      item.range === undefined || origin === undefined
+        ? undefined
+        : lineColumnAtIndex(indexOf(origin.source), item.range.start);
 
+    // Spread rather than assigned `undefined`: `exactOptionalPropertyTypes` tells an
+    // absent key from an undefined one, and a reader of the JSON should see neither.
+    return {
+      severity: item.severity,
+      code: item.code,
+      message: item.message,
+      ...(origin === undefined ? {} : { path: origin.path }),
+      ...(position === undefined ? {} : { line: position.line, column: position.column }),
+      ...(item.hint === undefined ? {} : { hint: item.hint }),
+    };
+  });
+}
+
+/**
+ * The run's diagnostics sink (`environment.diagnostics`, ADR 0159 decision 7), held for the
+ * run's own asynchronous work and nobody else's: two runs at once in the window each reach
+ * their own. Carried this way rather than threaded through every command, so every place that
+ * prints diagnostics reaches it, and what it prints is not touched.
+ */
+const sinks = new AsyncLocalStorage<(items: readonly LocatedDiagnostic[]) => void>();
+
+/** Runs `work` with `sink` receiving every diagnostic the run prints. */
+export function withDiagnosticsSink<T>(
+  sink: ((items: readonly LocatedDiagnostic[]) => void) | undefined,
+  work: () => T,
+): T {
+  return sink === undefined ? work() : sinks.run(sink, work);
+}
+
+function reported(located: readonly LocatedDiagnostic[]): void {
+  if (located.length > 0) sinks.getStore()?.(located);
+}
+
+/** `path:line:col: error E_CODE Message.` plus an indented hint when there is one. */
+export function formatDiagnostics(items: Diagnostics, options: ReportOptions = {}): string {
+  const located = locate(items, options);
+  reported(located);
+
+  return located
+    .map((item) => {
       const where =
-        origin === undefined
+        item.path === undefined
           ? ''
-          : position === undefined
-            ? `${origin.path}: `
-            : `${origin.path}:${String(position.line)}:${String(position.column)}: `;
+          : item.line === undefined || item.column === undefined
+            ? `${item.path}: `
+            : `${item.path}:${String(item.line)}:${String(item.column)}: `;
 
       const hint = item.hint === undefined ? '' : `\n    ${item.hint}`;
       return `${where}${item.severity} ${item.code} ${item.message}${hint}\n`;
@@ -114,44 +169,16 @@ export function formatDiagnostics(items: Diagnostics, options: ReportOptions = {
 /** What `--json` prints for a command that has no artifacts to report. */
 export interface DiagnosticsDocument {
   readonly status: 'ok' | 'error';
-  readonly diagnostics: readonly {
-    readonly severity: string;
-    readonly code: string;
-    readonly message: string;
-    readonly path?: string;
-    readonly line?: number;
-    readonly column?: number;
-    readonly hint?: string;
-  }[];
+  readonly diagnostics: readonly LocatedDiagnostic[];
 }
 
 export function diagnosticsDocument(
   items: Diagnostics,
   options: ReportOptions = {},
 ): DiagnosticsDocument {
-  const indexOf = indexer();
-
-  return {
-    status: hasErrors(items) ? 'error' : 'ok',
-    diagnostics: sortDiagnostics(items).map((item) => {
-      const origin = originOf(item, options);
-      const position =
-        item.range === undefined || origin === undefined
-          ? undefined
-          : lineColumnAtIndex(indexOf(origin.source), item.range.start);
-
-      // Spread rather than assigned `undefined`: `exactOptionalPropertyTypes` tells an
-      // absent key from an undefined one, and a reader of the JSON should see neither.
-      return {
-        severity: item.severity,
-        code: item.code,
-        message: item.message,
-        ...(origin === undefined ? {} : { path: origin.path }),
-        ...(position === undefined ? {} : { line: position.line, column: position.column }),
-        ...(item.hint === undefined ? {} : { hint: item.hint }),
-      };
-    }),
-  };
+  const located = locate(items, options);
+  reported(located);
+  return { status: hasErrors(items) ? 'error' : 'ok', diagnostics: located };
 }
 
 /** Two spaces of indent and a trailing newline, the shape every `--json` here prints. */

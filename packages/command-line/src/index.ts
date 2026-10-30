@@ -15,6 +15,7 @@ export type {
   CommandInvocation,
 } from './environment.js';
 export { EXIT_CODES, EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
+export type { LocatedDiagnostic } from './report.js';
 export { type CloseableRasterizer } from './plugins/rasterizer.js';
 export {
   TEST_GUEST_VARIABLE,
