@@ -2,7 +2,7 @@
 
 # Linha de comando
 
-Todos os comandos que o `tyto` aceita: 15. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
+Todos os comandos que o `tyto` aceita: 16. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
 
 ::: info Ajuda em inglês
 A ajuda da linha de comando existe só em inglês, e esta página a mostra como o terminal a imprime.
@@ -113,6 +113,27 @@ tyto template new [options] <name>
 | --- | --- | --- |
 | `--out <dir>` | where the folder is created | `"templates"` |
 | `--formats <ids>` | comma-separated format ids the template renders | `["grid"]` |
+
+## tyto delivery new
+
+make &lt;name>/ with assets/ and editaveis/, and its brief in editaveis/&lt;name>.brief; prints the brief
+
+```sh
+tyto delivery new [options] <name>
+```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `<name>` | the delivery's folder name, usually the ticket key and a title |
+
+**Opções**
+
+| Opção | O que faz | Padrão |
+| --- | --- | --- |
+| `-t, --template <name>` | start the brief from this template's skeleton |  |
+| `--trust` | trust the workspace folder and its work profile for this run only; never written to trust.json |  |
 
 ## tyto plugin list
 

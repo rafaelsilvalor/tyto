@@ -103,15 +103,32 @@ export function isPathShaped(value: string): boolean {
  * it may climb out of that folder or mean something to the file system other than a name.
  */
 export function problemWithName(name: string): string | undefined {
-  if (name.startsWith('.')) return 'starts with a dot, which a profile name may not';
-  if (name.includes('..')) return "holds '..', which a profile name may not";
+  return problemWithFolderName(name, { noun: 'a profile name', maximum: MAXIMUM_NAME_LENGTH });
+}
+
+/**
+ * Why `name` cannot be one folder's name that a person typed, or `undefined` when it can: the
+ * rule ADR 0114 wrote for a profile, which a delivery's name follows too (ADR 0157). Refused,
+ * never rewritten, because a second sanitiser beside the file system's own is how one name
+ * ends up as two folders. A path separator is a forbidden character here, so a name is always
+ * one segment. `noun` names what is refused; `maximum` counts UTF-16 code units, as Windows'
+ * path limit does.
+ */
+export function problemWithFolderName(
+  name: string,
+  rule: { readonly noun: string; readonly maximum: number },
+): string | undefined {
+  if (name.startsWith('.')) return `starts with a dot, which ${rule.noun} may not`;
+  if (name.includes('..')) return `holds '..', which ${rule.noun} may not`;
+  // A separator never reaches here as a profile, which `isPathShaped` reads as a path first.
+  if (/[\\/]/u.test(name)) return `holds a path separator, which ${rule.noun} may not`;
   if (FORBIDDEN_CHARACTERS.test(name) || [...name].some((character) => character < ' ')) {
     return 'holds a character a folder name may not';
   }
   if (/[ .]$/u.test(name)) return 'ends in a space or a dot, which Windows drops from a name';
   if (RESERVED_NAMES.test(name)) return 'is a name Windows reserves for a device';
-  if (name.length > MAXIMUM_NAME_LENGTH) {
-    return `is longer than ${String(MAXIMUM_NAME_LENGTH)} characters`;
+  if (name.length > rule.maximum) {
+    return `is longer than ${String(rule.maximum)} characters`;
   }
   return undefined;
 }
