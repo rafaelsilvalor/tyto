@@ -1,5 +1,25 @@
 # @tyto/editor
 
+## 0.12.0
+
+### Minor Changes
+
+- b7c5136: A slide carries its own slots (TYTO-482, ADR 0160). A manifest slot declared `per: lamina` takes one value per slide, written as `::imagem` after that slide's `::lamina`; it resolves like any other image, a missing file is reported at that line, and a template reads `slots.imagem` as this slide's picture. `ResolvedArtwork` gains `slots` and `missingRequiredSlots`, and a required `per` slot stamps only the slide that lacks it. The editor marks the slot `per lamina` and the skeleton writes it under every slide.
+
+### Patch Changes
+
+- 0164874: `tyto delivery new <name> [--template <name>]` makes a delivery: one folder per piece of work, named after its ticket, with `assets/`, `editaveis/` and the brief as `editaveis/<name>.brief` (TYTO-489, ADR 0157). The project file and a work profile gain the `delivery` key (`parent`, `folders`, `brief`, `exports`, `formats`, `types`), merged one subkey at a time; `parent` stays inside the workspace folder for every sheet. An existing delivery folder is reused, an existing brief is refused with `E_DELIVERY_BRIEF_EXISTS` and nothing written, and a name a folder cannot have is `W_DELIVERY_NAME_INVALID` (ADR 0114's profile rule, up to 100 characters, NFC). `@tyto/core` now holds `briefSkeleton` and `skeletonText`, which `@tyto/editor` re-exports unchanged.
+- Updated dependencies [503f924]
+- Updated dependencies [6d431f6]
+- Updated dependencies [eca9871]
+- Updated dependencies [b7c5136]
+- Updated dependencies [b40dea8]
+- Updated dependencies [0164874]
+- Updated dependencies [cd14464]
+  - @tyto/core@0.34.0
+  - @tyto/brief-lang@0.7.5
+  - @tyto/template-lang@0.8.6
+
 ## 0.11.0
 
 ### Minor Changes
