@@ -1,5 +1,13 @@
 # @tyto/template-lang
 
+## 0.8.5
+
+### Patch Changes
+
+- Updated dependencies [f612e26]
+- Updated dependencies [096f80e]
+  - @tyto/core@0.33.0
+
 ## 0.8.4
 
 ### Patch Changes
