@@ -223,3 +223,15 @@ export function imageSize(bytes: Buffer): Size | undefined {
   }
   return undefined;
 }
+
+/**
+ * The `size` field of a ref read from `bytes`, or nothing (ADR 0158).
+ *
+ * Spread into the ref where it is built, so a header nothing parses leaves the field out
+ * rather than writing `undefined`, which a strict schema on the other side of the
+ * isolation boundary reads as a value.
+ */
+export function sizeFieldOf(bytes: Buffer): { readonly size?: Size } {
+  const size = imageSize(bytes);
+  return size === undefined ? {} : { size };
+}

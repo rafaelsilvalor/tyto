@@ -50,6 +50,8 @@ export {
 
 export { type Mark, mark } from './mark.js';
 
+export { imageHeight } from './image.js';
+
 export { type BandedPageOptions, type Seal, bandedPage, reportOverflow, sealed } from './page.js';
 
 export {
