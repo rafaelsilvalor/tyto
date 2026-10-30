@@ -1,5 +1,16 @@
 # @tyto/core
 
+## 0.35.0
+
+### Minor Changes
+
+- 6881557: New warning `W_DELIVERY_ASSET_KEPT` (TYTO-499, ADR 0161): a delivery's assets folder already holds a different file under the name an image of the brief would be copied to, so the person's file is kept and that image is not copied.
+- 4168183: Ten diagnostic codes for the gallery (TYTO-503, ADR 0162): `E_GALLERY_INDEX_SYNTAX`, `E_GALLERY_INDEX_ENTRY`, `W_GALLERY_INDEX_KEY_UNKNOWN`, `E_GALLERY_INDEX_FETCH`, `W_GALLERY_INDEX_OFFLINE`, `E_GALLERY_ENTRY_UNKNOWN`, `E_GALLERY_ENGINE`, `E_GALLERY_NOT_INSTALLED`, `E_GALLERY_ENTRY_EDITED` and `E_GALLERY_WRITE`. All non-fatal.
+
+### Patch Changes
+
+- fc3bee5: Tests and comments stop naming the production templates as if they were built in (TYTO-436): a test's template name is invented or one of the pack's test templates, and a comment about a template in its own repository names the repository. No behaviour changes.
+
 ## 0.34.0
 
 ### Minor Changes

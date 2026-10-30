@@ -1,5 +1,18 @@
 # @tyto/editor
 
+## 0.12.1
+
+### Patch Changes
+
+- fc3bee5: Tests and comments stop naming the production templates as if they were built in (TYTO-436): a test's template name is invented or one of the pack's test templates, and a comment about a template in its own repository names the repository. No behaviour changes.
+- Updated dependencies [fc3bee5]
+- Updated dependencies [04233fc]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+  - @tyto/brief-lang@0.7.6
+  - @tyto/core@0.35.0
+  - @tyto/template-lang@0.8.7
+
 ## 0.12.0
 
 ### Minor Changes

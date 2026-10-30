@@ -1,5 +1,13 @@
 # @tyto/theme-pack
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies [fc3bee5]
+- Updated dependencies [4168183]
+  - @tyto/plugin-api@0.12.0
+
 ## 0.1.6
 
 ### Patch Changes

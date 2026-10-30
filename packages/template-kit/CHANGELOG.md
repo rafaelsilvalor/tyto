@@ -1,5 +1,23 @@
 # @tyto/template-kit
 
+## 0.6.0
+
+### Minor Changes
+
+- 04233fc: TYTO-454: `@tyto/template-kit/testing` compiles a markup template (`template.html`) handed in as text, and `@tyto/template-lang` joins the published contract.
+
+### Patch Changes
+
+- fc3bee5: Tests and comments stop naming the production templates as if they were built in (TYTO-436): a test's template name is invented or one of the pack's test templates, and a comment about a template in its own repository names the repository. No behaviour changes.
+- Updated dependencies [fc3bee5]
+- Updated dependencies [04233fc]
+- Updated dependencies [6881557]
+- Updated dependencies [4168183]
+  - @tyto/brief-lang@0.7.6
+  - @tyto/core@0.35.0
+  - @tyto/template-lang@0.8.7
+  - @tyto/export-html@0.7.8
+
 ## 0.5.0
 
 ### Minor Changes
