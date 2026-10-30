@@ -143,6 +143,53 @@ describe('watchTarget', () => {
   });
 });
 
+describe('watchTarget, for a template in its own repository (TYTO-485)', () => {
+  let repository: string;
+
+  const repositoryTarget = (): PreviewTarget => ({
+    template: 'agenda',
+    templates: join(repository, 'templates'),
+    brief: join(repository, 'templates', 'agenda', 'examples', 'agenda.brief'),
+    formatsFile: join(repository, 'templates', 'formats.yaml'),
+    types: ['png'],
+    compiled: true,
+    repository: { folder: repository, plugin: 'agenda' },
+  });
+
+  beforeEach(async () => {
+    repository = join(root, 'repo');
+    await mkdir(join(repository, 'src'), { recursive: true });
+    await mkdir(join(repository, 'templates', 'agenda', 'examples'), { recursive: true });
+    await writeFile(join(repository, 'src', 'template.ts'), '');
+    await writeFile(join(repository, 'src', 'template.test.ts'), '');
+    await writeFile(join(repository, 'templates', 'agenda', 'manifest.yaml'), '');
+    await writeFile(join(repository, 'tyto-plugin.json'), '{}');
+    stop = watchTarget(repositoryTarget(), session as unknown as PreviewSession, {
+      kitSource: kit,
+      houseStyleSource: houseStyle,
+    });
+  });
+
+  it('asks for a build when its source is saved', async () => {
+    await save(join(repository, 'src', 'template.ts'));
+    expect(requests).toEqual([{ rebuild: true, kit: false }]);
+  });
+
+  it('asks for the install alone when a manifest or tyto-plugin.json is saved', async () => {
+    await save(join(repository, 'templates', 'agenda', 'manifest.yaml'));
+    await save(join(repository, 'tyto-plugin.json'));
+    expect(requests).toEqual([
+      { rebuild: false, kit: false },
+      { rebuild: false, kit: false },
+    ]);
+  });
+
+  it("does not watch the monorepo's kit, which its bundle does not read", async () => {
+    await save(join(kit, 'pill-table.ts'));
+    expect(requests).toEqual([]);
+  });
+});
+
 describe('isInside', () => {
   it('answers yes for a file under the folder and no for one beside it', () => {
     expect(isInside(join(root, 'a'), join(root, 'a', 'examples', 'x.brief'))).toBe(true);

@@ -158,31 +158,26 @@ per paragraph, no trailers.
 Rafael corrects from the image, not from a description. Every iteration ends with a picture he
 can see and a number you measured.
 
-**First try the live preview.** In the main checkout, `.claude/launch.json` gets a
+**Run the live preview on the repository.** In the main checkout, `.claude/launch.json` gets a
 `template-preview` configuration running
-`pnpm template:preview C:/projects/tyto/templates/tyto-template-<name>/templates/<name>
---formats-file C:/projects/tyto/templates/tyto-template-<name>/templates/formats.yaml` on port
-4174, started with `preview_start`. After each save read `http://127.0.0.1:4174/api/state` and
-the PNG under `/out/<generation>/`.
+`pnpm template:preview C:/projects/tyto/templates/tyto-template-<name>` on port 4174, started with
+`preview_start`. The repository needs its `pnpm install` (step 4) first: the preview builds `src/`
+with the repository's own `tsup.config.ts`, which bundles `@tyto/*` from its `node_modules/`.
 
-**It may not run this template's code.** The preview renders the folder it is given with
-`--templates`, and a code template's `build` lives in the repository's `dist/index.js`, not in
-the folder (read in `tools/template-preview/src/target.ts` and `tyto.ts`, not measured when this
-command was written). When `/api/state` answers a diagnostic instead of an image, say so to
-Rafael in one line and use this loop instead, with a `TYTO_HOME` of its own so the real one is
-untouched until step 6:
+It loads the template the way an installed plugin loads (TYTO-485): the build goes into a staging
+folder with the package's `files`, which `tyto plugin install --yes` installs into a `TYTO_HOME`
+of the preview's own, deleted when it stops. Your real `TYTO_HOME` is never written, and the
+repository's committed `dist/` is never rewritten — `pnpm build` it before committing, as CI
+compares it. Your other installed plugins (the brand kit) are copied into the preview's home, so
+the logo draws as it will after step 6. A save under `src/` rebuilds and installs (about 10 s
+on `questao-estrategica`, 4.7 s of it the build); a save under `templates/` only installs.
 
-```sh
-cd C:/projects/tyto/templates/tyto-template-<name>
-pnpm build
-TYTO_HOME=<scratchpad>/tyto-home tyto plugin install . --yes
-TYTO_HOME=<scratchpad>/tyto-home tyto render templates/<name>/examples/<example>.brief --formats-file templates/formats.yaml --out <scratchpad>/out --json
-```
+After each save read `http://127.0.0.1:4174/api/state` and the PNG under `/out/<generation>/`.
+Show him the PNG with `SendUserFile` (`display: "render"`), every time, without being asked.
+`status: "failed"` with `PREVIEW_BUILD_FAILED` is esbuild's error at its line; with
+`PREVIEW_INSTALL_FAILED`, what `tyto plugin install` refused.
 
-`result.json` must say `status: "ok"` with no `W_PLUGIN_SKIPPED`. Show him the PNG with
-`SendUserFile` (`display: "render"`), every time, without being asked. If the preview did run
-the code, tell Rafael: the preview gap in TYTO-463's "Not in this card" is then wrong and the
-README and this command are corrected.
+The preview renders one brief, the first `examples/*.brief`; `--brief <file>` picks another.
 
 Rules for the loop:
 

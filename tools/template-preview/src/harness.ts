@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { REPOSITORY_ROOT, TYTO_BINARY } from './paths.ts';
+import { repositoryRebuild } from './repository.ts';
 import { type PreviewServer, startPreviewServer } from './server.ts';
 import {
   type PreviewPorts,
@@ -14,6 +15,7 @@ import {
   type PreviewTarget,
   PreviewSession,
 } from './session.ts';
+import { renderWithTyto } from './tyto.ts';
 
 /**
  * What the two test suites share: a preview on a free port, and `tyto render` run a second
@@ -55,9 +57,20 @@ export function getFrom(url: string | URL): Promise<Fetched> {
 export async function startPreview(
   target: PreviewTarget,
   ports?: PreviewPorts,
+  /** For a repository target: whose installed plugins the private home starts from. */
+  personHome?: string,
 ): Promise<RunningPreview> {
   const outputRoot = await mkdtemp(join(tmpdir(), 'tyto-preview-test-'));
-  const session = new PreviewSession(target, outputRoot, ports);
+  // A repository is installed into a home of the run's own, as `main.ts` does (TYTO-485).
+  const repositoryPorts: PreviewPorts | undefined =
+    ports === undefined && target.repository !== undefined
+      ? {
+          render: renderWithTyto,
+          rebuild: await repositoryRebuild(target.repository, outputRoot, personHome),
+          now: () => performance.now(),
+        }
+      : undefined;
+  const session = new PreviewSession(target, outputRoot, ports ?? repositoryPorts);
   const server = await startPreviewServer(session, 0);
 
   const state = async (): Promise<PreviewState> =>

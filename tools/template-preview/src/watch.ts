@@ -1,4 +1,4 @@
-import { type FSWatcher, watch } from 'node:fs';
+import { type FSWatcher, existsSync, watch } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 
 import { HOUSE_STYLE_SOURCE, KIT_SOURCE } from './paths.ts';
@@ -20,6 +20,11 @@ import type { PreviewSession, PreviewTarget } from './session.ts';
  * package, and a save to any of them used to leave the page drawing the build from before. All
  * are watched now; the kit and the house's package ask for their own rebuild, because
  * `@tyto/templates` imports their `dist/` rather than bundling them.
+ *
+ * **A template in its own repository** (TYTO-485) is watched as a package: a save under `src/`
+ * asks for a build, and one under `templates/` or to `tyto-plugin.json` for the install alone
+ * (the session installs before every render). Its bundle carries the kit and the house's
+ * package from `node_modules/`, so the monorepo's sources are not its business.
  */
 
 export const QUIET_MS = 80;
@@ -65,10 +70,10 @@ export function watchTarget(
   let rebuild = false;
   let kit = false;
 
-  const changed = (file: string | null, from: 'pack' | 'kit' | 'brief'): void => {
+  const changed = (file: string | null, from: 'pack' | 'kit' | 'brief' | 'package'): void => {
     const code = file !== null && CODE_FILE.test(file) && !TEST_FILE.test(file);
     if (code && from === 'kit') kit = true;
-    if (code && from !== 'kit') rebuild = true;
+    if (code && from !== 'kit' && from !== 'package') rebuild = true;
     if (timer !== undefined) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = undefined;
@@ -79,18 +84,35 @@ export function watchTarget(
     }, QUIET_MS);
   };
 
+  const repository = target.repository;
+  if (repository !== undefined) {
+    // A repository with no `src/` ships a hand-written `dist/`, which the build then reads.
+    const source = join(
+      repository.folder,
+      existsSync(join(repository.folder, 'src')) ? 'src' : 'dist',
+    );
+    watchers.push(
+      watch(source, { recursive: true }, (_event, file) => changed(file, 'pack')),
+      watch(target.templates, { recursive: true }, (_event, file) => changed(file, 'package')),
+      watch(repository.folder, (_event, file) => {
+        if (file === 'tyto-plugin.json' || file === 'package.json') changed(file, 'package');
+      }),
+    );
+  }
+
   // The pack folder rather than the template's own, so the brand module beside it is seen;
   // a save to another template of the pack is not this picture's business and is ignored.
-  watchers.push(
-    watch(target.templates, { recursive: true }, (_event, file) => {
-      if (file === null) return;
-      const [folder = ''] = file.split(/[\\/]/u);
-      const brand = target.compiled && isBrandModule(folder);
-      if (folder === target.template || brand) changed(file, 'pack');
-    }),
-  );
+  if (repository === undefined)
+    watchers.push(
+      watch(target.templates, { recursive: true }, (_event, file) => {
+        if (file === null) return;
+        const [folder = ''] = file.split(/[\\/]/u);
+        const brand = target.compiled && isBrandModule(folder);
+        if (folder === target.template || brand) changed(file, 'pack');
+      }),
+    );
 
-  if (target.compiled) {
+  if (target.compiled && repository === undefined) {
     const kitSource = options.kitSource ?? KIT_SOURCE;
     const houseStyleSource = options.houseStyleSource ?? HOUSE_STYLE_SOURCE;
     for (const source of [kitSource, houseStyleSource]) {
