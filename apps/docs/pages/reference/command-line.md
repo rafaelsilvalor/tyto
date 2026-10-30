@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 16. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 19. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -270,6 +270,63 @@ tyto plugin enable [options] <name>
 | Argument | What it does |
 | --- | --- |
 | `<name>` | the plugin's name, as tyto plugin list prints it |
+
+## tyto gallery list
+
+list every entry: installed, not installed or update available, and where
+
+```sh
+tyto gallery list [options]
+```
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+
+## tyto gallery install
+
+write an entry into the machine's plugin files at its latest tag, then sync
+
+```sh
+tyto gallery install [options] <id>
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<id>` | the entry, as tyto gallery list prints it |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+| `-y, --yes` | approve the fetched plugin's permissions without asking |  |
+
+## tyto gallery update
+
+move an installed entry's ref to the index's latest tag, then sync
+
+```sh
+tyto gallery update [options] <id>
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<id>` | the entry, as tyto gallery list prints it |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+| `-y, --yes` | approve the fetched plugin's permissions without asking |  |
+| `--force` | move a ref changed by hand since the gallery wrote it |  |
 
 ## tyto trust add
 
