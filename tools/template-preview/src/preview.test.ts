@@ -18,7 +18,7 @@ import { watchTarget } from './watch.ts';
  *
  * `--types svg` so it runs where `pnpm check` runs, which has no Chromium: what is under
  * test here is that the server hands over the file `tyto render` wrote, and an SVG is a
- * file like a PNG is. The PNG half, for `banner-roxo` and a markup template, is
+ * file like a PNG is. The PNG half, for `banner-teste` and a markup template, is
  * `preview.visual.test.ts`.
  */
 

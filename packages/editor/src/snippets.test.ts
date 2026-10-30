@@ -41,7 +41,7 @@ const AGENDA_ONLY: BriefSnippet = {
   name: 'Dia',
   prefixes: ['dia'],
   template: '::dia ${1:data}',
-  forTemplate: 'agenda-semana',
+  forTemplate: 'agenda-diaria',
 };
 
 const manifestOf = (yaml: string): TemplateManifest => {
@@ -51,7 +51,7 @@ const manifestOf = (yaml: string): TemplateManifest => {
 };
 
 const AGENDA = manifestOf(`
-name: agenda-semana
+name: agenda-diaria
 version: 1.0.0
 formats: [grid]
 slots:
@@ -188,7 +188,7 @@ describe('the snippets in completion', () => {
         effects: setBriefAnalysis.of({
           source: 'di',
           diagnostics: [],
-          templates: ['agenda-semana'],
+          templates: ['agenda-diaria'],
           ...(manifest === undefined ? {} : { manifest }),
         }),
       }).state;

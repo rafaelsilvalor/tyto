@@ -16,7 +16,7 @@ import { run } from './program.js';
  * An installed code template, from `tyto plugin install` to `tyto render` (TYTO-189,
  * ADR 0048) — against a real temp disk and the real, confined plugin process.
  *
- * The template is `banner-roxo`, the built-in pack's code template, which draws its
+ * The template is `banner-teste`, the built-in pack's code template, which draws its
  * background from its own folder (TYTO-478), bundled the way a plugin author bundles one: every import inlined into `dist/index.js`,
  * `@tyto/*` included, so the installed folder runs on its own. The folder lives under the
  * system's temp directory, where no `node_modules` is above it; the one test that leaves a
@@ -28,7 +28,7 @@ import { run } from './program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACK = resolve(HERE, '..', '..', '..', 'packages', 'templates', 'templates');
-const BANNER = join(PACK, 'banner-roxo');
+const BANNER = join(PACK, 'banner-teste');
 const FORMATS = join(PACK, 'formats.yaml');
 const NAME = 'banner-plugin';
 
@@ -104,7 +104,7 @@ export function activate(host) {
   await mkdir(template, { recursive: true });
   await cp(join(BANNER, 'assets'), join(template, 'assets'), { recursive: true });
   const manifest = (await readFile(join(BANNER, 'manifest.yaml'), 'utf8')).replace(
-    /^name: banner-roxo$/mu,
+    /^name: banner-teste$/mu,
     `name: ${NAME}`,
   );
   await writeFile(
@@ -122,7 +122,7 @@ async function briefFor(template: string, into: string): Promise<string> {
   await cp(join(BANNER, 'examples'), into, { recursive: true });
   const path = join(into, 'agencia.brief');
   const source = await readFile(path, 'utf8');
-  await writeFile(path, source.replace(/^template: banner-roxo$/mu, `template: ${template}`));
+  await writeFile(path, source.replace(/^template: banner-teste$/mu, `template: ${template}`));
   return path;
 }
 
@@ -278,7 +278,7 @@ describe("an installed code template's own folder (TYTO-478)", () => {
   }, 60_000);
 });
 
-describe('banner-roxo, packed as a plugin', () => {
+describe('banner-teste, packed as a plugin', () => {
   // Starts a plugin's worker thread and bundles a template, which a full `pnpm check` can
   // hold past Vitest's 5 s.
   it('renders from tyto render exactly as the in-repo template does', async () => {
@@ -288,7 +288,7 @@ describe('banner-roxo, packed as a plugin', () => {
     );
 
     const inRepo = await render(
-      await briefFor('banner-roxo', join(workspace, 'in-repo')),
+      await briefFor('banner-teste', join(workspace, 'in-repo')),
       join(workspace, 'out-in-repo'),
     );
     const installed = await render(

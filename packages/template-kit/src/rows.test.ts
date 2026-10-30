@@ -7,7 +7,7 @@ import type { RichText } from '@tyto/core';
 
 /**
  * Reading one slot as a small table. The first five cases came with the code from
- * `agenda-semana` (TYTO-173); `rowGroups` is what TYTO-185 added so a table component can
+ * the weekly agenda (TYTO-173); `rowGroups` is what TYTO-185 added so a table component can
  * read any slot the same way.
  */
 

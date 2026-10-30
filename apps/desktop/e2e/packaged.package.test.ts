@@ -375,7 +375,7 @@ describe('the packaged app', () => {
       ).tyto['app:info']({}),
     );
 
-    expect(info.templates).toEqual(['banner-roxo', 'carrossel-lista', 'promo-curso']);
+    expect(info.templates).toEqual(['banner-teste', 'carrossel-lista', 'promo-curso']);
   });
 
   it('reports its own version, which is the one the tag has to name', async () => {

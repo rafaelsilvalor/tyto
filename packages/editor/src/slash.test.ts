@@ -38,7 +38,7 @@ const itemFor = (label: string): SlashItem => ({
 
 const TEMPLATES: SlashSource = {
   section: 'Templates',
-  items: () => ['agenda-semana', 'tabela-roxo', 'banner-roxo'].map(itemFor),
+  items: () => ['agenda-diaria', 'tabela-nova', 'banner-novo'].map(itemFor),
 };
 
 let view: EditorView | undefined;
@@ -101,10 +101,10 @@ describe('the "/" menu', () => {
     type(target, '/');
     await waitForList(target);
 
-    expect(labels(target)).toEqual(['agenda-semana', 'banner-roxo', 'tabela-roxo']);
+    expect(labels(target)).toEqual(['agenda-diaria', 'banner-novo', 'tabela-nova']);
     const option = currentCompletions(target.state)[0];
     expect(option?.section).toEqual({ name: 'Templates', rank: 0 });
-    expect(option?.detail).toBe('detail of agenda-semana');
+    expect(option?.detail).toBe('detail of agenda-diaria');
   });
 
   it('carries the info of an item to the panel beside it, none for one without (TYTO-467)', () => {
@@ -130,7 +130,7 @@ describe('the "/" menu', () => {
   });
 
   it('opens in a brief whose frontmatter is not closed yet, which is body to the grammar', () => {
-    expect(answers('---\ntemplate: agenda-semana\n/')).toBe(true);
+    expect(answers('---\ntemplate: agenda-diaria\n/')).toBe(true);
   });
 
   it('stays shut for a "/" in the middle of a line', () => {
@@ -162,14 +162,14 @@ describe('the "/" menu', () => {
     const target = mount('::titulo Olá\n\n');
     type(target, '/agen');
     await waitForList(target);
-    expect(labels(target)).toEqual(['agenda-semana']);
+    expect(labels(target)).toEqual(['agenda-diaria']);
 
     // CodeMirror refuses to accept within its interaction delay of the list opening (75 ms).
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(press(target, 'Enter')).toBe(true);
 
-    expect(applied).toEqual([{ label: 'agenda-semana', from: 14, to: 19 }]);
-    expect(target.state.doc.toString()).toBe('::titulo Olá\n\n[agenda-semana]');
+    expect(applied).toEqual([{ label: 'agenda-diaria', from: 14, to: 19 }]);
+    expect(target.state.doc.toString()).toBe('::titulo Olá\n\n[agenda-diaria]');
   });
 
   it('closes on Escape and leaves the "/" as it was typed', async () => {
@@ -204,14 +204,14 @@ describe('the "/" menu', () => {
 
     type(target, 'tab');
     await vi.waitFor(() => {
-      expect(labels(target)).toEqual(['tabela-roxo']);
+      expect(labels(target)).toEqual(['tabela-nova']);
     });
     await new Promise((resolve) => setTimeout(resolve, 100));
     press(target, 'Enter');
 
     // Only the query goes: there was no "/" to take with it.
-    expect(applied).toEqual([{ label: 'tabela-roxo', from: 8, to: 11 }]);
-    expect(target.state.doc.toString()).toBe('::titulo[tabela-roxo] Olá\n');
+    expect(applied).toEqual([{ label: 'tabela-nova', from: 8, to: 11 }]);
+    expect(target.state.doc.toString()).toBe('::titulo[tabela-nova] Olá\n');
   });
 
   it('forgets the request once the text or the cursor moves', () => {

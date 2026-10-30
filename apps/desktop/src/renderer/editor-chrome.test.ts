@@ -226,8 +226,8 @@ describe('templateEditFor', () => {
 
 describe('templateChoiceFor (TYTO-275)', () => {
   it('answers the skeleton on a brief with nothing in it', () => {
-    expect(templateChoiceFor(undefined, '', 'agenda-semana')).toEqual({ kind: 'skeleton' });
-    expect(templateChoiceFor(undefined, '  \n\n', 'agenda-semana')).toEqual({ kind: 'skeleton' });
+    expect(templateChoiceFor(undefined, '', 'carrossel-lista')).toEqual({ kind: 'skeleton' });
+    expect(templateChoiceFor(undefined, '  \n\n', 'carrossel-lista')).toEqual({ kind: 'skeleton' });
   });
 
   it('answers the one-line edit on a brief that says something', () => {
@@ -238,8 +238,8 @@ describe('templateChoiceFor (TYTO-275)', () => {
   });
 
   it('answers nothing on an app file, even an empty one', () => {
-    expect(templateChoiceFor('settings', '', 'agenda-semana')).toBeUndefined();
-    expect(templateChoiceFor('keybindings', '', 'agenda-semana')).toBeUndefined();
+    expect(templateChoiceFor('settings', '', 'carrossel-lista')).toBeUndefined();
+    expect(templateChoiceFor('keybindings', '', 'carrossel-lista')).toBeUndefined();
   });
 });
 
@@ -262,25 +262,25 @@ describe('the "/" menu choosing a template (TYTO-276)', () => {
   };
 
   it('answers the skeleton when the "/" and its query are all the brief holds', () => {
-    expect(slashTemplateChoiceFor(undefined, '/agen', 0, 5, 'agenda-semana')).toEqual({
+    expect(slashTemplateChoiceFor(undefined, '/carr', 0, 5, 'carrossel-lista')).toEqual({
       kind: 'skeleton',
     });
-    expect(slashTemplateNote('\n/agen', 1, 6, 'agenda-semana')).toEqual({
+    expect(slashTemplateNote('\n/carr', 1, 6, 'carrossel-lista')).toEqual({
       key: 'slash.template.new',
     });
   });
 
   it('switches `template:` and takes the "/" away in one set of changes on a brief with content', () => {
-    const brief = '---\ntemplate: promo-curso\n---\n\n::titulo Olá\n/tab';
-    const from = brief.indexOf('/tab');
-    const choice = slashTemplateChoiceFor(undefined, brief, from, brief.length, 'tabela-roxo');
+    const brief = '---\ntemplate: promo-curso\n---\n\n::titulo Olá\n/lis';
+    const from = brief.indexOf('/lis');
+    const choice = slashTemplateChoiceFor(undefined, brief, from, brief.length, 'lista-teste');
 
     expect(choice?.kind).toBe('changes');
     if (choice?.kind !== 'changes') return;
     expect(applied(brief, choice.changes)).toBe(
-      '---\ntemplate: tabela-roxo\n---\n\n::titulo Olá\n',
+      '---\ntemplate: lista-teste\n---\n\n::titulo Olá\n',
     );
-    expect(slashTemplateNote(brief, from, brief.length, 'tabela-roxo')).toEqual({
+    expect(slashTemplateNote(brief, from, brief.length, 'lista-teste')).toEqual({
       key: 'slash.template.switch',
       current: 'promo-curso',
     });
@@ -288,26 +288,26 @@ describe('the "/" menu choosing a template (TYTO-276)', () => {
 
   it('writes a frontmatter above a brief that has none, and still takes the "/"', () => {
     const brief = '/ban\n::titulo Olá\n';
-    const choice = slashTemplateChoiceFor(undefined, brief, 0, 4, 'banner-roxo');
+    const choice = slashTemplateChoiceFor(undefined, brief, 0, 4, 'banner-teste');
     if (choice?.kind !== 'changes')
       throw new Error(`expected changes, got ${String(choice?.kind)}`);
     expect(applied(brief, choice.changes)).toBe(
-      '---\ntemplate: banner-roxo\n---\n\n::titulo Olá\n',
+      '---\ntemplate: banner-teste\n---\n\n::titulo Olá\n',
     );
-    expect(slashTemplateNote(brief, 0, 4, 'banner-roxo')).toEqual({ key: 'slash.template.set' });
+    expect(slashTemplateNote(brief, 0, 4, 'banner-teste')).toEqual({ key: 'slash.template.set' });
   });
 
   it('takes only the "/" when the brief already names that template', () => {
-    const brief = '---\ntemplate: tabela-roxo\n---\n/tab';
-    const choice = slashTemplateChoiceFor(undefined, brief, 30, 34, 'tabela-roxo');
+    const brief = '---\ntemplate: lista-teste\n---\n/lis';
+    const choice = slashTemplateChoiceFor(undefined, brief, 30, 34, 'lista-teste');
     expect(choice).toEqual({ kind: 'changes', changes: [{ from: 30, to: 34, insert: '' }] });
-    expect(slashTemplateNote(brief, 30, 34, 'tabela-roxo')).toEqual({
+    expect(slashTemplateNote(brief, 30, 34, 'lista-teste')).toEqual({
       key: 'slash.template.current',
     });
   });
 
   it('answers nothing on an app file', () => {
-    expect(slashTemplateChoiceFor('settings', '/a', 0, 2, 'agenda-semana')).toBeUndefined();
+    expect(slashTemplateChoiceFor('settings', '/a', 0, 2, 'carrossel-lista')).toBeUndefined();
   });
 });
 

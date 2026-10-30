@@ -23,7 +23,7 @@ const headsAt = (state: EditorState, line: number): readonly string[] =>
 
 const BRIEF = [
   '---', //                 1
-  'template: agenda-semana', // 2
+  'template: agenda-diaria', // 2
   '---', //                 3
   '::titulo', //            4
   '  AGENDA', //            5

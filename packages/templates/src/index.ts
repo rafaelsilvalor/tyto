@@ -1,4 +1,4 @@
-import { build as bannerRoxo } from '../templates/banner-roxo/template.js';
+import { build as bannerTeste } from '../templates/banner-teste/template.js';
 
 import type { TemplateBuild } from '@tyto/core';
 
@@ -41,7 +41,7 @@ export const BUILT_IN_TEMPLATES_DIRECTORY = 'templates';
 
 /** The names this pack ships, for a caller that wants them without reading a disk. */
 export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
-  'banner-roxo',
+  'banner-teste',
   'carrossel-lista',
   'promo-curso',
 ];
@@ -64,5 +64,5 @@ export const BUILT_IN_TEMPLATE_NAMES: readonly string[] = [
  * plugin file (ADR 0151, TYTO-436); what stays here is what the tests draw.
  */
 export const BUILT_IN_TEMPLATE_BUILDS: Readonly<Record<string, TemplateBuild>> = {
-  'banner-roxo': bannerRoxo,
+  'banner-teste': bannerTeste,
 };

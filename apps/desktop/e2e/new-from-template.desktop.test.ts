@@ -205,11 +205,11 @@ describe('New brief from template…', () => {
     await page.click('#editor .cm-content');
     await page.keyboard.type('/');
     await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
-    await page.keyboard.type('banner-r');
+    await page.keyboard.type('banner-t');
     await page.waitForTimeout(150);
     await page.keyboard.press('Enter');
 
-    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: banner-roxo');
+    await expect.poll(editorText, { timeout: 10_000 }).toContain('template: banner-teste');
     expect(await editorText()).toContain('::titulo titulo\n');
     expect(await selectedText()).toBe('titulo');
   }, 60_000);

@@ -38,8 +38,9 @@ function mount(answer: DeliveryAnswer = MADE) {
     pick: (request) => {
       bar.pick(request);
     },
-    templates: () => [{ id: 'aprovados', label: 'aprovados' }],
-    skeletonOf: (name) => (name === 'aprovados' ? '---\ntemplate: aprovados\n---\n' : undefined),
+    templates: () => [{ id: 'carrossel-lista', label: 'carrossel-lista' }],
+    skeletonOf: (name) =>
+      name === 'carrossel-lista' ? '---\ntemplate: carrossel-lista\n---\n' : undefined,
     create,
     opened,
     notice,
@@ -96,15 +97,18 @@ describe('Delivery: New…', () => {
 
   it('asks for a template, No template first, and sends the skeleton of the one chosen', async () => {
     const { bar, create, opened } = mount();
-    await type(bar, 'mca-66911_aprovados');
+    await type(bar, 'mca-66911_carrossel');
     await press(bar, 'Enter');
-    expect(labels(bar)).toEqual(['No template', 'aprovados']);
+    expect(labels(bar)).toEqual(['No template', 'carrossel-lista']);
     await press(bar, 'ArrowDown');
     await press(bar, 'Enter');
     await vi.waitFor(() => {
       expect(opened).toHaveBeenCalledOnce();
     });
-    expect(create).toHaveBeenCalledWith('mca-66911_aprovados', '---\ntemplate: aprovados\n---\n');
+    expect(create).toHaveBeenCalledWith(
+      'mca-66911_carrossel',
+      '---\ntemplate: carrossel-lista\n---\n',
+    );
     expect(opened).toHaveBeenCalledWith(MADE, true);
   });
 

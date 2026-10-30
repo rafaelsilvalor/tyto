@@ -17,13 +17,13 @@ Os tamanhos que um brief pode pedir na linha `formats:`. Um template só desenha
 | `banner-1x1` | 600 × 600 | `banner` | Banner 1:1 |
 | `banner-345x146` | 345 × 146 | `banner` | Banner 345×146 |
 
-## banner-roxo
+## banner-teste
 
-![banner-roxo, desenhando examples/agencia.brief no formato banner](/template-gallery/banner-roxo.png)
+![banner-teste, desenhando examples/agencia.brief no formato banner](/template-gallery/banner-teste.png)
 
-roxo's product banner — one text over a fixed background, in three sizes.
+A test banner — one text over a flat background, in three sizes.
 
-**Marca** `roxo` · **Faz** banner · **Formatos** `banner` (1200 × 628), `banner-1x1` (600 × 600), `banner-345x146` (345 × 146)
+**Marca** `tyto-demo` · **Faz** banner · **Formatos** `banner` (1200 × 628), `banner-1x1` (600 × 600), `banner-345x146` (345 × 146)
 
 **Slots**
 

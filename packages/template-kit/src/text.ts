@@ -9,7 +9,7 @@ import type { NonEmpty, TextOptions } from '@tyto/core/template';
  * Text as a {@link Block}: a brief's words at a size somebody stated, or at the size they
  * measure to.
  *
- * Moved here from `agenda-semana/parts.ts` by TYTO-185. Neither function knows a colour or
+ * Moved here from the weekly agenda's `parts.ts` by TYTO-185. Neither function knows a colour or
  * a face — both arrive in a {@link TextStyle} — so they are mechanism, and mechanism is what
  * this package owns.
  */

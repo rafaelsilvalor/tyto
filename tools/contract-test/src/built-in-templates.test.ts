@@ -52,7 +52,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * assertion is about text that was actually measured.
  *
  * Through the same library the CLI uses, but as a machine with no fonts installed
- * (ADR 0037): `banner-roxo` asks the machine for CircularXX, and a suite that found it on
+ * (ADR 0037): `banner-teste` asks the machine for CircularXX, and a suite that found it on
  * one laptop and not on CI would measure two different artworks. With no folders to read,
  * every machine measures the substitute CI draws.
  */
@@ -97,13 +97,13 @@ const EXAMPLES: readonly Example[] = [
   // The product banner (TYTO-210): one text over a background from the template's own folder,
   // in three sizes, its breaks chosen by measuring.
   {
-    template: 'banner-roxo',
+    template: 'banner-teste',
     brief: 'examples/agencia.brief',
     body: 'code',
     formats: ['banner', 'banner-1x1', 'banner-345x146'],
   },
   {
-    template: 'banner-roxo',
+    template: 'banner-teste',
     brief: 'examples/prefeitura.brief',
     body: 'code',
     formats: ['banner', 'banner-1x1', 'banner-345x146'],
@@ -225,7 +225,7 @@ describe.each(EXAMPLES.map((example) => [example.template, example] as const))(
       // Never a file beside the template. Bundled — the repository ships one copy in
       // `fonts/` — except the house's, whose brand face is read from the machine (ADR 0037).
       const expected =
-        name === 'banner-roxo'
+        name === 'banner-teste'
           ? { family: 'CircularXX', source: 'system' }
           : { family: 'Source Sans 3', source: 'bundled' };
       expect(scene.fonts).toContainEqual(expected);
@@ -266,7 +266,7 @@ function textNodes(nodes: readonly SceneNode[]): TextNode[] {
  * handed it, which is exactly the question a template sizing a box around its text would
  * ask. Measured against the substitute CI draws, like the rest of this file.
  */
-describe.each(['banner-roxo', 'promo-curso'])(
+describe.each(['banner-teste', 'promo-curso'])(
   '%s: the height a template is told is the height that is laid out',
   (name) => {
     it('agrees on lines and height for every text node, in every format', async () => {
@@ -659,7 +659,7 @@ describe('the pack as a whole', () => {
     expect(
       Object.fromEntries(registry.value.list().map((manifest) => [manifest.name, manifest.brand])),
     ).toEqual({
-      'banner-roxo': 'roxo',
+      'banner-teste': 'tyto-demo',
       'carrossel-lista': 'tyto-demo',
       'promo-curso': 'tyto-demo',
     });
@@ -681,7 +681,7 @@ describe('the pack as a whole', () => {
     );
     expect(kinds).toEqual({
       // One piece per format: three sizes of one banner read as three banners.
-      'banner-roxo': ['banner', 'banner', 'banner'],
+      'banner-teste': ['banner', 'banner', 'banner'],
       'carrossel-lista': ['carrossel', 'stories'],
       'promo-curso': ['grid', 'story'],
     });
@@ -696,7 +696,7 @@ describe('the pack as a whole', () => {
         .list()
         .map((entry) => entry.name)
         .sort(),
-    ).toEqual(['banner-roxo', 'carrossel-lista', 'promo-curso']);
+    ).toEqual(['banner-teste', 'carrossel-lista', 'promo-curso']);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
     expect(registry.value.failures).toEqual([]);
@@ -833,17 +833,17 @@ describe('the fonts the pack draws in, as a render embeds them (ADR 0021)', () =
   }, 120_000);
 
   /**
-   * ADR 0037, through the binary: `banner-roxo` asks the machine for CircularXX. Which
+   * ADR 0037, through the binary: `banner-teste` asks the machine for CircularXX. Which
    * branch runs depends on the machine, and each branch asserts the whole of its own
    * outcome — the maintainer's laptop has the face, CI has not, so both are exercised.
    */
-  it('renders banner-roxo in the installed CircularXX, or in the substitute and says so', async () => {
+  it('renders banner-teste in the installed CircularXX, or in the substitute and says so', async () => {
     const banner = join(project, 'banner');
     await mkdir(banner, { recursive: true });
     await writeFile(join(banner, 'formats.yaml'), await readFile(join(PACK, 'formats.yaml')));
     await writeFile(
       join(banner, 'agencia.brief'),
-      await readFile(join(PACK, 'banner-roxo/examples/agencia.brief')),
+      await readFile(join(PACK, 'banner-teste/examples/agencia.brief')),
     );
 
     await runBinary(

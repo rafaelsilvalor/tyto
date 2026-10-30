@@ -37,7 +37,7 @@ values:
   logo: { type: image }
 `);
 
-const BUILT_IN = manifestOf('name: tabela-roxo\nversion: 1.0.0\nformats: [feed]\nslots: {}\n');
+const BUILT_IN = manifestOf('name: tabela-nova\nversion: 1.0.0\nformats: [feed]\nslots: {}\n');
 
 function registryOf(...manifests: TemplateManifest[]): TemplateRegistry {
   return {
@@ -217,7 +217,7 @@ describe('collisions, decided and never by load order (ADR 0151 decision 7)', ()
       registry: registryOf(TABELA, BUILT_IN),
       project: [
         entry({
-          configurations: [{ name: 'roxo', alias: 'tabela-roxo', aliasRange: at(70), values: {} }],
+          configurations: [{ name: 'roxo', alias: 'tabela-nova', aliasRange: at(70), values: {} }],
         }),
       ],
     });
@@ -225,7 +225,7 @@ describe('collisions, decided and never by load order (ADR 0151 decision 7)', ()
     expect(
       diagnostics.map(({ file, diagnostic }) => [file, diagnostic.code, diagnostic.range]),
     ).toEqual([['tabelas.yaml', 'E_TEMPLATE_ALIAS_TAKEN', at(70)]]);
-    expect(configurations.select('tabela-roxo')).toBeUndefined();
+    expect(configurations.select('tabela-nova')).toBeUndefined();
   });
 
   it('supplies an alias two files of one folder give from neither', async () => {

@@ -15,7 +15,7 @@ import type { Measure, TextStyle } from './text.js';
 
 /**
  * What the table is checked against: arithmetic and structure, as the rest of this package
- * is. Nothing renders; the pixels are proven by rendering `agenda-semana` against `main`
+ * is. Nothing renders; the pixels are proven by rendering the weekly agenda against `main`
  * (TYTO-185), which is where a real face measures.
  */
 

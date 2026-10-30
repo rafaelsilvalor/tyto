@@ -1,0 +1,13 @@
+name: banner-teste
+version: 1.0.0
+brand: tyto-demo
+description: A test banner — one text over a flat background, in three sizes.
+# The pack's code template (TYTO-436): what tests a template that is code rather than markup,
+# reads its own folder, and measures its text. One piece in three sizes; each format draws its
+# own background from `assets/bg-<format>.png`.
+formats: [banner, banner-1x1, banner-345x146]
+slots:
+  # The same words on every format. The lines are broken by the template, balanced, with a
+  # group in parentheses kept whole and no line ending on `de` or `e`; a line break in the
+  # brief is kept. `**bold**` is the bold face.
+  titulo: { type: rich-text, required: true, max: 120 }

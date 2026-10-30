@@ -342,10 +342,10 @@ describe('a brief that stops compiling', () => {
  * window level had ever asked it to serve a build function — so "the preview draws a code
  * template" was a claim resting on two composition roots being spelled the same way.
  *
- * `banner-roxo` is the pack's code template since the production ones left it (TYTO-436).
+ * `banner-teste` is the pack's code template since the production ones left it (TYTO-436).
  */
 describe('a template whose body is code', () => {
-  const BANNER = join(packDirectory, 'banner-roxo', 'examples', 'agencia.brief');
+  const BANNER = join(packDirectory, 'banner-teste', 'examples', 'agencia.brief');
 
   beforeAll(async () => {
     await page.click('#editor .cm-content');

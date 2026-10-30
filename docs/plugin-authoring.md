@@ -280,7 +280,7 @@ When a plugin cannot be used, the render goes on without it and says why in `res
 $ tyto plugin disable meu-pack
 Disabled meu-pack.
 $ tyto render meu-pack/templates/meu-pack/examples/meu-pack.brief --types svg --out out2
-meu-pack/templates/meu-pack/examples/meu-pack.brief:2:1: error E_UNKNOWN_TEMPLATE No template named 'meu-pack'. Available: banner-roxo, carrossel-lista, promo-curso.
+meu-pack/templates/meu-pack/examples/meu-pack.brief:2:1: error E_UNKNOWN_TEMPLATE No template named 'meu-pack'. Available: banner-teste, carrossel-lista, promo-curso.
 $ tyto plugin enable meu-pack
 Enabled meu-pack.
 ```
