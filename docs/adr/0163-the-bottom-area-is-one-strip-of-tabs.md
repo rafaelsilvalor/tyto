@@ -51,6 +51,11 @@ with no box.
 - A built-in panel's heading id and key move onto its tab (`#problems-heading`,
   `problems.heading`), so the window's translation pass still writes it and nothing that found it
   by id has to change.
+- TYTO-267 left the window one problem count, the status bar's. Decision 3 adds a second place
+  for it: Problems' tab shows the same number, painted with the bar, and
+  `e2e/preview.desktop.test.ts` holds the two equal.
+- A panel that shares the area, like Project, is drawn only while its tab is in front. Anything
+  that reads Problems' rows has Problems in front first.
 - Problems' own 140 px default no longer sets the area's height while the command panel is open:
   the command panel's 240 px does.
 - The command panel's output has no font area of its own (ADR 0099). It follows the UI text size.
