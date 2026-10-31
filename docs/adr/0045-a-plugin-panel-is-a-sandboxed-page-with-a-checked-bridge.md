@@ -75,7 +75,8 @@ built-in's record. `layoutFrom` keeps a remembered plugin panel through a restar
 element taken from this build. `withPluginPanels` adds an offered panel **closed**, in the dock
 it asked for, and drops one nobody offers any more. An older `layout.json` still parses. The
 bottom dock lays its panels side by side: stacked in the problems panel's 140 px, two panels left
-a line each.
+a line each. (Superseded on 2026-10-30 by ADR 0163, TYTO-496: the bottom area is one strip of tabs,
+one panel shown.)
 
 ## Consequences
 

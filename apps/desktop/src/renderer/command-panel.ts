@@ -11,7 +11,6 @@ import {
   findMatches,
   lineText,
   piecesOf,
-  scrollbackText,
 } from './command-output.js';
 import { HistoryCursor, searchHistory } from './command-history.js';
 import { type CommandSession, type CommandSessions, isBusy } from './command-sessions.js';
@@ -47,7 +46,6 @@ export interface CommandPanelPorts {
   /** The lines run before in this folder, oldest first. */
   readonly history: () => readonly string[];
   readonly remember: (line: string) => void;
-  readonly copy: (text: string) => void;
 }
 
 const NO_PORTS: CommandPanelPorts = {
@@ -58,7 +56,6 @@ const NO_PORTS: CommandPanelPorts = {
   caseless: false,
   history: () => [],
   remember: () => undefined,
-  copy: () => undefined,
 };
 
 /** Ctrl+R's state: what is typed in the search, and where the match is in the history. */
@@ -198,19 +195,6 @@ export class CommandPanel extends DockedPanel {
   private closeSession(id: string): void {
     const runId = this.sessions?.close(id);
     if (runId !== undefined) this.ports.cancel(runId);
-  }
-
-  private copyOutput(): void {
-    const session = this.active();
-    if (session === undefined) return;
-    const selected = window.getSelection()?.toString() ?? '';
-    const output = this.output();
-    const inside =
-      selected !== '' &&
-      output !== null &&
-      window.getSelection()?.anchorNode !== null &&
-      output.contains(window.getSelection()?.anchorNode ?? null);
-    this.ports.copy(inside ? selected : scrollbackText(session.scrollback));
   }
 
   /* ------------------------------------------------------------------- the keys -- */
@@ -565,6 +549,27 @@ export class CommandPanel extends DockedPanel {
     </div>`;
   }
 
+  /**
+   * The sessions as small tabs at the right of the header, only once there is more than one
+   * (ADR 0163, TYTO-496): with one session there is nothing to choose, and the strip stays clean.
+   */
+  private sessionTabs(): TemplateResult | typeof nothing {
+    const sessions = this.sessions;
+    if (sessions === undefined || sessions.sessions.length < 2) return nothing;
+    const active = sessions.active;
+    return html`<div
+      class="command-panel__sessions"
+      role="tablist"
+      aria-label=${this.say('commandPanel.sessions')}
+    >
+      ${repeat(
+        sessions.sessions,
+        (item) => item.id,
+        (item, index) => this.sessionTab(item, index, item.id === active.id),
+      )}
+    </div>`;
+  }
+
   protected override render(): unknown {
     const sessions = this.sessions;
     const session = sessions?.active;
@@ -575,31 +580,30 @@ export class CommandPanel extends DockedPanel {
         : findMatches(session.scrollback, this.findQuery);
     if (this.findCurrent >= matches.length) this.findCurrent = 0;
 
-    const actions = html`${this.action('plus', 'commandPanel.session.new', () => {
-      sessions?.create();
-      this.focusInput();
-    })}
-    ${this.action(
-      'stop',
-      'commandPanel.stop',
-      () => {
-        this.stop();
-      },
-      !busy,
-    )}
+    // Few and quiet: Stop only while something runs, and no Copy — a selection copies.
+    const actions = html`${this.sessionTabs()}
+    ${
+      busy
+        ? this.action('stop', 'commandPanel.stop', () => {
+            this.stop();
+          })
+        : nothing
+    }
     ${this.action('search', 'commandPanel.find', () => {
       this.openFind();
     })}
-    ${this.action('copy', 'commandPanel.copy', () => {
-      this.copyOutput();
-    })}
     ${this.action('clear', 'commandPanel.clear', () => {
       if (session !== undefined) sessions?.clear(session.id);
+    })}
+    ${this.action('plus', 'commandPanel.session.new', () => {
+      sessions?.create();
+      this.focusInput();
     })}`;
 
     const search = this.search;
     const searchMatch =
       search?.index === undefined ? undefined : this.ports.history()[search.index];
+    const fresh = session === undefined || session.scrollback.lines.length === 0;
 
     return html`${this.chrome(
         html`<h2 class="tool__title">${this.say('panel.commands')}</h2>`,
@@ -615,30 +619,16 @@ export class CommandPanel extends DockedPanel {
           }
         }}
       >
-        <div
-          class="command-panel__sessions"
-          role="tablist"
-          aria-label=${this.say('commandPanel.sessions')}
-        >
-          ${repeat(
-            sessions?.sessions ?? [],
-            (item) => item.id,
-            (item, index) => this.sessionTab(item, index, item.id === session?.id),
-          )}
-        </div>
         ${this.findBar(matches.length)}
         <div
           class="command-panel__output"
           id="command-panel-output"
           role="log"
           aria-label=${this.say('commandPanel.output')}
-          tabindex="0"
+          @click=${(event: MouseEvent) => {
+            this.focusFromOutput(event);
+          }}
         >
-          ${
-            session === undefined || session.scrollback.lines.length > 0
-              ? nothing
-              : html`<p class="command-panel__empty">${this.say('commandPanel.empty')}</p>`
-          }
           ${
             session === undefined || session.scrollback.dropped === 0
               ? nothing
@@ -658,39 +648,49 @@ export class CommandPanel extends DockedPanel {
                   (line, index) => this.line(session, line, index, matches),
                 )
           }
-        </div>
-        <div class="command-panel__prompt-row">
-          <label class="command-panel__prompt" for="command-panel-input"
-            >${search === undefined ? 'tyto' : this.say('commandPanel.history.search')}</label
-          >
-          <input
-            id="command-panel-input"
-            class="command-panel__input"
-            type="text"
-            spellcheck="false"
-            autocomplete="off"
-            aria-label=${this.say('commandPanel.input')}
-            placeholder=${search === undefined ? this.say('commandPanel.input') : ''}
-            @keydown=${(event: KeyboardEvent) => {
-              this.onInputKey(event);
-            }}
-            @input=${(event: InputEvent) => {
-              this.onSearchInput(event.currentTarget as HTMLInputElement);
-            }}
-          />
-          ${
-            search === undefined
-              ? nothing
-              : html`<span class="command-panel__search-match" aria-live="polite"
-                  >${
-                    search.query === ''
-                      ? ''
-                      : (searchMatch ?? this.say('commandPanel.history.none'))
-                  }</span
-                >`
-          }
+          <div class="command-panel__prompt-line">
+            <label class="command-panel__prompt" for="command-panel-input"
+              >${search === undefined ? 'tyto ›' : `${this.say('commandPanel.history.search')} ›`}</label
+            >
+            <input
+              id="command-panel-input"
+              class="command-panel__input"
+              type="text"
+              spellcheck="false"
+              autocomplete="off"
+              aria-label=${this.say('commandPanel.input')}
+              placeholder=${search === undefined && fresh ? this.say('commandPanel.input') : ''}
+              @keydown=${(event: KeyboardEvent) => {
+                this.onInputKey(event);
+              }}
+              @input=${(event: InputEvent) => {
+                this.onSearchInput(event.currentTarget as HTMLInputElement);
+              }}
+            />
+            ${
+              search === undefined
+                ? nothing
+                : html`<span class="command-panel__search-match" aria-live="polite"
+                    >${
+                      search.query === ''
+                        ? ''
+                        : (searchMatch ?? this.say('commandPanel.history.none'))
+                    }</span
+                  >`
+            }
+          </div>
         </div>
       </div>`;
+  }
+
+  /**
+   * A click in the output puts the caret on the prompt, as a terminal does — unless it ended a
+   * selection, which is someone copying, or landed on a link.
+   */
+  private focusFromOutput(event: MouseEvent): void {
+    if ((window.getSelection()?.toString() ?? '') !== '') return;
+    if (event.target instanceof Element && event.target.closest('a, input') !== null) return;
+    this.input()?.focus();
   }
 }
 

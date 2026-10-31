@@ -324,6 +324,10 @@ describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
     expect(await projectLine('assets')).toBe('profile saude');
     expect(await projectLine('output')).toBe('this folder');
     expect(await projectLine('fonts')).toBe('not set');
+    // Problems back in front: the Project panel is a tab of the bottom area beside it (ADR 0163),
+    // and the tests below read Problems' rows.
+    await window.locator('[data-tab="problems"]').click();
+    await window.locator('tyto-problems-panel').waitFor();
   }, 60_000);
 
   it('names a restricted shared profile on its own line, and Trust this profile applies it', async () => {

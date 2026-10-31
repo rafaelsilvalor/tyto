@@ -538,6 +538,10 @@ describe('switching the language', () => {
     // TYTO-496: the command panel is closed until Ctrl+` opens it, and it renders its own words;
     // `command-panel.test.ts` holds them.
     'panel.commands',
+    // ADR 0163: the bottom area's × and its strip's name, an attribute each, written by the
+    // panel in front (`panels.ts`); `dock.test.ts` holds them.
+    'panel.hideArea',
+    'panel.tabs',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('commandPanel.')),
     'command.bar.placeholder',
     'command.bar.empty',

@@ -74,9 +74,25 @@ export const layoutSchema = z.object({
    * with both. Optional, so every `layout.json` written before it still reads.
    */
   hiddenDocks: z.array(z.enum(HIDEABLE_DOCKS)).max(3).optional(),
+  /**
+   * The tab in front of a tabbed area (TYTO-496, ADR 0163): the bottom area shows one of its open
+   * panels at a time, as VS Code's panel does. Optional, so a `layout.json` written before it
+   * reads, with its first open panel in front; an id that names no open panel there is ignored.
+   */
+  front: z
+    .object({ bottom: z.string().min(1).max(100) })
+    .partial()
+    .optional(),
 });
 
 export type Layout = z.infer<typeof layoutSchema>;
+
+/**
+ * The areas that show one panel at a time behind a strip of tabs (ADR 0163): the bottom, as in
+ * VS Code. The side areas still stack theirs.
+ */
+export const TABBED_DOCKS: readonly Dock[] = ['bottom'];
+export const isTabbed = (dock: Dock): boolean => TABBED_DOCKS.includes(dock);
 
 export const EDITOR_PANEL = 'editor';
 export const PROBLEMS_PANEL = 'problems';
@@ -122,19 +138,6 @@ export const DEFAULT_LAYOUT: Layout = {
       fixed: true,
     },
     {
-      // TYTO-496. The command panel, in the bottom area beside Problems and closed until Ctrl+`
-      // or the command bar opens it. **Before Problems, and that is about height, not order**:
-      // the bottom area takes the size of its first open panel (`dock.ts`), and Problems' 140px
-      // leaves a scrollback of three lines under the tabs and the input. Listed first, the panel
-      // brings its own 240px while it is open, and Problems gets its own back when it closes.
-      id: COMMANDS_PANEL,
-      element: 'tyto-command-panel',
-      dock: 'bottom',
-      open: false,
-      size: 240,
-      fixed: false,
-    },
-    {
       id: PROBLEMS_PANEL,
       element: 'tyto-problems-panel',
       dock: 'bottom',
@@ -169,6 +172,18 @@ export const DEFAULT_LAYOUT: Layout = {
       dock: 'left',
       open: false,
       size: 340,
+      fixed: false,
+    },
+    {
+      // TYTO-496. The command panel, a tab of the bottom area after Problems, as VS Code's
+      // Terminal follows its Problems (ADR 0163), closed until Ctrl+` or the command bar opens
+      // it. 240px because the area is as tall as its tallest open tab (`dockSizeOf`): Problems'
+      // 140px would leave a command three lines of output.
+      id: COMMANDS_PANEL,
+      element: 'tyto-command-panel',
+      dock: 'bottom',
+      open: false,
+      size: 240,
       fixed: false,
     },
     {
@@ -213,16 +228,61 @@ export function withPanelOpen(layout: Layout, id: string, open: boolean): Layout
   // value nobody can see would be a command that does nothing.
   const dock = panelOf(layout, id)?.dock;
   const reveal = open && dock !== undefined && dockIsHidden(layout, dock);
-  return reveal ? withHidden({ ...layout, panels }, dock, false) : { ...layout, panels };
+  const next = reveal ? withHidden({ ...layout, panels }, dock, false) : { ...layout, panels };
+  // Opening a tab is wanting to see it (ADR 0163).
+  return open && dock !== undefined && isTabbed(dock) ? withFront(next, dock, id) : next;
 }
 
+const withFront = (layout: Layout, dock: Dock, id: string): Layout =>
+  dock === 'bottom' ? { ...layout, front: { ...layout.front, bottom: id } } : layout;
+
+/** Puts an open panel of a tabbed area in front (ADR 0163). Anything else is unchanged. */
+export function withPanelInFront(layout: Layout, id: string): Layout {
+  const panel = panelOf(layout, id);
+  if (panel === undefined || !panel.open || !isTabbed(panel.dock)) return layout;
+  return withFront(layout, panel.dock, id);
+}
+
+/**
+ * The panel a tabbed area shows: the one the record puts in front if it is open, else its first
+ * open panel. `undefined` for an area with none open, and for an area that is not tabbed.
+ */
+export function frontPanelOf(layout: Layout, dock: Dock): PanelRecord | undefined {
+  if (!isTabbed(dock)) return undefined;
+  const open = openPanelsOf(layout, dock);
+  const wanted = dock === 'bottom' ? layout.front?.bottom : undefined;
+  return open.find((panel) => panel.id === wanted) ?? open[0];
+}
+
+/**
+ * A panel's size. In a tabbed area every open tab takes it, so the area keeps one height when
+ * the tab in front changes (ADR 0163).
+ */
 export function withPanelSize(layout: Layout, id: string, size: number): Layout {
+  const dock = panelOf(layout, id)?.dock;
+  const shared = dock !== undefined && isTabbed(dock);
   return {
     ...layout,
     panels: layout.panels.map((panel) =>
-      panel.id === id ? { ...panel, size: clampSize(size) } : panel,
+      panel.id === id || (shared && panel.dock === dock && panel.open)
+        ? { ...panel, size: clampSize(size) }
+        : panel,
     ),
   };
+}
+
+/**
+ * How tall or wide an area is drawn: its first shown panel's size, or in a tabbed area its
+ * tallest open tab's, so switching tabs never changes the height. `undefined` while empty.
+ */
+export function dockSizeOf(layout: Layout, dock: Dock): number | undefined {
+  const shown = isTabbed(dock)
+    ? dockIsHidden(layout, dock)
+      ? []
+      : openPanelsOf(layout, dock)
+    : shownPanelsOf(layout, dock);
+  if (shown.length === 0) return undefined;
+  return isTabbed(dock) ? Math.max(...shown.map((panel) => panel.size)) : shown[0]?.size;
 }
 
 /** Panels of one dock, open ones only, in the order the record lists them. */
@@ -232,9 +292,20 @@ export const openPanelsOf = (layout: Layout, dock: Dock): readonly PanelRecord[]
 export const dockIsHidden = (layout: Layout, dock: Dock): boolean =>
   layout.hiddenDocks?.includes(dock as HideableDock) ?? false;
 
-/** The panels a dock shows: none while it is hidden, its open ones otherwise. */
-export const shownPanelsOf = (layout: Layout, dock: Dock): readonly PanelRecord[] =>
-  dockIsHidden(layout, dock) ? [] : openPanelsOf(layout, dock);
+/**
+ * The panels a dock shows: none while it is hidden, its open ones otherwise — and in a tabbed
+ * area only the one in front (ADR 0163), whose header draws the others as tabs.
+ */
+export function shownPanelsOf(layout: Layout, dock: Dock): readonly PanelRecord[] {
+  if (dockIsHidden(layout, dock)) return [];
+  if (!isTabbed(dock)) return openPanelsOf(layout, dock);
+  const front = frontPanelOf(layout, dock);
+  return front === undefined ? [] : [front];
+}
+
+/** The tabs a tabbed area's strip shows: its open panels, in the record's order. */
+export const tabsOf = (layout: Layout, dock: Dock): readonly PanelRecord[] =>
+  isTabbed(dock) && !dockIsHidden(layout, dock) ? openPanelsOf(layout, dock) : [];
 
 /**
  * Whether any panel lives in a dock, open or not: an area with none has nothing a status-bar
@@ -310,9 +381,11 @@ export function layoutFrom(value: unknown): Layout {
     }));
 
   const hiddenDocks = parsed.success ? parsed.data.hiddenDocks : undefined;
+  const front = parsed.success ? parsed.data.front : undefined;
   return {
     panels: [...builtIns(saved), ...plugins],
     ...(hiddenDocks === undefined ? {} : { hiddenDocks }),
+    ...(front === undefined ? {} : { front }),
   };
 }
 

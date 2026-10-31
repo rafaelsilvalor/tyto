@@ -5,10 +5,13 @@ import {
   DOCKS,
   ELASTIC_DOCK,
   clampSize,
+  dockSizeOf,
+  isTabbed,
   shownPanelsOf,
+  tabsOf,
 } from '../../shared/layout.js';
-import { type Locale } from '../../shared/i18n/index.js';
-import { type DockedPanel } from './panels.js';
+import { type Locale, translate } from '../../shared/i18n/index.js';
+import { type DockStrip, type DockTab, type DockedPanel } from './panels.js';
 
 /**
  * The window, arranged from a record (E9.10, ADR 0024).
@@ -33,6 +36,12 @@ export interface DockHost {
   readonly onClose: (panelId: string) => void;
   /** While the pointer is down. `settled` marks the drag's end, which is what persists. */
   readonly onResize: (panelId: string, size: number, settled: boolean) => void;
+  /** A tab of a tabbed area (ADR 0163): its name, and the count it shows, if any. */
+  readonly tab: (panelId: string) => Omit<DockTab, 'id'>;
+  /** A tab was picked: it comes to the front. */
+  readonly onPick: (panelId: string) => void;
+  /** The tabbed area's × was pressed: the whole area hides, its tabs kept. */
+  readonly onHide: (dock: Dock) => void;
 }
 
 const dockElement = (root: ParentNode, dock: Dock): HTMLElement | null =>
@@ -50,7 +59,47 @@ const splitterElement = (root: ParentNode, dock: Dock): HTMLElement | null =>
  * and it will have a second panel on screen to decide it against.
  */
 const resizedPanelOf = (layout: Layout, dock: Dock): PanelRecord | undefined =>
+  // In a tabbed area the one shown is the one in front, and `withPanelSize` gives every open
+  // tab the size dragged, so the area keeps its height whichever is in front (ADR 0163).
   shownPanelsOf(layout, dock)[0];
+
+/** The strip the panel in front of a tabbed area draws, or nothing for any other area. */
+function stripOf(layout: Layout, dock: Dock, host: DockHost): DockStrip | undefined {
+  const front = shownPanelsOf(layout, dock)[0];
+  if (!isTabbed(dock) || front === undefined) return undefined;
+  return {
+    tabs: tabsOf(layout, dock).map((panel) => ({ id: panel.id, ...host.tab(panel.id) })),
+    front: front.id,
+    label: translate(host.locale, 'panel.tabs'),
+    pick: host.onPick,
+    hide: () => {
+      host.onHide(dock);
+    },
+  };
+}
+
+/**
+ * The tabs' names and counts again, without arranging (ADR 0163): Problems' count changes on a
+ * keystroke. Handed over only when something in them changed, because a new strip renders the
+ * whole panel again and the command panel's scrollback is thousands of lines.
+ */
+export function paintStrips(root: ParentNode, layout: Layout, host: DockHost): void {
+  for (const dock of DOCKS) {
+    const strip = stripOf(layout, dock, host);
+    if (strip === undefined) continue;
+    const element = dockElement(root, dock)?.querySelector<DockedPanel>(
+      `[data-panel="${strip.front}"]`,
+    );
+    if (element === null || element === undefined) continue;
+    const before = element.strip;
+    const same =
+      before !== undefined &&
+      before.front === strip.front &&
+      before.label === strip.label &&
+      JSON.stringify(before.tabs) === JSON.stringify(strip.tabs);
+    if (!same) element.strip = strip;
+  }
+}
 
 /**
  * Puts the window in the shape the record describes.
@@ -84,10 +133,11 @@ export async function arrange(root: ParentNode, layout: Layout, host: DockHost):
       element.panelId = panel.id;
       element.fixed = panel.fixed;
       element.onClose = host.onClose;
+      element.strip = stripOf(layout, dock, host);
       pending.push(element.updateComplete);
     }
 
-    applySize(container, dock, resizedPanelOf(layout, dock));
+    applySize(container, dock, dockSizeOf(layout, dock));
 
     const splitter = splitterElement(root, dock);
     // A dock with nothing in it takes up no room, and neither does the edge it would have
@@ -124,14 +174,14 @@ function ensurePanel(container: HTMLElement, panel: PanelRecord, index: number):
  * `centre` never gets one: it is the remainder, which is the only answer that survives the
  * window being resized (`shared/layout.ts`).
  */
-function applySize(container: HTMLElement, dock: Dock, panel: PanelRecord | undefined): void {
-  container.hidden = panel === undefined;
+function applySize(container: HTMLElement, dock: Dock, pixels: number | undefined): void {
+  container.hidden = pixels === undefined;
   for (const property of ['width', 'height', 'min-width', 'min-height']) {
     container.style.removeProperty(property);
   }
-  if (dock === ELASTIC_DOCK || panel === undefined) return;
+  if (dock === ELASTIC_DOCK || pixels === undefined) return;
 
-  const size = `${String(clampSize(panel.size))}px`;
+  const size = `${String(clampSize(pixels))}px`;
   // The size is where the dock starts; it gives way to the editor groups down to the smaller of
   // it and the floor token, so a dock dragged narrower than the floor keeps its own size
   // (TYTO-299, ADR 0093). The record is not changed: a wider window gives the size back.

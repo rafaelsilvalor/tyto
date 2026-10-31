@@ -7,7 +7,7 @@ import { type CommandSession, CommandSessions } from './command-sessions.js';
 
 /**
  * The command panel (TYTO-496) as jsdom can see it: the input line, the history keys, the
- * tabs and their status, Stop, the links in the output, find and copy. Where it sits beside
+ * tabs and their status, Stop, the links in the output, find and clear. Where it sits beside
  * Problems, and what a real run prints, are the e2e's and the real window's.
  */
 
@@ -20,7 +20,6 @@ interface Harness {
   readonly ran: (readonly string[])[];
   readonly cancelled: string[];
   readonly opened: OutputLink[];
-  readonly copied: string[];
   readonly history: string[];
 }
 
@@ -36,7 +35,6 @@ async function mount(
     ran: [],
     cancelled: [],
     opened: [],
-    copied: [],
     history: options.history ?? [],
   };
   let runs = 0;
@@ -52,7 +50,6 @@ async function mount(
     caseless: true,
     history: () => harness.history,
     remember: (line) => harness.history.push(line),
-    copy: (text) => harness.copied.push(text),
   };
   element.locale = options.locale ?? 'en';
   element.sessions = sessions;
@@ -96,7 +93,7 @@ describe('running a line', () => {
     expect(lines(harness.element)).toEqual(['$ tyto render "Meus briefs/a.brief" --types svg']);
     expect(input(harness.element).value).toBe('');
     expect(harness.sessions.active.runId).toBe('run-1');
-    expect(tabs(harness.element)[0]?.textContent).toContain('render "Meus briefs/a.brief"');
+    expect(harness.sessions.active.line).toBe('tyto render "Meus briefs/a.brief" --types svg');
   });
 
   it('refuses a line with an unclosed quote, saying where, and runs nothing', async () => {
@@ -150,7 +147,7 @@ describe('the history keys', () => {
     const field = input(harness.element);
     await press(harness.element, field, 'r', { ctrlKey: true });
     expect(harness.element.querySelector('.command-panel__prompt')?.textContent?.trim()).toBe(
-      'history',
+      'history ›',
     );
     field.value = 'render';
     field.dispatchEvent(new InputEvent('input', { bubbles: true }));
@@ -170,7 +167,7 @@ describe('the history keys', () => {
     await press(harness.element, field, 'r', { ctrlKey: true });
     await press(harness.element, field, 'Escape');
     expect(harness.element.querySelector('.command-panel__prompt')?.textContent?.trim()).toBe(
-      'tyto',
+      'tyto ›',
     );
     expect(harness.ran).toEqual([]);
   });
@@ -195,9 +192,17 @@ describe('the sessions', () => {
     expect(tabs(harness.element)[0]?.textContent?.trim()).toBe('Session 1');
   });
 
+  it('draws no session tabs while there is one session (ADR 0163)', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'check a.brief');
+    expect(tabs(harness.element)).toEqual([]);
+  });
+
   it('shows how a run ended on its tab, in words for a screen reader', async () => {
     const harness = await mount();
     await typeAndRun(harness, 'check a.brief');
+    harness.sessions.create();
+    harness.sessions.select(harness.sessions.sessions[0]!.id);
     harness.sessions.state({ runId: 'run-1', state: 'finished', code: 1 });
     await harness.element.updateComplete;
     const status = harness.element.querySelector('.command-session__status');
@@ -211,17 +216,19 @@ describe('the sessions', () => {
   it('stops the run in front, and only while there is one', async () => {
     const harness = await mount();
     const stop = () =>
-      harness.element.querySelector<HTMLButtonElement>('[data-action="commandPanel.stop"]')!;
-    expect(stop().disabled).toBe(true);
+      harness.element.querySelector<HTMLButtonElement>('[data-action="commandPanel.stop"]');
+    expect(stop()).toBeNull();
     await typeAndRun(harness, 'watch .');
-    expect(stop().disabled).toBe(false);
-    stop().click();
+    stop()!.click();
     expect(harness.cancelled).toEqual(['run-1']);
   });
 
   it('stops a tab’s run when the tab is closed', async () => {
     const harness = await mount();
     await typeAndRun(harness, 'watch .');
+    harness.sessions.create();
+    harness.sessions.select(harness.sessions.sessions[0]!.id);
+    await harness.element.updateComplete;
     harness.element.querySelector<HTMLButtonElement>('.command-session__close')!.click();
     expect(harness.cancelled).toEqual(['run-1']);
   });
@@ -273,13 +280,11 @@ describe('the output', () => {
     expect(count()).toBe('2 of 2');
   });
 
-  it('copies the whole output as text, and clears it', async () => {
+  it('clears the output', async () => {
     const harness = await mount();
     await typeAndRun(harness, 'check a.brief');
-    harness.sessions.output({ runId: 'run-1', stream: 'out', text: '\u001b[32mok\u001b[0m\n' });
+    harness.sessions.output({ runId: 'run-1', stream: 'out', text: 'ok\n' });
     await harness.element.updateComplete;
-    harness.element.querySelector<HTMLButtonElement>('[data-action="commandPanel.copy"]')!.click();
-    expect(harness.copied).toEqual(['$ tyto check a.brief\nok']);
     harness.element.querySelector<HTMLButtonElement>('[data-action="commandPanel.clear"]')!.click();
     await harness.element.updateComplete;
     expect(lines(harness.element)).toEqual([]);
@@ -297,6 +302,33 @@ describe('the output', () => {
     harness.sessions.output({ runId: 'run-1', stream: 'out', text: 'swept 4\n' });
     await again.updateComplete;
     expect(lines(again)).toEqual(['$ tyto watch .', 'swept 3', 'swept 4']);
+  });
+});
+
+describe('the prompt (ADR 0163)', () => {
+  it('is the last line of the output, labelled, and the only stop in the tab order', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'check a.brief');
+    const output = harness.element.querySelector('.command-panel__output')!;
+    const field = input(harness.element);
+    expect(output.lastElementChild?.contains(field)).toBe(true);
+    expect(field.labels?.[0]?.textContent?.trim()).toBe('tyto ›');
+    expect(field.getAttribute('aria-label')).toBe('Type a tyto command, then Enter');
+    expect(output.hasAttribute('tabindex')).toBe(false);
+  });
+
+  it('takes the caret on a click in the output', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'check a.brief');
+    harness.element.querySelector<HTMLElement>('.command-panel__line')!.click();
+    expect(document.activeElement).toBe(input(harness.element));
+  });
+
+  it('says what to type only before anything has been run', async () => {
+    const harness = await mount();
+    expect(input(harness.element).placeholder).toBe('Type a tyto command, then Enter');
+    await typeAndRun(harness, 'check a.brief');
+    expect(input(harness.element).placeholder).toBe('');
   });
 });
 

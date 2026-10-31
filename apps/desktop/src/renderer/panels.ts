@@ -26,6 +26,33 @@ import './problems-panel.js';
 export const EDITOR_PANEL_TAG = 'tyto-editor-panel';
 export const PROBLEMS_PANEL_TAG = 'tyto-problems-panel';
 
+/** One tab of a tabbed area's strip (ADR 0163): a panel, its name, and a count when it has one. */
+export interface DockTab {
+  readonly id: string;
+  readonly label: string;
+  /** Problems' count, as VS Code's tab shows it; absent or 0 draws none. */
+  readonly count?: number;
+  /**
+   * A built-in panel's heading, kept as the tab's name: its id and its key, which the window's
+   * `[data-i18n]` pass writes, as it wrote the title this tab replaces (`#problems-heading`).
+   */
+  readonly heading?: { readonly id: string; readonly key: CatalogueKey };
+}
+
+/**
+ * What the panel in front of a tabbed area draws in place of its title (ADR 0163): every open
+ * panel of the area as a tab, the one in front selected, and what picking a tab, closing one and
+ * hiding the whole area do. The dock sets it; a panel in a side area has none.
+ */
+export interface DockStrip {
+  readonly tabs: readonly DockTab[];
+  readonly front: string;
+  readonly label: string;
+  readonly pick: (panelId: string) => void;
+  /** Hides the area, as VS Code's × does; every tab is still there when it comes back. */
+  readonly hide: () => void;
+}
+
 /** What the dock sets on every panel it creates. */
 export interface PanelChrome {
   readonly locale: Locale;
@@ -59,12 +86,14 @@ export abstract class DockedPanel extends LitElement {
     panelId: { attribute: false },
     fixed: { type: Boolean },
     onClose: { attribute: false },
+    strip: { attribute: false },
   };
 
   declare locale: Locale;
   declare panelId: string;
   declare fixed: boolean;
   declare onClose: (panelId: string) => void;
+  declare strip: DockStrip | undefined;
 
   constructor() {
     super();
@@ -72,6 +101,7 @@ export abstract class DockedPanel extends LitElement {
     this.panelId = '';
     this.fixed = false;
     this.onClose = () => undefined;
+    this.strip = undefined;
   }
 
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
@@ -89,6 +119,8 @@ export abstract class DockedPanel extends LitElement {
    * `aria-label`; then the close button, which hides the tool.
    */
   protected chrome(title: TemplateResult, actions: unknown = nothing): TemplateResult {
+    const strip = this.strip;
+    if (strip !== undefined) return this.tabbed(strip, actions);
     return html`<div class="pane__strip pane__strip--tool" data-font-area="paneHeaders">
       ${title}
       <div class="pane__actions tool__actions">
@@ -108,6 +140,68 @@ export abstract class DockedPanel extends LitElement {
                 ×
               </button>`
         }
+      </div>
+    </div>`;
+  }
+
+  /**
+   * The header in a tabbed area (ADR 0163): the area's tabs where the title was, this panel's
+   * actions, then the × that hides the area. ← and → move between the tabs, as a tab list does.
+   */
+  private tabbed(strip: DockStrip, actions: unknown): TemplateResult {
+    const step = (event: KeyboardEvent, index: number): void => {
+      const by = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (by === 0) return;
+      event.preventDefault();
+      const next = strip.tabs[(index + by + strip.tabs.length) % strip.tabs.length];
+      if (next !== undefined) strip.pick(next.id);
+    };
+    return html`<div
+      class="pane__strip pane__strip--tool pane__strip--tabs"
+      data-font-area="paneHeaders"
+    >
+      <div class="dock-tabs" role="tablist" aria-label=${strip.label}>
+        ${strip.tabs.map(
+          (tab, index) =>
+            html`<button
+              type="button"
+              role="tab"
+              class="dock-tab"
+              data-tab=${tab.id}
+              aria-selected=${tab.id === strip.front ? 'true' : 'false'}
+              tabindex=${tab.id === strip.front ? '0' : '-1'}
+              @click=${() => {
+                strip.pick(tab.id);
+              }}
+              @keydown=${(event: KeyboardEvent) => {
+                step(event, index);
+              }}
+            >
+              ${
+                tab.heading === undefined
+                  ? tab.label
+                  : html`<span id=${tab.heading.id} data-i18n=${tab.heading.key}></span>`
+              }${
+                tab.count === undefined || tab.count === 0
+                  ? nothing
+                  : html`<span class="dock-tab__count">${tab.count}</span>`
+              }
+            </button>`,
+        )}
+      </div>
+      <div class="pane__actions tool__actions">
+        ${actions}
+        <button
+          type="button"
+          class="tool__action panel__close"
+          title=${this.say('panel.hideArea')}
+          aria-label=${this.say('panel.hideArea')}
+          @click=${() => {
+            strip.hide();
+          }}
+        >
+          ×
+        </button>
       </div>
     </div>`;
   }

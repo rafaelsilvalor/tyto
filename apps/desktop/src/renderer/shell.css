@@ -1521,24 +1521,79 @@ button.problems__row:focus-visible {
 }
 
 /*
- * The command panel (TYTO-496, ADR 0159): tabs of sessions, the output, an optional find bar
- * and the input line, top to bottom, inside the tool's own strip. The output takes what is
- * left and scrolls; everything else keeps its height.
+ * The bottom area's tabs (ADR 0163), as VS Code draws its panel's: the names in the strip where a
+ * tool's title was, the one in front in the text colour with a line under it, the others muted.
+ * No border anywhere else: the strip and the content share the panel's surface.
+ */
+.dock-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+  gap: var(--tyto-space-5);
+  overflow: hidden;
+}
+
+.dock-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tyto-space-2);
+  border: 0;
+  border-bottom: var(--tyto-hairline-width) solid transparent;
+  padding: 0 var(--tyto-space-1);
+  background: none;
+  color: var(--tyto-text-muted);
+  font: inherit;
+  font-size: var(--tyto-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dock-tab:hover {
+  color: var(--tyto-text);
+}
+
+.dock-tab[aria-selected='true'] {
+  border-bottom-color: var(--tyto-text);
+  color: var(--tyto-text);
+}
+
+.dock-tab:focus-visible {
+  outline: var(--tyto-focus-width) solid var(--tyto-focus-ring);
+  outline-offset: calc(var(--tyto-focus-width) * -1);
+}
+
+.dock-tab__count {
+  border-radius: var(--tyto-radius-full);
+  padding: 0 var(--tyto-space-3);
+  background: var(--tyto-accent);
+  color: var(--tyto-accent-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/*
+ * The command panel (TYTO-496, ADR 0159, ADR 0163): the output and, as its last line, the prompt,
+ * the way a terminal shows them. No box around the input and no line between parts: Rafael asked
+ * for the panel as clean as it can be.
  */
 .command-panel {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
+  /* Outside the scroll area, so a line scrolled half out never meets the tab's underline. */
+  padding-top: var(--tyto-space-3);
 }
 
 .command-panel__sessions {
   display: flex;
-  flex: 0 0 auto;
+  min-width: 0;
   gap: var(--tyto-space-1);
-  overflow-x: auto;
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
-  padding: var(--tyto-space-1) var(--tyto-space-4);
+  overflow: hidden;
+  margin-inline-end: var(--tyto-space-3);
 }
 
 .command-session {
@@ -1551,7 +1606,7 @@ button.problems__row:focus-visible {
 }
 
 .command-session[data-active] {
-  background: var(--tyto-surface-raised);
+  background: var(--tyto-hover);
 }
 
 .command-session__tab {
@@ -1560,7 +1615,7 @@ button.problems__row:focus-visible {
   align-items: baseline;
   gap: var(--tyto-space-2);
   border: 0;
-  padding: var(--tyto-space-1) var(--tyto-space-3);
+  padding: 0 var(--tyto-space-2);
   background: none;
   color: var(--tyto-text-muted);
   font: inherit;
@@ -1599,7 +1654,7 @@ button.problems__row:focus-visible {
 
 .command-session__close {
   border: 0;
-  padding: 0 var(--tyto-space-2);
+  padding: 0 var(--tyto-space-1);
   background: none;
   color: var(--tyto-text-muted);
   font: inherit;
@@ -1607,8 +1662,7 @@ button.problems__row:focus-visible {
   visibility: hidden;
 }
 
-.command-session:hover .command-session__close,
-.command-session[data-active] .command-session__close {
+.command-session:hover .command-session__close {
   visibility: visible;
 }
 
@@ -1622,24 +1676,23 @@ button.problems__row:focus-visible {
   flex: 0 0 auto;
   align-items: center;
   gap: var(--tyto-space-3);
-  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
-  padding: var(--tyto-space-1) var(--tyto-space-4);
+  padding: var(--tyto-space-1) var(--tyto-space-5);
 }
 
-.command-panel__find-input,
-.command-panel__input {
+.command-panel__find-input {
+  flex: 0 1 auto;
   min-width: 0;
-  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border: 0;
   border-radius: var(--tyto-radius-sm);
   padding: var(--tyto-space-1) var(--tyto-space-3);
-  background: var(--tyto-surface-sunken);
+  background: var(--tyto-hover);
   color: var(--tyto-text);
   font-family: var(--tyto-font-mono);
   font-size: var(--tyto-text-sm);
 }
 
-.command-panel__find-input {
-  flex: 0 1 auto;
+.command-panel__find-input:focus-visible {
+  outline: var(--tyto-hairline-width) solid var(--tyto-focus-ring);
 }
 
 .command-panel__find-count {
@@ -1652,14 +1705,15 @@ button.problems__row:focus-visible {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: var(--tyto-space-3) var(--tyto-space-5);
+  padding: 0 var(--tyto-space-5) var(--tyto-space-4);
   font-family: var(--tyto-font-mono);
   font-size: var(--tyto-text-sm);
+  line-height: var(--tyto-line-height);
+  cursor: text;
   user-select: text;
 }
 
 .command-panel__line {
-  min-height: calc(var(--tyto-text-sm) * var(--tyto-line-height));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -1672,7 +1726,6 @@ button.problems__row:focus-visible {
   color: var(--tyto-text-muted);
 }
 
-.command-panel__empty,
 .command-panel__dropped {
   margin: 0;
   color: var(--tyto-text-muted);
@@ -1693,29 +1746,39 @@ button.problems__row:focus-visible {
   outline: var(--tyto-hairline-width) solid var(--tyto-accent);
 }
 
-.command-panel__prompt-row {
+/* The prompt: one more line of the output, with nothing drawn around what is typed. */
+.command-panel__prompt-line {
   display: flex;
-  flex: 0 0 auto;
-  align-items: center;
+  align-items: baseline;
   gap: var(--tyto-space-3);
-  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
-  padding: var(--tyto-space-2) var(--tyto-space-4);
 }
 
 .command-panel__prompt {
+  flex: none;
   color: var(--tyto-accent);
-  font-family: var(--tyto-font-mono);
-  font-size: var(--tyto-text-sm);
 }
 
 .command-panel__input {
   flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--tyto-text);
+  font: inherit;
+  caret-color: var(--tyto-text);
 }
 
-.command-panel__input:focus-visible,
-.command-panel__find-input:focus-visible {
-  outline: var(--tyto-focus-width) solid var(--tyto-focus-ring);
-  outline-offset: calc(var(--tyto-focus-width) * -1);
+/*
+ * The caret is what shows where typing goes, as in a terminal; a ring around a line that is
+ * already the only place to type would be the box Rafael asked to take away.
+ */
+.command-panel__input:focus {
+  outline: none;
+}
+
+.command-panel__input::placeholder {
+  color: var(--tyto-text-disabled);
 }
 
 .command-panel__search-match {
@@ -1725,8 +1788,6 @@ button.problems__row:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--tyto-text-muted);
-  font-family: var(--tyto-font-mono);
-  font-size: var(--tyto-text-sm);
 }
 
 /*

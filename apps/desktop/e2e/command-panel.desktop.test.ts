@@ -76,6 +76,16 @@ describe('the command panel', () => {
     expect(
       await page.evaluate(() => document.activeElement?.classList.contains('command-panel__input')),
     ).toBe(true);
+    // One tab of the bottom area beside Problems, the only panel drawn there (ADR 0163).
+    expect(
+      await page.$$eval('[data-dock="bottom"] .dock-tab', (tabs) =>
+        tabs.map(
+          (tab) =>
+            `${tab.getAttribute('data-tab') ?? ''}:${tab.getAttribute('aria-selected') ?? ''}`,
+        ),
+      ),
+    ).toEqual(['problems:false', 'commands:true']);
+    expect(await page.$('[data-dock="bottom"] tyto-problems-panel')).toBeNull();
   });
 
   it('runs a typed line, shows how it ended, and opens the place it printed', async () => {
@@ -93,9 +103,8 @@ describe('the command panel', () => {
     await page.locator('.command-panel__input').fill(line);
     await page.locator('.command-panel__input').press('Enter');
 
-    // The tab says the run ended with the CLI's exit code for error diagnostics.
-    await page.waitForSelector('.command-session__status[data-state="failed"]');
-    expect(await page.locator('.command-session__status').textContent()).toBe('1');
+    // The run's last line says it ended with the CLI's exit code for error diagnostics.
+    await page.waitForSelector('.command-panel__line[data-stream="note"]:has-text("exit code 1")');
 
     const link = page.locator('.command-panel__link', { hasText: 'perdido.brief:5:1' }).first();
     await link.click();

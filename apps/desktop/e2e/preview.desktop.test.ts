@@ -81,7 +81,11 @@ const otherProblemCounts = async (): Promise<string[]> =>
     const bar = document.querySelector<HTMLElement>('tyto-status-bar')?.innerText ?? '';
     const at = bar === '' ? -1 : whole.lastIndexOf(bar);
     if (at < 0) throw new Error(`status bar text ${JSON.stringify(bar)} not found in the window`);
-    const rest = whole.slice(0, at) + whole.slice(at + bar.length);
+    let rest = whole.slice(0, at) + whole.slice(at + bar.length);
+    // Problems' tab carries the bar's count on purpose (ADR 0163, as VS Code's does), and the
+    // test below holds it to the bar's number; it is the one other place allowed.
+    const tab = document.querySelector<HTMLElement>('[data-tab="problems"]')?.innerText ?? '';
+    if (tab !== '') rest = rest.replace(tab, '');
     // A separator of spaces, line breaks, a colon or brackets — what lies between a label and
     // its number in "Problems: 1", "PROBLEMS\n1" or "(1) problems".
     return rest.match(/problem\w*[\s:()]*\d+|\d+[\s()]*problem/giu) ?? [];
@@ -230,6 +234,11 @@ describe('the main screen', () => {
     // card removed — would have nothing to show and the assertion below nothing to catch.
     expect(await page.locator('#problems-heading').isVisible()).toBe(true);
     expect(await otherProblemCounts()).toEqual([]);
+    // ADR 0163: the count on Problems' tab is the bar's, never a second number.
+    const tabCount = await page.evaluate(
+      () => document.querySelector('[data-tab="problems"] .dock-tab__count')?.textContent ?? '',
+    );
+    expect(Number(tabCount)).toBe(await problemCount());
   });
 });
 

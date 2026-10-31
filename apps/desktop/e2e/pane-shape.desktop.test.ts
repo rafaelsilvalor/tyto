@@ -234,7 +234,11 @@ const toolHeaders = async (): Promise<{ panels: string[]; groups: number }> =>
       .map((panel) => ({ panel, strip: panel.querySelector(':scope > .pane__strip') }))
       .filter(({ strip }) => strip instanceof HTMLElement && strip.getClientRects().length > 0)
       .map(({ panel, strip }) => {
-        const title = strip!.querySelector<HTMLElement>(':scope > .tool__title');
+        // A tool's title, or in the tabbed bottom area the tab in front, which stands for it
+        // (ADR 0163).
+        const title =
+          strip!.querySelector<HTMLElement>(':scope > .tool__title') ??
+          strip!.querySelector<HTMLElement>(':scope > .dock-tabs > [aria-selected="true"]');
         const tool =
           strip!.classList.contains('pane__strip--tool') &&
           title !== null &&

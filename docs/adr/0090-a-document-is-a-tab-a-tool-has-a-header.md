@@ -55,3 +55,6 @@ actions at the right. Rafael approved giving Tyto's tools that look the same day
   at an icon sheet.
 - Two tools in one dock are not built here; decision 3 only says which element a switcher
   replaces.
+
+**Superseded in part on 2026-10-30 by ADR 0163 (TYTO-496):** in the bottom area the switcher decision
+3 foresaw is built. The area's tabs take the place of the title of the panel in front.
