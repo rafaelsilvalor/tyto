@@ -54,6 +54,9 @@ describe('the catalogue', () => {
       'template.label',
       // TYTO-497's tab in the bottom strip: "Terminal" is the word in both languages.
       'panel.terminal',
+      // TYTO-514's menu, for `panel.editor`'s reason below: "Brief" is the format's name in both, and
+      // its mnemonic is the B in both.
+      'menu.brief',
       // E9.10's name for the editor panel in a list of panels: "Brief", the name of the file
       // format and of the language — a Portuguese speaker writing one calls it a brief, and
       // "Resumo" would name something else.

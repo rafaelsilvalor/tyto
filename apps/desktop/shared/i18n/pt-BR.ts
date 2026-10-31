@@ -63,6 +63,8 @@ export const ptBR: Catalogue = {
   'terminal.quit.stay': 'Continuar',
   'panel.terminal': 'Terminal',
   'command.terminal.new': 'Terminal: Novo terminal',
+  'command.terminal.show': 'Mostrar o Terminal',
+  'command.problems.show': 'Mostrar Problemas',
   'terminal.new': 'Novo terminal',
   'terminal.sessions': 'Terminais',
   'terminal.session.close': 'Fechar o terminal',
@@ -159,6 +161,9 @@ export const ptBR: Catalogue = {
   'menu.file': '&Arquivo',
   'menu.edit': '&Editar',
   'menu.view': 'E&xibir',
+  'menu.brief': '&Brief',
+  'menu.preview': '&Prévia',
+  'menu.tools': '&Ferramentas',
   'menu.window': '&Janela',
   // D and not U: Alt+U is CodeMirror's redoSelection, which the editor takes first (TYTO-264).
   'menu.help': 'Aju&da',

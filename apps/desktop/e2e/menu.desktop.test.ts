@@ -9,11 +9,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 
-import { FILE_MENU_COMMANDS } from '../shared/commands.js';
+import { FILE_MENU_COMMANDS, MENU_COMMANDS } from '../shared/commands.js';
 import { translate } from '../shared/i18n/index.js';
 
 /**
- * The File menu, in a running app (TYTO-124).
+ * The File menu, in a running app (TYTO-124), and since TYTO-514 every other menu's commands.
  *
  * **What `src/main/menu.test.ts` cannot say.** That suite reads the template, which is a value
  * this repository wrote; this one reads `Menu.getApplicationMenu()`, which is what Electron
@@ -127,10 +127,10 @@ describe('the File menu Electron built', () => {
     expect(labelOf('minimize')).toBe(translate(locale, 'menu.role.minimize'));
   });
 
-  it('takes no accelerator from the page', async () => {
+  it('takes no accelerator from the page, in any menu', async () => {
     const items = await menuItems();
     const fileAccelerators = items
-      .filter((item) => FILE_MENU_COMMANDS.some((command) => command.id === item.id))
+      .filter((item) => MENU_COMMANDS.some((command) => command.id === item.id))
       .map((item) => item.accelerator)
       .filter((accelerator) => accelerator !== null);
 
@@ -153,5 +153,52 @@ describe('the File menu Electron built', () => {
     // The whole route: a click in main, a push across the bridge, `registry.run` in the
     // renderer, a tab on screen. Nothing in this app can prove that except a launched one.
     expect(await page.locator('.tabs__tab').count()).toBe(before + 1);
+  });
+});
+
+describe('the menus Electron built around File (TYTO-514)', () => {
+  it('puts Brief, Preview and Tools in the bar, and Window where it was', async () => {
+    const top = await app.evaluate(({ Menu }) =>
+      (Menu.getApplicationMenu()?.items ?? []).map((item) => item.id || item.role || ''),
+    );
+    // Off macOS: macOS starts with its application menu, which this CI never runs.
+    expect(top).toEqual([
+      'file',
+      'editmenu',
+      'brief',
+      'preview',
+      'viewmenu',
+      'tools',
+      'windowmenu',
+      'help',
+    ]);
+  });
+
+  it('carries every command any menu names', async () => {
+    const ids = (await menuItems()).map((item) => item.id);
+    for (const command of MENU_COMMANDS) expect(ids, command.id).toContain(command.id);
+  });
+
+  it('brings the Problems tab to the front from View, and leaves it there on a second click', async () => {
+    const selected = (): Promise<string[]> =>
+      page.$$eval('[data-dock="bottom"] .dock-tab[aria-selected="true"]', (tabs) =>
+        tabs.map((tab) => tab.getAttribute('data-tab') ?? ''),
+      );
+
+    await clickItem('problems.show');
+    await page.waitForSelector(
+      '[data-dock="bottom"] .dock-tab[data-tab="problems"][aria-selected="true"]',
+    );
+    // Show and not toggle: a second click is not the one that hides it (`queue.show`'s reason).
+    await clickItem('problems.show');
+    await clickItem('commandPanel.run');
+    await page.waitForSelector(
+      '[data-dock="bottom"] .dock-tab[data-tab="commands"][aria-selected="true"]',
+    );
+    await clickItem('problems.show');
+    await page.waitForSelector(
+      '[data-dock="bottom"] .dock-tab[data-tab="problems"][aria-selected="true"]',
+    );
+    expect(await selected()).toEqual(['problems']);
   });
 });

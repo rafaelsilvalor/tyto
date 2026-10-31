@@ -254,6 +254,12 @@ export const COMMAND_PANEL_RENDER_BRIEF = 'commandPanel.renderBrief';
  */
 export const TERMINAL_NEW = 'terminal.new';
 /**
+ * TYTO-514 (ADR 0166). View's bottom tabs: the Terminal and the Problems tab brought to the front,
+ * never hidden, for `queue.show`'s reason. The Terminal's caret goes to the shell in front.
+ */
+export const TERMINAL_SHOW = 'terminal.show';
+export const PROBLEMS_SHOW = 'problems.show';
+/**
  * The export of the delivery the brief in front belongs to (TYTO-490, ADR 0157 §6): no dialog to
  * fill, main resolves the folders, and the export box opens already running. Offered only for a
  * brief in a delivery; no key by default, bindable in `keybindings.json`.
@@ -336,6 +342,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [COMMAND_PANEL_RUN]: 'command.commandPanel.run',
   [COMMAND_PANEL_RENDER_BRIEF]: 'command.commandPanel.renderBrief',
   [TERMINAL_NEW]: 'command.terminal.new',
+  [TERMINAL_SHOW]: 'command.terminal.show',
+  [PROBLEMS_SHOW]: 'command.problems.show',
   [DELIVERY_EXPORT]: 'command.delivery.export',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
@@ -405,6 +413,10 @@ export interface DesktopActions {
   focusCommandPanel(): void;
   /** Opens another terminal in front, the Terminal tab with it (TYTO-497). */
   newTerminal(): void;
+  /** TYTO-514. The Terminal tab in front, its shell focused; a first one if none runs. */
+  showTerminal(): void;
+  /** TYTO-514. The Problems tab in front, opened when it is not already shown. */
+  showProblems(): void;
   /** TYTO-496. `render` and the brief in front written on the prompt, not run. */
   renderBriefInCommandPanel(): void;
   stepZoom(direction: 1 | -1): void;
@@ -597,6 +609,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(TERMINAL_NEW, () => {
     actions.newTerminal();
+  });
+  add(TERMINAL_SHOW, () => {
+    actions.showTerminal();
+  });
+  add(PROBLEMS_SHOW, () => {
+    actions.showProblems();
   });
   add(DELIVERY_EXPORT, () => {
     actions.exportDelivery();
