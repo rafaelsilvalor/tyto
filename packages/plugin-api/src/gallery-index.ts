@@ -25,6 +25,14 @@ import type { PluginFile, PluginFilesLock } from './plugin-files.js';
 
 export const GALLERY_INDEX_FILE = 'index.yaml';
 
+/**
+ * The index a gallery reads when nobody names another (TYTO-506, ADR 0162): the list the
+ * project curates. A git location like any other, never a provider: `--index`,
+ * `TYTO_GALLERY_INDEX` or the window's `galleryIndex` setting replace it. Here, beside the
+ * reader, so the CLI and the window start from one value.
+ */
+export const DEFAULT_GALLERY_INDEX = 'https://github.com/rafaelsilvalor/tyto-gallery.git';
+
 export type GalleryKind = 'template' | 'plugin';
 
 export interface GalleryEntry {

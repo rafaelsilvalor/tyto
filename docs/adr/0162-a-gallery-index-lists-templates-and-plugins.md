@@ -81,6 +81,17 @@ TYTO-504's. **There is no built-in default in this card**: which list a machine 
 choice, and the curated repository does not exist yet. TYTO-505 creates it and may add the
 default.
 
+_Amended 2026-10-31 (TYTO-506):_ TYTO-505 made the curated index, and the gallery now falls back
+to it. `DEFAULT_GALLERY_INDEX` in `@tyto/plugin-api`, beside `parseGalleryIndex`, names it as a
+plain git location (`https://github.com/rafaelsilvalor/tyto-gallery.git`), fetched like any
+other, with no provider's API behind it (ADR 0011, ADR 0127). It lives in the pure package
+because it is one value two readers start from: the CLI reads `--index`, else
+`TYTO_GALLERY_INDEX`, else this default, and a blank value falls through as an unset one does;
+the window's built-in setting `galleryIndex` (not `gallery.index`: a dot in a built-in key reads
+as a plugin's prefix) defaults to the same value. Neither reads the other's configuration
+(ADR 0145 decision 5). It is only a default: which list a machine trusts is still the person's
+choice, made with either override, and a private list works as before.
+
 ### 3. The cache is the copy fetched last
 
 Every `tyto gallery` command fetches, because each is something a person typed. The text lands
