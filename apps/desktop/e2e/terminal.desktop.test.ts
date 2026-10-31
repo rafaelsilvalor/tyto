@@ -228,9 +228,9 @@ describe('a terminal in the window', () => {
       const { dialog } = _electron;
       const fs = process.getBuiltinModule('node:fs');
       dialog.showMessageBoxSync = ((...args: unknown[]) => {
-        const options = args.at(-1) as { message?: string };
-        fs.writeFileSync(file, options.message ?? '');
-        return 0;
+        const options = args.at(-1) as { message?: string; detail?: string; cancelId?: number };
+        fs.appendFileSync(file, `${options.message ?? ''} | ${options.detail ?? ''}\n`);
+        return options.cancelId ?? 0;
       }) as never;
     }, asked);
 
@@ -323,6 +323,18 @@ describe('a terminal in the window', () => {
     ]);
     debug(closed);
     holders();
+    // DEBUG TYTO-497: the app's log, which names any crash in main.
+    const logs = join(scratch, 'user-data', 'logs');
+    if (existsSync(logs)) {
+      for (const name of readdirSync(logs)) {
+        process.stdout.write(
+          `[TYTO-497 debug] log ${name}:\n${readFileSync(join(logs, name), 'utf8').slice(-3000)}\n`,
+        );
+      }
+    }
+    if (existsSync(asked)) {
+      process.stdout.write(`[TYTO-497 debug] asked: ${readFileSync(asked, 'utf8')}\n`);
+    }
     expect(closed).toBe('closed');
 
     expect(existsSync(asked) ? readFileSync(asked, 'utf8') : 'not asked').toBe('not asked');
