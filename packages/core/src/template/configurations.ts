@@ -340,12 +340,12 @@ export async function resolveTemplateConfigurations(
     return result;
   };
   const selectionOf = async (
-    placed: Placed,
+    placedTemplate: Placed,
     configuration: ConfigurationEntry,
   ): Promise<TemplateSelection> => {
-    const { values, brief, brand, formats } = await checkedOf(placed, configuration);
+    const { values, brief, brand, formats } = await checkedOf(placedTemplate, configuration);
     return {
-      template: placed.entry.template,
+      template: placedTemplate.entry.template,
       configuration: configuration.name,
       values,
       brief,

@@ -349,14 +349,18 @@ export function parsePluginFile(source: string, file: string): PluginFileRead {
 
   if (pluginNode !== undefined) {
     const keys = reader.keys('plugin', pluginNode, ['source']);
-    const source =
+    const pluginSource =
       keys === undefined
         ? reader.refuse('plugin', 'plugin is a mapping with a source', pluginNode)
         : keys.has('source')
           ? reader.source('plugin.source', keys.get('source'))
           : reader.refuse('plugin.source', 'source is required', pluginNode);
     return {
-      value: { file, templates: [], ...(source === undefined ? {} : { plugin: { source } }) },
+      value: {
+        file,
+        templates: [],
+        ...(pluginSource === undefined ? {} : { plugin: { source: pluginSource } }),
+      },
       diagnostics: reader.diagnostics,
     };
   }

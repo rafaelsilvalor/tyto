@@ -103,21 +103,21 @@ export function runGuest(
   }
 
   function answer(message: Extract<HostMessage, { type: 'response' }>): void {
-    const pending = requests.get(message.id);
-    if (pending === undefined) return;
+    const pendingRequest = requests.get(message.id);
+    if (pendingRequest === undefined) return;
     requests.delete(message.id);
     if (!message.ok) {
-      pending.reject(
+      pendingRequest.reject(
         message.diagnostic === undefined
           ? new Error(message.message)
           : new PluginCapabilityError(message.diagnostic),
       );
       return;
     }
-    const checked = pending.accept.safeParse(message.value);
-    if (checked.success) pending.resolve(checked.data);
+    const checked = pendingRequest.accept.safeParse(message.value);
+    if (checked.success) pendingRequest.resolve(checked.data);
     else
-      pending.reject(
+      pendingRequest.reject(
         new Error(`the host answered something unexpected: ${describeIssues(checked.error)}`),
       );
   }
@@ -163,15 +163,15 @@ export function runGuest(
     ) as [string, PointSpec];
 
     const data: Record<string, unknown> = {};
-    for (const [name, value] of Object.entries(contribution)) {
+    for (const [name, contributionValue] of Object.entries(contribution)) {
       if (name in spec.callables) continue;
-      if (typeof value === 'function') {
+      if (typeof contributionValue === 'function') {
         throw new TypeError(
           `a '${point}' contribution cannot carry a function in '${name}'; only ` +
             `${Object.keys(spec.callables).join(', ') || 'data'} crosses to the host`,
         );
       }
-      data[name] = value;
+      data[name] = contributionValue;
     }
     // Read by name rather than from the entries, so an exporter written as a class — whose
     // methods live on the prototype — crosses the same as an object literal.
@@ -331,8 +331,8 @@ export function runGuest(
     try {
       const handed = callable.receive?.(args.data, state) ?? args.data;
       const value = await target.fn(...handed);
-      const answer = callable.reply === undefined ? value : callable.reply(value, handed);
-      send({ protocol: RPC_PROTOCOL_VERSION, type: 'result', id, value: answer });
+      const replyValue = callable.reply === undefined ? value : callable.reply(value, handed);
+      send({ protocol: RPC_PROTOCOL_VERSION, type: 'result', id, value: replyValue });
     } catch (cause) {
       send({ protocol: RPC_PROTOCOL_VERSION, type: 'thrown', id, problem: messageOf(cause) });
     }
