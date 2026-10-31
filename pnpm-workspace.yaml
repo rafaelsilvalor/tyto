@@ -23,7 +23,14 @@ packages:
 # into place for that target and does nothing else; `electron-builder.yml` builds `nsis`,
 # so the script would prepare a target this repository never asks for. Adopting
 # Squirrel.Windows flips this to `true` in the same commit.
+#
+# node-pty is the desktop terminal's pseudo-terminal (TYTO-497, ADR 0164). Its install script
+# compiles the native module with node-gyp where no prebuilt binary fits: node-pty 1.1.0 ships
+# none for Linux, so blocking it would leave the Linux install with nothing to load. It is the
+# reason a machine that installs `apps/desktop` on Linux, or packages it anywhere, needs a C++
+# toolchain.
 allowBuilds:
   electron: true
   electron-winstaller: false
   esbuild: true
+  node-pty: true

@@ -436,6 +436,84 @@ describe('the packaged app', () => {
     expect(readFileSync(join(out, texts[0]!), 'utf8')).toMatch(/^\S+ \S+$/u);
   }, 120_000);
 
+  it("opens a terminal on the person's shell through node-pty and reads echo back (TYTO-497)", async () => {
+    // ADR 0164 decision 2: the native module loads from outside the asar in the packaged app, on
+    // every leg of `desktop.yml`, and a shell answers. The answer is computed by the shell, so
+    // the marker never appears in the typed text and an echo of the keystrokes cannot pass.
+    type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
+    const call = <T>(channel: string, request: unknown): Promise<T> =>
+      page.evaluate(
+        ([name, body]) => (globalThis as never as { tyto: Bridge }).tyto[name as string]!(body),
+        [channel, request] as const,
+      ) as Promise<T>;
+
+    const opened = await call<{ terminalId?: string; title?: string; message?: string }>(
+      'terminal:open',
+      { cols: 100, rows: 30 },
+    );
+    expect(opened.message).toBeUndefined();
+    const terminalId = opened.terminalId!;
+    const typed =
+      process.platform === 'win32' ? 'echo ("TYTO_PTY_" + (40+2))\r' : 'echo TYTO_PTY_$((40+2))\r';
+    const started = Date.now();
+    let replay = '';
+    let sent = false;
+    while (!replay.includes('TYTO_PTY_42')) {
+      // Typed once the shell has printed something, so a slow first prompt does not eat it.
+      if (!sent && replay !== '') {
+        await call('terminal:input', { terminalId, data: typed });
+        sent = true;
+      }
+      if (Date.now() - started > 30_000) {
+        throw new Error(
+          `the packaged terminal never answered; it printed: ${JSON.stringify(replay)}`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const { terminals } = await call<{ terminals: { terminalId: string; replay: string }[] }>(
+        'terminal:list',
+        {},
+      );
+      replay = terminals.find((terminal) => terminal.terminalId === terminalId)?.replay ?? '';
+    }
+    await call('terminal:kill', { terminalId });
+    const { terminals } = await call<{ terminals: unknown[] }>('terminal:list', {});
+    process.stdout.write(
+      `[TYTO-497] packaged terminal ran ${String(opened.title)} through node-pty and read ` +
+        `TYTO_PTY_42 back in ${String(Date.now() - started)} ms; open after kill: ${String(terminals.length)}\n`,
+    );
+    expect(terminals).toEqual([]);
+  }, 60_000);
+
+  it("ships node-pty unpacked with only this platform's runtime files (TYTO-497)", () => {
+    // ADR 0164 decision 2: no `prebuilds/` and no compiler leftovers, which the probe measured at
+    // 5 MiB and 15.6 MiB of the Windows folder.
+    const executable = packagedExecutable();
+    const unpacked =
+      process.platform === 'darwin'
+        ? join(
+            dirname(executable),
+            '..',
+            'Resources',
+            'app.asar.unpacked',
+            'node_modules',
+            'node-pty',
+          )
+        : join(dirname(executable), 'resources', 'app.asar.unpacked', 'node_modules', 'node-pty');
+    const files = readdirSync(unpacked, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(unpacked, join(entry.parentPath, entry.name)).replaceAll('\\', '/'));
+    const binaries = files.filter((file) => file.startsWith('build/'));
+    process.stdout.write(`[TYTO-497] packaged node-pty binaries: ${binaries.join(', ')}\n`);
+
+    expect(files).toContain('package.json');
+    expect(binaries).toContain('build/Release/pty.node');
+    expect(
+      files.filter((file) => /^prebuilds\/|\.(?:pdb|iobj|ipdb|lib|exp|obj)$|\/obj\//u.test(file)),
+    ).toEqual([]);
+    expect(files.filter((file) => file.endsWith('.test.js'))).toEqual([]);
+  });
+
   it('hands an installed plugin its setting from settings.json (TYTO-254)', async () => {
     type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
     const call = <T>(channel: string, request: unknown): Promise<T> =>

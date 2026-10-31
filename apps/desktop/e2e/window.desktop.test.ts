@@ -376,6 +376,12 @@ describe('the bridge', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
+      // TYTO-497, ADR 0164: the terminals main owns. Driven by `e2e/terminal.desktop.test.ts`.
+      'terminal:input',
+      'terminal:kill',
+      'terminal:list',
+      'terminal:open',
+      'terminal:resize',
       // TYTO-208: the colours the window applies, and the theme picker's three. Exercised by
       // `e2e/theme.desktop.test.ts` and `e2e/theme-pick.desktop.test.ts`.
       'theme:choose',
@@ -503,6 +509,10 @@ describe('switching the language', () => {
     // TYTO-495: the native box a `tyto` command run in the window asks through (ADR 0159).
     'cli.confirm.yes',
     'cli.confirm.no',
+    // TYTO-497, ADR 0164 §6: the box main shows before quitting over a running program.
+    'terminal.quit.message',
+    'terminal.quit.quit',
+    'terminal.quit.stay',
     'workspace.banner.text',
     'workspace.banner.trust',
     'workspace.banner.problems',

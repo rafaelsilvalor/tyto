@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
-import { realpathSync, watch } from 'node:fs';
+import { existsSync, realpathSync, watch } from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 
@@ -107,6 +108,14 @@ import { createWorkspaceService } from './workspace.js';
 import { createDeliveryService } from './delivery.js';
 import { createExplorerService } from './explorer.js';
 import { createExitGuard, mayUnload } from './quit.js';
+import {
+  type PseudoTerminal,
+  type SpawnOptions,
+  createTerminals,
+  killTree,
+  terminalQuitGuard,
+} from './terminal.js';
+import { chooseShell, terminalEnvironment } from './terminal-shell.js';
 import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
 import { settingsOutline } from './settings-outline.js';
@@ -615,6 +624,7 @@ async function start(): Promise<void> {
   // And how the command panel lays out its runs (TYTO-496), on the same answer.
   let commandsOrder = saved.commandsOrder;
   let commandsFoldOlderRuns = saved.commandsFoldOlderRuns;
+  let terminalShell = { shell: saved.terminalShell, args: saved.terminalArgs };
   // And the faces and sizes (TYTO-272), on the same answer. The zoom is applied here, in main.
   let typography: Typography = {
     uiFontFamily: saved.uiFontFamily,
@@ -1087,6 +1097,74 @@ async function start(): Promise<void> {
     cli.cancelAll();
   });
 
+  // **The terminals** (TYTO-497, ADR 0164): the person's shell in a pseudo-terminal main owns.
+  // node-pty is loaded at the first open, so a window that never opens a terminal never loads a
+  // native module. A workspace change does not touch them: each keeps the folder it started in.
+  const terminals = createTerminals({
+    spawn: (file, args, options) => {
+      const pty = createRequire(import.meta.url)('node-pty') as {
+        spawn: (
+          file: string,
+          args: string[],
+          options: SpawnOptions & { name: string },
+        ) => PseudoTerminal;
+      };
+      return pty.spawn(file, [...args], { name: 'xterm-256color', ...options });
+    },
+    shell: () =>
+      chooseShell({
+        platform: process.platform,
+        environment: process.env,
+        setting: terminalShell,
+        exists: existsSync,
+      }),
+    folder: () => workspace.state().folder,
+    home: () => app.getPath('home'),
+    // With no folder open the state still reads `restricted` (nothing is trusted), and ADR 0164
+    // opens a terminal then: only an open, untrusted folder refuses.
+    restricted: () => {
+      const state = workspace.state();
+      return state.folder !== null && state.trust === 'restricted';
+    },
+    environment: () => terminalEnvironment(process.env),
+    output: (terminalId, data) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'terminal:output', { terminalId, data });
+    },
+    exit: (terminalId, code) => {
+      const contents = mainWindow?.webContents;
+      if (contents === undefined || contents.isDestroyed()) return;
+      sendIpcEvent(contents, 'terminal:exit', { terminalId, code });
+    },
+    killTree: killTree(process.platform, (pid) => process.kill(pid, 'SIGHUP')),
+    foregroundKnown: process.platform !== 'win32',
+  });
+  app.on('will-quit', () => {
+    terminals.killAll();
+  });
+  // Quitting over a program still running in a terminal asks first, in a box main owns.
+  const terminalsMayQuit = terminalQuitGuard(terminals.busy, (titles) => {
+    const options = {
+      type: 'warning' as const,
+      message: translate(uiLocale, 'terminal.quit.message').replaceAll(
+        '{terminals}',
+        titles.join(', '),
+      ),
+      buttons: [
+        translate(uiLocale, 'terminal.quit.quit'),
+        translate(uiLocale, 'terminal.quit.stay'),
+      ],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const answer =
+      mainWindow === undefined
+        ? dialog.showMessageBoxSync(options)
+        : dialog.showMessageBoxSync(mainWindow, options);
+    return answer === 0;
+  });
+
   // **Live settings** (TYTO-206): a save of `settings.json` from the tab or any editor applies
   // with no restart. Bound here, after the queue, because applying a key means reaching it.
   const liveSettings = createLiveSettings({
@@ -1130,6 +1208,9 @@ async function start(): Promise<void> {
       if (keys.includes('commandsOrder')) commandsOrder = next.commandsOrder;
       if (keys.includes('commandsFoldOlderRuns')) {
         commandsFoldOlderRuns = next.commandsFoldOlderRuns;
+      }
+      if (keys.includes('terminalShell') || keys.includes('terminalArgs')) {
+        terminalShell = { shell: next.terminalShell, args: next.terminalArgs };
       }
       if (keys.includes('zoom')) applyZoom(next.zoom);
       if (
@@ -1511,6 +1592,7 @@ async function start(): Promise<void> {
     },
     pluginFiles: { sync: (update) => syncPluginFiles(update) },
     cli,
+    terminals,
     explorer,
     delivery: createDeliveryService({ layout: () => workspace.deliveryLayout() }),
     queue: {
@@ -1753,6 +1835,12 @@ async function start(): Promise<void> {
   // The guard is shared, so whichever fires second finds the permission the first one already
   // got instead of putting a second dialog in front of one click.
   mainWindow.on('close', (event) => {
+    // On macOS closing the window quits nothing and the terminals keep running, so only the
+    // platforms where the last window's close is the quit ask about them here.
+    if (process.platform !== 'darwin' && !terminalsMayQuit()) {
+      event.preventDefault();
+      return;
+    }
     if (!exit.mayExit(() => mainWindow?.close())) event.preventDefault();
   });
 
@@ -1776,6 +1864,10 @@ async function start(): Promise<void> {
   });
 
   app.on('before-quit', (event) => {
+    if (!terminalsMayQuit()) {
+      event.preventDefault();
+      return;
+    }
     if (
       !exit.mayExit(() => {
         app.quit();

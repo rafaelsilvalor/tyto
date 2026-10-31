@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 28. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 30. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -433,3 +433,19 @@ The IANA time zone a recipe reads written times in, such as "America/Sao_Paulo",
 | Type | Default |
 | --- | --- |
 | `string \| null` | `null` |
+
+## terminalShell
+
+The program a terminal tab runs, such as "pwsh.exe" or "/bin/zsh", or null for the platform's shell (the default).
+
+| Type | Default |
+| --- | --- |
+| `string \| null` | `null` |
+
+## terminalArgs
+
+The arguments a terminal tab's program starts with, such as ["-NoLogo"], or null for the platform's (the default).
+
+| Type | Default |
+| --- | --- |
+| `list of string \| null` | `null` |
