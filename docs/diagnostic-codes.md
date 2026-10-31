@@ -120,6 +120,7 @@ non-zero.
 | `E_FONT_FACE_UNAVAILABLE` | error | no | Text asks for a face the fonts Tyto can read do not have, so it cannot be exported. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
+| `W_TEMPLATE_ORPHAN` | warning | no | A paragraph of an artwork ends on a line holding a single word in one format. |
 | `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
 | `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration sets a declared value to one of the wrong kind or outside its limits. |
 | `E_TEMPLATE_ALIAS_TAKEN` | error | no | A plugin file gives a configuration an alias that is a template's name. |
@@ -2298,6 +2299,20 @@ Artwork '{artwork}' does not fit format '{format}': its content runs {overflow}p
 ```
 
 Parameters: `artwork`, `format`, `overflow`
+
+### `W_TEMPLATE_ORPHAN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0167-a-template-spaces-its-blocks-by-weight-and-keeps-orphans-off-its-text.md`
+
+A paragraph of an artwork ends on a line holding a single word in one format.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Artwork '{artwork}' ends a paragraph on the single word '{word}' in format '{format}': no size or letter spacing within the template's limits moved another word down to it.
+```
+
+Parameters: `artwork`, `word`, `format`
 
 ### `W_TEMPLATE_VALUE_UNKNOWN`
 

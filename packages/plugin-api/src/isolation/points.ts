@@ -4,6 +4,7 @@ import {
   type ExpandedInline,
   type Inline,
   type TemplateReport,
+  ORPHAN_WORD_LIMIT,
   artworkSchema,
   assetRefSchema,
   brandIdSchema,
@@ -15,7 +16,6 @@ import {
   sceneSchema,
   sizeSchema,
   templateManifestSchema,
-  templateReportCodes,
 } from '@tyto/core';
 import { COLUMN_TYPES, type CellValue, type Plan, type Table } from '@tyto/recipe';
 import { z } from 'zod';
@@ -199,13 +199,17 @@ const templateCallSchema = z.strictObject({
 
 /**
  * A template's report, as a plugin may send it back (ADR 0058): one of the closed list of
- * codes and its own numbers, nothing else — the host writes the diagnostic, so a plugin
- * cannot put an error, a message or a range of its choosing into the author's run.
+ * codes and its own numbers — or, for an orphan, the word (ADR 0167), bounded — nothing else.
+ * The host writes the diagnostic, so a plugin cannot put an error, a message or a range of its
+ * choosing into the author's run.
  */
-const templateReportSchema = z.strictObject({
-  code: z.enum(templateReportCodes),
-  overflow: z.number().nonnegative(),
-});
+const templateReportSchema = z.discriminatedUnion('code', [
+  z.strictObject({ code: z.literal('W_TEMPLATE_OVERFLOW'), overflow: z.number().nonnegative() }),
+  z.strictObject({
+    code: z.literal('W_TEMPLATE_ORPHAN'),
+    word: z.string().min(1).max(ORPHAN_WORD_LIMIT),
+  }),
+]);
 
 /** `TemplateAnswer`: the frame, and the reports beside it, as a list that is always there. */
 const templateAnswerSchema = z.strictObject({

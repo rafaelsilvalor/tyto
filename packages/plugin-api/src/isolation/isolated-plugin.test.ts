@@ -419,7 +419,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 12 and this host speaks 13.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 13 and this host speaks 14.",
     );
   });
 
@@ -1328,6 +1328,24 @@ describe('an isolated template’s reports (ADR 0058)', () => {
     const answer = await buildIn([{ code: 'E_PLUGIN_CRASHED', overflow: 1 }]);
 
     expect(answer.ok ? [] : answer.error.map((item) => item.code)).toEqual(['E_PLUGIN_PROTOCOL']);
+  });
+
+  it('carries an orphan report with its word (ADR 0167)', async () => {
+    const answer = await buildIn([{ code: 'W_TEMPLATE_ORPHAN', word: 'princípio.' }]);
+
+    expect(answer.ok && answer.value.reports).toEqual([
+      { code: 'W_TEMPLATE_ORPHAN', word: 'princípio.' },
+    ]);
+  });
+
+  it('refuses an orphan report whose word is a paragraph, or that smuggles a number', async () => {
+    const long = await buildIn([{ code: 'W_TEMPLATE_ORPHAN', word: 'x'.repeat(81) }]);
+    const mixed = await buildIn([{ code: 'W_TEMPLATE_ORPHAN', word: 'a', overflow: 1 }]);
+
+    expect([long, mixed].map((answer) => (answer.ok ? 'ok' : answer.error[0]?.code))).toEqual([
+      'E_PLUGIN_PROTOCOL',
+      'E_PLUGIN_PROTOCOL',
+    ]);
   });
 });
 

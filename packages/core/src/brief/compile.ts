@@ -481,10 +481,14 @@ function contextOf(
  * how much, and this says where — the artwork, the format and the directive it came from.
  */
 function reportDiagnostic(report: TemplateReport, plan: Plan, format: string): Diagnostic {
+  const where = plan.range === undefined ? {} : { range: plan.range };
+  if (report.code === 'W_TEMPLATE_ORPHAN') {
+    return diagnostic(report.code, { artwork: plan.id, format, word: report.word }, where);
+  }
   return diagnostic(
     report.code,
     { artwork: plan.id, format, overflow: Math.round(report.overflow) },
-    plan.range === undefined ? {} : { range: plan.range },
+    where,
   );
 }
 
