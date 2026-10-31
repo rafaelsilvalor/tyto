@@ -5,16 +5,19 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   GALLERY_RECORD_FILE,
   fetchGalleryIndex,
   readGalleryRecord,
+  safePreviewPath,
   writeGalleryRecord,
 } from './gallery.js';
 
 const exec = promisify(execFile);
+// Each fetch is a real `git`, which takes seconds on a loaded Windows machine.
+vi.setConfig({ testTimeout: 60_000 });
 const AUTHOR = ['-c', 'user.name=Tyto', '-c', 'user.email=tyto@example.invalid'];
 
 let root: string;
@@ -58,6 +61,64 @@ describe('fetchGalleryIndex', () => {
     const fetched = await fetchGalleryIndex(home, missing);
     expect(fetched.text).toBeUndefined();
     expect(fetched.diagnostics.map((item) => item.code)).toEqual(['E_GALLERY_INDEX_FETCH']);
+  });
+});
+
+describe('the previews (TYTO-504)', () => {
+  /** Not text: a NUL and a CRLF, which a checkout that converted line ends would change. */
+  const PICTURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
+
+  function entry(id: string, preview: string): string {
+    return `  - id: ${id}
+    kind: plugin
+    name: ${id}
+    description: The ${id} plugin.
+    source: { git: https://git.example.invalid/${id}.git }
+    latest: v1
+    engine: '>=0.1.0'
+    preview: ${preview}
+`;
+  }
+
+  async function withPictures(): Promise<string> {
+    const folder = join(root, 'index-repository');
+    await mkdir(join(folder, 'previews'), { recursive: true });
+    await writeFile(join(folder, 'previews', 'kept.png'), PICTURE);
+    const text = [
+      'version: 1',
+      'entries:',
+      entry('kept', 'previews/kept.png').trimEnd(),
+      entry('absent', 'previews/absent.png').trimEnd(),
+      entry('outside', '../outside.png').trimEnd(),
+      '',
+    ].join('\n');
+    await writeFile(join(folder, 'index.yaml'), text, 'utf8');
+    await exec('git', ['init', '--quiet', '-b', 'main'], { cwd: folder });
+    await exec('git', ['add', '.'], { cwd: folder });
+    await exec('git', [...AUTHOR, 'commit', '--quiet', '-m', 'index'], { cwd: folder });
+    return pathToFileURL(folder).href;
+  }
+
+  it('keeps each picture byte for byte, and still serves it when the fetch fails', async () => {
+    const url = await withPictures();
+    expect((await fetchGalleryIndex(home, url)).previews.size).toBe(0);
+
+    const fetched = await fetchGalleryIndex(home, url, { previews: true });
+    expect([...fetched.previews.keys()]).toEqual(['previews/kept.png']);
+    expect(await readFile(fetched.previews.get('previews/kept.png') ?? '')).toEqual(PICTURE);
+
+    await rm(join(root, 'index-repository'), { recursive: true, force: true });
+    const offline = await fetchGalleryIndex(home, url, { previews: true });
+    expect(offline.diagnostics.map((item) => item.code)).toEqual(['W_GALLERY_INDEX_OFFLINE']);
+    expect(await readFile(offline.previews.get('previews/kept.png') ?? '')).toEqual(PICTURE);
+  });
+
+  it('reads only paths inside the index repository', () => {
+    expect(safePreviewPath('previews/a.png')).toBe(true);
+    const outside = ['../a.png', 'previews/../../a.png', '/a.png', 'C:/a.png', 'a\\b.png'];
+    for (const path of [...outside, '-a', './a', 'a//b']) {
+      expect(safePreviewPath(path), path).toBe(false);
+    }
   });
 });
 

@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { type Diagnostics, diagnostic } from '@tyto/core';
-import { GALLERY_INDEX_FILE } from '@tyto/plugin-api';
+import { GALLERY_INDEX_FILE, parseGalleryIndex } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { git, problemOf } from './plugin-files.js';
@@ -14,6 +14,7 @@ import { git, problemOf } from './plugin-files.js';
  *
  * ```
  * TYTO_HOME/cache/gallery/<sha256(index)>/index.yaml   the index as fetched last
+ * TYTO_HOME/cache/gallery/<sha256(index)>/previews/    its entries' pictures, when asked for
  * TYTO_HOME/plugin-files/gallery.json                  what the gallery wrote, entry by entry
  * ```
  *
@@ -49,12 +50,93 @@ function cachedIndexPath(home: string, index: string): string {
   );
 }
 
+/** Beside the cached index: the entries' pictures, at their paths in the index repository. */
+const PREVIEWS = 'previews';
+
 export interface FetchedGalleryIndex {
   /** The index's text; absent when it was never fetched and could not be now. */
   readonly text?: string;
   /** When this text was fetched: now, or the time of the copy kept from before. */
   readonly fetched?: Date;
+  /**
+   * The pictures kept, by `preview` as the index writes it, to the file on the machine. Only
+   * when asked for; an entry whose picture is not in the index's commit has none.
+   */
+  readonly previews: ReadonlyMap<string, string>;
   readonly diagnostics: Diagnostics;
+}
+
+export interface FetchGalleryIndexOptions {
+  /** Also keep each entry's `preview` out of the fetched commit, for the window to show. */
+  readonly previews?: boolean;
+}
+
+/**
+ * A `preview` that names a file inside the index repository and nothing else: relative,
+ * forward slashes, no `..`, no dash first. It reaches `git` as a path after `--`, read
+ * literally, so these rules are what keeps a curator's typo from reading outside the commit.
+ */
+export function safePreviewPath(preview: string): boolean {
+  if (preview.startsWith('-') || preview.startsWith('/') || preview.includes('\\')) return false;
+  if (/^[a-z]:/iu.test(preview)) return false;
+  return preview.split('/').every((part) => part !== '' && part !== '.' && part !== '..');
+}
+
+function previewPaths(text: string, index: string): string[] {
+  const entries = parseGalleryIndex(text, index).value?.entries ?? [];
+  const paths = entries.flatMap((entry) => (entry.preview === undefined ? [] : [entry.preview]));
+  return [...new Set(paths)].filter(safePreviewPath);
+}
+
+/**
+ * Checks each picture out of FETCH_HEAD in `staging` and replaces the kept pictures with
+ * them. One `git checkout` per path, so a picture the commit lacks costs that picture alone.
+ * Bytes as committed (`core.autocrlf=false`): a picture is not text.
+ */
+async function keepPreviews(
+  staging: string,
+  folder: string,
+  paths: readonly string[],
+): Promise<void> {
+  const next = `${folder}.${process.pid}.${Date.now()}.writing`;
+  await mkdir(next, { recursive: true });
+  for (const path of paths) {
+    try {
+      await git(
+        [
+          '--literal-pathspecs',
+          '-c',
+          'core.autocrlf=false',
+          'checkout',
+          '--quiet',
+          'FETCH_HEAD',
+          '--',
+          path,
+        ],
+        staging,
+      );
+      await mkdir(dirname(join(next, path)), { recursive: true });
+      await copyFile(join(staging, path), join(next, path));
+    } catch {
+      // Not in the commit: the entry is listed without a picture.
+    }
+  }
+  await rm(folder, { recursive: true, force: true });
+  await rename(next, folder);
+}
+
+/** The kept pictures that exist, by `preview` as written. */
+async function keptPreviews(
+  folder: string,
+  paths: readonly string[],
+): Promise<ReadonlyMap<string, string>> {
+  const kept = new Map<string, string>();
+  for (const path of paths) {
+    const file = join(folder, path);
+    const found = await stat(file).catch(() => undefined);
+    if (found?.isFile() === true) kept.set(path, file);
+  }
+  return kept;
 }
 
 /**
@@ -62,10 +144,18 @@ export interface FetchedGalleryIndex {
  *
  * The default branch and not a tag, because the list is what is meant to move; what is pinned
  * is each entry's tag in the plugin file. Only `index.yaml` is read out of the commit
- * (`git show`), so nothing of the index repository is checked out on the machine.
+ * (`git show`), and with `previews` the entries' pictures (TYTO-504), so nothing else of the
+ * index repository is checked out on the machine.
  */
-export async function fetchGalleryIndex(home: string, index: string): Promise<FetchedGalleryIndex> {
+export async function fetchGalleryIndex(
+  home: string,
+  index: string,
+  options: FetchGalleryIndexOptions = {},
+): Promise<FetchedGalleryIndex> {
   const cached = cachedIndexPath(home, index);
+  const pictures = join(dirname(cached), PREVIEWS);
+  const previewsOf = async (text: string): Promise<ReadonlyMap<string, string>> =>
+    options.previews === true ? keptPreviews(pictures, previewPaths(text, index)) : new Map();
   await mkdir(dirname(cached), { recursive: true });
   const staging = await mkdtemp(join(dirname(cached), '.fetching-'));
   let problem: string;
@@ -74,7 +164,10 @@ export async function fetchGalleryIndex(home: string, index: string): Promise<Fe
     await git(['fetch', '--depth', '1', '--quiet', index, 'HEAD'], staging);
     const text = await git(['show', `FETCH_HEAD:${GALLERY_INDEX_FILE}`], staging);
     await writeFileAtomically(cached, text);
-    return { text, fetched: new Date(), diagnostics: [] };
+    if (options.previews === true) {
+      await keepPreviews(staging, pictures, previewPaths(text, index));
+    }
+    return { text, fetched: new Date(), previews: await previewsOf(text), diagnostics: [] };
   } catch (cause) {
     problem = problemOf(cause);
   } finally {
@@ -86,6 +179,7 @@ export async function fetchGalleryIndex(home: string, index: string): Promise<Fe
     return {
       text,
       fetched: info.mtime,
+      previews: await previewsOf(text),
       diagnostics: [
         diagnostic('W_GALLERY_INDEX_OFFLINE', {
           index,
@@ -96,7 +190,10 @@ export async function fetchGalleryIndex(home: string, index: string): Promise<Fe
     };
   } catch {
     // Never fetched: there is no earlier copy, and no other list stands in for it.
-    return { diagnostics: [diagnostic('E_GALLERY_INDEX_FETCH', { index, problem })] };
+    return {
+      previews: new Map(),
+      diagnostics: [diagnostic('E_GALLERY_INDEX_FETCH', { index, problem })],
+    };
   }
 }
 
