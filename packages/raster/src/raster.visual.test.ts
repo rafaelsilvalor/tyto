@@ -764,6 +764,38 @@ describe('a blur', () => {
       expect(Math.abs(row - (svg[index] ?? 0)), `column ${String(index)}`).toBeLessThanOrEqual(1);
     });
   });
+
+  // A filter interpolates in linearRGB unless told otherwise, and the shape it hands back
+  // comes out of that round trip shifted: #081c3d was drawn #0d1c3d, over the whole shape,
+  // by `feDropShadow` and by the spread's `feMerge` (TYTO-501).
+  it('leaves the fill of the shape it shadows untouched, with and without a spread', async () => {
+    const fromSvg = await svgRender(shadowFixture, document);
+    const fromHtml = PNG.sync.read(Buffer.from(await render(document)));
+    // The two navy rects, inset past their antialiased edges.
+    const interiors = [
+      { left: 22, right: 98 },
+      { left: 132, right: 208 },
+    ];
+    const offFill = (png: PNG): number => {
+      let count = 0;
+      for (const { left, right } of interiors) {
+        for (let y = 22; y < 68; y += 1) {
+          for (let x = left; x < right; x += 1) {
+            const index = (y * png.width + x) * 4;
+            const pixel = [png.data[index], png.data[index + 1], png.data[index + 2]];
+            if (pixel.join() !== '8,28,61') count += 1;
+          }
+        }
+      }
+      return count;
+    };
+
+    const html = offFill(fromHtml);
+    const svg = offFill(fromSvg);
+    process.stdout.write(`interior off the fill, html ${String(html)} svg ${String(svg)} of 6992
+`);
+    expect({ html, svg }).toEqual({ html: 0, svg: 0 });
+  });
 });
 
 /**

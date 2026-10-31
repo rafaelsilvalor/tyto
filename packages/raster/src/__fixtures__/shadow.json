@@ -17,7 +17,7 @@
               "transform": { "x": 20, "y": 20 },
               "size": { "w": 80, "h": 50 },
               "radius": [0, 0, 0, 0],
-              "fill": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } },
+              "fill": { "kind": "solid", "color": { "r": 8, "g": 28, "b": 61 } },
               "effects": [
                 {
                   "kind": "shadow",
@@ -36,7 +36,7 @@
               "transform": { "x": 130, "y": 20 },
               "size": { "w": 80, "h": 50 },
               "radius": [0, 0, 0, 0],
-              "fill": { "kind": "solid", "color": { "r": 255, "g": 255, "b": 255 } },
+              "fill": { "kind": "solid", "color": { "r": 8, "g": 28, "b": 61 } },
               "effects": [
                 {
                   "kind": "shadow",

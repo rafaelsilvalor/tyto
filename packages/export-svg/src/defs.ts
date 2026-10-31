@@ -502,14 +502,20 @@ export function filterMarkup(
   }
 
   const id = nextId(sink, 'filter');
+  // Filters interpolate in linearRGB by default, and the source graphic comes back from
+  // that round trip at 8 bits a channel with its colour shifted — `feDropShadow` and the
+  // spread's `feMerge` both hand it back, so #081c3d was drawn #0d1c3d. In sRGB it passes
+  // through untouched, as it does under CSS `drop-shadow()` (TYTO-501).
+  const interpolation = attribute('color-interpolation-filters', 'sRGB');
   sink.defs.push(
     element(
       'filter',
       region === undefined
         ? // A node scaled to nothing draws nothing; any region will do.
-          [attribute('id', id)]
+          [attribute('id', id), interpolation]
         : [
             attribute('id', id),
+            interpolation,
             attribute('filterUnits', 'userSpaceOnUse'),
             attribute('x', svgNumber(region.x)),
             attribute('y', svgNumber(region.y)),
