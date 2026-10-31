@@ -114,6 +114,19 @@ jobs:
             pnpm --filter @tyto/desktop test:package --reporter=verbose
           fi
 
+      # PROBE TYTO-510: the installers of the other legs, never published, and every size.
+      - name: PROBE installers without publishing
+        if: github.event_name == 'pull_request' && runner.os != 'macOS'
+        shell: bash
+        run: pnpm --filter @tyto/desktop exec electron-builder --publish never
+      - name: PROBE sizes
+        if: github.event_name == 'pull_request' && runner.os != 'macOS'
+        shell: bash
+        run: |
+          ls -l apps/desktop/release/
+          du -sk apps/desktop/release/*-unpacked
+          find apps/desktop/release/*-unpacked -path '*node-pty*' -type f -exec ls -l {} +
+
       # **On a pull request the Mac leg that publishes also builds the `dmg`, and uploads
       # nothing** (TYTO-146). The gate above packages with `--dir`, so until a tag nothing
       # showed that the configured target — one universal `dmg` — builds at all, nor its name
@@ -124,6 +137,9 @@ jobs:
         run: |
           pnpm --filter @tyto/desktop exec electron-builder --mac --publish never
           ls -l apps/desktop/release/*.dmg
+          # PROBE TYTO-510
+          du -sk apps/desktop/release/mac*
+          find apps/desktop/release/mac* -path '*node-pty*' -type f -exec ls -l {} +
 
       # **A secret that does not exist is not an absent variable.** `${{ secrets.CSC_LINK }}`
       # in a step's `env:` writes the variable either way — to the empty string when no such

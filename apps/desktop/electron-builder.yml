@@ -73,10 +73,12 @@ files:
   - node_modules/node-pty/LICENSE
   - node_modules/node-pty/lib/**/*.js
   - '!node_modules/node-pty/lib/**/*.test.js'
-  - node_modules/node-pty/build/Release/*.node
-  - node_modules/node-pty/build/Release/*.dll
-  - node_modules/node-pty/build/Release/*.exe
-  - node_modules/node-pty/build/Release/spawn-helper
+  # PROBE TYTO-510: Linux has no prebuild, so `pnpm install` compiled `build/Release/pty.node`
+  # there (N-API); Windows and macOS ship node-pty's prebuilds, listed under `win:`/`mac:`.
+  - node_modules/node-pty/build/Release/pty.node
+
+# PROBE TYTO-510: no @electron/rebuild, so node-pty is never compiled at packaging time.
+npmRebuild: false
 
 # **Installed plugins run on a Node of their own, which the package carries** (TYTO-186,
 # ADR 0050). `pnpm build` puts Node's official binary for this platform, checked against the
@@ -199,10 +201,21 @@ mac:
   target:
     - target: dmg
       arch: universal
+  # PROBE TYTO-510: both slices carry both darwin prebuilds (identical Mach-O files), so the
+  # universal merge has to be told to keep the x64 copy.
+  files:
+    - node_modules/node-pty/prebuilds/darwin-*/pty.node
+    - node_modules/node-pty/prebuilds/darwin-*/spawn-helper
+  x64ArchFiles: '**/node_modules/node-pty/prebuilds/**'
 win:
   target:
     - nsis
     - portable
+  # PROBE TYTO-510
+  files:
+    - node_modules/node-pty/prebuilds/win32-x64/*.node
+    - node_modules/node-pty/prebuilds/win32-x64/*.dll
+    - node_modules/node-pty/prebuilds/win32-x64/*.exe
 linux:
   target: AppImage
   # Linux is the one platform that does not name the binary after `productName`. Its

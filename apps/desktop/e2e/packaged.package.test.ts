@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   cpSync,
   existsSync,
@@ -477,6 +478,18 @@ describe('the packaged app', () => {
       replay = terminals.find((terminal) => terminal.terminalId === terminalId)?.replay ?? '';
     }
     await call('terminal:kill', { terminalId });
+    // PROBE TYTO-510: the absolute path of every `.node` main loaded, with its size and sha256.
+    const loaded = JSON.parse(
+      readFileSync(join(scratch, 'user-data', 'probe-tyto-510-native.json'), 'utf8'),
+    ) as string[];
+    for (const file of loaded) {
+      const bytes = readFileSync(file.replace(/app\.asar([\\/])/u, 'app.asar.unpacked$1'));
+      process.stdout.write(
+        `[PROBE-510] loaded ${file} ${String(bytes.length)} bytes sha256 ` +
+          `${createHash('sha256').update(bytes).digest('hex')}\n`,
+      );
+    }
+    expect(loaded.some((file) => file.endsWith('pty.node'))).toBe(true);
     const { terminals } = await call<{ terminals: unknown[] }>('terminal:list', {});
     process.stdout.write(
       `[TYTO-497] packaged terminal ran ${String(opened.title)} through node-pty and read ` +
@@ -503,14 +516,15 @@ describe('the packaged app', () => {
     const files = readdirSync(unpacked, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => relative(unpacked, join(entry.parentPath, entry.name)).replaceAll('\\', '/'));
-    const binaries = files.filter((file) => file.startsWith('build/'));
+    const binaries = files.filter((file) => /^(?:build|prebuilds)\//u.test(file));
     process.stdout.write(`[TYTO-497] packaged node-pty binaries: ${binaries.join(', ')}\n`);
 
+    // PROBE TYTO-510: prebuilds are allowed here; compiler leftovers and `.pdb` are not.
     expect(files).toContain('package.json');
-    expect(binaries).toContain('build/Release/pty.node');
-    expect(
-      files.filter((file) => /^prebuilds\/|\.(?:pdb|iobj|ipdb|lib|exp|obj)$|\/obj\//u.test(file)),
-    ).toEqual([]);
+    expect(binaries.some((file) => file.endsWith('/pty.node'))).toBe(true);
+    expect(files.filter((file) => /\.(?:pdb|iobj|ipdb|lib|exp|obj)$|\/obj\//u.test(file))).toEqual(
+      [],
+    );
     expect(files.filter((file) => file.endsWith('.test.js'))).toEqual([]);
   });
 

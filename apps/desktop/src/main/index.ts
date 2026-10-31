@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, realpathSync, watch } from 'node:fs';
+import { existsSync, realpathSync, watch, writeFileSync } from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -1096,7 +1096,16 @@ async function start(): Promise<void> {
           options: SpawnOptions & { name: string },
         ) => PseudoTerminal;
       };
-      return pty.spawn(file, [...args], { name: 'xterm-256color', ...options });
+      const spawned = pty.spawn(file, [...args], { name: 'xterm-256color', ...options });
+      // PROBE TYTO-510: which native files main actually loaded, absolute paths, after the
+      // spawn because Windows loads `conpty.node` there.
+      writeFileSync(
+        join(app.getPath('userData'), 'probe-tyto-510-native.json'),
+        JSON.stringify(
+          Object.keys(createRequire(import.meta.url).cache).filter((key) => key.endsWith('.node')),
+        ),
+      );
+      return spawned;
     },
     shell: () =>
       chooseShell({
