@@ -196,3 +196,22 @@ Every place is checked before any file is written, so a refusal leaves every fil
   person's layout.
 - **Marking the gallery's entries with a comment in the YAML.** A comment is what a person
   edits or deletes first; the record lives in a file the tool alone writes.
+
+## Amendment, 2026-10-31 (TYTO-504)
+
+**The operations moved from the CLI into `@tyto/io`**, so the window's gallery runs the same
+code `tyto gallery` does, as decision 2 already required of the sync. `readGallery`,
+`installGalleryEntry` and `updateGalleryEntry` (`gallery-operations.ts`) answer what happened
+as data and print nothing; `tyto gallery` formats an outcome as lines, the window as a card's
+state. **Neither syncs**: each caller runs the sync it already owns afterwards, so a fetched
+plugin's permissions are still asked through `CliEnvironment.confirm` at a terminal and in
+the window's own box.
+
+**The previews are read out of the fetched commit**, as the Consequences above anticipated,
+only when the caller asks (`fetchGalleryIndex(…, { previews: true })`; the window does, the
+CLI does not). Each `preview` is checked out on its own (`git --literal-pathspecs checkout
+FETCH_HEAD -- <path>`, bytes as committed) and kept beside the cached index in
+`previews/`, so an offline window still shows them. A `preview` that is not a relative path
+inside the repository (absolute, a drive, a backslash, a `..`, `.` or empty segment, a dash
+first) is never handed to `git`; a picture the commit lacks costs that picture alone, and the
+entry is listed without one.

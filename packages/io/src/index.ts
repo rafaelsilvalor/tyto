@@ -192,6 +192,7 @@ export {
   syncPluginFiles,
 } from './plugin-files-sync.js';
 export {
+  type FetchGalleryIndexOptions,
   type FetchedGalleryIndex,
   type GalleryRecord,
   type GalleryWrite,
@@ -199,6 +200,20 @@ export {
   GALLERY_RECORD_FILE,
   fetchGalleryIndex,
   readGalleryRecord,
+  safePreviewPath,
   writeFileAtomically,
   writeGalleryRecord,
 } from './gallery.js';
+export {
+  type Gallery,
+  type GalleryInstallOutcome,
+  type GalleryUpdateOptions,
+  type GalleryUpdateOutcome,
+  type ReadGallery,
+  type ReadGalleryOptions,
+  type ShownPath,
+  GALLERY_TEMPLATES_FILE,
+  installGalleryEntry,
+  readGallery,
+  updateGalleryEntry,
+} from './gallery-operations.js';
