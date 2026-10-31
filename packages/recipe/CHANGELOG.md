@@ -1,5 +1,16 @@
 # @tyto/recipe
 
+## 0.1.7
+
+### Patch Changes
+
+- 9021b50: Rename shadowing local bindings without changing behavior and enforce the no-shadow lint rule.
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [05c9f83]
+  - @tyto/core@0.36.0
+
 ## 0.1.6
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@tyto/house-style",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "description": "The house's tokens, presets and shared parts its templates are drawn with.",
   "license": "UNLICENSED",
