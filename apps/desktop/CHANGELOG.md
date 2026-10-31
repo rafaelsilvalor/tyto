@@ -1,5 +1,49 @@
 # @tyto/desktop
 
+## 0.14.0
+
+### Minor Changes
+
+- ded00d7: TYTO-504: Gallery: Browse Templates and Plugins shows the list the `galleryIndex` setting names, with each entry's preview and state, and installs or updates an entry with a click through the same operations as `tyto gallery`. A newer version is shown and waits for the click.
+- 9517f15: **The bottom area is one strip of tabs, as in VS Code** (TYTO-496, ADR 0163): Problems, with its count, Commands, and Project or a plugin's panel when they are open, one shown at a time. The tab in front is remembered, the area keeps one height whichever tab is in front, and its × hides the whole area. The command panel has no input box any more: its prompt is the last line of its output, with nothing drawn around what is typed. Its sessions show as small tabs only when there is more than one, Stop shows only while something runs, and no line separates the panel's parts. Copy is gone from its actions: a selection copies.
+- 24d6b47: **The command panel** (TYTO-496, ADR 0159): `tyto` commands typed into the window, in the bottom area beside Problems, opened and closed with `` Ctrl+` `` (Show or hide: Commands). Each session is a tab with one run, a Stop, and how the run ended: the exit code, or stopped. The input line splits on spaces and keeps a quoted word whole, refusing an unclosed quote; ↑/↓ walk the history and Ctrl+R searches it, kept per workspace folder. The output keeps a command's colours, links a place it printed to the file at that line, finds with Ctrl+F, copies and clears. After a `trust` command the window reads the folder's trust again. The keyboard and command references list the new key.
+- 8dd4503: The command panel completes as you type (TYTO-496): commands, options and their values, read off the CLI's own tree, with the window's templates and aliases, the chosen template's formats, the output types, the installed plugins and the open folder's files. Tab takes a suggestion, the arrows choose and Enter takes the chosen one. **Commands: Run…** puts the caret on the prompt, and **Commands: Render This Brief** writes `render` and the brief in front on it. The user manual has a Commands page in both editions.
+- 75cf37a: The command panel shows each run as a block (TYTO-496): a header with the command, its paths cut to file names, the time it started and how it ended (✓ 0, ✗ 1, stopped, not run), over what it printed, with a gap before the next. Problems' command sections take the same header. Two settings lay the runs out, live: `commandsOrder` (`"newestLast"`, the default, or `"newestFirst"`, which puts the prompt first; Problems' sections follow it) and `commandsFoldOlderRuns` (`false` by default; `true` folds every run but the newest to its header, a click opens one, and Ctrl+F opens a folded run that holds a match).
+- 61dbfc1: The desktop app can run the person's shell in a terminal that main owns (TYTO-497, ADR 0164): PowerShell 7 or Windows PowerShell on Windows, the login shell elsewhere, or the program `terminalShell` and `terminalArgs` name in `settings.json`. A terminal starts in the open folder, or the home folder with none, and is refused while the open folder is restricted. It survives a change of folder and a reload of the window, which draws its last 256 KiB again, and ends with the app. The installers carry node-pty, the pseudo-terminal, with only the files each platform loads. No tab draws a terminal yet; the next pull request adds it.
+- f0cd9b8: The desktop app has a Terminal tab after Commands (TYTO-497, ADR 0164): **Ctrl+Shift+`** or **Terminal: New Terminal** opens your own shell inside the window, in the open folder. Several terminals show as small tabs at the right of the strip. A terminal follows the window's colours, in light and dark, and its code font. Copy and paste follow each platform's terminal keys, a paste of more than one line asks first, and the window's own keys, such as **Ctrl+K**, still work from inside a terminal. A restricted folder says so in the tab, with the trust action beside it. Every push from main to the window now checks first that the window is still there, which ends a crash on quit. The user manual has a Terminal page in both editions.
+- 9bcb68b: A built-in setting, `galleryIndex`, names the repository holding the gallery's index (TYTO-506, ADR 0162). Its default is the index the project curates, the same one `tyto gallery` falls back to; the window's gallery reads it.
+- ff3461b: Each workspace folder keeps its open tabs, unsaved text included, and opening the folder again from File ▸ Open Folder or the recent list brings them back (TYTO-513, ADR 0165).
+
+### Patch Changes
+
+- 546f99f: TYTO-410: rename local names that shadow an import or an outer name in the desktop app, without changing behavior, and enforce the no-shadow lint rule there too.
+- 280761a: The status bar's problem count includes the rows a `tyto` command run in the window reported, and its errors count as errors. A command's place in a Problems row reads relative to the open folder, takes at most half of the row, and is cut from the start of its folder, so the file and its line always show. The command panel's parts arrive ahead of it, unused until TYTO-496's panel lands: the command line split into words, a command's colours, the history per folder, the links in its output, and its sessions.
+- 0bf1b88: TYTO-510: the packaged app carries node-pty's own prebuilt binaries on Windows and macOS instead of compiling them, so packaging there needs no C++ toolchain; macOS's spawn-helper is made executable when packing.
+- Updated dependencies [213f553]
+- Updated dependencies [213f553]
+- Updated dependencies [9021b50]
+- Updated dependencies [8dd4503]
+- Updated dependencies [f0cd9b8]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [bd56ec5]
+- Updated dependencies [9bcb68b]
+  - @tyto/command-line@0.2.0
+  - @tyto/io@5.2.0
+  - @tyto/core@0.36.0
+  - @tyto/editor@0.13.0
+  - @tyto/pipeline@0.12.5
+  - @tyto/plugin-api@0.13.0
+  - @tyto/recipe@0.1.7
+  - @tyto/template-lang@0.8.8
+  - @tyto/export-html@0.7.9
+  - @tyto/export-svg@2.0.9
+  - @tyto/brief-lang@0.7.7
+  - @tyto/fonts@0.4.1
+  - @tyto/google-fonts@0.1.8
+  - @tyto/templates@1.2.1
+  - @tyto/theme-pack@0.1.8
+
 ## 0.13.0
 
 ### Minor Changes

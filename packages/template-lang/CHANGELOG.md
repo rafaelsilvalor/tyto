@@ -1,5 +1,15 @@
 # @tyto/template-lang
 
+## 0.8.8
+
+### Patch Changes
+
+- 9021b50: Rename shadowing local bindings without changing behavior and enforce the no-shadow lint rule.
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+  - @tyto/core@0.36.0
+
 ## 0.8.7
 
 ### Patch Changes
