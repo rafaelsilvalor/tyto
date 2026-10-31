@@ -67,6 +67,7 @@ import { createDocumentService, openFilters, saveFilters } from './documents.js'
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { approveInABox, createDesktopPluginFiles } from './plugin-files.js';
+import { createDesktopGallery } from './gallery.js';
 import { fileLayoutStore } from './layout-store.js';
 import { createSessionService, createTemplateFolder } from './session.js';
 import { fileSessionStore } from './session-store.js';
@@ -615,6 +616,8 @@ async function start(): Promise<void> {
   let formatBriefOnSave = saved.formatBriefOnSave;
   // And whether a missing face is asked of Google Fonts (TYTO-281), read on every compile.
   let googleFonts = saved.googleFonts;
+  // And the gallery's index (TYTO-504, ADR 0162), read whenever the gallery is asked.
+  let galleryIndex = saved.galleryIndex;
   // And the zone a recipe reads written times in (TYTO-377, ADR 0148), read at every run.
   let recipeTimeZone = saved.recipeTimeZone;
   // And how the columns of a `|` line are drawn (TYTO-298), on the same answer.
@@ -1211,6 +1214,7 @@ async function start(): Promise<void> {
       if (keys.includes('tabSize')) tabSize = next.tabSize;
       if (keys.includes('formatBriefOnSave')) formatBriefOnSave = next.formatBriefOnSave;
       if (keys.includes('googleFonts')) googleFonts = next.googleFonts;
+      if (keys.includes('galleryIndex')) galleryIndex = next.galleryIndex;
       if (keys.includes('recipeTimeZone')) recipeTimeZone = next.recipeTimeZone;
       if (keys.includes('briefColumns')) briefColumns = next.briefColumns;
       if (keys.includes('lineNumbers')) lineNumbers = next.lineNumbers;
@@ -1600,6 +1604,13 @@ async function start(): Promise<void> {
       },
     },
     pluginFiles: { sync: (update) => syncPluginFiles(update) },
+    // TYTO-504: the gallery writes the machine's plugin files, then syncs them as the command
+    // does, never moving a ref the person did not click.
+    gallery: createDesktopGallery({
+      home: pluginsHome,
+      index: () => galleryIndex,
+      sync: () => syncPluginFiles(false),
+    }),
     cli,
     terminals,
     explorer,

@@ -56,6 +56,10 @@ describe('the IPC contract', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      // TYTO-504, ADR 0162: the gallery, read and acted on through main's git.
+      'gallery:install',
+      'gallery:list',
+      'gallery:update',
       'help:open-documentation',
       'keybindings:open',
       'keybindings:read',
@@ -462,6 +466,8 @@ describe('what the contract does not promise', () => {
       'app:exit-listening',
       // TYTO-47. "Which plugins are there" has no subject: there is one plugins folder.
       'plugins:list',
+      // TYTO-504. Nor "what does the gallery list": the index is the setting's, read in main.
+      'gallery:list',
       // TYTO-49. "Which panels do the plugins offer" has none either, for the same reason.
       'plugins:panels',
       // TYTO-207. Nor "which keys do the plugins bind".
