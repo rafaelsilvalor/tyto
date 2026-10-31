@@ -56,6 +56,13 @@ files:
   # `@tyto/theme-pack`'s code is bundled into main, but the MIT notices of the palettes it
   # ports have to travel with the colours (TYTO-300). The app never reads this file.
   - node_modules/@tyto/theme-pack/LICENSES
+  # PROBE TYTO-497 — never merged. node-pty is native: its JavaScript, the binary built at
+  # install (Linux) or copied there (Windows conpty), and the prebuilds, without debug symbols.
+  - node_modules/node-pty/package.json
+  - node_modules/node-pty/lib/**
+  - node_modules/node-pty/build/Release/**
+  - node_modules/node-pty/prebuilds/**
+  - '!node_modules/node-pty/**/*.pdb'
 
 # **Installed plugins run on a Node of their own, which the package carries** (TYTO-186,
 # ADR 0050). `pnpm build` puts Node's official binary for this platform, checked against the
@@ -67,6 +74,7 @@ extraResources:
     to: node
 asarUnpack:
   - out/guest/**
+  - node_modules/node-pty/**
 
 # **Three of Electron's fuses are switched off** (TYTO-193, TYTO-249, ADR 0067). A fuse is a byte in the executable that electron-builder flips after packing and
 # before signing, so this applies to the packaged app only — never to the Electron in

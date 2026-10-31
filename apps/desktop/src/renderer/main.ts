@@ -344,6 +344,10 @@ import {
   stepZoom,
   svgViewBoxSize,
 } from './preview.js';
+// PROBE TYTO-497 — never merged: keeps xterm in the renderer bundle so its size is measured.
+import { Terminal } from '@xterm/xterm';
+import '@xterm/xterm/css/xterm.css';
+(globalThis as { xtermProbe?: unknown }).xtermProbe = Terminal;
 
 /**
  * The renderer's entry point: an editor on the left, the frames it produces on the right.

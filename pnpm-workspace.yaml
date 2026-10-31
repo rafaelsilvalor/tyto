@@ -27,3 +27,5 @@ allowBuilds:
   electron: true
   electron-winstaller: false
   esbuild: true
+  # PROBE TYTO-497 — never merged.
+  node-pty: true

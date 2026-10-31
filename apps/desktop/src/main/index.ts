@@ -116,6 +116,7 @@ import { shouldCheck, updateFeedFrom, updateRoute } from './update-feed.js';
 import { type InstallingUpdater, createUpdateService } from './updates.js';
 import { chooseUserDataPath } from './user-data.js';
 import { bundledRenderer, createMainWindow } from './window.js';
+import { runPtyProbeIfAsked } from './pty-probe.js';
 
 /**
  * The composition root (ADR 0010).
@@ -1837,7 +1838,7 @@ async function start(): Promise<void> {
 // line nobody can reach, and the person who double-clicked watches nothing happen.
 void app
   .whenReady()
-  .then(start)
+  .then(() => (runPtyProbeIfAsked() ? undefined : start()))
   .catch((reason: unknown) => {
     reportCrash(reason);
   });

@@ -144,6 +144,27 @@ jobs:
           ls -l release/
           du -sk release/*-unpacked release/mac* 2>/dev/null || true
           find release -name '*.node' -o -name spawn-helper -o -name 'conpty.dll' | sed 's/^/PROBE native: /'
+      - name: PROBE the packaged app spawns a shell through node-pty
+        timeout-minutes: 3
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          cd apps/desktop/release
+          case "$RUNNER_OS" in
+            Windows) exe=win-unpacked/Tyto.exe ;;
+            Linux) exe=linux-unpacked/tyto ;;
+            macOS) exe=$(ls -d mac*/Tyto.app | head -1)/Contents/MacOS/Tyto ;;
+          esac
+          result="$RUNNER_TEMP/pty-probe.json"
+          start=$(date +%s)
+          if [ "$RUNNER_OS" = Linux ]; then
+            TYTO_PTY_PROBE="$result" xvfb-run -a "$exe" --no-sandbox --user-data-dir="$RUNNER_TEMP/pty-ud" || echo "PROBE exit $?"
+          else
+            TYTO_PTY_PROBE="$result" "$exe" --user-data-dir="$RUNNER_TEMP/pty-ud" || echo "PROBE exit $?"
+          fi
+          echo "PROBE probe seconds: $(( $(date +%s) - start ))"
+          cat "$result"
+          grep -q '"marker": true' "$result"
       - name: PROBE keep the Windows app folder for the local Smart App Control check
         if: github.event_name == 'pull_request' && runner.os == 'Windows'
         uses: actions/upload-artifact@v4
