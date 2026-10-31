@@ -421,12 +421,5 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
 
-  {
-    // Another card is building the desktop app. TYTO-410 PR 2 enables this rule
-    // for desktop after TYTO-497 merges, avoiding overlapping source edits.
-    files: ['apps/desktop/**'],
-    rules: { '@typescript-eslint/no-shadow': 'off' },
-  },
-
   prettier,
 );

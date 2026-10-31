@@ -498,14 +498,14 @@ const VK_RIGHT = 0x27;
 /** The window receiving an arrow while a list is open: what main's hook would be handed. */
 const pressInList = (code: number): Promise<boolean> =>
   app.evaluate(
-    (_electron, { message, code }) => {
+    (_electronModule, { message, code: keyCode }) => {
       const store = globalThis as unknown as {
         tytoHooks: Record<number, ((wParam: Buffer, lParam: Buffer) => void) | undefined>;
       };
       const handler = store.tytoHooks[message];
       if (handler === undefined) return false;
       const wParam = Buffer.alloc(8);
-      wParam.writeUInt32LE(code, 0);
+      wParam.writeUInt32LE(keyCode, 0);
       handler(wParam, Buffer.alloc(8));
       return true;
     },

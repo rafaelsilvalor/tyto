@@ -1428,7 +1428,7 @@ async function start(): Promise<void> {
     contextMenu: ({ x, y, items }) => {
       const window = mainWindow;
       if (window === undefined || window.isDestroyed()) return Promise.resolve(null);
-      return new Promise((settle) => {
+      return new Promise((resolveChoice) => {
         let chosen: string | null = null;
         const zoom = window.webContents.getZoomFactor();
         Menu.buildFromTemplate(
@@ -1445,7 +1445,7 @@ async function start(): Promise<void> {
           y: Math.round(y * zoom),
           callback: () => {
             setTimeout(() => {
-              settle(chosen);
+              resolveChoice(chosen);
             }, CONTEXT_MENU_CLICK_GRACE_MS);
           },
         });
@@ -1672,12 +1672,12 @@ async function start(): Promise<void> {
       preview: (id) => applying(themes.preview(id)),
       choose: async (id) => {
         const next = await themes.choose(id, themeSetting);
-        let saved = true;
+        let persisted = true;
         if (next !== undefined) {
           themeSetting = next;
-          saved = await remember({ theme: next });
+          persisted = await remember({ theme: next });
         }
-        return { applied: await applying(themes.current()), saved };
+        return { applied: await applying(themes.current()), saved: persisted };
       },
       iconStrokeWidth: () => iconStrokeWidth,
       statusBarItems: () => statusBarItems,

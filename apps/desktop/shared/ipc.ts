@@ -2648,13 +2648,16 @@ export function isIpcChannelName(name: string): name is IpcChannelName {
  * message was going.
  */
 export class IpcContractError extends TypeError {
+  readonly channel: string;
+
   constructor(
-    readonly channel: string,
+    channelName: string,
     readonly direction: 'request' | 'response' | 'event',
     readonly issues: string,
   ) {
-    super(`ipc ${channel}: ${direction} does not match the contract — ${issues}`);
+    super(`ipc ${channelName}: ${direction} does not match the contract — ${issues}`);
     this.name = 'IpcContractError';
+    this.channel = channelName;
   }
 }
 

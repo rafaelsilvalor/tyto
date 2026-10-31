@@ -381,10 +381,10 @@ afterAll(async () => {
  * being the adapter**: a story is 1080×1920 and no display in the CI fleet is 1920 tall, so
  * the artwork would come back cropped, at 100% painted coverage, saying nothing.
  */
-function clipped(asked: { width: number; height: number }, capture: Capture) {
+function clipped(asked: { width: number; height: number }, captured: Capture) {
   return {
-    width: Math.min(asked.width, capture.workArea.width),
-    height: Math.min(asked.height, capture.workArea.height),
+    width: Math.min(asked.width, captured.workArea.width),
+    height: Math.min(asked.height, captured.workArea.height),
   };
 }
 

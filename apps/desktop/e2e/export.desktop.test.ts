@@ -257,8 +257,8 @@ describe('exporting from the window (E9.4)', () => {
       .locator('.export__type input')
       .evaluateAll((boxes) =>
         boxes
-          .filter((box) => (box as HTMLInputElement).checked)
-          .map((box) => (box as HTMLInputElement).value),
+          .filter((checkbox) => (checkbox as HTMLInputElement).checked)
+          .map((checkbox) => (checkbox as HTMLInputElement).value),
       );
     expect(ticked).toEqual(['png']);
   });

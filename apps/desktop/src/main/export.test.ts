@@ -662,14 +662,14 @@ describe('installed plugins in the export (TYTO-48)', () => {
         });
       },
     };
-    const service = await createExportService({
+    const exportService = await createExportService({
       fileSystem: nodeFileSystem(),
       sources: await createProjectSources({ fileSystem: nodeFileSystem(), builtIn: packDirectory }),
       version: '0.0.0-test',
       plugins: Promise.resolve(installed(conector)),
       configuration: () => ({ conector: { baseUrl: 'https://acme.example' } }),
     });
-    const progress = await service.run({
+    const progress = await exportService.run({
       brief: exampleBrief('promo-curso', 'promo.brief'),
       directory: out,
       label: 'promo',
