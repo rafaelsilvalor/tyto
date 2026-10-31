@@ -273,6 +273,21 @@ describe('ending terminals', () => {
     expect(windowsPty.killed).toBe(0);
   });
 
+  it('reports no exit for a terminal main ended, which may come after the window is gone', () => {
+    const { terminals, spawned, outputs, exits } = harness();
+    terminals.open({ cols: 80, rows: 24 });
+    terminals.open({ cols: 80, rows: 24 });
+
+    terminals.kill('terminal-1');
+    terminals.killAll();
+    spawned[0]!.pty.print('late');
+    spawned[0]!.pty.end(0);
+    spawned[1]!.pty.end(129);
+
+    expect(exits).toEqual([]);
+    expect(outputs).toEqual([]);
+  });
+
   it('still kills the shell when its group is already gone', () => {
     const pty = new FakePty(5);
 

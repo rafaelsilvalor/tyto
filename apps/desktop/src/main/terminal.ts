@@ -194,6 +194,10 @@ export function createTerminals(dependencies: TerminalDependencies): Terminals {
         });
       });
       pty.onExit(({ exitCode }) => {
+        // A terminal main ended itself, from its tab or on the way out, is already forgotten and
+        // nobody waits for its exit. On Linux that exit can arrive after the window is gone
+        // during a quit, measured on CI, where reporting it crashed main.
+        if (running.get(terminalId) !== terminal) return;
         // What the shell printed last reaches the window before the exit does.
         flush(terminalId);
         running.delete(terminalId);

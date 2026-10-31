@@ -1,12 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  readlinkSync,
-  rmSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -105,8 +97,6 @@ beforeAll(async () => {
       ...process.env,
       TYTO_HEADLESS: '1',
       TYTO_HOME: join(scratch, 'tyto-home'),
-      // DEBUG TYTO-497: main's timestamps around the quit. Removed before merge.
-      TYTO_TERMINAL_TRACE: join(scratch, 'trace.log'),
     },
   });
   page = await firstWindow(app);
@@ -220,10 +210,13 @@ describe('a terminal in the window', () => {
       }
     };
     expect(alive()).toBe(true);
-    // An idle shell asks nothing on the way out. The quit box is synchronous and nobody would
-    // answer it here, so it is replaced by one that writes what it was asked and answers Quit:
-    // a wrong question is then this test's assertion, not a hang.
-    const asked = join(scratch, 'quit-question.txt');
+    // Nothing asks on the way out: an idle shell raises no quit question, and a crash in main
+    // raises its box. Both boxes are synchronous and nobody answers them here, which is how this
+    // test hung on Linux CI before (a crash box, once a late shell exit reached a destroyed
+    // window). So each box is replaced by one that writes what it was asked, message and detail,
+    // and answers its cancel button; the close gets 20 s, and a box is then the failure, with its
+    // text, instead of a hang.
+    const asked = join(scratch, 'boxes.txt');
     await app.evaluate((_electron, file) => {
       const { dialog } = _electron;
       const fs = process.getBuiltinModule('node:fs');
@@ -234,111 +227,13 @@ describe('a terminal in the window', () => {
       }) as never;
     }, asked);
 
-    // DEBUG TYTO-497: what the shell holds open and where the quit stops, on Linux CI.
-    const debug = (label: string): void => {
-      const lines = [`[TYTO-497 debug] ${String(Date.now())} ${label}`];
-      if (process.platform === 'linux') {
-        try {
-          const status = readFileSync(`/proc/${String(pid)}/status`, 'utf8');
-          lines.push(
-            `  state ${/^State:\s*(.*)$/mu.exec(status)?.[1] ?? '?'} ppid ${/^PPid:\s*(.*)$/mu.exec(status)?.[1] ?? '?'}`,
-          );
-          for (const fd of readdirSync(`/proc/${String(pid)}/fd`)) {
-            lines.push(`  fd ${fd} -> ${readlinkSync(`/proc/${String(pid)}/fd/${fd}`)}`);
-          }
-        } catch (error) {
-          lines.push(`  /proc read failed: ${String(error)}`);
-        }
-      }
-      try {
-        const electron = app.process();
-        lines.push(
-          `  electron pid ${String(electron.pid)} exitCode ${String(electron.exitCode)} signal ${String(electron.signalCode)}`,
-        );
-      } catch (error) {
-        lines.push(`  electron process unreadable: ${String(error)}`);
-      }
-      lines.push(`  shell ${String(pid)} alive ${String(alive())}`);
-      const traceFile = join(scratch, 'trace.log');
-      if (existsSync(traceFile)) {
-        lines.push(
-          ...readFileSync(traceFile, 'utf8')
-            .trim()
-            .split('\n')
-            .map((line) => `  trace ${line}`),
-        );
-      }
-      process.stdout.write(`${lines.join('\n')}\n`);
-    };
-    debug('before closeApp');
-    // DEBUG TYTO-497: Electron's own stdio pipes, and later every process still holding one.
-    const electronPid = app.process().pid ?? 0;
-    const stdio = new Set<string>();
-    if (process.platform === 'linux') {
-      for (const fd of ['0', '1', '2']) {
-        try {
-          stdio.add(readlinkSync(`/proc/${String(electronPid)}/fd/${fd}`));
-        } catch {
-          // Not readable.
-        }
-      }
-    }
-    const holders = (): void => {
-      if (process.platform !== 'linux') return;
-      const found: string[] = [
-        `[TYTO-497 debug] electron ${String(electronPid)} stdio ${[...stdio].join(' ')}`,
-      ];
-      for (const entry of readdirSync('/proc')) {
-        if (!/^\d+$/u.test(entry)) continue;
-        try {
-          const links = readdirSync(`/proc/${entry}/fd`).map((fd) => {
-            try {
-              return readlinkSync(`/proc/${entry}/fd/${fd}`);
-            } catch {
-              return '';
-            }
-          });
-          const held = links.filter((link) => stdio.has(link) && link !== '/dev/null');
-          if (held.length === 0) continue;
-          const command = readFileSync(`/proc/${entry}/cmdline`, 'utf8')
-            .replaceAll('\0', ' ')
-            .slice(0, 200);
-          const status = readFileSync(`/proc/${entry}/status`, 'utf8');
-          const parent = /^PPid:\s*(.*)$/mu.exec(status)?.[1] ?? '?';
-          const state = /^State:\s*(.*)$/mu.exec(status)?.[1] ?? '?';
-          found.push(
-            `  holder ${entry} ppid ${parent} state ${state} holds ${held.join(',')}: ${command}`,
-          );
-        } catch {
-          // Gone or not ours.
-        }
-      }
-      process.stdout.write(`${found.join('\n')}\n`);
-    };
     const closed = await Promise.race([
       closeApp(app).then(() => 'closed'),
-      new Promise<string>((resolve) =>
-        setTimeout(() => resolve('still closing after 30 s'), 30_000),
-      ),
+      new Promise<string>((resolve) => setTimeout(() => resolve('not closed after 20 s'), 20_000)),
     ]);
-    debug(closed);
-    holders();
-    // DEBUG TYTO-497: the app's log, which names any crash in main.
-    const logs = join(scratch, 'user-data', 'logs');
-    if (existsSync(logs)) {
-      for (const name of readdirSync(logs)) {
-        process.stdout.write(
-          `[TYTO-497 debug] log ${name}:\n${readFileSync(join(logs, name), 'utf8').slice(-3000)}\n`,
-        );
-      }
-    }
-    if (existsSync(asked)) {
-      process.stdout.write(`[TYTO-497 debug] asked: ${readFileSync(asked, 'utf8')}\n`);
-    }
+
+    expect(existsSync(asked) ? readFileSync(asked, 'utf8') : 'nothing asked').toBe('nothing asked');
     expect(closed).toBe('closed');
-
-    expect(existsSync(asked) ? readFileSync(asked, 'utf8') : 'not asked').toBe('not asked');
-
     await expect.poll(alive, { timeout: 10_000 }).toBe(false);
     process.stdout.write(`[TYTO-497] shell ${String(pid)} gone after the app quit\n`);
   }, 60_000);
