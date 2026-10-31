@@ -441,6 +441,7 @@ export function filterMarkup(
   effects: readonly Effect[],
   node: string,
   sink: Sink,
+  region: FilterRegion | undefined,
 ): string | undefined {
   // Written as a loop rather than a `filter`: the predicate would report as a side effect
   // and, worse, would not narrow the union, so every field below would need a second check.
@@ -469,10 +470,10 @@ export function filterMarkup(
       primitives.push(
         element('feGaussianBlur', [
           attribute('in', input),
-          // CSS states a blur radius; SVG states a standard deviation, and the radius is
-          // twice it. `export-html` writes the radius, so halving it here is what keeps
-          // the two exports the same picture.
-          attribute('stdDeviation', svgNumber(effect.radius / 2)),
+          // The IR's radius is the Gaussian's standard deviation, which is what CSS
+          // `blur()` reads it as in Chromium and what `export-html` writes (ADR 0156,
+          // 2026-10-31 note), so it goes in unconverted.
+          attribute('stdDeviation', svgNumber(effect.radius)),
           attribute('result', result),
         ]),
       );
@@ -486,7 +487,7 @@ export function filterMarkup(
           attribute('in', input),
           attribute('dx', svgNumber(effect.x)),
           attribute('dy', svgNumber(effect.y)),
-          attribute('stdDeviation', svgNumber(effect.blur / 2)),
+          attribute('stdDeviation', svgNumber(effect.blur)),
           attribute('flood-color', svgColor(effect.color)),
           attribute('flood-opacity', svgNumber(effect.color.a)),
           attribute('result', result),
@@ -504,19 +505,55 @@ export function filterMarkup(
   sink.defs.push(
     element(
       'filter',
-      [
-        attribute('id', id),
-        // Room for the shadow and the blur to land outside the node's own box; the
-        // default region is a 10% margin, which a 24px blur on a 240px badge overruns.
-        attribute('x', '-50%'),
-        attribute('y', '-50%'),
-        attribute('width', '200%'),
-        attribute('height', '200%'),
-      ],
+      region === undefined
+        ? // A node scaled to nothing draws nothing; any region will do.
+          [attribute('id', id)]
+        : [
+            attribute('id', id),
+            attribute('filterUnits', 'userSpaceOnUse'),
+            attribute('x', svgNumber(region.x)),
+            attribute('y', svgNumber(region.y)),
+            attribute('width', svgNumber(region.w)),
+            attribute('height', svgNumber(region.h)),
+          ],
       primitives.join(''),
     ),
   );
   return `url(#${id})`;
+}
+
+/** A filter's region in the node's own space, which `filterUnits="userSpaceOnUse"` reads. */
+export interface FilterRegion {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * How far an effect list can move ink past where the node paints it: each shadow's offset
+ * and spread, and three standard deviations of every blur, summed because the chain feeds
+ * each primitive the previous one's result.
+ */
+export function effectReach(effects: readonly Effect[]): number {
+  let reach = 0;
+  for (const effect of effects) {
+    if (effect.kind === 'shadow') {
+      reach += Math.abs(effect.x) + Math.abs(effect.y) + Math.abs(effect.spread) + effect.blur * 3;
+    } else if (effect.kind === 'blur') {
+      reach += effect.radius * 3;
+    }
+  }
+  return reach;
+}
+
+export function padRegion(region: FilterRegion, margin: number): FilterRegion {
+  return {
+    x: region.x - margin,
+    y: region.y - margin,
+    w: region.w + margin * 2,
+    h: region.h + margin * 2,
+  };
 }
 
 /** The five primitives `feDropShadow` is short for, plus the spread it has no room for. */
@@ -555,7 +592,7 @@ function spreadShadow(
     ]),
     element('feGaussianBlur', [
       attribute('in', moved),
-      attribute('stdDeviation', svgNumber(effect.blur / 2)),
+      attribute('stdDeviation', svgNumber(effect.blur)),
       attribute('result', blurred),
     ]),
     element('feFlood', [

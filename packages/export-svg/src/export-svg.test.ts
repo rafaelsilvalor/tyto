@@ -310,6 +310,24 @@ describe('what SVG can say precisely and export-html cannot', () => {
     expect(feed).toContain('<feDropShadow');
     expect(feed).not.toContain('<feMorphology');
   });
+
+  // The IR's blur is a standard deviation, as CSS reads it (ADR 0156, 2026-10-31 note):
+  // promo's shadow says 24 and mapping's layer blur says 1, and neither is halved.
+  it('writes the blur as the standard deviation, unconverted', () => {
+    const [promo = ''] = svgOf(sceneOf(promoFixture));
+    const [mapping = ''] = svgOf(sceneOf(mappingFixture));
+
+    expect(promo).toMatch(/<feDropShadow [^>]*stdDeviation="24"/u);
+    expect(mapping).toMatch(/<feGaussianBlur [^>]*stdDeviation="1"/u);
+  });
+
+  it('gives a filter the frame plus three deviations of room, not a margin of the node', () => {
+    const [promo = ''] = svgOf(sceneOf(promoFixture));
+
+    // A fixed fraction of the box is what cut a 24 px shadow off a short node.
+    expect(promo).toMatch(/<filter [^>]*filterUnits="userSpaceOnUse"/u);
+    expect(promo).not.toContain('x="-50%"');
+  });
 });
 
 describe('what SVG cannot say, it reports', () => {

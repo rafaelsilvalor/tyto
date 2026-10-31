@@ -52,3 +52,25 @@ The SVG primitive chain now lives in two packages, deliberately: an exporter doe
 import another exporter, and the cross-render test is what fails when the two drift.
 
 A template that faked a spread with a hidden caster can drop it.
+
+## Note, 2026-10-31 — a blur is a standard deviation (TYTO-500)
+
+The decision above wrote `feGaussianBlur` "at half the blur radius", the halving
+`export-svg` had always done, on the reading that the IR states a blur radius as CSS
+`box-shadow` does. CSS `drop-shadow()` and `blur()` do not: Chromium reads their length as
+the standard deviation itself. So a shadow with no spread was twice as soft in the HTML and
+the PNG as in the SVG, and giving it a spread halved its softness (measured on 2026-10-30
+by the TYTO-492 session: a shadow of blur 12 matched a spread one only at blur 24).
+
+**The IR's shadow `blur` and layer-blur `radius` are the Gaussian's standard deviation.**
+`drop-shadow()` and `blur()` already read them that way, and every exporter now writes them
+unconverted: `export-svg`'s `feDropShadow` and `feGaussianBlur`, and the spread filter in
+both exporters. This side and not the other because every PNG a production template has
+made went through `drop-shadow()` or `blur()`, and the two templates with a shadow tuned it
+by eye against those PNGs: the choice moves no production PNG. What moves is the SVG export
+of a shadow or a blur, and the spread path, which no production template used yet.
+
+A Gaussian is spent three standard deviations out, so a filter's region is padded by three
+blurs, not two. `export-svg`'s region was a fixed `-50%` margin of the node's box, which a
+blur of 10 on a 24 px node overran; it is now the frame in the node's space, padded the
+same way, which is what this ADR already gave the HTML filter.

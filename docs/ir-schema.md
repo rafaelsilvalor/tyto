@@ -22,7 +22,7 @@ Transform { x; y; rotation; scaleX; scaleY; anchor }
 Color     { r: 0..255; g: 0..255; b: 0..255; a: 0..1 }
 Paint     = Solid{color} | LinearGradient{angle, stops} | RadialGradient{center, radius, stops} | ImagePaint{asset, fit}
 Stroke    { paint: Paint; width; align: 'inside'|'center'|'outside' }
-Effect    = Shadow{x,y,blur,spread,color} | Blur{radius} | BackgroundBlur{radius}
+Effect    = Shadow{x,y,blur,spread,color} | Blur{radius} | BackgroundBlur{radius}   // blur, radius: a standard deviation (ADR 0156)
 MaskRef   { nodeId: string; mode: 'alpha'|'luminance' }     // a mask references another node
 BlendMode = 'normal'|'multiply'|'screen'|'overlay'|'darken'|'lighten'|'color-dodge'|'color-burn'|'soft-light'|'hard-light'|'difference'|'exclusion'|'hue'|'saturation'|'color'|'luminosity'
 FontRef   { family; source: 'bundled'|'file'|'system'; path? }   // 'system': ADR 0037

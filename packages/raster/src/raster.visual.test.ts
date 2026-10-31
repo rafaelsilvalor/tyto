@@ -15,6 +15,7 @@ import { createPlaywrightRasterizer } from './playwright.js';
 import type { RasterFormat } from './rasterizer.js';
 
 import alphaFixture from './__fixtures__/alpha.json';
+import shadowFixture from './__fixtures__/shadow.json';
 import shapesFixture from './__fixtures__/shapes.json';
 import spreadFixture from './__fixtures__/spread.json';
 import textFixture from './__fixtures__/text.json';
@@ -295,6 +296,7 @@ function documentsOf(fixture: unknown, perPlatform = false): readonly Document[]
 const SHAPES = documentsOf(shapesFixture);
 const ALPHA = documentsOf(alphaFixture);
 const SPREAD = documentsOf(spreadFixture);
+const SHADOW = documentsOf(shadowFixture);
 const TEXT = documentsOf(textFixture, true);
 
 /**
@@ -691,6 +693,76 @@ describe('a shadow spread', () => {
     expect(fraction, `${(fraction * 100).toFixed(4)}% of pixels differ`).toBeLessThanOrEqual(
       TOLERANCE,
     );
+  });
+});
+
+/** A document's SVG export, rendered by the same Chromium the HTML goes through. */
+async function svgRender(fixture: unknown, document: Document): Promise<PNG> {
+  const exported = exportSvg(sceneOf(fixture));
+  if (!exported.ok) throw new Error(`export-svg failed on ${document.name}.`);
+  const svg = exported.value[0]?.svg ?? '';
+  return PNG.sync.read(
+    Buffer.from(
+      await rasterizer.raster(`<!doctype html><html><body style="margin:0">${svg}</body></html>`, {
+        width: document.width,
+        height: document.height,
+      }),
+    ),
+  );
+}
+
+/**
+ * The first row below `from`, in column `x`, that is the background again: how far down a
+ * shadow reaches. Exact equality, so the faintest tail of the Gaussian still counts.
+ */
+function reachBelow(png: PNG, x: number, from: number, background: readonly number[]): number {
+  for (let y = from; y < png.height; y += 1) {
+    const index = (y * png.width + x) * 4;
+    if ([0, 1, 2].every((channel) => png.data[index + channel] === background[channel])) return y;
+  }
+  return png.height;
+}
+
+describe('a blur', () => {
+  const document = SHADOW[0];
+  if (document === undefined) throw new Error('The shadow fixture rendered no frames.');
+  const background = [240, 236, 228];
+
+  // The IR's blur is a standard deviation (ADR 0156, 2026-10-31 note). CSS `drop-shadow()`
+  // and `blur()` read their length that way in Chromium and SVG's `stdDeviation` is one, so
+  // a renderer that halved it on one side doubles the softness on the other.
+  it('is the same picture in HTML and SVG, with and without a spread', async () => {
+    const fromSvg = await svgRender(shadowFixture, document);
+    const fromHtml = PNG.sync.read(Buffer.from(await render(document)));
+
+    const differing = pixelmatch(
+      fromSvg.data,
+      fromHtml.data,
+      undefined,
+      document.width,
+      document.height,
+      { threshold: PIXEL_THRESHOLD },
+    );
+    const fraction = differing / (document.width * document.height);
+    expect(fraction, `${(fraction * 100).toFixed(4)}% of pixels differ`).toBeLessThanOrEqual(
+      TOLERANCE,
+    );
+  });
+
+  it('reaches as far below the node in HTML as in SVG, to a pixel', async () => {
+    const fromSvg = await svgRender(shadowFixture, document);
+    const fromHtml = PNG.sync.read(Buffer.from(await render(document)));
+    // Mid-column of each rect, from its bottom edge (y 70) down.
+    const reach = (png: PNG): readonly number[] =>
+      [60, 170].map((x) => reachBelow(png, x, 70, background));
+
+    const html = reach(fromHtml);
+    const svg = reach(fromSvg);
+    process.stdout.write(`shadow reach below, html ${html.join('/')} svg ${svg.join('/')}
+`);
+    html.forEach((row, index) => {
+      expect(Math.abs(row - (svg[index] ?? 0)), `column ${String(index)}`).toBeLessThanOrEqual(1);
+    });
   });
 });
 

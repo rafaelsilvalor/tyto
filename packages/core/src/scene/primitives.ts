@@ -135,10 +135,15 @@ export const effectSchema = z.discriminatedUnion('kind', [
     kind: z.literal('shadow'),
     x: finite,
     y: finite,
+    /**
+     * The Gaussian's standard deviation, which is how CSS `drop-shadow()` reads its length
+     * and what SVG's `stdDeviation` is — every exporter writes it unconverted (ADR 0156).
+     */
     blur: nonNegative,
     spread: finite,
     color: colorSchema,
   }),
+  /** `radius` is a standard deviation too, as CSS `blur()` reads it. */
   z.strictObject({ kind: z.literal('blur'), radius: nonNegative }),
   z.strictObject({ kind: z.literal('background-blur'), radius: nonNegative }),
 ]);

@@ -311,7 +311,7 @@ describe('what the exporter cannot do, it says', () => {
     expect(html).toContain(
       '<feMorphology in="alpha" operator="dilate" radius="3" result="grown"/>',
     );
-    expect(html).toContain('<feGaussianBlur in="moved" stdDeviation="6" result="blurred"/>');
+    expect(html).toContain('<feGaussianBlur in="moved" stdDeviation="12" result="blurred"/>');
     expect(html).not.toContain('drop-shadow(');
   });
 
@@ -336,9 +336,10 @@ describe('what the exporter cannot do, it says', () => {
     // element has none: a default region would be empty and the group would vanish.
     const html = htmlOf(sceneOf(withEffects(mappingFixture, 'clipped', [shadow(3)])))[0] ?? '';
 
-    // `clipped` sits at (20, 20) of a 400×400 frame, padded by 4 + 3 + 12 × 2 = 31.
+    // `clipped` sits at (20, 20) of a 400×400 frame, padded by 4 + 3 + 12 × 3 = 43,
+    // three standard deviations of blur.
     expect(html).toContain(
-      'filterUnits="userSpaceOnUse" x="-51" y="-51" width="462" height="462">',
+      'filterUnits="userSpaceOnUse" x="-63" y="-63" width="486" height="486">',
     );
   });
 
