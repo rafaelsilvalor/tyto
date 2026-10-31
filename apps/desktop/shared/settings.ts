@@ -1,4 +1,4 @@
-import type { ConfigurationContribution } from '@tyto/plugin-api';
+import { type ConfigurationContribution, DEFAULT_GALLERY_INDEX } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import { type BriefColumnLook, briefColumnsContribution } from './brief-columns.js';
@@ -345,7 +345,25 @@ export const recipeTimeZoneContribution = {
 } satisfies ConfigurationContribution<string | null>;
 
 /**
- * The twenty-eight, in the order the settings file is documented in. `theme` checks its ids against
+ * The gallery's index, as `git` reads it (TYTO-506, ADR 0162): any location the person's `git`
+ * reaches, private ones included. The default is the list the project curates, the same value
+ * `tyto gallery` falls back to; the CLI never reads this file (ADR 0145 decision 5), so each
+ * carries the default on its own, from `@tyto/plugin-api`. The window's gallery (TYTO-504) reads
+ * it. The key is `galleryIndex` and not `gallery.index`: a built-in's key is letters and digits,
+ * and the host would read a dot as a plugin's prefix (`configuration.ts`).
+ */
+export const galleryIndexContribution = {
+  id: 'galleryIndex',
+  schema: z.string().refine((location) => location.trim() !== '', {
+    message: 'Expected a repository git can read',
+  }),
+  default: DEFAULT_GALLERY_INDEX,
+  description:
+    "The repository holding the gallery's index.yaml, as git reads it; the default is the index the project curates.",
+} satisfies ConfigurationContribution<string>;
+
+/**
+ * The twenty-nine, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -381,6 +399,7 @@ export function settingContributions(
     fontFamiliesContribution,
     googleFontsContribution,
     recipeTimeZoneContribution,
+    galleryIndexContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -432,6 +451,8 @@ export interface Settings {
   readonly googleFonts: boolean;
   /** The zone a recipe reads written times in, or `null` for the machine's (TYTO-377). */
   readonly recipeTimeZone: string | null;
+  /** The repository holding the gallery's index (TYTO-506, ADR 0162). */
+  readonly galleryIndex: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -463,13 +484,14 @@ export const DEFAULT_SETTINGS: Settings = {
   fontFamilies: fontFamiliesContribution.default,
   googleFonts: googleFontsContribution.default,
   recipeTimeZone: recipeTimeZoneContribution.default,
+  galleryIndex: galleryIndexContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-eight out of the resolved values, which already hold every declared key with a value
+ * The twenty-nine out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -504,5 +526,6 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     fontFamilies: pick('fontFamilies'),
     googleFonts: pick('googleFonts'),
     recipeTimeZone: pick('recipeTimeZone'),
+    galleryIndex: pick('galleryIndex'),
   };
 }
