@@ -182,6 +182,9 @@ publish:
 # (`macPackager.doUniversalPack`); the bundled Node arrives already universal from
 # `scripts/fetch-node.ts`, the one Mach-O file the merge would otherwise refuse.
 mac:
+  # PROBE TYTO-497: node-pty ships both darwin prebuilds in each slice, identical in both, which
+  # @electron/universal refuses unless they are named here.
+  x64ArchFiles: '**/node_modules/node-pty/prebuilds/**'
   target:
     - target: dmg
       arch: universal
