@@ -776,6 +776,11 @@ export interface Catalogue {
    * (one string, so renaming it is one edit per language), and its own words.
    */
   readonly 'panel.commands': string;
+  /** TYTO-496. The command panel's entries in the command bar. */
+  readonly 'command.commandPanel.run': string;
+  readonly 'command.commandPanel.renderBrief': string;
+  /** TYTO-496. The completion list under the command panel's prompt. */
+  readonly 'commandPanel.suggestions': string;
   readonly 'commandPanel.sessions': string;
   readonly 'commandPanel.session': string;
   readonly 'commandPanel.session.new': string;
@@ -1228,6 +1233,9 @@ export const CATALOGUE_KEYS = [
   'queue.openOutput',
   'queue.unavailable',
   'panel.commands',
+  'command.commandPanel.run',
+  'command.commandPanel.renderBrief',
+  'commandPanel.suggestions',
   'commandPanel.sessions',
   'commandPanel.session',
   'commandPanel.session.new',

@@ -189,7 +189,12 @@ describe('the command tree as data', () => {
     expect(names).toEqual(expect.arrayContaining(['render', 'watch', 'plugin', 'trust']));
     const render = tree.commands.find((command) => command.name === 'render');
     expect(render?.arguments).toEqual([
-      { name: 'brief', required: true, description: 'path to the .brief file' },
+      {
+        name: 'brief',
+        required: true,
+        description: 'path to the .brief file',
+        value: { kind: 'brief' },
+      },
     ]);
     expect(render?.options.map((option) => option.flags)).toContain('--trust');
     const plugin = tree.commands.find((command) => command.name === 'plugin');

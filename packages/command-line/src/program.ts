@@ -18,6 +18,7 @@ import { renderCommand } from './render.js';
 import { withDiagnosticsSink } from './report.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
 import { trustAddCommand, trustListCommand, trustRemoveCommand } from './trust.js';
+import { BUILT_IN_TYPES, type ValueDescription, valuesOf } from './value-kinds.js';
 import { watchCommand } from './watch.js';
 
 /**
@@ -33,12 +34,15 @@ import { watchCommand } from './watch.js';
 export const DEFAULT_TEMPLATES_DIRECTORY = 'templates';
 export const DEFAULT_FORMATS_FILE = 'formats.yaml';
 
+/** What the window's completion offers for a value (TYTO-496, `value-kinds.ts`). */
+const FOLDER: ValueDescription = { kind: 'folder' };
+
 interface Captured {
   code: ExitCode;
 }
 
 function withProjectOptions(command: Command): Command {
-  return command
+  command
     .option(
       '--templates <dir>',
       'folder holding one subfolder per template',
@@ -55,35 +59,42 @@ function withProjectOptions(command: Command): Command {
       "comma-separated format ids; narrows the brief's own list when it has one",
       parseFormatList,
     );
+  return valuesOf(command, {
+    '--templates': FOLDER,
+    '--formats-file': { kind: 'file' },
+    '--template': { kind: 'template' },
+    '--formats': { kind: 'formats', list: true },
+  });
 }
 
 function withOutputOptions(command: Command): Command {
-  return (
-    command
-      .option(
-        '--types <kinds>',
-        'comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds',
-        parseTypes,
-        ['png'],
-      )
-      .option(
-        '--scale <n>',
-        'device pixels per CSS pixel; 2 is the retina export',
-        parsePositiveInteger('--scale'),
-      )
-      .option('--quality <n>', 'encoder quality 1-100, for jpeg and webp only', parseQuality)
-      .option(
-        '--concurrency <n>',
-        'frames rastered at once (default 2)',
-        parsePositiveInteger('--concurrency'),
-      )
-      .option('--json', 'print a machine-readable document instead of prose', false)
-      // On by default (ADR 0120); `TYTO_GOOGLE_FONTS=off` turns it off for every run too.
-      .option(
-        '--no-google-fonts',
-        'never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style)',
-      )
-  );
+  command
+    .option(
+      '--types <kinds>',
+      'comma-separated: png, jpeg, webp, svg, or a kind an installed exporter adds',
+      parseTypes,
+      ['png'],
+    )
+    .option(
+      '--scale <n>',
+      'device pixels per CSS pixel; 2 is the retina export',
+      parsePositiveInteger('--scale'),
+    )
+    .option('--quality <n>', 'encoder quality 1-100, for jpeg and webp only', parseQuality)
+    .option(
+      '--concurrency <n>',
+      'frames rastered at once (default 2)',
+      parsePositiveInteger('--concurrency'),
+    )
+    .option('--json', 'print a machine-readable document instead of prose', false)
+    // On by default (ADR 0120); `TYTO_GOOGLE_FONTS=off` turns it off for every run too.
+    .option(
+      '--no-google-fonts',
+      'never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style)',
+    );
+  return valuesOf(command, {
+    '--types': { kind: 'types', list: true, choices: BUILT_IN_TYPES },
+  });
 }
 
 /**
@@ -197,6 +208,8 @@ export function createProgram(
       parseSection,
     );
 
+  valuesOf(render, { '<brief>': { kind: 'brief' }, '--out': FOLDER, '--assets': FOLDER });
+
   withOutputOptions(withProjectOptions(render)).action(async (brief: string) => {
     captured.code = await renderCommand(
       brief,
@@ -223,6 +236,8 @@ export function createProgram(
       parsePositiveInteger('--interval'),
     )
     .option('--once', 'handle what is in the inbox now and exit, instead of watching', false);
+
+  valuesOf(watch, { '<folder>': FOLDER });
 
   withOutputOptions(withProjectOptions(watch)).action(async (folder: string) => {
     captured.code = await watchCommand(
@@ -251,6 +266,7 @@ export function createProgram(
     .action(async (folder: string) => {
       captured.code = await templateCheckCommand(folder, check.opts(), environment);
     });
+  valuesOf(check, { '<folder>': FOLDER });
 
   const scaffold = template
     .command('new')
@@ -263,6 +279,7 @@ export function createProgram(
     .action(async (name: string) => {
       captured.code = await templateNewCommand(name, scaffold.opts(), environment);
     });
+  valuesOf(scaffold, { '--out': FOLDER, '--formats': { kind: 'formats', list: true } });
 
   /* ------------------------------------------------------------------------- delivery -- */
 
@@ -285,6 +302,7 @@ export function createProgram(
     .action(async (name: string) => {
       captured.code = await deliveryNewCommand(name, deliveryNew.opts(), environment);
     });
+  valuesOf(deliveryNew, { '--template': { kind: 'template' } });
 
   /* --------------------------------------------------------------------------- plugin -- */
 
@@ -303,6 +321,7 @@ export function createProgram(
     .action(async (folder: string) => {
       captured.code = await pluginListCommand({ ...pluginList.opts(), folder }, environment);
     });
+  valuesOf(pluginList, { '<folder>': FOLDER });
 
   const pluginInstall = plugin
     .command('install')
@@ -322,6 +341,7 @@ export function createProgram(
     .action(async (name: string) => {
       captured.code = await pluginNewCommand(name, pluginNew.opts(), environment);
     });
+  valuesOf(pluginNew, { '--out': FOLDER });
 
   const pluginSync = plugin
     .command('sync')
@@ -338,27 +358,30 @@ export function createProgram(
     .action(async (folder: string) => {
       captured.code = await pluginSyncCommand(folder, pluginSync.opts(), environment);
     });
+  valuesOf(pluginSync, { '<folder>': FOLDER });
 
-  plugin
+  const pluginClean = plugin
     .command('clean')
     .description("delete the cached copies of the plugin files' sources that no lock names")
     .argument('[folder]', 'a folder inside the workspace whose lock counts too', '.')
     .action(async (folder: string) => {
       captured.code = await pluginCleanCommand(folder, environment);
     });
+  valuesOf(pluginClean, { '<folder>': FOLDER });
 
   for (const [change, description] of [
     ['remove', 'delete an installed plugin and what was approved for it'],
     ['disable', 'keep a plugin installed and stop activating it'],
     ['enable', 'activate a disabled plugin again'],
   ] as const) {
-    plugin
+    const state = plugin
       .command(change)
       .description(description)
       .argument('<name>', "the plugin's name, as tyto plugin list prints it")
       .action(async (name: string) => {
         captured.code = await pluginStateCommand(change, name, environment);
       });
+    valuesOf(state, { '<name>': { kind: 'plugin' } });
   }
 
   /* -------------------------------------------------------------------------- gallery -- */
@@ -409,7 +432,7 @@ export function createProgram(
     .command('trust')
     .description('the workspace folders this person trusts (~/.tyto/trust.json, ADR 0111)');
 
-  trust
+  const trustAdd = trust
     .command('add')
     .description(
       'trust a workspace folder or a shared work profile file for good, after printing what it does restricted',
@@ -418,6 +441,7 @@ export function createProgram(
     .action(async (path: string) => {
       captured.code = await trustAddCommand(path, environment);
     });
+  valuesOf(trustAdd, { '<path>': FOLDER });
 
   trust
     .command('list')
@@ -426,13 +450,14 @@ export function createProgram(
       captured.code = await trustListCommand(environment);
     });
 
-  trust
+  const trustRemove = trust
     .command('remove')
     .description('take back the trust given to a workspace folder or a work profile file')
     .argument('<folder>', 'the workspace folder or profile file, as it was trusted')
     .action(async (folder: string) => {
       captured.code = await trustRemoveCommand(folder, environment);
     });
+  valuesOf(trustRemove, { '<folder>': FOLDER });
 
   // Applied after the tree is built and to every node of it. Commander copies
   // `_exitCallback` to a subcommand when the subcommand is *created*, so an

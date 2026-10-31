@@ -482,4 +482,7 @@ export const ptBR: Catalogue = {
   'commandPanel.state.finished': 'terminou com código de saída {code}',
   'commandPanel.state.refused': 'não executado',
   'problems.command.exit': 'saída {code}',
+  'command.commandPanel.run': 'Comandos: Executar…',
+  'command.commandPanel.renderBrief': 'Comandos: Renderizar este brief',
+  'commandPanel.suggestions': 'Sugestões',
 };

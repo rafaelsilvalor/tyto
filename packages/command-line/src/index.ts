@@ -8,6 +8,7 @@
  */
 
 export { type CommandDescription, commandTree } from './commands.js';
+export { type ValueDescription, type ValueKind, BUILT_IN_TYPES } from './value-kinds.js';
 export type {
   CliConsole,
   CliEnvironment,

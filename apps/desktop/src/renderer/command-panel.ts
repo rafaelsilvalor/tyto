@@ -3,6 +3,7 @@ import { repeat } from 'lit/directives/repeat.js';
 
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 import { ansiPresentation } from './ansi.js';
+import { type Completion, accept } from './command-completion.js';
 import { type OutputLink, linksIn } from './command-links.js';
 import {
   type FindMatch,
@@ -46,6 +47,8 @@ export interface CommandPanelPorts {
   readonly cancel: (runId: string) => void;
   /** Opens what a link in a session's output names. */
   readonly open: (session: CommandSession, link: OutputLink) => void;
+  /** What can come at the caret, from the CLI's own tree (`command-completion.ts`). */
+  readonly complete: (line: string, caret: number) => Promise<Completion>;
   /** The open workspace folder, absolute, for telling which printed paths are inside it. */
   readonly folder: () => string | null;
   /** Whether this platform compares paths without case. */
@@ -59,6 +62,7 @@ const NO_PORTS: CommandPanelPorts = {
   run: () => Promise.reject(new Error('no bridge')),
   cancel: () => undefined,
   open: () => undefined,
+  complete: (_line, caret) => Promise.resolve({ from: caret, to: caret, items: [] }),
   folder: () => null,
   caseless: false,
   history: () => [],
@@ -98,6 +102,12 @@ export class CommandPanel extends DockedPanel {
   private findCurrent = 0;
   /** Whether the output was scrolled to its end before the last update: then it follows. */
   private following = true;
+  /** The suggestions under the prompt, while there are any (TYTO-496). */
+  private completion: Completion | undefined;
+  /** The one an arrow chose, or -1: then Enter runs the line and Tab takes the first. */
+  private chosen = -1;
+  /** Counts the questions asked, so an answer to an older line is dropped. */
+  private asked = 0;
 
   constructor() {
     super();
@@ -192,6 +202,7 @@ export class CommandPanel extends DockedPanel {
 
     this.ports.remember(line.trim());
     this.cursor = undefined;
+    this.closeSuggestions();
     const input = this.input();
     if (input !== null) input.value = '';
     this.following = true;
@@ -230,6 +241,7 @@ export class CommandPanel extends DockedPanel {
       this.onSearchKey(event, input);
       return;
     }
+    if (this.onCompletionKey(event, input)) return;
     if (event.key === 'Enter') {
       event.preventDefault();
       void this.submit(input.value);
@@ -265,6 +277,79 @@ export class CommandPanel extends DockedPanel {
       // Typing leaves the walk through the history where it is: ↑ starts again from the end.
       this.cursor = undefined;
     }
+  }
+
+  /**
+   * The suggestion list's keys (TYTO-496), as an editor's: Tab takes the chosen suggestion or the
+   * first, and asks when none is shown, taking it at once when it is the only one; ↑ and ↓ choose
+   * while the list is open; Enter takes a suggestion an arrow chose and otherwise runs the line;
+   * Escape closes the list. Answers whether it took the key.
+   */
+  private onCompletionKey(event: KeyboardEvent, input: HTMLInputElement): boolean {
+    const items = this.completion?.items ?? [];
+    if (event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      if (items.length > 0) this.take(input, Math.max(this.chosen, 0));
+      else void this.suggest(input, true);
+      return true;
+    }
+    if (items.length === 0) return false;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const by = event.key === 'ArrowDown' ? 1 : -1;
+      this.chosen =
+        this.chosen < 0 && by < 0
+          ? items.length - 1
+          : (this.chosen + by + items.length) % items.length;
+      this.requestUpdate();
+      return true;
+    }
+    if (event.key === 'Enter' && this.chosen >= 0) {
+      event.preventDefault();
+      this.take(input, this.chosen);
+      return true;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeSuggestions();
+      return true;
+    }
+    return false;
+  }
+
+  /** Asks what can come at the caret; with `takeOnly`, a single answer is taken at once. */
+  private async suggest(input: HTMLInputElement, takeOnly = false): Promise<void> {
+    const asked = (this.asked += 1);
+    const line = input.value;
+    const completion = await this.ports.complete(line, input.selectionStart ?? line.length);
+    if (asked !== this.asked || input.value !== line) return;
+    if (takeOnly && completion.items.length === 1) {
+      this.completion = completion;
+      this.take(input, 0);
+      return;
+    }
+    this.completion = completion.items.length > 0 ? completion : undefined;
+    this.chosen = -1;
+    this.requestUpdate();
+  }
+
+  /** Puts a suggestion on the line, and asks again for what comes after it. */
+  private take(input: HTMLInputElement, index: number): void {
+    const completion = this.completion;
+    const item = completion?.items[index];
+    if (completion === undefined || item === undefined) return;
+    const next = accept(input.value, completion, item);
+    input.value = next.line;
+    input.setSelectionRange(next.caret, next.caret);
+    this.closeSuggestions();
+    void this.suggest(input);
+  }
+
+  private closeSuggestions(): void {
+    this.asked += 1;
+    this.completion = undefined;
+    this.chosen = -1;
+    this.requestUpdate();
   }
 
   /**
@@ -309,7 +394,12 @@ export class CommandPanel extends DockedPanel {
   }
 
   private onSearchInput(input: HTMLInputElement): void {
-    if (this.search === undefined) return;
+    if (this.search === undefined) {
+      // As you type: what can come next, or nothing on an empty line (TYTO-496).
+      if (input.value.trim() === '') this.closeSuggestions();
+      else void this.suggest(input);
+      return;
+    }
     const history = this.ports.history();
     const query = input.value;
     this.search = { query, index: query === '' ? undefined : searchHistory(history, query)?.index };
@@ -666,6 +756,40 @@ export class CommandPanel extends DockedPanel {
       </div>`;
   }
 
+  /** The suggestions under the prompt, the chosen one marked; a click takes one. */
+  private suggestions(): TemplateResult | typeof nothing {
+    const items = this.completion?.items ?? [];
+    if (items.length === 0) return nothing;
+    return html`<ul
+      class="command-panel__suggestions"
+      id="command-panel-suggestions"
+      role="listbox"
+      aria-label=${this.say('commandPanel.suggestions')}
+    >
+      ${items.map(
+        (item, index) =>
+          html`<li
+            class="command-panel__suggestion"
+            id=${`command-suggestion-${String(index)}`}
+            role="option"
+            aria-selected=${index === this.chosen ? 'true' : 'false'}
+            @mousedown=${(event: MouseEvent) => {
+              // Before the input loses focus, so the caret stays on the prompt.
+              event.preventDefault();
+              const input = this.input();
+              if (input !== null) this.take(input, index);
+            }}
+          >
+            <span class="command-panel__suggestion-label">${item.label}</span>${
+              item.detail === undefined || item.detail === ''
+                ? nothing
+                : html`<span class="command-panel__suggestion-detail">${item.detail}</span>`
+            }
+          </li>`,
+      )}
+    </ul>`;
+  }
+
   /**
    * The runs as blocks (TYTO-496): each under a header that says the command, when it started
    * and how it ended, in the order `commandsOrder` asks for; older ones folded to their header
@@ -749,40 +873,49 @@ export class CommandPanel extends DockedPanel {
     </button>`;
   }
 
-  /** The prompt line: the label, the input, and Ctrl+R's match beside it. */
+  /**
+   * The prompt line: the label, the input, and Ctrl+R's match beside it. The suggestions come
+   * right after it, so they sit under the prompt in either `commandsOrder`.
+   */
   private prompt(fresh: boolean): TemplateResult {
     const search = this.search;
     const searchMatch =
       search?.index === undefined ? undefined : this.ports.history()[search.index];
     return html`<div class="command-panel__prompt-line">
-      <label class="command-panel__prompt" for="command-panel-input"
-        >${search === undefined ? 'tyto ›' : `${this.say('commandPanel.history.search')} ›`}</label
-      >
-      <input
-        id="command-panel-input"
-        class="command-panel__input"
-        type="text"
-        spellcheck="false"
-        autocomplete="off"
-        aria-label=${this.say('commandPanel.input')}
-        placeholder=${search === undefined && fresh ? this.say('commandPanel.input') : ''}
-        @keydown=${(event: KeyboardEvent) => {
-          this.onInputKey(event);
-        }}
-        @input=${(event: InputEvent) => {
-          this.onSearchInput(event.currentTarget as HTMLInputElement);
-        }}
-      />
-      ${
-        search === undefined
-          ? nothing
-          : html`<span class="command-panel__search-match" aria-live="polite"
-              >${
-                search.query === '' ? '' : (searchMatch ?? this.say('commandPanel.history.none'))
-              }</span
-            >`
-      }
-    </div>`;
+        <label class="command-panel__prompt" for="command-panel-input"
+          >${search === undefined ? 'tyto ›' : `${this.say('commandPanel.history.search')} ›`}</label
+        >
+        <input
+          id="command-panel-input"
+          class="command-panel__input"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          aria-label=${this.say('commandPanel.input')}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="command-panel-suggestions"
+          aria-expanded=${this.completion === undefined ? 'false' : 'true'}
+          aria-activedescendant=${this.chosen < 0 ? nothing : `command-suggestion-${String(this.chosen)}`}
+          placeholder=${search === undefined && fresh ? this.say('commandPanel.input') : ''}
+          @keydown=${(event: KeyboardEvent) => {
+            this.onInputKey(event);
+          }}
+          @input=${(event: InputEvent) => {
+            this.onSearchInput(event.currentTarget as HTMLInputElement);
+          }}
+        />
+        ${
+          search === undefined
+            ? nothing
+            : html`<span class="command-panel__search-match" aria-live="polite"
+                >${
+                  search.query === '' ? '' : (searchMatch ?? this.say('commandPanel.history.none'))
+                }</span
+              >`
+        }
+      </div>
+      ${this.suggestions()}`;
   }
 
   /**
