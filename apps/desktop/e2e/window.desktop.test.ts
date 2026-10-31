@@ -540,6 +540,9 @@ describe('switching the language', () => {
     'panel.commands',
     // TYTO-496: a command's Problems section says how it ended, only once a command has run.
     'problems.command.exit',
+    // TYTO-496: the command panel's two command-bar entries, the bar's text only.
+    'command.commandPanel.run',
+    'command.commandPanel.renderBrief',
     // ADR 0163: the bottom area's × and its strip's name, an attribute each, written by the
     // panel in front (`panels.ts`); `dock.test.ts` holds them.
     'panel.hideArea',

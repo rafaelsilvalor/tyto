@@ -241,6 +241,12 @@ export const DOCUMENT_NEW_FROM_TEMPLATE = 'document.newFromTemplate';
  */
 export const DELIVERY_NEW = 'delivery.new';
 /**
+ * TYTO-496. The command panel's two entries in the command bar: put the caret on its prompt, and
+ * write `render` with the brief in front on it, to run with Enter or add options to first.
+ */
+export const COMMAND_PANEL_RUN = 'commandPanel.run';
+export const COMMAND_PANEL_RENDER_BRIEF = 'commandPanel.renderBrief';
+/**
  * The export of the delivery the brief in front belongs to (TYTO-490, ADR 0157 §6): no dialog to
  * fill, main resolves the folders, and the export box opens already running. Offered only for a
  * brief in a delivery; no key by default, bindable in `keybindings.json`.
@@ -320,6 +326,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [DOCUMENT_NEW]: 'command.document.new',
   [DOCUMENT_NEW_FROM_TEMPLATE]: 'command.document.newFromTemplate',
   [DELIVERY_NEW]: 'command.delivery.new',
+  [COMMAND_PANEL_RUN]: 'command.commandPanel.run',
+  [COMMAND_PANEL_RENDER_BRIEF]: 'command.commandPanel.renderBrief',
   [DELIVERY_EXPORT]: 'command.delivery.export',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
@@ -384,6 +392,10 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
  * lets a test drive the whole registry without a window, a bridge or an editor.
  */
 export interface DesktopActions {
+  /** TYTO-496. The command panel's tab in front, the caret on its prompt. */
+  focusCommandPanel(): void;
+  /** TYTO-496. `render` and the brief in front written on the prompt, not run. */
+  renderBriefInCommandPanel(): void;
   stepZoom(direction: 1 | -1): void;
   zoomToFit(): void;
   /** Wraps at the ends: a tab strip with two formats should cycle rather than stop. */
@@ -563,6 +575,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(DELIVERY_NEW, () => {
     actions.newDelivery();
+  });
+  add(COMMAND_PANEL_RUN, () => {
+    actions.focusCommandPanel();
+  });
+  add(COMMAND_PANEL_RENDER_BRIEF, () => {
+    actions.renderBriefInCommandPanel();
   });
   add(DELIVERY_EXPORT, () => {
     actions.exportDelivery();

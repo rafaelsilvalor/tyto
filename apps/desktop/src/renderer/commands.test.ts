@@ -138,6 +138,8 @@ const actions = () =>
     runRecipe: vi.fn<() => void>(),
     runRecipeFromCell: vi.fn<() => void>(),
     runRecipeFresh: vi.fn<() => void>(),
+    focusCommandPanel: vi.fn<() => void>(),
+    renderBriefInCommandPanel: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
 /**

@@ -4,7 +4,7 @@
 Every command was run on 2026-10-19 on a build of the repository at commit `b039537` (CLI 0.4.1) on Windows 11. The outputs below are copied from those runs; where one is long, the first lines are shown and the page says so.
 :::
 
-The `tyto` command does from a terminal what the window does: render a brief, watch a folder for briefs to render, check and start templates, and manage plugins. It is what a script, a scheduled job or another program uses.
+The `tyto` command does from a terminal what the window does: render a brief, watch a folder for briefs to render, check and start templates, and manage plugins. It is what a script, a scheduled job or another program uses. The same commands run inside the window too, in the [Commands](../editor/commands.md) tab, with nothing to install.
 
 ## Get the command
 

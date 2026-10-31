@@ -1863,6 +1863,41 @@ button.command-run__header:hover .command-run__command {
 }
 
 /*
+ * The suggestions under the prompt (TYTO-496): a quiet list in the output's own font, the
+ * chosen one on the hover colour, a suggestion's description muted beside it. No border.
+ */
+.command-panel__suggestions {
+  max-height: calc(8 * var(--tyto-text-sm) * var(--tyto-line-height));
+  margin: var(--tyto-space-1) 0 0;
+  overflow-y: auto;
+  border-radius: var(--tyto-radius-sm);
+  padding: var(--tyto-space-1) 0;
+  background: var(--tyto-surface-raised);
+  list-style: none;
+}
+
+.command-panel__suggestion {
+  display: flex;
+  gap: var(--tyto-space-5);
+  padding: 0 var(--tyto-space-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.command-panel__suggestion[aria-selected='true'],
+.command-panel__suggestion:hover {
+  background: var(--tyto-hover);
+}
+
+.command-panel__suggestion-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-ui);
+}
+
+/*
  * A command's colours (`ansi.ts`): the sixteen named ones follow the theme's own tokens, so a
  * theme that changes its red changes the panel's. Black and white are the theme's text and
  * surface, which keeps them readable in both schemes. Inverse comes before the colours so a

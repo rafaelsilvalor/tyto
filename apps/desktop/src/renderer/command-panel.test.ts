@@ -24,7 +24,12 @@ interface Harness {
 }
 
 async function mount(
-  options: { history?: string[]; locale?: 'en' | 'pt-BR'; folder?: string | null } = {},
+  options: {
+    history?: string[];
+    locale?: 'en' | 'pt-BR';
+    folder?: string | null;
+    complete?: CommandPanelPorts['complete'];
+  } = {},
 ): Promise<Harness> {
   document.body.innerHTML = `<${COMMAND_PANEL_TAG}></${COMMAND_PANEL_TAG}>`;
   const element = document.querySelector<CommandPanel>(COMMAND_PANEL_TAG)!;
@@ -50,6 +55,9 @@ async function mount(
     caseless: true,
     history: () => harness.history,
     remember: (line) => harness.history.push(line),
+    complete:
+      options.complete ??
+      ((_line, caret) => Promise.resolve({ from: caret, to: caret, items: [] })),
   };
   element.locale = options.locale ?? 'en';
   element.sessions = sessions;
@@ -397,6 +405,99 @@ describe('the runs’ order and folding (commandsOrder, commandsFoldOlderRuns)',
     await harness.element.updateComplete;
     expect(lines(harness.element)).toEqual(['html', 'svg', 'error E_X']);
     expect(harness.element.querySelectorAll('.command-panel__match')).toHaveLength(1);
+  });
+});
+
+/** A completion that offers the subcommands that start with what is typed, as the tree would. */
+const subcommands: CommandPanelPorts['complete'] = (line, caret) => {
+  const words = ['render', 'plugin', 'trust'].filter((word) => word.startsWith(line.trim()));
+  return Promise.resolve({
+    from: 0,
+    to: caret,
+    items: words.map((word) => ({ label: word, insert: word, continues: false })),
+  });
+};
+
+/** Types `text` into the prompt the way a key does: the value, then an input event. */
+async function typeInto(harness: Harness, text: string): Promise<void> {
+  const field = input(harness.element);
+  field.value = text;
+  field.setSelectionRange(text.length, text.length);
+  field.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await harness.element.updateComplete;
+}
+
+const suggestions = (element: HTMLElement) =>
+  [...element.querySelectorAll('[role="option"]')].map(
+    (option) => option.querySelector('.command-panel__suggestion-label')?.textContent,
+  );
+
+describe('completion (TYTO-496)', () => {
+  it('lists what can come next as you type, and says so to a screen reader', async () => {
+    const harness = await mount({ complete: subcommands });
+    await typeInto(harness, 'r');
+    expect(suggestions(harness.element)).toEqual(['render']);
+    expect(input(harness.element).getAttribute('aria-expanded')).toBe('true');
+    await typeInto(harness, '');
+    expect(suggestions(harness.element)).toEqual([]);
+  });
+
+  it('takes the only suggestion on Tab, with a space after it', async () => {
+    const harness = await mount({ complete: subcommands });
+    input(harness.element).value = 'pl';
+    await press(harness.element, input(harness.element), 'Tab');
+    expect(input(harness.element).value).toBe('plugin ');
+  });
+
+  it('chooses with the arrows and takes the choice on Enter, without running', async () => {
+    const harness = await mount({ complete: subcommands, history: ['trust list'] });
+    // An empty line lists nothing as you type; Tab asks.
+    await press(harness.element, input(harness.element), 'Tab');
+    expect(suggestions(harness.element)).toEqual(['render', 'plugin', 'trust']);
+    await press(harness.element, input(harness.element), 'ArrowDown');
+    await press(harness.element, input(harness.element), 'ArrowDown');
+    expect(input(harness.element).getAttribute('aria-activedescendant')).toBe(
+      'command-suggestion-1',
+    );
+    await press(harness.element, input(harness.element), 'Enter');
+    expect(input(harness.element).value).toBe('plugin ');
+    expect(harness.ran).toEqual([]);
+  });
+
+  it('runs the line on Enter when no suggestion was chosen, and closes on Escape', async () => {
+    const harness = await mount({ complete: subcommands });
+    await typeInto(harness, 'tr');
+    await press(harness.element, input(harness.element), 'Escape');
+    expect(suggestions(harness.element)).toEqual([]);
+    await typeInto(harness, 'trust');
+    await press(harness.element, input(harness.element), 'Enter');
+    expect(harness.ran).toEqual([['trust']]);
+  });
+
+  it('lists the suggestions right under the prompt, in either order', async () => {
+    const harness = await mount({ complete: subcommands });
+    await twoRuns(harness);
+    await typeInto(harness, 'r');
+    const after = (element: HTMLElement) =>
+      element
+        .querySelector('.command-panel__prompt-line')
+        ?.nextElementSibling?.getAttribute('role');
+    expect(after(harness.element)).toBe('listbox');
+    harness.element.order = 'newestFirst';
+    await harness.element.updateComplete;
+    expect(after(harness.element)).toBe('listbox');
+    expect(layout(harness.element)).toEqual(['›', '?', 'check a.brief', 'plugin list']);
+  });
+
+  it('takes a suggestion on a click', async () => {
+    const harness = await mount({ complete: subcommands });
+    await typeInto(harness, 'p');
+    harness.element
+      .querySelector('[role="option"]')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await harness.element.updateComplete;
+    expect(input(harness.element).value).toBe('plugin ');
   });
 });
 
