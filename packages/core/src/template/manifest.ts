@@ -68,6 +68,13 @@ export const slotSchema = z
      * takes one value per slide, written as `::imagem` after that slide's `::lamina`.
      */
     per: z.string().min(1).optional(),
+    /**
+     * A `per` image slot that takes several values on one slide (ADR 0160, amended
+     * 2026-10-31): each `::imagem` after the same `::lamina` adds one, and the lines written
+     * under it continue the slide's body. Optional rather than defaulted, so a manifest that
+     * never says it parses to the same object it did before.
+     */
+    multiple: z.boolean().optional(),
     min: z.number().int().nonnegative().optional(),
     max: z.number().int().positive().optional(),
     /** The accepted values of an `enum` slot, and nothing else's. */
@@ -318,6 +325,16 @@ export const templateManifestSchema = z
     // A slide's own slot hangs off the one occurrence it follows, so it has to name the slot
     // that has occurrences, and it cannot have one of its own or a value nobody wrote.
     for (const [name, slot] of Object.entries(manifest.slots)) {
+      // Several values sit among a slide's lines, so only a slide's own slot can have them,
+      // and only a picture: its path is one line, which leaves the lines under it free to be
+      // the slide's body.
+      if (slot.multiple === true && (slot.per === undefined || slot.type !== 'image')) {
+        context.addIssue({
+          code: 'custom',
+          path: ['slots', name, 'multiple'],
+          message: 'multiple is only meaningful on an image slot that declares per',
+        });
+      }
       if (slot.per === undefined) continue;
       const owner = manifest.slots[slot.per];
       if (owner?.repeat !== true) {

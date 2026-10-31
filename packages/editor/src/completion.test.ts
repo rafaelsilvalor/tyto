@@ -43,6 +43,7 @@ slots:
   lamina: { type: rich-text, repeat: true, min: 1 }
   imagem: { type: image, per: lamina }
   tom: { type: enum, values: [claro, escuro], per: lamina }
+  foto: { type: image, per: lamina, multiple: true }
 `);
 
 const analysisOf = (manifest?: TemplateManifest): BriefAnalysis => ({
@@ -151,6 +152,14 @@ describe('completeBrief', () => {
     const imagem = result?.options.find((option) => option.label === 'imagem');
 
     expect(imagem?.detail).toBe('image · per lamina');
+  });
+
+  it('says a per-slide slot takes several pictures among the lines', () => {
+    const doc = ['---', 'template: questao', '---', '::lamina', '  Um', '::|'].join('\n');
+    const result = completeAt(doc, analysisOf(QUESTAO));
+    const foto = result?.options.find((option) => option.label === 'foto');
+
+    expect(foto?.detail).toBe('image · per lamina · multiple');
   });
 
   it('offers no frontmatter value for a per-slide enum, which is never a key there', () => {

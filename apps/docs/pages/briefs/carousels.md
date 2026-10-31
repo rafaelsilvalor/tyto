@@ -20,6 +20,12 @@ Some templates let each slide carry its own picture. The gallery lists that slot
 
 Each `::imagem` goes with the `::lamina` written before it, so there is no limit on how many slides have one. The file is looked for the same way as any other image in the brief, and a file that is not there is underlined on its own line. An `::imagem` before the first `::lamina`, or two of them for the same slide, is underlined too.
 
+### Several pictures among a slide's lines
+
+When the slot is listed as "per lamina · multiple", a slide may hold as many pictures as you write, and each one goes where you write it among the slide's lines. The path stays on the `::imagem` line, and the indented lines under it carry on the slide's text.
+
+Write `::lamina` with the first paragraph indented under it, then `::imagem ./chart.png` with the second paragraph indented under it, then `::imagem ./photo.png`. That slide reads: the first paragraph, the chart, the second paragraph, the photo. The next `::lamina` starts the next slide. A picture whose file is not there is underlined on its own line, and the text under it still belongs to the slide.
+
 ## How many slides
 
 A template can set a smallest and a largest number of slides. The gallery shows both under the repeating slot, as "at least" and "at most". A brief with no `::lamina` at all makes one artwork from the other slots — that is how `notice` works, and other templates may require at least one.
