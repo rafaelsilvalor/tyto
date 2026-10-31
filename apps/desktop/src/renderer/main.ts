@@ -273,6 +273,7 @@ import {
   type CommandProblems,
   type ProblemsPanel,
   PROBLEMS_TAG,
+  countProblems,
   offsetAt,
   withCommandProblems,
 } from './problems-panel.js';
@@ -910,6 +911,8 @@ function paintPanel(): void {
       // A preview tab's `active()` is the brief it follows, so "this brief" is right there.
       kind: current.kind ?? 'brief',
       commands: commandProblems,
+      folder: workspaceShown?.folder ?? null,
+      caseless: pathsCaseless(),
     };
   }
 }
@@ -4497,6 +4500,7 @@ function paintStatusBar(): void {
   if (bar === null) return;
   const current = active();
   const problems = [...panel.installation, ...current.diagnostics];
+  const counted = countProblems(problems, commandProblems);
   const problemsShown = panelShown(PROBLEMS_PANEL);
   // Every way the panel comes on screen — its button, the command bar, a key, showing the
   // bottom area — ends in a repaint, so this is the one place that has to know.
@@ -4519,8 +4523,10 @@ function paintStatusBar(): void {
     cursor: shownState === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(shownState),
     kind: activeKind() ?? 'brief',
     template: isBrief(current.kind) ? templateOf(activeText()) : undefined,
-    problems: problems.length,
-    errors: errorCount(problems),
+    // A command's rows count too (TYTO-496): the bar is the window's one count, and a person
+    // reading it after a failed `tyto render` should not see "no problems".
+    problems: counted.problems,
+    errors: counted.errors,
     newProblems: problemsMark.lit,
     shown: {
       left: dockIsShown(layout, 'left'),
@@ -5384,6 +5390,11 @@ function openCommandProblem(runId: string, row: CommandProblemRow): void {
   });
 }
 
+/** Windows compares paths without case, here and in main (`windows-fs-ignores-case`). */
+function pathsCaseless(): boolean {
+  return state.platform === 'win32';
+}
+
 /**
  * The id the quit question files the template mode under (TYTO-44).
  *
@@ -5602,6 +5613,8 @@ async function load(): Promise<void> {
     bridge.on('cli:diagnostics', (pushed) => {
       commandProblems = withCommandProblems(commandProblems, pushed);
       paintPanel();
+      // The status bar counts a command's rows too (TYTO-496).
+      paintStatusBar();
     });
 
     bridge.on('queue:changed', () => {

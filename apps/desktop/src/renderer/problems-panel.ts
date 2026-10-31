@@ -46,6 +46,35 @@ export interface ProblemsState {
    * per run under the brief's rows, the newest last. Absent or empty, the panel is the brief's.
    */
   readonly commands?: readonly CommandProblems[];
+  /**
+   * The open workspace folder, so a command's place under it reads relative (TYTO-496): an
+   * absolute path took most of a row's width.
+   */
+  readonly folder?: string | null;
+  /** Whether paths compare without case, as on Windows. */
+  readonly caseless?: boolean;
+}
+
+/**
+ * A command's printed place, split for a row that has little width (TYTO-496): the folder,
+ * which may be cut from its start, and the file with its line, which is always shown. Under the
+ * open folder the folder part is relative to it.
+ */
+export function placeParts(
+  where: string,
+  folder: string | null | undefined,
+  caseless: boolean,
+): { readonly folder: string; readonly file: string } {
+  let path = where;
+  if (folder !== null && folder !== undefined && folder !== '') {
+    const base = folder.replace(/[\\/]+$/u, '');
+    const head = path.slice(0, base.length);
+    const next = path.charAt(base.length);
+    const same = caseless ? head.toLowerCase() === base.toLowerCase() : head === base;
+    if (same && (next === '/' || next === '\\')) path = path.slice(base.length + 1);
+  }
+  const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+  return { folder: path.slice(0, cut + 1), file: path.slice(cut + 1) };
 }
 
 /** One run's rows, under the command it ran (`cli:diagnostics`). */
@@ -76,6 +105,22 @@ export function withCommandProblems(
     );
   }
   return [...sections, pushed].slice(-SHOWN_RUNS);
+}
+
+/**
+ * The status bar's count (TYTO-496): the brief's rows and every command section's. It is the
+ * window's one count, and a person reading it after a failed `tyto render` should not see
+ * "no problems" while the panel lists the render's.
+ */
+export function countProblems(
+  rows: readonly { readonly severity: string }[],
+  sections: readonly CommandProblems[],
+): { readonly problems: number; readonly errors: number } {
+  const all = [...rows, ...sections.flatMap((section) => section.diagnostics)];
+  return {
+    problems: all.length,
+    errors: all.filter((row) => row.severity === 'error').length,
+  };
 }
 
 /** The offset of a 1-based line and column in `text`, held inside it. */
@@ -259,12 +304,11 @@ export class ProblemsPanel extends LitElement {
   /** A command's row: its file and line as the command printed them, since it is not the brief's. */
   private commandRow(runId: string, item: CommandProblemRow): TemplateResult {
     const severity = translate(this.state.locale, SEVERITY_KEY[item.severity]);
-    const place =
+    const at = item.line === undefined ? '' : `:${String(item.line)}:${String(item.column ?? 1)}`;
+    const parts =
       item.where === undefined
-        ? '—'
-        : item.line === undefined
-          ? item.where
-          : `${item.where}:${String(item.line)}:${String(item.column ?? 1)}`;
+        ? undefined
+        : placeParts(item.where, this.state.folder, this.state.caseless ?? false);
     const body = html`<span
         class="problems__dot problems__dot--${item.severity}"
         aria-label=${severity}
@@ -272,7 +316,19 @@ export class ProblemsPanel extends LitElement {
       ></span>
       <code class="problems__code">${item.code}</code>
       <span class="problems__message">${item.message}</span>
-      <span class="problems__where">${place}</span>`;
+      ${
+        parts === undefined
+          ? html`<span class="problems__where">—</span>`
+          : html`<span
+              class="problems__where problems__where--command"
+              title=${`${item.where ?? ''}${at}`}
+              >${
+                parts.folder === ''
+                  ? nothing
+                  : html`<span class="problems__folder"><bdi>${parts.folder}</bdi></span>`
+              }<span class="problems__file">${parts.file}${at}</span></span
+            >`
+      }`;
     const title = item.hint !== undefined && item.hint !== '' ? item.hint : nothing;
 
     if (!item.openable) return html`<div class="problems__row" title=${title}>${body}</div>`;
