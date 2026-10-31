@@ -61,6 +61,19 @@ export const ptBR: Catalogue = {
   'terminal.quit.message': 'Ainda há um programa rodando em {terminals}. Sair e encerrá-lo?',
   'terminal.quit.quit': 'Sair',
   'terminal.quit.stay': 'Continuar',
+  'panel.terminal': 'Terminal',
+  'command.terminal.new': 'Terminal: Novo terminal',
+  'terminal.new': 'Novo terminal',
+  'terminal.sessions': 'Terminais',
+  'terminal.session.close': 'Fechar o terminal',
+  'terminal.restricted':
+    'Esta pasta está restrita: um terminal aberto nela poderia rodar os arquivos dela antes de você digitar qualquer coisa.',
+  'terminal.trust': 'Confiar na pasta',
+  'terminal.exited': 'Processo encerrado com código {code}',
+  'terminal.paste.message': 'Colar {lines} linhas no terminal?',
+  'terminal.paste.detail': 'O shell roda cada linha assim que ela chega.',
+  'terminal.paste.confirm': 'Colar',
+  'terminal.paste.cancel': 'Cancelar',
   'command.workspace.showProject': 'Pasta de trabalho: mostrar projeto',
   'workspace.banner.text':
     'Esta pasta não é confiável, então {count} das pastas, seções e arquivos de plugins que ela traz ficaram de fora.',
@@ -362,7 +375,7 @@ export const ptBR: Catalogue = {
   'keybindings.assist.field.command':
     'O comando que a tecla executa, pelo id. "-<id>" tira desta tecla o atalho padrão desse comando.',
   'keybindings.assist.field.when':
-    'Onde a tecla funciona: um de seis contextos. Sem ele, a tecla funciona em qualquer lugar.',
+    'Onde a tecla funciona: um de sete contextos. Sem ele, a tecla funciona em qualquer lugar.',
   'keybindings.assist.removes': 'Tira desta tecla o atalho padrão de "{title}".',
   'keybindings.assist.removesWithKey': 'Tira desta tecla o atalho padrão de "{title}" ({key}).',
   'command.keybindings.open': 'Preferências: Abrir atalhos de teclado (JSON)',

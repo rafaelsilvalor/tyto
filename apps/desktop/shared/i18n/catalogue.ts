@@ -122,6 +122,18 @@ export interface Catalogue {
   readonly 'terminal.quit.message': string;
   readonly 'terminal.quit.quit': string;
   readonly 'terminal.quit.stay': string;
+  readonly 'panel.terminal': string;
+  readonly 'command.terminal.new': string;
+  readonly 'terminal.new': string;
+  readonly 'terminal.sessions': string;
+  readonly 'terminal.session.close': string;
+  readonly 'terminal.restricted': string;
+  readonly 'terminal.trust': string;
+  readonly 'terminal.exited': string;
+  readonly 'terminal.paste.message': string;
+  readonly 'terminal.paste.detail': string;
+  readonly 'terminal.paste.confirm': string;
+  readonly 'terminal.paste.cancel': string;
   readonly 'command.workspace.showProject': string;
   readonly 'workspace.banner.text': string;
   readonly 'workspace.banner.trust': string;
@@ -909,6 +921,18 @@ export const CATALOGUE_KEYS = [
   'terminal.quit.message',
   'terminal.quit.quit',
   'terminal.quit.stay',
+  'panel.terminal',
+  'command.terminal.new',
+  'terminal.new',
+  'terminal.sessions',
+  'terminal.session.close',
+  'terminal.restricted',
+  'terminal.trust',
+  'terminal.exited',
+  'terminal.paste.message',
+  'terminal.paste.detail',
+  'terminal.paste.confirm',
+  'terminal.paste.cancel',
   'command.workspace.showProject',
   'workspace.banner.text',
   'workspace.banner.trust',

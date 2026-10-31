@@ -52,6 +52,8 @@ describe('the catalogue', () => {
       // "Template" is the word in both languages, the same way "Slide" is: it is what the
       // frontmatter key is called and what a Portuguese speaker says out loud.
       'template.label',
+      // TYTO-497's tab in the bottom strip: "Terminal" is the word in both languages.
+      'panel.terminal',
       // E9.10's name for the editor panel in a list of panels: "Brief", the name of the file
       // format and of the language — a Portuguese speaker writing one calls it a brief, and
       // "Resumo" would name something else.

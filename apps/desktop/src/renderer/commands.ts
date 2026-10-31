@@ -249,6 +249,11 @@ export const DELIVERY_NEW = 'delivery.new';
 export const COMMAND_PANEL_RUN = 'commandPanel.run';
 export const COMMAND_PANEL_RENDER_BRIEF = 'commandPanel.renderBrief';
 /**
+ * TYTO-497 (ADR 0164 decision 7). A new terminal, in front in the Terminal tab, which opens if it
+ * was closed: Ctrl+Shift+`, VS Code's key for it, while Ctrl+` stays the command panel's.
+ */
+export const TERMINAL_NEW = 'terminal.new';
+/**
  * The export of the delivery the brief in front belongs to (TYTO-490, ADR 0157 §6): no dialog to
  * fill, main resolves the folders, and the export box opens already running. Offered only for a
  * brief in a delivery; no key by default, bindable in `keybindings.json`.
@@ -330,6 +335,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [DELIVERY_NEW]: 'command.delivery.new',
   [COMMAND_PANEL_RUN]: 'command.commandPanel.run',
   [COMMAND_PANEL_RENDER_BRIEF]: 'command.commandPanel.renderBrief',
+  [TERMINAL_NEW]: 'command.terminal.new',
   [DELIVERY_EXPORT]: 'command.delivery.export',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
@@ -397,6 +403,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
 export interface DesktopActions {
   /** TYTO-496. The command panel's tab in front, the caret on its prompt. */
   focusCommandPanel(): void;
+  /** Opens another terminal in front, the Terminal tab with it (TYTO-497). */
+  newTerminal(): void;
   /** TYTO-496. `render` and the brief in front written on the prompt, not run. */
   renderBriefInCommandPanel(): void;
   stepZoom(direction: 1 | -1): void;
@@ -586,6 +594,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(COMMAND_PANEL_RENDER_BRIEF, () => {
     actions.renderBriefInCommandPanel();
+  });
+  add(TERMINAL_NEW, () => {
+    actions.newTerminal();
   });
   add(DELIVERY_EXPORT, () => {
     actions.exportDelivery();
@@ -895,6 +906,11 @@ export const builtInKeybindings: readonly Keybinding[] = [
   // VS Code binds it. Global, so it closes the panel from inside it and opens it from anywhere.
   // Free in this table, in CodeMirror's keymaps and in vim's engine.
   { key: 'Ctrl-`', command: togglePanelCommandId(COMMANDS_PANEL), source: 'built-in' },
+  // TYTO-497 (ADR 0164 decision 7). A new terminal on VS Code's key for one, by the same physical
+  // key (`windowStrokeOf`), so Shift with the key left of 1 reaches it on ABNT2 too. Global, so it
+  // opens one from the editor and from inside another terminal. Free in this table, in
+  // CodeMirror's keymaps and in vim's engine.
+  { key: 'Ctrl-Shift-`', command: TERMINAL_NEW, source: 'built-in' },
   // TYTO-272 (ADR 0099). The keys every browser and VS Code zoom with, global like the two
   // above so they answer in vim, in a preview and in the settings tab alike. Electron's roles
   // held them before, from the browser process; the window's table holds them now. Free in

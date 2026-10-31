@@ -78,7 +78,7 @@ import { findTopLevel, projectMenu } from './menu-model.js';
 import { newKeybindingsFile, newSnippetsFile } from './seed-files.js';
 import { fileRecentFiles, fileRecentFolders } from './recent-files.js';
 import { createRecentFoldersService } from './recent-folders.js';
-import { registerIpcHandlers, sendIpcEvent } from './ipc.js';
+import { registerIpcHandlers } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import desktopManifest from './desktop.tyto-plugin.json';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
@@ -109,6 +109,7 @@ import { createWorkspaceService } from './workspace.js';
 import { createDeliveryService } from './delivery.js';
 import { createExplorerService } from './explorer.js';
 import { createExitGuard, mayUnload } from './quit.js';
+import { windowEvents } from './window-events.js';
 import {
   type PseudoTerminal,
   type SpawnOptions,
@@ -315,6 +316,8 @@ async function start(): Promise<void> {
   // to `prefer-const` as a `const` written the long way round. It is genuinely reassigned —
   // below, after the window exists.
   let mainWindow: BrowserWindow | undefined = undefined;
+  // Every push to the window, asked of the window first (`window-events.ts`).
+  const toWindow = windowEvents(() => mainWindow);
   // The arrow press that moved an open menu list, swallowed once it reaches the page (TYTO-263).
   const leakedArrow = new LeakedArrow();
 
@@ -357,9 +360,7 @@ async function start(): Promise<void> {
           // The id and nothing else. Main does not know what `editor.save` does, and the whole
           // point of the table in `shared/commands.ts` is that it never needs to.
           onCommand: (id) => {
-            const contents = mainWindow?.webContents;
-            if (contents === undefined || contents.isDestroyed()) return;
-            sendIpcEvent(contents, 'command:run', { id });
+            toWindow('command:run', { id });
           },
           // macOS's own about panel shows the credits; on Windows `showAboutPanel` draws a box
           // with the app name alone (measured, TYTO-248), so there it is a message box.
@@ -642,8 +643,10 @@ async function start(): Promise<void> {
   // every load too, because a reload is a new page.
   const applyZoom = (level: number): void => {
     windowZoom = level;
-    const contents = mainWindow?.webContents;
-    if (contents === undefined || contents.isDestroyed()) return;
+    // The window before its contents, for `window-events.ts`'s reason: a destroyed window throws.
+    if (mainWindow === undefined || mainWindow.isDestroyed()) return;
+    const contents = mainWindow.webContents;
+    if (contents.isDestroyed()) return;
     contents.setZoomLevel(level);
     paintTitleBar();
   };
@@ -675,9 +678,7 @@ async function start(): Promise<void> {
   // open. A notice and not a question, as the queue's: the panel lists again when it hears it.
   const explorer = createExplorerService({
     onChange: () => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'explorer:changed', {});
+      toWindow('explorer:changed', {});
     },
     onError: (message, cause) => {
       log.error(message, cause);
@@ -872,9 +873,7 @@ async function start(): Promise<void> {
     apply: async (fetched) => {
       for (const problem of fetched.problems) log.warn(problem.message);
       await sources.setFetched(fetched);
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'templates:changed', {});
+      toWindow('templates:changed', {});
     },
   });
   syncPluginFiles = (update) => {
@@ -933,9 +932,7 @@ async function start(): Promise<void> {
   // Kept by `sources` for every read after, so a sync or an install says it again.
   void contributed.ready.then(async () => {
     await sources.setKitBrands(new Set(contributed.brandKits().kits.keys()));
-    const contents = mainWindow?.webContents;
-    if (contents === undefined || contents.isDestroyed()) return;
-    sendIpcEvent(contents, 'templates:changed', {});
+    toWindow('templates:changed', {});
   });
   // The recipe notebook's runner (TYTO-377, ADR 0148): the plugins' verbs, each with its own
   // section of the folder a recipe is in, read per call (ADR 0147); the folder's trust and data
@@ -1020,9 +1017,7 @@ async function start(): Promise<void> {
     // Dropped while there is no window, which costs nothing — a window that opens later asks
     // once on its own.
     onChange: () => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'queue:changed', {});
+      toWindow('queue:changed', {});
     },
     // Main moved the file, so main tells the document service: a tab holding the brief a
     // person just fixed follows it to `done/`, and their next save lands there.
@@ -1064,30 +1059,19 @@ async function start(): Promise<void> {
       (key) => translate(uiLocale, key),
     ),
     output: (output) => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'cli:output', output);
+      toWindow('cli:output', output);
     },
     state: (change) => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'cli:state', change);
+      toWindow('cli:state', change);
     },
     diagnostics: (rows) => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'cli:diagnostics', { ...rows, diagnostics: [...rows.diagnostics] });
+      toWindow('cli:diagnostics', { ...rows, diagnostics: [...rows.diagnostics] });
     },
     // The commands with a window twin leave the window as its own twin would (decision 3).
     afterRun: async ([command, subcommand], code) => {
       if (code !== 0) return;
       if (command === 'plugin' && subcommand === 'sync') await syncPluginFiles(false);
-      if (command === 'delivery' && subcommand === 'new') {
-        const contents = mainWindow?.webContents;
-        if (contents !== undefined && !contents.isDestroyed()) {
-          sendIpcEvent(contents, 'explorer:changed', {});
-        }
-      }
+      if (command === 'delivery' && subcommand === 'new') toWindow('explorer:changed', {});
       // A revoke applies the next time the folder opens (ADR 0111), so only a grant re-reads.
       const open = workspace.state().folder;
       if (command === 'trust' && subcommand === 'add' && open !== null) await workspace.open(open);
@@ -1133,16 +1117,10 @@ async function start(): Promise<void> {
     // A shell outlives the window it printed to, so the window is asked whether it is gone
     // before its `webContents` is read, which throws on a destroyed window.
     output: (terminalId, data) => {
-      if (mainWindow === undefined || mainWindow.isDestroyed()) return;
-      const contents = mainWindow.webContents;
-      if (contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'terminal:output', { terminalId, data });
+      toWindow('terminal:output', { terminalId, data });
     },
     exit: (terminalId, code) => {
-      if (mainWindow === undefined || mainWindow.isDestroyed()) return;
-      const contents = mainWindow.webContents;
-      if (contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'terminal:exit', { terminalId, code });
+      toWindow('terminal:exit', { terminalId, code });
     },
     killTree: killTree(
       process.platform,
@@ -1246,9 +1224,7 @@ async function start(): Promise<void> {
     },
     configure: configureAll,
     send: (payload) => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'settings:changed', payload);
+      toWindow('settings:changed', payload);
     },
     log,
   });
@@ -1283,9 +1259,7 @@ async function start(): Promise<void> {
   const pushTo =
     (event: 'keybindings:changed' | 'snippets:changed') =>
     (payload: { readonly text: string }): void => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, event, { text: payload.text });
+      toWindow(event, { text: payload.text });
     };
   const liveKeybindings = createLiveTextFile('keybindings.json', {
     readText: textOrNothing(keybindingsFile),
@@ -1333,12 +1307,7 @@ async function start(): Promise<void> {
   // `quit.ts` holds the latch and the ids and knows nothing about Electron, which is what
   // lets the decision be tested without launching one (ADR 0010).
   const exit = createExitGuard({
-    send: (askId) => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return false;
-      sendIpcEvent(contents, 'app:exit-requested', { askId });
-      return true;
-    },
+    send: (askId) => toWindow('app:exit-requested', { askId }),
   });
 
   // **A newer version** (TYTO-131, ADR 0069). Composed before the handlers, so the window can
@@ -1398,9 +1367,7 @@ async function start(): Promise<void> {
     },
     log,
     changed: () => {
-      const contents = mainWindow?.webContents;
-      if (contents === undefined || contents.isDestroyed()) return;
-      sendIpcEvent(contents, 'update:changed', {});
+      toWindow('update:changed', {});
     },
     quit: () => {
       app.quit();

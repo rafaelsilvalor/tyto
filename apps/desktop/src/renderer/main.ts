@@ -134,6 +134,9 @@ import {
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import { type ProjectPanel, PROJECT_PANEL_TAG } from './project-panel.js';
 import { type CommandPanel, COMMAND_PANEL_TAG } from './command-panel.js';
+import { type TerminalPanel, TERMINAL_PANEL_TAG } from './terminal-panel.js';
+import { TerminalSessions } from './terminal-sessions.js';
+import { type TerminalKey, pasteNeedsConfirming, pastedLines } from './terminal-keys.js';
 import { type CommandSession, CommandSessions, refreshesWorkspace } from './command-sessions.js';
 import { inRunOrder, sectionTitle, shortCommand } from './command-blocks.js';
 import type { CommandsOrder } from '../../shared/command-runs.js';
@@ -298,6 +301,7 @@ import {
   QUEUE_PANEL,
   PROJECT_PANEL,
   COMMANDS_PANEL,
+  TERMINAL_PANEL,
   EXPLORER_PANEL,
   dockHasPanels,
   dockIsHidden,
@@ -572,6 +576,80 @@ let commandProblems: readonly CommandProblems[] = [];
  */
 const commandSessions = new CommandSessions();
 
+/**
+ * The terminals main has open (TYTO-497, ADR 0164), for the window's life, as the command panel's
+ * sessions are: the dock makes the panel element again on every layout change, and a shell's
+ * screen must survive it. Main chooses the program, the folder and the environment; these ports
+ * only open, type, resize and end, by the id main answered (decision 3).
+ */
+const terminalSessions = new TerminalSessions({
+  open: async (size) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return { refused: 'failed', message: 'No bridge to main.' };
+    return bridge['terminal:open'](size);
+  },
+  input: (terminalId, data) => {
+    void withBridge(async (bridge) => {
+      await bridge['terminal:input']({ terminalId, data });
+    });
+  },
+  resize: (terminalId, cols, rows) => {
+    void withBridge(async (bridge) => {
+      await bridge['terminal:resize']({ terminalId, cols, rows });
+    });
+  },
+  kill: (terminalId) => {
+    void withBridge(async (bridge) => {
+      await bridge['terminal:kill']({ terminalId });
+    });
+  },
+  list: async () => (await window.tyto?.['terminal:list']({}))?.terminals ?? [],
+  // xterm loads here, the first time a terminal is drawn, never with the window (ADR 0164 §7).
+  view: async (send) => {
+    const { createTerminalView } = await import('./terminal-view.js');
+    return createTerminalView(
+      {
+        platform: state.platform,
+        read: (name) => getComputedStyle(document.documentElement).getPropertyValue(name),
+        windowClaims: terminalKeyIsTheWindows,
+        readClipboard: () => navigator.clipboard.readText(),
+        writeClipboard: (text) => navigator.clipboard.writeText(text),
+        confirmPaste,
+      },
+      send,
+    );
+  },
+  exited: (code) => translate(state.locale, 'terminal.exited').replaceAll('{code}', String(code)),
+});
+
+/**
+ * Whether the window's key table runs a key pressed in a terminal: an entry bound globally or in
+ * the `terminal` context (ADR 0164 decision 8). Every other key is the shell's.
+ */
+function terminalKeyIsTheWindows(event: TerminalKey): boolean {
+  const stroke = windowStrokeOf(event);
+  return windowBindingsOf(keybindings).some(
+    (binding) =>
+      (binding.when === undefined || binding.when === 'terminal') &&
+      concreteKey(binding, state.platform) === stroke,
+  );
+}
+
+/** A paste of more than one line asks first, in main's box (ADR 0164 decision 8). */
+async function confirmPaste(text: string): Promise<boolean> {
+  if (!pasteNeedsConfirming(text)) return true;
+  const bridge = window.tyto;
+  if (bridge === undefined) return false;
+  const say = (key: CatalogueKey): string => translate(state.locale, key);
+  const { confirmed } = await bridge['dialog:confirm']({
+    message: say('terminal.paste.message').replaceAll('{lines}', String(pastedLines(text))),
+    detail: say('terminal.paste.detail'),
+    confirm: say('terminal.paste.confirm'),
+    cancel: say('terminal.paste.cancel'),
+  });
+  return confirmed;
+}
+
 /** The lines run in the command panel in the open folder, oldest first (TYTO-496). */
 let commandHistory: readonly string[] = [];
 /** The folder `commandHistory` is kept for; `undefined` until the first workspace answer. */
@@ -800,6 +878,8 @@ function resolveElements() {
     projectPanel: document.querySelector<ProjectPanel>(PROJECT_PANEL_TAG),
     // TYTO-496. Beside Problems, `null` while closed; it draws `commandSessions`.
     commandPanel: document.querySelector<CommandPanel>(COMMAND_PANEL_TAG),
+    // TYTO-497. After Commands, `null` while closed; it draws `terminalSessions`' screens.
+    terminalPanel: document.querySelector<TerminalPanel>(TERMINAL_PANEL_TAG),
     // TYTO-279. In the left area above the queue, `null` while closed; it asks main itself.
     explorerPanel: document.querySelector<ExplorerPanel>(EXPLORER_PANEL_TAG),
     // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
@@ -1742,6 +1822,9 @@ const registry: CommandRegistry = withCommandGate(
     },
     focusCommandPanel: () => {
       void showCommandPanel();
+    },
+    newTerminal: () => {
+      void newTerminal();
     },
     renderBriefInCommandPanel: () => {
       const path = briefCommandPath();
@@ -2892,6 +2975,8 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       // watches no custom property, so every pane re-reads its text's size, and a face this
       // machine does not have is said in the problems panel.
       showTypography(applied.typography);
+      // And the terminals, whose colours and code font are the window's (TYTO-497).
+      terminalSessions.restyle();
       // Only once it is loaded, as with the locale: `loadTemplateMode` hands it the value then.
       if (customElements.get(TEMPLATE_MODE_TAG) !== undefined && elements.templateMode) {
         elements.templateMode.showIndentGuides(indentGuides);
@@ -3394,6 +3479,8 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   deliveries.clear();
   workspaceShown = answer;
   useCommandHistoryOf(answer.folder);
+  // Another folder, or the same one trusted now: the last refusal is no longer the answer.
+  terminalSessions.forgetRefusal();
   showExportPresets(answer.exportPresets);
   panel.installation = withWorkspaceRows(panel.installation, answer.problems);
   if (elements.workspaceBanner !== null) {
@@ -4323,6 +4410,8 @@ function registerPanelCommands(): void {
           if (panel.id === COMMANDS_PANEL && panelShown(panel.id)) {
             elements.commandPanel?.focusInput();
           }
+          // And the terminal's is wanting a shell: the one in front, or a first one (TYTO-497).
+          if (panel.id === TERMINAL_PANEL && panelShown(panel.id)) focusTerminal();
         });
       },
     });
@@ -4451,6 +4540,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   project: 'panel.project',
   explorer: 'panel.explorer',
   commands: 'panel.commands',
+  terminal: 'panel.terminal',
 };
 
 /** Every command the registry holds, translated and with the key that runs it. */
@@ -4646,6 +4736,7 @@ function dockHost(): DockHost {
     onPick: (panelId) => {
       void changeLayout(withPanelInFront(layout, panelId)).then(() => {
         if (panelId === COMMANDS_PANEL) elements.commandPanel?.focusInput();
+        if (panelId === TERMINAL_PANEL) focusTerminal();
       });
     },
     onHide: (dock) => {
@@ -4750,6 +4841,7 @@ async function applyLayout(persist: boolean): Promise<void> {
   // A Project panel the dock just made has no answer yet; the last one is still true.
   if (elements.projectPanel) elements.projectPanel.view = workspaceShown;
   wireCommandPanel();
+  wireTerminalPanel();
   wireCommandBar();
   present();
   repaint();
@@ -5493,15 +5585,20 @@ async function drawMenuRow(bridge: TytoBridge): Promise<void> {
   menuRow.draw((await bridge['menu:model']({})).menus);
 }
 
-/** `commandBar`, `panel` and global, the three contexts the window answers (ADR 0074). */
+/** `commandBar`, `panel`, `terminal` and global: what the window answers (ADR 0074, ADR 0164). */
 function windowContextHolds(when: KeybindingContext | undefined): boolean {
   if (when === undefined) return true;
   const barOpen = elements.commandBar?.open === true;
   if (when === 'commandBar') return barOpen;
+  // A terminal is its own context (ADR 0164 decision 8), and not `panel`'s: there the keys are
+  // the shell's, except the table's global and `terminal` entries.
+  const inTerminal = document.activeElement?.closest('.terminal-panel__screens') != null;
+  if (when === 'terminal') return !barOpen && inTerminal;
   const panel = document.activeElement?.closest('[data-panel]');
   return (
     when === 'panel' &&
     !barOpen &&
+    !inTerminal &&
     panel !== null &&
     panel !== undefined &&
     panel.getAttribute('data-panel') !== EDITOR_PANEL
@@ -5599,6 +5696,39 @@ function wireCommandPanel(): void {
 async function showCommandPanel(): Promise<void> {
   await changeLayout(withPanelOpen(layout, COMMANDS_PANEL, true));
   elements.commandPanel?.focusInput();
+}
+
+/** The Terminal tab's sessions and ports (TYTO-497), handed to every element the dock makes. */
+function wireTerminalPanel(): void {
+  const element = elements.terminalPanel;
+  if (element === null) return;
+  element.sessions = terminalSessions;
+  element.ports = {
+    create: () => {
+      void newTerminal();
+    },
+    // The banner's own action, and then the shell the person asked for (ADR 0164 decision 5).
+    trust: () => {
+      void setWorkspaceTrust(true, 'folder').then(() => newTerminal());
+    },
+  };
+}
+
+/** A new terminal in front, the Terminal tab open and focused on it (TYTO-497). */
+async function newTerminal(): Promise<void> {
+  await changeLayout(withPanelOpen(layout, TERMINAL_PANEL, true));
+  await terminalSessions.create();
+  await elements.terminalPanel?.updateComplete;
+  elements.terminalPanel?.focusTerminal();
+}
+
+/** The terminal in front focused, or a first one opened when there is none. */
+function focusTerminal(): void {
+  const element = elements.terminalPanel;
+  if (element === null) return;
+  void element.updateComplete.then(() => {
+    element.focusTerminal();
+  });
 }
 
 /** The path a command is given for the brief in front: its label, or relative to the folder. */
@@ -5927,6 +6057,15 @@ async function load(): Promise<void> {
     bridge.on('cli:state', (pushed) => {
       commandSessions.state(pushed);
     });
+    // What a terminal's shell printed and its end, into its screen (TYTO-497, ADR 0164).
+    bridge.on('terminal:output', (pushed) => {
+      terminalSessions.output(pushed.terminalId, pushed.data);
+    });
+    bridge.on('terminal:exit', (pushed) => {
+      terminalSessions.exit(pushed.terminalId, pushed.code);
+    });
+    // The terminals main kept across a reload, drawn again from their replay (decision 3).
+    void terminalSessions.restore();
 
     bridge.on('queue:changed', () => {
       if (elements.queuePanel !== null) void refreshQueue();

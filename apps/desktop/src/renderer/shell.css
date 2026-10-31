@@ -1575,6 +1575,58 @@ button.problems__row:focus-visible {
 }
 
 /*
+ * The Terminal tab (TYTO-497, ADR 0164 decision 7): the screen of the terminal in front, edge to
+ * edge under the strip, with xterm's own padding. The window's colours reach xterm through its
+ * theme (`terminal-theme.ts`), not through these rules. Its tabs are the command panel's
+ * `command-session` look; only the exit code beside an ended one is its own.
+ */
+.terminal-panel {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--tyto-surface);
+}
+
+.terminal-panel__screens {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--tyto-space-2) 0 0 var(--tyto-space-4);
+}
+
+.terminal-screen {
+  position: absolute;
+  inset: var(--tyto-space-2) 0 0 var(--tyto-space-4);
+}
+
+.terminal-screen[hidden] {
+  display: none;
+}
+
+/* The line the restricted folder's banner shows, with its trust action (ADR 0164 decision 5). */
+.terminal-panel__refusal {
+  display: flex;
+  align-items: center;
+  gap: var(--tyto-space-3);
+  margin: var(--tyto-space-3) var(--tyto-space-4);
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  border-left: var(--tyto-focus-width) solid var(--tyto-warning);
+  background: var(--tyto-surface-raised);
+  font-size: var(--tyto-text-sm);
+}
+
+.terminal-panel__refusal > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.terminal-session__ended {
+  color: var(--tyto-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
  * The command panel (TYTO-496, ADR 0159, ADR 0163): the output and, as its last line, the prompt,
  * the way a terminal shows them. No box around the input and no line between parts: Rafael asked
  * for the panel as clean as it can be.

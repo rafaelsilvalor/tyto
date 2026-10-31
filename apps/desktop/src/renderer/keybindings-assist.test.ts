@@ -100,7 +100,7 @@ describe('suggesting in keybindings.json', () => {
     expect(answer?.options[3]?.info).toMatch(/Removes the default binding of "Save" \(Ctrl\+S\)/u);
   });
 
-  it('lists the six contexts, each with what it means, for when', () => {
+  it('lists the seven contexts, each with what it means, for when', () => {
     const answer = complete('[\n  { "key": "ctrl+e", "when": "|" }\n]');
     expect(answer?.options.map((option) => option.label)).toEqual([...KEYBINDING_CONTEXTS]);
     expect(answer?.options.find((each) => each.label === 'commandBar')?.info).toBe(
@@ -143,7 +143,7 @@ describe('hover in keybindings.json', () => {
   it("shows a context's sentence on a when value", () => {
     expect(on('"panel"')).toMatchObject({
       title: 'panel',
-      text: 'Focus is in a panel other than the editor, and the command bar is closed.',
+      text: 'Focus is in a panel other than the editor or a terminal, and the command bar is closed.',
     });
   });
 
@@ -167,7 +167,7 @@ describe('hover in keybindings.json', () => {
     );
     const field = at('[\n  { "wh|en": "panel" }\n]');
     expect(portuguese.hover(field.text, field.position)?.text).toBe(
-      'Onde a tecla funciona: um de seis contextos. Sem ele, a tecla funciona em qualquer lugar.',
+      'Onde a tecla funciona: um de sete contextos. Sem ele, a tecla funciona em qualquer lugar.',
     );
   });
 

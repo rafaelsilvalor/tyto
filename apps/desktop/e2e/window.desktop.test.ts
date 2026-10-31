@@ -513,10 +513,12 @@ describe('switching the language', () => {
     // TYTO-495: the native box a `tyto` command run in the window asks through (ADR 0159).
     'cli.confirm.yes',
     'cli.confirm.no',
-    // TYTO-497, ADR 0164 §6: the box main shows before quitting over a running program.
-    'terminal.quit.message',
-    'terminal.quit.quit',
-    'terminal.quit.stay',
+    // TYTO-497, ADR 0164: the Terminal tab is closed until Ctrl+Shift+` opens it and renders its
+    // own words, the paste and quit questions are boxes, and its command is the bar's text only;
+    // `terminal-panel.test.ts` holds the tab's.
+    'panel.terminal',
+    'command.terminal.new',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('terminal.')),
     'workspace.banner.text',
     'workspace.banner.trust',
     'workspace.banner.problems',

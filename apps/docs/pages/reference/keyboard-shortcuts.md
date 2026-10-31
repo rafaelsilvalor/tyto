@@ -2,7 +2,7 @@
 
 # Keyboard shortcuts
 
-The keys the app binds before you change anything: 38. Each one runs a command, and works only where its context holds. Change them in `keybindings.json`, which **Preferences: Open Keyboard Shortcuts (JSON)** opens; a plugin can add its own.
+The keys the app binds before you change anything: 39. Each one runs a command, and works only where its context holds. Change them in `keybindings.json`, which **Preferences: Open Keyboard Shortcuts (JSON)** opens; a plugin can add its own.
 
 ## Contexts
 
@@ -13,7 +13,8 @@ The keys the app binds before you change anything: 38. Each one runs a command, 
 | `vim.insert` | Vim mode is on and the engine is in insert mode. |
 | `mode.desktop` | The editor has focus and vim mode is off. |
 | `commandBar` | The command bar is open. |
-| `panel` | Focus is in a panel other than the editor, and the command bar is closed. |
+| `panel` | Focus is in a panel other than the editor or a terminal, and the command bar is closed. |
+| `terminal` | Focus is in a terminal, and the command bar is closed. |
 
 ## Everywhere
 
@@ -24,6 +25,7 @@ A key with no context works wherever focus is.
 | `Ctrl+k` | `⌘k` | Open the command bar | `commandBar.toggle` |
 | `Ctrl+Shift+v` | `⌘⇧v` | Open preview to the side | `preview.openToSide` |
 | `` Ctrl+` `` (the key left of 1) | `` Ctrl` `` (the key left of 1) | Show or hide: Commands | `layout.togglePanel:commands` |
+| `` Ctrl+Shift+` `` | `` Ctrl⇧` `` | Terminal: New Terminal | `terminal.new` |
 | `Ctrl+=` | `⌘=` | Zoom in | `window.zoomIn` |
 | `Ctrl+-` | `⌘-` | Zoom out | `window.zoomOut` |
 | `Ctrl+0` | `⌘0` | Reset zoom | `window.zoomReset` |

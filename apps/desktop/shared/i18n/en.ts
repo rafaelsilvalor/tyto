@@ -61,6 +61,19 @@ export const en: Catalogue = {
   'terminal.quit.message': 'A program is still running in {terminals}. Quit and end it?',
   'terminal.quit.quit': 'Quit',
   'terminal.quit.stay': 'Keep running',
+  'panel.terminal': 'Terminal',
+  'command.terminal.new': 'Terminal: New Terminal',
+  'terminal.new': 'New terminal',
+  'terminal.sessions': 'Terminals',
+  'terminal.session.close': 'Close the terminal',
+  'terminal.restricted':
+    'This folder is restricted: a terminal started in it could run its files before you type anything.',
+  'terminal.trust': 'Trust the folder',
+  'terminal.exited': 'Process exited with code {code}',
+  'terminal.paste.message': 'Paste {lines} lines into the terminal?',
+  'terminal.paste.detail': 'The shell runs each line as it arrives.',
+  'terminal.paste.confirm': 'Paste',
+  'terminal.paste.cancel': 'Cancel',
   'command.workspace.showProject': 'Workspace: Show Project',
   'workspace.banner.text':
     'This folder is not trusted, so {count} of the folders, sections and plugin files it ships were left out.',
@@ -359,7 +372,7 @@ export const en: Catalogue = {
   'keybindings.assist.field.command':
     'The command the key runs, by id. "-<id>" removes that command\'s default binding on this key.',
   'keybindings.assist.field.when':
-    'Where the key works: one of six contexts. Left out, the key works everywhere.',
+    'Where the key works: one of seven contexts. Left out, the key works everywhere.',
   'keybindings.assist.removes': 'Removes the default binding of "{title}" on this key.',
   'keybindings.assist.removesWithKey':
     'Removes the default binding of "{title}" ({key}) on this key.',
