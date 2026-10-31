@@ -372,7 +372,7 @@ export const en: Catalogue = {
   'keybindings.assist.field.command':
     'The command the key runs, by id. "-<id>" removes that command\'s default binding on this key.',
   'keybindings.assist.field.when':
-    'Where the key works: one of six contexts. Left out, the key works everywhere.',
+    'Where the key works: one of seven contexts. Left out, the key works everywhere.',
   'keybindings.assist.removes': 'Removes the default binding of "{title}" on this key.',
   'keybindings.assist.removesWithKey':
     'Removes the default binding of "{title}" ({key}) on this key.',

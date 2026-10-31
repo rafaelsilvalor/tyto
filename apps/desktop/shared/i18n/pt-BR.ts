@@ -375,7 +375,7 @@ export const ptBR: Catalogue = {
   'keybindings.assist.field.command':
     'O comando que a tecla executa, pelo id. "-<id>" tira desta tecla o atalho padrão desse comando.',
   'keybindings.assist.field.when':
-    'Onde a tecla funciona: um de seis contextos. Sem ele, a tecla funciona em qualquer lugar.',
+    'Onde a tecla funciona: um de sete contextos. Sem ele, a tecla funciona em qualquer lugar.',
   'keybindings.assist.removes': 'Tira desta tecla o atalho padrão de "{title}".',
   'keybindings.assist.removesWithKey': 'Tira desta tecla o atalho padrão de "{title}" ({key}).',
   'command.keybindings.open': 'Preferências: Abrir atalhos de teclado (JSON)',

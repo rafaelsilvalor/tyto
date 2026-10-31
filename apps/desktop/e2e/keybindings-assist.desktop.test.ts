@@ -183,7 +183,15 @@ async function togglesLocale(page: Page, key: string): Promise<boolean> {
   return moved;
 }
 
-const CONTEXTS = ['editor', 'vim.normal', 'vim.insert', 'mode.desktop', 'commandBar', 'panel'];
+const CONTEXTS = [
+  'editor',
+  'vim.normal',
+  'vim.insert',
+  'mode.desktop',
+  'commandBar',
+  'panel',
+  'terminal',
+];
 const ENTRY = { key: 'ctrl+shift+e', command: 'shell.toggleLocale', when: 'editor' };
 
 /** Builds `ENTRY` on the file's empty line, by picks wherever the tab suggests. */
@@ -276,7 +284,7 @@ describe('the keybindings tab’s suggestions and hover', () => {
     await page.mouse.move(0, 0);
     await expect.poll(() => hoverText(page)).toBe('');
     await hoverOver(page, '"when"');
-    await expect.poll(() => hoverText(page), { timeout: 15_000 }).toMatch(/one of six contexts/u);
+    await expect.poll(() => hoverText(page), { timeout: 15_000 }).toMatch(/one of seven contexts/u);
   });
 
   it('suggests with vim on, in insert mode', async () => {
