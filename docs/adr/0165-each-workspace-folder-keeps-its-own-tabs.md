@@ -48,7 +48,8 @@ record they define the way their own optional fields were added.
    draft with its hash, so leaving a folder loses nothing. Only when that write fails while a tab
    holds unsaved text does the switch not happen, and the status bar says so — the rule a reload
    already follows (ADR 0080). Asking on every switch would put a dialog in the common case for
-   no safety a successful write does not already give.
+   no safety a successful write does not already give. **Rafael chose this on 2026-10-31**, over
+   asking before leaving a folder with unsaved changes: "Volta sozinho" (it comes back by itself).
 
 ## Consequences
 
