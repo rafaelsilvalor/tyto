@@ -13,6 +13,7 @@ import {
   writeGalleryRecord,
 } from '@tyto/io';
 import {
+  DEFAULT_GALLERY_INDEX,
   EMPTY_PLUGIN_FILES_LOCK,
   type GalleryPlacement,
   type GalleryStatus,
@@ -43,7 +44,7 @@ import { formatDiagnostics, registerOrigin, registerUnplaced } from './report.js
 
 /** Where templates the gallery installs are written, in the machine's plugin files. */
 export const GALLERY_TEMPLATES_FILE = 'gallery.yaml';
-/** Read when `--index` is not given. No default: which list to trust is the person's choice. */
+/** Read when `--index` is not given; the curated index stands in when neither is (TYTO-506). */
 export const GALLERY_INDEX_VARIABLE = 'TYTO_GALLERY_INDEX';
 
 export interface GalleryCommandOptions {
@@ -62,20 +63,28 @@ function report(items: Diagnostics, environment: CliEnvironment): void {
   if (items.length > 0) environment.console.err(formatDiagnostics(items));
 }
 
-/** The index and the machine's files, read; or the exit code when there is no index to read. */
+/**
+ * Which index a command reads: `--index`, else `TYTO_GALLERY_INDEX`, else the curated one
+ * (ADR 0162, TYTO-506). A blank value names nothing and falls through, as an unset one does.
+ * This is the CLI's own configuration: it never reads the window's `settings.json` (ADR 0145).
+ */
+export function galleryIndexOf(
+  option: string | undefined,
+  variables: Readonly<Record<string, string | undefined>> | undefined,
+): string {
+  for (const written of [option, variables?.[GALLERY_INDEX_VARIABLE]]) {
+    if (written !== undefined && written.trim() !== '') return written;
+  }
+  return DEFAULT_GALLERY_INDEX;
+}
+
+/** The index and the machine's files, read; or the exit code when the index cannot be read. */
 async function loadGallery(
   options: GalleryCommandOptions,
   environment: CliEnvironment,
 ): Promise<Gallery | ExitCode> {
   const home = homeOf(environment);
-  const written = options.index ?? environment.variables?.[GALLERY_INDEX_VARIABLE];
-  if (written === undefined || written.trim() === '') {
-    environment.console.err(
-      `No gallery index: pass --index <git> or set ${GALLERY_INDEX_VARIABLE} to a repository holding index.yaml.\n`,
-    );
-    return EXIT_DIAGNOSTICS;
-  }
-  const index = locationOf(written, environment.cwd);
+  const index = locationOf(galleryIndexOf(options.index, environment.variables), environment.cwd);
   const fetched = await fetchGalleryIndex(home, index);
   registerUnplaced(fetched.diagnostics);
   report(fetched.diagnostics, environment);

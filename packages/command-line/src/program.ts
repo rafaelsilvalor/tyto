@@ -1,4 +1,5 @@
 import { Command, CommanderError, Option } from 'commander';
+import { DEFAULT_GALLERY_INDEX } from '@tyto/plugin-api';
 
 import type { CliEnvironment, CommandInvocation } from './environment.js';
 import { deliveryNewCommand } from './delivery.js';
@@ -394,7 +395,7 @@ export function createProgram(
   const indexOption = (): Option =>
     new Option(
       '--index <git>',
-      'the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX)',
+      `the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX, else ${DEFAULT_GALLERY_INDEX})`,
     );
 
   const galleryList = gallery
