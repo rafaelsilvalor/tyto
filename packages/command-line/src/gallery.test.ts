@@ -7,8 +7,11 @@ import { promisify } from 'node:util';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { DEFAULT_GALLERY_INDEX } from '@tyto/plugin-api';
+
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK } from './exit.js';
+import { GALLERY_INDEX_VARIABLE, galleryIndexOf } from './gallery.js';
 import { launchPluginProcess } from './plugins/plugin-process.js';
 import { run } from './program.js';
 
@@ -184,9 +187,38 @@ describe('tyto gallery list', () => {
     expect(errors.join('')).toBe('');
   });
 
-  it('says where the index comes from when nobody set one', async () => {
-    expect(await run(['gallery', 'list'], environment())).toBe(EXIT_DIAGNOSTICS);
-    expect(errors.join('')).toContain('pass --index <git> or set TYTO_GALLERY_INDEX');
+  it('reads TYTO_GALLERY_INDEX when --index is absent', async () => {
+    const variables = { [GALLERY_INDEX_VARIABLE]: index };
+    expect(await run(['gallery', 'list'], { ...environment(), variables })).toBe(EXIT_OK);
+    expect(out.join('')).toContain('concursos  template  not installed  v1');
+    expect(errors.join('')).toBe('');
+  });
+
+  it('takes --index over TYTO_GALLERY_INDEX', async () => {
+    const nowhere = pathToFileURL(join(root, 'repositories', 'nowhere')).href;
+    const variables = { [GALLERY_INDEX_VARIABLE]: nowhere };
+    expect(await run(['gallery', 'list', '--index', index], { ...environment(), variables })).toBe(
+      EXIT_OK,
+    );
+    expect(out.join('')).toContain('concursos  template  not installed  v1');
+    expect(errors.join('')).toBe('');
+  });
+});
+
+describe('which index the gallery reads (TYTO-506)', () => {
+  const flag = 'https://git.example.com/flag/index.git';
+  const variable = 'https://git.example.com/variable/index.git';
+
+  it('reads the curated index when nobody names one', () => {
+    expect(galleryIndexOf(undefined, undefined)).toBe(DEFAULT_GALLERY_INDEX);
+    expect(galleryIndexOf(undefined, {})).toBe(DEFAULT_GALLERY_INDEX);
+    expect(galleryIndexOf(' ', { [GALLERY_INDEX_VARIABLE]: '' })).toBe(DEFAULT_GALLERY_INDEX);
+  });
+
+  it('takes the variable over the default, and --index over both', () => {
+    expect(galleryIndexOf(undefined, { [GALLERY_INDEX_VARIABLE]: variable })).toBe(variable);
+    expect(galleryIndexOf(flag, { [GALLERY_INDEX_VARIABLE]: variable })).toBe(flag);
+    expect(galleryIndexOf(flag, {})).toBe(flag);
   });
 });
 

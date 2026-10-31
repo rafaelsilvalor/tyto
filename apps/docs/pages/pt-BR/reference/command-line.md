@@ -287,7 +287,7 @@ tyto gallery list [options]
 
 | Opção | O que faz | Padrão |
 | --- | --- | --- |
-| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX, else https://github.com/rafaelsilvalor/tyto-gallery.git) |  |
 
 ## tyto gallery install
 
@@ -307,7 +307,7 @@ tyto gallery install [options] <id>
 
 | Opção | O que faz | Padrão |
 | --- | --- | --- |
-| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX, else https://github.com/rafaelsilvalor/tyto-gallery.git) |  |
 | `-y, --yes` | approve the fetched plugin's permissions without asking |  |
 
 ## tyto gallery update
@@ -328,7 +328,7 @@ tyto gallery update [options] <id>
 
 | Opção | O que faz | Padrão |
 | --- | --- | --- |
-| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX) |  |
+| `--index <git>` | the repository holding index.yaml, as git reads it (default: $TYTO_GALLERY_INDEX, else https://github.com/rafaelsilvalor/tyto-gallery.git) |  |
 | `-y, --yes` | approve the fetched plugin's permissions without asking |  |
 | `--force` | move a ref changed by hand since the gallery wrote it |  |
 

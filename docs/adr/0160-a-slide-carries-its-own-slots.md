@@ -84,3 +84,46 @@ here:
 - A brief written for an older Tyto is unchanged: no manifest before this declared `per`.
 - Not measured: a brief with hundreds of slides. Attaching a `per` slot is a lookup of the last
   occurrence, so it adds nothing per slide beyond the image read that was already there.
+
+## Amendment — 2026-10-31 · TYTO-498: several pictures among a slide's lines
+
+The maintainer chose, for `tyto-template-questao-estrategica`, the extension described above: a
+slide may hold any number of pictures, each where it is written among the slide's lines.
+
+```yaml
+slots:
+  lamina: { type: rich-text, repeat: true, min: 1 }
+  imagem: { type: image, per: lamina, multiple: true }
+```
+
+```
+::lamina
+  Paragraph 1
+::imagem ./a.png
+  Paragraph 2
+::imagem ./b.png
+```
+
+1. **`multiple: true` is declared on a `per` image slot, and nowhere else** (a manifest error at
+   `slots.<name>.multiple`). Each `::imagem` after the same `::lamina` adds one instead of
+   being `E_BAD_SLOT_VALUE`. A `per` slot without it keeps rule 2.
+2. **No grammar change, and no `::texto` slot.** The parser already reads the indented lines
+   under `::imagem ./a.png` as that directive's body, joined by a `Break` with none before the
+   first line. For a `multiple` slot, `resolve` takes the first line as the path — on the
+   directive's line or, when that is empty, on the first indented one — and the lines after
+   it as the slide's body continuing. The path is reported at its own line, so a missing
+   second picture is `E_ASSET_NOT_FOUND` there; the text under a refused picture still
+   belongs to the slide.
+3. **The order reaches the template inside `slots`, with no protocol change.** The repeatable
+   slot's value gains `blocks`: the slide's body in order, `{ kind: 'text', text, range }` and
+   `{ kind: 'slot', slot }` interleaved. `slots.lamina.value` stays the opening text and
+   `slots.imagem` the first picture, so a template that reads one picture reads what it read
+   before. `blocks` is present only when the manifest declares a `multiple` slot; `slots`
+   crosses to a plugin's process as a loose record (rule 7).
+4. **A brief written for the original rules is unchanged.** Without `multiple`, the lines under
+   an `::imagem` are part of its path as they were, and a brief with one picture after the
+   body compiles to the same scene with or without `multiple` (measured in
+   `images-among-lines.test.ts`).
+
+Not built: a `multiple` rich-text or enum slot, and reading `blocks` from an HTML template
+(`template.html`); both wait for a template that needs them.

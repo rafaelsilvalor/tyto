@@ -105,6 +105,14 @@ These are the rules it enforces beyond the shape:
   `per` slot neither repeats nor takes a `default`. Several may belong to one slide
   (`imagem` and `foto`). This replaces numbered slots (`imagem-1` … `imagem-4`) picked with
   an adjustment, which capped the carousel at the number declared.
+- **`multiple: true` places several pictures among a slide's lines** (ADR 0160, amended
+  2026-10-31): `imagem: { type: image, per: lamina, multiple: true }`. Each `::imagem` after
+  the same `::lamina` adds one; its first line is the path and the lines under it continue
+  the slide's body. The template reads `slots.lamina.blocks`, the slide's body in order —
+  `{ kind: 'text', text, range }` and `{ kind: 'slot', slot }` interleaved — while
+  `slots.lamina.value` stays the opening text and `slots.imagem` the first picture.
+  `blocks` is present only when the manifest declares a `multiple` slot. Only an `image`
+  slot that declares `per` may say `multiple`.
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's
   identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by
   any brief.

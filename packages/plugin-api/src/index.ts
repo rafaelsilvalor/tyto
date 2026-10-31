@@ -272,6 +272,7 @@ export {
   type GalleryPlacement,
   type GalleryState,
   type GalleryStatus,
+  DEFAULT_GALLERY_INDEX,
   GALLERY_INDEX_FILE,
   galleryStatus,
   parseGalleryIndex,

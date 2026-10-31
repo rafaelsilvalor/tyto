@@ -5,7 +5,7 @@ import { didYouMean } from '../diagnostics/suggest.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
 import { type Diagnostics, type Result, err, fromPartial } from '../result/result.js';
 import type { AssetRef } from '../scene/primitives.js';
-import type { SourceRange } from '../source/range.js';
+import { type SourceRange, sourceRange } from '../source/range.js';
 import type { TemplateConfigurations, TemplateSelection } from '../template/configurations.js';
 import { type BriefDefaults, measured } from '../template/configured-brief.js';
 import type { SuppliedValues } from '../template/declared-values.js';
@@ -52,7 +52,22 @@ export interface ResolvedSlot {
   readonly adjustments: readonly ResolvedAdjustment[];
   /** Where the brief set it. Absent when the value came from the manifest's `default`. */
   readonly range?: SourceRange;
+  /**
+   * The slide's body in the order it was written, text and pictures interleaved (ADR 0160,
+   * amended 2026-10-31). Only on the repeatable slot's value, and only when the manifest
+   * declares a `multiple` slot: everywhere else it is absent, so a template written before
+   * it reads what it always read.
+   */
+  readonly blocks?: readonly SlideBlock[];
 }
+
+/**
+ * One piece of a slide's body: a run of lines, or a value of a `multiple` slot written
+ * among them. `value` of the repeatable slot is the first run alone.
+ */
+export type SlideBlock =
+  | { readonly kind: 'text'; readonly text: RichText; readonly range: SourceRange }
+  | { readonly kind: 'slot'; readonly slot: ResolvedSlot };
 
 /** One occurrence of the repeatable slot; each becomes an `Artwork` in `compile`. */
 export interface ResolvedArtwork {
@@ -183,6 +198,27 @@ function unknownSlot(
   );
 }
 
+/** A run of lines as a block, or nothing when the run is empty. */
+function textBlocks(text: RichText): SlideBlock[] {
+  const first = text[0];
+  const last = text[text.length - 1];
+  if (first === undefined || last === undefined) return [];
+  return [{ kind: 'text', text, range: sourceRange(first.range.start, last.range.end) }];
+}
+
+/**
+ * A `multiple` slot's first line is its value and the rest is the slide's body. The parser
+ * joins the directive's lines with a `Break` and puts none before the first, so the first
+ * top-level break is where the path ends, whether it was written on the directive's line or
+ * on the first indented one.
+ */
+function firstLine(text: RichText): { readonly line: RichText; readonly rest: RichText } {
+  const at = text.findIndex((inline) => inline.kind === 'break');
+  return at === -1
+    ? { line: text, rest: [] }
+    : { line: text.slice(0, at), rest: text.slice(at + 1) };
+}
+
 function badValue(slot: string, problem: string, range: SourceRange | undefined): Diagnostic {
   return diagnostic('E_BAD_SLOT_VALUE', { slot, problem }, range === undefined ? {} : { range });
 }
@@ -259,11 +295,16 @@ class Resolver {
   private readonly artworks: OpenArtwork[] = [];
   private readonly assets = new Map<string, AssetRef>();
   private readonly missingRequired: string[] = [];
+  /** Each occurrence's body in order, by index; kept only when a slot is `multiple`. */
+  private readonly blocks = new Map<number, SlideBlock[]>();
+  private readonly placesAmongLines: boolean;
 
   constructor(
     private readonly manifest: TemplateManifest,
     private readonly options: ResolveOptions,
-  ) {}
+  ) {
+    this.placesAmongLines = Object.values(manifest.slots).some((slot) => slot.multiple === true);
+  }
 
   report(problem: Diagnostic): void {
     this.problems.push(problem);
@@ -308,6 +349,11 @@ class Resolver {
       return;
     }
 
+    if (slot.multiple === true && slot.per !== undefined) {
+      await this.takeAmongLines(candidate, slot, slot.per);
+      return;
+    }
+
     const adjustments = this.checkAdjustments(candidate, slot);
     const value = await this.valueOf(candidate, slot, fromFrontmatter);
     if (value === undefined) return;
@@ -320,12 +366,11 @@ class Resolver {
     };
 
     if (slot.repeat) {
-      this.artworks.push({
-        index: this.artworks.length,
-        slot: resolved,
-        slots: {},
-        missingRequiredSlots: [],
-      });
+      const index = this.artworks.length;
+      this.artworks.push({ index, slot: resolved, slots: {}, missingRequiredSlots: [] });
+      if (this.placesAmongLines && value.kind === 'rich-text') {
+        this.blocks.set(index, textBlocks(value.text));
+      }
       return;
     }
 
@@ -354,17 +399,8 @@ class Resolver {
    * not the line also has no slide to belong to, so one pass names both problems.
    */
   private takeForOccurrence(resolved: ResolvedSlot, owner: string): void {
-    const occurrence = this.artworks[this.artworks.length - 1];
-    if (occurrence === undefined) {
-      this.report(
-        badValue(
-          resolved.name,
-          `belongs to a '${owner}' and is written after one, and no '${owner}' comes before it`,
-          resolved.range,
-        ),
-      );
-      return;
-    }
+    const occurrence = this.ownerOf(resolved, owner);
+    if (occurrence === undefined) return;
     if (resolved.name in occurrence.slots) {
       this.report(
         badValue(
@@ -376,6 +412,56 @@ class Resolver {
       return;
     }
     occurrence.slots[resolved.name] = resolved;
+  }
+
+  private ownerOf(resolved: ResolvedSlot, owner: string): OpenArtwork | undefined {
+    const occurrence = this.artworks[this.artworks.length - 1];
+    if (occurrence === undefined) {
+      this.report(
+        badValue(
+          resolved.name,
+          `belongs to a '${owner}' and is written after one, and no '${owner}' comes before it`,
+          resolved.range,
+        ),
+      );
+    }
+    return occurrence;
+  }
+
+  /**
+   * A `multiple` slot's value, placed among its slide's lines (ADR 0160, amended 2026-10-31).
+   *
+   * Its first line is the value and is reported at that line; the lines under it continue the
+   * slide's body, and stay the slide's even when the picture is refused, because the text was
+   * written for the slide and not for the picture. The first one also fills the slot under its
+   * name, so `required` and a template that reads one picture see what they saw before.
+   */
+  private async takeAmongLines(candidate: Candidate, slot: Slot, owner: string): Promise<void> {
+    const { line, rest } = firstLine(candidate.text);
+    const lastOfLine = line[line.length - 1];
+    const head: Candidate = {
+      ...candidate,
+      text: line,
+      range: sourceRange(candidate.range.start, lastOfLine?.range.end ?? candidate.range.end),
+    };
+    const adjustments = this.checkAdjustments(head, slot);
+    const value = await this.valueOf(head, slot, false);
+
+    const resolved: ResolvedSlot | undefined =
+      value === undefined ? undefined : { name: head.name, value, adjustments, range: head.range };
+    const occurrence =
+      resolved === undefined
+        ? this.artworks[this.artworks.length - 1]
+        : this.ownerOf(resolved, owner);
+    if (occurrence === undefined) return;
+
+    const blocks = this.blocks.get(occurrence.index) ?? [];
+    if (resolved !== undefined) {
+      if (!(resolved.name in occurrence.slots)) occurrence.slots[resolved.name] = resolved;
+      blocks.push({ kind: 'slot', slot: resolved });
+    }
+    blocks.push(...textBlocks(rest));
+    this.blocks.set(occurrence.index, blocks);
   }
 
   private checkAdjustments(candidate: Candidate, slot: Slot): readonly ResolvedAdjustment[] {
@@ -677,7 +763,10 @@ class Resolver {
       template: this.manifest.name,
       formats,
       slots: Object.fromEntries(this.slots),
-      artworks: this.artworks,
+      artworks: this.artworks.map((artwork) => {
+        const blocks = this.blocks.get(artwork.index);
+        return blocks === undefined ? artwork : { ...artwork, slot: { ...artwork.slot, blocks } };
+      }),
       assets: [...this.assets.values()],
       missingRequiredSlots: this.missingRequired,
     };

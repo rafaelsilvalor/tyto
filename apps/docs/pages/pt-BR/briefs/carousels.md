@@ -20,6 +20,12 @@ Alguns templates deixam cada slide trazer a própria imagem. A galeria mostra es
 
 Cada `::imagem` vai com o `::lamina` escrito antes dele, então não há limite de quantos slides têm imagem. O arquivo é procurado do mesmo jeito que qualquer outra imagem do brief, e um arquivo que não existe fica sublinhado na própria linha. Um `::imagem` antes do primeiro `::lamina`, ou dois para o mesmo slide, também fica sublinhado.
 
+### Várias imagens entre as linhas de um slide
+
+Quando o slot aparece como "per lamina · multiple", um slide pode ter quantas imagens você escrever, e cada uma entra onde você a escreve no meio das linhas do slide. O caminho fica na linha do `::imagem`, e as linhas recuadas abaixo dele continuam o texto do slide.
+
+Escreva `::lamina` com o primeiro parágrafo recuado abaixo dele, depois `::imagem ./grafico.png` com o segundo parágrafo recuado abaixo, depois `::imagem ./foto.png`. Esse slide fica assim: o primeiro parágrafo, o gráfico, o segundo parágrafo, a foto. O próximo `::lamina` começa o slide seguinte. Uma imagem cujo arquivo não existe fica sublinhada na própria linha, e o texto abaixo dela continua pertencendo ao slide.
+
 ## Quantos slides
 
 Um template pode definir um número mínimo e um máximo de slides. A galeria mostra os dois no slot que repete, como "no mínimo" e "no máximo". Um brief sem nenhum `::lamina` gera uma arte com os outros slots — é assim que o `notice` funciona, e outros templates podem exigir pelo menos um.

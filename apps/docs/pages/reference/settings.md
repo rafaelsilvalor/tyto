@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 30. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 31. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -433,6 +433,14 @@ The IANA time zone a recipe reads written times in, such as "America/Sao_Paulo",
 | Type | Default |
 | --- | --- |
 | `string \| null` | `null` |
+
+## galleryIndex
+
+The repository holding the gallery's index.yaml, as git reads it; the default is the index the project curates.
+
+| Type | Default |
+| --- | --- |
+| `string` | `"https://github.com/rafaelsilvalor/tyto-gallery.git"` |
 
 ## terminalShell
 
