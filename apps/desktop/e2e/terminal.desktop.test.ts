@@ -298,7 +298,7 @@ describe('a terminal in the window', () => {
               return '';
             }
           });
-          const held = links.filter((link) => stdio.has(link) && link.startsWith('pipe:'));
+          const held = links.filter((link) => stdio.has(link) && link !== '/dev/null');
           if (held.length === 0) continue;
           const command = readFileSync(`/proc/${entry}/cmdline`, 'utf8')
             .replaceAll('\0', ' ')
