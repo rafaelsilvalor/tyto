@@ -2,7 +2,7 @@
 
 # Commands
 
-Everything the window can be told to do, by title as the command bar shows it: 83. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
+Everything the window can be told to do, by title as the command bar shows it: 84. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
 
 The window adds more while it runs, which this list cannot show: a toggle for each panel, including a plugin's, an entry for each recently opened file, and one for each export preset of the open folder, `export.preset:<name>`.
 
@@ -91,3 +91,4 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Tab: 7 | `document.select:7` | `Ctrl+7` | `⌘7` |
 | Tab: 8 | `document.select:8` | `Ctrl+8` | `⌘8` |
 | Tab: 9 | `document.select:9` | `Ctrl+9` | `⌘9` |
+| Show or hide: Commands | `layout.togglePanel:commands` | `` Ctrl+` `` | `` Ctrl` `` |

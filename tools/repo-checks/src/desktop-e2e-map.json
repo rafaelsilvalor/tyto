@@ -676,11 +676,12 @@
         "apps/desktop/src/renderer/command-history.ts",
         "apps/desktop/src/renderer/command-links.ts",
         "apps/desktop/src/renderer/command-output.ts",
+        "apps/desktop/src/renderer/command-panel.ts",
         "apps/desktop/src/renderer/command-sessions.ts",
         "apps/desktop/src/renderer/command-words.ts"
       ],
-      "e2e": [],
-      "why": "reviewed: the command panel's pure parts (TYTO-496); no window imports them until the panel lands, and unit tests cover them"
+      "e2e": ["command-panel.desktop.test.ts"],
+      "why": "reviewed: the command panel, its key, a typed line run in main, and a printed place opening its file (TYTO-496, ADR 0159)"
     },
     {
       "paths": ["apps/desktop/src/main/seed-files.ts"],

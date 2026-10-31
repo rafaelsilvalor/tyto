@@ -535,6 +535,10 @@ describe('switching the language', () => {
     // screen at load; `explorer-panel.test.ts` holds them.
     'panel.explorer',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('explorer.')),
+    // TYTO-496: the command panel is closed until Ctrl+` opens it, and it renders its own words;
+    // `command-panel.test.ts` holds them.
+    'panel.commands',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('commandPanel.')),
     'command.bar.placeholder',
     'command.bar.empty',
     'command.undo',

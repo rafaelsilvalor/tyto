@@ -2,7 +2,7 @@
 
 # Atalhos de teclado
 
-As teclas que o app liga antes de você mudar qualquer coisa: 37. Cada uma roda um comando, e só funciona onde o contexto dela vale. Mude-as no `keybindings.json`, que **Preferências: Abrir atalhos de teclado (JSON)** abre; um plugin pode acrescentar as dele.
+As teclas que o app liga antes de você mudar qualquer coisa: 38. Cada uma roda um comando, e só funciona onde o contexto dela vale. Mude-as no `keybindings.json`, que **Preferências: Abrir atalhos de teclado (JSON)** abre; um plugin pode acrescentar as dele.
 
 ::: info Contextos em inglês
 A explicação de cada contexto está em inglês: o código guarda essas frases em um só idioma, e esta página as mostra como estão.
@@ -27,6 +27,7 @@ Uma tecla sem contexto funciona onde quer que esteja o foco.
 | --- | --- | --- | --- |
 | `Ctrl+k` | `⌘k` | Abrir a barra de comandos | `commandBar.toggle` |
 | `Ctrl+Shift+v` | `⌘⇧v` | Abrir a prévia ao lado | `preview.openToSide` |
+| `` Ctrl+` `` (a tecla à esquerda do 1) | `` Ctrl` `` (a tecla à esquerda do 1) | Mostrar ou esconder: Comandos | `layout.togglePanel:commands` |
 | `Ctrl+=` | `⌘=` | Aumentar zoom | `window.zoomIn` |
 | `Ctrl+-` | `⌘-` | Diminuir zoom | `window.zoomOut` |
 | `Ctrl+0` | `⌘0` | Redefinir zoom | `window.zoomReset` |

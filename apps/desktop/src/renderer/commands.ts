@@ -5,6 +5,7 @@ import {
   type KeybindingEntry,
   type KeybindingLayer,
   type KeybindingTable,
+  type KeyStroke,
   COMMAND_BAR_KEY,
   COMMAND_BAR_TOGGLE,
   EDITOR_FIND,
@@ -21,6 +22,7 @@ import {
   bindingsOf,
   createCommandRegistry,
   defaultKeymapSet,
+  keyOfStroke,
   keybindingsOf,
   keymapSetFor as keymapSetOfTable,
   vimKeymapSet,
@@ -29,7 +31,7 @@ import {
 import type { IpcResponse } from '../../shared/ipc.js';
 
 import { type CatalogueKey } from '../../shared/i18n/index.js';
-import { type HideableDock } from '../../shared/layout.js';
+import { type HideableDock, COMMANDS_PANEL } from '../../shared/layout.js';
 
 /**
  * What the window can be told to do, as ids (E9.12).
@@ -863,6 +865,10 @@ export const builtInKeybindings: readonly Keybinding[] = [
   // context reaches. Free in CodeMirror's keymaps and in this table; Chromium's "paste as plain
   // text" on the same key is what VS Code gives up for it too.
   { key: 'Mod-Shift-v', command: PREVIEW_OPEN_TO_SIDE, source: 'built-in' },
+  // TYTO-496. The command panel, on VS Code's terminal key: Ctrl and not Mod, on macOS too, as
+  // VS Code binds it. Global, so it closes the panel from inside it and opens it from anywhere.
+  // Free in this table, in CodeMirror's keymaps and in vim's engine.
+  { key: 'Ctrl-`', command: togglePanelCommandId(COMMANDS_PANEL), source: 'built-in' },
   // TYTO-272 (ADR 0099). The keys every browser and VS Code zoom with, global like the two
   // above so they answer in vim, in a preview and in the settings tab alike. Electron's roles
   // held them before, from the browser process; the window's table holds them now. Free in
@@ -880,6 +886,21 @@ export const builtInKeybindings: readonly Keybinding[] = [
 ];
 
 export const builtInTable: KeybindingTable = { bindings: builtInKeybindings };
+
+/**
+ * A keydown as the window's key table reads it: `keyOfStroke`, except that **the physical key
+ * left of 1 is always `` ` ``**, whatever the layout prints on it (TYTO-496). The command panel's
+ * Ctrl+` is VS Code's terminal key, and VS Code matches it by position too. On a Brazilian ABNT2
+ * keyboard that key prints `'`, and the backquote is a dead key elsewhere on the keyboard, so
+ * reading `key` would leave the shortcut unreachable on the keyboard its maintainer types on.
+ * A dead key itself (`Dead`, on another `code`) stays what it is and runs nothing.
+ */
+export function windowStrokeOf(event: KeyStroke & { readonly code: string }): string {
+  if (event.code !== 'Backquote') return keyOfStroke(event);
+  // The modifiers one by one: a `KeyboardEvent`'s fields are getters, which a spread drops.
+  const { ctrlKey, metaKey, altKey, shiftKey } = event;
+  return keyOfStroke({ key: '`', ctrlKey, metaKey, altKey, shiftKey });
+}
 
 /**
  * The set that is interpreting the keys right now, which vim mode changes.

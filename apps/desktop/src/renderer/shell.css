@@ -1521,6 +1521,329 @@ button.problems__row:focus-visible {
 }
 
 /*
+ * The command panel (TYTO-496, ADR 0159): tabs of sessions, the output, an optional find bar
+ * and the input line, top to bottom, inside the tool's own strip. The output takes what is
+ * left and scrolls; everything else keeps its height.
+ */
+.command-panel {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.command-panel__sessions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--tyto-space-1);
+  overflow-x: auto;
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding: var(--tyto-space-1) var(--tyto-space-4);
+}
+
+.command-session {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: var(--tyto-tab-label-max);
+  align-items: center;
+  border-radius: var(--tyto-radius-sm);
+}
+
+.command-session[data-active] {
+  background: var(--tyto-surface-raised);
+}
+
+.command-session__tab {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--tyto-space-2);
+  border: 0;
+  padding: var(--tyto-space-1) var(--tyto-space-3);
+  background: none;
+  color: var(--tyto-text-muted);
+  font: inherit;
+  font-size: var(--tyto-text-xs);
+  cursor: pointer;
+}
+
+.command-session[data-active] .command-session__tab {
+  color: var(--tyto-text);
+}
+
+.command-session__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--tyto-font-mono);
+}
+
+.command-session__status {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--tyto-weight-strong);
+}
+
+.command-session__status[data-state='ok'] {
+  color: var(--tyto-success);
+}
+
+.command-session__status[data-state='failed'] {
+  color: var(--tyto-error);
+}
+
+.command-session__status[data-state='running'],
+.command-session__status[data-state='waiting'] {
+  color: var(--tyto-accent);
+}
+
+.command-session__close {
+  border: 0;
+  padding: 0 var(--tyto-space-2);
+  background: none;
+  color: var(--tyto-text-muted);
+  font: inherit;
+  cursor: pointer;
+  visibility: hidden;
+}
+
+.command-session:hover .command-session__close,
+.command-session[data-active] .command-session__close {
+  visibility: visible;
+}
+
+.command-session__tab:hover,
+.command-session__close:hover {
+  color: var(--tyto-text);
+}
+
+.command-panel__find {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--tyto-space-3);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding: var(--tyto-space-1) var(--tyto-space-4);
+}
+
+.command-panel__find-input,
+.command-panel__input {
+  min-width: 0;
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  padding: var(--tyto-space-1) var(--tyto-space-3);
+  background: var(--tyto-surface-sunken);
+  color: var(--tyto-text);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-sm);
+}
+
+.command-panel__find-input {
+  flex: 0 1 auto;
+}
+
+.command-panel__find-count {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
+  white-space: nowrap;
+}
+
+.command-panel__output {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--tyto-space-3) var(--tyto-space-5);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-sm);
+  user-select: text;
+}
+
+.command-panel__line {
+  min-height: calc(var(--tyto-text-sm) * var(--tyto-line-height));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.command-panel__line[data-stream='err'] {
+  color: var(--tyto-error);
+}
+
+.command-panel__line[data-stream='note'] {
+  color: var(--tyto-text-muted);
+}
+
+.command-panel__empty,
+.command-panel__dropped {
+  margin: 0;
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-ui);
+}
+
+.command-panel__link {
+  color: var(--tyto-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.command-panel__match {
+  background: var(--tyto-selection);
+}
+
+.command-panel__match--current {
+  outline: var(--tyto-hairline-width) solid var(--tyto-accent);
+}
+
+.command-panel__prompt-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--tyto-space-3);
+  border-top: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+}
+
+.command-panel__prompt {
+  color: var(--tyto-accent);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-sm);
+}
+
+.command-panel__input {
+  flex: 1 1 auto;
+}
+
+.command-panel__input:focus-visible,
+.command-panel__find-input:focus-visible {
+  outline: var(--tyto-focus-width) solid var(--tyto-focus-ring);
+  outline-offset: calc(var(--tyto-focus-width) * -1);
+}
+
+.command-panel__search-match {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-sm);
+}
+
+/*
+ * A command's colours (`ansi.ts`): the sixteen named ones follow the theme's own tokens, so a
+ * theme that changes its red changes the panel's. Black and white are the theme's text and
+ * surface, which keeps them readable in both schemes. Inverse comes before the colours so a
+ * named colour wins over it.
+ */
+.ansi-inverse {
+  background: var(--tyto-text);
+  color: var(--tyto-surface);
+}
+
+.ansi-fg-0,
+.ansi-fg-8 {
+  color: var(--tyto-text-muted);
+}
+
+.ansi-fg-1,
+.ansi-fg-9 {
+  color: var(--tyto-error);
+}
+
+.ansi-fg-2,
+.ansi-fg-10 {
+  color: var(--tyto-success);
+}
+
+.ansi-fg-3,
+.ansi-fg-11 {
+  color: var(--tyto-warning);
+}
+
+.ansi-fg-4,
+.ansi-fg-12 {
+  color: var(--tyto-info);
+}
+
+.ansi-fg-5,
+.ansi-fg-13 {
+  color: var(--tyto-syntax-keyword);
+}
+
+.ansi-fg-6,
+.ansi-fg-14 {
+  color: var(--tyto-syntax-constant);
+}
+
+.ansi-fg-7,
+.ansi-fg-15 {
+  color: var(--tyto-text);
+}
+
+.ansi-bg-0,
+.ansi-bg-8 {
+  background: var(--tyto-surface-sunken);
+}
+
+.ansi-bg-1,
+.ansi-bg-9 {
+  background: var(--tyto-error);
+  color: var(--tyto-surface);
+}
+
+.ansi-bg-2,
+.ansi-bg-10 {
+  background: var(--tyto-success);
+  color: var(--tyto-surface);
+}
+
+.ansi-bg-3,
+.ansi-bg-11 {
+  background: var(--tyto-warning);
+  color: var(--tyto-surface);
+}
+
+.ansi-bg-4,
+.ansi-bg-12 {
+  background: var(--tyto-info);
+  color: var(--tyto-surface);
+}
+
+.ansi-bg-5,
+.ansi-bg-13 {
+  background: var(--tyto-syntax-keyword);
+  color: var(--tyto-surface);
+}
+
+.ansi-bg-6,
+.ansi-bg-14 {
+  background: var(--tyto-syntax-constant);
+  color: var(--tyto-surface);
+}
+
+.ansi-bg-7,
+.ansi-bg-15 {
+  background: var(--tyto-text);
+  color: var(--tyto-surface);
+}
+
+.ansi-bold {
+  font-weight: var(--tyto-weight-strong);
+}
+
+.ansi-dim {
+  opacity: 0.7;
+}
+
+.ansi-italic {
+  font-style: italic;
+}
+
+.ansi-underline {
+  text-decoration: underline;
+}
+
+/*
  * The command bar (E9.12).
  *
  * `display: contents` while closed and `block` when open, so the element takes up no room

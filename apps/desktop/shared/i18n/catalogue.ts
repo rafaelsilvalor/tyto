@@ -767,6 +767,39 @@ export interface Catalogue {
   readonly 'queue.openBrief': string;
   readonly 'queue.openOutput': string;
   readonly 'queue.unavailable': string;
+
+  /**
+   * TYTO-496 (ADR 0159). The command panel: its name in a list of panels and over the panel
+   * (one string, so renaming it is one edit per language), and its own words.
+   */
+  readonly 'panel.commands': string;
+  readonly 'commandPanel.sessions': string;
+  readonly 'commandPanel.session': string;
+  readonly 'commandPanel.session.new': string;
+  readonly 'commandPanel.session.close': string;
+  readonly 'commandPanel.stop': string;
+  readonly 'commandPanel.find': string;
+  readonly 'commandPanel.find.next': string;
+  readonly 'commandPanel.find.close': string;
+  readonly 'commandPanel.find.count': string;
+  readonly 'commandPanel.find.none': string;
+  readonly 'commandPanel.copy': string;
+  readonly 'commandPanel.clear': string;
+  readonly 'commandPanel.output': string;
+  readonly 'commandPanel.input': string;
+  readonly 'commandPanel.empty': string;
+  readonly 'commandPanel.dropped': string;
+  readonly 'commandPanel.busy': string;
+  readonly 'commandPanel.unclosedQuote': string;
+  readonly 'commandPanel.refused': string;
+  readonly 'commandPanel.link': string;
+  readonly 'commandPanel.history.search': string;
+  readonly 'commandPanel.history.none': string;
+  readonly 'commandPanel.state.idle': string;
+  readonly 'commandPanel.state.running': string;
+  readonly 'commandPanel.state.waiting': string;
+  readonly 'commandPanel.state.cancelled': string;
+  readonly 'commandPanel.state.finished': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -1187,4 +1220,32 @@ export const CATALOGUE_KEYS = [
   'queue.openBrief',
   'queue.openOutput',
   'queue.unavailable',
+  'panel.commands',
+  'commandPanel.sessions',
+  'commandPanel.session',
+  'commandPanel.session.new',
+  'commandPanel.session.close',
+  'commandPanel.stop',
+  'commandPanel.find',
+  'commandPanel.find.next',
+  'commandPanel.find.close',
+  'commandPanel.find.count',
+  'commandPanel.find.none',
+  'commandPanel.copy',
+  'commandPanel.clear',
+  'commandPanel.output',
+  'commandPanel.input',
+  'commandPanel.empty',
+  'commandPanel.dropped',
+  'commandPanel.busy',
+  'commandPanel.unclosedQuote',
+  'commandPanel.refused',
+  'commandPanel.link',
+  'commandPanel.history.search',
+  'commandPanel.history.none',
+  'commandPanel.state.idle',
+  'commandPanel.state.running',
+  'commandPanel.state.waiting',
+  'commandPanel.state.cancelled',
+  'commandPanel.state.finished',
 ] as const satisfies readonly CatalogueKey[];

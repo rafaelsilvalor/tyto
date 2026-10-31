@@ -25,6 +25,7 @@ const WORDS = {
     mac: 'macOS',
     command: 'Command',
     id: 'Id',
+    leftOfOne: 'the key left of 1',
   },
   'pt-BR': {
     title: 'Atalhos de teclado',
@@ -44,13 +45,22 @@ const WORDS = {
     mac: 'macOS',
     command: 'Comando',
     id: 'Id',
+    leftOfOne: 'a tecla à esquerda do 1',
   },
 } as const;
 
+/**
+ * The keys the window matches by position rather than by what they print (`windowStrokeOf` in
+ * `commands.ts`): the command panel's Ctrl+`, which on a Brazilian ABNT2 keyboard prints `'`.
+ */
+const BY_POSITION = new Set(['Ctrl-`']);
+
 function bindingRows(bindings: readonly Keybinding[], locale: Locale): string[][] {
+  const where = (binding: Keybinding): string =>
+    BY_POSITION.has(binding.key) ? ` (${WORDS[locale].leftOfOne})` : '';
   return bindings.map((binding) => [
-    code(keyLabel(binding, 'win32')),
-    code(keyLabel(binding, 'darwin')),
+    code(keyLabel(binding, 'win32')) + where(binding),
+    code(keyLabel(binding, 'darwin')) + where(binding),
     prose(commandTitle(binding.command, locale)),
     code(binding.command),
   ]);
