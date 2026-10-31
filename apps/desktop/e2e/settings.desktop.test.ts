@@ -199,10 +199,13 @@ describe('the settings tab', () => {
       await bridge['queue:set-auto-run']({ on: true });
     });
 
-    const buffer = (): Promise<string> =>
+    const bufferText = (): Promise<string> =>
       page.evaluate(() => document.querySelector('#editor .cm-content')?.textContent ?? '');
-    await waitFor(async () => (await buffer()).includes('"queueAutoRun": true'), 'the buffer edit');
-    expect(await buffer()).toContain('// typing, not saved');
+    await waitFor(
+      async () => (await bufferText()).includes('"queueAutoRun": true'),
+      'the buffer edit',
+    );
+    expect(await bufferText()).toContain('// typing, not saved');
     expect(readFileSync(join(userData, 'settings.json'), 'utf8')).toBe(onDisk);
   });
 

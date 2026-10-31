@@ -247,12 +247,12 @@ describe("banner-teste's backgrounds in the window and the CLI (TYTO-210)", () =
       timeout: 90_000,
     });
 
-    const shown = await shownDiagnostics();
+    const shownNow = await shownDiagnostics();
     // CI has no CircularXX, so there every house render says it drew the substitute
     // (W_FONT_SUBSTITUTED); that is the machine, not the template. Anything else is not.
-    expect(shown.map((item) => item.code).filter((code) => code !== 'W_FONT_SUBSTITUTED')).toEqual(
-      [],
-    );
+    expect(
+      shownNow.map((item) => item.code).filter((code) => code !== 'W_FONT_SUBSTITUTED'),
+    ).toEqual([]);
 
     const fromCli = join(scratch, 'from-cli');
     execFileSync(process.execPath, [cli, 'render', briefPath, '--out', fromCli, '--types', 'svg'], {

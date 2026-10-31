@@ -1284,21 +1284,21 @@ const wiredQueuePanels = new WeakSet<QueuePanel>();
  * current without the window polling behind it.
  */
 function wireQueuePanel(): void {
-  const panel = elements.queuePanel;
-  if (panel === null || wiredQueuePanels.has(panel)) return;
-  wiredQueuePanels.add(panel);
+  const queueElement = elements.queuePanel;
+  if (queueElement === null || wiredQueuePanels.has(queueElement)) return;
+  wiredQueuePanels.add(queueElement);
 
-  const answer = (ask: (bridge: TytoBridge) => Promise<QueuePanel['view']>): void => {
+  const answer = (fetchView: (bridge: TytoBridge) => Promise<QueuePanel['view']>): void => {
     void withBridge(async (bridge) => {
       try {
-        panel.view = await ask(bridge);
+        queueElement.view = await fetchView(bridge);
       } catch {
-        panel.view = 'failed';
+        queueElement.view = 'failed';
       }
     });
   };
 
-  panel.actions = {
+  queueElement.actions = {
     chooseFolder: () => {
       answer((bridge) => bridge['queue:set-folder']({ choose: true }));
     },
@@ -1339,22 +1339,22 @@ function wireQueuePanel(): void {
 /** What a queue folder can be asked to produce, the export dialog's list (ADR 0044). */
 async function refreshQueueKinds(): Promise<void> {
   await withBridge(async (bridge) => {
-    const panel = elements.queuePanel;
-    if (panel === null) return;
+    const queueElement = elements.queuePanel;
+    if (queueElement === null) return;
     const answer = await bridge['export:kinds']({});
-    panel.available = [...new Set(answer.kinds.map((item) => item.kind))];
+    queueElement.available = [...new Set(answer.kinds.map((item) => item.kind))];
   });
 }
 
 /** Asks main for the queue and hands it to the panel, if the panel is open. */
 async function refreshQueue(): Promise<void> {
   await withBridge(async (bridge) => {
-    const panel = elements.queuePanel;
-    if (panel === null) return;
+    const queueElement = elements.queuePanel;
+    if (queueElement === null) return;
     try {
-      panel.view = await bridge['queue:list']({});
+      queueElement.view = await bridge['queue:list']({});
     } catch {
-      panel.view = 'failed';
+      queueElement.view = 'failed';
     }
   });
 }
@@ -2212,14 +2212,14 @@ function enter(groupId: string, tabId: string, documentId: string): void {
       pane_.restore(target.state, target.scroll);
       return;
     }
-    const state = withSelection(target.state, place);
+    const selected = withSelection(target.state, place);
     const scroll = { top: place.top };
     workspace = updateDocument(workspace, documentId, (document_) => ({
       ...document_,
-      state,
+      state: selected,
       scroll,
     }));
-    pane_.restore(state, scroll);
+    pane_.restore(selected, scroll);
     return;
   }
   const follower = editor.followerOf(primary);
@@ -2922,10 +2922,13 @@ let themeShown: IpcResponse<'theme:current'> | undefined;
  * themes raised, which replace the previous answer's rows in the problems panel. The picker
  * asks on every move, so an older answer arriving after a newer one is not applied.
  */
-function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:current'>>): void {
+function showTheme(
+  bridge: TytoBridge,
+  askTheme: () => Promise<IpcResponse<'theme:current'>>,
+): void {
   themeTurn += 1;
   const turn = themeTurn;
-  void ask().then(
+  void askTheme().then(
     (applied) => {
       if (turn !== themeTurn) return;
       themeShown = applied;
@@ -3450,12 +3453,12 @@ async function openRecentFolder(id: string): Promise<void> {
 
 /** What both doors share: main's answer painted, the tabs relabelled, the explorer opened. */
 async function changeWorkspaceFolder(
-  ask: (bridge: TytoBridge) => Promise<IpcResponse<'workspace:set-folder'>>,
+  askFolder: (bridge: TytoBridge) => Promise<IpcResponse<'workspace:set-folder'>>,
   choose: boolean,
 ): Promise<void> {
   await withBridge(async (bridge) => {
     const before = workspaceShown?.folder ?? null;
-    const answer = await ask(bridge);
+    const answer = await askFolder(bridge);
     // A label inside the open folder is relative to it (TYTO-274, ADR 0125): main labels every
     // open tab again, and they take it as they take a rename.
     workspace = withMovedDocuments(workspace, answer.relabelled);
@@ -3505,12 +3508,12 @@ let explorerFolder: string | null | undefined;
 function showExplorerFolder(answer: IpcResponse<'workspace:folder'> | undefined): void {
   // Another folder makes every image id of the last one name nothing: main answers `gone`.
   refreshImages();
-  const panel = elements.explorerPanel;
-  if (panel === null || answer === undefined) return;
-  panel.folderName = answer.folder === null ? null : answer.name;
+  const explorer = elements.explorerPanel;
+  if (explorer === null || answer === undefined) return;
+  explorer.folderName = answer.folder === null ? null : answer.name;
   if (explorerFolder === answer.folder) return;
   explorerFolder = answer.folder;
-  panel.reset();
+  explorer.reset();
 }
 
 /** The explorers `wireExplorerPanel` has wired, by element, for `wiredQueuePanels`'s reason. */
@@ -4265,7 +4268,7 @@ type StoredGroupItem =
     : never;
 
 async function restoreGroups(
-  layout: NonNullable<IpcResponse<'session:read'>['groups']>,
+  storedLayout: NonNullable<IpcResponse<'session:read'>['groups']>,
   builtAt: ReadonlyMap<number, string>,
   staleAt: ReadonlyMap<number, string>,
 ): Promise<void> {
@@ -4274,20 +4277,20 @@ async function restoreGroups(
   const withDrafts = (node: SessionGroupNode<StoredGroupItem>): SessionGroupNode<Item> => {
     if ('split' in node) return { ...node, children: node.children.map(withDrafts) };
     const tabs: Item[] = [];
-    let active = 0;
+    let activeIndex = 0;
     node.tabs.forEach((tab, index) => {
-      if (index === node.active) active = tabs.length;
+      if (index === node.active) activeIndex = tabs.length;
       tabs.push({ stored: tab, stale: false });
       if (!('view' in tab) && staleAt.has(tab.tab) && !besideOnce.has(tab.tab)) {
         besideOnce.add(tab.tab);
         tabs.push({ stored: tab, stale: true });
       }
     });
-    return { tabs, active };
+    return { tabs, active: activeIndex };
   };
   const rebuilt = groupsFromLayout(
     groups,
-    { root: withDrafts(layout.root), focused: layout.focused },
+    { root: withDrafts(storedLayout.root), focused: storedLayout.focused },
     ({ stored, stale }) => {
       if (!('view' in stored)) return (stale ? staleAt : builtAt).get(stored.tab);
       // A following preview is pointed at the brief in front once the groups are built; a
@@ -4388,30 +4391,30 @@ async function requestCloseTab(tabId: string): Promise<void> {
  * the card makes about adding a panel being one entry and an element.
  */
 function registerPanelCommands(): void {
-  for (const panel of layout.panels) {
+  for (const entry of layout.panels) {
     // A fixed panel gets no command for the same reason it gets no close button: there is
     // nothing it could do (`shared/layout.ts`).
-    if (panel.fixed) continue;
+    if (entry.fixed) continue;
     registry.register({
-      id: togglePanelCommandId(panel.id),
-      label: panel.id,
+      id: togglePanelCommandId(entry.id),
+      label: entry.id,
       run: () => {
-        const current = panelOf(layout, panel.id);
+        const current = panelOf(layout, entry.id);
         if (current === undefined) return;
         // In the tabbed bottom area a toggle works as VS Code's: the tab on screen hides the
         // area, and any other state brings the tab to the front (ADR 0163).
         const next = isTabbed(current.dock)
-          ? panelShown(panel.id)
+          ? panelShown(entry.id)
             ? withDockToggled(layout, 'bottom')
-            : withPanelOpen(layout, panel.id, true)
-          : withPanelOpen(layout, panel.id, !current.open);
+            : withPanelOpen(layout, entry.id, true)
+          : withPanelOpen(layout, entry.id, !current.open);
         void changeLayout(next).then(() => {
           // Opening the command panel is wanting to type in it (TYTO-496).
-          if (panel.id === COMMANDS_PANEL && panelShown(panel.id)) {
+          if (entry.id === COMMANDS_PANEL && panelShown(entry.id)) {
             elements.commandPanel?.focusInput();
           }
           // And the terminal's is wanting a shell: the one in front, or a first one (TYTO-497).
-          if (panel.id === TERMINAL_PANEL && panelShown(panel.id)) focusTerminal();
+          if (entry.id === TERMINAL_PANEL && panelShown(entry.id)) focusTerminal();
         });
       },
     });
@@ -4438,15 +4441,15 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
   // search before answering (`index.ts`), so this is also the moment the picker can list them.
   const { panels } = await bridge['plugins:panels']({});
   void afterTemplatesReread(bridge);
-  for (const panel of panels) {
-    offeredPanels.set(panel.id, panel);
+  for (const offered of panels) {
+    offeredPanels.set(offered.id, offered);
     registry.register({
-      id: togglePanelCommandId(panel.id),
-      label: panel.title,
+      id: togglePanelCommandId(offered.id),
+      label: offered.title,
       run: () => {
-        const current = panelOf(layout, panel.id);
+        const current = panelOf(layout, offered.id);
         if (current === undefined) return;
-        void changeLayout(withPanelOpen(layout, panel.id, !current.open));
+        void changeLayout(withPanelOpen(layout, offered.id, !current.open));
       },
     });
   }
@@ -4828,8 +4831,8 @@ async function applyLayout(persist: boolean): Promise<void> {
   await arrange(document, layout, dockHost());
 
   // A plugin panel's element exists once the dock has made it; what it shows is ours to say.
-  for (const panel of document.querySelectorAll(PLUGIN_PANEL_ELEMENT)) {
-    if (panel instanceof PluginPanel) panel.offered = offeredPanels.get(panel.panelId);
+  for (const element of document.querySelectorAll(PLUGIN_PANEL_ELEMENT)) {
+    if (element instanceof PluginPanel) element.offered = offeredPanels.get(element.panelId);
   }
 
   // The editor groups before the lookup: the first group's pane is `#editor` (TYTO-286).
@@ -5594,14 +5597,14 @@ function windowContextHolds(when: KeybindingContext | undefined): boolean {
   // the shell's, except the table's global and `terminal` entries.
   const inTerminal = document.activeElement?.closest('.terminal-panel__screens') != null;
   if (when === 'terminal') return !barOpen && inTerminal;
-  const panel = document.activeElement?.closest('[data-panel]');
+  const panelElement = document.activeElement?.closest('[data-panel]');
   return (
     when === 'panel' &&
     !barOpen &&
     !inTerminal &&
-    panel !== null &&
-    panel !== undefined &&
-    panel.getAttribute('data-panel') !== EDITOR_PANEL
+    panelElement !== null &&
+    panelElement !== undefined &&
+    panelElement.getAttribute('data-panel') !== EDITOR_PANEL
   );
 }
 
@@ -5884,8 +5887,8 @@ async function loadTemplateMode(): Promise<TemplateMode | undefined> {
 function wireTemplateMode(mode: TemplateMode, bridge: TytoBridge): void {
   mode.ports = {
     open: async (directory) => (await bridge['template:open']({ directory })).template,
-    preview: (request) => bridge['template:preview'](request),
-    save: (request) => bridge['template:save'](request),
+    preview: (payload) => bridge['template:preview'](payload),
+    save: (payload) => bridge['template:save'](payload),
     create: (name) => bridge['template:new']({ name }),
     confirmDiscard: async () =>
       (

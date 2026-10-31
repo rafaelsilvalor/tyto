@@ -217,8 +217,8 @@ describe('a terminal in the window', () => {
     // and answers its cancel button; the close gets 20 s, and a box is then the failure, with its
     // text, instead of a hang.
     const asked = join(scratch, 'boxes.txt');
-    await app.evaluate((_electron, file) => {
-      const { dialog } = _electron;
+    await app.evaluate((electronModule, file) => {
+      const { dialog } = electronModule;
       const fs = process.getBuiltinModule('node:fs');
       dialog.showMessageBoxSync = ((...args: unknown[]) => {
         const options = args.at(-1) as { message?: string; detail?: string; cancelId?: number };

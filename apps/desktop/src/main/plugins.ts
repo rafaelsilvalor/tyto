@@ -100,8 +100,8 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
   const templatePack: Plugin = {
     id: manifest.name,
     manifest,
-    activate: (host) =>
-      host.registerTemplatePack({
+    activate: (pluginHost) =>
+      pluginHost.registerTemplatePack({
         id: manifest.name,
         templates: pack.ok ? pack.value.list() : [],
         directory,
@@ -124,8 +124,8 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
   const chromium: Plugin = {
     id: chromiumManifest.name,
     manifest: chromiumManifest,
-    activate: (host) =>
-      host.registerRasterizer<Rasterizer>({ id: chromiumManifest.name, value: rasterizer }),
+    activate: (pluginHost) =>
+      pluginHost.registerRasterizer<Rasterizer>({ id: chromiumManifest.name, value: rasterizer }),
   };
 
   host.activate(chromium);
@@ -137,15 +137,15 @@ export async function activateBuiltIns(options: BuiltInsOptions): Promise<InProc
   host.activate({
     id: desktopManifest.name,
     manifest: desktopManifest,
-    activate: (host) => {
+    activate: (pluginHost) => {
       for (const setting of settingContributions(options.themes)) {
-        host.registerConfiguration(setting);
+        pluginHost.registerConfiguration(setting);
       }
-      host.registerTheme(BUILT_IN_THEMES.light);
-      host.registerTheme(BUILT_IN_THEMES.dark);
+      pluginHost.registerTheme(BUILT_IN_THEMES.light);
+      pluginHost.registerTheme(BUILT_IN_THEMES.dark);
       // And its vim plugins, through the `editor.vim` point an installed plugin's would use
       // (TYTO-418, ADR 0143); the `vimPlugins` setting switches them in the window.
-      for (const { contribution } of BUILT_IN_VIM_PLUGINS) host.registerVim(contribution);
+      for (const { contribution } of BUILT_IN_VIM_PLUGINS) pluginHost.registerVim(contribution);
     },
   });
 

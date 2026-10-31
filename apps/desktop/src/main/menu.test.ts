@@ -41,7 +41,7 @@ const fileSubmenu = (
  */
 
 /** Every role the template asks for, at any depth. */
-function roles(template: readonly MenuItemConstructorOptions[]): string[] {
+function roles(entries: readonly MenuItemConstructorOptions[]): string[] {
   const found: string[] = [];
   const walk = (items: readonly MenuItemConstructorOptions[]): void => {
     for (const item of items) {
@@ -49,15 +49,15 @@ function roles(template: readonly MenuItemConstructorOptions[]): string[] {
       if (Array.isArray(item.submenu)) walk(item.submenu);
     }
   };
-  walk(template);
+  walk(entries);
   return found;
 }
 
 const submenuOf = (
-  template: readonly MenuItemConstructorOptions[],
+  entries: readonly MenuItemConstructorOptions[],
   role: string,
 ): readonly MenuItemConstructorOptions[] | undefined => {
-  const found = template.find((item) => item.role === role);
+  const found = entries.find((item) => item.role === role);
   return Array.isArray(found?.submenu) ? found.submenu : undefined;
 };
 

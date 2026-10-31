@@ -217,9 +217,9 @@ describe('a brief opened from a delivery-shaped folder (ADR 0056)', () => {
       timeout: 60_000,
     });
 
-    const shown = await shownDiagnostics();
-    expect(shown.map((item) => item.code)).not.toContain('E_ASSET_NOT_FOUND');
-    expect(shown.filter((item) => item.severity === 'error')).toEqual([]);
+    const shownNow = await shownDiagnostics();
+    expect(shownNow.map((item) => item.code)).not.toContain('E_ASSET_NOT_FOUND');
+    expect(shownNow.filter((item) => item.severity === 'error')).toEqual([]);
     // The artwork alone, with the image drawn into it and not copied beside it (ADR 0157).
     const written = readdirSync(out);
     expect(written.every((name) => name.endsWith('.svg'))).toBe(true);
