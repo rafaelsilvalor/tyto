@@ -64,6 +64,9 @@ const slotOption = (name: string, manifest: TemplateManifest): Completion => {
     // Said in the list because nothing else on the line says it: `::imagem` belongs to the
     // `::lamina` written before it (ADR 0160).
     slot?.per === undefined ? undefined : `per ${slot.per}`,
+    // Several on one slide, each where it is written among the slide's lines (ADR 0160,
+    // amended 2026-10-31).
+    slot?.multiple === true ? 'multiple' : undefined,
   ].filter((note): note is string => note !== undefined);
   return { label: name, type: 'property', detail: notes.join(' · ') };
 };

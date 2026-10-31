@@ -158,6 +158,7 @@ export {
   type ResolvedArtwork,
   type ResolvedBrief,
   type ResolvedSlot,
+  type SlideBlock,
   type SlotValue,
   listedFormats,
   resolve,
