@@ -93,6 +93,8 @@ export const EDITOR_SAVE_AS = 'editor.saveAs';
 export const FILE_EXPORT = 'file.export';
 /** TYTO-47. Shows the plugins screen; installing one is the CLI's (`tyto plugin install`). */
 export const PLUGINS_SHOW = 'plugins.show';
+/** TYTO-504. Shows the gallery; installing and updating are main's, as `tyto gallery` does them. */
+export const GALLERY_SHOW = 'gallery.show';
 /** TYTO-45. Opens the local queue panel, or brings it forward when it is already open. */
 export const QUEUE_SHOW = 'queue.show';
 /** TYTO-206. Opens `settings.json` in a tab, or brings its tab forward. */
@@ -334,6 +336,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
   [FILE_EXPORT]: 'command.file.export',
   [PLUGINS_SHOW]: 'command.plugins.show',
+  [GALLERY_SHOW]: 'command.gallery.show',
   [QUEUE_SHOW]: 'command.queue.show',
   [SETTINGS_OPEN]: 'command.settings.open',
   [KEYBINDINGS_OPEN]: 'command.keybindings.open',
@@ -446,6 +449,8 @@ export interface DesktopActions {
   openExport(): void;
   /** TYTO-47. Shows the plugins screen; the list is a round trip to main. */
   showPlugins(): void;
+  /** TYTO-504. Shows the gallery; the list and each click are round trips to main. */
+  showGallery(): void;
   /**
    * TYTO-45. Opens the queue panel. Open and not toggle, unlike the panel's own
    * `layout.togglePanel:queue`: a menu item called "Show the local queue" that hid it the
@@ -600,6 +605,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(PLUGINS_SHOW, () => {
     actions.showPlugins();
+  });
+  add(GALLERY_SHOW, () => {
+    actions.showGallery();
   });
   add(QUEUE_SHOW, () => {
     actions.showQueue();
