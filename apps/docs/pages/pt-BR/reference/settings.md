@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 26. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 28. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -266,6 +266,29 @@ How the editor numbers its lines: 'on' (the default), 'relative' to the cursor's
 | `"on"` | Each line its own number. The default. |
 | `"relative"` | The cursor's line its own number, every other line its distance to the cursor: what a vim count like 5j moves. |
 | `"off"` | No line numbers. |
+
+## commandsOrder
+
+The order of the command panel's runs, and of their sections in Problems: 'newestLast' (the default) or 'newestFirst'.
+
+| Tipo | Padrão |
+| --- | --- |
+| `string` | `"newestLast"` |
+
+**Valores**
+
+| Valor | Significado |
+| --- | --- |
+| `"newestLast"` | Each run under the one before, the prompt last, as a terminal does. The default. |
+| `"newestFirst"` | The newest run first, under the prompt, which comes first. |
+
+## commandsFoldOlderRuns
+
+Fold every run of the command panel but the newest to its header line; a click opens one (default false).
+
+| Tipo | Padrão |
+| --- | --- |
+| `boolean` | `false` |
 
 ## zoom
 

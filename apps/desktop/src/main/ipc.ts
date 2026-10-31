@@ -26,6 +26,7 @@ import { type VimModeStyle } from '../../shared/vim-mode-style.js';
 import { type VimPlugins } from '../../shared/vim-plugins.js';
 import { type BriefColumnLook } from '../../shared/brief-columns.js';
 import { type LineNumbersLook } from '../../shared/line-numbers.js';
+import { type CommandsOrder } from '../../shared/command-runs.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type CliRunner } from './cli-runner.js';
 import { type Credentials } from './credentials.js';
@@ -78,6 +79,9 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   briefColumns(): BriefColumnLook;
   /** The `lineNumbers` setting in force (TYTO-415), on the same answer. */
   lineNumbers(): LineNumbersLook;
+  /** The command panel's two settings in force (TYTO-496), on the same answer. */
+  commandsOrder(): CommandsOrder;
+  commandsFoldOlderRuns(): boolean;
   /** The faces and sizes in force (TYTO-272), on the same answer. */
   typography(): Typography;
 }
@@ -102,6 +106,8 @@ function appliedForWindow(
     | 'formatBriefOnSave'
     | 'briefColumns'
     | 'lineNumbers'
+    | 'commandsOrder'
+    | 'commandsFoldOlderRuns'
     | 'typography'
   >,
 ): IpcResponse<'theme:current'> {
@@ -120,6 +126,8 @@ function appliedForWindow(
     formatBriefOnSave: themes.formatBriefOnSave(),
     briefColumns: themes.briefColumns(),
     lineNumbers: themes.lineNumbers(),
+    commandsOrder: themes.commandsOrder(),
+    commandsFoldOlderRuns: themes.commandsFoldOlderRuns(),
     typography: { ...themes.typography() },
     light: { id: light.id, colors: light.colors },
     dark: { id: dark.id, colors: dark.colors },

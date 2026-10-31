@@ -286,6 +286,8 @@ describe('the theme the window applies (TYTO-208)', () => {
     formatBriefOnSave: false,
     briefColumns: 'separator',
     lineNumbers: 'on',
+    commandsOrder: 'newestLast',
+    commandsFoldOlderRuns: false,
     typography: {
       uiFontFamily: 'Source Sans 3',
       uiFontSize: 14,

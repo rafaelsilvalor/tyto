@@ -538,6 +538,8 @@ describe('switching the language', () => {
     // TYTO-496: the command panel is closed until Ctrl+` opens it, and it renders its own words;
     // `command-panel.test.ts` holds them.
     'panel.commands',
+    // TYTO-496: a command's Problems section says how it ended, only once a command has run.
+    'problems.command.exit',
     // ADR 0163: the bottom area's × and its strip's name, an attribute each, written by the
     // panel in front (`panels.ts`); `dock.test.ts` holds them.
     'panel.hideArea',

@@ -801,6 +801,10 @@ export interface Catalogue {
   readonly 'commandPanel.state.waiting': string;
   readonly 'commandPanel.state.cancelled': string;
   readonly 'commandPanel.state.finished': string;
+  /** TYTO-496: a line refused before it ran, on its run's header. */
+  readonly 'commandPanel.state.refused': string;
+  /** TYTO-496: how a command's run ended, in its Problems section's header. */
+  readonly 'problems.command.exit': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -1249,4 +1253,6 @@ export const CATALOGUE_KEYS = [
   'commandPanel.state.waiting',
   'commandPanel.state.cancelled',
   'commandPanel.state.finished',
+  'commandPanel.state.refused',
+  'problems.command.exit',
 ] as const satisfies readonly CatalogueKey[];

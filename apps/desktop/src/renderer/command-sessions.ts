@@ -18,6 +18,23 @@ type CliDiagnostics = IpcEventPayload<'cli:diagnostics'>;
 
 export type SessionState = 'idle' | CliState['state'];
 
+/**
+ * One line run in a session (TYTO-496): its block in the scrollback, under a header that says
+ * the command, when it started and how it ended. A line refused before it ran — an open quote,
+ * a refusal from `cli:run` — is a run that never started, so every line of output has a block.
+ */
+export interface CommandRun {
+  /** Counted from 1 in its session. */
+  readonly number: number;
+  readonly line: string;
+  readonly words: readonly string[];
+  readonly runId?: string;
+  /** Milliseconds since the epoch, as `Date.now()` gave it. */
+  readonly startedAt: number;
+  readonly state: CliState['state'] | 'refused';
+  readonly code?: number;
+}
+
 export interface CommandSession {
   readonly id: string;
   /** Counted from 1 for the window's life, so a closed tab's number is not reused. */
@@ -35,6 +52,8 @@ export interface CommandSession {
   readonly scrollback: Scrollback;
   /** The rows the current run reported, which its output's places link to. */
   readonly diagnostics: readonly CommandProblemRow[];
+  /** Every line run here, oldest first; each is a block of the scrollback. */
+  readonly runs: readonly CommandRun[];
 }
 
 /** A run that is going: Stop applies, and the tab may not start another. */
@@ -115,6 +134,7 @@ export class CommandSessions {
       state: 'idle',
       scrollback: EMPTY_SCROLLBACK,
       diagnostics: [],
+      runs: [],
     };
     this.list = [...this.list, session];
     this.activeId = session.id;
@@ -149,16 +169,53 @@ export class CommandSessions {
     return closing.runId !== undefined && isBusy(closing) ? closing.runId : undefined;
   }
 
+  /** One of the panel's own lines, in the block of the run that is going (`busy`). */
   note(id: string, text: string): void {
-    this.update(id, (session) => ({ ...session, scrollback: withNote(session.scrollback, text) }));
+    this.update(id, (session) => ({
+      ...session,
+      scrollback: withNote(session.scrollback, text, session.runs.at(-1)?.number),
+    }));
   }
 
+  /** A line that never ran, with the reason, as a block of its own (TYTO-496). */
+  refused(id: string, line: string, reason: string, at: number = Date.now()): void {
+    this.update(id, (session) => {
+      const number = (session.runs.at(-1)?.number ?? 0) + 1;
+      return {
+        ...session,
+        runs: [...session.runs, { number, line, words: [], startedAt: at, state: 'refused' }],
+        scrollback: withNote(session.scrollback, reason, number),
+      };
+    });
+  }
+
+  /** Empties the output; the runs go with it, a running one's header staying for what comes. */
   clear(id: string): void {
-    this.update(id, (session) => ({ ...session, scrollback: EMPTY_SCROLLBACK }));
+    this.update(id, (session) => ({
+      ...session,
+      scrollback: EMPTY_SCROLLBACK,
+      runs: session.runs.filter((run) => run.state === 'running' || run.state === 'waiting'),
+    }));
+  }
+
+  /** The run a `runId` names, in whichever session ran it: Problems' section title. */
+  runOf(runId: string): CommandRun | undefined {
+    // Any run, not only a session's current one: an older run keeps its section in Problems.
+    for (const session of this.list) {
+      const found = session.runs.find((run) => run.runId === runId);
+      if (found !== undefined) return found;
+    }
+    return undefined;
   }
 
   /** The run `cli:run` started for this session's line, now that its id is known. */
-  started(id: string, line: string, words: readonly string[], runId: string): void {
+  started(
+    id: string,
+    line: string,
+    words: readonly string[],
+    runId: string,
+    at: number = Date.now(),
+  ): void {
     this.ansi.set(runId, freshAnsiState());
     this.update(id, (session) => ({
       ...session,
@@ -167,6 +224,17 @@ export class CommandSessions {
       runId,
       state: 'running',
       diagnostics: [],
+      runs: [
+        ...session.runs,
+        {
+          number: (session.runs.at(-1)?.number ?? 0) + 1,
+          line,
+          words,
+          runId,
+          startedAt: at,
+          state: 'running',
+        },
+      ],
     }));
     const early = this.early.get(runId) ?? [];
     this.early.delete(runId);
@@ -193,7 +261,13 @@ export class CommandSessions {
     this.ansi.set(event.runId, ansi);
     this.update(session.id, (current) => ({
       ...current,
-      scrollback: withOutput(current.scrollback, event.stream, event.text, ansi),
+      scrollback: withOutput(
+        current.scrollback,
+        event.stream,
+        event.text,
+        ansi,
+        current.runs.find((run) => run.runId === event.runId)?.number,
+      ),
     }));
   }
 
@@ -213,6 +287,15 @@ export class CommandSessions {
         state: event.state,
         ...(event.code === undefined ? {} : { code: event.code }),
         ...(event.question === undefined ? {} : { question: event.question }),
+        runs: current.runs.map((run) => {
+          if (run.runId !== event.runId) return run;
+          const { code: _runCode, ...kept } = run;
+          return {
+            ...kept,
+            state: event.state,
+            ...(event.code === undefined ? {} : { code: event.code }),
+          };
+        }),
       };
     });
     if (event.state === 'finished' || event.state === 'cancelled') {

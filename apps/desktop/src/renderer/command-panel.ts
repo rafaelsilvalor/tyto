@@ -13,7 +13,14 @@ import {
   piecesOf,
 } from './command-output.js';
 import { HistoryCursor, searchHistory } from './command-history.js';
-import { type CommandSession, type CommandSessions, isBusy } from './command-sessions.js';
+import type { CommandsOrder } from '../../shared/command-runs.js';
+import { type RunBlock, blocksOf, isFolded, shortCommand, startTime } from './command-blocks.js';
+import {
+  type CommandRun,
+  type CommandSession,
+  type CommandSessions,
+  isBusy,
+} from './command-sessions.js';
 import { splitCommandLine } from './command-words.js';
 import { icon } from './icons.js';
 import { DockedPanel } from './panels.js';
@@ -69,10 +76,18 @@ export class CommandPanel extends DockedPanel {
     ...DockedPanel.properties,
     sessions: { attribute: false },
     ports: { attribute: false },
+    order: { attribute: false },
+    foldOlderRuns: { attribute: false },
   };
 
   declare sessions: CommandSessions | undefined;
   declare ports: CommandPanelPorts;
+  /** The `commandsOrder` setting (TYTO-496): the newest run last, under the others, or first. */
+  declare order: CommandsOrder;
+  /** The `commandsFoldOlderRuns` setting (TYTO-496): every run but the newest folded. */
+  declare foldOlderRuns: boolean;
+  /** The runs a person opened while folding is on, by session. */
+  private readonly opened = new Map<string, Set<number>>();
 
   private unsubscribe: (() => void) | undefined;
   private subscribed: CommandSessions | undefined;
@@ -88,6 +103,8 @@ export class CommandPanel extends DockedPanel {
     super();
     this.sessions = undefined;
     this.ports = NO_PORTS;
+    this.order = 'newestLast';
+    this.foldOlderRuns = false;
   }
 
   override disconnectedCallback(): void {
@@ -104,7 +121,11 @@ export class CommandPanel extends DockedPanel {
     this.unsubscribe = this.sessions?.subscribe(() => {
       const output = this.output();
       if (output !== null) {
-        this.following = output.scrollTop + output.clientHeight >= output.scrollHeight - 4;
+        // Following the newest run: at the end of the output, or at its top when it comes first.
+        this.following =
+          this.order === 'newestFirst'
+            ? output.scrollTop <= 4
+            : output.scrollTop + output.clientHeight >= output.scrollHeight - 4;
       }
       this.requestUpdate();
     });
@@ -112,7 +133,8 @@ export class CommandPanel extends DockedPanel {
 
   protected override updated(): void {
     const output = this.output();
-    if (output !== null && this.following) output.scrollTop = output.scrollHeight;
+    if (output === null || !this.following) return;
+    output.scrollTop = this.order === 'newestFirst' ? 0 : output.scrollHeight;
   }
 
   /** Puts the caret on the input line: Ctrl+` and a quick action land here. */
@@ -159,8 +181,9 @@ export class CommandPanel extends DockedPanel {
     }
     const split = splitCommandLine(line);
     if (!split.ok) {
-      sessions.note(
+      sessions.refused(
         session.id,
+        line.trim(),
         this.say('commandPanel.unclosedQuote').replaceAll('{column}', String(split.at + 1)),
       );
       return;
@@ -171,14 +194,14 @@ export class CommandPanel extends DockedPanel {
     this.cursor = undefined;
     const input = this.input();
     if (input !== null) input.value = '';
-    sessions.note(session.id, `$ tyto ${line.trim().replace(/^tyto\s+/u, '')}`);
     this.following = true;
     try {
       const runId = await this.ports.run(split.words);
       sessions.started(session.id, line.trim(), split.words, runId);
     } catch (error) {
-      sessions.note(
+      sessions.refused(
         session.id,
+        line.trim(),
         this.say('commandPanel.refused').replaceAll(
           '{reason}',
           error instanceof Error ? error.message : String(error),
@@ -600,10 +623,7 @@ export class CommandPanel extends DockedPanel {
       this.focusInput();
     })}`;
 
-    const search = this.search;
-    const searchMatch =
-      search?.index === undefined ? undefined : this.ports.history()[search.index];
-    const fresh = session === undefined || session.scrollback.lines.length === 0;
+    const fresh = session === undefined || session.runs.length === 0;
 
     return html`${this.chrome(
         html`<h2 class="tool__title">${this.say('panel.commands')}</h2>`,
@@ -639,48 +659,130 @@ export class CommandPanel extends DockedPanel {
                   )}
                 </p>`
           }
-          ${
-            session === undefined
-              ? nothing
-              : repeat(
-                  session.scrollback.lines,
-                  (_line, index) => index + session.scrollback.dropped,
-                  (line, index) => this.line(session, line, index, matches),
-                )
-          }
-          <div class="command-panel__prompt-line">
-            <label class="command-panel__prompt" for="command-panel-input"
-              >${search === undefined ? 'tyto ›' : `${this.say('commandPanel.history.search')} ›`}</label
-            >
-            <input
-              id="command-panel-input"
-              class="command-panel__input"
-              type="text"
-              spellcheck="false"
-              autocomplete="off"
-              aria-label=${this.say('commandPanel.input')}
-              placeholder=${search === undefined && fresh ? this.say('commandPanel.input') : ''}
-              @keydown=${(event: KeyboardEvent) => {
-                this.onInputKey(event);
-              }}
-              @input=${(event: InputEvent) => {
-                this.onSearchInput(event.currentTarget as HTMLInputElement);
-              }}
-            />
-            ${
-              search === undefined
-                ? nothing
-                : html`<span class="command-panel__search-match" aria-live="polite"
-                    >${
-                      search.query === ''
-                        ? ''
-                        : (searchMatch ?? this.say('commandPanel.history.none'))
-                    }</span
-                  >`
-            }
-          </div>
+          ${this.order === 'newestFirst' ? this.prompt(fresh) : nothing}
+          ${session === undefined ? nothing : this.blocks(session, matches)}
+          ${this.order === 'newestFirst' ? nothing : this.prompt(fresh)}
         </div>
       </div>`;
+  }
+
+  /**
+   * The runs as blocks (TYTO-496): each under a header that says the command, when it started
+   * and how it ended, in the order `commandsOrder` asks for; older ones folded to their header
+   * when `commandsFoldOlderRuns` is on, unless opened or holding a find match.
+   */
+  private blocks(session: CommandSession, matches: readonly FindMatch[]): TemplateResult {
+    const matched = new Set(matches.map((match) => match.line));
+    const opened = this.opened.get(session.id) ?? new Set<number>();
+    const newest = session.runs.at(-1)?.number;
+    return html`${repeat(
+      blocksOf(session, this.order),
+      (block) => block.run.number,
+      (block) => {
+        const folded = isFolded(block, newest, this.foldOlderRuns, opened, matched);
+        return html`<section
+          class="command-run"
+          data-run=${block.run.number}
+          ?data-folded=${folded}
+        >
+          ${this.header(session, block, folded)}
+          ${folded ? nothing : block.lines.map(({ line, index }) => this.line(session, line, index, matches))}
+        </section>`;
+      },
+    )}`;
+  }
+
+  /** The words a run's state is said in: on its header's badge, for a screen reader. */
+  private runStatus(run: CommandRun): string {
+    switch (run.state) {
+      case 'running':
+        return this.say('commandPanel.state.running');
+      case 'waiting':
+        return this.say('commandPanel.state.waiting').replaceAll('{question}', '');
+      case 'cancelled':
+        return this.say('commandPanel.state.cancelled');
+      case 'refused':
+        return this.say('commandPanel.state.refused');
+      case 'finished':
+        return this.say('commandPanel.state.finished').replaceAll('{code}', String(run.code ?? 0));
+    }
+  }
+
+  private header(session: CommandSession, block: RunBlock, folded: boolean): TemplateResult {
+    const run = block.run;
+    const tone = run.state === 'finished' ? (run.code === 0 ? 'ok' : 'failed') : run.state;
+    const badge =
+      run.state === 'finished'
+        ? `${run.code === 0 ? '✓' : '✗'} ${String(run.code ?? 0)}`
+        : run.state === 'cancelled'
+          ? '–'
+          : run.state === 'refused'
+            ? '✗'
+            : run.state === 'waiting'
+              ? '?'
+              : '•';
+    const status = this.runStatus(run);
+    const body = html`<span class="command-run__command" title=${run.line}
+        >${shortCommand(run.line)}</span
+      >
+      <span class="command-run__time">${startTime(run, this.locale)}</span>
+      <span class="command-run__badge" data-state=${tone} title=${status} aria-label=${status}
+        >${badge}</span
+      >`;
+    // A header is a button only while folding is on: there is something for it to do.
+    if (!this.foldOlderRuns || run.number === session.runs.at(-1)?.number) {
+      return html`<div class="command-run__header">${body}</div>`;
+    }
+    return html`<button
+      type="button"
+      class="command-run__header"
+      aria-expanded=${folded ? 'false' : 'true'}
+      @click=${() => {
+        const opened = this.opened.get(session.id) ?? new Set<number>();
+        if (opened.has(run.number)) opened.delete(run.number);
+        else opened.add(run.number);
+        this.opened.set(session.id, opened);
+        this.requestUpdate();
+      }}
+    >
+      ${body}
+    </button>`;
+  }
+
+  /** The prompt line: the label, the input, and Ctrl+R's match beside it. */
+  private prompt(fresh: boolean): TemplateResult {
+    const search = this.search;
+    const searchMatch =
+      search?.index === undefined ? undefined : this.ports.history()[search.index];
+    return html`<div class="command-panel__prompt-line">
+      <label class="command-panel__prompt" for="command-panel-input"
+        >${search === undefined ? 'tyto ›' : `${this.say('commandPanel.history.search')} ›`}</label
+      >
+      <input
+        id="command-panel-input"
+        class="command-panel__input"
+        type="text"
+        spellcheck="false"
+        autocomplete="off"
+        aria-label=${this.say('commandPanel.input')}
+        placeholder=${search === undefined && fresh ? this.say('commandPanel.input') : ''}
+        @keydown=${(event: KeyboardEvent) => {
+          this.onInputKey(event);
+        }}
+        @input=${(event: InputEvent) => {
+          this.onSearchInput(event.currentTarget as HTMLInputElement);
+        }}
+      />
+      ${
+        search === undefined
+          ? nothing
+          : html`<span class="command-panel__search-match" aria-live="polite"
+              >${
+                search.query === '' ? '' : (searchMatch ?? this.say('commandPanel.history.none'))
+              }</span
+            >`
+      }
+    </div>`;
   }
 
   /**

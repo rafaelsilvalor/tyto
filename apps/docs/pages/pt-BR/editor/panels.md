@@ -13,6 +13,22 @@ Os painéis ficam em três **áreas** em volta dos grupos de editores: esquerda,
 - O **×** à direita do cabeçalho de um painel o esconde.
 - **Restaurar a disposição padrão** devolve cada painel ao lugar onde o Tyto o colocou de início: Problemas aberto na área de baixo, a fila fechada.
 
+## Comandos
+
+A aba **COMANDOS** roda comandos `tyto` na janela. Cada comando que você roda é um bloco: um cabeçalho com o comando, os caminhos cortados para o nome do arquivo, a hora em que começou e como terminou — **✓ 0** quando deu certo, **✗ 1** quando o brief tem erros — sobre o que ele imprimiu, com um espaço antes do próximo. O mesmo cabeçalho dá nome à seção dele em Problemas.
+
+Duas configurações do `settings.json` mudam como os blocos ficam, e valem assim que o arquivo é salvo:
+
+- `commandsOrder`: `"newestLast"`, o padrão, põe cada execução embaixo da anterior e o prompt por último, como num terminal; `"newestFirst"` põe o prompt primeiro e a execução mais nova logo abaixo. As seções de comandos em Problemas seguem a mesma ordem.
+- `commandsFoldOlderRuns`: `true` recolhe todas as execuções, menos a mais nova, à linha do cabeçalho; clique num cabeçalho para abri-lo. **Ctrl+F** abre uma execução recolhida que tenha uma ocorrência.
+
+```json
+{
+  "commandsOrder": "newestFirst",
+  "commandsFoldOlderRuns": true
+}
+```
+
 ## Problemas
 
 <Screenshot

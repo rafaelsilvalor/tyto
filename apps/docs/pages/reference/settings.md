@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 26. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 28. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -262,6 +262,29 @@ How the editor numbers its lines: 'on' (the default), 'relative' to the cursor's
 | `"on"` | Each line its own number. The default. |
 | `"relative"` | The cursor's line its own number, every other line its distance to the cursor: what a vim count like 5j moves. |
 | `"off"` | No line numbers. |
+
+## commandsOrder
+
+The order of the command panel's runs, and of their sections in Problems: 'newestLast' (the default) or 'newestFirst'.
+
+| Type | Default |
+| --- | --- |
+| `string` | `"newestLast"` |
+
+**Values**
+
+| Value | Meaning |
+| --- | --- |
+| `"newestLast"` | Each run under the one before, the prompt last, as a terminal does. The default. |
+| `"newestFirst"` | The newest run first, under the prompt, which comes first. |
+
+## commandsFoldOlderRuns
+
+Fold every run of the command panel but the newest to its header line; a click opens one (default false).
+
+| Type | Default |
+| --- | --- |
+| `boolean` | `false` |
 
 ## zoom
 

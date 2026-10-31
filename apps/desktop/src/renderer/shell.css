@@ -1746,6 +1746,78 @@ button.problems__row:focus-visible {
   outline: var(--tyto-hairline-width) solid var(--tyto-accent);
 }
 
+/*
+ * A run (TYTO-496): its header — the command, when it started, how it ended — over what it
+ * printed, and a gap before the next run. No border: the gap and the header's weight separate
+ * them. A folded run is its header alone.
+ */
+.command-run + .command-run,
+.command-run + .command-panel__prompt-line,
+.command-panel__prompt-line + .command-run {
+  margin-top: var(--tyto-space-5);
+}
+
+.command-run__header {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: var(--tyto-space-5);
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--tyto-text);
+  font: inherit;
+  text-align: start;
+}
+
+button.command-run__header {
+  cursor: pointer;
+}
+
+button.command-run__header:hover .command-run__command {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.command-run[data-folded] .command-run__command {
+  color: var(--tyto-text-muted);
+}
+
+.command-run__command {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--tyto-weight-strong);
+}
+
+.command-run__time {
+  margin-inline-start: auto;
+  color: var(--tyto-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.command-run__badge {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--tyto-weight-strong);
+  white-space: nowrap;
+}
+
+.command-run__badge[data-state='ok'] {
+  color: var(--tyto-success);
+}
+
+.command-run__badge[data-state='failed'],
+.command-run__badge[data-state='refused'] {
+  color: var(--tyto-error);
+}
+
+.command-run__badge[data-state='running'],
+.command-run__badge[data-state='waiting'],
+.command-run__badge[data-state='cancelled'] {
+  color: var(--tyto-text-muted);
+}
+
 /* The prompt: one more line of the output, with nothing drawn around what is typed. */
 .command-panel__prompt-line {
   display: flex;

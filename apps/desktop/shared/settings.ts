@@ -3,6 +3,11 @@ import { z } from 'zod';
 
 import { type BriefColumnLook, briefColumnsContribution } from './brief-columns.js';
 import { type LineNumbersLook, lineNumbersContribution } from './line-numbers.js';
+import {
+  type CommandsOrder,
+  commandsFoldOlderRunsContribution,
+  commandsOrderContribution,
+} from './command-runs.js';
 import { type StatusBarColors, statusBarColorsContribution } from './status-bar-colors.js';
 import { type VimPlugins, vimPluginsContribution } from './vim-plugins.js';
 import { type StatusBarItemId, statusBarItemsContribution } from './status-bar-items.js';
@@ -340,7 +345,7 @@ export const recipeTimeZoneContribution = {
 } satisfies ConfigurationContribution<string | null>;
 
 /**
- * The twenty-six, in the order the settings file is documented in. `theme` checks its ids against
+ * The twenty-eight, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -365,6 +370,8 @@ export function settingContributions(
     tabSizeContribution,
     briefColumnsContribution,
     lineNumbersContribution,
+    commandsOrderContribution,
+    commandsFoldOlderRunsContribution,
     zoomContribution,
     uiFontFamilyContribution,
     uiFontSizeContribution,
@@ -406,6 +413,10 @@ export interface Settings {
   readonly briefColumns: BriefColumnLook;
   /** How the editor numbers its lines: on, relative or off (TYTO-415). */
   readonly lineNumbers: LineNumbersLook;
+  /** The order of the command panel's runs and of their Problems sections (TYTO-496). */
+  readonly commandsOrder: CommandsOrder;
+  /** Whether the command panel folds every run but the newest (TYTO-496). */
+  readonly commandsFoldOlderRuns: boolean;
   /** How far the window is zoomed, in Electron's steps of 1.2 (TYTO-272, ADR 0099). */
   readonly zoom: number;
   /** The face and size of the window's text outside the editor (TYTO-272). */
@@ -441,6 +452,8 @@ export const DEFAULT_SETTINGS: Settings = {
   tabSize: tabSizeContribution.default,
   briefColumns: briefColumnsContribution.default,
   lineNumbers: lineNumbersContribution.default,
+  commandsOrder: commandsOrderContribution.default,
+  commandsFoldOlderRuns: commandsFoldOlderRunsContribution.default,
   zoom: zoomContribution.default,
   uiFontFamily: uiFontFamilyContribution.default,
   uiFontSize: uiFontSizeContribution.default,
@@ -456,7 +469,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-six out of the resolved values, which already hold every declared key with a value
+ * The twenty-eight out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -480,6 +493,8 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     tabSize: pick('tabSize'),
     briefColumns: pick('briefColumns'),
     lineNumbers: pick('lineNumbers'),
+    commandsOrder: pick('commandsOrder'),
+    commandsFoldOlderRuns: pick('commandsFoldOlderRuns'),
     zoom: pick('zoom'),
     uiFontFamily: pick('uiFontFamily'),
     uiFontSize: pick('uiFontSize'),

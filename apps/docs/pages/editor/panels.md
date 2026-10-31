@@ -13,6 +13,22 @@ Panels sit in three **areas** around the editor groups: left, right and bottom. 
 - The **×** at the right of a panel's header hides it.
 - **Restore the default layout** puts every panel back where Tyto first had it: Problems open in the bottom area, the queue closed.
 
+## Commands
+
+The **COMMANDS** tab runs `tyto` commands in the window. Each command you run is a block: a header with the command, its paths cut to the file name, the time it started and how it ended — **✓ 0** when it went well, **✗ 1** when the brief has errors — over what it printed, with a gap before the next. The same header names its section in Problems.
+
+Two settings in `settings.json` change how the blocks are laid out, and they apply as soon as the file is saved:
+
+- `commandsOrder`: `"newestLast"`, the default, puts each run under the one before and the prompt last, as a terminal does; `"newestFirst"` puts the prompt first and the newest run under it. Problems' command sections follow the same order.
+- `commandsFoldOlderRuns`: `true` folds every run but the newest to its header line; click a header to open it. **Ctrl+F** opens a folded run that holds a match.
+
+```json
+{
+  "commandsOrder": "newestFirst",
+  "commandsFoldOlderRuns": true
+}
+```
+
 ## Problems
 
 <Screenshot
