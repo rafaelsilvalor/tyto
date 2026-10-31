@@ -60,11 +60,10 @@ export type IconName =
   | 'newFile'
   | 'newFolder'
   | 'collapseAll'
-  // TYTO-496: the command panel's New Session, Stop, Find, Copy and Clear.
+  // TYTO-496: the command panel's New Session, Stop, Find and Clear.
   | 'plus'
   | 'stop'
   | 'search'
-  | 'copy'
   | 'clear'
   // TYTO-282: a file or folder in the explorer and on a tab.
   | FileIconName;
@@ -130,8 +129,6 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
   plus: () => svg`<path d="M8 3.25v9.5M3.25 8h9.5" />`,
   stop: () => svg`<rect x="4" y="4" width="8" height="8" rx="1.25" />`,
   search: () => svg`<circle cx="7" cy="7" r="4.25" /><path d="m10.25 10.25 3 3" />`,
-  copy: () =>
-    svg`<rect x="5.5" y="5.5" width="7.75" height="7.75" rx="1.25" /><path d="M10.5 5.5V4a1.25 1.25 0 0 0-1.25-1.25H4A1.25 1.25 0 0 0 2.75 4v5.25A1.25 1.25 0 0 0 4 10.5h1.5" />`,
   clear: () => svg`${FRAME}<path d="M5.5 6.25 10.5 11.25M10.5 6.25 5.5 11.25" />`,
   brief: () =>
     svg`<circle cx="8" cy="4.25" r="1.75" /><path d="M7 6v2.25H4.25A1.25 1.25 0 0 0 3 9.5v1.5h10V9.5a1.25 1.25 0 0 0-1.25-1.25H9V6M3 13.25h10" />`,

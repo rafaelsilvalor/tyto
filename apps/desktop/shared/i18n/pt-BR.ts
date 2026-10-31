@@ -182,6 +182,8 @@ export const ptBR: Catalogue = {
   'command.preview.showAllSlides': 'Prévia: mostrar todos os slides',
   'command.document.select': 'Aba',
   'panel.close': 'Fechar o painel',
+  'panel.hideArea': 'Esconder a área de painéis',
+  'panel.tabs': 'Painéis',
   'command.layout.togglePanel': 'Mostrar ou esconder',
   'command.layout.restore': 'Restaurar a disposição padrão',
   'panel.editor': 'Brief',
@@ -462,12 +464,9 @@ export const ptBR: Catalogue = {
   'commandPanel.find.close': 'Fechar a busca',
   'commandPanel.find.count': '{current} de {total}',
   'commandPanel.find.none': 'Nada encontrado',
-  'commandPanel.copy': 'Copiar a saída',
   'commandPanel.clear': 'Limpar a saída',
   'commandPanel.output': 'Saída',
   'commandPanel.input': 'Digite um comando do tyto e tecle Enter',
-  'commandPanel.empty':
-    'Digite abaixo um comando do tyto e tecle Enter: render, check, trust, plugin, watch… “help” lista todos.',
   'commandPanel.dropped': '{count} linhas mais antigas foram descartadas.',
   'commandPanel.busy': 'Há um comando rodando nesta sessão. Pare-o ou abra uma nova sessão.',
   'commandPanel.unclosedQuote':

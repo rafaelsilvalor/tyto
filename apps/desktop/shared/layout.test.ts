@@ -19,6 +19,11 @@ import {
   layoutFrom,
   openPanelsOf,
   panelOf,
+  COMMANDS_PANEL,
+  dockSizeOf,
+  frontPanelOf,
+  tabsOf,
+  withPanelInFront,
   withPanelOpen,
   withPanelSize,
   withPluginPanels,
@@ -368,5 +373,105 @@ describe('hiding a whole area (TYTO-248, ADR 0076)', () => {
     expect(layoutFrom({ panels: DEFAULT_LAYOUT.panels }).hiddenDocks).toBeUndefined();
     // A hand-edited `centre` is refused with the rest of the file rather than hiding the editor.
     expect(layoutFrom({ ...hidden, hiddenDocks: ['centre'] }).hiddenDocks).toBeUndefined();
+  });
+});
+
+/** ADR 0163: the bottom area shows one open panel at a time, the one in front. */
+describe('the bottom area’s tabs', () => {
+  const both = withPanelOpen(DEFAULT_LAYOUT, COMMANDS_PANEL, true);
+
+  it('puts a panel in front when it opens, and shows only that one', () => {
+    expect(frontPanelOf(both, 'bottom')?.id).toBe(COMMANDS_PANEL);
+    expect(shownPanelsOf(both, 'bottom').map((panel) => panel.id)).toEqual([COMMANDS_PANEL]);
+    expect(tabsOf(both, 'bottom').map((panel) => panel.id)).toEqual([
+      PROBLEMS_PANEL,
+      COMMANDS_PANEL,
+    ]);
+  });
+
+  it('brings an open tab to the front, and ignores a closed panel or a side area’s', () => {
+    expect(frontPanelOf(withPanelInFront(both, PROBLEMS_PANEL), 'bottom')?.id).toBe(PROBLEMS_PANEL);
+    expect(withPanelInFront(DEFAULT_LAYOUT, COMMANDS_PANEL)).toBe(DEFAULT_LAYOUT);
+    expect(withPanelInFront(both, EXPLORER_PANEL)).toBe(both);
+  });
+
+  it('falls back to the first open tab when the one in front closes', () => {
+    const closed = withPanelOpen(both, COMMANDS_PANEL, false);
+    expect(frontPanelOf(closed, 'bottom')?.id).toBe(PROBLEMS_PANEL);
+  });
+
+  it('gives every open tab the size dragged, and is as tall as the tallest', () => {
+    expect(dockSizeOf(both, 'bottom')).toBe(240);
+    const dragged = withPanelSize(both, COMMANDS_PANEL, 300);
+    expect(panelOf(dragged, PROBLEMS_PANEL)?.size).toBe(300);
+    expect(dockSizeOf(dragged, 'bottom')).toBe(300);
+    // A side area still takes its first panel's size alone.
+    const left = withPanelOpen(
+      withPanelOpen(DEFAULT_LAYOUT, QUEUE_PANEL, true),
+      EXPLORER_PANEL,
+      true,
+    );
+    expect(dockSizeOf(withPanelSize(left, QUEUE_PANEL, 500), 'left')).toBe(280);
+  });
+
+  it('reads a layout.json written before the tabs with both panels’ state intact', () => {
+    // As TYTO-496's PR A2 wrote it: the command panel listed before Problems, both open, no
+    // `front`. Nothing is lost, and the first open panel in this build's order is in front.
+    const before = {
+      panels: [
+        {
+          id: 'editor',
+          element: 'tyto-editor-panel',
+          dock: 'centre',
+          open: true,
+          size: 600,
+          fixed: true,
+        },
+        {
+          id: 'commands',
+          element: 'tyto-command-panel',
+          dock: 'bottom',
+          open: true,
+          size: 310,
+          fixed: false,
+        },
+        {
+          id: 'problems',
+          element: 'tyto-problems-panel',
+          dock: 'bottom',
+          open: true,
+          size: 180,
+          fixed: false,
+        },
+      ],
+      hiddenDocks: [],
+    };
+    const read = layoutFrom(before);
+
+    expect(panelOf(read, COMMANDS_PANEL)).toMatchObject({ open: true, size: 310 });
+    expect(panelOf(read, PROBLEMS_PANEL)).toMatchObject({ open: true, size: 180 });
+    expect(read.front).toBeUndefined();
+    expect(frontPanelOf(read, 'bottom')?.id).toBe(PROBLEMS_PANEL);
+    expect(dockSizeOf(read, 'bottom')).toBe(310);
+  });
+
+  it('remembers the tab in front across a restart, and ignores one that names nothing open', () => {
+    // The command panel, which is not the first open tab, so only the field can bring it back.
+    expect(frontPanelOf(layoutFrom(JSON.parse(JSON.stringify(both))), 'bottom')?.id).toBe(
+      COMMANDS_PANEL,
+    );
+    const stale = layoutFrom({ ...DEFAULT_LAYOUT, front: { bottom: COMMANDS_PANEL } });
+    expect(frontPanelOf(stale, 'bottom')?.id).toBe(PROBLEMS_PANEL);
+  });
+
+  it('makes a plugin panel that docks at the bottom one more tab when it opens', () => {
+    const offered = [{ id: 'plugin:demo/contagem', location: 'bottom' as const }];
+    const opened = withPanelOpen(withPluginPanels(both, offered), 'plugin:demo/contagem', true);
+    expect(tabsOf(opened, 'bottom').map((panel) => panel.id)).toEqual([
+      PROBLEMS_PANEL,
+      COMMANDS_PANEL,
+      'plugin:demo/contagem',
+    ]);
+    expect(frontPanelOf(opened, 'bottom')?.id).toBe('plugin:demo/contagem');
   });
 });

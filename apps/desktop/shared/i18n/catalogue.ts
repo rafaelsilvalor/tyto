@@ -378,6 +378,9 @@ export interface Catalogue {
    * carries a file name.
    */
   readonly 'panel.close': string;
+  /** ADR 0163: the × of the tabbed bottom area, and the name its strip of tabs is read by. */
+  readonly 'panel.hideArea': string;
+  readonly 'panel.tabs': string;
   readonly 'command.layout.togglePanel': string;
   readonly 'command.layout.restore': string;
   readonly 'panel.editor': string;
@@ -783,11 +786,9 @@ export interface Catalogue {
   readonly 'commandPanel.find.close': string;
   readonly 'commandPanel.find.count': string;
   readonly 'commandPanel.find.none': string;
-  readonly 'commandPanel.copy': string;
   readonly 'commandPanel.clear': string;
   readonly 'commandPanel.output': string;
   readonly 'commandPanel.input': string;
-  readonly 'commandPanel.empty': string;
   readonly 'commandPanel.dropped': string;
   readonly 'commandPanel.busy': string;
   readonly 'commandPanel.unclosedQuote': string;
@@ -971,6 +972,8 @@ export const CATALOGUE_KEYS = [
   'command.preview.showAllSlides',
   'command.document.select',
   'panel.close',
+  'panel.hideArea',
+  'panel.tabs',
   'command.layout.togglePanel',
   'command.layout.restore',
   'panel.editor',
@@ -1231,11 +1234,9 @@ export const CATALOGUE_KEYS = [
   'commandPanel.find.close',
   'commandPanel.find.count',
   'commandPanel.find.none',
-  'commandPanel.copy',
   'commandPanel.clear',
   'commandPanel.output',
   'commandPanel.input',
-  'commandPanel.empty',
   'commandPanel.dropped',
   'commandPanel.busy',
   'commandPanel.unclosedQuote',

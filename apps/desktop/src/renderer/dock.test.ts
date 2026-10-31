@@ -2,14 +2,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  COMMANDS_PANEL,
   DEFAULT_LAYOUT,
   EDITOR_PANEL,
   PROBLEMS_PANEL,
+  withPanelInFront,
   withPanelOpen,
   withPanelSize,
 } from '../../shared/layout.js';
-import { arrange } from './dock.js';
-import './panels.js';
+import { arrange, paintStrips } from './dock.js';
+import { type DockedPanel } from './panels.js';
+// For the side effect: the command panel's element, a tab of the bottom area.
+import './command-panel.js';
 // For the side effect: the queue panel's element, so the pane shape can be read off it.
 import './queue-panel.js';
 
@@ -34,7 +38,14 @@ const DOCK_MARKUP = `
   <div data-splitter="bottom"></div><div data-dock="bottom"></div>
 `;
 
-const host = () => ({ locale: 'pt-BR' as const, onClose: vi.fn(), onResize: vi.fn() });
+const host = () => ({
+  locale: 'pt-BR' as const,
+  onClose: vi.fn(),
+  onResize: vi.fn(),
+  tab: (panelId: string) => ({ label: panelId }),
+  onPick: vi.fn(),
+  onHide: vi.fn(),
+});
 
 const panelsIn = (dock: string): string[] =>
   [...document.querySelectorAll(`[data-dock="${dock}"] [data-panel]`)].map(
@@ -150,7 +161,8 @@ describe('what survives a rearrangement', () => {
   it('draws every docked panel with a tool header, not a tab, and no header row (TYTO-302)', async () => {
     await arrange(document, withPanelOpen(DEFAULT_LAYOUT, 'queue', true), host());
 
-    for (const id of [PROBLEMS_PANEL, 'queue']) {
+    // A side area's tool: the bottom area draws tabs instead (ADR 0163, below).
+    for (const id of ['queue']) {
       const panel = document.querySelector(`[data-panel="${id}"]`);
       const children = [...(panel?.children ?? [])].map((child) => child.className);
       // A tool is not a document: its strip is a tool header (ADR 0090), and it has no header
@@ -160,9 +172,6 @@ describe('what survives a rearrangement', () => {
       expect(panel?.querySelector('.pane__tab, .tabs__tab'), id).toBeNull();
       expect(panel?.querySelector(':scope > .pane__header'), id).toBeNull();
     }
-    // The problems heading keeps its id and its key, now as the tool's title.
-    const heading = document.querySelector('.pane__strip--tool > #problems-heading.tool__title');
-    expect(heading?.getAttribute('data-i18n')).toBe('problems.heading');
     // The editor panel has no bar of its own any more: each group is a pane (ADR 0085).
     const editor = document.querySelector(`[data-panel="${EDITOR_PANEL}"]`);
     expect(editor?.querySelector('.pane__strip, #editor-heading, #template')).toBeNull();
@@ -179,10 +188,84 @@ describe('what survives a rearrangement', () => {
 
   it('reports the panel a close button belongs to', async () => {
     const chrome = host();
-    await arrange(document, DEFAULT_LAYOUT, chrome);
+    await arrange(document, withPanelOpen(DEFAULT_LAYOUT, 'queue', true), chrome);
 
-    document.querySelector<HTMLElement>(`[data-panel="${PROBLEMS_PANEL}"] .panel__close`)?.click();
+    document.querySelector<HTMLElement>('[data-panel="queue"] .panel__close')?.click();
 
-    expect(chrome.onClose).toHaveBeenCalledWith(PROBLEMS_PANEL);
+    expect(chrome.onClose).toHaveBeenCalledWith('queue');
+  });
+});
+
+/** ADR 0163: the bottom area is one strip of tabs, one panel shown, as in VS Code. */
+describe('the bottom area’s tabs', () => {
+  const both = withPanelOpen(DEFAULT_LAYOUT, COMMANDS_PANEL, true);
+  const tabs = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-dock="bottom"] [role="tab"]')].map(
+      (tab) => `${tab.dataset['tab'] ?? ''}:${tab.getAttribute('aria-selected') ?? ''}`,
+    );
+
+  it('shows only the tab in front, and names every open panel as a tab', async () => {
+    await arrange(document, both, host());
+
+    expect(panelsIn('bottom')).toEqual([COMMANDS_PANEL]);
+    expect(tabs()).toEqual([`${PROBLEMS_PANEL}:false`, `${COMMANDS_PANEL}:true`]);
+    expect(document.querySelector('[data-dock="bottom"] .tool__title')).toBeNull();
+  });
+
+  it('draws the count the host gives a tab, and none for zero', async () => {
+    const chrome = {
+      ...host(),
+      tab: (panelId: string) => ({ label: panelId, count: panelId === PROBLEMS_PANEL ? 3 : 0 }),
+    };
+    await arrange(document, both, chrome);
+
+    const counts = [...document.querySelectorAll('[data-dock="bottom"] .dock-tab__count')];
+    expect(counts.map((count) => count.textContent)).toEqual(['3']);
+  });
+
+  it('picks a tab on a click and on an arrow, and hides the area on ×', async () => {
+    const chrome = host();
+    await arrange(document, both, chrome);
+
+    document.querySelector<HTMLElement>(`[data-tab="${PROBLEMS_PANEL}"]`)?.click();
+    document
+      .querySelector<HTMLElement>(`[data-tab="${COMMANDS_PANEL}"]`)
+      ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    document.querySelector<HTMLElement>('[data-dock="bottom"] .panel__close')?.click();
+
+    expect(chrome.onPick.mock.calls).toEqual([[PROBLEMS_PANEL], [PROBLEMS_PANEL]]);
+    expect(chrome.onHide).toHaveBeenCalledWith('bottom');
+    expect(chrome.onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps one height whichever tab is in front: the tallest open one', async () => {
+    await arrange(document, both, host());
+    expect(dockOf('bottom').style.height).toBe('240px');
+
+    await arrange(document, withPanelInFront(both, PROBLEMS_PANEL), host());
+    expect(dockOf('bottom').style.height).toBe('240px');
+  });
+
+  it('hands a strip over again only when what it shows changed', async () => {
+    let count = 1;
+    const chrome = { ...host(), tab: (panelId: string) => ({ label: panelId, count }) };
+    await arrange(document, both, chrome);
+    const element = document.querySelector<DockedPanel>(`[data-panel="${COMMANDS_PANEL}"]`)!;
+    const first = element.strip;
+
+    paintStrips(document, both, chrome);
+    expect(element.strip).toBe(first);
+
+    count = 2;
+    paintStrips(document, both, chrome);
+    expect(element.strip).not.toBe(first);
+  });
+
+  it('still stacks the panels of a side area', async () => {
+    const left = withPanelOpen(withPanelOpen(DEFAULT_LAYOUT, 'queue', true), 'explorer', true);
+    await arrange(document, left, host());
+
+    expect(panelsIn('left')).toEqual(['explorer', 'queue']);
+    expect(document.querySelector('[data-dock="left"] [role="tab"]')).toBeNull();
   });
 });

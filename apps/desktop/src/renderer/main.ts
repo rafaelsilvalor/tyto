@@ -281,7 +281,7 @@ import {
   offsetAt,
   withCommandProblems,
 } from './problems-panel.js';
-import { arrange, wireSplitters } from './dock.js';
+import { type DockHost, arrange, paintStrips, wireSplitters } from './dock.js';
 import './panels.js';
 import {
   type Layout,
@@ -296,8 +296,11 @@ import {
   dockHasPanels,
   dockIsHidden,
   dockIsShown,
+  frontPanelOf,
+  isTabbed,
   panelOf,
   withDockToggled,
+  withPanelInFront,
   withPanelOpen,
   withPanelSize,
   withPluginPanels,
@@ -4227,9 +4230,18 @@ function registerPanelCommands(): void {
       run: () => {
         const current = panelOf(layout, panel.id);
         if (current === undefined) return;
-        void changeLayout(withPanelOpen(layout, panel.id, !current.open)).then(() => {
+        // In the tabbed bottom area a toggle works as VS Code's: the tab on screen hides the
+        // area, and any other state brings the tab to the front (ADR 0163).
+        const next = isTabbed(current.dock)
+          ? panelShown(panel.id)
+            ? withDockToggled(layout, 'bottom')
+            : withPanelOpen(layout, panel.id, true)
+          : withPanelOpen(layout, panel.id, !current.open);
+        void changeLayout(next).then(() => {
           // Opening the command panel is wanting to type in it (TYTO-496).
-          if (panel.id === COMMANDS_PANEL && !current.open) elements.commandPanel?.focusInput();
+          if (panel.id === COMMANDS_PANEL && panelShown(panel.id)) {
+            elements.commandPanel?.focusInput();
+          }
         });
       },
     });
@@ -4509,8 +4521,59 @@ const STATUS_COMMANDS: StatusBarCommands = {
 /** A panel is on screen when it is open and its area is not hidden (ADR 0076). */
 const panelShown = (id: string): boolean => {
   const record = panelOf(layout, id);
-  return record !== undefined && record.open && !dockIsHidden(layout, record.dock);
+  if (record === undefined || !record.open || dockIsHidden(layout, record.dock)) return false;
+  // In the tabbed bottom area only the tab in front is on screen (ADR 0163).
+  return !isTabbed(record.dock) || frontPanelOf(layout, record.dock)?.id === id;
 };
+
+/**
+ * What the dock asks the window (ADR 0024, ADR 0163): a close, a resize, and for the tabbed
+ * bottom area a tab's name and count, a tab picked, and the area hidden by its ×.
+ */
+function dockHost(): DockHost {
+  return {
+    locale: state.locale,
+    onClose: (panelId) => {
+      void changeLayout(withPanelOpen(layout, panelId, false));
+    },
+    onResize: (panelId, size, settled) => {
+      layout = withPanelSize(layout, panelId, size);
+      // Only the settled one is written down. A drag is sixty of these a second and the
+      // disk should hear about one of them.
+      void applyLayout(settled);
+    },
+    tab: (panelId) => {
+      const key = PANEL_NAMES[panelId];
+      const label =
+        key === undefined
+          ? (offeredPanels.get(panelId)?.title ?? panelId)
+          : translate(state.locale, key);
+      // A built-in heading keeps its id and key on its tab, as it had on its title (ADR 0163).
+      if (panelId === PROBLEMS_PANEL) {
+        const heading = { id: 'problems-heading', key: 'problems.heading' } as const;
+        return { label, heading, count: problemCount().problems };
+      }
+      if (panelId === PROJECT_PANEL) {
+        return { label, heading: { id: 'project-heading', key: 'project.heading' } as const };
+      }
+      return { label };
+    },
+    onPick: (panelId) => {
+      void changeLayout(withPanelInFront(layout, panelId)).then(() => {
+        if (panelId === COMMANDS_PANEL) elements.commandPanel?.focusInput();
+      });
+    },
+    onHide: (dock) => {
+      if (dock === 'bottom') void changeLayout(withDockToggled(layout, dock));
+    },
+  };
+}
+
+/** The window's one count (TYTO-248, TYTO-496): the brief's rows and every command's. */
+function problemCount(): { readonly problems: number; readonly errors: number } {
+  const current = active();
+  return countProblems([...panel.installation, ...current.diagnostics], commandProblems);
+}
 
 /**
  * The status bar, from the tab in front, the layout and the editor (TYTO-248, ADR 0076).
@@ -4519,11 +4582,13 @@ const panelShown = (id: string): boolean => {
  * what lets this run on every cursor move.
  */
 function paintStatusBar(): void {
+  // Problems' tab carries the same count as the bar (ADR 0163), so it is painted wherever the
+  // bar is: on a keystroke, and when a command's diagnostics arrive.
+  paintStrips(document, layout, dockHost());
   const bar = elements.statusBar;
   if (bar === null) return;
   const current = active();
-  const problems = [...panel.installation, ...current.diagnostics];
-  const counted = countProblems(problems, commandProblems);
+  const counted = problemCount();
   const problemsShown = panelShown(PROBLEMS_PANEL);
   // Every way the panel comes on screen — its button, the command bar, a key, showing the
   // bottom area — ends in a repaint, so this is the one place that has to know.
@@ -4584,18 +4649,7 @@ function paintCommandBar(): void {
  * clicks, which is the failure this function is shaped around.
  */
 async function applyLayout(persist: boolean): Promise<void> {
-  await arrange(document, layout, {
-    locale: state.locale,
-    onClose: (panelId) => {
-      void changeLayout(withPanelOpen(layout, panelId, false));
-    },
-    onResize: (panelId, size, settled) => {
-      layout = withPanelSize(layout, panelId, size);
-      // Only the settled one is written down. A drag is sixty of these a second and the
-      // disk should hear about one of them.
-      void applyLayout(settled);
-    },
-  });
+  await arrange(document, layout, dockHost());
 
   // A plugin panel's element exists once the dock has made it; what it shows is ours to say.
   for (const panel of document.querySelectorAll(PLUGIN_PANEL_ELEMENT)) {
@@ -5449,9 +5503,6 @@ function wireCommandPanel(): void {
       commandHistory = withHistoryLine(commandHistory, line);
       saveHistory(historyStorage(), commandHistoryFolder ?? null, commandHistory);
     },
-    copy: (text) => {
-      void navigator.clipboard.writeText(text);
-    },
   };
 }
 
@@ -5708,16 +5759,7 @@ async function load(): Promise<void> {
   document.querySelector(TITLE_BAR_PROJECT)?.addEventListener('click', () => {
     runCommand(WORKSPACE_OPEN_RECENT);
   });
-  wireSplitters(document, () => layout, {
-    locale: state.locale,
-    onClose: (panelId) => {
-      void changeLayout(withPanelOpen(layout, panelId, false));
-    },
-    onResize: (panelId, size, settled) => {
-      layout = withPanelSize(layout, panelId, size);
-      void applyLayout(settled);
-    },
-  });
+  wireSplitters(document, () => layout, dockHost());
 
   if (bridge !== undefined) {
     // A File menu item was picked (TYTO-124). Straight into `runCommand`, which is the same
