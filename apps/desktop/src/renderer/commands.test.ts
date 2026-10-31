@@ -72,9 +72,11 @@ import {
   createDesktopRegistry,
   keymapSetFor,
   selectDocumentCommandId,
+  togglePanelCommandId,
   withCommandGate,
 } from './commands.js';
 import { CATALOGUE_KEYS } from '../../shared/i18n/index.js';
+import { COMMANDS_PANEL } from '../../shared/layout.js';
 
 /**
  * The desktop's half of the registry (E9.12).
@@ -223,6 +225,9 @@ describe('the ids the window registers', () => {
         .map((command) => command.id),
       COMMAND_BAR_TOGGLE,
       ...DOCUMENT_SLOTS.map(selectDocumentCommandId),
+      // TYTO-496: the command panel's toggle, which `registerPanelCommands` registers from the
+      // layout at startup and Ctrl+` names.
+      togglePanelCommandId(COMMANDS_PANEL),
     ]);
 
     const unanswered = builtInKeybindings

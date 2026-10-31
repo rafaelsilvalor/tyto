@@ -83,6 +83,8 @@ export const PROBLEMS_PANEL = 'problems';
 export const QUEUE_PANEL = 'queue';
 export const EXPLORER_PANEL = 'explorer';
 export const PROJECT_PANEL = 'project';
+/** TYTO-496 (ADR 0159): `tyto` commands typed into the window. */
+export const COMMANDS_PANEL = 'commands';
 
 /**
  * A plugin's panel (TYTO-49, ADR 0045): an id under this prefix, drawn by one element.
@@ -118,6 +120,19 @@ export const DEFAULT_LAYOUT: Layout = {
       open: true,
       size: 600,
       fixed: true,
+    },
+    {
+      // TYTO-496. The command panel, in the bottom area beside Problems and closed until Ctrl+`
+      // or the command bar opens it. **Before Problems, and that is about height, not order**:
+      // the bottom area takes the size of its first open panel (`dock.ts`), and Problems' 140px
+      // leaves a scrollback of three lines under the tabs and the input. Listed first, the panel
+      // brings its own 240px while it is open, and Problems gets its own back when it closes.
+      id: COMMANDS_PANEL,
+      element: 'tyto-command-panel',
+      dock: 'bottom',
+      open: false,
+      size: 240,
+      fixed: false,
     },
     {
       id: PROBLEMS_PANEL,

@@ -2,7 +2,7 @@
 
 # Comandos
 
-Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 83. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
+Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 84. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
 
 A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, um para cada arquivo aberto recentemente, e um para cada predefinição de exportação da pasta aberta, `export.preset:<nome>`.
 
@@ -91,3 +91,4 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Aba: 7 | `document.select:7` | `Ctrl+7` | `⌘7` |
 | Aba: 8 | `document.select:8` | `Ctrl+8` | `⌘8` |
 | Aba: 9 | `document.select:9` | `Ctrl+9` | `⌘9` |
+| Mostrar ou esconder: Comandos | `layout.togglePanel:commands` | `` Ctrl+` `` | `` Ctrl` `` |

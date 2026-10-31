@@ -2,7 +2,7 @@
 
 # Keyboard shortcuts
 
-The keys the app binds before you change anything: 37. Each one runs a command, and works only where its context holds. Change them in `keybindings.json`, which **Preferences: Open Keyboard Shortcuts (JSON)** opens; a plugin can add its own.
+The keys the app binds before you change anything: 38. Each one runs a command, and works only where its context holds. Change them in `keybindings.json`, which **Preferences: Open Keyboard Shortcuts (JSON)** opens; a plugin can add its own.
 
 ## Contexts
 
@@ -23,6 +23,7 @@ A key with no context works wherever focus is.
 | --- | --- | --- | --- |
 | `Ctrl+k` | `⌘k` | Open the command bar | `commandBar.toggle` |
 | `Ctrl+Shift+v` | `⌘⇧v` | Open preview to the side | `preview.openToSide` |
+| `` Ctrl+` `` (the key left of 1) | `` Ctrl` `` (the key left of 1) | Show or hide: Commands | `layout.togglePanel:commands` |
 | `Ctrl+=` | `⌘=` | Zoom in | `window.zoomIn` |
 | `Ctrl+-` | `⌘-` | Zoom out | `window.zoomOut` |
 | `Ctrl+0` | `⌘0` | Reset zoom | `window.zoomReset` |

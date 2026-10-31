@@ -117,7 +117,7 @@ describe('resizing', () => {
 
 describe('reading what was on the disk', () => {
   const saved = (over: Partial<Layout['panels'][number]>): unknown => ({
-    panels: [{ ...DEFAULT_LAYOUT.panels[1], ...over }],
+    panels: [{ ...panelOf(DEFAULT_LAYOUT, PROBLEMS_PANEL), ...over }],
   });
 
   it('is the default for anything that is not a layout', () => {

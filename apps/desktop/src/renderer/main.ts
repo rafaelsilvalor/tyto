@@ -32,7 +32,6 @@ import {
   skeletonText,
   isFollower,
   jsonAssist,
-  keyOfStroke,
   markdownToHtml,
   openSlashMenu,
   relintBrief,
@@ -133,6 +132,10 @@ import {
 } from './plugin-panel.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import { type ProjectPanel, PROJECT_PANEL_TAG } from './project-panel.js';
+import { type CommandPanel, COMMAND_PANEL_TAG } from './command-panel.js';
+import { type CommandSession, CommandSessions, refreshesWorkspace } from './command-sessions.js';
+import { type OutputLink, resolveEntry } from './command-links.js';
+import { loadHistory, saveHistory, withHistoryLine } from './command-history.js';
 import { type ExplorerPanel, EXPLORER_PANEL_TAG } from './explorer-panel.js';
 import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
@@ -161,6 +164,7 @@ import {
   selectDocumentCommandId,
   slotOfSelectCommand,
   togglePanelCommandId,
+  windowStrokeOf,
   withCommandGate,
 } from './commands.js';
 import { FILE_MENU_COMMANDS, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
@@ -287,6 +291,7 @@ import {
   PROBLEMS_PANEL,
   QUEUE_PANEL,
   PROJECT_PANEL,
+  COMMANDS_PANEL,
   EXPLORER_PANEL,
   dockHasPanels,
   dockIsHidden,
@@ -553,6 +558,17 @@ let problemsMark: ProblemsMark = UNLIT;
 let commandProblems: readonly CommandProblems[] = [];
 
 /**
+ * The command panel's sessions (TYTO-496), for the window's life: the panel's element is
+ * removed while it is closed, and a run keeps printing into its tab all the same.
+ */
+const commandSessions = new CommandSessions();
+
+/** The lines run in the command panel in the open folder, oldest first (TYTO-496). */
+let commandHistory: readonly string[] = [];
+/** The folder `commandHistory` is kept for; `undefined` until the first workspace answer. */
+let commandHistoryFolder: string | null | undefined;
+
+/**
  * Which tab or path a save-failure or missing-file row is about, so the save or open that fixes
  * it can take it away (TYTO-260). Not saved anywhere: these rows live as long as the window.
  */
@@ -771,6 +787,8 @@ function resolveElements() {
     queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
     // TYTO-347. A dock panel too, `null` while closed; painted from the workspace answer.
     projectPanel: document.querySelector<ProjectPanel>(PROJECT_PANEL_TAG),
+    // TYTO-496. Beside Problems, `null` while closed; it draws `commandSessions`.
+    commandPanel: document.querySelector<CommandPanel>(COMMAND_PANEL_TAG),
     // TYTO-279. In the left area above the queue, `null` while closed; it asks main itself.
     explorerPanel: document.querySelector<ExplorerPanel>(EXPLORER_PANEL_TAG),
     // TYTO-44. Outside `.shell` for the export dialog's reason: it covers the window.
@@ -3291,6 +3309,7 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   // asked again, which is cheap, rather than compared key by key.
   deliveries.clear();
   workspaceShown = answer;
+  useCommandHistoryOf(answer.folder);
   showExportPresets(answer.exportPresets);
   panel.installation = withWorkspaceRows(panel.installation, answer.problems);
   if (elements.workspaceBanner !== null) {
@@ -4208,7 +4227,10 @@ function registerPanelCommands(): void {
       run: () => {
         const current = panelOf(layout, panel.id);
         if (current === undefined) return;
-        void changeLayout(withPanelOpen(layout, panel.id, !current.open));
+        void changeLayout(withPanelOpen(layout, panel.id, !current.open)).then(() => {
+          // Opening the command panel is wanting to type in it (TYTO-496).
+          if (panel.id === COMMANDS_PANEL && !current.open) elements.commandPanel?.focusInput();
+        });
       },
     });
   }
@@ -4335,6 +4357,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   queue: 'panel.queue',
   project: 'panel.project',
   explorer: 'panel.explorer',
+  commands: 'panel.commands',
 };
 
 /** Every command the registry holds, translated and with the key that runs it. */
@@ -4587,6 +4610,7 @@ async function applyLayout(persist: boolean): Promise<void> {
   wireExplorerPanel();
   // A Project panel the dock just made has no answer yet; the last one is still true.
   if (elements.projectPanel) elements.projectPanel.view = workspaceShown;
+  wireCommandPanel();
   wireCommandBar();
   present();
   repaint();
@@ -4627,6 +4651,7 @@ function applyLocale(next: Locale): void {
   // across a switch kept the old language — the explorer's menu and delete question among
   // them (TYTO-352).
   if (elements.explorerPanel) elements.explorerPanel.locale = next;
+  if (elements.commandPanel) elements.commandPanel.locale = next;
   if (workspaceShown !== undefined && elements.workspaceBanner !== null) {
     paintWorkspaceBanner(elements.workspaceBanner, workspaceShown, next);
   }
@@ -5222,7 +5247,8 @@ function wireKeybindingDispatcher(): void {
   const altTap = new AltTap();
   window.addEventListener('keydown', (event) => {
     altTap.down(event);
-    const stroke = keyOfStroke(event);
+    // By position for the key left of 1, so Ctrl+` reaches the command panel on ABNT2 (TYTO-496).
+    const stroke = windowStrokeOf(event);
     for (const binding of windowBindingsOf(keybindings)) {
       if (concreteKey(binding, state.platform) !== stroke) continue;
       if (!windowContextHolds(binding.when)) continue;
@@ -5393,6 +5419,104 @@ function openCommandProblem(runId: string, row: CommandProblemRow): void {
 /** Windows compares paths without case, here and in main (`windows-fs-ignores-case`). */
 function pathsCaseless(): boolean {
   return state.platform === 'win32';
+}
+
+/**
+ * The command panel's ports (TYTO-496, ADR 0159). Handed to the element every time the dock makes
+ * it, like the queue's: it runs through `cli:run`, stops through `cli:cancel`, and opens what a
+ * link names by an id main minted, never by a path (ADR 0113).
+ */
+function wireCommandPanel(): void {
+  const element = elements.commandPanel;
+  if (element === null) return;
+  element.sessions = commandSessions;
+  element.ports = {
+    run: async (words) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) throw new Error('no bridge');
+      return (await bridge['cli:run']({ argv: [...words] })).runId;
+    },
+    cancel: (runId) => {
+      void withBridge(async (bridge) => {
+        await bridge['cli:cancel']({ runId });
+      });
+    },
+    open: openOutputLink,
+    folder: () => workspaceShown?.folder ?? null,
+    caseless: pathsCaseless(),
+    history: () => commandHistory,
+    remember: (line) => {
+      commandHistory = withHistoryLine(commandHistory, line);
+      saveHistory(historyStorage(), commandHistoryFolder ?? null, commandHistory);
+    },
+    copy: (text) => {
+      void navigator.clipboard.writeText(text);
+    },
+  };
+}
+
+/** The window's own storage, or none where the profile refuses it (`command-history.ts`). */
+function historyStorage(): Storage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The command panel's history follows the open folder: each folder keeps its own. */
+function useCommandHistoryOf(folder: string | null): void {
+  if (folder === commandHistoryFolder) return;
+  commandHistoryFolder = folder;
+  commandHistory = loadHistory(historyStorage(), folder);
+}
+
+/**
+ * What a run's end does beyond its tab: the line saying how it ended, and, after a `trust`
+ * command, the window asks for the folder again. Main re-reads the folder's trust when the
+ * command changes it (ADR 0159 decision 3) but tells the window nothing, so the banner and the
+ * Manage Trust dialog would keep showing the old answer until the next ask.
+ */
+commandSessions.onEnded = (session: CommandSession): void => {
+  const ended =
+    session.state === 'cancelled'
+      ? translate(state.locale, 'commandPanel.state.cancelled')
+      : translate(state.locale, 'commandPanel.state.finished').replaceAll(
+          '{code}',
+          String(session.code ?? 0),
+        );
+  commandSessions.note(session.id, `— ${ended}`);
+  if (refreshesWorkspace(session)) {
+    void withBridge(async (bridge) => {
+      showWorkspace(await bridge['workspace:folder']({}));
+    });
+  }
+};
+
+/**
+ * A link in a command's output (TYTO-496): a place a diagnostic printed opens as its Problems row
+ * does; a file inside the open folder is found in the explorer's listings, opened by the id main
+ * gave it, and the cursor goes to the line the command printed.
+ */
+function openOutputLink(session: CommandSession, link: OutputLink): void {
+  if (link.kind === 'diagnostic') {
+    if (session.runId !== undefined) openCommandProblem(session.runId, link.row);
+    return;
+  }
+  void withBridge(async (bridge) => {
+    const entryId = await resolveEntry(
+      link.segments,
+      (parent) => bridge['explorer:list']({ entryId: parent }),
+      pathsCaseless(),
+    );
+    if (entryId === undefined) return;
+    const wanted = nextDocumentId();
+    const opened = await bridge['explorer:open']({ documentId: wanted, entryId });
+    adopt(opened.document, opened.documentId, wanted);
+    if (opened.document === null || link.line === undefined) return;
+    const at = offsetAt(active().brief, link.line, link.column ?? 1);
+    reveal({ start: at, end: at });
+  });
 }
 
 /**
@@ -5612,9 +5736,17 @@ async function load(): Promise<void> {
     // A `tyto` command run from the window reported diagnostics (TYTO-495): its section grows.
     bridge.on('cli:diagnostics', (pushed) => {
       commandProblems = withCommandProblems(commandProblems, pushed);
+      commandSessions.diagnostics(pushed);
       paintPanel();
       // The status bar counts a command's rows too (TYTO-496).
       paintStatusBar();
+    });
+    // What a run prints and how it stands, into its tab of the command panel (TYTO-496).
+    bridge.on('cli:output', (pushed) => {
+      commandSessions.output(pushed);
+    });
+    bridge.on('cli:state', (pushed) => {
+      commandSessions.state(pushed);
     });
 
     bridge.on('queue:changed', () => {

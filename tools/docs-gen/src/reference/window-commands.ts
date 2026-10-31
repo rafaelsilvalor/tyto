@@ -9,7 +9,9 @@ import {
   createDesktopRegistry,
   selectDocumentCommandId,
   slotOfSelectCommand,
+  togglePanelCommandId,
 } from '../../../../apps/desktop/src/renderer/commands.js';
+import { COMMANDS_PANEL } from '../../../../apps/desktop/shared/layout.js';
 import type { Locale } from './markdown.js';
 
 /**
@@ -27,12 +29,17 @@ const idleActions = new Proxy({} as DesktopActions, {
  * The ids `main.ts` registers beside `createDesktopRegistry`, which cannot be imported without
  * a document. Only the ones that exist from the first frame and carry a default key: the nine
  * tab slots (`registerDocumentCommands`). The bar's own toggle is the resolver's, not the
- * registry's (`@tyto/editor`'s keybindings). A panel's toggle and a recent file's entry come
- * and go while the window runs, so the commands page names them in prose.
+ * registry's (`@tyto/editor`'s keybindings). A recent file's entry comes and goes while the
+ * window runs, and so does a plugin panel's toggle, so the commands page names them in prose.
+ * The command panel's toggle is the one panel toggle named here (TYTO-496): a built-in panel's
+ * toggle exists from the first frame (`registerPanelCommands`), and this one carries Ctrl+`.
  */
+const COMMANDS_PANEL_TOGGLE = togglePanelCommandId(COMMANDS_PANEL);
+
 const WINDOW_REGISTERED: readonly string[] = [
   COMMAND_BAR_TOGGLE,
   ...DOCUMENT_SLOTS.map(selectDocumentCommandId),
+  COMMANDS_PANEL_TOGGLE,
 ];
 
 /** Every command id the window answers at startup, in the bar's order. */
@@ -56,6 +63,10 @@ export function commandTitle(id: string, locale: Locale): string {
   const slot = slotOfSelectCommand(id);
   if (slot !== undefined) return `${translate(locale, 'command.document.select')}: ${String(slot)}`;
   if (id === COMMAND_BAR_TOGGLE) return translate(locale, COMMAND_BAR_TITLE);
+  // As the command bar titles every panel's toggle: "Show or hide: Commands".
+  if (id === COMMANDS_PANEL_TOGGLE) {
+    return `${translate(locale, 'command.layout.togglePanel')}: ${translate(locale, 'panel.commands')}`;
+  }
   const key = COMMAND_LABELS[id];
   return key === undefined ? id : translate(locale, key);
 }
