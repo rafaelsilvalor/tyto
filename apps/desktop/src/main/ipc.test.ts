@@ -821,6 +821,22 @@ const dependencies = () => {
     project: projectFolder(),
     workspace: workspaceFolder(),
     pluginFiles: { sync: () => Promise.resolve() },
+    gallery: {
+      list: () => Promise.resolve({ index: 'file:///index', problems: [] }),
+      install: (id: string) =>
+        Promise.resolve({
+          outcome: 'written' as const,
+          byHand: [],
+          view: { index: 'file:///index', problems: [`installed ${id}`] },
+        }),
+      update: (id: string) =>
+        Promise.resolve({
+          outcome: 'refused' as const,
+          problem: `E_GALLERY_ENTRY_EDITED: ${id}`,
+          byHand: [],
+          view: { index: 'file:///index', problems: [] },
+        }),
+    },
     explorer: explorerFiles(),
     queue: queueDependency(),
     settings: {
@@ -1256,6 +1272,32 @@ describe('plugins:list', () => {
     ]);
     // What main sends must satisfy the contract the preload validates it against.
     expect(IPC_CHANNELS['plugins:list'].response.safeParse(answer).success).toBe(true);
+  });
+});
+
+describe('the gallery (TYTO-504)', () => {
+  it('hands the entry id to main and answers in the shape the preload validates', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const installed = await handlers['gallery:install']({ id: 'tabela' });
+    expect(installed.view.problems).toEqual(['installed tabela']);
+    const refused = await handlers['gallery:update']({ id: 'tabela' });
+    expect(refused.problem).toBe('E_GALLERY_ENTRY_EDITED: tabela');
+
+    expect(IPC_CHANNELS['gallery:install'].response.safeParse(installed).success).toBe(true);
+    expect(IPC_CHANNELS['gallery:update'].response.safeParse(refused).success).toBe(true);
+    expect(
+      IPC_CHANNELS['gallery:list'].response.safeParse(await handlers['gallery:list']({})).success,
+    ).toBe(true);
+  });
+
+  it('names no index: a request that carries one is refused at the contract', () => {
+    expect(IPC_CHANNELS['gallery:list'].request.safeParse({ index: 'file:///x' }).success).toBe(
+      false,
+    );
+    expect(IPC_CHANNELS['gallery:install'].request.safeParse({ id: '../tabela' }).success).toBe(
+      false,
+    );
   });
 });
 

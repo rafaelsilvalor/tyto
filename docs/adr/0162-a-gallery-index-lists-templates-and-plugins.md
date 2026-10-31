@@ -215,3 +215,10 @@ FETCH_HEAD -- <path>`, bytes as committed) and kept beside the cached index in
 inside the repository (absolute, a drive, a backslash, a `..`, `.` or empty segment, a dash
 first) is never handed to `git`; a picture the commit lacks costs that picture alone, and the
 entry is listed without one.
+
+**The window's gallery (TYTO-504, second half)** reads the index the `galleryIndex` setting
+names, in main, on every open; the renderer names no index and no path, only an entry's id.
+Install and update are the operations above, followed by the window's own plugin-files sync,
+so approvals use its box and failures reach its problems panel. **The window has no
+`--force`**: a place changed by hand since the gallery wrote it is refused there, and the
+refusal names `tyto gallery update <id> --force` for a terminal.
