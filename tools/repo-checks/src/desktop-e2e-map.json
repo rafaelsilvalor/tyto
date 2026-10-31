@@ -675,6 +675,7 @@
         "apps/desktop/shared/command-runs.ts",
         "apps/desktop/src/renderer/ansi.ts",
         "apps/desktop/src/renderer/command-blocks.ts",
+        "apps/desktop/src/renderer/command-completion.ts",
         "apps/desktop/src/renderer/command-history.ts",
         "apps/desktop/src/renderer/command-links.ts",
         "apps/desktop/src/renderer/command-output.ts",

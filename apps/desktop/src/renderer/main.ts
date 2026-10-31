@@ -136,7 +136,9 @@ import { type CommandPanel, COMMAND_PANEL_TAG } from './command-panel.js';
 import { type CommandSession, CommandSessions, refreshesWorkspace } from './command-sessions.js';
 import { inRunOrder, sectionTitle, shortCommand } from './command-blocks.js';
 import type { CommandsOrder } from '../../shared/command-runs.js';
-import { type OutputLink, resolveEntry } from './command-links.js';
+import { type OutputLink, commandPathOf, listFolderAt, resolveEntry } from './command-links.js';
+import { type Completion, complete } from './command-completion.js';
+import { joinCommandLine } from './command-words.js';
 import { loadHistory, saveHistory, withHistoryLine } from './command-history.js';
 import { type ExplorerPanel, EXPLORER_PANEL_TAG } from './explorer-panel.js';
 import type { RestoredDrafts, TemplateMode } from './template-mode.js';
@@ -145,6 +147,7 @@ import {
   COMMAND_LABELS,
   DELIVERY_EXPORT,
   DELIVERY_NEW,
+  COMMAND_PANEL_RENDER_BRIEF,
   DOCUMENT_SLOTS,
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
@@ -1499,6 +1502,10 @@ function showExportPresets(presets: readonly ExportPresetView[]): void {
 // A delivery is made only inside the open folder (ADR 0157 §3), so its command waits for one.
 const offeredNow = (id: string): boolean => {
   if (id === DELIVERY_NEW) return deliveryOffered(workspaceShown);
+  // TYTO-496: only with a brief in front whose path a command can be given.
+  if (id === COMMAND_PANEL_RENDER_BRIEF) {
+    return isBrief(active().kind) && briefCommandPath() !== undefined;
+  }
   // And the delivery's export only for a brief main said is in one (TYTO-490).
   if (id === DELIVERY_EXPORT) {
     return commandOffered(activeKind(), id) && deliveryOf(active().id, active()) !== null;
@@ -1698,6 +1705,16 @@ const registry: CommandRegistry = withCommandGate(
 
     newDelivery: () => {
       newDelivery();
+    },
+    focusCommandPanel: () => {
+      void showCommandPanel();
+    },
+    renderBriefInCommandPanel: () => {
+      const path = briefCommandPath();
+      if (path === undefined) return;
+      void showCommandPanel().then(() => {
+        elements.commandPanel?.fill(`render ${joinCommandLine([path])} `);
+      });
     },
 
     exportDelivery: () => {
@@ -5532,6 +5549,7 @@ function wireCommandPanel(): void {
       });
     },
     open: openOutputLink,
+    complete: completeCommand,
     folder: () => workspaceShown?.folder ?? null,
     caseless: pathsCaseless(),
     history: () => commandHistory,
@@ -5541,6 +5559,60 @@ function wireCommandPanel(): void {
     },
   };
 }
+
+/** The command panel's tab in front, open if it was closed, the caret on its prompt (TYTO-496). */
+async function showCommandPanel(): Promise<void> {
+  await changeLayout(withPanelOpen(layout, COMMANDS_PANEL, true));
+  elements.commandPanel?.focusInput();
+}
+
+/** The path a command is given for the brief in front: its label, or relative to the folder. */
+function briefCommandPath(): string | undefined {
+  return commandPathOf(active().pathLabel, workspaceShown?.folder ?? null);
+}
+
+/** The CLI's tree, asked once: it does not change while the window runs (ADR 0159). */
+let commandTreeAsked: Promise<IpcResponse<'cli:commands'>['tree'] | undefined> | undefined;
+
+/**
+ * What can come at the caret on the command panel's prompt (TYTO-496): the CLI's tree, and for a
+ * value the window's templates, the installed plugins and the open folder's files, listed by the
+ * explorer's ids.
+ */
+async function completeCommand(line: string, caret: number): Promise<Completion> {
+  const bridge = window.tyto;
+  const none: Completion = { from: caret, to: caret, items: [] };
+  if (bridge === undefined) return none;
+  commandTreeAsked ??= bridge['cli:commands']({}).then(
+    (answer) => answer.tree,
+    () => undefined,
+  );
+  const tree = await commandTreeAsked;
+  if (tree === undefined) return none;
+  return complete(line, caret, tree, {
+    templates: () =>
+      panel.templates.map((template) => ({
+        name: template.name,
+        formats: template.formats.map((format) => format.id),
+        ...(template.alias === undefined ? {} : { aliasOf: template.alias.template }),
+      })),
+    plugins: async () => (await bridge['plugins:list']({})).plugins.map((plugin) => plugin.name),
+    list: (segments) =>
+      workspaceShown?.folder === null || workspaceShown?.folder === undefined
+        ? Promise.resolve(undefined)
+        : listFolderAt(
+            segments,
+            (entryId) => bridge['explorer:list']({ entryId }),
+            pathsCaseless(),
+          ),
+    caseless: pathsCaseless(),
+    // Refused before any command starts (`src/main/cli-refusals.ts`, ADR 0159 decision 2): the
+    // window trusts a folder through Workspace: Manage Trust only.
+    refused: REFUSED_OPTIONS,
+  });
+}
+
+const REFUSED_OPTIONS: ReadonlySet<string> = new Set(['--trust']);
 
 /** The window's own storage, or none where the profile refuses it (`command-history.ts`). */
 function historyStorage(): Storage | undefined {
