@@ -728,6 +728,26 @@
       "why": "reviewed: session restore runs on every launch"
     },
     {
+      "paths": [
+        "apps/desktop/e2e/folder-tabs.desktop.test.ts",
+        "apps/desktop/e2e/folder-switch.ts"
+      ],
+      "e2e": [
+        "explorer-image.desktop.test.ts",
+        "explorer-write.desktop.test.ts",
+        "explorer.desktop.test.ts",
+        "export-delivery.desktop.test.ts",
+        "export-presets.desktop.test.ts",
+        "folder-tabs.desktop.test.ts",
+        "markdown-preview.desktop.test.ts",
+        "plugin-sources.desktop.test.ts",
+        "tab-folder.desktop.test.ts",
+        "text-tabs.desktop.test.ts",
+        "workspace.desktop.test.ts"
+      ],
+      "why": "reviewed: each workspace folder keeps its tabs, and every suite that switches folders waits for the reload into the new folder's (TYTO-513, ADR 0165)"
+    },
+    {
       "paths": ["apps/desktop/src/main/settings-file.ts"],
       "e2e": [
         "block-enter.desktop.test.ts",

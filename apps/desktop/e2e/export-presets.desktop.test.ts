@@ -15,6 +15,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 
 /**
@@ -168,7 +169,7 @@ beforeAll(async () => {
 
   // Restricted, as every folder starts: `entregas` is inside it, so the preset stays.
   await answerPickers({ directory: work });
-  await run('workspace.openFolder');
+  await switchingFolder(window, () => run('workspace.openFolder'));
   await openBrief(join(work, 'briefs', 'uma.brief'), 'Lâmina 1');
 });
 

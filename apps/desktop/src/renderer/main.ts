@@ -3451,24 +3451,39 @@ async function openRecentFolder(id: string): Promise<void> {
   await changeWorkspaceFolder((bridge) => bridge['workspace:open-recent']({ id }), true);
 }
 
-/** What both doors share: main's answer painted, the tabs relabelled, the explorer opened. */
+/**
+ * What both doors share: main's answer painted, the tabs relabelled, the explorer opened.
+ *
+ * **Each folder keeps its tabs** (TYTO-513, ADR 0165). The session is written first, as a reload
+ * writes it, so the folder being left keeps every tab and draft; main files them under that
+ * folder when the answer names another one, and the window reloads to read the new folder's.
+ * A write that failed while a tab holds unsaved text stops the switch, as it stops a reload.
+ */
 async function changeWorkspaceFolder(
   askFolder: (bridge: TytoBridge) => Promise<IpcResponse<'workspace:set-folder'>>,
   choose: boolean,
 ): Promise<void> {
   await withBridge(async (bridge) => {
     const before = workspaceShown?.folder ?? null;
+    if (!(await keepSession(false)) && workspace.documents.some(isUnsaved)) {
+      showNotice('session.folderNotSwitched');
+      return;
+    }
     const answer = await askFolder(bridge);
+    if (answer.folder !== before) {
+      // Opening a folder opens the explorer (Rafael, 2026-10-21), and only here: a folder the
+      // session brings back at launch leaves the panel as the saved layout has it.
+      if (choose && answer.folder !== null) {
+        await changeLayout(withPanelOpen(layout, EXPLORER_PANEL, true));
+      }
+      window.location.reload();
+      return;
+    }
+    // The same folder, read again, or a picker dismissed: the tabs stay where they are.
     // A label inside the open folder is relative to it (TYTO-274, ADR 0125): main labels every
     // open tab again, and they take it as they take a rename.
     workspace = withMovedDocuments(workspace, answer.relabelled);
     showWorkspace(answer);
-    // Opening a folder opens the explorer (Rafael, 2026-10-21), and only here: a folder the
-    // session brings back at launch leaves the panel as the saved layout has it, and a picker
-    // dismissed with the same folder open changes nothing.
-    if (choose && answer.folder !== null && answer.folder !== before) {
-      await changeLayout(withPanelOpen(layout, EXPLORER_PANEL, true));
-    }
     await afterTemplatesReread(bridge);
   });
 }
@@ -6298,6 +6313,9 @@ async function load(): Promise<void> {
       // templates and previews it changes.
       showWorkspace(await bridge['workspace:folder']({}));
       await afterTemplatesReread(bridge);
+      // The page's tabs and folder are the session's now. A folder switch reloads the window
+      // (TYTO-513, ADR 0165), and this is the one place that says the new folder's tabs are in.
+      document.documentElement.dataset.session = 'restored';
     }
   }
 

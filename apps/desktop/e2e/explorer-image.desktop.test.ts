@@ -10,6 +10,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 import { SHOWN_PREVIEW, previewPart, previewSrcdoc } from './preview-pane.js';
 
@@ -151,7 +152,7 @@ beforeAll(async () => {
   await app.evaluate(({ dialog }, chosen) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
   }, work);
-  await run('workspace.openFolder');
+  await switchingFolder(window, () => run('workspace.openFolder'));
   await row('logo.png').waitFor({ timeout: 15_000 });
 }, 180_000);
 

@@ -210,6 +210,11 @@ export interface Catalogue {
    * appended, as `file.missing` appends it.
    */
   readonly 'session.draftStale': string;
+  /**
+   * TYTO-513, ADR 0165. The status bar's notice when another folder was asked for but the tabs
+   * could not be kept while one held unsaved text: the folder stays as it was.
+   */
+  readonly 'session.folderNotSwitched': string;
 
   /**
    * The document tabs (E9.11).
@@ -976,6 +981,7 @@ export const CATALOGUE_KEYS = [
   'file.missing',
   'file.saveFailed',
   'session.draftStale',
+  'session.folderNotSwitched',
   'document.close',
   'document.discard.message',
   'document.discard.detail',

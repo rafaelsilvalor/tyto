@@ -8,6 +8,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 
@@ -168,7 +169,7 @@ afterAll(async () => {
 describe('a workspace folder in the window (TYTO-278)', () => {
   it('opens through main, and a brief inside draws from the declared folders', async () => {
     await answerPickers({ directory: work });
-    await run('workspace.openFolder');
+    await switchingFolder(window, () => run('workspace.openFolder'));
     await expect.poll(problemsText, { timeout: 10_000 }).toContain('W_PROJECT_PATH_OUTSIDE');
     expect(await problemsText()).toContain('project.json:4:');
 
@@ -203,8 +204,12 @@ describe('a workspace folder in the window (TYTO-278)', () => {
       .poll(() => previewSrcdoc(window), { timeout: 15_000 })
       .toContain('Template do projeto');
 
-    await run('workspace.closeFolder');
+    // Closing it files its tabs under it (TYTO-513, ADR 0165), so the brief that drew a
+    // template of the folder's is opened again with no folder open: the template went too.
+    await switchingFolder(window, () => run('workspace.closeFolder'));
     await expect.poll(problemsText, { timeout: 10_000 }).not.toContain('W_PROJECT_PATH_OUTSIDE');
+    await answerPickers({ file: join(work, 'briefs', 'guarda.brief') });
+    await run('editor.open');
     await expect.poll(problemsText, { timeout: 10_000 }).toContain('E_UNKNOWN_TEMPLATE');
   }, 60_000);
 });
@@ -235,7 +240,7 @@ describe('trusting a folder from the window (TYTO-278, ADR 0111)', () => {
     );
 
     await answerPickers({ directory: team });
-    await run('workspace.openFolder');
+    await switchingFolder(window, () => run('workspace.openFolder'));
     await expect.poll(bannerShown, { timeout: 10_000 }).toBe(true);
     await openBrief(join(team, 'briefs', 'shared.brief'), 'Arte da equipe');
     expect(await previewSrcdoc(window)).not.toContain(SHARED.toString('base64'));
@@ -315,7 +320,7 @@ describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
     const path = brief(campaign, 'perfil', 'Do perfil');
 
     await answerPickers({ directory: campaign });
-    await run('workspace.openFolder');
+    await switchingFolder(window, () => run('workspace.openFolder'));
     await openBrief(path, 'Do perfil');
     expect(await previewSrcdoc(window)).toContain(PROFILE_ART.toString('base64'));
 
@@ -341,7 +346,7 @@ describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
     const path = brief(shop, 'equipe', 'Da equipe');
 
     await answerPickers({ directory: shop });
-    await run('workspace.openFolder');
+    await switchingFolder(window, () => run('workspace.openFolder'));
     await expect.poll(profileLineShown, { timeout: 10_000 }).toBe(true);
     await openBrief(path, 'Da equipe');
     expect(await previewSrcdoc(window)).not.toContain(TEAM_ART.toString('base64'));
@@ -365,10 +370,12 @@ describe('the recent folders in the title bar (TYTO-487)', () => {
     // Four folders were opened above; the last, `loja`, is open now.
     await expect.poll(() => button.textContent(), { timeout: 10_000 }).toBe('loja');
 
-    await button.click();
-    await window.locator('.recent-folders__search').waitFor({ state: 'visible' });
-    await window.keyboard.type('promo');
-    await window.keyboard.press('Enter');
+    await switchingFolder(window, async () => {
+      await button.click();
+      await window.locator('.recent-folders__search').waitFor({ state: 'visible' });
+      await window.keyboard.type('promo');
+      await window.keyboard.press('Enter');
+    });
 
     await expect.poll(() => button.textContent(), { timeout: 10_000 }).toBe('promo');
     await expect.poll(problemsText, { timeout: 10_000 }).toContain('W_PROJECT_PATH_OUTSIDE');

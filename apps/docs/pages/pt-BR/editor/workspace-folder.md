@@ -27,6 +27,14 @@ A barra de título tem um botão depois de **Ajuda** com o nome da pasta aberta,
 
 Uma pasta escolhida aqui abre exatamente como pelo **Arquivo ▸ Abrir pasta…**: na mesma janela, no lugar da pasta aberta agora, e confiável só se você já tiver confiado nela. A lista guarda as últimas dez pastas, e uma pasta que não está mais no disco fica de fora. O id do comando é `workspace.openRecent`, então o `keybindings.json` pode pô-lo numa tecla.
 
+### Cada pasta guarda as suas abas
+
+Cada pasta lembra as abas que estavam abertas nela, como no Zed. Quando você abre outra pasta, pelo **Arquivo ▸ Abrir pasta…**, pela lista de recentes ou pelo **Arquivo ▸ Fechar pasta**, o Tyto guarda as abas da pasta que você está deixando, recarrega a janela e mostra as abas que a pasta nova tinha quando você saiu dela da última vez. Uma pasta que você ainda não abriu começa sem abas, e a prévia continua ao lado se estava aberta. As abas que você tinha abertas sem pasta são guardadas do mesmo jeito, e voltam quando você fecha a pasta.
+
+O texto não salvo volta também, e nada pergunta antes da troca. Se um arquivo mudou no disco enquanto a pasta dele estava fora, ele abre como está agora e o seu texto não salvo volta numa aba nova ao lado. Um arquivo que sumiu perde a aba, e o painel de problemas avisa. Se o Tyto não conseguiu guardar uma aba com texto não salvo, a pasta não muda e a barra de status avisa: salve a aba e tente de novo.
+
+O Tyto guarda as abas das últimas dez pastas que você deixou, tantas quantas a lista de recentes mostra. O tamanho dos painéis e os terminais são da janela, não da pasta: a troca os deixa como estão.
+
 Enquanto ela está aberta:
 
 - os templates dela aparecem ao lado dos seus e dos internos, depois da [sua pasta de templates](../templates/templates-folder.md);

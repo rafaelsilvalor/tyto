@@ -7,6 +7,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 
 /**
@@ -133,7 +134,9 @@ beforeAll(async () => {
   await app?.evaluate(({ dialog }, chosen) => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
   }, work);
-  if (!(await run('workspace.openFolder'))) throw new Error('workspace.openFolder was refused');
+  await switchingFolder(window, async () => {
+    if (!(await run('workspace.openFolder'))) throw new Error('workspace.openFolder was refused');
+  });
   await row('notas.md').waitFor({ timeout: 15_000 });
 }, 300_000);
 

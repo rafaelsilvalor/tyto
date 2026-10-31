@@ -12,6 +12,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 import { openPreviewBeside, previewSrcdoc } from './preview-pane.js';
 import { waitForWindowTemplates } from './window-templates.js';
@@ -334,7 +335,7 @@ describe("an installed plugin's image and face in the window (ADR 0119)", () => 
     await app?.evaluate(({ dialog }, chosen) => {
       dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
     }, work);
-    await run('workspace.openFolder');
+    await switchingFolder(page, () => run('workspace.openFolder'));
     await open(path);
 
     // The command and not the banner: a folder that left nothing out shows no banner.

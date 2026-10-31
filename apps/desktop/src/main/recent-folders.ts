@@ -38,11 +38,20 @@ export interface RecentFoldersOptions {
   readonly platform?: NodeJS.Platform;
 }
 
+/**
+ * What one folder is, for comparing two paths: case folded on Windows only. The recent list's
+ * ids and comparisons use it, and so does the session's per-folder tabs (TYTO-513).
+ */
+export const folderKeyFor =
+  (platform: NodeJS.Platform) =>
+  (folder: string): string =>
+    platform === 'win32' ? folder.toLowerCase() : folder;
+
 export function createRecentFoldersService(options: RecentFoldersOptions): RecentFoldersService {
   const platform = options.platform ?? process.platform;
   const windows = platform === 'win32';
-  // The id and the comparison agree on what one folder is: case folded on Windows only.
-  const key = (folder: string): string => (windows ? folder.toLowerCase() : folder);
+  // The id and the comparison agree on what one folder is.
+  const key = folderKeyFor(platform);
   const idOf = (folder: string): string =>
     createHash('sha256').update(key(folder)).digest('hex').slice(0, 16);
   const same = (left: string, right: string | null): boolean =>

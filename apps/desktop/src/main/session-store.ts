@@ -146,6 +146,36 @@ const storedTemplate = z.object({
  */
 const storedWorkspace = z.object({ folder: z.string().min(1) });
 
+/** What a tree that does not parse reads as: no group, and not a first launch (TYTO-287). */
+const storedGroupsOrNone = storedGroups
+  .optional()
+  .catch(() => ({ root: { tabs: [], active: 0 }, focused: 0 }));
+
+/**
+ * The tabs a workspace folder had when the window left it (TYTO-513, ADR 0165): the same three
+ * fields the window's own record keeps, under the folder's real path as main opened it. `null`
+ * is the window with no folder open. **An entry that does not parse is dropped alone**: it
+ * costs that folder's tabs, never another folder's nor the window's.
+ */
+const storedFolderTabs = z.object({
+  folder: z.string().min(1).nullable(),
+  tabs: z.array(storedTab),
+  active: z.number().int().min(0),
+  groups: storedGroupsOrNone,
+});
+
+/** Each entry is read on its own, by {@link foldersOf}, so a bad one is dropped alone. */
+const storedFolders = z
+  .array(z.unknown())
+  .optional()
+  .catch(() => undefined);
+
+const foldersOf = (entries: readonly unknown[]): StoredFolderTabs[] =>
+  entries.flatMap((entry) => {
+    const parsed = storedFolderTabs.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+
 const storedSession = z.object({
   version: z.literal(1),
   tabs: z.array(storedTab),
@@ -154,13 +184,22 @@ const storedSession = z.object({
   workspace: storedWorkspace.optional().catch(() => undefined),
   // A tree that does not parse costs the arrangement and nothing else: it reads as no group,
   // and not as a session without groups, which would be a first launch (TYTO-287).
-  groups: storedGroups.optional().catch(() => ({ root: { tabs: [], active: 0 }, focused: 0 })),
+  groups: storedGroupsOrNone,
+  /**
+   * The other folders' tabs, newest first (TYTO-513, ADR 0165). The top-level fields stay the
+   * window as it was left, so a file written before this field is exactly a session that
+   * remembers no other folder, with the version still 1 — the migration is reading it.
+   */
+  folders: storedFolders,
 });
 
 export type StoredGroups = z.infer<typeof storedGroups>;
 export type StoredTab = z.infer<typeof storedTab>;
 export type StoredTemplate = z.infer<typeof storedTemplate>;
-export type StoredSession = z.infer<typeof storedSession>;
+export type StoredFolderTabs = z.infer<typeof storedFolderTabs>;
+export type StoredSession = Omit<z.infer<typeof storedSession>, 'folders'> & {
+  readonly folders?: StoredFolderTabs[];
+};
 
 export const EMPTY_SESSION: StoredSession = { version: 1, tabs: [], active: 0 };
 
@@ -200,7 +239,9 @@ export function fileSessionStore(file: string): SessionStore {
       }
       try {
         const parsed = storedSession.safeParse(JSON.parse(text));
-        return parsed.success ? parsed.data : UNREADABLE_SESSION;
+        if (!parsed.success) return UNREADABLE_SESSION;
+        const { folders, ...session } = parsed.data;
+        return folders === undefined ? session : { ...session, folders: foldersOf(folders) };
       } catch {
         return UNREADABLE_SESSION;
       }
