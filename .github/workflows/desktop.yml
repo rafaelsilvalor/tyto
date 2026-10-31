@@ -105,6 +105,15 @@ jobs:
         run: pnpm exec playwright install-deps chromium
       - if: runner.os == 'Linux'
         run: sudo apt-get install -y --no-install-recommends xvfb
+      # PROBE TYTO-510: run D measured `posix_spawnp failed.` on both Mac legs. The mode of the
+      # prebuilt `spawn-helper` as the tarball installed it, then the execute bit set.
+      - name: PROBE spawn-helper mode
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          ls -l node_modules/.pnpm/node-pty@*/node_modules/node-pty/prebuilds/darwin-*/
+          chmod +x node_modules/.pnpm/node-pty@*/node_modules/node-pty/prebuilds/darwin-*/spawn-helper
+          ls -l node_modules/.pnpm/node-pty@*/node_modules/node-pty/prebuilds/darwin-*/spawn-helper
       - name: The packaged app opens before anything is uploaded
         shell: bash
         run: |
