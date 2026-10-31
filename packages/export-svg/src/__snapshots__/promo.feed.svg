@@ -7,7 +7,7 @@
       <stop offset="0" stop-color="#ff5900"/>
       <stop offset="1" stop-color="#ffbd00"/>
     </linearGradient>
-    <filter id="filter3" filterUnits="userSpaceOnUse" x="-80" y="-80" width="1240" height="1240">
+    <filter id="filter3" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse" x="-80" y="-80" width="1240" height="1240">
       <feDropShadow in="SourceGraphic" dx="0" dy="8" stdDeviation="24" flood-color="#000000" flood-opacity="0.35" result="fx2"/>
     </filter>
     <mask id="mask4" maskUnits="userSpaceOnUse" style="mask-type:alpha">
