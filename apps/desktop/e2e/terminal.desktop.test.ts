@@ -271,6 +271,50 @@ describe('a terminal in the window', () => {
       process.stdout.write(`${lines.join('\n')}\n`);
     };
     debug('before closeApp');
+    // DEBUG TYTO-497: Electron's own stdio pipes, and later every process still holding one.
+    const electronPid = app.process().pid ?? 0;
+    const stdio = new Set<string>();
+    if (process.platform === 'linux') {
+      for (const fd of ['0', '1', '2']) {
+        try {
+          stdio.add(readlinkSync(`/proc/${String(electronPid)}/fd/${fd}`));
+        } catch {
+          // Not readable.
+        }
+      }
+    }
+    const holders = (): void => {
+      if (process.platform !== 'linux') return;
+      const found: string[] = [
+        `[TYTO-497 debug] electron ${String(electronPid)} stdio ${[...stdio].join(' ')}`,
+      ];
+      for (const entry of readdirSync('/proc')) {
+        if (!/^\d+$/u.test(entry)) continue;
+        try {
+          const links = readdirSync(`/proc/${entry}/fd`).map((fd) => {
+            try {
+              return readlinkSync(`/proc/${entry}/fd/${fd}`);
+            } catch {
+              return '';
+            }
+          });
+          const held = links.filter((link) => stdio.has(link) && link.startsWith('pipe:'));
+          if (held.length === 0) continue;
+          const command = readFileSync(`/proc/${entry}/cmdline`, 'utf8')
+            .replaceAll('\0', ' ')
+            .slice(0, 200);
+          const status = readFileSync(`/proc/${entry}/status`, 'utf8');
+          const parent = /^PPid:\s*(.*)$/mu.exec(status)?.[1] ?? '?';
+          const state = /^State:\s*(.*)$/mu.exec(status)?.[1] ?? '?';
+          found.push(
+            `  holder ${entry} ppid ${parent} state ${state} holds ${held.join(',')}: ${command}`,
+          );
+        } catch {
+          // Gone or not ours.
+        }
+      }
+      process.stdout.write(`${found.join('\n')}\n`);
+    };
     const closed = await Promise.race([
       closeApp(app).then(() => 'closed'),
       new Promise<string>((resolve) =>
@@ -278,6 +322,7 @@ describe('a terminal in the window', () => {
       ),
     ]);
     debug(closed);
+    holders();
     expect(closed).toBe('closed');
 
     expect(existsSync(asked) ? readFileSync(asked, 'utf8') : 'not asked').toBe('not asked');
