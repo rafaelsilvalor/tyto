@@ -1,5 +1,34 @@
 # @tyto/command-line
 
+## 0.2.0
+
+### Minor Changes
+
+- 8dd4503: The command tree says what each argument and option takes, for the window's completion (TYTO-496): `commandTree` gives each option its long and short flag, whether it takes a value, and, where `program.ts` says so beside the definition, the kind of value (a brief, a file, a folder, a template, format ids, output types with the built-in four as choices, or a plugin). `valuesOf` refuses a name the command does not declare, so a renamed option fails when the program is built. Nothing a command accepts or refuses changes.
+- 9bcb68b: `tyto gallery list | install | update` reads the curated index when neither `--index` nor `TYTO_GALLERY_INDEX` names one (TYTO-506, ADR 0162): `DEFAULT_GALLERY_INDEX`, a plain git location exported by `@tyto/plugin-api`. `--index` wins over the variable, and the variable over the default.
+
+### Patch Changes
+
+- 213f553: TYTO-504: `tyto gallery list | install | update` print what `@tyto/io`'s gallery operations answer; what they write and say is unchanged.
+- 9021b50: Rename shadowing local bindings without changing behavior and enforce the no-shadow lint rule.
+- Updated dependencies [213f553]
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [bd56ec5]
+- Updated dependencies [9bcb68b]
+  - @tyto/io@5.2.0
+  - @tyto/core@0.36.0
+  - @tyto/pipeline@0.12.5
+  - @tyto/plugin-api@0.13.0
+  - @tyto/template-lang@0.8.8
+  - @tyto/export-html@0.7.9
+  - @tyto/export-svg@2.0.9
+  - @tyto/raster@0.2.3
+  - @tyto/fonts@0.4.1
+  - @tyto/google-fonts@0.1.8
+  - @tyto/templates@1.2.1
+
 ## 0.1.0
 
 ### Minor Changes

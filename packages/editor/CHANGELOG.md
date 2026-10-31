@@ -1,5 +1,22 @@
 # @tyto/editor
 
+## 0.13.0
+
+### Minor Changes
+
+- f0cd9b8: The key table has a seventh context, `terminal`: focus is in a terminal, with the command bar closed (TYTO-497, ADR 0164). `panel` no longer holds inside a terminal.
+
+### Patch Changes
+
+- 9021b50: Rename shadowing local bindings without changing behavior and enforce the no-shadow lint rule.
+- 93fb9c9: A slide places several pictures where its body says (TYTO-498, ADR 0160 amended 2026-10-31). A manifest may declare `multiple: true` on a `per` image slot; then each `::imagem` after the same `::lamina` adds a picture, its first line is the path, and the indented lines under it continue the slide's body. The slide's value carries `blocks`, its body in order with the pictures among the text; `value` and the slot under its own name are unchanged, so a brief and a template written for one picture per slide render the same. The editor marks such a slot `multiple` when it completes `::`, and the manual's carousel page says how to write it.
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+  - @tyto/core@0.36.0
+  - @tyto/template-lang@0.8.8
+  - @tyto/brief-lang@0.7.7
+
 ## 0.12.1
 
 ### Patch Changes

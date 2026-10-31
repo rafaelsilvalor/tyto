@@ -1,5 +1,25 @@
 # @tyto/io
 
+## 5.2.0
+
+### Minor Changes
+
+- 213f553: TYTO-504: the gallery's operations (`readGallery`, `installGalleryEntry`, `updateGalleryEntry`) move into `@tyto/io` and answer what happened as data, so the CLI and the window run the same code; `fetchGalleryIndex` can keep the entries' preview pictures beside the cached index.
+
+### Patch Changes
+
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [bd56ec5]
+- Updated dependencies [9bcb68b]
+  - @tyto/core@0.36.0
+  - @tyto/pipeline@0.12.5
+  - @tyto/plugin-api@0.13.0
+  - @tyto/template-lang@0.8.8
+  - @tyto/export-html@0.7.9
+  - @tyto/export-svg@2.0.9
+
 ## 5.1.0
 
 ### Minor Changes

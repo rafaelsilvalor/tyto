@@ -1,5 +1,21 @@
 # @tyto/pipeline
 
+## 0.12.5
+
+### Patch Changes
+
+- 9021b50: Rename shadowing local bindings without changing behavior and enforce the no-shadow lint rule.
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [bd56ec5]
+- Updated dependencies [9bcb68b]
+  - @tyto/core@0.36.0
+  - @tyto/plugin-api@0.13.0
+  - @tyto/template-lang@0.8.8
+  - @tyto/raster@0.2.3
+  - @tyto/brief-lang@0.7.7
+
 ## 0.12.4
 
 ### Patch Changes

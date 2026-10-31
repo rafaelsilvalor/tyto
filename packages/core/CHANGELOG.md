@@ -1,5 +1,22 @@
 # @tyto/core
 
+## 0.36.0
+
+### Minor Changes
+
+- 93fb9c9: A slide places several pictures where its body says (TYTO-498, ADR 0160 amended 2026-10-31). A manifest may declare `multiple: true` on a `per` image slot; then each `::imagem` after the same `::lamina` adds a picture, its first line is the path, and the indented lines under it continue the slide's body. The slide's value carries `blocks`, its body in order with the pictures among the text; `value` and the slot under its own name are unchanged, so a brief and a template written for one picture per slide render the same. The editor marks such a slot `multiple` when it completes `::`, and the manual's carousel page says how to write it.
+
+### Patch Changes
+
+- 9021b50: Rename shadowing local bindings without changing behavior and enforce the no-shadow lint rule.
+- 147eafa: A shadow's blur and a layer blur are the Gaussian's standard deviation everywhere, as CSS
+  `drop-shadow()` and `blur()` already read them (ADR 0156, 2026-10-31 note). `export-svg`
+  and the spread filter in `export-html` no longer halve it, so the SVG and a spread shadow
+  draw what the HTML and the PNG drew; no PNG of a shadow without a spread changes.
+  `export-svg` gives a filter the frame plus three deviations of room instead of a fixed
+  margin of the node, which cut a wide blur off a small node. The raster suite compares
+  the HTML and SVG renders of a shadow, a spread and a blur.
+
 ## 0.35.0
 
 ### Minor Changes
