@@ -12,6 +12,8 @@ export type OutputStream = 'out' | 'err' | 'note';
 export interface OutputLine {
   readonly stream: OutputStream;
   readonly runs: readonly AnsiRun[];
+  /** The run of the session that printed it, by its number (TYTO-496): its block. */
+  readonly run?: number;
 }
 
 export interface Scrollback {
@@ -51,9 +53,11 @@ export function withOutput(
   stream: 'out' | 'err',
   chunk: string,
   ansi: AnsiState,
+  run?: number,
 ): Scrollback {
   const lines = [...scrollback.lines];
-  let open = scrollback.open && lines.at(-1)?.stream === stream;
+  const tag = run === undefined ? {} : { run };
+  let open = scrollback.open && lines.at(-1)?.stream === stream && lines.at(-1)?.run === run;
   const pieces = chunk.replaceAll('\r\n', '\n').split('\n');
 
   pieces.forEach((piece, index) => {
@@ -64,9 +68,13 @@ export function withOutput(
     const last = lines.at(-1);
     const continued = open && last !== undefined;
     if (continued) {
-      lines[lines.length - 1] = { stream, runs: restart ? runs : [...last.runs, ...runs] };
+      lines[lines.length - 1] = {
+        stream,
+        runs: restart ? runs : [...last.runs, ...runs],
+        ...tag,
+      };
     } else if (!isLast || piece !== '') {
-      lines.push({ stream, runs });
+      lines.push({ stream, runs, ...tag });
     }
     // Every piece but the last ended at a line break. The last leaves its line open if it
     // printed something, or if it continued a line that was already open.
@@ -79,9 +87,12 @@ export function withOutput(
 const PLAIN: AnsiStyle = {};
 
 /** The scrollback with one of the panel's own lines added, on a line of its own. */
-export function withNote(scrollback: Scrollback, text: string): Scrollback {
+export function withNote(scrollback: Scrollback, text: string, run?: number): Scrollback {
   return capped(
-    [...scrollback.lines, { stream: 'note', runs: [{ text, style: PLAIN }] }],
+    [
+      ...scrollback.lines,
+      { stream: 'note', runs: [{ text, style: PLAIN }], ...(run === undefined ? {} : { run }) },
+    ],
     false,
     scrollback.dropped,
   );

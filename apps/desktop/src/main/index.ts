@@ -48,6 +48,7 @@ import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/t
 import { vimModeStyleExample } from '../../shared/vim-mode-style.js';
 import { briefColumnsExample } from '../../shared/brief-columns.js';
 import { lineNumbersExample } from '../../shared/line-numbers.js';
+import { commandRunsExample } from '../../shared/command-runs.js';
 import { vimPluginsExample } from '../../shared/vim-plugins.js';
 import {
   type Typography,
@@ -165,7 +166,7 @@ const NEW_SETTINGS_FILE =
   `${vimPluginsExample()}\n${vimModeStyleExample()}\n` +
   `${indentGuidesExample()}\n${stickyScrollExample()}\n` +
   `${formatBriefOnSaveExample()}\n${tabSizeExample()}\n${briefColumnsExample()}\n` +
-  `${lineNumbersExample()}\n` +
+  `${lineNumbersExample()}\n${commandRunsExample()}\n` +
   `${typographyExample()}\n${googleFontsExample()}\n}\n`;
 
 /**
@@ -611,6 +612,9 @@ async function start(): Promise<void> {
   let briefColumns = saved.briefColumns;
   // And how the editor numbers its lines (TYTO-415), on the same answer.
   let lineNumbers = saved.lineNumbers;
+  // And how the command panel lays out its runs (TYTO-496), on the same answer.
+  let commandsOrder = saved.commandsOrder;
+  let commandsFoldOlderRuns = saved.commandsFoldOlderRuns;
   // And the faces and sizes (TYTO-272), on the same answer. The zoom is applied here, in main.
   let typography: Typography = {
     uiFontFamily: saved.uiFontFamily,
@@ -1123,6 +1127,10 @@ async function start(): Promise<void> {
       if (keys.includes('recipeTimeZone')) recipeTimeZone = next.recipeTimeZone;
       if (keys.includes('briefColumns')) briefColumns = next.briefColumns;
       if (keys.includes('lineNumbers')) lineNumbers = next.lineNumbers;
+      if (keys.includes('commandsOrder')) commandsOrder = next.commandsOrder;
+      if (keys.includes('commandsFoldOlderRuns')) {
+        commandsFoldOlderRuns = next.commandsFoldOlderRuns;
+      }
       if (keys.includes('zoom')) applyZoom(next.zoom);
       if (
         keys.includes('uiFontFamily') ||
@@ -1614,6 +1622,8 @@ async function start(): Promise<void> {
       formatBriefOnSave: () => formatBriefOnSave,
       briefColumns: () => briefColumns,
       lineNumbers: () => lineNumbers,
+      commandsOrder: () => commandsOrder,
+      commandsFoldOlderRuns: () => commandsFoldOlderRuns,
       typography: () => typography,
     },
     // View > Zoom and its keys (TYTO-272): applied at once and written as a screen's change, so

@@ -37,6 +37,8 @@ describe("the app's settings outline", () => {
       'tabSize',
       'briefColumns',
       'lineNumbers',
+      'commandsOrder',
+      'commandsFoldOlderRuns',
       'zoom',
       'uiFontFamily',
       'uiFontSize',

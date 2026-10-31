@@ -84,13 +84,18 @@ const lines = (element: HTMLElement) =>
 
 const tabs = (element: HTMLElement) => [...element.querySelectorAll('[role="tab"]')];
 
+const headers = (element: HTMLElement) =>
+  [...element.querySelectorAll('.command-run__command')].map((header) => header.textContent);
+
 describe('running a line', () => {
   it('runs the words, echoes the line, remembers it and clears the input', async () => {
     const harness = await mount();
     await typeAndRun(harness, 'tyto render "Meus briefs/a.brief" --types svg');
     expect(harness.ran).toEqual([['render', 'Meus briefs/a.brief', '--types', 'svg']]);
     expect(harness.history).toEqual(['tyto render "Meus briefs/a.brief" --types svg']);
-    expect(lines(harness.element)).toEqual(['$ tyto render "Meus briefs/a.brief" --types svg']);
+    // No echo: the run's header says it, its paths cut to file names (TYTO-496).
+    expect(lines(harness.element)).toEqual([]);
+    expect(headers(harness.element)).toEqual(['render a.brief --types svg']);
     expect(input(harness.element).value).toBe('');
     expect(harness.sessions.active.runId).toBe('run-1');
     expect(harness.sessions.active.line).toBe('tyto render "Meus briefs/a.brief" --types svg');
@@ -301,7 +306,7 @@ describe('the output', () => {
     await again.updateComplete;
     harness.sessions.output({ runId: 'run-1', stream: 'out', text: 'swept 4\n' });
     await again.updateComplete;
-    expect(lines(again)).toEqual(['$ tyto watch .', 'swept 3', 'swept 4']);
+    expect(lines(again)).toEqual(['swept 3', 'swept 4']);
   });
 });
 
@@ -320,7 +325,7 @@ describe('the prompt (ADR 0163)', () => {
   it('takes the caret on a click in the output', async () => {
     const harness = await mount();
     await typeAndRun(harness, 'check a.brief');
-    harness.element.querySelector<HTMLElement>('.command-panel__line')!.click();
+    harness.element.querySelector<HTMLElement>('.command-run__header')!.click();
     expect(document.activeElement).toBe(input(harness.element));
   });
 
@@ -329,6 +334,69 @@ describe('the prompt (ADR 0163)', () => {
     expect(input(harness.element).placeholder).toBe('Type a tyto command, then Enter');
     await typeAndRun(harness, 'check a.brief');
     expect(input(harness.element).placeholder).toBe('');
+  });
+});
+
+/** Two runs in one session: an older one that printed, and the newest. */
+async function twoRuns(harness: Harness): Promise<void> {
+  await typeAndRun(harness, 'plugin list');
+  harness.sessions.output({ runId: 'run-1', stream: 'out', text: 'html\nsvg\n' });
+  harness.sessions.state({ runId: 'run-1', state: 'finished', code: 0 });
+  await typeAndRun(harness, 'check a.brief');
+  harness.sessions.output({ runId: 'run-2', stream: 'err', text: 'error E_X\n' });
+  await harness.element.updateComplete;
+}
+
+/** The output's children in order: a run by its header's command, the prompt as `›`. */
+const layout = (element: HTMLElement) =>
+  [...element.querySelector('.command-panel__output')!.children].map((child) =>
+    child.classList.contains('command-panel__prompt-line')
+      ? '›'
+      : (child.querySelector('.command-run__command')?.textContent ?? '?'),
+  );
+
+describe('the runs’ order and folding (commandsOrder, commandsFoldOlderRuns)', () => {
+  it('puts the newest run last and the prompt after it by default', async () => {
+    const harness = await mount();
+    await twoRuns(harness);
+    expect(layout(harness.element)).toEqual(['plugin list', 'check a.brief', '›']);
+    expect(harness.element.querySelector('.command-run__badge')?.textContent?.trim()).toBe('✓ 0');
+  });
+
+  it('puts the prompt first and the newest run under it with newestFirst, live', async () => {
+    const harness = await mount();
+    await twoRuns(harness);
+    harness.element.order = 'newestFirst';
+    await harness.element.updateComplete;
+    expect(layout(harness.element)).toEqual(['›', 'check a.brief', 'plugin list']);
+  });
+
+  it('folds every run but the newest when told to, live, and opens one on a click', async () => {
+    const harness = await mount();
+    await twoRuns(harness);
+    expect(lines(harness.element)).toEqual(['html', 'svg', 'error E_X']);
+    harness.element.foldOlderRuns = true;
+    await harness.element.updateComplete;
+    expect(lines(harness.element)).toEqual(['error E_X']);
+    const older = harness.element.querySelector<HTMLButtonElement>('button.command-run__header')!;
+    expect(older.getAttribute('aria-expanded')).toBe('false');
+    older.click();
+    await harness.element.updateComplete;
+    expect(lines(harness.element)).toEqual(['html', 'svg', 'error E_X']);
+  });
+
+  it('opens a folded run that holds a match of Ctrl+F', async () => {
+    const harness = await mount();
+    await twoRuns(harness);
+    harness.element.foldOlderRuns = true;
+    await harness.element.updateComplete;
+    await press(harness.element, input(harness.element), 'f', { ctrlKey: true });
+    const find = harness.element.querySelector<HTMLInputElement>('.command-panel__find-input')!;
+    find.value = 'svg';
+    find.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    await harness.element.updateComplete;
+    expect(lines(harness.element)).toEqual(['html', 'svg', 'error E_X']);
+    expect(harness.element.querySelectorAll('.command-panel__match')).toHaveLength(1);
   });
 });
 

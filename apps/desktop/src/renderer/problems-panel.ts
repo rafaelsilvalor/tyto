@@ -81,6 +81,12 @@ export function placeParts(
 export interface CommandProblems {
   readonly runId: string;
   readonly label: string;
+  /**
+   * What the section's header says, when the window has more to say than the command line
+   * (TYTO-496): the command with its paths cut to file names, when it ran and how it ended.
+   * The whole line is the header's tooltip.
+   */
+  readonly title?: string;
   readonly diagnostics: readonly CommandProblemRow[];
 }
 
@@ -122,6 +128,9 @@ export function countProblems(
     errors: all.filter((row) => row.severity === 'error').length,
   };
 }
+
+/** A command section's header: its title, or the command line it ran. */
+const heading = (section: CommandProblems): string => section.title ?? section.label;
 
 /** The offset of a 1-based line and column in `text`, held inside it. */
 export function offsetAt(text: string, line: number, column: number): number {
@@ -347,7 +356,7 @@ export class ProblemsPanel extends LitElement {
   private commandSections(): TemplateResult[] {
     return (this.state.commands ?? []).map(
       (command) =>
-        html`<p class="problems__command">${command.label}</p>
+        html`<p class="problems__command" title=${command.label}>${heading(command)}</p>
           ${repeat(
             command.diagnostics,
             (item) => item.index,

@@ -103,8 +103,11 @@ describe('the command panel', () => {
     await page.locator('.command-panel__input').fill(line);
     await page.locator('.command-panel__input').press('Enter');
 
-    // The run's last line says it ended with the CLI's exit code for error diagnostics.
-    await page.waitForSelector('.command-panel__line[data-stream="note"]:has-text("exit code 1")');
+    // The run's header says it ended with the CLI's exit code for error diagnostics (TYTO-496).
+    await page.waitForSelector('.command-run__badge[data-state="failed"]:has-text("1")');
+    expect(await page.locator('.command-run__command').last().textContent()).toBe(
+      'render perdido.brief --out out --types svg --templates templates --formats-file formats.yaml',
+    );
 
     const link = page.locator('.command-panel__link', { hasText: 'perdido.brief:5:1' }).first();
     await link.click();

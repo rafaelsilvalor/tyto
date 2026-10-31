@@ -134,6 +134,8 @@ import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import { type ProjectPanel, PROJECT_PANEL_TAG } from './project-panel.js';
 import { type CommandPanel, COMMAND_PANEL_TAG } from './command-panel.js';
 import { type CommandSession, CommandSessions, refreshesWorkspace } from './command-sessions.js';
+import { inRunOrder, sectionTitle, shortCommand } from './command-blocks.js';
+import type { CommandsOrder } from '../../shared/command-runs.js';
 import { type OutputLink, resolveEntry } from './command-links.js';
 import { loadHistory, saveHistory, withHistoryLine } from './command-history.js';
 import { type ExplorerPanel, EXPLORER_PANEL_TAG } from './explorer-panel.js';
@@ -931,11 +933,32 @@ function paintPanel(): void {
       locale: state.locale,
       // A preview tab's `active()` is the brief it follows, so "this brief" is right there.
       kind: current.kind ?? 'brief',
-      commands: commandProblems,
+      commands: problemSections(),
       folder: workspaceShown?.folder ?? null,
       caseless: pathsCaseless(),
     };
   }
+}
+
+/**
+ * The command sections Problems shows (TYTO-496): in the order `commandsOrder` gives the command
+ * panel's runs, each titled as its run's header is — the command with its paths cut to file
+ * names, when it started, and how it ended — rather than the whole command line.
+ */
+function problemSections(): readonly CommandProblems[] {
+  const titled = commandProblems.map((section) => {
+    const run = commandSessions.runOf(section.runId);
+    if (run === undefined) return { ...section, title: shortCommand(section.label) };
+    const ended =
+      run.state === 'finished'
+        ? translate(state.locale, 'problems.command.exit').replaceAll(
+            '{code}',
+            String(run.code ?? 0),
+          )
+        : translate(state.locale, `commandPanel.state.${run.state}`).replaceAll('{question}', '');
+    return { ...section, title: sectionTitle(run, state.locale, ended) };
+  });
+  return inRunOrder(titled, commandsOrder);
 }
 
 /** The name a tab and the window title show, which is the catalogue's when there is none. */
@@ -2807,6 +2830,13 @@ function showTheme(bridge: TytoBridge, ask: () => Promise<IpcResponse<'theme:cur
       // And how the lines are numbered (TYTO-415), in every tab and the template mode.
       lineNumbers = applied.lineNumbers;
       editor?.setLineNumbers(lineNumbers);
+      // And how the command panel lays out its runs, and Problems its command sections (TYTO-496).
+      commandsOrder = applied.commandsOrder;
+      commandsFoldOlderRuns = applied.commandsFoldOlderRuns;
+      if (elements.commandPanel) {
+        elements.commandPanel.order = commandsOrder;
+        elements.commandPanel.foldOlderRuns = commandsFoldOlderRuns;
+      }
       // And the faces and sizes (TYTO-272), which the sheet above already holds: CodeMirror
       // watches no custom property, so every pane re-reads its text's size, and a face this
       // machine does not have is said in the problems panel.
@@ -4504,6 +4534,10 @@ let formatBriefOnSave = false;
 /** The `briefColumns` setting, from the same answer (TYTO-298): the separator until it arrives. */
 let briefColumns: BriefColumnLook = 'separator';
 
+/** The command panel's two settings, from the same answer (TYTO-496): option A until it arrives. */
+let commandsOrder: CommandsOrder = 'newestLast';
+let commandsFoldOlderRuns = false;
+
 /** The `lineNumbers` setting, from the same answer (TYTO-415): each line its own until it arrives. */
 let lineNumbers: LineNumbersLook = 'on';
 
@@ -5484,6 +5518,8 @@ function wireCommandPanel(): void {
   const element = elements.commandPanel;
   if (element === null) return;
   element.sessions = commandSessions;
+  element.order = commandsOrder;
+  element.foldOlderRuns = commandsFoldOlderRuns;
   element.ports = {
     run: async (words) => {
       const bridge = window.tyto;
@@ -5529,14 +5565,8 @@ function useCommandHistoryOf(folder: string | null): void {
  * Manage Trust dialog would keep showing the old answer until the next ask.
  */
 commandSessions.onEnded = (session: CommandSession): void => {
-  const ended =
-    session.state === 'cancelled'
-      ? translate(state.locale, 'commandPanel.state.cancelled')
-      : translate(state.locale, 'commandPanel.state.finished').replaceAll(
-          '{code}',
-          String(session.code ?? 0),
-        );
-  commandSessions.note(session.id, `— ${ended}`);
+  // How the run ended is its header's badge (TYTO-496); Problems' section title says it too.
+  paintPanel();
   if (refreshesWorkspace(session)) {
     void withBridge(async (bridge) => {
       showWorkspace(await bridge['workspace:folder']({}));

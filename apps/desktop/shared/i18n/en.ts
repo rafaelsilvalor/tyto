@@ -475,4 +475,6 @@ export const en: Catalogue = {
   'commandPanel.state.waiting': 'waiting for an answer: {question}',
   'commandPanel.state.cancelled': 'stopped',
   'commandPanel.state.finished': 'ended with exit code {code}',
+  'commandPanel.state.refused': 'not run',
+  'problems.command.exit': 'exit {code}',
 };

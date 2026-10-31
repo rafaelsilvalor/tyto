@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { BRIEF_COLUMN_LOOK_IDS } from './brief-columns.js';
 import { LINE_NUMBERS_LOOK_IDS } from './line-numbers.js';
+import { COMMANDS_ORDER_IDS } from './command-runs.js';
 import { EXPLORER_PLACES } from './file-icons.js';
 import { typographySchema } from './typography.js';
 import { layoutSchema } from './layout.js';
@@ -597,6 +598,10 @@ const appliedThemesSchema = z.object({
   briefColumns: z.enum(BRIEF_COLUMN_LOOK_IDS),
   /** The `lineNumbers` setting in force (TYTO-415): on, relative to the cursor, or off. */
   lineNumbers: z.enum(LINE_NUMBERS_LOOK_IDS),
+  /** The command panel's run order, and its Problems sections' (TYTO-496). */
+  commandsOrder: z.enum(COMMANDS_ORDER_IDS),
+  /** Whether the command panel folds every run but the newest (TYTO-496). */
+  commandsFoldOlderRuns: z.boolean(),
   /**
    * The faces and sizes in force (TYTO-272, ADR 0099): the window's two bases, which it writes
    * into its sheet as custom properties. Checked with the settings' own schemas, so a family

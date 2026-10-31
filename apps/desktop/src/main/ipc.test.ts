@@ -680,6 +680,8 @@ const windowThemes = (): WindowThemes => {
     formatBriefOnSave: () => true,
     briefColumns: () => 'perColumn',
     lineNumbers: () => 'relative',
+    commandsOrder: () => 'newestFirst',
+    commandsFoldOlderRuns: () => true,
     typography: () => ({
       uiFontFamily: 'Segoe UI',
       uiFontSize: 18,

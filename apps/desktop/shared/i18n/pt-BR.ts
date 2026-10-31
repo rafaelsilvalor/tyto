@@ -480,4 +480,6 @@ export const ptBR: Catalogue = {
   'commandPanel.state.waiting': 'esperando uma resposta: {question}',
   'commandPanel.state.cancelled': 'parado',
   'commandPanel.state.finished': 'terminou com código de saída {code}',
+  'commandPanel.state.refused': 'não executado',
+  'problems.command.exit': 'saída {code}',
 };
