@@ -125,6 +125,33 @@ jobs:
           pnpm --filter @tyto/desktop exec electron-builder --mac --publish never
           ls -l apps/desktop/release/*.dmg
 
+      # PROBE TYTO-497 — never merged. Builds every leg's real installers without publishing,
+      # so a run without node-pty (A) and one with it (B) can be compared by size and time.
+      - name: PROBE installers and sizes, without publishing
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env: { LEG_PUBLISHES: '${{ matrix.publish }}' }
+        run: |
+          cd apps/desktop
+          start=$(date +%s)
+          case "$RUNNER_OS" in
+            Windows) pnpm exec electron-builder --win --publish never ;;
+            Linux) pnpm exec electron-builder --linux --publish never ;;
+            macOS) [ "$LEG_PUBLISHES" = true ] || pnpm exec electron-builder --mac --publish never ;;
+          esac
+          echo "PROBE installer-step seconds: $(( $(date +%s) - start ))"
+          echo "PROBE runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+          ls -l release/
+          du -sk release/*-unpacked release/mac* 2>/dev/null || true
+          find release -name '*.node' -o -name spawn-helper -o -name 'conpty.dll' | sed 's/^/PROBE native: /'
+      - name: PROBE keep the Windows app folder for the local Smart App Control check
+        if: github.event_name == 'pull_request' && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-unpacked-${{ github.sha }}
+          path: apps/desktop/release/win-unpacked
+          retention-days: 3
+
       # **A secret that does not exist is not an absent variable.** `${{ secrets.CSC_LINK }}`
       # in a step's `env:` writes the variable either way — to the empty string when no such
       # secret is configured — and electron-builder's two platforms disagree about what that
