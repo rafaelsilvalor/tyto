@@ -21,14 +21,15 @@ import type { CommandBinding, EditorKeymap } from './keymap.js';
 /**
  * The contexts a binding can be limited to, and there are no others.
  *
- * A closed list rather than VS Code's expression language: six names a person can read in
+ * A closed list rather than VS Code's expression language: seven names a person can read in
  * one line, each of which the window can answer without evaluating anything.
  *
  * - `editor` — the editor has focus, in either input mode.
  * - `vim.normal` / `vim.insert` — vim mode is on and the engine is (not) in insert mode.
  * - `mode.desktop` — the editor has focus and vim mode is off.
  * - `commandBar` — the command bar is open.
- * - `panel` — focus is in a panel other than the editor, and the bar is closed.
+ * - `panel` — focus is in a panel other than the editor or a terminal, and the bar is closed.
+ * - `terminal` — focus is in a terminal, and the bar is closed (ADR 0164, the seventh).
  *
  * A binding with no `when` is global: it runs wherever focus is.
  */
@@ -39,6 +40,7 @@ export const KEYBINDING_CONTEXTS = [
   'mode.desktop',
   'commandBar',
   'panel',
+  'terminal',
 ] as const;
 
 export type KeybindingContext = (typeof KEYBINDING_CONTEXTS)[number];
@@ -54,10 +56,11 @@ export const KEYBINDING_CONTEXT_DESCRIPTIONS: Readonly<Record<KeybindingContext,
   'vim.insert': 'Vim mode is on and the engine is in insert mode.',
   'mode.desktop': 'The editor has focus and vim mode is off.',
   commandBar: 'The command bar is open.',
-  panel: 'Focus is in a panel other than the editor, and the command bar is closed.',
+  panel: 'Focus is in a panel other than the editor or a terminal, and the command bar is closed.',
+  terminal: 'Focus is in a terminal, and the command bar is closed.',
 };
 
-/** The contexts CodeMirror answers; the other two, and global keys, are the window's. */
+/** The contexts CodeMirror answers; the other three, and global keys, are the window's. */
 export const EDITOR_CONTEXTS: ReadonlySet<KeybindingContext> = new Set(
   KEYBINDING_CONTEXTS.slice(0, 4),
 );

@@ -4,14 +4,14 @@
 Cada passo foi seguido em 2026-10-19 numa versão de desenvolvimento do Tyto 0.7.0 (commit `e3d32e9`) no Windows 11, uma vez com a janela em inglês e outra em português do Brasil. Os menus e rótulos abaixo são os da janela em português. A seção sobre uma imagem do Explorador foi seguida em 2026-10-23 numa versão de desenvolvimento, na janela em inglês, no tema claro e no escuro.
 :::
 
-Os painéis ficam em três **áreas** em volta dos grupos de editores: esquerda, direita e de baixo. Os do próprio Tyto são o **Explorador**, **Problemas**, **[Comandos](commands.md)**, **Projeto** e a **fila local**, e um plugin pode acrescentar os seus. A prévia não é um painel: é uma aba, e tem a sua própria parte mais abaixo.
+Os painéis ficam em três **áreas** em volta dos grupos de editores: esquerda, direita e de baixo. Os do próprio Tyto são o **Explorador**, **Problemas**, **[Comandos](commands.md)**, **[Terminal](terminal.md)**, **Projeto** e a **fila local**, e um plugin pode acrescentar os seus. A prévia não é um painel: é uma aba, e tem a sua própria parte mais abaixo.
 
-A área de baixo mostra **um painel por vez**, como abas no alto dela: **PROBLEMAS**, com a contagem, depois **COMANDOS**, e **PROJETO** ou o painel de um plugin enquanto estiverem abertos. Clique numa aba, ou use **←** e **→** sobre ela, para trazê-la para a frente; o Tyto lembra qual estava. A área mantém a altura qualquer que seja a aba da frente. As áreas da esquerda e da direita mostram seus painéis um embaixo do outro.
+A área de baixo mostra **um painel por vez**, como abas no alto dela: **PROBLEMAS**, com a contagem, depois **COMANDOS** e **TERMINAL**, e **PROJETO** ou o painel de um plugin enquanto estiverem abertos. Clique numa aba, ou use **←** e **→** sobre ela, para trazê-la para a frente; o Tyto lembra qual estava. A área mantém a altura qualquer que seja a aba da frente. As áreas da esquerda e da direita mostram seus painéis um embaixo do outro.
 
 ## Mostrar e esconder
 
 - Os botões nas duas pontas da barra de status mostram e escondem uma área inteira: **Mostrar ou ocultar a área esquerda** à esquerda, **Mostrar ou ocultar a área de baixo** à direita. Os mesmos comandos estão na barra de comandos, com um para a área direita.
-- A contagem de problemas na barra de status mostra e esconde **Problemas**; o botão da fila ao lado faz o mesmo com a **fila local**, assim como **Mostrar a fila local** na barra de comandos. **Ctrl+`** mostra e esconde [Comandos](commands.md).
+- A contagem de problemas na barra de status mostra e esconde **Problemas**; o botão da fila ao lado faz o mesmo com a **fila local**, assim como **Mostrar a fila local** na barra de comandos. **Ctrl+`** mostra e esconde [Comandos](commands.md), e **Ctrl+Shift+`** abre um [terminal](terminal.md) novo.
 - O **×** à direita do cabeçalho de um painel o esconde. Na área inferior, ele esconde a área inteira, e as abas voltam com ela.
 - **Restaurar a disposição padrão** devolve cada painel ao lugar onde o Tyto o colocou de início: Problemas aberto na área de baixo, a fila fechada.
 

@@ -39,7 +39,7 @@ export type KeybindingField = (typeof KEYBINDING_FIELDS)[number];
 /**
  * What the tab says, in the window's language (TYTO-334): the hover's label, what each field
  * is, and the sentence beside a removal. The commands' titles come translated from the registry;
- * the six contexts' sentences are `@tyto/editor`'s and still English.
+ * the seven contexts' sentences are `@tyto/editor`'s and still English.
  */
 export interface KeybindingsAssistLabels {
   readonly defaultKey: string;

@@ -4,7 +4,7 @@
 Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them.
 :::
 
-The **Commands** tab of the bottom area runs `tyto` commands, the same ones as the [command line](../command-line/index.md), inside the window. Nothing else runs there: not a shell and not another program.
+The **Commands** tab of the bottom area runs `tyto` commands, the same ones as the [command line](../command-line/index.md), inside the window. Nothing else runs there: not a shell and not another program. For a shell, use the [Terminal](terminal.md) tab.
 
 ## Open it
 

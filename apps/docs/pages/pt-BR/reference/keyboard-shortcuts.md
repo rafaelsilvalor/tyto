@@ -2,7 +2,7 @@
 
 # Atalhos de teclado
 
-As teclas que o app liga antes de você mudar qualquer coisa: 38. Cada uma roda um comando, e só funciona onde o contexto dela vale. Mude-as no `keybindings.json`, que **Preferências: Abrir atalhos de teclado (JSON)** abre; um plugin pode acrescentar as dele.
+As teclas que o app liga antes de você mudar qualquer coisa: 39. Cada uma roda um comando, e só funciona onde o contexto dela vale. Mude-as no `keybindings.json`, que **Preferências: Abrir atalhos de teclado (JSON)** abre; um plugin pode acrescentar as dele.
 
 ::: info Contextos em inglês
 A explicação de cada contexto está em inglês: o código guarda essas frases em um só idioma, e esta página as mostra como estão.
@@ -17,7 +17,8 @@ A explicação de cada contexto está em inglês: o código guarda essas frases 
 | `vim.insert` | Vim mode is on and the engine is in insert mode. |
 | `mode.desktop` | The editor has focus and vim mode is off. |
 | `commandBar` | The command bar is open. |
-| `panel` | Focus is in a panel other than the editor, and the command bar is closed. |
+| `panel` | Focus is in a panel other than the editor or a terminal, and the command bar is closed. |
+| `terminal` | Focus is in a terminal, and the command bar is closed. |
 
 ## Em qualquer lugar
 
@@ -28,6 +29,7 @@ Uma tecla sem contexto funciona onde quer que esteja o foco.
 | `Ctrl+k` | `⌘k` | Abrir a barra de comandos | `commandBar.toggle` |
 | `Ctrl+Shift+v` | `⌘⇧v` | Abrir a prévia ao lado | `preview.openToSide` |
 | `` Ctrl+` `` (a tecla à esquerda do 1) | `` Ctrl` `` (a tecla à esquerda do 1) | Mostrar ou esconder: Comandos | `layout.togglePanel:commands` |
+| `` Ctrl+Shift+` `` | `` Ctrl⇧` `` | Terminal: Novo terminal | `terminal.new` |
 | `Ctrl+=` | `⌘=` | Aumentar zoom | `window.zoomIn` |
 | `Ctrl+-` | `⌘-` | Diminuir zoom | `window.zoomOut` |
 | `Ctrl+0` | `⌘0` | Redefinir zoom | `window.zoomReset` |

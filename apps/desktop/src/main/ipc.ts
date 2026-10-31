@@ -3,21 +3,18 @@
 // resolves to a path string and would make this module unloadable in a test.
 import { basename } from 'node:path';
 
-import type { IpcMain, WebContents } from 'electron';
+import type { IpcMain } from 'electron';
 import type { Diagnostics } from '@tyto/core';
 import type { SettingOption, SettingOutline } from '@tyto/plugin-api';
 
 import {
   type IpcChannelName,
-  type IpcEventName,
-  type IpcEventPayload,
   type IpcRequest,
   type IpcResponse,
   type MenuModel,
   type MenuMove,
   IPC_CHANNEL_NAMES,
   parseIpc,
-  parseIpcEvent,
 } from '../../shared/ipc.js';
 import { TAB_EXTENSIONS, isTextFile } from '../../shared/file-icons.js';
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
@@ -1049,24 +1046,6 @@ export function guard<Name extends IpcChannelName>(
     const response = await handler(parsed);
     return parseIpc(name, 'response', response) as IpcResponse<Name>;
   };
-}
-
-/**
- * Puts a message on the wire in the other direction (ADR 0029).
- *
- * Validated before it is sent, which is the mirror of `guard`'s reason: main is the side that
- * can refuse a bad push *before* the process boundary, and a payload the preload rejects
- * would otherwise be a listener that silently never fires.
- *
- * `send` and not `invoke`: a push carries no reply. What the renderer has to say about this
- * one comes back on `app:exit-answer`, an ordinary channel in the table above.
- */
-export function sendIpcEvent<Name extends IpcEventName>(
-  webContents: WebContents,
-  name: Name,
-  payload: IpcEventPayload<Name>,
-): void {
-  webContents.send(name, parseIpcEvent(name, payload));
 }
 
 /**

@@ -143,7 +143,7 @@ describe('hover in keybindings.json', () => {
   it("shows a context's sentence on a when value", () => {
     expect(on('"panel"')).toMatchObject({
       title: 'panel',
-      text: 'Focus is in a panel other than the editor, and the command bar is closed.',
+      text: 'Focus is in a panel other than the editor or a terminal, and the command bar is closed.',
     });
   });
 

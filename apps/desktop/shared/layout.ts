@@ -101,6 +101,8 @@ export const EXPLORER_PANEL = 'explorer';
 export const PROJECT_PANEL = 'project';
 /** TYTO-496 (ADR 0159): `tyto` commands typed into the window. */
 export const COMMANDS_PANEL = 'commands';
+/** TYTO-497 (ADR 0164): the person's shell, in terminals main owns. */
+export const TERMINAL_PANEL = 'terminal';
 
 /**
  * A plugin's panel (TYTO-49, ADR 0045): an id under this prefix, drawn by one element.
@@ -181,6 +183,17 @@ export const DEFAULT_LAYOUT: Layout = {
       // 140px would leave a command three lines of output.
       id: COMMANDS_PANEL,
       element: 'tyto-command-panel',
+      dock: 'bottom',
+      open: false,
+      size: 240,
+      fixed: false,
+    },
+    {
+      // TYTO-497. The terminal, after Commands as ADR 0164 decision 7 orders the strip, closed
+      // until Ctrl+Shift+` or the command bar opens it. The command panel's height, for its
+      // reason: a shell's prompt and a few lines of output.
+      id: TERMINAL_PANEL,
+      element: 'tyto-terminal-panel',
       dock: 'bottom',
       open: false,
       size: 240,

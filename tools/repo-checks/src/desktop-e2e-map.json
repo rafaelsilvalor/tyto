@@ -681,6 +681,23 @@
     },
     {
       "paths": [
+        "apps/desktop/src/renderer/terminal-panel.ts",
+        "apps/desktop/src/renderer/terminal-sessions.ts",
+        "apps/desktop/src/renderer/terminal-keys.ts",
+        "apps/desktop/src/renderer/terminal-theme.ts",
+        "apps/desktop/src/renderer/terminal-view.ts",
+        "apps/desktop/e2e/terminal-tab.desktop.test.ts"
+      ],
+      "e2e": ["terminal-tab.desktop.test.ts", "terminal.desktop.test.ts"],
+      "why": "reviewed: the Terminal tab, xterm drawing a shell's answer, and the window's keys handed back from inside a terminal (TYTO-497, ADR 0164)"
+    },
+    {
+      "paths": ["apps/desktop/src/main/window-events.ts"],
+      "e2e": "all",
+      "why": "reviewed: every push from main to the window goes through it (TYTO-497)"
+    },
+    {
+      "paths": [
         "apps/desktop/shared/command-runs.ts",
         "apps/desktop/src/renderer/ansi.ts",
         "apps/desktop/src/renderer/command-blocks.ts",

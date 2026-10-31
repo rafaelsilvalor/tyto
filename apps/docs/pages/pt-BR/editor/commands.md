@@ -4,7 +4,7 @@
 Todos os passos foram seguidos em 30/10/2026 numa build de desenvolvimento do Tyto, a partir da branch que acrescentou esta página, no Windows 11, com a janela em inglês. Os nomes em português foram lidos do catálogo da própria janela, não de uma janela aberta. Os blocos e o lugar da lista de sugestões foram conferidos de novo em 31/10/2026, depois que a página passou a descrevê-los.
 :::
 
-A aba **Comandos** da área inferior roda comandos `tyto`, os mesmos da [linha de comando](../command-line/index.md), dentro da janela. Nada mais roda ali: nem um shell, nem outro programa.
+A aba **Comandos** da área inferior roda comandos `tyto`, os mesmos da [linha de comando](../command-line/index.md), dentro da janela. Nada mais roda ali: nem um shell, nem outro programa. Para um shell, use a aba [Terminal](terminal.md).
 
 ## Abrir
 

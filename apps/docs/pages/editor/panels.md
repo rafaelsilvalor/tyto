@@ -4,14 +4,14 @@
 Every step was followed on 2026-10-19 on a development build of Tyto 0.7.0 (commit `e3d32e9`) on Windows 11, once with the window in English and once in Brazilian Portuguese. Menus and labels below are the English window's. The section on an image from the Explorer was followed on 2026-10-23 on a development build, in the English window, in the light and the dark theme.
 :::
 
-Panels sit in three **areas** around the editor groups: left, right and bottom. Tyto's own are the **Explorer**, **Problems**, **[Commands](commands.md)**, **Project** and the **local queue**, and a plugin can add its own. The preview is not a panel: it is a tab, and has its own section below.
+Panels sit in three **areas** around the editor groups: left, right and bottom. Tyto's own are the **Explorer**, **Problems**, **[Commands](commands.md)**, **[Terminal](terminal.md)**, **Project** and the **local queue**, and a plugin can add its own. The preview is not a panel: it is a tab, and has its own section below.
 
-The bottom area shows **one panel at a time**, as tabs along its top: **PROBLEMS**, with its count, then **COMMANDS**, and **PROJECT** or a plugin's panel while they are open. Click a tab, or use **←** and **→** on it, to bring it to the front; Tyto remembers which one was. The area keeps its height whichever tab is in front. The left and right areas show their panels one under the other.
+The bottom area shows **one panel at a time**, as tabs along its top: **PROBLEMS**, with its count, then **COMMANDS** and **TERMINAL**, and **PROJECT** or a plugin's panel while they are open. Click a tab, or use **←** and **→** on it, to bring it to the front; Tyto remembers which one was. The area keeps its height whichever tab is in front. The left and right areas show their panels one under the other.
 
 ## Show and hide
 
 - The buttons at the two ends of the status bar show and hide a whole area: **Show or hide the left area** on the left, **Show or hide the bottom area** on the right. The same commands are in the command bar, with one for the right area.
-- The problems count in the status bar shows and hides **Problems**; the queue button beside it does the same for the **local queue**, as does **Show the local queue** in the command bar. **Ctrl+`** shows and hides [Commands](commands.md).
+- The problems count in the status bar shows and hides **Problems**; the queue button beside it does the same for the **local queue**, as does **Show the local queue** in the command bar. **Ctrl+`** shows and hides [Commands](commands.md), and **Ctrl+Shift+`** opens a new [terminal](terminal.md).
 - The **×** at the right of a panel's header hides it. In the bottom area it hides the whole area, with its tabs kept for when it comes back.
 - **Restore the default layout** puts every panel back where Tyto first had it: Problems open in the bottom area, the queue closed.
 
