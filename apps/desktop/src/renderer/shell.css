@@ -2778,6 +2778,146 @@ tyto-plugins-dialog[open] {
   justify-content: flex-end;
 }
 
+/* The gallery (TYTO-504): the plugins screen's overlay and panel, holding a grid of cards
+   instead of a table. A card is a preview over its words, so a narrow window keeps one column. */
+tyto-gallery-dialog {
+  display: contents;
+}
+
+tyto-gallery-dialog[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tyto-scrim);
+}
+
+.gallery__panel {
+  display: flex;
+  overflow: auto;
+  width: min(var(--tyto-dialog-width-lg), calc(100vw - 2 * var(--tyto-space-6)));
+  max-height: calc(100vh - 2 * var(--tyto-space-6));
+  flex-direction: column;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  margin: var(--tyto-space-6);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  gap: var(--tyto-space-4);
+}
+
+.gallery__title {
+  margin: 0;
+  font-size: var(--tyto-text-lg);
+}
+
+.gallery__index,
+.gallery__loading,
+.gallery__failure,
+.gallery__empty {
+  margin: 0;
+  font-size: var(--tyto-text-sm);
+}
+
+.gallery__index code {
+  word-break: break-all;
+}
+
+.gallery__cached {
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  border-left: var(--tyto-focus-width) solid var(--tyto-warning);
+  margin: 0;
+  font-size: var(--tyto-text-sm);
+}
+
+.gallery__problems {
+  padding-left: var(--tyto-space-6);
+  margin: 0;
+  color: var(--tyto-error);
+  font-size: var(--tyto-text-sm);
+}
+
+.gallery__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tyto-space-2);
+}
+
+.gallery__filter[aria-pressed='true'] {
+  border-color: var(--tyto-accent);
+  color: var(--tyto-accent);
+}
+
+.gallery__cards {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  gap: var(--tyto-space-4);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  list-style: none;
+}
+
+.gallery__card {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  background: var(--tyto-surface);
+}
+
+.gallery__preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--tyto-surface-raised);
+  object-fit: contain;
+}
+
+.gallery__body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--tyto-space-4);
+  font-size: var(--tyto-text-sm);
+  gap: var(--tyto-space-2);
+}
+
+.gallery__body p {
+  margin: 0;
+}
+
+.gallery__name {
+  margin: 0;
+  font-size: var(--tyto-text-md);
+}
+
+.gallery__meta,
+.gallery__configurations,
+.gallery__unsynced {
+  color: var(--tyto-text-muted);
+}
+
+.gallery__installed {
+  color: var(--tyto-success);
+}
+
+.gallery__incompatible,
+.gallery__result[data-failed='true'] {
+  color: var(--tyto-error);
+}
+
+.gallery__act {
+  align-self: flex-start;
+}
+
+.gallery__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 /*
  * The untrusted-folder strip (TYTO-278, ADR 0111): one line above the editor groups, with the
  * warning edge the plugins notice has, so it reads as the same kind of sentence.

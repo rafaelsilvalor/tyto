@@ -1019,6 +1019,16 @@
     },
     {
       "paths": [
+        "apps/desktop/e2e/gallery.desktop.test.ts",
+        "apps/desktop/src/main/gallery.ts",
+        "apps/desktop/src/renderer/gallery-dialog.ts",
+        "apps/desktop/src/renderer/gallery-view.ts"
+      ],
+      "e2e": ["gallery.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: the gallery's install and update in main, its screen, and the channels and strings the window counts (TYTO-504)"
+    },
+    {
+      "paths": [
         "apps/desktop/src/main/plugin-files.ts",
         "apps/desktop/e2e/plugin-files.desktop.test.ts"
       ],

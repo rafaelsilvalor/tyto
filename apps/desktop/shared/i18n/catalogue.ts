@@ -825,6 +825,39 @@ export interface Catalogue {
   readonly 'commandPanel.state.refused': string;
   /** TYTO-496: how a command's run ended, in its Problems section's header. */
   readonly 'problems.command.exit': string;
+  /** TYTO-504, ADR 0162: the gallery screen, its filters, a card's states and what a click did. */
+  readonly 'command.gallery.show': string;
+  readonly 'gallery.heading': string;
+  readonly 'gallery.index': string;
+  readonly 'gallery.loading': string;
+  readonly 'gallery.unavailable': string;
+  readonly 'gallery.cached': string;
+  readonly 'gallery.empty': string;
+  readonly 'gallery.filters': string;
+  readonly 'gallery.filter.all': string;
+  readonly 'gallery.filter.templates': string;
+  readonly 'gallery.filter.plugins': string;
+  readonly 'gallery.filter.installed': string;
+  readonly 'gallery.filter.updates': string;
+  readonly 'gallery.kind.template': string;
+  readonly 'gallery.kind.plugin': string;
+  readonly 'gallery.install': string;
+  readonly 'gallery.installing': string;
+  readonly 'gallery.installed': string;
+  readonly 'gallery.update': string;
+  readonly 'gallery.updating': string;
+  readonly 'gallery.pinned': string;
+  readonly 'gallery.changes': string;
+  readonly 'gallery.incompatible': string;
+  readonly 'gallery.notSynced': string;
+  readonly 'gallery.configurations': string;
+  readonly 'gallery.done.written': string;
+  readonly 'gallery.done.already': string;
+  readonly 'gallery.done.moved': string;
+  readonly 'gallery.done.current': string;
+  readonly 'gallery.byHand': string;
+  readonly 'gallery.force': string;
+  readonly 'gallery.close': string;
 }
 
 export type CatalogueKey = keyof Catalogue;
@@ -1293,4 +1326,36 @@ export const CATALOGUE_KEYS = [
   'commandPanel.state.finished',
   'commandPanel.state.refused',
   'problems.command.exit',
+  'command.gallery.show',
+  'gallery.heading',
+  'gallery.index',
+  'gallery.loading',
+  'gallery.unavailable',
+  'gallery.cached',
+  'gallery.empty',
+  'gallery.filters',
+  'gallery.filter.all',
+  'gallery.filter.templates',
+  'gallery.filter.plugins',
+  'gallery.filter.installed',
+  'gallery.filter.updates',
+  'gallery.kind.template',
+  'gallery.kind.plugin',
+  'gallery.install',
+  'gallery.installing',
+  'gallery.installed',
+  'gallery.update',
+  'gallery.updating',
+  'gallery.pinned',
+  'gallery.changes',
+  'gallery.incompatible',
+  'gallery.notSynced',
+  'gallery.configurations',
+  'gallery.done.written',
+  'gallery.done.already',
+  'gallery.done.moved',
+  'gallery.done.current',
+  'gallery.byHand',
+  'gallery.force',
+  'gallery.close',
 ] as const satisfies readonly CatalogueKey[];

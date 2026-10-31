@@ -114,6 +114,7 @@ const actions = () =>
     closeGroup: vi.fn<() => void>(),
     openExport: vi.fn<() => void>(),
     showPlugins: vi.fn<() => void>(),
+    showGallery: vi.fn<() => void>(),
     showQueue: vi.fn<() => void>(),
     openSettings: vi.fn<() => void>(),
     openKeybindings: vi.fn<() => void>(),
@@ -571,6 +572,7 @@ describe('the File menu table', () => {
     expect(spies.openDocument).toHaveBeenCalledTimes(1);
     expect(spies.openExport).toHaveBeenCalledTimes(1);
     expect(spies.showPlugins).toHaveBeenCalledTimes(1);
+    expect(spies.showGallery).toHaveBeenCalledTimes(1);
     expect(spies.showQueue).toHaveBeenCalledTimes(1);
     expect(spies.openSettings).toHaveBeenCalledTimes(1);
     expect(spies.openKeybindings).toHaveBeenCalledTimes(1);

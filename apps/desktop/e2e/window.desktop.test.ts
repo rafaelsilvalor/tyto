@@ -309,6 +309,10 @@ describe('the bridge', () => {
       'file:reopen',
       'file:save',
       'files:recent',
+      // TYTO-504: the gallery. Exercised by `e2e/gallery.desktop.test.ts`.
+      'gallery:install',
+      'gallery:list',
+      'gallery:update',
       // TYTO-318: Help > Documentation. Opens the system browser, which no suite should do;
       // `src/main/ipc.test.ts` and `src/main/documentation.test.ts` hold what it does.
       'help:open-documentation',
@@ -784,6 +788,11 @@ describe('switching the language', () => {
     // `e2e/plugins.desktop.test.ts` opens the real screen and measures it is drawn.
     'command.plugins.show',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('plugins.')),
+    // TYTO-504: the gallery is closed on load too, for the plugins screen's reason.
+    // `src/renderer/gallery-dialog.test.ts` renders its states, and `e2e/gallery.desktop.test.ts`
+    // opens the real screen.
+    'command.gallery.show',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('gallery.')),
     // TYTO-45: the queue panel is closed in the default layout, and a closed panel's element is
     // never created — so none of its strings is in the document on load. Excluded because they
     // are not on screen yet, not to loosen the count: `src/renderer/queue-panel.test.ts`

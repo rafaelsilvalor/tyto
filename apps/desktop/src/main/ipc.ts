@@ -35,6 +35,7 @@ import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
 import { type ExplorerService } from './explorer.js';
 import { type ExportService } from './export.js';
+import { type DesktopGallery } from './gallery.js';
 import { type LayoutStore } from './layout-store.js';
 import { type SessionService, type TemplateFolder } from './session.js';
 import { type PanelService } from './panels.js';
@@ -249,6 +250,11 @@ export interface IpcDependencies {
    */
   readonly pluginFiles: { sync: (update: boolean) => Promise<void> };
   /**
+   * The gallery (TYTO-504, ADR 0162): `@tyto/io`'s install and update, the setting's index, and
+   * the sync above afterwards. The handlers pass an entry's id and nothing else.
+   */
+  readonly gallery: DesktopGallery;
+  /**
    * The open workspace folder's files (TYTO-279, ADR 0115): listed by id, and a brief's path
    * found by id, only inside the folder main has open.
    */
@@ -461,6 +467,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     project,
     workspace,
     pluginFiles,
+    gallery,
     explorer,
     queue,
     recipes,
@@ -550,6 +557,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       await pluginFiles.sync(update);
       return {};
     },
+
+    'gallery:list': () => gallery.list(),
+    'gallery:install': ({ id }) => gallery.install(id),
+    'gallery:update': ({ id }) => gallery.update(id),
 
     'explorer:list': ({ entryId }) => explorer.list(entryId),
 

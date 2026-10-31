@@ -689,6 +689,64 @@ export type MenuModel = z.infer<typeof menuSchema>;
 export const menuMoveSchema = z.enum(['previous', 'next']);
 export type MenuMove = z.infer<typeof menuMoveSchema>;
 
+/** An index entry's id, as `@tyto/plugin-api`'s reader admits one (ADR 0162). */
+const galleryIdSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]*$/u);
+
+/**
+ * One gallery card (TYTO-504): an index entry against the machine's plugin files. `pinned` is
+ * every ref a file pins it at, `files` the plugin files that hold it. `preview` is the
+ * picture as a `data:` URL, because the page's policy loads no `file:` image.
+ */
+export const galleryEntrySchema = z.object({
+  id: galleryIdSchema,
+  kind: z.enum(['template', 'plugin']),
+  name: z.string(),
+  description: z.string(),
+  latest: z.string(),
+  changes: z.string().optional(),
+  configurations: z.array(z.string()),
+  state: z.enum(['not installed', 'installed', 'update available']),
+  /** False when this Tyto's plugin API is outside the entry's `engine`: listed, never installed. */
+  compatible: z.boolean(),
+  engine: z.string(),
+  pinned: z.array(z.string()),
+  files: z.array(z.string()),
+  /** Whether the lock pins every place, so a sync has fetched it. */
+  synced: z.boolean(),
+  preview: z.string().startsWith('data:image/').optional(),
+});
+
+export type GalleryEntryView = z.infer<typeof galleryEntrySchema>;
+
+/**
+ * The gallery as the window shows it. `entries` is absent when there is no index to list;
+ * `cached` is when the copy shown was fetched, present only when today's fetch failed;
+ * `problems` are already-rendered sentences, as the plugins screen's are.
+ */
+export const galleryViewSchema = z.object({
+  index: z.string(),
+  entries: z.array(galleryEntrySchema).max(500).optional(),
+  cached: z.string().optional(),
+  problems: z.array(z.string()),
+});
+
+export type GalleryView = z.infer<typeof galleryViewSchema>;
+
+/**
+ * What one install or update did (TYTO-504), as `tyto gallery` prints it: `written`,
+ * `already installed`, `moved`, `current` or `refused` with the refusal's sentence.
+ * `byHand` names each place written by hand that the update moves, which the CLI says before
+ * it moves them. `view` is the gallery read again after the sync.
+ */
+export const galleryActionSchema = z.object({
+  outcome: z.enum(['written', 'already installed', 'moved', 'current', 'refused']),
+  problem: z.string().optional(),
+  byHand: z.array(z.object({ file: z.string(), ref: z.string() })),
+  view: galleryViewSchema,
+});
+
+export type GalleryAction = z.infer<typeof galleryActionSchema>;
+
 export const IPC_CHANNELS = {
   /**
    * What the renderer needs to render its shell, asked once on load.
@@ -1700,6 +1758,27 @@ export const IPC_CHANNELS = {
    * window to read again.
    */
   'plugin-files:sync': channel(z.strictObject({ update: z.boolean() }), z.object({})),
+
+  /**
+   * The gallery (TYTO-504, ADR 0162): the index the `galleryIndex` setting names, fetched now,
+   * each entry against the machine's plugin files. **Strict, and it names no index**: main
+   * reads the setting, so a page cannot point the window's `git` at a location of its own.
+   */
+  'gallery:list': channel(z.strictObject({}), galleryViewSchema),
+
+  /**
+   * Installs one entry, as `tyto gallery install` does (the same `@tyto/io` operation), then
+   * syncs the machine's plugin files as Plugins: Sync Plugin Files does, so a fetched plugin's
+   * permissions are asked in the same box. Answers with the gallery read again.
+   */
+  'gallery:install': channel(z.strictObject({ id: galleryIdSchema }), galleryActionSchema),
+
+  /**
+   * Moves one entry to its latest tag, as `tyto gallery update` does without `--force`, then
+   * syncs. **The only way the window moves a ref** (ADR 0151 decision 3): a newer version is
+   * shown by `gallery:list` and waits for this.
+   */
+  'gallery:update': channel(z.strictObject({ id: galleryIdSchema }), galleryActionSchema),
 
   /**
    * The installed plugins' panels (TYTO-49, ADR 0045), answered once the plugins have started.

@@ -421,6 +421,7 @@ describe('the File submenu', () => {
       'template.edit',
       '—',
       'plugins.show',
+      'gallery.show',
       'queue.show',
       'settings.open',
       'keybindings.open',

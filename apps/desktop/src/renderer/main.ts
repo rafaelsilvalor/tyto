@@ -123,6 +123,7 @@ import {
   EXPORT_DIALOG_TAG,
 } from './export-dialog.js';
 import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
+import { type GalleryDialog, GALLERY_DIALOG_TAG } from './gallery-dialog.js';
 import { previewAnalysis } from './brief-analysis.js';
 import {
   type OfferedPanel,
@@ -869,6 +870,8 @@ function resolveElements() {
     exportDialog: document.querySelector<ExportDialog>(EXPORT_DIALOG_TAG),
     // TYTO-47. By tag, for the problems panel's reason: naming it keeps the import a runtime one.
     pluginsDialog: document.querySelector<PluginsDialog>(PLUGINS_DIALOG_TAG),
+    // TYTO-504. By tag, for the same reason.
+    galleryDialog: document.querySelector<GalleryDialog>(GALLERY_DIALOG_TAG),
     // TYTO-45. A dock panel, so `null` whenever it is closed — which is how it starts.
     queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
     // TYTO-347. A dock panel too, `null` while closed; painted from the workspace answer.
@@ -1387,6 +1390,34 @@ function openPluginsDialog(): void {
   });
 }
 
+/**
+ * The gallery (TYTO-504): opened empty and filled when main answers, since the index is fetched
+ * with `git` on every open, as `tyto gallery list` fetches it. Each click is main's install or
+ * update; the template list follows on `templates:changed`, which the sync after it sends.
+ */
+function openGalleryDialog(): void {
+  const dialog = elements.galleryDialog;
+  if (dialog === null || dialog === undefined) return;
+
+  dialog.locale = state.locale;
+  dialog.view = undefined;
+  dialog.open = true;
+  dialog.onAct = async (verb, id) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    return verb === 'install'
+      ? bridge['gallery:install']({ id })
+      : bridge['gallery:update']({ id });
+  };
+  void withBridge(async (bridge) => {
+    try {
+      dialog.view = await bridge['gallery:list']({});
+    } catch {
+      dialog.view = 'failed';
+    }
+  });
+}
+
 function openExportDialog(): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
@@ -1708,6 +1739,9 @@ const registry: CommandRegistry = withCommandGate(
     },
     showPlugins: () => {
       openPluginsDialog();
+    },
+    showGallery: () => {
+      openGalleryDialog();
     },
     openSettings: () => {
       openAppFile('settings');
@@ -4842,6 +4876,7 @@ function applyLocale(next: Locale): void {
     elements.templateMode.locale = next;
   }
   if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
+  if (elements.galleryDialog) elements.galleryDialog.locale = next;
   if (elements.trustDialog) elements.trustDialog.locale = next;
   if (elements.recentFolders) elements.recentFolders.locale = next;
   // The docked panels were handed the locale only when the dock was arranged, so a panel open
