@@ -4,18 +4,24 @@ import type { MenuItemConstructorOptions } from 'electron';
 type MenuRole = NonNullable<MenuItemConstructorOptions['role']>;
 
 import {
+  type MenuCommand,
+  BRIEF_MENU_GROUPS,
   DOCUMENTATION_COMMAND,
   FILE_MENU_GROUPS,
+  PREVIEW_MENU_GROUPS,
   RELOAD_COMMAND,
-  VIEW_MENU_COMMANDS,
+  TOOLS_MENU_GROUPS,
+  VIEW_MENU_GROUPS,
   ZOOM_MENU_COMMANDS,
 } from '../../shared/commands.js';
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 import { withoutMnemonic } from './menu-model.js';
 
 /**
- * The application menu, which exists for one reason: **two of its default accelerators
- * destroy work.**
+ * The application menu. Since TYTO-514 (ADR 0166) it is where a person who has learnt no key
+ * finds every verb worth a click — File, Edit, Brief, Preview, View, Tools, Window and Help, each
+ * a table of `shared/commands.ts`. It began, and stays, a defence: **two of Electron's default
+ * accelerators destroy work.**
  *
  * Electron builds a default menu when an app installs none, and that menu carries
  * `CommandOrControl+W` on *Close Window* and `CommandOrControl+R` on *Reload* — measured,
@@ -57,12 +63,13 @@ import { withoutMnemonic } from './menu-model.js';
  * that would fill its own list — `editMenu`, macOS's `appMenu` — has it written out, because
  * Electron fills one in English. `menu.test.ts` walks the template on all three platforms for it.
  *
- * **The five top-level titles are this app's off macOS** (TYTO-264, ADR 0078): each carries a
+ * **The top-level titles are this app's off macOS** (TYTO-264, ADR 0078): each carries a
  * mnemonic — `&File`, `E&xibir` — so Alt and that letter open it, and a role's label has none.
  * The role stays, so what each list holds and does is unchanged. macOS keeps the roles' own
- * titles and the File title without its `&` (ADR 0078 §2): a Mac has no mnemonics.
+ * titles, and the four with no role — File, Brief, Preview, Tools — lose their `&` (ADR 0078
+ * §2): a Mac has no mnemonics.
  *
- * **The File items name commands rather than implement them.** `shared/commands.ts` is the
+ * **The items name commands rather than implement them.** `shared/commands.ts` is the
  * table both processes read — the renderer registers those ids, this file draws them, and
  * `onCommand` carries the id back across. That is the acceptance criterion literally: a menu
  * item and a command-bar row are the same command, not two that agree today.
@@ -92,8 +99,8 @@ export interface MenuOptions {
   /** Help > About (TYTO-248): shows {@link aboutText}, in a box or macOS's own panel. */
   readonly onAbout: () => void;
   /**
-   * The File and View items to grey, by command id: what the window said does nothing with the tab in
-   * front (TYTO-283, `menu:disabled`). Absent is none.
+   * The items to grey, by command id: what the window said does nothing with the tab in front
+   * (TYTO-283, `menu:disabled`; every menu since TYTO-514). Absent is none.
    */
   readonly disabled?: ReadonlySet<string>;
 }
@@ -132,6 +139,35 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     role: name,
     label: options.t(key),
   });
+  // A command of the renderer's registry as an item. The id is the command's, which is what
+  // lets the end-to-end suite find an item without matching a translated label; the click is
+  // `onCommand`, the same `registry.run` the command bar calls, so nothing here knows what any
+  // id does (ADR 0166).
+  const command = (entry: MenuCommand): MenuItemConstructorOptions => ({
+    id: entry.id,
+    label: options.t(entry.label),
+    enabled: options.disabled?.has(entry.id) !== true,
+    click: () => {
+      options.onCommand(entry.id);
+    },
+  });
+  // A table's groups, with a separator between each pair of them.
+  const groups = (table: readonly (readonly MenuCommand[])[]): MenuItemConstructorOptions[] =>
+    table.flatMap((group, index) => [
+      ...(index === 0 ? [] : [{ type: 'separator' } as const]),
+      ...group.map(command),
+    ]);
+  // One of this app's own top-level menus (TYTO-514): an id the drawn row asks for it by
+  // (TYTO-244), since it has no role to be named by, and the title without its `&` on macOS.
+  const own = (
+    id: string,
+    key: CatalogueKey,
+    submenu: MenuItemConstructorOptions[],
+  ): MenuItemConstructorOptions => ({
+    id,
+    label: mac ? withoutMnemonic(options.t(key)) : options.t(key),
+    submenu,
+  });
 
   return [
     // On macOS the app menu is where Quit lives and the first submenu is always the app's.
@@ -164,41 +200,25 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
     // Every item runs a command id out of `shared/commands.ts` through `onCommand`, which
     // reaches the renderer's registry — the same `registry.run` the command bar calls. Nothing
     // here knows what any of the ids do.
-    {
-      // The id the drawn menu row asks for it by (TYTO-244); every other top-level item has a
-      // role, and the row names those by it (`menu-model.ts`).
-      id: 'file',
-      label: mac ? withoutMnemonic(options.t('menu.file')) : options.t('menu.file'),
-      submenu: [
-        ...FILE_MENU_GROUPS.flatMap((group, index) => [
-          ...(index === 0 ? [] : [{ type: 'separator' } as const]),
-          ...group.map((command) => ({
-            // The id is the command's, which is what lets the end-to-end suite find an item
-            // without matching a translated label.
-            id: command.id,
-            label: options.t(command.label),
-            enabled: options.disabled?.has(command.id) !== true,
-            click: () => {
-              options.onCommand(command.id);
-            },
-          })),
-        ]),
-        // **No accelerators anywhere in this submenu, and that is the decision.** A menu
-        // accelerator is handled by the browser process before the page sees the key, so one
-        // written here would take that key away from `desktopKeymapSet` unconditionally —
-        // including in vim mode, where the desktop bindings are deliberately not in force and
-        // `Ctrl-O` belongs to the vim engine. The menu's job in this card is to *teach the
-        // verbs*; the keystrokes stay the page's, and `e2e/tabs.desktop.test.ts`'s accelerator
-        // table staying green unchanged is the evidence nothing was taken.
-        // Exit on Windows and Quit on Linux, the words Electron's own label used there.
-        ...(mac
-          ? []
-          : [
-              { type: 'separator' } as const,
-              role('quit', platform === 'win32' ? 'menu.role.exit' : 'menu.role.quit'),
-            ]),
-      ],
-    },
+    // `own` gives it the id the drawn menu row asks for it by (TYTO-244); a top-level item with
+    // a role is named by the role instead (`menu-model.ts`).
+    own('file', 'menu.file', [
+      ...groups(FILE_MENU_GROUPS),
+      // **No accelerators anywhere in this menu bar, and that is the decision.** A menu
+      // accelerator is handled by the browser process before the page sees the key, so one
+      // written here would take that key away from `desktopKeymapSet` unconditionally —
+      // including in vim mode, where the desktop bindings are deliberately not in force and
+      // `Ctrl-O` belongs to the vim engine. The menu's job is to *teach the verbs*; the
+      // keystrokes stay the page's, and `e2e/tabs.desktop.test.ts`'s accelerator table
+      // staying green unchanged is the evidence nothing was taken.
+      // Exit on Windows and Quit on Linux, the words Electron's own label used there.
+      ...(mac
+        ? []
+        : [
+            { type: 'separator' } as const,
+            role('quit', platform === 'win32' ? 'menu.role.exit' : 'menu.role.quit'),
+          ]),
+    ]),
     // `editMenu` is what makes copy and paste work on macOS, where the clipboard shortcuts are
     // the menu's rather than the page's. Its list is written out item for item as Electron would
     // build it — minus macOS's Speech submenu — so each item is labelled in the window's language
@@ -219,48 +239,35 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
         role('selectAll', 'menu.role.selectAll'),
       ],
     },
+    // TYTO-514 (ADR 0166). Tyto's own work, named after it: the brief, what it looks like, and
+    // further along the bar the tools. Each is a table of `shared/commands.ts`, greyed by what
+    // the window says does nothing with the tab in front.
+    own('brief', 'menu.brief', groups(BRIEF_MENU_GROUPS)),
+    own('preview', 'menu.preview', groups(PREVIEW_MENU_GROUPS)),
     // Written out because the default carries Reload and Force Reload as roles, which tear the
     // page down before it can keep its tabs. Reload is the window's command instead (TYTO-113).
-    // Originally: a reload discarded every open buffer. Everything else the role would have built is kept, item
-    // for item: the developer tools and full screen are harmless, and dropping the submenu
-    // wholesale would take them along with the two entries that are the problem. The three
-    // zoom items are the window's commands since TYTO-272, so that each one writes `zoom`.
+    // Everything else the role would have built is kept, item for item: the developer tools and
+    // full screen are harmless, and dropping the submenu wholesale would take them along with
+    // the two entries that are the problem. The three zoom items are the window's commands
+    // since TYTO-272, so that each one writes `zoom`.
     {
       role: 'viewMenu',
       ...title('menu.view'),
       submenu: [
-        // TYTO-286. No accelerators, for the File menu's reason: the keys are the page's.
-        ...VIEW_MENU_COMMANDS.map((command) => ({
-          id: command.id,
-          label: options.t(command.label),
-          enabled: options.disabled?.has(command.id) !== true,
-          click: () => {
-            options.onCommand(command.id);
-          },
-        })),
+        // TYTO-286, TYTO-514: the groups, the bottom area's tabs, the vim mode.
+        ...groups(VIEW_MENU_GROUPS),
         { type: 'separator' as const },
-        {
-          id: RELOAD_COMMAND.id,
-          label: options.t(RELOAD_COMMAND.label),
-          click: () => {
-            options.onCommand(RELOAD_COMMAND.id);
-          },
-        },
+        command(RELOAD_COMMAND),
         role('toggleDevTools', 'menu.role.toggleDevTools'),
         { type: 'separator' },
         // TYTO-272 (ADR 0099). The window's commands and not the roles: each writes the `zoom`
         // setting, and the keys (`Mod-0`, `Mod-=`, `Mod--`) are the page's like every other.
-        ...ZOOM_MENU_COMMANDS.map((command) => ({
-          id: command.id,
-          label: options.t(command.label),
-          click: () => {
-            options.onCommand(command.id);
-          },
-        })),
+        ...ZOOM_MENU_COMMANDS.map(command),
         { type: 'separator' },
         role('togglefullscreen', 'menu.role.togglefullscreen'),
       ],
     },
+    own('tools', 'menu.tools', groups(TOOLS_MENU_GROUPS)),
     // The one other submenu written out: the default carries Close, and its accelerator is
     // the key a tab now answers to.
     {
@@ -284,13 +291,7 @@ export function menuTemplate(platform: string, options: MenuOptions): MenuItemCo
       submenu: [
         // TYTO-318. First, as the manual is in VS Code's and Blender's Help: it is what the
         // menu is for. It runs the registry's command, which asks main to open the manual.
-        {
-          id: DOCUMENTATION_COMMAND.id,
-          label: options.t(DOCUMENTATION_COMMAND.label),
-          click: () => {
-            options.onCommand(DOCUMENTATION_COMMAND.id);
-          },
-        },
+        command(DOCUMENTATION_COMMAND),
         { type: 'separator' },
         { label: options.t('menu.revealLogs'), click: options.onRevealLogs },
         // A label and a click rather than `role: 'about'`, so the facts are read when it is

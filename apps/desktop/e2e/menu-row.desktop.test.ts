@@ -184,12 +184,15 @@ afterAll(async () => {
 });
 
 describe('the drawn menu row', () => {
-  it("names the installed menu's five top-level menus, in its own labels", async () => {
+  it("names the installed menu's eight top-level menus, in its own labels", async () => {
     const names = await rowNames();
     expect(names.map(({ id }) => id)).toEqual([
       'file',
       'editmenu',
+      'brief',
+      'preview',
       'viewmenu',
+      'tools',
       'windowmenu',
       'help',
     ]);
@@ -400,12 +403,13 @@ describe('Alt and a letter (TYTO-264)', () => {
     expect(await underlinedLetters()).toEqual([]);
     await page.keyboard.down('Alt');
     // W is the person's own Alt+W (written before launch), so Window shows no underline.
-    expect(await underlinedLetters()).toEqual(['F', 'E', 'V', 'H']);
+    // Brief, Preview and Tools since TYTO-514: B, P and T, which nothing else holds.
+    expect(await underlinedLetters()).toEqual(['F', 'E', 'B', 'P', 'V', 'T', 'H']);
     await shoot('alt-en');
     await page.keyboard.up('Alt');
     // Alt alone was a tap: the row has focus, and keeps its letters while it does.
     expect(await focusedMenu()).toBe('file');
-    expect(await underlinedLetters()).toEqual(['F', 'E', 'V', 'H']);
+    expect(await underlinedLetters()).toEqual(['F', 'E', 'B', 'P', 'V', 'T', 'H']);
     await page.keyboard.press('Escape');
     expect(await editorFocused()).toBe(true);
     expect(await underlinedLetters()).toEqual([]);
@@ -423,7 +427,7 @@ describe('Alt and a letter (TYTO-264)', () => {
     await useLocale('pt-BR');
     await focusEditor();
     await page.keyboard.down('Alt');
-    expect(await underlinedLetters()).toEqual(['A', 'E', 'x', 'J', 'd']);
+    expect(await underlinedLetters()).toEqual(['A', 'E', 'B', 'P', 'x', 'F', 'J', 'd']);
     await shoot('alt-ptbr');
     await page.keyboard.up('Alt');
     await page.keyboard.press('Escape');
@@ -440,10 +444,17 @@ describe('Alt and a letter (TYTO-264)', () => {
     await closeList();
     await page.keyboard.press('Escape');
 
-    // English's letter for File opens nothing in Portuguese.
+    // F is Ferramentas there since TYTO-514, not File.
+    before = (await popups()).length;
+    await altAnd('f');
+    expect((await waitForPopups(before + 1)).at(-1)?.owner).toBe('tools');
+    await closeList();
+    await page.keyboard.press('Escape');
+
+    // English's letter for View opens nothing in Portuguese, where View is E&xibir.
     before = (await popups()).length;
     await focusEditor();
-    await altAnd('f');
+    await altAnd('v');
     await page.waitForTimeout(200);
     expect(await popups()).toHaveLength(before);
     expect(await focusedMenu()).toBeNull();

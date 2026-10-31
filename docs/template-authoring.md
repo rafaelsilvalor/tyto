@@ -907,10 +907,10 @@ manifest declares; a brief that names fewer gets fewer.
 
 ## Editing one in the desktop app
 
-_File ▸ Edit template…_ (the command bar lists it as _Editar template…_) opens a template
+_Brief ▸ Edit template…_ (the command bar lists it as _Editar template…_) opens a template
 folder in the **template mode**, which covers the window: `manifest.yaml` and `template.html` in
 two tabs, one of the folder's `examples/*.brief` as the sample, and **every format the manifest
-declares drawn side by side**. _File ▸ New template…_ writes the same scaffold `tyto template new`
+declares drawn side by side**. _Brief ▸ New template…_ writes the same scaffold `tyto template new`
 writes and opens it.
 
 **The grid is drawn from the buffers, not from the files.** Every edit in either tab — CSS in

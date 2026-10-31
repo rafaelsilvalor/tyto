@@ -1,7 +1,16 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
 
-import { DOCUMENTATION_COMMAND, FILE_MENU_COMMANDS } from '../../shared/commands.js';
+import {
+  type MenuCommand,
+  BRIEF_MENU_GROUPS,
+  DOCUMENTATION_COMMAND,
+  FILE_MENU_COMMANDS,
+  MENU_COMMANDS,
+  PREVIEW_MENU_GROUPS,
+  TOOLS_MENU_GROUPS,
+  VIEW_MENU_GROUPS,
+} from '../../shared/commands.js';
 import { aboutText, menuTemplate } from './menu.js';
 
 /**
@@ -359,25 +368,41 @@ describe('the File submenu', () => {
     expect(built.find((item) => item.label === 'menu.file')).toBeDefined();
   });
 
-  it.each(['win32', 'linux'])('titles all five from the catalogue on %s (TYTO-264)', (platform) => {
-    const built = template(platform);
-    expect(built.map((item) => [item.role ?? item.id, item.label])).toEqual([
-      ['file', 'menu.file'],
-      ['editMenu', 'menu.edit'],
-      ['viewMenu', 'menu.view'],
-      ['windowMenu', 'menu.window'],
-      ['help', 'menu.help'],
-    ]);
-  });
+  it.each(['win32', 'linux'])(
+    'titles all eight from the catalogue on %s (TYTO-264)',
+    (platform) => {
+      const built = template(platform);
+      // TYTO-514 (ADR 0166): Brief, Preview and Tools between them, Window where it was.
+      expect(built.map((item) => [item.role ?? item.id, item.label])).toEqual([
+        ['file', 'menu.file'],
+        ['editMenu', 'menu.edit'],
+        ['brief', 'menu.brief'],
+        ['preview', 'menu.preview'],
+        ['viewMenu', 'menu.view'],
+        ['tools', 'menu.tools'],
+        ['windowMenu', 'menu.window'],
+        ['help', 'menu.help'],
+      ]);
+    },
+  );
 
-  it('drops the mnemonic from the File title on macOS, which has none (TYTO-264)', () => {
+  it('drops the mnemonic from its own titles on macOS, which has none (TYTO-264)', () => {
     const mac = menuTemplate('darwin', {
-      t: (key) => (key === 'menu.file' ? '&Arquivo' : key),
+      t: (key) => `&${key}`,
       onRevealLogs: () => {},
       onCommand: () => {},
       onAbout: () => {},
     });
-    expect(mac.find((item) => item.id === 'file')?.label).toBe('Arquivo');
+    expect(mac.find((item) => item.id === 'file')?.label).toBe('menu.file');
+    // TYTO-514: Brief, Preview and Tools have no role, so their titles are this app's there too.
+    expect(
+      mac.filter((item) => item.role === undefined).map((item) => [item.id, item.label]),
+    ).toEqual([
+      ['file', 'menu.file'],
+      ['brief', 'menu.brief'],
+      ['preview', 'menu.preview'],
+      ['tools', 'menu.tools'],
+    ]);
     expect(mac.filter((item) => item.role !== undefined && item.label !== undefined)).toEqual([]);
   });
 
@@ -402,8 +427,8 @@ describe('the File submenu', () => {
     const items = fileSubmenu(template('linux'));
     const shape = items.map((item) => (item.type === 'separator' ? '—' : (item.id ?? item.role)));
 
-    // Five groups, so four separators between them — plus the fifth before Quit, which is
-    // appended on this platform rather than coming from the table.
+    // Three groups since TYTO-514, so two separators between them — plus the third before
+    // Quit, which is appended on this platform rather than coming from the table.
     expect(shape).toEqual([
       'document.new',
       'document.newFromTemplate',
@@ -414,18 +439,6 @@ describe('the File submenu', () => {
       '—',
       'editor.save',
       'editor.saveAs',
-      '—',
-      'file.export',
-      '—',
-      'template.new',
-      'template.edit',
-      '—',
-      'plugins.show',
-      'gallery.show',
-      'queue.show',
-      'settings.open',
-      'keybindings.open',
-      'snippets.open',
       '—',
       'document.close',
       'workspace.closeFolder',
@@ -462,15 +475,17 @@ describe('the File submenu', () => {
         onRevealLogs: () => {},
         onCommand: () => {},
         onAbout: () => {},
-        disabled: new Set(['file.export']),
+        disabled: new Set(['workspace.closeFolder']),
       }),
     );
     const enabled = (id: string): boolean | undefined =>
       items.find((item) => item.id === id)?.enabled;
 
-    expect(enabled('file.export')).toBe(false);
+    expect(enabled('workspace.closeFolder')).toBe(false);
     for (const command of FILE_MENU_COMMANDS) {
-      if (command.id !== 'file.export') expect(enabled(command.id), command.id).toBe(true);
+      if (command.id !== 'workspace.closeFolder') {
+        expect(enabled(command.id), command.id).toBe(true);
+      }
     }
     // Absent is none greyed.
     for (const item of fileSubmenu(template('win32'))) {
@@ -478,17 +493,106 @@ describe('the File submenu', () => {
     }
   });
 
-  it('gives no item an accelerator, on any platform', () => {
+  it('gives no item an accelerator, in any menu, on any platform', () => {
     // **The decision, asserted.** A menu accelerator is handled by the browser process before
     // the page sees the key, so one here would override `desktopKeymapSet` unconditionally —
     // vim mode included, where those bindings are deliberately absent and `Ctrl-N` and
     // `Ctrl-O` belong to the vim engine. The menu teaches the verbs; the page keeps the keys.
     for (const platform of ['win32', 'darwin', 'linux']) {
-      const withAccelerator = fileSubmenu(template(platform)).filter(
+      const withAccelerator = everyItem(template(platform)).filter(
         (item) => item.accelerator !== undefined,
       );
 
       expect(withAccelerator, platform).toEqual([]);
     }
+  });
+});
+
+/** Every item at every depth, top-level titles included. */
+function everyItem(entries: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
+  return entries.flatMap((item) => [
+    item,
+    ...(Array.isArray(item.submenu) ? everyItem(item.submenu) : []),
+  ]);
+}
+
+/** A top-level submenu by the id or role it is named by. */
+const menuNamed = (
+  built: readonly MenuItemConstructorOptions[],
+  name: string,
+): readonly MenuItemConstructorOptions[] => {
+  const found = built.find((item) => item.id === name || item.role === name);
+  return Array.isArray(found?.submenu) ? found.submenu : [];
+};
+
+/** A table as the menu should draw it: its ids, with a separator between each pair of groups. */
+const shapeOf = (table: readonly (readonly MenuCommand[])[]): string[] =>
+  table.flatMap((group, index) => [...(index === 0 ? [] : ['—']), ...group.map(({ id }) => id)]);
+
+const drawn = (items: readonly MenuItemConstructorOptions[]): string[] =>
+  items.map((item) => (item.type === 'separator' ? '—' : (item.id ?? item.role ?? '?')));
+
+/**
+ * Brief, Preview and Tools (TYTO-514, ADR 0166): this app's own menus, each one table of
+ * `shared/commands.ts` drawn whole, with nothing in it the registry does not run.
+ */
+describe('the Brief, Preview and Tools menus', () => {
+  it.each(['win32', 'darwin', 'linux'])('draw their tables, in order, on %s', (platform) => {
+    const built = template(platform);
+
+    expect(drawn(menuNamed(built, 'brief'))).toEqual(shapeOf(BRIEF_MENU_GROUPS));
+    expect(drawn(menuNamed(built, 'preview'))).toEqual(shapeOf(PREVIEW_MENU_GROUPS));
+    expect(drawn(menuNamed(built, 'tools'))).toEqual(shapeOf(TOOLS_MENU_GROUPS));
+    // View opens with its own groups, then Reload and the rest it always had.
+    expect(drawn(menuNamed(built, 'viewMenu')).slice(0, shapeOf(VIEW_MENU_GROUPS).length)).toEqual(
+      shapeOf(VIEW_MENU_GROUPS),
+    );
+  });
+
+  it('runs each item by its id, through onCommand and nothing else', () => {
+    const onCommand = vi.fn();
+    const built = template('win32', () => {}, onCommand);
+    const items = ['brief', 'preview', 'tools'].flatMap((name) =>
+      menuNamed(built, name).filter((item) => item.type !== 'separator'),
+    );
+
+    for (const item of items) (item.click as (() => void) | undefined)?.();
+
+    expect(onCommand.mock.calls.map(([id]) => id as string)).toEqual(items.map((item) => item.id));
+  });
+
+  it('greys what the window said does nothing, in these menus too (TYTO-283)', () => {
+    const built = menuTemplate('linux', {
+      t: (key) => key,
+      onRevealLogs: () => {},
+      onCommand: () => {},
+      onAbout: () => {},
+      disabled: new Set(['delivery.export', 'preview.nextSlide', 'terminal.show']),
+    });
+    const greyed = everyItem(built)
+      .filter((item) => item.enabled === false)
+      .map((item) => item.id);
+
+    expect(greyed).toEqual(['delivery.export', 'preview.nextSlide', 'terminal.show']);
+  });
+});
+
+/**
+ * The card's rule, over the whole bar (TYTO-514): every item with an id that is not a title,
+ * About or a role is a command of `MENU_COMMANDS` — the list `commands.test.ts` holds to the
+ * registry — so no menu can grow an id nothing answers.
+ */
+describe('every item that runs a command', () => {
+  it.each(['win32', 'darwin', 'linux'])('names one of MENU_COMMANDS on %s', (platform) => {
+    const built = template(platform);
+    const titles = new Set(built.map((item) => item.id));
+    const named = everyItem(built)
+      .filter((item) => item.id !== undefined && !titles.has(item.id) && item.id !== 'about')
+      .map((item) => item.id);
+    const listed = MENU_COMMANDS.map((command) => command.id);
+
+    expect(named.filter((id) => !listed.includes(id as string))).toEqual([]);
+    // And the other way: every command the list names is drawn somewhere.
+    expect(listed.filter((id) => !named.includes(id))).toEqual([]);
   });
 });
