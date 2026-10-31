@@ -255,6 +255,8 @@ compartment's initial content would be the language the window opened in.
 
 **The bottom area is one strip of tabs, one panel shown** (ADR 0163, TYTO-496). As in VS Code, every open bottom panel is a tab (Problems with its count, Commands, Project, a plugin's), only the one in front is drawn, `layout.json` remembers it as `front.bottom`, and the area keeps the height of its tallest open tab. The command panel has no input box: its prompt is the last line of its output. The side areas still stack their panels.
 
+**A terminal tab runs the person's shell in main, through node-pty** (ADR 0164, TYTO-497). Main owns the PTY and the shell (PowerShell, or the login shell), started in the open workspace and refused in a restricted one; the renderer only draws xterm and types, over `terminal:*` channels that take no path or program. The tab sits beside Problems and Commands; each platform's package carries only the node-pty files it loads.
+
 ## Design directives
 
 1. The IR is the single source of truth for the artwork. If it is not in the IR, it does not exist.
