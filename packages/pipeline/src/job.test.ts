@@ -678,7 +678,8 @@ describe('a kind Tyto never shipped (TYTO-47)', () => {
       extension: 'pdf',
       kinds: ['pdf'],
       rasterized: false,
-      exportFrame: (_scene, artwork, frame) => ok(`%PDF ${artwork.id} ${frame.format}`),
+      exportFrame: (_scene, artwork, exportedFrame) =>
+        ok(`%PDF ${artwork.id} ${exportedFrame.format}`),
     });
 
     const sink = recordingSink();
@@ -709,9 +710,9 @@ describe('an exporter that answers later (TYTO-48)', () => {
       extension: 'txt',
       kinds: ['txt'],
       rasterized: false,
-      exportFrame: async (_scene, artwork, frame) => {
+      exportFrame: async (_scene, artwork, exportedFrame) => {
         await new Promise((resolve) => setTimeout(resolve, 1));
-        return ok(`${artwork.id} ${frame.format}`);
+        return ok(`${artwork.id} ${exportedFrame.format}`);
       },
     });
 

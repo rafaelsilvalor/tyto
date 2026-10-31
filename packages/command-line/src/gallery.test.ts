@@ -86,12 +86,12 @@ async function release(name: string): Promise<void> {
   await git(folder, 'tag', 'v2');
 }
 
-function entry(id: string, git: string, latest: string, engine = '>=0.1.0'): string {
+function entry(id: string, repositoryUrl: string, latest: string, engine = '>=0.1.0'): string {
   return `  - id: ${id}
     kind: template
     name: ${id}
     description: The ${id} template.
-    source: { git: '${git}' }
+    source: { git: '${repositoryUrl}' }
     latest: ${latest}
     templates: [${id}]
     engine: '${engine}'

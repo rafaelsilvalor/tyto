@@ -94,10 +94,10 @@ describe('transformMatrix', () => {
 });
 
 describe('invertMatrix', () => {
-  const box = { w: 100, h: 20 };
+  const bounds = { w: 100, h: 20 };
   const placed = transformMatrix(
     { ...identityTransform, x: 40, y: -12, rotation: 30, scaleX: 2, scaleY: 0.5 },
-    box,
+    bounds,
   );
 
   it('undoes a transform, whichever side it is applied from', () => {
@@ -117,8 +117,8 @@ describe('invertMatrix', () => {
   });
 
   it('expresses one node in another’s coordinates, which is what a CSS mask needs', () => {
-    const masked = transformMatrix({ ...identityTransform, x: 20, y: 130 }, box);
-    const mask = transformMatrix({ ...identityTransform, x: 20, y: 130 }, box);
+    const masked = transformMatrix({ ...identityTransform, x: 20, y: 130 }, bounds);
+    const mask = transformMatrix({ ...identityTransform, x: 20, y: 130 }, bounds);
     const inverse = invertMatrix(masked);
     if (inverse === undefined) throw new Error('no inverse');
 
@@ -127,6 +127,8 @@ describe('invertMatrix', () => {
   });
 
   it('has no answer for a node scaled to nothing', () => {
-    expect(invertMatrix(transformMatrix({ ...identityTransform, scaleX: 0 }, box))).toBeUndefined();
+    expect(
+      invertMatrix(transformMatrix({ ...identityTransform, scaleX: 0 }, bounds)),
+    ).toBeUndefined();
   });
 });

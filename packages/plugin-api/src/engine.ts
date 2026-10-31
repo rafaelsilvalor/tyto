@@ -66,8 +66,8 @@ function ceiling(bound: Bound): readonly [number, number, number] {
   return [0, 0, patch + 1];
 }
 
-function admits(bound: Bound, version: readonly [number, number, number]): boolean {
-  const order = compare(version, bound.parts);
+function admits(bound: Bound, candidateVersion: readonly [number, number, number]): boolean {
+  const order = compare(candidateVersion, bound.parts);
   switch (bound.comparator) {
     case '>=':
       return order >= 0;
@@ -81,10 +81,11 @@ function admits(bound: Bound, version: readonly [number, number, number]): boole
       // `=1.2` is every 1.2.x, the way npm reads a partial version.
       return bound.written === 3
         ? order === 0
-        : compare(version.slice(0, bound.written), bound.parts.slice(0, bound.written)) === 0;
+        : compare(candidateVersion.slice(0, bound.written), bound.parts.slice(0, bound.written)) ===
+            0;
     case '^':
     case '~':
-      return order >= 0 && compare(version, ceiling(bound)) < 0;
+      return order >= 0 && compare(candidateVersion, ceiling(bound)) < 0;
   }
 }
 
@@ -104,8 +105,8 @@ function admits(bound: Bound, version: readonly [number, number, number]): boole
  * A range the schema would have refused answers `false`, never throws: this is called on
  * a file somebody else wrote, and a malformed one is a plugin that does not load.
  */
-export function satisfiesEngine(range: string, version: string): boolean {
-  const host = parseVersion(version);
+export function satisfiesEngine(range: string, candidateVersion: string): boolean {
+  const host = parseVersion(candidateVersion);
   if (host === undefined) return false;
 
   return range.split('||').some((alternative) => {

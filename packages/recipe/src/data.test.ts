@@ -190,8 +190,8 @@ describe('readDataArgument', () => {
       resolveData: memoryFiles({}).resolve,
     });
     if (!result.ok) throw new Error('starts');
-    const run = result.value as { cells: { diagnostics: Diagnostic[] }[] };
-    const range = run.cells[0]?.diagnostics[0]?.range;
+    const recipeRun = result.value as { cells: { diagnostics: Diagnostic[] }[] };
+    const range = recipeRun.cells[0]?.diagnostics[0]?.range;
     expect(range && source.slice(range.start, range.end)).toBe('@./{file}.json#/kinds');
   });
 });

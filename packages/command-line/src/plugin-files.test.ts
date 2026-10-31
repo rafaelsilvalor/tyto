@@ -127,8 +127,8 @@ async function lockOf(folder: string): Promise<Lock> {
   return JSON.parse(await readFile(join(folder, 'plugin-files.lock.json'), 'utf8')) as Lock;
 }
 
-const commitOf = async (lock: Lock, git: string): Promise<string | undefined> =>
-  lock.sources.find((entry) => entry.git === git)?.commit;
+const commitOf = async (lock: Lock, repositoryUrl: string): Promise<string | undefined> =>
+  lock.sources.find((entry) => entry.git === repositoryUrl)?.commit;
 
 async function sync(...flags: string[]): Promise<number> {
   return run(['plugin', 'sync', ...flags], environment());
@@ -270,13 +270,13 @@ describe('two entries', () => {
 
 describe("a project's plugin files", () => {
   /** A workspace beside the brief, with its own plugin file naming `aviso` at `ref`. */
-  async function project(git: string, ref: string): Promise<string> {
+  async function project(repositoryUrl: string, ref: string): Promise<string> {
     const folder = join(workspace, 'project');
     await mkdir(join(folder, '.tyto', 'plugin-files'), { recursive: true });
     await writeFile(join(folder, '.tyto', 'project.json'), '{}\n', 'utf8');
     await writeFile(
       join(folder, '.tyto', 'plugin-files', 'aviso.yaml'),
-      pluginFile({ aviso: { git, ref } }),
+      pluginFile({ aviso: { git: repositoryUrl, ref } }),
       'utf8',
     );
     const brief = join(folder, 'aviso.brief');
