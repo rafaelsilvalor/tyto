@@ -329,7 +329,7 @@ describe('an isolated exporter', () => {
     expect(host.registry.exporters.list()).toHaveLength(1);
 
     registration?.dispose();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
     expect(host.registry.exporters.list()).toHaveLength(0);
   });
 });
@@ -344,8 +344,8 @@ describe('a crashed plugin', () => {
           ...textExporter,
           // Never answers, so the call is still waiting when the process goes.
           exportFrame: () =>
-            new Promise((resolve) => {
-              release = () => resolve(ok(''));
+            new Promise((resolvePromise) => {
+              release = () => resolvePromise(ok(''));
             }),
         }),
       { onCrash: (reason) => crashes.push(reason) },
@@ -354,7 +354,7 @@ describe('a crashed plugin', () => {
 
     const exporter = exporterIn(connected.value.plugin);
     const waiting = exporter.exportFrame(SCENE, ARTWORK, FRAME);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
     pair.crash('exit code 7');
     release?.();
 
@@ -463,7 +463,7 @@ describe('what crosses besides contributions', () => {
       },
     });
     expect(connected.ok).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
     expect(lines).toEqual(['[texto] olá [object Object]']);
   });
 
@@ -482,7 +482,7 @@ describe('what crosses besides contributions', () => {
       manifest: { ...MANIFEST, name: 'svg' },
       activate: (inner) => inner.registerExporter({ ...textExporter, id: 'svg', kinds: ['svg'] }),
     });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
     expect(seen).toEqual(['exporter/svg']);
   });
 });
@@ -1755,10 +1755,10 @@ describe('isolated asset and font sources (TYTO-280, ADR 0117)', () => {
   const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 
   async function connected(activate: (host: PluginHost) => Disposable | void, point: string) {
-    const { connected } = await isolate(activate, { contributes: [point] });
-    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const { connected: connection } = await isolate(activate, { contributes: [point] });
+    if (!connection.ok) throw new Error(connection.error[0]?.message);
     const host = createPluginHost();
-    const activated = host.tryActivate(connected.value.plugin);
+    const activated = host.tryActivate(connection.value.plugin);
     if (!activated.ok) throw new Error(activated.error[0]?.message);
     return host.registry;
   }
@@ -1846,11 +1846,11 @@ describe('isolated asset and font sources (TYTO-280, ADR 0117)', () => {
   });
 
   it('is refused with a scheme a reference could never spell', async () => {
-    const { connected } = await isolate(
+    const { connected: connection } = await isolate(
       (host) => host.registerAssetSource({ id: 't', schemes: ['C'], fetch: () => ok({} as never) }),
       { contributes: ['asset-source'] },
     );
-    expect(connected.ok ? '' : connected.error[0]?.message).toContain(
+    expect(connection.ok ? '' : connection.error[0]?.message).toContain(
       "its 'asset-source' contribution does not match",
     );
   });

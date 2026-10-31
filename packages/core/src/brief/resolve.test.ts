@@ -472,15 +472,15 @@ describe('what counts as markup in a frontmatter scalar', () => {
     const ast = valid({
       directives: [directive('slide', 'Um'), directive('subtitulo', 'a **b**')],
     });
-    const codes = (await problems(ast)).map((item) => item.code);
-    expect(codes).not.toContain('W_MARKUP_IN_FRONTMATTER');
+    const diagnosticCodes = (await problems(ast)).map((item) => item.code);
+    expect(diagnosticCodes).not.toContain('W_MARKUP_IN_FRONTMATTER');
   });
 
   it('never looks at a slot that is not rich text', async () => {
     // `imagem: ./a*b*.png` is a path, and `cor` is one of a listed set.
     const ast = valid({ data: { imagem: './prof-ana.png', cor: 'laranja' } });
-    const codes = (await problems(ast)).map((item) => item.code);
-    expect(codes).not.toContain('W_MARKUP_IN_FRONTMATTER');
+    const diagnosticCodes = (await problems(ast)).map((item) => item.code);
+    expect(diagnosticCodes).not.toContain('W_MARKUP_IN_FRONTMATTER');
   });
 });
 

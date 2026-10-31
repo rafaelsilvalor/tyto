@@ -1175,8 +1175,8 @@ describe('a parameter handed one component further down', () => {
       BOTH,
     );
 
-    const group = built?.children[0];
-    const node = group?.kind === 'group' ? group.children[0] : undefined;
+    const firstGroup = built?.children[0];
+    const node = firstGroup?.kind === 'group' ? firstGroup.children[0] : undefined;
     const run = node?.kind === 'text' ? node.runs[0] : undefined;
 
     expect(run?.kind === 'text' ? run.text : undefined).toBe('Turma nova');

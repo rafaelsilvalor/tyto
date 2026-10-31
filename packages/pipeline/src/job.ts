@@ -534,17 +534,17 @@ export async function runJob(
       return answer === undefined ? {} : { diagnostics: answer };
     };
 
-    let loaded = await load(compiled.value);
-    if (loaded.recompile !== undefined) {
+    let loadedResources = await load(compiled.value);
+    if (loadedResources.recompile !== undefined) {
       // The first pass measured with a substitute, so neither its compile's diagnostics nor
       // its loader's describe what will be drawn. A second request is not honoured.
       problems.length = beforeCompile;
-      compiled = await compileWith(loaded.recompile.faces);
+      compiled = await compileWith(loadedResources.recompile.faces);
       if (!compiled.ok) return err([...problems, ...compiled.error]);
       problems.push(...compiled.diagnostics);
-      loaded = await load(compiled.value);
+      loadedResources = await load(compiled.value);
     }
-    problems.push(...(loaded.diagnostics ?? []));
+    problems.push(...(loadedResources.diagnostics ?? []));
   }
 
   if (aborted()) {

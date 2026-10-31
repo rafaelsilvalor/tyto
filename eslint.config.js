@@ -209,6 +209,17 @@ export default tseslint.config(
 
   {
     rules: {
+      'no-shadow': 'off',
+      '@typescript-eslint/no-shadow': [
+        'error',
+        {
+          builtinGlobals: false,
+          hoist: 'never',
+          ignoreTypeValueShadow: true,
+          ignoreFunctionTypeParameterNameValueShadow: true,
+          ignoreOnInitialization: true,
+        },
+      ],
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
@@ -408,6 +419,13 @@ export default tseslint.config(
     files: ['*.js', 'tools/**/*.ts', 'tools/**/*.mjs', '**/*.config.ts'],
     languageOptions: { globals: globals.node },
     rules: { 'no-console': 'off' },
+  },
+
+  {
+    // Another card is building the desktop app. TYTO-410 PR 2 enables this rule
+    // for desktop after TYTO-497 merges, avoiding overlapping source edits.
+    files: ['apps/desktop/**'],
+    rules: { '@typescript-eslint/no-shadow': 'off' },
   },
 
   prettier,

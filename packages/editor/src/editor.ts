@@ -776,10 +776,10 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       };
     },
 
-    createPane: (parent: HTMLElement) =>
+    createPane: (paneParent: HTMLElement) =>
       paneOn(
         new EditorView({
-          parent,
+          parent: paneParent,
           state: CodeMirrorEditorState.create({ doc: '', extensions }),
         }),
       ),

@@ -282,8 +282,8 @@ export function resolveSettings(
     const entry = written.get(setting.key);
     let value: unknown = setting.contribution.default;
     if (entry !== undefined) {
-      const written = keptEntries(setting, entry, diagnostics);
-      const parsed = setting.contribution.schema.safeParse(written);
+      const writtenValue = keptEntries(setting, entry, diagnostics);
+      const parsed = setting.contribution.schema.safeParse(writtenValue);
       if (parsed.success) value = parsed.data;
       else
         diagnostics.push(

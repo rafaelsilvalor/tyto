@@ -56,6 +56,12 @@ Name `@tyto/<name>`. `src/index.ts` is the only public API. `exports` in package
 
 ## Runtime boundary
 
+Local value bindings must not shadow names from an enclosing scope, including imports
+(TYTO-410). Rename the inner binding instead of the import. The TypeScript `no-shadow`
+rule ignores built-in globals, type/value overlaps, function-type parameter names and
+initialization shadows, and does not hoist later declarations. Desktop is temporarily
+exempt while TYTO-497 is in progress; TYTO-410 PR 2 enables the rule there after it merges.
+
 Every package is _pure_, _Node_ or _DOM_ (ADR 0010). The category is declared twice on purpose: `tsconfig.{pure,node,dom}.json` decide which types the package can even see, and the `boundary/*` blocks in `eslint.config.js` forbid the matching imports and globals with a message that names the way out. `tools/repo-checks` lints throwaway sources against the real config, so weakening a boundary rule fails `pnpm check`.
 
 **One block per rule per file set, or the later one wins silently.** Flat config replaces a rule's options rather than merging them, so a narrow block that sets `no-restricted-imports` turns off whatever a wider block configured for the same rule. `editor/one-reader-of-the-syntax-tree` is narrower than `boundary/dom` and sets that rule, so it re-states the Node message through the same `restrictedImports` helper; written without it, the runtime boundary came off `packages/editor/src` and nothing about the lint output said so (TYTO-114). `runtime-boundary.test.ts` is what caught it, and that is the reason it lints a throwaway `node:fs` import rather than trusting the config to be read correctly.
