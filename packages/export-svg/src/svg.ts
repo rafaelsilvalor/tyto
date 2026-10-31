@@ -26,13 +26,16 @@ import {
 } from '@tyto/core';
 
 import {
+  type FilterRegion,
   type Sink,
   type SvgResources,
   approximated,
+  effectReach,
   aspectRatio,
   assetUri,
   croppedImage,
   filterMarkup,
+  padRegion,
   nextId,
   paintAttributes,
   strokeMarkup,
@@ -333,7 +336,10 @@ function nodeAttributes(node: SceneNode, context: VisitContext, frames: Frames):
   return [
     node.opacity === 1 ? '' : attribute('opacity', svgNumber(node.opacity)),
     node.blend === 'normal' ? '' : attribute('style', `mix-blend-mode:${node.blend}`),
-    attribute('filter', filterMarkup(node.effects, node.id, frames.sink)),
+    attribute(
+      'filter',
+      filterMarkup(node.effects, node.id, frames.sink, filterRegion(node, context)),
+    ),
     clipAttribute(node, frames.sink),
     maskAttribute(node, context, frames),
   ].join('');
@@ -367,29 +373,50 @@ function record(node: SceneNode, context: VisitContext, frames: Frames, inner: s
  * one, so one rect answers both modes.
  */
 function passThroughMask(item: Pending, size: Size): string {
-  const corners = [
-    { x: 0, y: 0 },
-    { x: size.w, y: 0 },
-    { x: size.w, y: size.h },
-    { x: 0, y: size.h },
-  ].map((corner) => applyMatrix(item.inverse, corner));
-
-  const xs = corners.map((corner) => corner.x);
-  const ys = corners.map((corner) => corner.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
+  const region = frameRegion(item.inverse, size);
 
   return element(
     'mask',
     [attribute('id', item.maskId), attribute('maskUnits', 'userSpaceOnUse')],
     element('rect', [
-      attribute('x', svgNumber(x)),
-      attribute('y', svgNumber(y)),
-      attribute('width', svgNumber(Math.max(...xs) - x)),
-      attribute('height', svgNumber(Math.max(...ys) - y)),
+      attribute('x', svgNumber(region.x)),
+      attribute('y', svgNumber(region.y)),
+      attribute('width', svgNumber(region.w)),
+      attribute('height', svgNumber(region.h)),
       attribute('fill', '#ffffff'),
     ]),
   );
+}
+
+/** The frame's box in a node's own space: its four corners through the inverse transform. */
+function frameRegion(inverse: Matrix, size: Size): FilterRegion {
+  const corners = [
+    { x: 0, y: 0 },
+    { x: size.w, y: 0 },
+    { x: size.w, y: size.h },
+    { x: 0, y: size.h },
+  ].map((corner) => applyMatrix(inverse, corner));
+
+  const xs = corners.map((corner) => corner.x);
+  const ys = corners.map((corner) => corner.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/**
+ * Where a node's filter may draw: the frame in the node's space, padded by how far its
+ * effects can move ink, so a node just outside the frame still casts into it.
+ *
+ * Not a margin around the node's box: a blur is a standard deviation and a Gaussian is
+ * spent three of them out, so a 24 px shadow on a 40 px node overruns any fixed fraction —
+ * `export-html` gives its spread filter the same region for the same reason (ADR 0156).
+ * Undefined for a node scaled to nothing, which draws nothing to keep in a region.
+ */
+function filterRegion(node: SceneNode, context: VisitContext): FilterRegion | undefined {
+  const inverse = invertMatrix(context.transform);
+  if (inverse === undefined) return undefined;
+  return padRegion(frameRegion(inverse, context.frame.size), effectReach(node.effects));
 }
 
 /**

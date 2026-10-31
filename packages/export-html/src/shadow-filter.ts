@@ -30,9 +30,9 @@ export function spreadShadowFilter(
     `<feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="alpha"/>`,
     `<feMorphology in="alpha" operator="${effect.spread > 0 ? 'dilate' : 'erode'}" radius="${cssNumber(Math.abs(effect.spread))}" result="grown"/>`,
     `<feOffset in="grown" dx="${cssNumber(effect.x)}" dy="${cssNumber(effect.y)}" result="moved"/>`,
-    // The IR states a blur radius, as CSS does; the standard deviation is half of it,
-    // which is the halving `export-svg` does for the same reason.
-    `<feGaussianBlur in="moved" stdDeviation="${cssNumber(effect.blur / 2)}" result="blurred"/>`,
+    // The IR's blur is the standard deviation, as `drop-shadow()` reads it in Chromium,
+    // so the spread and the plain shadow blur alike (ADR 0156, 2026-10-31 note).
+    `<feGaussianBlur in="moved" stdDeviation="${cssNumber(effect.blur)}" result="blurred"/>`,
     `<feFlood flood-color="${flood}" flood-opacity="${cssNumber(color.a)}" result="flooded"/>`,
     `<feComposite in="flooded" in2="blurred" operator="in" result="shadow"/>`,
     `<feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>`,

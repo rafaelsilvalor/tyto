@@ -282,7 +282,7 @@ line-height letter-spacing color text-align vertical-align overflow`, `fill stro
 | `font`           | `700 72px/1.05 "Inter"` — weight and `/line-height` optional; the family needs **double** quotes                               |
 | `fill` / `color` | `#ff5900`, a CSS basic colour name, `linear-gradient(180deg, #000 0, #fff 1)`, `radial-gradient(0.5 0.5, 0.7, #000 0, #fff 1)` |
 | `stroke`         | `2px #ffffff` with an optional `inside` / `center` / `outside`                                                                 |
-| `shadow`         | `0 4 12 #00000088`, or `0 4 12 2 #00000088` with a spread                                                                      |
+| `shadow`         | `0 4 12 #00000088`, or `0 4 12 2 #00000088` with a spread; the blur is a standard deviation, as CSS `drop-shadow()` reads it   |
 | `radius`         | `8`, or `8 8 0 0` for `[tl, tr, br, bl]`                                                                                       |
 | `anchor`         | `center`, `0.5`, or `0.5 1`                                                                                                    |
 | `visible`        | `true` / `false`                                                                                                               |

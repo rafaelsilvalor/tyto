@@ -11,11 +11,11 @@
       <rect x="-4" y="-4" width="68" height="68" fill="#ffffff"/>
       <path d="M0 0 H60 V60 H0 V0 Z" fill="#000000"/>
     </mask>
-    <filter id="filter10" x="-50%" y="-50%" width="200%" height="200%">
+    <filter id="filter10" filterUnits="userSpaceOnUse" x="-232.2031" y="-161.4924" width="651.6854" height="651.6854">
       <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="fx4"/>
       <feMorphology in="fx4" operator="dilate" radius="3" result="fx5"/>
       <feOffset in="fx5" dx="0" dy="4" result="fx6"/>
-      <feGaussianBlur in="fx6" stdDeviation="6" result="fx7"/>
+      <feGaussianBlur in="fx6" stdDeviation="12" result="fx7"/>
       <feFlood flood-color="#000000" flood-opacity="0.5" result="fx8"/>
       <feComposite in="fx8" in2="fx7" operator="in" result="fx9"/>
       <feMerge result="fx3">
@@ -30,8 +30,8 @@
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
-    <filter id="filter15" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" result="fx14"/>
+    <filter id="filter15" filterUnits="userSpaceOnUse" x="-223" y="-143" width="406" height="406">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1" result="fx14"/>
     </filter>
     <linearGradient id="paint16" gradientUnits="userSpaceOnUse" x1="83" y1="111" x2="277" y2="-83">
       <stop offset="0" stop-color="#ff5900"/>

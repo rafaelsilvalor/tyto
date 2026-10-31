@@ -204,8 +204,9 @@ function effectDeclarations(
     if (inverse !== undefined) {
       // Padded by everything that moves the shadow, so a node just outside the frame still
       // casts into it — the region bounds what the filter reads as well as what it writes.
+      // A Gaussian is spent three standard deviations out, and the blur is one.
       const reach =
-        Math.abs(effect.x) + Math.abs(effect.y) + Math.abs(effect.spread) + effect.blur * 2;
+        Math.abs(effect.x) + Math.abs(effect.y) + Math.abs(effect.spread) + effect.blur * 3;
       const id = `tyto-spread-${String(emit.filters.length)}`;
       emit.filters.push(
         spreadShadowFilter(effect, id, padRegion(frameRegion(inverse, emit.frame.size), reach)),
