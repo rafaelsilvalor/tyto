@@ -16,6 +16,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 
 /**
@@ -156,7 +157,9 @@ beforeAll(async () => {
   await window.waitForSelector('.tabs__tab');
 
   await answerPickers({ directory: work });
-  if (!(await run('workspace.openFolder'))) throw new Error('the folder did not open');
+  await switchingFolder(window, async () => {
+    if (!(await run('workspace.openFolder'))) throw new Error('the folder did not open');
+  });
 });
 
 afterAll(async () => {

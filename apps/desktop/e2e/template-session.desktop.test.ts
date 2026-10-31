@@ -191,7 +191,9 @@ describe('hot exit in the template mode', () => {
     expect(await tabNames()).toContainEqual(expect.stringMatching(UNTITLED));
     await expect
       .poll(messages)
-      .toMatch(/(mudou enquanto o Tyto|changed while Tyto).*: promo-curso\/template\.html/u);
+      .toMatch(
+        /(mudou depois que o texto|changed since your unsaved text).*: promo-curso\/template\.html/u,
+      );
     expect(readFileSync(join(folder, 'template.html'), 'utf8')).toBe(changed);
     await quit();
   });

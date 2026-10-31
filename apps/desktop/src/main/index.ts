@@ -77,7 +77,7 @@ import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
 import { findTopLevel, projectMenu } from './menu-model.js';
 import { newKeybindingsFile, newSnippetsFile } from './seed-files.js';
 import { fileRecentFiles, fileRecentFolders } from './recent-files.js';
-import { createRecentFoldersService } from './recent-folders.js';
+import { createRecentFoldersService, folderKeyFor } from './recent-folders.js';
 import { registerIpcHandlers } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
 import desktopManifest from './desktop.tyto-plugin.json';
@@ -1248,7 +1248,27 @@ async function start(): Promise<void> {
         else await workspace.open(folder);
       },
     },
+    folderKey: folderKeyFor(process.platform),
   });
+  const sameFolder = (left: string | null, right: string | null): boolean => {
+    const key = folderKeyFor(process.platform);
+    return left === null || right === null ? left === right : key(left) === key(right);
+  };
+  /**
+   * Opens or closes a folder for the window, and when the folder is another one, files the
+   * tabs the window wrote under the folder it left and hands it the new folder's (TYTO-513, ADR
+   * 0165). The window wrote its session before asking, and reloads on an answer naming another
+   * folder, so the page that reads next is the one that shows them.
+   */
+  const switchingFolder = async (change: () => Promise<unknown>) => {
+    const before = workspace.state().folder;
+    await change();
+    const after = workspace.state();
+    if (!sameFolder(before, after.folder)) {
+      await session.switchFolder(before ?? undefined, after.folder ?? undefined);
+    }
+    return after;
+  };
   // **Live keybindings** (TYTO-207) and **live snippets** (TYTO-277): main only watches; the
   // window parses them, against its command registry and its templates.
   const textOrNothing = (path: string) => () =>
@@ -1545,21 +1565,20 @@ async function start(): Promise<void> {
       state: () => workspace.state(),
       setFolder: async (choose) => {
         if (!choose) {
-          await workspace.close();
-          return workspace.state();
+          return switchingFolder(() => workspace.close());
         }
         // Main's picker, never a path from the window (ADR 0113). Dismissed, nothing changes.
         const answer = await dialog.showOpenDialog({ properties: ['openDirectory'] });
         const chosen = answer.canceled ? undefined : answer.filePaths[0];
-        if (chosen !== undefined) await workspace.open(chosen);
-        return workspace.state();
+        if (chosen === undefined) return workspace.state();
+        return switchingFolder(() => workspace.open(chosen));
       },
       recent: async () => ({ folders: await recentFolders.listing(workspace.state().folder) }),
       openRecent: async (id) => {
         // Main finds the folder in the list it wrote; then the picker's own door (ADR 0113).
         const chosen = await recentFolders.chosen(id, workspace.state().folder);
-        if (chosen !== undefined) await workspace.open(chosen);
-        return workspace.state();
+        if (chosen === undefined) return workspace.state();
+        return switchingFolder(() => workspace.open(chosen));
       },
       setTrust: async (trusted, source) => {
         const done = trusted ? await workspace.grant(source) : await workspace.revoke(source);

@@ -4,10 +4,13 @@ import { basename } from 'node:path';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 import { prunedGroups } from '../../shared/session-groups.js';
 import type { DocumentService } from './documents.js';
+import { RECENT_LIMIT } from './recent-files.js';
 import {
   NO_GROUPS,
   type SessionStore,
+  type StoredFolderTabs,
   type StoredGroups,
+  type StoredSession,
   type StoredTab,
   type StoredTemplate,
 } from './session-store.js';
@@ -84,12 +87,31 @@ export interface SessionServiceOptions {
     current(): string | undefined;
     reopen(folder: string | undefined): Promise<void>;
   };
+  /**
+   * What makes two folder paths one folder, for finding a folder's kept tabs (TYTO-513): the
+   * recent list's own rule, case folded on Windows only. Absent, the paths are compared as
+   * they are.
+   */
+  readonly folderKey?: (folder: string) => string;
 }
 
 export interface SessionService {
   write(request: IpcRequest<'session:write'>): Promise<IpcResponse<'session:write'>>;
   read(): Promise<IpcResponse<'session:read'>>;
+  /**
+   * The window left `from` for `to` (TYTO-513, ADR 0165): the tabs last written go under `from`,
+   * and `to`'s tabs, or none, become the window's, for the page that reads them next. Until
+   * that page reads, the leaving page's writes are dropped: they hold `from`'s tabs, and would
+   * land on `to`'s. `undefined` is no folder. Says whether the record reached the disk.
+   */
+  switchFolder(from: string | undefined, to: string | undefined): Promise<boolean>;
 }
+
+/**
+ * How many other folders keep their tabs (TYTO-513): as many as the recent list shows, so a
+ * folder that can be chosen from it has its tabs, and the file does not grow without end.
+ */
+export const KEPT_FOLDERS = RECENT_LIMIT;
 
 type RestoredTab = IpcResponse<'session:read'>['tabs'][number];
 type RestoredTemplate = NonNullable<IpcResponse<'session:read'>['template']>;
@@ -112,12 +134,38 @@ export const hasPath = (
 ): kind is 'brief' | 'text' | 'markdown' | 'recipe' =>
   kind === 'brief' || kind === 'text' || kind === 'markdown' || kind === 'recipe';
 
+/**
+ * The groups a folder with no tabs kept opens with (TYTO-513, ADR 0165): the window's own, less
+ * every tab that names a document — so a following preview that was open stays open, and a
+ * window that had none gets none. Never absent: no groups would read as a first launch.
+ */
+const arrangementOf = (groups: StoredGroups | undefined): StoredGroups =>
+  (groups === undefined
+    ? undefined
+    : prunedGroups(groups, (tab) => ('tab' in tab ? undefined : tab))) ?? NO_GROUPS;
+
 /** A brief that came back with something to show: its file, or its draft in no file. */
 const isBriefBack = (tab: RestoredTab): boolean =>
   tab.kind === 'brief' && (tab.document !== null || tab.draft !== null);
 
 export function createSessionService(options: SessionServiceOptions): SessionService {
   const { store, documents } = options;
+  const keyOf = options.folderKey ?? ((folder: string) => folder);
+  const sameFolder = (left: string | null, right: string | null): boolean =>
+    left === null || right === null ? left === right : keyOf(left) === keyOf(right);
+
+  /** The record as last read or written: what a folder switch files away (TYTO-513). */
+  let last: StoredSession | undefined;
+  /** True from a folder switch until the next page reads: the old page's writes are stale. */
+  let leftBehind = false;
+  /** One write at a time, in the order asked, so a switch never lands under a late write. */
+  let writing: Promise<unknown> = Promise.resolve();
+  const keep = (session: StoredSession): Promise<boolean> => {
+    last = session;
+    const written = writing.then(() => store.write(session));
+    writing = written;
+    return written;
+  };
 
   const appFileOf = (kind: keyof SessionServiceOptions['appFiles']): string =>
     options.appFiles[kind];
@@ -251,8 +299,11 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
                 return { tab: at, view: 'preview' as const, locked: true as const, ...howShown };
               return { tab: at, ...(tab.place === null ? {} : { place: tab.place }) };
             });
+      if (leftBehind) return { written: false };
+      // The other folders' tabs ride along unchanged; only a switch files or takes one.
+      const folders = (last ?? (await store.read())).folders;
       return {
-        written: await store.write({
+        written: await keep({
           version: 1,
           tabs: kept,
           active: keptActive,
@@ -260,15 +311,56 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
           ...(workspaceFolder === undefined ? {} : { workspace: { folder: workspaceFolder } }),
           // Always: a session without groups reads as a first launch (TYTO-287, NO_GROUPS).
           groups: keptGroups ?? NO_GROUPS,
+          ...(folders === undefined ? {} : { folders }),
         }),
       };
+    },
+
+    async switchFolder(from, to) {
+      // Settled first, so the tabs filed away are the last ones the leaving page wrote.
+      leftBehind = true;
+      await writing;
+      const current = last ?? (await store.read());
+      const leaving: StoredFolderTabs = {
+        folder: from ?? null,
+        tabs: current.tabs,
+        active: current.active,
+        groups: current.groups ?? NO_GROUPS,
+      };
+      const others = current.folders ?? [];
+      const returning = others.find((entry) => sameFolder(entry.folder, to ?? null));
+      const folders = [
+        leaving,
+        ...others.filter(
+          (entry) =>
+            !sameFolder(entry.folder, leaving.folder) && !sameFolder(entry.folder, to ?? null),
+        ),
+      ].slice(0, KEPT_FOLDERS);
+      const {
+        tabs: _tabs,
+        active: _active,
+        groups: _groups,
+        workspace: _workspace,
+        ...rest
+      } = current;
+      return keep({
+        ...rest,
+        tabs: returning?.tabs ?? [],
+        active: returning?.active ?? 0,
+        groups: returning?.groups ?? arrangementOf(current.groups),
+        ...(to === undefined ? {} : { workspace: { folder: to } }),
+        folders,
+      });
     },
 
     async read() {
       // A new page: whatever the last one held is gone with it, and its ids will be reused.
       documents.reset();
       options.templateFolder.set(undefined);
+      await writing;
       const stored = await store.read();
+      last = stored;
+      leftBehind = false;
       // Before the tabs, so a brief that comes back inside the folder previews with its places.
       // A folder that is gone, or no longer a workspace, simply is not open (ADR 0113).
       await options.workspace?.reopen(stored.workspace?.folder);

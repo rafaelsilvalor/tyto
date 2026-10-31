@@ -164,7 +164,8 @@ export interface IpcDependencies {
   /** Where the panels were last time (E9.10). */
   readonly layout: LayoutStore;
   /** The tabs, kept for the next launch and decided against the disk then (TYTO-113). */
-  readonly session: SessionService;
+  /** A folder switch files the tabs from main's own handlers, never from a channel (TYTO-513). */
+  readonly session: Pick<SessionService, 'read' | 'write'>;
   /**
    * A yes-or-no in front of the window (E9.11), injected for the reason the dialogs are.
    *

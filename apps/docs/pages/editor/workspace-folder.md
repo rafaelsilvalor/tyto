@@ -27,6 +27,14 @@ The title bar has a button after **Help** with the open folder's name, or _No fo
 
 A folder chosen here opens exactly as **File ▸ Open Folder…** opens it: in the same window, replacing the folder open now, and trusted only if you trusted it before. The list keeps the last ten folders, and a folder that is no longer on disk is left out. `workspace.openRecent` is the command's id, so `keybindings.json` can put it on a key.
 
+### Each folder keeps its tabs
+
+Every folder remembers the tabs that were open in it, as in Zed. When you open another folder, from **File ▸ Open Folder…**, the recent list or **File ▸ Close Folder**, Tyto keeps the tabs of the folder you are leaving, reloads the window and shows the tabs the new folder had when you last left it. A folder you have not opened before starts with no tabs, and the preview stays beside them if it was open. The tabs you had open with no folder are kept the same way, and come back when you close the folder.
+
+Unsaved text comes back too, and nothing asks before you switch. If a file changed on disk while its folder was away, it opens as it is now and your unsaved text comes back in a new tab beside it. A file that is gone loses its tab, and the problems panel says so. If Tyto could not keep a tab with unsaved text, the folder does not change and the status bar says so: save the tab, then try again.
+
+Tyto keeps the tabs of the last ten folders you left, as many as the recent list shows. Panel sizes and the terminals belong to the window, not to the folder: a switch leaves them as they are.
+
 While it is open:
 
 - its templates are offered beside yours and the built-in ones, after [your templates folder](../templates/templates-folder.md);

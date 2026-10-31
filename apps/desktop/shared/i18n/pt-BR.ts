@@ -125,7 +125,9 @@ export const ptBR: Catalogue = {
   'file.missing': 'Este arquivo não está mais onde estava',
   'file.saveFailed': 'Este arquivo não foi salvo',
   'session.draftStale':
-    'Este arquivo mudou enquanto o Tyto estava fechado; o texto não salvo está numa aba nova ao lado',
+    'Este arquivo mudou depois que o texto não salvo foi guardado; o texto está numa aba nova ao lado',
+  'session.folderNotSwitched':
+    'A pasta não foi trocada: as abas não salvas não puderam ser guardadas. Salve-as e tente de novo',
   'document.close': 'Fechar a aba',
   'document.discard.message': 'Fechar sem salvar?',
   'document.discard.detail': 'Este brief tem alterações que ainda não foram escritas no disco',

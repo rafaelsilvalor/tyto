@@ -15,6 +15,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 
 /**
@@ -167,7 +168,7 @@ beforeAll(async () => {
     },
     [work, bin] as const,
   );
-  await run('workspace.openFolder');
+  await switchingFolder(window, () => run('workspace.openFolder'));
   await window.waitForSelector('.explorer__row[data-name="logo.png"]', { timeout: 10_000 });
 }, 180_000);
 

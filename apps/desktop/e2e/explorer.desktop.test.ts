@@ -7,6 +7,7 @@ import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 
 /**
@@ -109,7 +110,7 @@ describe('the explorer (TYTO-279)', () => {
     expect(await rows()).toBeNull();
 
     await answerFolderPicker(work);
-    await run('workspace.openFolder');
+    await switchingFolder(window, () => run('workspace.openFolder'));
 
     await expect
       .poll(rows, { timeout: 10_000 })

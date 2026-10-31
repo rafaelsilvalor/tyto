@@ -596,6 +596,8 @@ describe('switching the language', () => {
     // TYTO-113: a draft not put back over a file that changed, minted like `file.missing`
     // and in the document only after a restore found one. `e2e/session.desktop.test.ts`.
     'session.draftStale',
+    // TYTO-513: a notice painted only after a folder switch could not keep unsaved tabs.
+    'session.folderNotSwitched',
     // E9.10: the close button's word lives on `title` and `aria-label`, and the rest name
     // panels and commands inside the bar. The panel *headings* are still element text and
     // are still counted — what moved is who renders them, not whether they are painted.

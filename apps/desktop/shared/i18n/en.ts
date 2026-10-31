@@ -124,7 +124,9 @@ export const en: Catalogue = {
   'file.missing': 'This file is no longer where it was',
   'file.saveFailed': 'This file was not saved',
   'session.draftStale':
-    'This file changed while Tyto was closed; your unsaved text is in a new tab beside it',
+    'This file changed since your unsaved text was kept; the text is in a new tab beside it',
+  'session.folderNotSwitched':
+    'The folder was not changed: the unsaved tabs could not be kept. Save them, then try again',
   'document.close': 'Close the tab',
   'document.discard.message': 'Close without saving?',
   'document.discard.detail': 'This brief has changes that have not been written to disk',

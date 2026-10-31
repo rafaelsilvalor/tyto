@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { pathLabelOf } from '../src/main/path-label.js';
 import { closeApp } from './close-app.js';
+import { switchingFolder } from './folder-switch.js';
 import { firstWindow } from './first-window.js';
 
 /**
@@ -261,7 +262,8 @@ describe('the path on hover inside the open folder', () => {
     await app?.evaluate(({ dialog }, chosen) => {
       dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
     }, promo);
-    await runFromBar('workspace.openFolder');
+    // The folder has its own tabs (TYTO-513, ADR 0165): the window reloads into it, empty.
+    await switchingFolder(page, () => runFromBar('workspace.openFolder'));
     await row('briefs').waitFor({ timeout: 15_000 });
     await row('briefs').click();
     await row('capa.brief').click();
@@ -275,7 +277,17 @@ describe('the path on hover inside the open folder', () => {
     expect(await titleOf(/^capa\.brief$/u)).toBe(label);
     // The breadcrumb line says it on hover too, and shows no new segment (ADR 0098).
     expect(await headerTitles()).toContain(label);
-    // A brief outside the folder keeps home's `~`.
+
+    // A brief outside the folder, opened inside it, keeps home's `~`.
+    await app?.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, briefPath);
+    await runFromBar('editor.open');
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('.tabs__label')].some(
+        (node) => node.textContent === 'campanha.brief',
+      ),
+    );
     expect(await titleOf(/^campanha\.brief$/u)).toBe(pathLabelOf(briefPath, homedir()));
     await shoot(/^capa\.brief$/u, 'workspace-brief-tab-hover');
   });
@@ -293,10 +305,14 @@ describe('the path on hover inside the open folder', () => {
     await shoot(/^logo\.png$/u, 'workspace-image-tab-hover');
   });
 
-  it('labels the open tabs again when the folder closes', async () => {
-    await runFromBar('workspace.closeFolder');
+  it('files the folder’s tabs away when it closes, and labels the window’s from home', async () => {
+    // Closing the folder brings back the tabs the window had with no folder (TYTO-513, ADR
+    // 0165); the folder's own stay with it.
+    await switchingFolder(page, () => runFromBar('workspace.closeFolder'));
     await expect
-      .poll(async () => titleOf(/^capa\.brief$/u), { timeout: 15_000 })
-      .toBe(pathLabelOf(capaPath, homedir()));
+      .poll(async () => titleOf(/^campanha\.brief$/u), { timeout: 15_000 })
+      .toBe(pathLabelOf(briefPath, homedir()));
+    expect(await titleOf(/^capa\.brief$/u)).toBeUndefined();
+    expect(capaPath).toContain('promo');
   });
 });

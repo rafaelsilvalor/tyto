@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDocumentService } from './documents.js';
 import { type RecentFiles } from './recent-files.js';
 import {
+  KEPT_FOLDERS,
   type SessionServiceOptions,
   createSessionService,
   createTemplateFolder,
@@ -198,6 +199,7 @@ const setup = (
   files: Record<string, string>,
   endSettingsTab: (documentId: string) => Promise<boolean> = () => Promise.resolve(false),
   workspace?: SessionServiceOptions['workspace'],
+  folderKey?: SessionServiceOptions['folderKey'],
 ) => {
   const disk = memoryDisk(files);
   const documents = createDocumentService({
@@ -219,6 +221,7 @@ const setup = (
     templateFolder,
     openTemplate: (directory) => openTemplate(files, directory),
     ...(workspace === undefined ? {} : { workspace }),
+    ...(folderKey === undefined ? {} : { folderKey }),
   });
   return { documents, store, session, templateFolder };
 };
@@ -1117,5 +1120,318 @@ describe('the workspace folder in the session (TYTO-278, ADR 0113)', () => {
     await store.write({ version: 1, tabs: [], active: 0 });
     await later.read();
     expect(next.reopened).toEqual(['/work/promo', undefined]);
+  });
+});
+
+/** TYTO-513, ADR 0165: each workspace folder keeps the tabs it had when the window left it. */
+describe('the tabs of each workspace folder (TYTO-513, ADR 0165)', () => {
+  const briefTab = (documentId: string, draft?: { text: string; savedText: string }) => ({
+    documentId,
+    kind: 'brief' as const,
+    draft: draft ?? null,
+    place: null,
+  });
+
+  /** A window on `folder`, its session over `files`, and a switch the way main runs one. */
+  const windowOn = (files: Record<string, string>, folder: string | undefined) => {
+    let open = folder;
+    const keys: string[] = [];
+    const built = setup(
+      files,
+      undefined,
+      {
+        current: () => open,
+        reopen: (next) => {
+          open = next;
+          return Promise.resolve();
+        },
+      },
+      (path) => {
+        keys.push(path);
+        return path.toLowerCase();
+      },
+    );
+    // The window was last on `folder`, so the first page's read reopens it, as at a launch.
+    void built.store.write({
+      ...EMPTY_SESSION,
+      ...(folder === undefined ? {} : { workspace: { folder } }),
+    });
+    const switchTo = async (next: string | undefined) => {
+      const before = open;
+      open = next;
+      return built.session.switchFolder(before, next);
+    };
+    return { ...built, switchTo, keys };
+  };
+
+  const pathsOf = (tabs: readonly { document: { path?: string | null } | null }[]) =>
+    tabs.map((tab) => tab.document?.path ?? null);
+
+  it('brings back A’s tabs after B, and B’s after A, each apart', async () => {
+    const files = { '/a/one.brief': 'a1', '/a/two.brief': 'a2', '/b/three.brief': 'b3' };
+    const { documents, session, switchTo } = windowOn(files, '/a');
+    await session.read();
+    await documents.openPath('document-1', '/a/one.brief');
+    await documents.openPath('document-2', '/a/two.brief');
+    await session.write({
+      tabs: [briefTab('document-1'), briefTab('document-2')],
+      active: 1,
+      template: null,
+      final: false,
+    });
+
+    expect(await switchTo('/b')).toBe(true);
+    let page = await session.read();
+    expect(page.tabs).toEqual([]);
+    // A folder with nothing kept is not a first launch: it keeps the window's arrangement.
+    expect(page.firstLaunch).toBe(false);
+    await documents.openPath('document-1', '/b/three.brief');
+    await session.write({
+      tabs: [briefTab('document-1')],
+      active: 0,
+      template: null,
+      final: false,
+    });
+
+    await switchTo('/a');
+    page = await session.read();
+    expect(pathsOf(page.tabs)).toEqual(['/a/one.brief', '/a/two.brief']);
+    expect(page.active).toBe(1);
+
+    await switchTo('/b');
+    page = await session.read();
+    expect(pathsOf(page.tabs)).toEqual(['/b/three.brief']);
+  });
+
+  it('files the tabs under the folder left, and the new folder in `workspace`', async () => {
+    const { documents, store, session, switchTo } = windowOn({ '/a/one.brief': 'a1' }, '/a');
+    await session.read();
+    await documents.openPath('document-1', '/a/one.brief');
+    await session.write({
+      tabs: [briefTab('document-1')],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    await switchTo('/b');
+    expect(store.saved()).toMatchObject({
+      tabs: [],
+      workspace: { folder: '/b' },
+      folders: [{ folder: '/a', tabs: [{ kind: 'brief', path: '/a/one.brief' }], active: 0 }],
+    });
+  });
+
+  it('drops the leaving page’s writes until the next page reads', async () => {
+    const { documents, store, session, switchTo } = windowOn({ '/a/one.brief': 'a1' }, '/a');
+    await session.read();
+    await documents.openPath('document-1', '/a/one.brief');
+    await switchTo('/b');
+    // A write the old page sent after the switch holds A's tabs; it must not land on B's.
+    expect(
+      await session.write({
+        tabs: [briefTab('document-1')],
+        active: 0,
+        template: null,
+        final: false,
+      }),
+    ).toEqual({ written: false });
+    expect(store.saved()).toMatchObject({ tabs: [], workspace: { folder: '/b' } });
+    await session.read();
+    expect(await session.write({ tabs: [], active: 0, template: null, final: false })).toEqual({
+      written: true,
+    });
+  });
+
+  it('keeps the tabs of the window with no folder as their own entry', async () => {
+    const { documents, session, switchTo } = windowOn({ '/loose/x.brief': 'x' }, undefined);
+    await session.read();
+    await documents.openPath('document-1', '/loose/x.brief');
+    await session.write({
+      tabs: [briefTab('document-1')],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    await switchTo('/a');
+    expect((await session.read()).tabs).toEqual([]);
+    await switchTo(undefined);
+    expect(pathsOf((await session.read()).tabs)).toEqual(['/loose/x.brief']);
+  });
+
+  it('finds a folder’s tabs by the platform’s folder key', async () => {
+    const { documents, session, switchTo, keys } = windowOn({ '/a/one.brief': 'a1' }, '/A');
+    await session.read();
+    await documents.openPath('document-1', '/a/one.brief');
+    await session.write({
+      tabs: [briefTab('document-1')],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    await switchTo('/b');
+    await session.read();
+    await switchTo('/a');
+    expect(pathsOf((await session.read()).tabs)).toEqual(['/a/one.brief']);
+    expect(keys).not.toEqual([]);
+  });
+
+  it('loses the tab of a file that is gone while its folder was away, and says so', async () => {
+    const files: Record<string, string> = { '/a/one.brief': 'a1', '/a/two.brief': 'a2' };
+    const { documents, session, switchTo } = windowOn(files, '/a');
+    await session.read();
+    await documents.openPath('document-1', '/a/one.brief');
+    await documents.openPath('document-2', '/a/two.brief');
+    await session.write({
+      tabs: [briefTab('document-1'), briefTab('document-2')],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    await switchTo('/b');
+    await session.read();
+    delete files['/a/two.brief'];
+    await switchTo('/a');
+    const { tabs } = await session.read();
+    expect(tabs[0]).toMatchObject({ document: { path: '/a/one.brief' }, missing: null });
+    expect(tabs[1]).toMatchObject({ document: null, draft: null, missing: 'two.brief' });
+  });
+
+  it('brings back a draft over its file, and beside it when the file changed', async () => {
+    const files: Record<string, string> = { '/a/one.brief': 'saved', '/a/two.brief': 'saved' };
+    const { documents, session, switchTo } = windowOn(files, '/a');
+    await session.read();
+    await documents.openPath('document-1', '/a/one.brief');
+    await documents.openPath('document-2', '/a/two.brief');
+    await session.write({
+      tabs: [
+        briefTab('document-1', { text: 'typed', savedText: 'saved' }),
+        briefTab('document-2', { text: 'typed too', savedText: 'saved' }),
+      ],
+      active: 0,
+      template: null,
+      final: false,
+    });
+    await switchTo('/b');
+    await session.read();
+    // Changed on disk while the folder was away: the draft must not be imposed over it.
+    files['/a/two.brief'] = 'changed elsewhere';
+    await switchTo('/a');
+    const { tabs } = await session.read();
+    expect(tabs[0]).toMatchObject({ draft: 'typed', stale: false });
+    expect(tabs[1]).toMatchObject({
+      document: { text: 'changed elsewhere' },
+      draft: 'typed too',
+      stale: true,
+    });
+  });
+
+  it('keeps at most ten other folders, the oldest going first', async () => {
+    const { store, session, switchTo } = windowOn({}, '/f0');
+    const folders = Array.from({ length: KEPT_FOLDERS + 3 }, (_, index) => `/f${String(index)}`);
+    for (const index of folders.keys()) {
+      await session.read();
+      await session.write({ tabs: [], active: 0, template: null, final: false });
+      await switchTo(folders[index + 1] ?? '/last');
+    }
+    const saved = store.saved() as { folders: { folder: string | null }[] };
+    expect(KEPT_FOLDERS).toBe(10);
+    expect(saved.folders).toHaveLength(KEPT_FOLDERS);
+    expect(saved.folders.map((entry) => entry.folder)).toEqual(
+      folders.slice(-KEPT_FOLDERS).reverse(),
+    );
+  });
+});
+
+describe('the other folders in the session file (TYTO-513, ADR 0165)', () => {
+  it('reads a file written before the folders were kept as remembering none', async () => {
+    // The whole migration: the old file is the window's own record, with no `folders`.
+    const file = join(scratch, 'session.json');
+    const before = {
+      version: 1,
+      tabs: [{ kind: 'brief', path: '/a/one.brief' }],
+      active: 0,
+      workspace: { folder: '/a' },
+    };
+    writeFileSync(file, JSON.stringify(before));
+    const read = await fileSessionStore(file).read();
+    expect(read).toEqual(before);
+    expect(read.folders).toBeUndefined();
+  });
+
+  it('reads back the folders it wrote', async () => {
+    const store = fileSessionStore(join(scratch, 'session.json'));
+    const session = {
+      version: 1 as const,
+      tabs: [],
+      active: 0,
+      groups: NO_GROUPS,
+      folders: [
+        {
+          folder: '/a',
+          tabs: [{ kind: 'brief' as const, path: '/a/one.brief' }],
+          active: 0,
+          groups: NO_GROUPS,
+        },
+        { folder: null, tabs: [], active: 0, groups: NO_GROUPS },
+      ],
+    };
+    expect(await store.write(session)).toBe(true);
+    expect(await store.read()).toEqual(session);
+  });
+
+  it('drops a folder entry that does not parse, and only that one', async () => {
+    const file = join(scratch, 'session.json');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        tabs: [{ kind: 'brief', path: '/b/two.brief' }],
+        active: 0,
+        folders: [
+          { folder: '/a', tabs: 'broken', active: 0 },
+          { folder: '/c', tabs: [{ kind: 'brief', path: '/c/three.brief' }], active: 0 },
+        ],
+      }),
+    );
+    const read = await fileSessionStore(file).read();
+    expect(read.tabs).toEqual([{ kind: 'brief', path: '/b/two.brief' }]);
+    expect(read.folders?.map((entry) => entry.folder)).toEqual(['/c']);
+
+    // A list that is not a list costs the folders, not the window's tabs.
+    writeFileSync(file, JSON.stringify({ version: 1, tabs: [], active: 0, folders: 'no' }));
+    expect((await fileSessionStore(file).read()).folders).toBeUndefined();
+  });
+});
+
+describe('the arrangement a folder with no tabs kept opens with (TYTO-513)', () => {
+  it('keeps a following preview the window had, and none of its documents', async () => {
+    const { documents, store, session } = setup({ '/a/one.brief': 'a1' }, undefined, {
+      current: () => '/a',
+      reopen: () => Promise.resolve(),
+    });
+    await session.read();
+    await documents.openPath('document-1', '/a/one.brief');
+    await session.write({
+      tabs: [{ documentId: 'document-1', kind: 'brief', draft: null, place: null }],
+      active: 0,
+      template: null,
+      final: false,
+      groups: {
+        root: {
+          split: 'row',
+          sizes: [0.5, 0.5],
+          children: [
+            { tabs: [{ documentId: 'document-1', place: null }], active: 0 },
+            { tabs: [{ view: 'preview' }], active: 0 },
+          ],
+        },
+        focused: 0,
+      },
+    });
+    await session.switchFolder('/a', '/b');
+    expect(store.saved()).toMatchObject({
+      tabs: [],
+      groups: { root: { tabs: [{ view: 'preview' }], active: 0 }, focused: 0 },
+    });
   });
 });

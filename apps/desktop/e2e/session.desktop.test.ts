@@ -237,7 +237,9 @@ describe('hot exit', () => {
     expect(await editorText()).toContain('::titulo Sujo editado');
     const said = await messages();
     expect(said).toMatch(/(não está mais onde estava|no longer where it was): salvo\.brief/u);
-    expect(said).toMatch(/(mudou enquanto o Tyto|changed while Tyto).*: sujo\.brief/u);
+    expect(said).toMatch(
+      /(mudou depois que o texto|changed since your unsaved text).*: sujo\.brief/u,
+    );
     expect(readFileSync(dirty, 'utf8')).toBe('::titulo Mudou lá fora');
     await quit();
   });
