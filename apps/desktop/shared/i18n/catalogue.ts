@@ -206,8 +206,8 @@ export interface Catalogue {
   readonly 'file.saveFailed': string;
   /**
    * TYTO-113, ADR 0080. A kept draft that was not put back over its file, because the file
-   * changed while the app was closed; the draft is in a new tab beside it. The file's name is
-   * appended, as `file.missing` appends it.
+   * changed while the app was closed, or while its folder was away (TYTO-513); the draft is in a
+   * new tab beside it. The file's name is appended, as `file.missing` appends it.
    */
   readonly 'session.draftStale': string;
   /**
