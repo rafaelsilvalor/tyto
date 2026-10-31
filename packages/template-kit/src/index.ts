@@ -55,6 +55,20 @@ export { imageHeight } from './image.js';
 export { type BandedPageOptions, type Seal, bandedPage, reportOverflow, sealed } from './page.js';
 
 export {
+  ORPHAN_LIMITS,
+  type OrphanLimits,
+  type Setting,
+  type SettleRequest,
+  type Settled,
+  type Spaced,
+  type WeightedSpacing,
+  orphanOf,
+  reportOrphan,
+  settle,
+  spaceByWeight,
+} from './rhythm.js';
+
+export {
   type TitleBlockContent,
   type TitleBlockStyle,
   type TitleImagePart,

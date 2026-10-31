@@ -1043,6 +1043,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // Raised by a template the same way (ADR 0167): every adjustment it allowed itself was tried
+  // and a paragraph still ends on a line of one word. The art is drawn with that line.
+  W_TEMPLATE_ORPHAN: {
+    severity: 'warning',
+    summary: 'A paragraph of an artwork ends on a line holding a single word in one format.',
+    template:
+      "Artwork '{artwork}' ends a paragraph on the single word '{word}' in format '{format}': no size or letter spacing within the template's limits moved another word down to it.",
+    spec: 'docs/adr/0167-a-template-spaces-its-blocks-by-weight-and-keeps-orphans-off-its-text.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // Warnings and not errors: a configuration is tolerant per value, as a plugin file is per
   // entry (ADR 0151 decision 2). The template draws with its default instead, and says so.
   W_TEMPLATE_VALUE_UNKNOWN: {

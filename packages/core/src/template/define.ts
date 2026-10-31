@@ -150,14 +150,31 @@ export interface TemplateFiles {
  * cross back as data, and a list the host checks is what keeps a plugin from writing an
  * arbitrary diagnostic — an error, say, or somebody else's code — into the author's run.
  */
-export type TemplateReport = {
-  /** The content runs past the room the template has for it; `overflow` is in px. */
-  readonly code: 'W_TEMPLATE_OVERFLOW';
-  readonly overflow: number;
-};
+export type TemplateReport =
+  | {
+      /** The content runs past the room the template has for it; `overflow` is in px. */
+      readonly code: 'W_TEMPLATE_OVERFLOW';
+      readonly overflow: number;
+    }
+  | {
+      /** A paragraph still ends on a line of one word, `word`, after every allowed adjustment (ADR 0167). */
+      readonly code: 'W_TEMPLATE_ORPHAN';
+      readonly word: string;
+      /**
+       * Never set. Declared so code written when `overflow` was the only field — a test's
+       * `reports[0]?.overflow` here and in templates' own repositories — still compiles.
+       */
+      readonly overflow?: undefined;
+    };
 
 /** Every code a template may report, for the checks that cannot read a type. */
-export const templateReportCodes = ['W_TEMPLATE_OVERFLOW'] as const;
+export const templateReportCodes = ['W_TEMPLATE_OVERFLOW', 'W_TEMPLATE_ORPHAN'] as const;
+
+/**
+ * The longest `word` an orphan report carries. A plugin's report is untrusted (ADR 0058), and
+ * a word longer than this is a paragraph that never wrapped, not a word.
+ */
+export const ORPHAN_WORD_LIMIT = 80;
 
 /**
  * The `measure` of a context that has no faces to measure against.

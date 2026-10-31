@@ -548,6 +548,29 @@ describe('a template reports beside its frame (ADR 0058)', () => {
     ]);
   });
 
+  it('turns an orphan report into W_TEMPLATE_ORPHAN naming the word, on the same directive', async () => {
+    const orphaned = defineTemplate(MANIFEST, (context) => {
+      if (context.artwork.index === 1 && context.format === 'feed') {
+        context.report({ code: 'W_TEMPLATE_ORPHAN', word: 'princípio.' });
+      }
+      return promoCurso.build(context);
+    });
+
+    const result = compile(await resolved(PLACED), orphaned, { formats: FORMATS });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diagnostics).toEqual([
+      {
+        severity: 'warning',
+        code: 'W_TEMPLATE_ORPHAN',
+        message:
+          "Artwork 'slide-2' ends a paragraph on the single word 'princípio.' in format 'feed': no size or letter spacing within the template's limits moved another word down to it.",
+        range: SLIDES[1],
+      },
+    ]);
+  });
+
   it('says nothing for a template that reports nothing, which is the control', async () => {
     const result = compile(await resolved(PLACED), promoCurso, { formats: FORMATS });
 

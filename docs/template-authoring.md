@@ -602,6 +602,15 @@ artwork, the format and the range of the directive the artwork came from, and th
 the catalog's (`W_TEMPLATE_OVERFLOW`). The list of codes is closed. A context built by hand in a
 test passes `reportNothing`.
 
+**A paragraph that ends on one word says so too** (ADR 0167). `settle` from
+`@tyto/template-kit` sets a text at the size it fitted at, then looks for a paragraph whose last
+line holds a single word and tries, within the template's limits, letter spacing first and a
+smaller size next until none does. When nothing within the limits clears it, the text is drawn
+as it fitted and `reportOrphan(context.report, settled.orphan)` raises `W_TEMPLATE_ORPHAN`
+naming the word. The limits are the caller's — `ORPHAN_LIMITS` is a size at most 8% smaller and
+letter spacing within 0.01 em — and a template that lets a configuration change them declares
+them as values (ADR 0153).
+
 **`files` is how a template draws what lives beside its manifest.** A fixed background, a
 logo or a badge goes in the template's folder, and the template asks for it by the path it
 has there, as a markup template's `src=` does: `context.files.image('assets/bg.png')` answers
