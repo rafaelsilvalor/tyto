@@ -361,6 +361,11 @@ const openDocument = z.object({
  */
 const documentId = z.string().min(1).max(100);
 
+/** A terminal main opened (TYTO-497, ADR 0164), and the size xterm measured for it. */
+const terminalId = z.string().min(1).max(100);
+const terminalColumns = z.number().int().min(1).max(1000);
+const terminalRows = z.number().int().min(1).max(1000);
+
 /** An explorer entry as main minted it (TYTO-279, ADR 0115): opaque, and never a path. */
 const explorerEntryId = z.string().min(1).max(100);
 
@@ -2304,6 +2309,49 @@ export const IPC_CHANNELS = {
     }),
     z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
   ),
+
+  /**
+   * Opens a terminal running the person's shell (TYTO-497, ADR 0164). **The request is a size
+   * and nothing else**, and strict, so a `cwd`, a `shell` or an `args` key is refused rather than
+   * ignored: main chooses the program, the folder and the environment (decision 3, ADR 0113).
+   * A restricted workspace answers `refused` (decision 5).
+   */
+  'terminal:open': channel(
+    z.strictObject({ cols: terminalColumns, rows: terminalRows }),
+    z.union([
+      z.object({ terminalId, title: z.string().max(200) }),
+      z.object({ refused: z.enum(['restricted', 'failed']), message: z.string().max(4000) }),
+    ]),
+  ),
+
+  /** What the person typed or pasted, as text for the shell's input. */
+  'terminal:input': channel(
+    z.strictObject({ terminalId, data: z.string().max(1_000_000) }),
+    z.object({}),
+  ),
+
+  'terminal:resize': channel(
+    z.strictObject({ terminalId, cols: terminalColumns, rows: terminalRows }),
+    z.object({}),
+  ),
+
+  /** Ends the shell and every process it started (decision 6). */
+  'terminal:kill': channel(z.strictObject({ terminalId }), z.object({})),
+
+  /**
+   * The open terminals, with what main kept of each one's recent output (at most 256 KiB), so a
+   * reloaded window draws them again. It has no subject: the terminals are main's.
+   */
+  'terminal:list': channel(
+    z.strictObject({}),
+    z.object({
+      terminals: z
+        .array(
+          z.object({ terminalId, title: z.string().max(200), replay: z.string().max(300_000) }),
+        )
+        .max(100),
+    }),
+  ),
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
@@ -2375,6 +2423,15 @@ export const IPC_EVENTS = {
     code: z.number().int().min(0).max(255).optional(),
     question: z.string().max(4000).optional(),
   }),
+
+  /**
+   * What a terminal's shell printed (TYTO-497, ADR 0164): raw, escape sequences and all, for
+   * xterm to draw. Batched by main to one event per frame per terminal.
+   */
+  'terminal:output': z.object({ terminalId, data: z.string().max(10_000_000) }),
+
+  /** A terminal's shell ended, with its exit code; main has already forgotten it. */
+  'terminal:exit': z.object({ terminalId, code: z.number().int() }),
 
   /**
    * The app is trying to exit and wants to know whether the window minds (TYTO-123).

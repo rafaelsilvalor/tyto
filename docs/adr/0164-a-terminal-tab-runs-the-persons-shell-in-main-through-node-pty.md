@@ -252,3 +252,13 @@ plugin panels.
 | Smart App Control on more than one machine and one day                              | It was one sample; the same machine has blocked new executables before                              | Not measured | TYTO-497 |
 | Build time with node-pty                                                            | With one run per leg the runs varied by more than the change. Only Windows' packaging rise is clear | Not measured | TYTO-497 |
 | ``Ctrl+Shift+` `` for a new terminal, with ``Ctrl+` `` staying on the command panel | VS Code puts the terminal on ``Ctrl+` ``. This ADR keeps the command panel there                    | Open         | Rafael   |
+
+## Notes from the build
+
+- 2026-10-31 (TYTO-497, first build pull request): the settings are `terminalShell` and
+  `terminalArgs`, not `terminal.shell` and `terminal.args`, because the host reads a dotted
+  built-in key as a plugin's prefix (`shared/settings.ts`, beside `recipeTimeZone`). The intent
+  of decision 4 is unchanged: `settings.json` is the only layer they come from.
+- 2026-10-31: on Windows node-pty reports the spawn's `name` (`xterm-256color`) as the running
+  program, measured, so the quit question of decision 6 cannot tell a busy shell from an idle
+  one and does not ask there. It asks on macOS and Linux.

@@ -363,7 +363,34 @@ export const galleryIndexContribution = {
 } satisfies ConfigurationContribution<string>;
 
 /**
- * The twenty-nine, in the order the settings file is documented in. `theme` checks its ids against
+ * The program a terminal tab runs (TYTO-497, ADR 0164 decision 4), or `null` for the platform's:
+ * PowerShell 7 or Windows PowerShell on Windows, `$SHELL` elsewhere. Read when a terminal opens,
+ * so a save applies to the next one.
+ *
+ * `settings.json` is the only layer it can come from: the settings have no per-folder layer
+ * (ADR 0073), and a workspace or profile that chose the program to run would be a source
+ * shipping code (ADR 0111). The key is `terminalShell` and not ADR 0164's `terminal.shell`, by the
+ * rule `recipeTimeZone` gives above: the host reads a dot as a plugin's prefix.
+ */
+export const terminalShellContribution = {
+  id: 'terminalShell',
+  schema: z.string().min(1).nullable(),
+  default: null,
+  description:
+    'The program a terminal tab runs, such as "pwsh.exe" or "/bin/zsh", or null for the platform\'s shell (the default).',
+} satisfies ConfigurationContribution<string | null>;
+
+/** Its arguments, or `null` for the platform's: `-l` on macOS, so the shell reads the login `PATH`. */
+export const terminalArgsContribution = {
+  id: 'terminalArgs',
+  schema: z.array(z.string()).max(64).nullable(),
+  default: null,
+  description:
+    'The arguments a terminal tab\'s program starts with, such as ["-NoLogo"], or null for the platform\'s (the default).',
+} satisfies ConfigurationContribution<readonly string[] | null>;
+
+/**
+ * The thirty-one, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -400,6 +427,8 @@ export function settingContributions(
     googleFontsContribution,
     recipeTimeZoneContribution,
     galleryIndexContribution,
+    terminalShellContribution,
+    terminalArgsContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -453,6 +482,9 @@ export interface Settings {
   readonly recipeTimeZone: string | null;
   /** The repository holding the gallery's index (TYTO-506, ADR 0162). */
   readonly galleryIndex: string;
+  /** The program a terminal tab runs and its arguments, `null` for the platform's (TYTO-497). */
+  readonly terminalShell: string | null;
+  readonly terminalArgs: readonly string[] | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -485,13 +517,15 @@ export const DEFAULT_SETTINGS: Settings = {
   googleFonts: googleFontsContribution.default,
   recipeTimeZone: recipeTimeZoneContribution.default,
   galleryIndex: galleryIndexContribution.default,
+  terminalShell: terminalShellContribution.default,
+  terminalArgs: terminalArgsContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The twenty-nine out of the resolved values, which already hold every declared key with a value
+ * The thirty-one out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -527,5 +561,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     googleFonts: pick('googleFonts'),
     recipeTimeZone: pick('recipeTimeZone'),
     galleryIndex: pick('galleryIndex'),
+    terminalShell: pick('terminalShell'),
+    terminalArgs: pick('terminalArgs'),
   };
 }

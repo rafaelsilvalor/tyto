@@ -29,6 +29,7 @@ import { type LineNumbersLook } from '../../shared/line-numbers.js';
 import { type CommandsOrder } from '../../shared/command-runs.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type CliRunner } from './cli-runner.js';
+import { type Terminals } from './terminal.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
@@ -262,6 +263,8 @@ export interface IpcDependencies {
   readonly delivery: DeliveryService;
   /** `tyto` commands run in main for the window (TYTO-495, ADR 0159). */
   readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands' | 'diagnosticPath'>;
+  /** The terminals, which main owns and the window only draws and types into (ADR 0164). */
+  readonly terminals: Pick<Terminals, 'open' | 'input' | 'resize' | 'kill' | 'list'>;
   /**
    * A native context menu of the window's items at a point, settling with the id picked or
    * `null` (TYTO-352, ADR 0121). A function for the reason `confirm` is one: `Menu.popup` is
@@ -441,6 +444,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
   const {
     askToSave,
     cli,
+    terminals,
     confirm,
     contextMenu,
     credentials,
@@ -769,6 +773,25 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       }
       return documents.openPath(documentId, path);
     },
+
+    'terminal:open': (size) => Promise.resolve(terminals.open(size)),
+
+    'terminal:input': ({ terminalId, data }) => {
+      terminals.input(terminalId, data);
+      return Promise.resolve({});
+    },
+
+    'terminal:resize': ({ terminalId, cols, rows }) => {
+      terminals.resize(terminalId, cols, rows);
+      return Promise.resolve({});
+    },
+
+    'terminal:kill': ({ terminalId }) => {
+      terminals.kill(terminalId);
+      return Promise.resolve({});
+    },
+
+    'terminal:list': () => Promise.resolve({ terminals: [...terminals.list()] }),
 
     'export:cancel': ({ exportId }) => {
       exports.cancel(exportId);

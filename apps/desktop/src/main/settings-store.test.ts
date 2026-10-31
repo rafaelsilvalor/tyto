@@ -128,6 +128,8 @@ describe('fileSettingsStore', () => {
       googleFonts: DEFAULT_SETTINGS.googleFonts,
       recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
+      terminalShell: DEFAULT_SETTINGS.terminalShell,
+      terminalArgs: DEFAULT_SETTINGS.terminalArgs,
     });
   });
 
@@ -170,6 +172,8 @@ describe('fileSettingsStore', () => {
       googleFonts: DEFAULT_SETTINGS.googleFonts,
       recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
+      terminalShell: DEFAULT_SETTINGS.terminalShell,
+      terminalArgs: DEFAULT_SETTINGS.terminalArgs,
     });
   });
 
@@ -212,6 +216,8 @@ describe('fileSettingsStore', () => {
       googleFonts: DEFAULT_SETTINGS.googleFonts,
       recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
+      terminalShell: DEFAULT_SETTINGS.terminalShell,
+      terminalArgs: DEFAULT_SETTINGS.terminalArgs,
     });
   });
 
@@ -253,6 +259,8 @@ describe('fileSettingsStore', () => {
       googleFonts: DEFAULT_SETTINGS.googleFonts,
       recipeTimeZone: DEFAULT_SETTINGS.recipeTimeZone,
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
+      terminalShell: DEFAULT_SETTINGS.terminalShell,
+      terminalArgs: DEFAULT_SETTINGS.terminalArgs,
     });
   });
 

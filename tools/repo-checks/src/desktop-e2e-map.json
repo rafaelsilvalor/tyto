@@ -672,6 +672,15 @@
     },
     {
       "paths": [
+        "apps/desktop/src/main/terminal.ts",
+        "apps/desktop/src/main/terminal-shell.ts",
+        "apps/desktop/e2e/terminal.desktop.test.ts"
+      ],
+      "e2e": ["terminal.desktop.test.ts"],
+      "why": "reviewed: the terminals main owns, through node-pty, kept across a reload and refused in a restricted folder (TYTO-497, ADR 0164)"
+    },
+    {
+      "paths": [
         "apps/desktop/shared/command-runs.ts",
         "apps/desktop/src/renderer/ansi.ts",
         "apps/desktop/src/renderer/command-blocks.ts",

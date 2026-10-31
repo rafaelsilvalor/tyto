@@ -58,6 +58,9 @@ export const en: Catalogue = {
   'pluginFiles.approve.skip': 'Not now',
   'cli.confirm.yes': 'Yes',
   'cli.confirm.no': 'No',
+  'terminal.quit.message': 'A program is still running in {terminals}. Quit and end it?',
+  'terminal.quit.quit': 'Quit',
+  'terminal.quit.stay': 'Keep running',
   'command.workspace.showProject': 'Workspace: Show Project',
   'workspace.banner.text':
     'This folder is not trusted, so {count} of the folders, sections and plugin files it ships were left out.',
