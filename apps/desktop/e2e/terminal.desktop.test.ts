@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -206,8 +206,23 @@ describe('a terminal in the window', () => {
       }
     };
     expect(alive()).toBe(true);
+    // An idle shell asks nothing on the way out. The quit box is synchronous and nobody would
+    // answer it here, so it is replaced by one that writes what it was asked and answers Quit:
+    // a wrong question is then this test's assertion, not a hang.
+    const asked = join(scratch, 'quit-question.txt');
+    await app.evaluate((_electron, file) => {
+      const { dialog } = _electron;
+      const fs = process.getBuiltinModule('node:fs');
+      dialog.showMessageBoxSync = ((...args: unknown[]) => {
+        const options = args.at(-1) as { message?: string };
+        fs.writeFileSync(file, options.message ?? '');
+        return 0;
+      }) as never;
+    }, asked);
 
     await closeApp(app);
+
+    expect(existsSync(asked) ? readFileSync(asked, 'utf8') : 'not asked').toBe('not asked');
 
     await expect.poll(alive, { timeout: 10_000 }).toBe(false);
     process.stdout.write(`[TYTO-497] shell ${String(pid)} gone after the app quit\n`);

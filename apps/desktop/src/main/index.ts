@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, realpathSync, watch } from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -1137,7 +1137,12 @@ async function start(): Promise<void> {
       if (contents === undefined || contents.isDestroyed()) return;
       sendIpcEvent(contents, 'terminal:exit', { terminalId, code });
     },
-    killTree: killTree(process.platform, (pid) => process.kill(pid, 'SIGHUP')),
+    killTree: killTree(
+      process.platform,
+      (pid) => process.kill(pid, 'SIGHUP'),
+      // Synchronous, so a quit does not end before the tree has.
+      (pid) => spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }),
+    ),
     foregroundKnown: process.platform !== 'win32',
   });
   app.on('will-quit', () => {

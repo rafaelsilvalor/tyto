@@ -249,25 +249,40 @@ describe('ending terminals', () => {
     expect(terminals.list()).toEqual([]);
   });
 
-  it('signals the process group on macOS and Linux, and leaves Windows to the console', () => {
+  it("signals the process group on macOS and Linux, and ends Windows' tree without node-pty's kill", () => {
     const signalled: number[] = [];
+    const ended: number[] = [];
     const unixPty = new FakePty(4242);
     const windowsPty = new FakePty(77);
 
-    killTree('linux', (pid) => signalled.push(pid))(unixPty);
-    killTree('win32', (pid) => signalled.push(pid))(windowsPty);
+    killTree(
+      'linux',
+      (pid) => signalled.push(pid),
+      (pid) => ended.push(pid),
+    )(unixPty);
+    killTree(
+      'win32',
+      (pid) => signalled.push(pid),
+      (pid) => ended.push(pid),
+    )(windowsPty);
 
     expect(signalled).toEqual([-4242]);
     expect(unixPty.killed).toBe(1);
-    expect(windowsPty.killed).toBe(1);
+    expect(ended).toEqual([77]);
+    // node-pty's Windows kill forks, which the packaged app cannot (ADR 0067).
+    expect(windowsPty.killed).toBe(0);
   });
 
   it('still kills the shell when its group is already gone', () => {
     const pty = new FakePty(5);
 
-    killTree('darwin', () => {
-      throw new Error('ESRCH');
-    })(pty);
+    killTree(
+      'darwin',
+      () => {
+        throw new Error('ESRCH');
+      },
+      () => {},
+    )(pty);
 
     expect(pty.killed).toBe(1);
   });

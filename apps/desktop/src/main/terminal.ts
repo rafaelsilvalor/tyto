@@ -240,18 +240,34 @@ export function createTerminals(dependencies: TerminalDependencies): Terminals {
 }
 
 /**
- * The process tree, ended. On Windows closing the pseudo-console ends what runs in it. On macOS
- * and Linux the shell leads its own process group (node-pty starts it with `setsid`), so the
- * group is sent `SIGHUP` — a hung-up terminal — before the shell itself is killed.
+ * The process tree, ended. On macOS and Linux the shell leads its own process group (node-pty
+ * starts it with `setsid`), so the group is sent `SIGHUP`, a hung-up terminal, before the shell
+ * itself is killed.
+ *
+ * **On Windows node-pty's own `kill` is never called.** It lists the console's processes by
+ * `child_process.fork`, and with the `runAsNode` fuse off (ADR 0067) that fork starts a second
+ * Tyto rather than a Node: measured on `desktop.yml`'s Windows leg, where the packaged app stopped
+ * answering after the first `terminal:kill`. So the shell's tree is ended by `endTree`
+ * (`taskkill /T /F`), and node-pty then cleans up the way it does for a shell that exited.
  */
-export function killTree(platform: NodeJS.Platform, signal: (pid: number) => void) {
+export function killTree(
+  platform: NodeJS.Platform,
+  signal: (pid: number) => void,
+  endTree: (pid: number) => void,
+) {
   return (pty: PseudoTerminal): void => {
-    if (platform !== 'win32') {
+    if (platform === 'win32') {
       try {
-        signal(-pty.pid);
+        endTree(pty.pid);
       } catch {
-        // The group may already be gone; the shell's own kill below still runs.
+        // Already gone.
       }
+      return;
+    }
+    try {
+      signal(-pty.pid);
+    } catch {
+      // The group may already be gone; the shell's own kill below still runs.
     }
     try {
       pty.kill();
