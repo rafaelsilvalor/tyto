@@ -38,7 +38,10 @@ export function spreadShadowFilter(
     `<feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>`,
   ];
 
-  return `<filter id="${id}" filterUnits="userSpaceOnUse" x="${cssNumber(region.x)}" y="${cssNumber(region.y)}" width="${cssNumber(region.w)}" height="${cssNumber(region.h)}">${primitives.join('')}</filter>`;
+  // Filters interpolate in linearRGB by default, and `feMerge` hands the source back through
+  // that round trip at 8 bits a channel, which shifts the shape's own colour (#081c3d
+  // came back #0d1c3d). In sRGB the source passes through untouched (TYTO-501).
+  return `<filter id="${id}" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse" x="${cssNumber(region.x)}" y="${cssNumber(region.y)}" width="${cssNumber(region.w)}" height="${cssNumber(region.h)}">${primitives.join('')}</filter>`;
 }
 
 function hex(channel: number): string {

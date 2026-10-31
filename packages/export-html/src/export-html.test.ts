@@ -312,6 +312,8 @@ describe('what the exporter cannot do, it says', () => {
       '<feMorphology in="alpha" operator="dilate" radius="3" result="grown"/>',
     );
     expect(html).toContain('<feGaussianBlur in="moved" stdDeviation="12" result="blurred"/>');
+    // linearRGB, the default, hands the shape back with its colour shifted (TYTO-501).
+    expect(html).toContain('<filter id="tyto-spread-0" color-interpolation-filters="sRGB" ');
     expect(html).not.toContain('drop-shadow(');
   });
 

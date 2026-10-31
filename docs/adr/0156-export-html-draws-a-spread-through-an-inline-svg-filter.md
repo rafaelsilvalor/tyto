@@ -74,3 +74,14 @@ A Gaussian is spent three standard deviations out, so a filter's region is padde
 blurs, not two. `export-svg`'s region was a fixed `-50%` margin of the node's box, which a
 blur of 10 on a 24 px node overran; it is now the frame in the node's space, padded the
 same way, which is what this ADR already gave the HTML filter.
+
+## Note, 2026-10-31 — filters interpolate in sRGB (TYTO-501)
+
+An SVG filter interpolates in linearRGB unless it says otherwise, and the source graphic
+that `feMerge` and `feDropShadow` hand back comes out of that round trip at 8 bits a
+channel with its colour shifted: a frame filled #081c3d was drawn #0d1c3d, on every one of
+its pixels, in the HTML spread filter and in every `export-svg` shadow, spread or not. CSS
+`drop-shadow()` did not do it. **Every `<filter>` either exporter writes declares
+`color-interpolation-filters="sRGB"`**, which leaves the shape's own pixels as its fill
+painted them; the raster suite checks the interior of a shadowed shape against its fill, in
+both renders, with and without a spread.

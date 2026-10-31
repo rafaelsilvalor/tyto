@@ -328,6 +328,18 @@ describe('what SVG can say precisely and export-html cannot', () => {
     expect(promo).toMatch(/<filter [^>]*filterUnits="userSpaceOnUse"/u);
     expect(promo).not.toContain('x="-50%"');
   });
+
+  // linearRGB, the default, hands the source back with its colour shifted: #081c3d came
+  // out #0d1c3d under `feDropShadow` and under the spread's `feMerge` (TYTO-501).
+  it('interpolates every filter in sRGB, so the shape keeps its fill', () => {
+    const svgs = [...svgOf(sceneOf(promoFixture)), ...svgOf(sceneOf(mappingFixture))];
+    const filters = svgs.flatMap((svg) => svg.match(/<filter [^>]*>/gu) ?? []);
+
+    expect(filters.length).toBeGreaterThan(0);
+    expect(filters.filter((tag) => !tag.includes('color-interpolation-filters="sRGB"'))).toEqual(
+      [],
+    );
+  });
 });
 
 describe('what SVG cannot say, it reports', () => {
