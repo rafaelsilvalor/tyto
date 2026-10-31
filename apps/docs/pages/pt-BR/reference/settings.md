@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 29. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 31. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -445,3 +445,19 @@ The repository holding the gallery's index.yaml, as git reads it; the default is
 | Tipo | Padrão |
 | --- | --- |
 | `string` | `"https://github.com/rafaelsilvalor/tyto-gallery.git"` |
+
+## terminalShell
+
+The program a terminal tab runs, such as "pwsh.exe" or "/bin/zsh", or null for the platform's shell (the default).
+
+| Tipo | Padrão |
+| --- | --- |
+| `string \| null` | `null` |
+
+## terminalArgs
+
+The arguments a terminal tab's program starts with, such as ["-NoLogo"], or null for the platform's (the default).
+
+| Tipo | Padrão |
+| --- | --- |
+| `list of string \| null` | `null` |

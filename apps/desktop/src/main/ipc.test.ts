@@ -732,6 +732,13 @@ const dependencies = () => {
       commands: () => ({ name: 'tyto', description: '', arguments: [], options: [], commands: [] }),
       diagnosticPath: () => undefined,
     },
+    terminals: {
+      open: () => ({ terminalId: 'terminal-1', title: 'bash' }),
+      input: () => {},
+      resize: () => {},
+      kill: () => {},
+      list: () => [],
+    },
     confirm: () => Promise.resolve(true),
     // The system's menu picks the second item, whatever was offered (TYTO-352).
     contextMenu: (request: { items: readonly { id: string }[] }) =>

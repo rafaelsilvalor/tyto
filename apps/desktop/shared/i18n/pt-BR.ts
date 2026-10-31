@@ -58,6 +58,9 @@ export const ptBR: Catalogue = {
   'pluginFiles.approve.skip': 'Agora não',
   'cli.confirm.yes': 'Sim',
   'cli.confirm.no': 'Não',
+  'terminal.quit.message': 'Ainda há um programa rodando em {terminals}. Sair e encerrá-lo?',
+  'terminal.quit.quit': 'Sair',
+  'terminal.quit.stay': 'Continuar',
   'command.workspace.showProject': 'Pasta de trabalho: mostrar projeto',
   'workspace.banner.text':
     'Esta pasta não é confiável, então {count} das pastas, seções e arquivos de plugins que ela traz ficaram de fora.',

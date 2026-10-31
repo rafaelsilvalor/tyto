@@ -97,6 +97,12 @@ describe('the IPC contract', () => {
       'templates:folder',
       'templates:list',
       'templates:set-folder',
+      // TYTO-497, ADR 0164: a terminal main owns; a size, typed text and an id, never a path.
+      'terminal:input',
+      'terminal:kill',
+      'terminal:list',
+      'terminal:open',
+      'terminal:resize',
       'theme:choose',
       'theme:current',
       'theme:list',
@@ -137,6 +143,41 @@ describe('the IPC contract', () => {
  * name is not a channel name and cannot be invoked, which is what keeps "a push carries no
  * reply" a rule of the contract rather than a habit of the callers.
  */
+/**
+ * ADR 0164 decision 3: the window draws a terminal and types into it, and main chooses the
+ * program, the folder and the environment. Strict schemas make that a refusal at the preload,
+ * not a key main happens to ignore.
+ */
+describe('the terminal channels', () => {
+  const terminalChannels = IPC_CHANNEL_NAMES.filter((name) => name.startsWith('terminal:'));
+
+  it('take no path, no program and no environment', () => {
+    expect(terminalChannels).toHaveLength(5);
+    const valid: Record<string, object> = {
+      'terminal:open': { cols: 80, rows: 24 },
+      'terminal:input': { terminalId: 'terminal-1', data: 'echo hi\r' },
+      'terminal:resize': { terminalId: 'terminal-1', cols: 80, rows: 24 },
+      'terminal:kill': { terminalId: 'terminal-1' },
+      'terminal:list': {},
+    };
+    for (const name of terminalChannels) {
+      const request = valid[name];
+      expect(request, name).toBeDefined();
+      expect(IPC_CHANNELS[name].request.safeParse(request).success, name).toBe(true);
+      for (const smuggled of [
+        { cwd: '/etc' },
+        { shell: '/bin/sh' },
+        { file: 'calc.exe' },
+        { args: ['-c', 'id'] },
+        { env: { PATH: '/tmp' } },
+      ]) {
+        const parsed = IPC_CHANNELS[name].request.safeParse({ ...request, ...smuggled });
+        expect(parsed.success, `${name} with ${Object.keys(smuggled)[0] ?? ''}`).toBe(false);
+      }
+    }
+  });
+});
+
 describe('the event table', () => {
   it('names every event exactly once, and nothing else', () => {
     expect([...IPC_EVENT_NAMES].sort()).toEqual([
@@ -158,6 +199,9 @@ describe('the event table', () => {
       'snippets:changed',
       // TYTO-433. A plugin files' sync changed the templates; the window lists them again.
       'templates:changed',
+      // TYTO-497, ADR 0164. What a terminal printed, and its shell ending.
+      'terminal:exit',
+      'terminal:output',
       // TYTO-131. The update status changed; the window asks `update:status`.
       'update:changed',
     ]);
@@ -451,6 +495,8 @@ describe('what the contract does not promise', () => {
       'menu:model',
       // TYTO-495. Nor "which commands does tyto have": there is one command tree.
       'cli:commands',
+      // TYTO-497. Nor "which terminals are open": they are main's.
+      'terminal:list',
     ];
 
     for (const name of IPC_CHANNEL_NAMES) {

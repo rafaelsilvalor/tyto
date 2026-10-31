@@ -49,6 +49,8 @@ describe("the app's settings outline", () => {
       'googleFonts',
       'recipeTimeZone',
       'galleryIndex',
+      'terminalShell',
+      'terminalArgs',
     ]);
   });
 
