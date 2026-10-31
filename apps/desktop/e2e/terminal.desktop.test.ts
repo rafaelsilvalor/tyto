@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -93,7 +101,13 @@ beforeAll(async () => {
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
+    env: {
+      ...process.env,
+      TYTO_HEADLESS: '1',
+      TYTO_HOME: join(scratch, 'tyto-home'),
+      // DEBUG TYTO-497: main's timestamps around the quit. Removed before merge.
+      TYTO_TERMINAL_TRACE: join(scratch, 'trace.log'),
+    },
   });
   page = await firstWindow(app);
   await page.waitForSelector('#editor .cm-content');
@@ -220,7 +234,51 @@ describe('a terminal in the window', () => {
       }) as never;
     }, asked);
 
-    await closeApp(app);
+    // DEBUG TYTO-497: what the shell holds open and where the quit stops, on Linux CI.
+    const debug = (label: string): void => {
+      const lines = [`[TYTO-497 debug] ${String(Date.now())} ${label}`];
+      if (process.platform === 'linux') {
+        try {
+          const status = readFileSync(`/proc/${String(pid)}/status`, 'utf8');
+          lines.push(
+            `  state ${/^State:\s*(.*)$/mu.exec(status)?.[1] ?? '?'} ppid ${/^PPid:\s*(.*)$/mu.exec(status)?.[1] ?? '?'}`,
+          );
+          for (const fd of readdirSync(`/proc/${String(pid)}/fd`)) {
+            lines.push(`  fd ${fd} -> ${readlinkSync(`/proc/${String(pid)}/fd/${fd}`)}`);
+          }
+        } catch (error) {
+          lines.push(`  /proc read failed: ${String(error)}`);
+        }
+      }
+      try {
+        const electron = app.process();
+        lines.push(
+          `  electron pid ${String(electron.pid)} exitCode ${String(electron.exitCode)} signal ${String(electron.signalCode)}`,
+        );
+      } catch (error) {
+        lines.push(`  electron process unreadable: ${String(error)}`);
+      }
+      lines.push(`  shell ${String(pid)} alive ${String(alive())}`);
+      const traceFile = join(scratch, 'trace.log');
+      if (existsSync(traceFile)) {
+        lines.push(
+          ...readFileSync(traceFile, 'utf8')
+            .trim()
+            .split('\n')
+            .map((line) => `  trace ${line}`),
+        );
+      }
+      process.stdout.write(`${lines.join('\n')}\n`);
+    };
+    debug('before closeApp');
+    const closed = await Promise.race([
+      closeApp(app).then(() => 'closed'),
+      new Promise<string>((resolve) =>
+        setTimeout(() => resolve('still closing after 30 s'), 30_000),
+      ),
+    ]);
+    debug(closed);
+    expect(closed).toBe('closed');
 
     expect(existsSync(asked) ? readFileSync(asked, 'utf8') : 'not asked').toBe('not asked');
 

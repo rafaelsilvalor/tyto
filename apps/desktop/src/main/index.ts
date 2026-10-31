@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, realpathSync, watch } from 'node:fs';
+import { appendFileSync, existsSync, realpathSync, watch } from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -1100,6 +1100,19 @@ async function start(): Promise<void> {
   // **The terminals** (TYTO-497, ADR 0164): the person's shell in a pseudo-terminal main owns.
   // node-pty is loaded at the first open, so a window that never opens a terminal never loads a
   // native module. A workspace change does not touch them: each keeps the folder it started in.
+  // DEBUG TYTO-497: timestamps around the quit, written where the e2e asks. Removed before merge.
+  const traceFile = process.env['TYTO_TERMINAL_TRACE'];
+  const trace = (line: string): void => {
+    if (traceFile === undefined || traceFile === '') return;
+    try {
+      appendFileSync(traceFile, `${String(Date.now())} ${line}\n`);
+    } catch {
+      // Tracing is best effort.
+    }
+  };
+  app.on('before-quit', () => trace('before-quit'));
+  app.on('quit', () => trace('quit'));
+  process.on('exit', (code) => trace(`process exit ${String(code)}`));
   const terminals = createTerminals({
     spawn: (file, args, options) => {
       const pty = createRequire(import.meta.url)('node-pty') as {
@@ -1133,6 +1146,7 @@ async function start(): Promise<void> {
       sendIpcEvent(contents, 'terminal:output', { terminalId, data });
     },
     exit: (terminalId, code) => {
+      trace(`pty exit ${terminalId} ${String(code)}`);
       const contents = mainWindow?.webContents;
       if (contents === undefined || contents.isDestroyed()) return;
       sendIpcEvent(contents, 'terminal:exit', { terminalId, code });
@@ -1146,7 +1160,9 @@ async function start(): Promise<void> {
     foregroundKnown: process.platform !== 'win32',
   });
   app.on('will-quit', () => {
+    trace(`will-quit, killing ${String(terminals.list().length)}`);
     terminals.killAll();
+    trace('killAll returned');
   });
   // Quitting over a program still running in a terminal asks first, in a box main owns.
   const terminalsMayQuit = terminalQuitGuard(terminals.busy, (titles) => {
