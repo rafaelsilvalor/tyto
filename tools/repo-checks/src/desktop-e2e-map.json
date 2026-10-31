@@ -671,6 +671,18 @@
       "why": "reviewed: tyto commands run in main for the window, streamed, stopped and refused (TYTO-495, ADR 0159)"
     },
     {
+      "paths": [
+        "apps/desktop/src/renderer/ansi.ts",
+        "apps/desktop/src/renderer/command-history.ts",
+        "apps/desktop/src/renderer/command-links.ts",
+        "apps/desktop/src/renderer/command-output.ts",
+        "apps/desktop/src/renderer/command-sessions.ts",
+        "apps/desktop/src/renderer/command-words.ts"
+      ],
+      "e2e": [],
+      "why": "reviewed: the command panel's pure parts (TYTO-496); no window imports them until the panel lands, and unit tests cover them"
+    },
+    {
       "paths": ["apps/desktop/src/main/seed-files.ts"],
       "e2e": ["keybindings-file.desktop.test.ts", "snippets-file.desktop.test.ts"],
       "why": "reviewed: what a new keybindings.json and snippets.json start with"

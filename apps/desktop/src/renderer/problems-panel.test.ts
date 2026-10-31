@@ -9,7 +9,9 @@ import {
   type ProblemsState,
   PROBLEMS_TAG,
   SHOWN_RUNS,
+  countProblems,
   offsetAt,
+  placeParts,
   withCommandProblems,
 } from './problems-panel.js';
 
@@ -212,20 +214,21 @@ describe('an update keeps the rows it did not change', () => {
   });
 });
 
+/** A command's Problems row, as `cli:diagnostics` sends one. */
+const command = (over: Partial<CommandProblemRow> = {}): CommandProblemRow => ({
+  index: 0,
+  severity: 'error',
+  code: 'E_ASSET_NOT_FOUND',
+  message: "Asset './logo.png' was not found.",
+  where: 'task/brief.brief',
+  line: 5,
+  column: 1,
+  openable: true,
+  ...over,
+});
+
 /** TYTO-495, ADR 0159 decision 7: what a `tyto` command reported, under the brief's rows. */
 describe("a command's section", () => {
-  const command = (over: Partial<CommandProblemRow> = {}): CommandProblemRow => ({
-    index: 0,
-    severity: 'error',
-    code: 'E_ASSET_NOT_FOUND',
-    message: "Asset './logo.png' was not found.",
-    where: 'task/brief.brief',
-    line: 5,
-    column: 1,
-    openable: true,
-    ...over,
-  });
-
   it('lists its rows under the command, after the brief, with the file and line it printed', async () => {
     const panel = mount({
       diagnostics: [problem()],
@@ -302,6 +305,53 @@ describe("a command's section", () => {
   });
 });
 
+describe("a command's place in a narrow row (TYTO-496)", () => {
+  it('reads relative under the open folder, matching its case only where paths do', () => {
+    expect(placeParts('C:\\Work\\briefs\\a.brief', 'c:\\work', true)).toEqual({
+      folder: 'briefs\\',
+      file: 'a.brief',
+    });
+    expect(placeParts('/home/Ana/a.brief', '/home/ana', false)).toEqual({
+      folder: '/home/Ana/',
+      file: 'a.brief',
+    });
+    // A folder whose name starts the same is not the folder.
+    expect(placeParts('C:\\work2\\a.brief', 'C:\\work', true).folder).toBe('C:\\work2\\');
+  });
+
+  it('draws the folder apart from the file, so the file and line always show', async () => {
+    const panel = mount({
+      folder: 'C:\\Users\\rafael\\campanha',
+      caseless: true,
+      commands: [
+        {
+          runId: 'cli-1',
+          label: 'tyto check',
+          diagnostics: [
+            command({ where: 'C:\\Users\\rafael\\campanha\\entregas\\cartaz.brief' }),
+            command({ index: 1, where: 'D:\\fora\\muito\\longe\\x.brief' }),
+          ],
+        },
+      ],
+    });
+    await panel.updateComplete;
+
+    const places = [...panel.querySelectorAll('.problems__where--command')];
+    expect(places.map((place) => place.querySelector('.problems__folder')?.textContent)).toEqual([
+      'entregas\\',
+      'D:\\fora\\muito\\longe\\',
+    ]);
+    expect(places.map((place) => place.querySelector('.problems__file')?.textContent)).toEqual([
+      'cartaz.brief:5:1',
+      'x.brief:5:1',
+    ]);
+    // The whole place, absolute, on hover.
+    expect(places[0]?.getAttribute('title')).toBe(
+      'C:\\Users\\rafael\\campanha\\entregas\\cartaz.brief:5:1',
+    );
+  });
+});
+
 describe('the command sections the window keeps', () => {
   const push = (runId: string, ...indexes: number[]): CommandProblems => ({
     runId,
@@ -342,5 +392,23 @@ describe('a line and column as an offset', () => {
     expect(offsetAt(text, 3, 1)).toBe(8);
     expect(offsetAt(text, 9, 1)).toBe(text.length);
     expect(offsetAt(text, 1, 99)).toBe(text.length);
+  });
+});
+
+describe("the status bar's count (TYTO-496)", () => {
+  it("counts a command's rows with the brief's, and its errors with the errors", () => {
+    expect(
+      countProblems(
+        [{ severity: 'warning' }],
+        [
+          {
+            runId: 'a',
+            label: 'tyto render',
+            diagnostics: [command(), command({ index: 1, severity: 'info' })],
+          },
+          { runId: 'b', label: 'tyto check', diagnostics: [command()] },
+        ],
+      ),
+    ).toEqual({ problems: 4, errors: 2 });
   });
 });

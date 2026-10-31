@@ -1493,6 +1493,34 @@ button.problems__row:focus-visible {
 }
 
 /*
+ * A command's place in a Problems row (TYTO-496). An absolute path took most of the row: the
+ * place now gets at most half of it, the file and its line always show, and the folder is cut
+ * from its start, where the parts least worth reading are. `<bdi>` keeps the path one run of
+ * text while the box is drawn right to left for the cut.
+ */
+.problems__row:has(> .problems__where--command) {
+  grid-template-columns: auto auto minmax(0, 1fr) fit-content(50%);
+}
+
+.problems__where--command {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.problems__folder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+
+.problems__file {
+  flex: 0 0 auto;
+  color: var(--tyto-text);
+}
+
+/*
  * The command bar (E9.12).
  *
  * `display: contents` while closed and `block` when open, so the element takes up no room
