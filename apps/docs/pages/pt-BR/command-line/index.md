@@ -6,6 +6,8 @@ Cada comando foi executado em 2026-10-19 num build do repositório no commit `b0
 
 O comando `tyto` faz pelo terminal o que a janela faz: renderiza um brief, vigia uma pasta à espera de briefs, confere e cria templates, e cuida dos plugins. É o que um script, uma tarefa agendada ou outro programa usa.
 
+Os mesmos comandos rodam também dentro da janela, na aba [Comandos](../editor/commands.md), sem nada para instalar.
+
 ## Obter o comando
 
 O `tyto` ainda não vem no instalador do aplicativo. Ele roda a partir de uma cópia do [repositório](https://github.com/rafaelsilvalor/tyto), com o [Node.js](https://nodejs.org) 22 ou 24 e o [pnpm](https://pnpm.io):

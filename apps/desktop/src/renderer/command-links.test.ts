@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { type LinkContext, type ListFolder, linksIn, resolveEntry } from './command-links.js';
+import {
+  type LinkContext,
+  type ListFolder,
+  commandPathOf,
+  linksIn,
+  listFolderAt,
+  resolveEntry,
+} from './command-links.js';
 import type { CommandProblemRow } from './problems-panel.js';
 
 /**
@@ -100,5 +107,49 @@ describe('finding the explorer entry a path names', () => {
     expect(await resolveEntry(['Briefs', 'nope.brief'], list, true)).toBeUndefined();
     expect(await resolveEntry(['Briefs'], list, true)).toBeUndefined();
     expect(await resolveEntry(['briefs', 'Cartaz.brief'], list, false)).toBeUndefined();
+  });
+});
+
+describe('listing a folder under the open one, for completion', () => {
+  const tree: Record<string, { id: string; name: string; kind: string }[]> = {
+    root: [
+      { id: 'f1', name: 'Briefs', kind: 'folder' },
+      { id: 'x', name: 'a.brief', kind: 'brief' },
+      { id: 'y', name: 'notas.md', kind: 'file' },
+    ],
+    f1: [{ id: 'b1', name: 'Cartaz.brief', kind: 'brief' }],
+  };
+  const list: ListFolder = (entryId) => Promise.resolve({ entries: tree[entryId ?? 'root'] ?? [] });
+
+  it('lists the open folder and a folder inside it, and nothing for a missing one', async () => {
+    expect(await listFolderAt([], list, true)).toEqual([
+      { name: 'Briefs', kind: 'folder' },
+      { name: 'a.brief', kind: 'brief' },
+      { name: 'notas.md', kind: 'file' },
+    ]);
+    expect(await listFolderAt(['briefs'], list, true)).toEqual([
+      { name: 'Cartaz.brief', kind: 'brief' },
+    ]);
+    expect(await listFolderAt(['briefs'], list, false)).toBeUndefined();
+    expect(await listFolderAt(['a.brief'], list, true)).toBeUndefined();
+  });
+});
+
+describe('the path a command is given for the brief in front', () => {
+  it('is the label itself when it is absolute', () => {
+    expect(commandPathOf('D:\\trabalho\\cartaz.brief', null)).toBe('D:\\trabalho\\cartaz.brief');
+  });
+
+  it('is relative to the open folder when the label starts with the home folder', () => {
+    expect(commandPathOf('~\\campanha\\briefs\\a.brief', 'C:\\Users\\rafael\\campanha')).toBe(
+      'briefs\\a.brief',
+    );
+    expect(commandPathOf('~/work/campanha/a.brief', '/home/rafael/work/campanha')).toBe('a.brief');
+  });
+
+  it('is none for a home path outside the open folder, with no folder, or with no file', () => {
+    expect(commandPathOf('~\\outra\\a.brief', 'C:\\Users\\rafael\\campanha')).toBeUndefined();
+    expect(commandPathOf('~\\campanha\\a.brief', null)).toBeUndefined();
+    expect(commandPathOf(undefined, 'C:\\x')).toBeUndefined();
   });
 });

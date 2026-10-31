@@ -477,4 +477,7 @@ export const en: Catalogue = {
   'commandPanel.state.finished': 'ended with exit code {code}',
   'commandPanel.state.refused': 'not run',
   'problems.command.exit': 'exit {code}',
+  'command.commandPanel.run': 'Commands: Run…',
+  'command.commandPanel.renderBrief': 'Commands: Render This Brief',
+  'commandPanel.suggestions': 'Suggestions',
 };

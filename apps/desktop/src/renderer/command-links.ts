@@ -156,3 +156,60 @@ export async function resolveEntry(
   }
   return parent ?? undefined;
 }
+
+/**
+ * The entries of the folder `segments` names under the open folder (TYTO-496): each step listed
+ * by the explorer's ids, as `resolveEntry` walks, for the completion of a path. `undefined` when a
+ * step is not a folder there.
+ */
+export async function listFolderAt(
+  segments: readonly string[],
+  list: ListFolder,
+  caseless: boolean,
+): Promise<
+  readonly { readonly name: string; readonly kind: 'folder' | 'brief' | 'file' }[] | undefined
+> {
+  let parent: string | null = null;
+  for (const segment of segments) {
+    const { entries } = await list(parent);
+    const found = entries.find(
+      (entry) =>
+        entry.kind === 'folder' &&
+        (caseless ? entry.name.toLowerCase() === segment.toLowerCase() : entry.name === segment),
+    );
+    if (found === undefined) return undefined;
+    parent = found.id;
+  }
+  const { entries } = await list(parent);
+  return entries.map((entry) => ({
+    name: entry.name,
+    kind: entry.kind === 'folder' ? 'folder' : entry.kind === 'brief' ? 'brief' : 'file',
+  }));
+}
+
+/**
+ * The path a command can be given for the brief in front (TYTO-496), from what the window holds:
+ * the label its tab shows, which is the absolute path unless the file is under the home folder,
+ * where it starts with `~` (ADR 0086). A `~` path is given relative to the open folder, where a
+ * command runs (ADR 0159), when the label shows the brief inside it; otherwise there is none,
+ * since the window does not know the home folder and a command reads no `~`.
+ */
+export function commandPathOf(
+  pathLabel: string | undefined,
+  folder: string | null,
+): string | undefined {
+  if (pathLabel === undefined || pathLabel === '') return undefined;
+  if (!pathLabel.startsWith('~')) return pathLabel;
+  if (folder === null) return undefined;
+  const tail = pathLabel.slice(1);
+  const parts = folder.split(/[\\/]+/u).filter((part) => part !== '');
+  // The longest end of the folder's own path that the label's starts with, on a separator.
+  for (let from = 0; from < parts.length; from += 1) {
+    const end = parts.slice(from);
+    const labelParts = tail.split(/[\\/]+/u).filter((part) => part !== '');
+    if (end.every((part, index) => part === labelParts[index]) && labelParts.length > end.length) {
+      return labelParts.slice(end.length).join(tail.includes('\\') ? '\\' : '/');
+    }
+  }
+  return undefined;
+}

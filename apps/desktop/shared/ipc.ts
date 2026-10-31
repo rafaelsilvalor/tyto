@@ -105,6 +105,18 @@ const pluginCredential = {
  * diagnostic was added, which is the opposite of what a contract is for.
  */
 /** One node of `tyto`'s command tree, as `@tyto/command-line`'s `commandTree` describes it. */
+/**
+ * What a command's argument or option takes, for the command panel's completion (TYTO-496): said
+ * beside each definition in `@tyto/command-line`'s `program.ts`, never listed again here.
+ */
+const commandValue = z.object({
+  kind: z.enum(['brief', 'file', 'folder', 'template', 'formats', 'types', 'plugin']),
+  choices: z.array(z.string().max(100)).max(50).readonly().optional(),
+  list: z.boolean().optional(),
+});
+
+export type CommandValue = z.infer<typeof commandValue>;
+
 interface CommandDescriptionShape {
   readonly name: string;
   readonly description: string;
@@ -112,10 +124,20 @@ interface CommandDescriptionShape {
     readonly name: string;
     readonly required: boolean;
     readonly description: string;
+    readonly value?: CommandValue | undefined;
   }[];
-  readonly options: readonly { readonly flags: string; readonly description: string }[];
+  readonly options: readonly {
+    readonly flags: string;
+    readonly description: string;
+    readonly long?: string | undefined;
+    readonly short?: string | undefined;
+    readonly takesValue?: boolean | undefined;
+    readonly value?: CommandValue | undefined;
+  }[];
   readonly commands: readonly CommandDescriptionShape[];
 }
+
+export type CommandDescription = CommandDescriptionShape;
 
 const commandDescription: z.ZodType<CommandDescriptionShape> = z.lazy(() =>
   z.object({
@@ -127,11 +149,21 @@ const commandDescription: z.ZodType<CommandDescriptionShape> = z.lazy(() =>
           name: z.string().max(200),
           required: z.boolean(),
           description: z.string().max(2000),
+          value: commandValue.optional(),
         }),
       )
       .max(50),
     options: z
-      .array(z.object({ flags: z.string().max(200), description: z.string().max(2000) }))
+      .array(
+        z.object({
+          flags: z.string().max(200),
+          description: z.string().max(2000),
+          long: z.string().max(100).optional(),
+          short: z.string().max(10).optional(),
+          takesValue: z.boolean().optional(),
+          value: commandValue.optional(),
+        }),
+      )
       .max(100),
     commands: z.array(commandDescription).max(100),
   }),
