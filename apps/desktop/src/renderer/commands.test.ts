@@ -11,15 +11,21 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  BRIEF_MENU_GROUPS,
   DOCUMENTATION_COMMAND,
   FILE_MENU_COMMANDS,
+  MENU_COMMANDS,
+  PREVIEW_MENU_GROUPS,
   RELOAD_COMMAND,
-  VIEW_MENU_COMMANDS,
+  TOOLS_MENU_GROUPS,
+  VIEW_MENU_GROUPS,
   ZOOM_MENU_COMMANDS,
 } from '../../shared/commands.js';
 import {
   type DesktopActions,
   BRIEF_ONLY_COMMANDS,
+  PROBLEMS_SHOW,
+  TERMINAL_SHOW,
   COMMAND_LABELS,
   DOCUMENT_NEW,
   DOCUMENT_NEW_FROM_TEMPLATE,
@@ -39,12 +45,9 @@ import {
   GROUP_MOVE_TAB_RIGHT,
   HELP_OPEN_DOCUMENTATION,
   PREVIEW_NEXT_FORMAT,
-  PREVIEW_OPEN,
-  PREVIEW_OPEN_TO_SIDE,
   PREVIEW_PREVIOUS_SLIDE,
   PREVIEW_SHOW_ALL_SLIDES,
   PREVIEW_SHOW_ONE_SLIDE,
-  PREVIEW_TOGGLE_LOCK,
   PREVIEW_ZOOM_FIT,
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
@@ -141,6 +144,8 @@ const actions = () =>
     runRecipeFresh: vi.fn<() => void>(),
     focusCommandPanel: vi.fn<() => void>(),
     newTerminal: vi.fn<() => void>(),
+    showTerminal: vi.fn<() => void>(),
+    showProblems: vi.fn<() => void>(),
     renderBriefInCommandPanel: vi.fn<() => void>(),
   }) satisfies DesktopActions;
 
@@ -567,17 +572,15 @@ describe('the File menu table', () => {
     for (const command of FILE_MENU_COMMANDS) registry.run(command.id, NO_VIEW);
 
     // One call each, through the port — which is the whole claim: the menu is not a second
-    // implementation, it is the same five commands reached by a different door.
+    // implementation, it is the same commands reached by a different door.
     expect(spies.newDocument).toHaveBeenCalledTimes(1);
+    expect(spies.newDocumentFromTemplate).toHaveBeenCalledTimes(1);
+    expect(spies.newDelivery).toHaveBeenCalledTimes(1);
     expect(spies.openDocument).toHaveBeenCalledTimes(1);
-    expect(spies.openExport).toHaveBeenCalledTimes(1);
-    expect(spies.showPlugins).toHaveBeenCalledTimes(1);
-    expect(spies.showGallery).toHaveBeenCalledTimes(1);
-    expect(spies.showQueue).toHaveBeenCalledTimes(1);
-    expect(spies.openSettings).toHaveBeenCalledTimes(1);
-    expect(spies.openKeybindings).toHaveBeenCalledTimes(1);
-    expect(spies.openSnippets).toHaveBeenCalledTimes(1);
+    expect(spies.openWorkspaceFolder).toHaveBeenCalledTimes(1);
+    expect(spies.openRecentFolders).toHaveBeenCalledTimes(1);
     expect(spies.closeDocument).toHaveBeenCalledTimes(1);
+    expect(spies.closeWorkspaceFolder).toHaveBeenCalledTimes(1);
     expect(spies.saveDocument.mock.calls).toEqual([[false], [true]]);
   });
 
@@ -655,7 +658,7 @@ describe('the File menu table', () => {
   it('names, on View, the group commands under their labels, pinned to the constants (TYTO-286)', () => {
     const spies = actions();
     const registry = createDesktopRegistry(spies);
-    expect(VIEW_MENU_COMMANDS.map((command) => command.id)).toEqual([
+    expect(VIEW_MENU_GROUPS[0]?.map((command) => command.id)).toEqual([
       EDITOR_SPLIT_RIGHT,
       EDITOR_SPLIT_DOWN,
       GROUP_FOCUS_NEXT,
@@ -664,12 +667,8 @@ describe('the File menu table', () => {
       GROUP_MOVE_TAB_LEFT,
       GROUP_MOVE_TAB_RIGHT,
       GROUP_CLOSE,
-      PREVIEW_OPEN_TO_SIDE,
-      PREVIEW_OPEN,
-      PREVIEW_TOGGLE_LOCK,
-      EDITOR_GO_TO_BLOCK,
     ]);
-    for (const command of VIEW_MENU_COMMANDS) {
+    for (const command of VIEW_MENU_GROUPS[0] ?? []) {
       expect(COMMAND_LABELS[command.id]).toBe(command.label);
       registry.run(command.id, NO_VIEW);
     }
@@ -679,9 +678,6 @@ describe('the File menu table', () => {
     // TYTO-288: left, then right, along the tab's own strip.
     expect(spies.stepTabInGroup.mock.calls).toEqual([[-1], [1]]);
     expect(spies.closeGroup).toHaveBeenCalledTimes(1);
-    // TYTO-287: beside the brief, then in the focused group, then the lock.
-    expect(spies.openPreview.mock.calls).toEqual([[true], [false]]);
-    expect(spies.togglePreviewLock).toHaveBeenCalledTimes(1);
   });
 
   it('pins `editor.save` to the id `@tyto/editor` ships', () => {
@@ -695,6 +691,81 @@ describe('the File menu table', () => {
       // The menu resolves `command.label` itself, in main; the bar resolves `COMMAND_LABELS`.
       // Both have to be the same word, or the same verb reads two ways in one app.
       expect(COMMAND_LABELS[command.id], command.id).toBe(command.label);
+    }
+  });
+});
+
+/**
+ * Every menu, not only File (TYTO-514, ADR 0166): no item in the bar may be an id the registry
+ * does not hold, or a label the command bar does not show it under.
+ */
+describe('every menu table', () => {
+  it('names only commands this window registers, each once, under its bar label', () => {
+    const registry = createDesktopRegistry(actions());
+    const ids = MENU_COMMANDS.map((command) => command.id);
+
+    for (const command of MENU_COMMANDS) {
+      expect(registry.get(command.id), command.id).toBeDefined();
+      expect(COMMAND_LABELS[command.id], command.id).toBe(command.label);
+    }
+    // One place per command: a verb in two menus is a menu nobody can learn.
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('runs, from Brief, Preview, View and Tools, the action the command bar runs', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+    const run = (table: readonly (readonly { id: string }[])[]): void => {
+      for (const command of table.flat()) {
+        // `true`: the command ran rather than declined, so no item is a dead id.
+        expect(registry.run(command.id, NO_VIEW), command.id).toBe(true);
+      }
+    };
+
+    run(BRIEF_MENU_GROUPS);
+    expect(spies.formatBrief).toHaveBeenCalledTimes(1);
+    expect(spies.openInsertMenu).toHaveBeenCalledTimes(1);
+    expect(spies.goToBlock).toHaveBeenCalledTimes(1);
+    expect(spies.openExport).toHaveBeenCalledTimes(1);
+    expect(spies.exportDelivery).toHaveBeenCalledTimes(1);
+    expect(spies.editTemplate).toHaveBeenCalledTimes(1);
+    expect(spies.newTemplate).toHaveBeenCalledTimes(1);
+
+    run(PREVIEW_MENU_GROUPS);
+    expect(spies.openPreview.mock.calls).toEqual([[false], [true]]);
+    expect(spies.togglePreviewLock).toHaveBeenCalledTimes(1);
+    expect(spies.stepSlide.mock.calls).toEqual([[1], [-1]]);
+    expect(spies.setPreviewMode.mock.calls).toEqual([['all'], ['one']]);
+    expect(spies.stepFormat.mock.calls).toEqual([[1], [-1]]);
+    expect(spies.zoomToFit).toHaveBeenCalledTimes(1);
+    expect(spies.stepZoom.mock.calls).toEqual([[1], [-1]]);
+
+    run(VIEW_MENU_GROUPS.slice(1));
+    expect(spies.showProblems).toHaveBeenCalledTimes(1);
+    expect(spies.focusCommandPanel).toHaveBeenCalledTimes(1);
+    expect(spies.showTerminal).toHaveBeenCalledTimes(1);
+    expect(spies.toggleVimMode).toHaveBeenCalledTimes(1);
+
+    run(TOOLS_MENU_GROUPS);
+    expect(spies.showGallery).toHaveBeenCalledTimes(1);
+    expect(spies.showPlugins).toHaveBeenCalledTimes(1);
+    expect(spies.showQueue).toHaveBeenCalledTimes(1);
+    expect(spies.newTerminal).toHaveBeenCalledTimes(1);
+    expect(spies.openSettings).toHaveBeenCalledTimes(1);
+    expect(spies.openKeybindings).toHaveBeenCalledTimes(1);
+    expect(spies.openSnippets).toHaveBeenCalledTimes(1);
+    expect(spies.manageTrust).toHaveBeenCalledTimes(1);
+  });
+
+  it('brings the bottom tabs forward from any tab in front, with no key of their own', () => {
+    // Not about a brief nor about text: View offers them whatever is in front.
+    for (const id of [PROBLEMS_SHOW, TERMINAL_SHOW]) {
+      expect(BRIEF_ONLY_COMMANDS.has(id), id).toBe(false);
+      expect(TEXT_COMMANDS.has(id), id).toBe(false);
+      expect(
+        builtInKeybindings.filter((binding) => binding.command === id),
+        id,
+      ).toEqual([]);
     }
   });
 });

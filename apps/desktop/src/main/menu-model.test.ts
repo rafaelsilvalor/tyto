@@ -64,14 +64,17 @@ function build(item: TemplateItem): MenuItemLike {
 const TITLES: Partial<Record<string, string>> = {
   'menu.file': '&File',
   'menu.edit': '&Edit',
+  'menu.brief': '&Brief',
+  'menu.preview': '&Preview',
   'menu.view': '&View',
+  'menu.tools': '&Tools',
   'menu.window': '&Window',
   'menu.help': '&Help',
 };
 
 const installed = (platform: string): MenuLike => ({
   items: menuTemplate(platform, {
-    // The English catalogue's five titles, with their mnemonics (TYTO-264).
+    // The English catalogue's eight titles, with their mnemonics (TYTO-264, TYTO-514).
     t: (key) => TITLES[key] ?? key,
     onRevealLogs: () => {},
     onCommand: () => {},
@@ -80,12 +83,15 @@ const installed = (platform: string): MenuLike => ({
 });
 
 describe("the menu row's model", () => {
-  it('names the five top-level menus of Windows and Linux, in order', () => {
+  it('names the eight top-level menus of Windows and Linux, in order', () => {
     const model = projectMenu(installed('win32'), 'win32');
     expect(model.map(({ id, label }) => [id, label])).toEqual([
       ['file', 'File'],
       ['editmenu', 'Edit'],
+      ['brief', 'Brief'],
+      ['preview', 'Preview'],
       ['viewmenu', 'View'],
+      ['tools', 'Tools'],
       ['windowmenu', 'Window'],
       ['help', 'Help'],
     ]);
@@ -95,7 +101,7 @@ describe("the menu row's model", () => {
     const model = projectMenu(installed('win32'), 'win32');
     expect(
       model.map(({ mnemonic, mnemonicAt }) => `${mnemonic ?? ''}@${String(mnemonicAt)}`),
-    ).toEqual(['F@0', 'E@0', 'V@0', 'W@0', 'H@0']);
+    ).toEqual(['F@0', 'E@0', 'B@0', 'P@0', 'V@0', 'T@0', 'W@0', 'H@0']);
     const mac = projectMenu(installed('darwin'), 'darwin');
     expect(mac.filter((menu) => menu.mnemonic !== undefined)).toEqual([]);
     expect(mac.find((menu) => menu.id === 'file')?.label).toBe('File');
@@ -104,9 +110,9 @@ describe("the menu row's model", () => {
   it("carries each menu's items: roles, separators and the about item's id", () => {
     const model = projectMenu(installed('linux'), 'linux');
     const view = model.find((menu) => menu.id === 'viewmenu');
-    // The group commands first (TYTO-286, TYTO-288) and the preview's three (TYTO-287), then
-    // Go to Block (TYTO-296), then Reload as the window's command and by its id (TYTO-113, ADR 0080).
-    expect(view?.items.slice(0, 12).map((item) => item.id)).toEqual([
+    // The group commands first (TYTO-286, TYTO-288), then the bottom tabs and the vim mode
+    // (TYTO-514), then Reload as the window's command and by its id (TYTO-113, ADR 0080).
+    expect(view?.items.slice(0, 14).map((item) => item.role ?? item.id)).toEqual([
       'editor.splitRight',
       'editor.splitDown',
       'editor.focusNextGroup',
@@ -115,24 +121,26 @@ describe("the menu row's model", () => {
       'editor.moveTabLeft',
       'editor.moveTabRight',
       'editor.closeGroup',
-      'preview.openToSide',
-      'preview.open',
-      'preview.toggleLock',
-      'editor.goToBlock',
+      'item-8',
+      'problems.show',
+      'commandPanel.run',
+      'terminal.show',
+      'item-12',
+      'editor.toggleVim',
     ]);
-    expect(view?.items[13]).toMatchObject({ id: 'window.reload', label: 'command.window.reload' });
-    expect(view?.items.slice(14).map((item) => item.role ?? item.id)).toEqual([
+    expect(view?.items[15]).toMatchObject({ id: 'window.reload', label: 'command.window.reload' });
+    expect(view?.items.slice(16).map((item) => item.role ?? item.id)).toEqual([
       'toggledevtools',
-      'item-15',
+      'item-17',
       // The window's zoom commands since TYTO-272, which write the `zoom` setting.
       'window.zoomReset',
       'window.zoomIn',
       'window.zoomOut',
-      'item-19',
+      'item-21',
       'togglefullscreen',
     ]);
-    const separator = view?.items[15];
-    expect(separator).toEqual({ id: 'item-15', label: '', type: 'separator', enabled: true });
+    const separator = view?.items[17];
+    expect(separator).toEqual({ id: 'item-17', label: '', type: 'separator', enabled: true });
 
     const help = model.find((menu) => menu.id === 'help');
     // TYTO-318: Documentation first, by its command id, then a separator and the log folder.
@@ -152,10 +160,10 @@ describe("the menu row's model", () => {
   it("shows a role's default key as a label for the platform, and none where there is none", () => {
     const model = projectMenu(installed('win32'), 'win32');
     const view = model.find((menu) => menu.id === 'viewmenu');
-    expect(view?.items[14]).toMatchObject({ role: 'toggledevtools', accelerator: 'Ctrl+Shift+I' });
-    expect(view?.items[13]).not.toHaveProperty('accelerator');
+    expect(view?.items[16]).toMatchObject({ role: 'toggledevtools', accelerator: 'Ctrl+Shift+I' });
+    expect(view?.items[15]).not.toHaveProperty('accelerator');
     expect(view?.items[0]).not.toHaveProperty('accelerator');
-    expect(view?.items[16]).not.toHaveProperty('accelerator');
+    expect(view?.items[18]).not.toHaveProperty('accelerator');
 
     const mac = projectMenu(installed('darwin'), 'darwin');
     const edit = mac.find((menu) => menu.id === 'editmenu');

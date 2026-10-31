@@ -129,7 +129,7 @@ that is exactly what separates 1 from 2 for a reader deciding whether to retry.
 
 ### The desktop queue panel
 
-`apps/desktop/src/main/queue.ts` (TYTO-45). **File ▸ Show the local queue** opens a panel in
+`apps/desktop/src/main/queue.ts` (TYTO-45). **Tools ▸ Show the local queue** opens a panel in
 the left dock over a folder a person picks, laid out exactly as `tyto watch <folder>` lays it
 out: `<folder>/inbox/<id>/brief.brief` in, `<folder>/outbox/<id>/out/` out, and a task that
 rendered cleanly moved to `<folder>/done/<id>/`. The window and the CLI can therefore be

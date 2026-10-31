@@ -176,7 +176,7 @@ import {
   windowStrokeOf,
   withCommandGate,
 } from './commands.js';
-import { FILE_MENU_COMMANDS, VIEW_MENU_COMMANDS } from '../../shared/commands.js';
+import { MENU_COMMANDS } from '../../shared/commands.js';
 import { deliveryOffered, startDeliveryNew } from './delivery-new.js';
 import {
   type StatusBar,
@@ -1825,6 +1825,14 @@ const registry: CommandRegistry = withCommandGate(
     },
     newTerminal: () => {
       void newTerminal();
+    },
+    showTerminal: () => {
+      void changeLayout(withPanelOpen(layout, TERMINAL_PANEL, true)).then(() => {
+        focusTerminal();
+      });
+    },
+    showProblems: () => {
+      showProblems();
     },
     renderBriefInCommandPanel: () => {
       const path = briefCommandPath();
@@ -4954,18 +4962,16 @@ function repaint(): void {
   }
 }
 
-/** The File and View ids main was last told to disable, joined; `undefined` before the first. */
+/** The menu ids main was last told to disable, joined; `undefined` before the first. */
 let menuDisabledSent: string | undefined;
 
 /**
- * Tells main which File and View items do nothing with this tab in front, so it greys them
- * (TYTO-283). The same predicate the bar and the registry ask; sent only when the answer
+ * Tells main which menu items do nothing with this tab in front, so it greys them (TYTO-283;
+ * every menu since TYTO-514). The same predicate the bar and the registry ask; sent only when the answer
  * changes, because this runs on every repaint and main rebuilds the menu on each message.
  */
 function tellMenuWhatIsOffered(): void {
-  const ids = [...FILE_MENU_COMMANDS, ...VIEW_MENU_COMMANDS]
-    .map((command) => command.id)
-    .filter((id) => !offeredNow(id));
+  const ids = MENU_COMMANDS.map((command) => command.id).filter((id) => !offeredNow(id));
   const joined = ids.join(' ');
   if (joined === menuDisabledSent) return;
   menuDisabledSent = joined;

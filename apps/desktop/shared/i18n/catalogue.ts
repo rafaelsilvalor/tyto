@@ -124,6 +124,8 @@ export interface Catalogue {
   readonly 'terminal.quit.stay': string;
   readonly 'panel.terminal': string;
   readonly 'command.terminal.new': string;
+  readonly 'command.terminal.show': string;
+  readonly 'command.problems.show': string;
   readonly 'terminal.new': string;
   readonly 'terminal.sessions': string;
   readonly 'terminal.session.close': string;
@@ -341,6 +343,13 @@ export interface Catalogue {
   readonly 'menu.view': string;
   readonly 'menu.window': string;
   readonly 'menu.help': string;
+  /**
+   * TYTO-514 (ADR 0166). This app's own top-level menus, with no role behind them: their titles
+   * are this app's on every platform, with the `&` dropped on macOS as File's is.
+   */
+  readonly 'menu.brief': string;
+  readonly 'menu.preview': string;
+  readonly 'menu.tools': string;
   /**
    * The items inside the Edit, View and Window lists, and inside macOS's application menu, that
    * are Electron roles (TYTO-334). A role's own label is Electron's fixed English on Windows and
@@ -928,6 +937,8 @@ export const CATALOGUE_KEYS = [
   'terminal.quit.stay',
   'panel.terminal',
   'command.terminal.new',
+  'command.terminal.show',
+  'command.problems.show',
   'terminal.new',
   'terminal.sessions',
   'terminal.session.close',
@@ -1010,6 +1021,9 @@ export const CATALOGUE_KEYS = [
   'menu.file',
   'menu.edit',
   'menu.view',
+  'menu.brief',
+  'menu.preview',
+  'menu.tools',
   'menu.window',
   'menu.help',
   'menu.role.undo',

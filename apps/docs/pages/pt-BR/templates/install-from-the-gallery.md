@@ -4,7 +4,7 @@ A galeria é uma lista de templates e plugins que alguém mantém, cada um num r
 
 ## Abrir
 
-Rode **Galeria: ver templates e plugins** na barra de comandos, ou **Arquivo ▸ Galeria: ver templates e plugins**. Cada cartão mostra uma prévia, o nome, o que é, a versão e o estado:
+Rode **Galeria: ver templates e plugins** na barra de comandos, ou **Ferramentas ▸ Galeria: ver templates e plugins**. Cada cartão mostra uma prévia, o nome, o que é, a versão e o estado:
 
 - **Instalar**: nenhum arquivo de plugins seu tem esse item ainda.
 - **Instalado em v1.2.0**: ele está nos seus arquivos de plugins nessa versão.

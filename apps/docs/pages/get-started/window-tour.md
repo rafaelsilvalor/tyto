@@ -23,7 +23,7 @@ The names on this page are the ones the rest of the manual uses. The picture sho
   ]"
 />
 
-1. **Title bar** — the menus (**File**, **Edit**, **View**, **Window**, **Help**), the open folder's name, which lists the [folders opened before](../editor/workspace-folder.md#switching-between-recent-folders), and the name of the file in front. On macOS the menus and the title are the system's, at the top of the screen.
+1. **Title bar** — the [menus](#the-menus), the open folder's name, which lists the [folders opened before](../editor/workspace-folder.md#switching-between-recent-folders), and the name of the file in front. On macOS the menus and the title are the system's, at the top of the screen.
 2. **Tab** — one for each open file. A tab with changes not yet saved says so; closing it asks first. Rest the pointer on a tab to see where its file is: inside the open folder the path starts with the folder's name, as `promo\briefs\capa.brief`, and elsewhere your home folder is written `~`.
 3. **Breadcrumb** — where the cursor is in the brief: `header` in the lines between the two `---`, or the block it is in. Resting the pointer on its row shows where the file is, as on the tab.
 4. **Editor group** — a row of tabs and the file in front. **Split editor right** (**Ctrl+\\**) divides a group in two, and the button at the right end of the tab row opens the preview in a group of its own; the picture has two groups side by side.
@@ -31,6 +31,21 @@ The names on this page are the ones the rest of the manual uses. The picture sho
 6. **Preview toolbar** — the formats the brief asks for (one chip each), **One slide** and **All slides** and the slide strip's toggle for a carousel, zoom, **Fit**, and **Lock**, which keeps the preview on this brief when you switch tabs.
 7. **Problems panel** — what is wrong with the brief in front, each with its line and column; click one to go there.
 8. **Status bar** — the line and column of the cursor, the kind of tab, the brief's template, the number of problems, and buttons for the queue, plugins, export, settings and the areas of the window.
+
+## The menus
+
+Every menu item runs a command, the same one the [command bar](#the-command-bar) runs, so what you find in a menu you can also bind to a key. An item that does nothing with the tab in front is greyed. Alt and the underlined letter opens a menu on Windows and Linux.
+
+- **File** — **New brief**, **New brief from template…**, **Delivery: New…**, **Open…**, **Open Folder…**, **Open Recent Folder…**; **Save** and **Save as…**; **Close the tab** and **Close Folder**; **Exit** (**Quit Tyto** on Linux).
+- **Edit** — undo, redo, cut, copy, paste, delete and select all.
+- **Brief** — **Format Brief**, **Insert: templates…** (the `/` menu), **Go to Block…**; **Export…** and **Delivery: Export**; **Edit template…** and **New template…**.
+- **Preview** — open the preview, beside the brief or in the group in front, and lock it; the next or previous slide, all slides or one; the next or previous format; zoom to fit, in and out.
+- **View** — split and move between editor groups; **Show Problems**, **Commands: Run…** and **Show Terminal**, the tabs of the bottom area; vim mode on or off; reload the window; the window's zoom; full screen.
+- **Tools** — the gallery, the plugins, the local queue; a new terminal; `settings.json`, `keybindings.json` and `snippets.json`; the open folder's trust.
+- **Window** — **Minimize** and **Zoom**.
+- **Help** — this manual, **Open the log folder**, and **About Tyto**.
+
+The menus show no keys beside their items: the [Commands](../reference/commands.md) reference lists each command with its key.
 
 ## The command bar
 

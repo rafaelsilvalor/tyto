@@ -4,7 +4,7 @@ The gallery is a list of templates and plugins somebody curates, each kept in a 
 
 ## Open it
 
-Run **Gallery: Browse Templates and Plugins** from the command bar, or **File ▸ Gallery: Browse Templates and Plugins**. Each card shows a preview, the name, what it is, its version and its state:
+Run **Gallery: Browse Templates and Plugins** from the command bar, or **Tools ▸ Gallery: Browse Templates and Plugins**. Each card shows a preview, the name, what it is, its version and its state:
 
 - **Install**: no plugin file of yours holds it yet.
 - **Installed at v1.2.0**: it is in your plugin files at that version.

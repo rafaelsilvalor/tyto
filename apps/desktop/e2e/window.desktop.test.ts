@@ -666,6 +666,13 @@ describe('switching the language', () => {
     'menu.view',
     'menu.window',
     'menu.help',
+    // TYTO-514 (ADR 0166): the three titles of this app's own, menu chrome like the others, and
+    // View's two new commands, whose words are the native list's and the bar's only.
+    'menu.brief',
+    'menu.preview',
+    'menu.tools',
+    'command.problems.show',
+    'command.terminal.show',
     // TYTO-334: the role items inside the native lists, which the window never draws.
     'menu.role.undo',
     'menu.role.redo',
