@@ -13,9 +13,12 @@ export default defineConfig({
     // names nothing defines (TYTO-96).
     // And the manual's scene list, which is data and launches nothing (TYTO-315).
     // And where the global setup finds the Electron binary, which only reads paths (TYTO-327).
+    // And the packaging hook in `scripts/`, which is checked through an injected file system
+    // (TYTO-510).
     include: [
       'shared/**/*.test.ts',
       'src/**/*.test.ts',
+      'scripts/**/*.test.ts',
       'e2e/launch-isolation.test.ts',
       'e2e/renderer-tokens.test.ts',
       'e2e/asar-patch.test.ts',
