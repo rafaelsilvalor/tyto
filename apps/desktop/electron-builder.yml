@@ -60,23 +60,41 @@ files:
   # ADR 0164 decision 2). It is a native module: external to the bundle, so it comes back as a
   # real package, unpacked below because a `.node` cannot be loaded from inside an asar.
   #
-  # electron-builder's rebuild compiles it for this Electron on every platform, into
-  # `build/Release/`, and node-pty's loader tries that folder first, so `prebuilds/` (every
-  # platform's binaries, 5 MiB) is never read and stays out. So do the compiler's leftovers
-  # beside the binaries (`.pdb`, `.iobj`, `.lib`, `obj/`, 15.6 MiB on Windows): the globs below
-  # name the files that load, `pty.node` everywhere, the ConPTY and winpty files on Windows and
-  # `spawn-helper` on macOS. A glob that matches nothing on a platform costs nothing there.
-  # `build/Release/conpty/` (1.3 MiB) stays out too: node-pty loads that bundled ConPTY only with
-  # `useConptyDll`, which `src/main/index.ts` does not pass, so Windows' own ConPTY runs.
+  # **Windows and macOS ship node-pty's own prebuilt binaries; nothing is compiled when packaging**
+  # (TYTO-510, `npmRebuild: false` below). They are N-API, so they do not depend on the Electron
+  # version, and the packaged app loads `prebuilds/win32-x64/conpty.node` and
+  # `prebuilds/darwin-<arch>/pty.node`, measured on all four legs of `desktop.yml`. Linux has no
+  # prebuild: `pnpm install` compiles `build/Release/pty.node` there, and that binary loads as it
+  # is. node-pty's loader tries `build/Release/` first and `prebuilds/<platform>-<arch>/` after.
+  #
+  # The globs name the files that load and stay at the top level: listed under `win:` or `mac:`
+  # they packed nothing from `node_modules`, measured, cause not read. `${platform}` is
+  # `process.platform`, so each platform takes its own folder. macOS takes both architectures,
+  # because one universal app carries both slices (`mac.x64ArchFiles` below). Windows keeps
+  # `pty.node` and the winpty pair beside ConPTY: node-pty falls back to winpty on Windows builds
+  # older than ConPTY. `win32-arm64`, the `.pdb` files and the bundled `conpty/` folder stay out:
+  # node-pty loads that ConPTY only with `useConptyDll`, which `src/main/index.ts` does not pass.
+  # `spawn-helper` is installed without its execute bit; `scripts/after-pack.ts` sets it.
   # `e2e/packaged.package.test.ts` opens a terminal in the packaged app and reads `echo` back.
   - node_modules/node-pty/package.json
   - node_modules/node-pty/LICENSE
   - node_modules/node-pty/lib/**/*.js
   - '!node_modules/node-pty/lib/**/*.test.js'
-  - node_modules/node-pty/build/Release/*.node
-  - node_modules/node-pty/build/Release/*.dll
-  - node_modules/node-pty/build/Release/*.exe
-  - node_modules/node-pty/build/Release/spawn-helper
+  - node_modules/node-pty/build/Release/pty.node
+  - node_modules/node-pty/prebuilds/${platform}-*/*.node
+  - node_modules/node-pty/prebuilds/${platform}-*/*.dll
+  - node_modules/node-pty/prebuilds/${platform}-*/*.exe
+  - node_modules/node-pty/prebuilds/${platform}-*/spawn-helper
+  - '!node_modules/node-pty/prebuilds/win32-arm64/**'
+
+# **No native module is rebuilt when packaging** (TYTO-510). electron-builder's default runs
+# `@electron/rebuild`, which compiled node-pty from source on every platform and so needed a C++
+# toolchain on every packaging machine; it also doubled Windows' packaging time (44 s to
+# 100–143 s). node-pty is the only native module the package carries, because `files` keeps no
+# other `node_modules` folder that holds code. A native dependency added later has to be measured
+# the same way.
+npmRebuild: false
+afterPack: ./scripts/after-pack.ts
 
 # **Installed plugins run on a Node of their own, which the package carries** (TYTO-186,
 # ADR 0050). `pnpm build` puts Node's official binary for this platform, checked against the
@@ -194,11 +212,18 @@ publish:
 # installer. It is roughly twice the size. electron-builder packs an x64 and an arm64 app and
 # `@electron/universal` joins them, then flips the fuses below on the joined app
 # (`macPackager.doUniversalPack`); the bundled Node arrives already universal from
-# `scripts/fetch-node.ts`, the one Mach-O file the merge would otherwise refuse.
+# `scripts/fetch-node.ts`, the Mach-O file the merge would otherwise refuse.
+#
+# node-pty's prebuilds are the other one (TYTO-510): both slices carry `darwin-arm64/` and
+# `darwin-x64/`, byte-identical, and the merge refuses them with `Detected file
+# "…/node-pty/prebuilds/darwin-arm64/pty.node" that's the same in both x64 and arm64 builds and
+# not covered by the x64ArchFiles rule` (measured in TYTO-497's probe). The rule keeps the x64
+# slice's copy, which is the same bytes.
 mac:
   target:
     - target: dmg
       arch: universal
+  x64ArchFiles: '**/node_modules/node-pty/prebuilds/**'
 win:
   target:
     - nsis

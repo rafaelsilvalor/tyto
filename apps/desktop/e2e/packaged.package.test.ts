@@ -7,6 +7,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -485,9 +486,10 @@ describe('the packaged app', () => {
     expect(terminals).toEqual([]);
   }, 60_000);
 
-  it("ships node-pty unpacked with only this platform's runtime files (TYTO-497)", () => {
-    // ADR 0164 decision 2: no `prebuilds/` and no compiler leftovers, which the probe measured at
-    // 5 MiB and 15.6 MiB of the Windows folder.
+  it("ships node-pty unpacked with only this platform's runtime files (TYTO-497, TYTO-510)", () => {
+    // ADR 0164 decision 2 and its TYTO-510 note: node-pty's own prebuilds on Windows and macOS,
+    // the binary `pnpm install` compiled on Linux, and nothing else — no other platform's
+    // prebuilds, no `.pdb`, no compiler leftovers.
     const executable = packagedExecutable();
     const unpacked =
       process.platform === 'darwin'
@@ -503,15 +505,34 @@ describe('the packaged app', () => {
     const files = readdirSync(unpacked, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => relative(unpacked, join(entry.parentPath, entry.name)).replaceAll('\\', '/'));
-    const binaries = files.filter((file) => file.startsWith('build/'));
+    const binaries = files.filter((file) => /^(?:build|prebuilds)\//u.test(file)).sort();
     process.stdout.write(`[TYTO-497] packaged node-pty binaries: ${binaries.join(', ')}\n`);
 
+    const expected: Record<string, string[]> = {
+      win32: [
+        'conpty.node',
+        'conpty_console_list.node',
+        'pty.node',
+        'winpty-agent.exe',
+        'winpty.dll',
+      ].map((file) => `prebuilds/win32-x64/${file}`),
+      darwin: ['darwin-arm64', 'darwin-x64'].flatMap((folder) => [
+        `prebuilds/${folder}/pty.node`,
+        `prebuilds/${folder}/spawn-helper`,
+      ]),
+      linux: ['build/Release/pty.node'],
+    };
     expect(files).toContain('package.json');
-    expect(binaries).toContain('build/Release/pty.node');
-    expect(
-      files.filter((file) => /^prebuilds\/|\.(?:pdb|iobj|ipdb|lib|exp|obj)$|\/obj\//u.test(file)),
-    ).toEqual([]);
+    expect(binaries).toEqual(expected[process.platform]);
     expect(files.filter((file) => file.endsWith('.test.js'))).toEqual([]);
+
+    // node-pty's tarball installs `spawn-helper` as 0644; `scripts/after-pack.ts` sets the bit,
+    // and without it every shell fails with `posix_spawnp failed.` (TYTO-510).
+    for (const helper of binaries.filter((file) => file.endsWith('/spawn-helper'))) {
+      const mode = statSync(join(unpacked, helper)).mode & 0o777;
+      process.stdout.write(`[TYTO-510] packaged ${helper} mode ${mode.toString(8)}\n`);
+      expect(mode).toBe(0o755);
+    }
   });
 
   it('hands an installed plugin its setting from settings.json (TYTO-254)', async () => {

@@ -44,7 +44,7 @@ arbiter**, and a Windows checkout can see green on a range CI will reject.
 
 ## Root scripts
 
-`pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots; needs `pnpm exec playwright install chromium`) · `pnpm --filter @tyto/desktop test:desktop` (real Electron) · `node tools/repo-checks/src/e2e-select.mjs --local` (which of those files a local change reaches; see `git-workflow.md`) · `pnpm --filter @tyto/desktop test:package` (packages the app and launches the result; needs a C++ toolchain, which compiles node-pty, ADR 0164) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
+`pnpm dev` (desktop) · `pnpm cli -- …` · `pnpm check` = typecheck + lint + test · `pnpm test:visual` (raster snapshots; needs `pnpm exec playwright install chromium`) · `pnpm --filter @tyto/desktop test:desktop` (real Electron) · `node tools/repo-checks/src/e2e-select.mjs --local` (which of those files a local change reaches; see `git-workflow.md`) · `pnpm --filter @tyto/desktop test:package` (packages the app and launches the result; on Linux `pnpm install` needs a C++ toolchain to compile node-pty, while Windows and macOS use its prebuilt binaries, ADR 0164) · `pnpm build` · `pnpm changeset` · `pnpm format` / `format:check`.
 
 ## Packages
 

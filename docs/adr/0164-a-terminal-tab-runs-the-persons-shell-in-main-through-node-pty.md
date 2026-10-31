@@ -246,12 +246,12 @@ plugin panels.
 
 ## Left open
 
-| What                                                                                | Why it matters                                                                                      | Status       | Owner    |
-| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------ | -------- |
-| Load node-pty's prebuilt binaries (`npmRebuild: false`) instead of compiling them   | It would drop the toolchain requirement on Windows and macOS packaging machines                     | Not measured | TYTO-497 |
-| Smart App Control on more than one machine and one day                              | It was one sample; the same machine has blocked new executables before                              | Not measured | TYTO-497 |
-| Build time with node-pty                                                            | With one run per leg the runs varied by more than the change. Only Windows' packaging rise is clear | Not measured | TYTO-497 |
-| ``Ctrl+Shift+` `` for a new terminal, with ``Ctrl+` `` staying on the command panel | VS Code puts the terminal on ``Ctrl+` ``. This ADR keeps the command panel there                    | Open         | Rafael   |
+| What                                                                                | Why it matters                                                                                      | Status                                 | Owner    |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------- | -------- |
+| Load node-pty's prebuilt binaries (`npmRebuild: false`) instead of compiling them   | It would drop the toolchain requirement on Windows and macOS packaging machines                     | Done, see the 2026-10-31 TYTO-510 note | TYTO-510 |
+| Smart App Control on more than one machine and one day                              | It was one sample; the same machine has blocked new executables before                              | Not measured                           | TYTO-497 |
+| Build time with node-pty                                                            | With one run per leg the runs varied by more than the change. Only Windows' packaging rise is clear | Not measured                           | TYTO-497 |
+| ``Ctrl+Shift+` `` for a new terminal, with ``Ctrl+` `` staying on the command panel | VS Code puts the terminal on ``Ctrl+` ``. This ADR keeps the command panel there                    | Open                                   | Rafael   |
 
 ## Notes from the build
 
@@ -262,3 +262,29 @@ plugin panels.
 - 2026-10-31: on Windows node-pty reports the spawn's `name` (`xterm-256color`) as the running
   program, measured, so the quit question of decision 6 cannot tell a busy shell from an idle
   one and does not ask there. It asks on macOS and Linux.
+- 2026-10-31 (TYTO-510): **decision 2 changes: Windows and macOS package node-pty's own prebuilt
+  binaries, and nothing is compiled when packaging.** `electron-builder.yml` sets
+  `npmRebuild: false`, lists `prebuilds/${platform}-*/` in the top-level `files` (listed under
+  `win:` or `mac:` they packed nothing from `node_modules`, measured, cause not read), keeps
+  `mac.x64ArchFiles` because both darwin prebuilds are in both slices, and runs
+  `scripts/after-pack.ts`, which sets the execute bit node-pty's tarball leaves off
+  `spawn-helper` (`-rw-r--r--` on both Mac runners; without it every shell fails with
+  `posix_spawnp failed.`). Linux has no prebuild: `pnpm install` still compiles
+  `build/Release/pty.node` there, and that binary loads unchanged, so only Linux still needs a
+  toolchain, at install time. Windows keeps `pty.node` and the winpty pair as node-pty's fallback
+  for Windows builds older than ConPTY. Measured on probe PR #288, all four legs of `desktop.yml`
+  ([run 41227026064](https://github.com/rafaelsilvalor/tyto/actions/runs/41227026064)), one sample
+  each. The paths are the `.node` keys of main's `require.cache` after the spawn:
+
+  | Leg            | Loaded                            | Echo   | Packaged gate (s): compiled → prebuilt | Installer (bytes): compiled → prebuilt  |
+  | -------------- | --------------------------------- | ------ | -------------------------------------- | --------------------------------------- |
+  | windows-latest | `prebuilds/win32-x64/conpty.node` | 688 ms | 100–143 → 35–50 (44 before node-pty)   | `Tyto Setup` 142 677 491 → 138 810 450  |
+  | ubuntu-latest  | `build/Release/pty.node`          | 412 ms | 85 → 62–72                             | AppImage 175 275 164 → 174 557 569      |
+  | macos-latest   | `prebuilds/darwin-arm64/pty.node` | 429 ms | 104 → 45                               | universal dmg 312 927 584 → 312 203 739 |
+  | macos-26-intel | `prebuilds/darwin-x64/pty.node`   | 439 ms | 107 → 83                               | (the arm leg builds the dmg)            |
+
+  On the maintainer's Windows machine, which has no Visual Studio, `pnpm install` and packaging now
+  pass. The freshly packaged `Tyto.exe` then failed to start twice with `spawn UNKNOWN`
+  (`errno -4094`), the Smart App Control pattern this ADR's first measurement saw once, but the
+  CodeIntegrity log was not read, so the cause is not confirmed. One earlier run failed renaming
+  `release/win-unpacked.tmp` (`EPERM`), cause unknown. Packaged checks are measured on CI.

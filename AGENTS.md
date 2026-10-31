@@ -79,11 +79,11 @@ Learned from past mistakes on this repository. Each one cost a red CI run or a w
 
 ### Building
 
-- `apps/desktop` depends on node-pty, a native module (ADR 0164): `pnpm install` compiles it on
-  Linux, and packaging (`test:package`, electron-builder) compiles it on every platform. That
-  machine needs a C++ toolchain: Visual Studio Build Tools, Xcode's command-line tools, or gcc
-  and make. On a machine without one, `test:package` fails and the package is measured on CI
-  only (TYTO-510 measures loading node-pty's prebuilt binaries instead).
+- `apps/desktop` depends on node-pty, a native module (ADR 0164): Windows and macOS package it
+  from node-pty's prebuilt binaries, with no C++ toolchain (TYTO-510). Linux has no prebuild, so
+  `pnpm install` still compiles it there and needs gcc and make. On the maintainer's machine a
+  freshly packaged exe may be blocked by Smart App Control (`spawn UNKNOWN`): packaged checks
+  are measured on CI.
 - In a fresh worktree, `node_modules` must exist before the first commit (the pre-commit hook would install everything), and `pnpm -r generate:parser` runs before the first build.
 - Desktop e2e runs the built bundle in `apps/desktop/out`: `TURBO_FORCE=1 pnpm build` first, never `--filter=@tyto/desktop...`, which skips the CLI some suites run.
 - A filtered vitest run reads other packages' `dist`: after changing `packages/core`, `pnpm --filter @tyto/core build` first. Docs tests read the built site: `pnpm --filter @tyto/docs build` after a page edit.
