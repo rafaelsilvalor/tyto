@@ -1,6 +1,6 @@
 {
   "name": "@tyto/recipe",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "type": "module",
   "description": "The recipe notebook's pure core: the table, the *.recipe parser and the generic verbs.",
   "license": "UNLICENSED",

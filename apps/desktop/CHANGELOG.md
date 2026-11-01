@@ -1,5 +1,26 @@
 # @tyto/desktop
 
+## 0.14.1
+
+### Patch Changes
+
+- Updated dependencies [e94aa55]
+  - @tyto/core@0.36.1
+  - @tyto/brief-lang@0.7.8
+  - @tyto/command-line@0.2.1
+  - @tyto/editor@0.13.1
+  - @tyto/export-html@0.7.10
+  - @tyto/export-svg@2.0.10
+  - @tyto/fonts@0.4.1
+  - @tyto/google-fonts@0.1.9
+  - @tyto/io@5.2.1
+  - @tyto/pipeline@0.12.6
+  - @tyto/plugin-api@0.13.1
+  - @tyto/recipe@0.1.8
+  - @tyto/template-lang@0.8.9
+  - @tyto/templates@1.2.2
+  - @tyto/theme-pack@0.1.9
+
 ## 0.14.0
 
 ### Minor Changes

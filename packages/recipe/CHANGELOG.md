@@ -1,5 +1,12 @@
 # @tyto/recipe
 
+## 0.1.8
+
+### Patch Changes
+
+- Updated dependencies [e94aa55]
+  - @tyto/core@0.36.1
+
 ## 0.1.7
 
 ### Patch Changes
