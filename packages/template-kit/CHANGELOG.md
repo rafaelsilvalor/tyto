@@ -1,5 +1,29 @@
 # @tyto/template-kit
 
+## 0.7.0
+
+### Minor Changes
+
+- 05c9f83: A template spaces its blocks by weight and keeps orphans off its text (ADR 0167, TYTO-516).
+  `@tyto/template-kit` gains `spaceByWeight`, which shares the room between two edges out by
+  weight so the gaps scale together and equal outer weights centre the blocks, and `settle`,
+  which clears a paragraph's last line of one word with letter spacing and then a smaller size
+  within the template's limits. What it cannot clear, `reportOrphan` reports as the new
+  `W_TEMPLATE_ORPHAN` warning, which `@tyto/core` adds to the closed list a template may report.
+  The report carries the word, so the plugin RPC protocol is 14.
+
+### Patch Changes
+
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [bd56ec5]
+- Updated dependencies [05c9f83]
+  - @tyto/core@0.36.0
+  - @tyto/template-lang@0.8.8
+  - @tyto/export-html@0.7.9
+  - @tyto/brief-lang@0.7.7
+
 ## 0.6.0
 
 ### Minor Changes

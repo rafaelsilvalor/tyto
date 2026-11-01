@@ -1,5 +1,28 @@
 # @tyto/plugin-api
 
+## 0.13.0
+
+### Minor Changes
+
+- 9bcb68b: `tyto gallery list | install | update` reads the curated index when neither `--index` nor `TYTO_GALLERY_INDEX` names one (TYTO-506, ADR 0162): `DEFAULT_GALLERY_INDEX`, a plain git location exported by `@tyto/plugin-api`. `--index` wins over the variable, and the variable over the default.
+- 05c9f83: A template spaces its blocks by weight and keeps orphans off its text (ADR 0167, TYTO-516).
+  `@tyto/template-kit` gains `spaceByWeight`, which shares the room between two edges out by
+  weight so the gaps scale together and equal outer weights centre the blocks, and `settle`,
+  which clears a paragraph's last line of one word with letter spacing and then a smaller size
+  within the template's limits. What it cannot clear, `reportOrphan` reports as the new
+  `W_TEMPLATE_ORPHAN` warning, which `@tyto/core` adds to the closed list a template may report.
+  The report carries the word, so the plugin RPC protocol is 14.
+
+### Patch Changes
+
+- 9021b50: Rename shadowing local bindings without changing behavior and enforce the no-shadow lint rule.
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [05c9f83]
+  - @tyto/core@0.36.0
+  - @tyto/recipe@0.1.7
+
 ## 0.12.0
 
 ### Minor Changes

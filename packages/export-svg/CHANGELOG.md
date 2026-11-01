@@ -1,5 +1,29 @@
 # @tyto/export-svg
 
+## 2.0.9
+
+### Patch Changes
+
+- 147eafa: A shadow's blur and a layer blur are the Gaussian's standard deviation everywhere, as CSS
+  `drop-shadow()` and `blur()` already read them (ADR 0156, 2026-10-31 note). `export-svg`
+  and the spread filter in `export-html` no longer halve it, so the SVG and a spread shadow
+  draw what the HTML and the PNG drew; no PNG of a shadow without a spread changes.
+  `export-svg` gives a filter the frame plus three deviations of room instead of a fixed
+  margin of the node, which cut a wide blur off a small node. The raster suite compares
+  the HTML and SVG renders of a shadow, a spread and a blur.
+- bd56ec5: Every filter `export-html` and `export-svg` write interpolates in sRGB, so a shape under a
+  shadow keeps its exact fill colour. In linearRGB, the default, the spread filter and
+  `export-svg`'s `feDropShadow` handed the shape back shifted (#081c3d drawn #0d1c3d)
+  (ADR 0156, 2026-10-31 note). The raster suite checks the interior of a shadowed shape
+  against its fill in the HTML and SVG renders.
+- Updated dependencies [9021b50]
+- Updated dependencies [93fb9c9]
+- Updated dependencies [147eafa]
+- Updated dependencies [9bcb68b]
+- Updated dependencies [05c9f83]
+  - @tyto/core@0.36.0
+  - @tyto/plugin-api@0.13.0
+
 ## 2.0.8
 
 ### Patch Changes
