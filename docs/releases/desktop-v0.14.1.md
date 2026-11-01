@@ -18,19 +18,20 @@ mostra a cópia buscada por último e diz de quando é. Na linha de comando, `ty
 o mesmo.
 
 **O painel de comandos.** A aba **Comandos** roda comandos `tyto`, os mesmos da linha de comando, dentro da janela, na
-pasta de trabalho aberta. **Ctrl+`** abre e esconde (num teclado brasileiro, é a tecla à esquerda do **1**, que imprime
+pasta de trabalho aberta. **Ctrl+\`** abre e esconde (num teclado brasileiro, é a tecla à esquerda do **1**, que imprime
 um apóstrofo). Enquanto você digita, uma lista sugere os comandos, as opções, os templates, os formatos do template
 escolhido e os arquivos da pasta: **Tab** pega a primeira sugestão. Cada comando vira um bloco com o comando, a hora e
 como terminou (**✓ 0**, **✗ 1**), sobre o que ele imprimiu. **↑** e **↓** percorrem o histórico, guardado por pasta, e
 **Ctrl+R** procura nele. Um lugar que o comando imprimiu vira um link para o arquivo naquela linha. **Comandos: Renderizar
-este brief** escreve `render`com o brief da frente no prompt, sem rodar. Duas coisas são recusadas, com uma linha dizendo por quê:`--trust`e, no Windows, instalar um pacote npm com`plugin install`.
+este brief** escreve `render` com o brief da frente no prompt, sem rodar. Duas coisas são recusadas, com uma linha
+dizendo por quê: `--trust` e, no Windows, instalar um pacote npm com `plugin install`.
 
 **O que um comando reporta aparece em Problemas.** Cada execução ganha uma seção sob o comando que rodou, abaixo das
 linhas do brief, para as últimas cinco execuções, e o número de problemas da barra de status conta essas linhas também.
 
-**Um terminal dentro da janela.** **Ctrl+Shift+`** ou **Terminal: Novo terminal** abre o seu próprio shell na aba
+**Um terminal dentro da janela.** **Ctrl+Shift+\`** ou **Terminal: Novo terminal** abre o seu próprio shell na aba
 **Terminal**, na pasta de trabalho aberta: o PowerShell no Windows, o seu shell de login no Mac e no Linux, ou o programa
-que `terminalShell`e`terminalArgs`dizem no`settings.json`. Ele roda qualquer programa, como `git`ou`npm`, segue as
+que `terminalShell` e `terminalArgs` dizem no `settings.json`. Ele roda qualquer programa, como `git` ou `npm`, segue as
 cores da janela no tema claro e no escuro, e sobrevive a uma troca de pasta e a um recarregamento da janela. O **+** abre
 outro. Colar mais de uma linha pergunta antes. **O shell roda como você**: a confiança na pasta e as permissões de um
 plugin não valem dentro dele. Numa pasta em que você ainda não confiou, um terminal novo é recusado, com **Confiar na
