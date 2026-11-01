@@ -1,4 +1,6 @@
-import { ORPHAN_WORD_LIMIT, type TemplateContext, type TextRun } from '@tyto/core';
+import { ORPHAN_WORD_LIMIT } from '@tyto/core/template';
+
+import type { TemplateContext, TextRun } from '@tyto/core';
 
 /**
  * Blocks spaced by weight between two edges, and text kept from ending a paragraph on a line
