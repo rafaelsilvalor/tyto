@@ -1,6 +1,6 @@
 {
   "name": "@tyto/command-line",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "description": "The tyto command tree, built around an environment each app fills (ADR 0159).",
   "license": "UNLICENSED",
