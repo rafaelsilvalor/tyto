@@ -16,6 +16,7 @@ export {
   type TemplateContext,
   type TemplateFiles,
   type TemplateReport,
+  ORPHAN_WORD_LIMIT,
   defineTemplate,
   measureNothing,
   noFiles,
