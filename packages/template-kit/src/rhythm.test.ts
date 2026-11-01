@@ -2,7 +2,15 @@ import { type FaceCache, type TemplateReport, type TextRun, measureText } from '
 import { lineBreak, run, text } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
-import { orphanOf, reportOrphan, settle, spaceByWeight } from './rhythm.js';
+import {
+  ORPHAN_LIMITS,
+  type Setting,
+  orphanOf,
+  rebreak,
+  reportOrphan,
+  settle,
+  spaceByWeight,
+} from './rhythm.js';
 
 /**
  * Against a face whose every character is half an em wide, as `core`'s layout tests do: the
@@ -38,8 +46,10 @@ function paragraph(words: string, size: number, letterSpacing = 0) {
 
 /** The layout `settle` is handed: the explanation, fitting any room it is given. */
 function explanation(room = Number.POSITIVE_INFINITY) {
-  return (setting: { size: number; letterSpacing: number }) => {
-    const node = paragraph(EXPLANATION, setting.size, setting.letterSpacing);
+  return (setting: Setting) => {
+    const plain = paragraph(EXPLANATION, setting.size, setting.letterSpacing);
+    // A rebroken setting is drawn with the runs it carries, as a template draws it.
+    const node = setting.runs === undefined ? plain : { ...plain, runs: [...setting.runs] };
     const height = measure(node)?.height ?? 0;
     return { text: node, fits: height <= room, laid: setting };
   };
@@ -135,6 +145,54 @@ describe('orphanOf', () => {
   });
 });
 
+describe('rebreak', () => {
+  it('breaks before the last word of the line over the orphan', () => {
+    const rebroken = rebreak(words('one two three'), words('one two', 'three'));
+
+    expect(rebroken).toEqual(words('one', 'two three'));
+  });
+
+  it('answers nothing for a text with no orphan, which is the control', () => {
+    expect(rebreak(words('one two three'), words('one', 'two three'))).toBeUndefined();
+  });
+
+  it('moves two words joined by a no-break space together, never splitting them', () => {
+    const rebroken = rebreak(words('one two three four'), words('one two three', 'four'));
+
+    expect(rebroken).toEqual(words('one', 'two three four'));
+  });
+
+  it('breaks inside the right paragraph, across runs, keeping each run’s style', () => {
+    const bold = run('two ', { font: FONT, size: 10, weight: 700, color: '#000000' });
+    const written = [
+      ...words('lead'),
+      lineBreak(),
+      run('one ', { font: FONT, size: 10, color: '#000000' }),
+      bold,
+      run('three', { font: FONT, size: 10, color: '#000000' }),
+    ];
+    const laid = [
+      ...words('lead'),
+      lineBreak(),
+      run('one ', { font: FONT, size: 10, color: '#000000' }),
+      { ...bold, text: 'two' },
+      lineBreak(),
+      run('three', { font: FONT, size: 10, color: '#000000' }),
+    ];
+    const rebroken = rebreak(written, laid) ?? [];
+
+    expect(rebroken.map((item) => (item.kind === 'break' ? '|' : item.text))).toEqual([
+      'lead',
+      '|',
+      'one',
+      '|',
+      'two ',
+      'three',
+    ]);
+    expect(rebroken[4]).toMatchObject({ weight: 700 });
+  });
+});
+
 describe('settle', () => {
   it('reproduces the screenshot: at 48 px the explanation ends on "princípio." alone', () => {
     const node = paragraph(EXPLANATION, 48);
@@ -143,7 +201,12 @@ describe('settle', () => {
   });
 
   it('clears it with letter spacing alone, at the size the text fitted at', () => {
-    const settled = settle({ size: 48, layout: explanation(), measure });
+    const settled = settle({
+      size: 48,
+      layout: explanation(),
+      measure,
+      limits: { shrink: 0.08, tracking: 0.01, rebreak: false },
+    });
     const node = paragraph(EXPLANATION, settled.setting.size, settled.setting.letterSpacing);
 
     expect(settled.orphan).toBeUndefined();
@@ -160,7 +223,7 @@ describe('settle', () => {
       size: 57,
       layout: explanation(),
       measure,
-      limits: { shrink: 0.08, tracking: 0 },
+      limits: { shrink: 0.08, tracking: 0, rebreak: false },
     });
 
     expect(settled.orphan).toBeUndefined();
@@ -173,7 +236,7 @@ describe('settle', () => {
       size: 48,
       layout: explanation(),
       measure,
-      limits: { shrink: 0, tracking: 0 },
+      limits: { shrink: 0, tracking: 0, rebreak: false },
     });
 
     expect(settled).toEqual({
@@ -183,12 +246,69 @@ describe('settle', () => {
     });
   });
 
+  it('first moves a word down from the line above, at the same size and spacing', () => {
+    const settled = settle({ size: 48, layout: explanation(), measure });
+    const runs = settled.setting.runs ?? [];
+    const node = { ...paragraph(EXPLANATION, 48), runs: [...runs] };
+
+    expect(settled.orphan).toBeUndefined();
+    expect(settled.setting).toMatchObject({ size: 48, letterSpacing: 0 });
+    expect(runs.filter((item) => item.kind === 'break')).toHaveLength(1);
+    expect(orphanOf(node.runs, measure(node)!.runs)).toBeUndefined();
+    // As many lines as before: the word moved down, nothing grew.
+    expect(measure(node)!.lines).toBe(measure(paragraph(EXPLANATION, 48))!.lines);
+  });
+
+  it('refuses a rebreak that leaves the line above alone, and goes on to the other tools', () => {
+    // At 76 px the line over "princípio." is "contrariam esse": moving "esse" strands "contrariam".
+    const node = paragraph(EXPLANATION, 76);
+    const rebroken = rebreak(node.runs, measure(node)!.runs)!;
+    const tried = { ...node, runs: rebroken };
+    const settled = settle({ size: 76, layout: explanation(), measure });
+
+    expect(orphanOf(tried.runs, measure(tried)!.runs)).toBe('contrariam');
+    expect(settled.setting.runs).toBeUndefined();
+  });
+
+  it('leaves a caller that ignores the rebroken runs exactly where it was before rebreak existed', () => {
+    const ignoring = (setting: Setting) =>
+      explanation()({ size: setting.size, letterSpacing: setting.letterSpacing });
+    const withRebreak = settle({ size: 48, layout: ignoring, measure });
+    const without = settle({
+      size: 48,
+      layout: ignoring,
+      measure,
+      limits: { ...ORPHAN_LIMITS, rebreak: false },
+    });
+
+    expect(withRebreak).toEqual(without);
+    expect(withRebreak.setting.runs).toBeUndefined();
+  });
+
+  it('refuses a rebreak whose moved word would not fit beside the lonely one', () => {
+    // At 100 px a character is 50 px, 16 to the 840 px line: "a bbbbbbbbbbbbb" fills one line
+    // and "ccc" is alone; moving "bbbbbbbbbbbbb" down needs 17 characters, so it wraps again.
+    const crowded = 'a bbbbbbbbbbbbb ccc';
+    const node = paragraph(crowded, 100);
+    const rebroken = { ...node, runs: rebreak(node.runs, measure(node)!.runs)! };
+    const layout = (setting: Setting) => {
+      const plain = paragraph(crowded, setting.size, setting.letterSpacing);
+      const drawn = setting.runs === undefined ? plain : { ...plain, runs: [...setting.runs] };
+      return { text: drawn, fits: true, laid: setting };
+    };
+    const settled = settle({ size: 100, layout, measure, limits: { shrink: 0, tracking: 0 } });
+
+    expect(measure(rebroken)!.lines).toBeGreaterThan(measure(node)!.lines);
+    expect(settled.setting.runs).toBeUndefined();
+    expect(settled.orphan).toBe('ccc');
+  });
+
   it('skips every setting at which the text no longer fits its room', () => {
     // A room that holds only the setting the text fitted at: every other is refused, so the
     // orphan stays and is named rather than cleared by a setting that would run over.
-    const onlyFitted = (setting: { size: number; letterSpacing: number }) => ({
+    const onlyFitted = (setting: Setting) => ({
       ...explanation()(setting),
-      fits: setting.size === 48 && setting.letterSpacing === 0,
+      fits: setting.size === 48 && setting.letterSpacing === 0 && setting.runs === undefined,
     });
     const settled = settle({ size: 48, layout: onlyFitted, measure });
 

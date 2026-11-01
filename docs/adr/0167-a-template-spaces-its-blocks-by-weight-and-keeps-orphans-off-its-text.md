@@ -77,6 +77,17 @@ the RPC protocol is 14.
 schema, the layout and both exporters, which is a change of its own and not needed to clear an
 orphan here.
 
+**Amended 2026-11-01 (TYTO-521): `settle` rebreaks first.** In a narrow column, such as a
+questão's option, neither letter spacing nor a smaller size moved a lone last word: the column
+barely narrows as the size drops (measured with the real faces on TYTO-520: 43 to 40 px, and
+even a 25% shrink, left it). So `settle` now first breaks the line above one word earlier
+(`rebreak`), at the same size and spacing, and only then tries letter spacing and size. The
+result carries the rebroken runs in `setting.runs`; a caller that ignores them draws exactly
+as before. A rebreak is measured again and refused when the line above would end on one word
+itself, or when the moved word does not fit beside the lonely one; it never splits two words
+joined by a no-break space. `OrphanLimits.rebreak: false` turns it off. Nothing new crosses
+the plugin RPC: the report list and the protocol are unchanged.
+
 ## Consequences
 
 - A template states its rhythm as numbers (the questão's answer slide takes 1 : 1.6 : 1, the

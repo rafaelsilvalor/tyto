@@ -604,8 +604,10 @@ test passes `reportNothing`.
 
 **A paragraph that ends on one word says so too** (ADR 0167). `settle` from
 `@tyto/template-kit` sets a text at the size it fitted at, then looks for a paragraph whose last
-line holds a single word and tries, within the template's limits, letter spacing first and a
-smaller size next until none does. When nothing within the limits clears it, the text is drawn
+line holds a single word and tries, within the template's limits, a break one word earlier on
+the line above first (TYTO-521), then letter spacing, then a smaller size, until none does. A
+rebreak comes back as `settled.setting.runs`, the runs to draw instead of the template's own; a
+template that ignores them draws as before. When nothing within the limits clears it, the text is drawn
 as it fitted and `reportOrphan(context.report, settled.orphan)` raises `W_TEMPLATE_ORPHAN`
 naming the word. The limits are the caller's — `ORPHAN_LIMITS` is a size at most 8% smaller and
 letter spacing within 0.01 em — and a template that lets a configuration change them declares

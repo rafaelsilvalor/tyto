@@ -247,8 +247,8 @@ stacks blocks between a fixed head and a fixed foot asks `spaceByWeight` from
 `@tyto/template-kit` for their tops: it gives one weight per gap, the outer two included, and
 every gap comes out as that weight times one unit — so the gaps grow and shrink together, the
 largest stays the largest, and equal outer weights centre the stack. A text that may wrap goes
-through `settle`, which keeps a paragraph from ending on a line of one word with letter spacing
-and then a smaller size, within the template's limits, and names the word for `reportOrphan`
+through `settle`, which keeps a paragraph from ending on a line of one word by breaking the line
+above one word earlier, then with letter spacing, then a smaller size, within the template's limits, and names the word for `reportOrphan`
 when it cannot. Neither knows a template: the weights and the limits are the template's.
 
 ## What a template may not do

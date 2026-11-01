@@ -63,6 +63,7 @@ export {
   type Spaced,
   type WeightedSpacing,
   orphanOf,
+  rebreak,
   reportOrphan,
   settle,
   spaceByWeight,
