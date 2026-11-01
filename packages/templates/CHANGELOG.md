@@ -1,5 +1,14 @@
 # @tyto/templates
 
+## 1.2.2
+
+### Patch Changes
+
+- Updated dependencies [e94aa55]
+  - @tyto/core@0.36.1
+  - @tyto/template-kit@0.7.1
+  - @tyto/house-style@0.4.3
+
 ## 1.2.1
 
 ### Patch Changes

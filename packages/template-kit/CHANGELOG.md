@@ -1,5 +1,16 @@
 # @tyto/template-kit
 
+## 0.7.1
+
+### Patch Changes
+
+- e94aa55: `@tyto/template-kit` takes `ORPHAN_WORD_LIMIT` from `@tyto/core/template`, which now exports it, instead of the `@tyto/core` root (TYTO-517). Since 0.7.0 a template that bundled the kit inlined the core root's font reader and YAML parser, and came out about three times its size.
+- Updated dependencies [e94aa55]
+  - @tyto/core@0.36.1
+  - @tyto/brief-lang@0.7.8
+  - @tyto/export-html@0.7.10
+  - @tyto/template-lang@0.8.9
+
 ## 0.7.0
 
 ### Minor Changes
