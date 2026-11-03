@@ -251,6 +251,11 @@ through `settle`, which keeps a paragraph from ending on a line of one word by b
 above one word earlier, then with letter spacing, then a smaller size, within the template's limits, and names the word for `reportOrphan`
 when it cannot. Neither knows a template: the weights and the limits are the template's.
 
+**A sign, an amount and its scale word stay on one line** (TYTO-593). A template that sets
+prices, salaries or percentages passes the brief's words through `keepTogether` before laying
+them out, and a line can no longer end on `R$` with `9,8 mil` on the next. The default rules
+are the ones the house's table already glued; a template's own pairs go beside them as data.
+
 ## What a template may not do
 
 - **No Node, no DOM.** A template runs wherever the compiler runs (ADR 0010). It cannot

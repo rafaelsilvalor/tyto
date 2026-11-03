@@ -613,6 +613,16 @@ naming the word. The limits are the caller's — `ORPHAN_LIMITS` is a size at mo
 letter spacing within 0.01 em — and a template that lets a configuration change them declares
 them as values (ADR 0153).
 
+**A price never splits from its sign** (TYTO-593). Tyto's layout breaks a line only at a plain
+space, so `keepTogether(value)` from `@tyto/template-kit` writes the space inside each protected
+pair as a no-break space (U+00A0) before the text is laid out: a currency sign and its amount
+(`R$ 9,8`, `US$`, `€`), an amount and its scale word (`9,8 mil`, `milhão`, `milhões`, `bi`,
+`bilhão`, `bilhões`), a number and `%`. It takes the brief's rich text and keeps its bold and
+marked spans, gluing across them; `keepTogetherText` does the same to a string. The rules are
+data — `KEEP_TOGETHER_RULES`, each a name and two regular-expression sources — so a template adds
+its own beside them. A template opts in by calling it; no kit helper glues on its own, so one
+that does not call it draws as before. `settle` and `rebreak` move a glued pair as one piece.
+
 **`files` is how a template draws what lives beside its manifest.** A fixed background, a
 logo or a badge goes in the template's folder, and the template asks for it by the path it
 has there, as a markup template's `src=` does: `context.files.image('assets/bg.png')` answers
