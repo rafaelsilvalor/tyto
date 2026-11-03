@@ -8,6 +8,6 @@ Claude Code reads them. Change a rule there, not here.
 ## Claude Code only
 
 - Repository commands are in `.claude/commands/` (`/next-card`, `/handoff`, `/coordinate`,
-  `/new-template`, `/pre-push`, `/card`). Each has a Codex port in `.agents/skills/<name>/SKILL.md`; a rule
+  `/new-template`, `/pre-push`, `/card`, `/evidence`). Each has a Codex port in `.agents/skills/<name>/SKILL.md`; a rule
   changed in one is changed in the other in the same PR.
 - `docs/agents.md` says how Claude Code sessions and Codex threads reach each other.
