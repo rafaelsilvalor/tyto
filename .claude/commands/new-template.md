@@ -97,7 +97,9 @@ Enter in the terminal tab after approving in the browser.
   English title and body that say why the card exists, parent TYTO-429, then `---` and a
   Portuguese half that explains, for somebody who does not write code, what Rafael can make
   afterwards that he could not before and what still does not work. Re-read its status after
-  creating it: a new card lands in To Do or Ready unpredictably. Never move it to Done.
+  creating it (`fields: ["status"]`): a new card lands in To Do or Ready unpredictably. Never
+  move it to Done. Jira calls follow AGENTS.md › Operational rules › Jira (fields, connector
+  fallback, transition ids).
 
 ## 4. The repository, only after Rafael's OK
 
@@ -268,7 +270,7 @@ PSD's text, kept in the scratchpad, and say that is what the number measures.
    `scripts/check_brief.py` on the example brief; repackage the zip as the memory
    `brief-modeller-skill-package` says. Uploading it to claude.ai replaces the skill on his
    account: ask before uploading.
-5. **The card** goes to Review with the repository's link, never to Done. Tell the template-repos
+5. **The card** goes to Review (transition `31`) with the repository's link, never to Done. Tell the template-repos
    coordinator, when active, in one line.
 6. **Report** in Estilo Bancada: what exists now (repository, tag, install, the rendered example),
    the `gh run view` output, the last comparison with the PSD when there was one (pixels over
