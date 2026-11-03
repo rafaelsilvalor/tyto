@@ -27,9 +27,12 @@ root file well under that: the home file shares the budget.
 | `.claude/commands/<name>.md`, run as `/<name> <args>` | `.agents/skills/<name>/SKILL.md`, run as `$<name> <args>` or picked from `/skills` |
 | `~/.claude/skills/<name>/SKILL.md` (personal)         | `~/.agents/skills/<name>/SKILL.md` (personal)                                      |
 
-The seven repository commands have Codex ports: `next-card`, `handoff`, `coordinate`,
-`new-template`, `pre-push`, `card` and `evidence`. **Each port names its source, and a rule changed in one is changed in the other
-in the same PR.** The two formats differ only in the frontmatter (a skill needs `name` and
+Every repository command in `.claude/commands/` has a Codex port in `.agents/skills/`; the two
+folders are the list. **Each port names its source, and a rule changed in one is changed in the
+other in the same PR.** `tools/repo-checks/src/codex-ports.test.ts` fails on a command without
+a port, a port without a command (such as a `source-command-<name>` folder the Codex app wrote
+on its own), a port whose frontmatter lacks its `name` or `description`, and a port that does
+not name its source file. The two formats differ only in the frontmatter (a skill needs `name` and
 `description`) and in the tools the text names.
 
 ## What each tool has
