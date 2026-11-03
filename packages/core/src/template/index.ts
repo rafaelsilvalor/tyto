@@ -16,6 +16,7 @@ export {
   type TemplateContext,
   type TemplateFiles,
   type TemplateReport,
+  FILE_PATH_LIMIT,
   ORPHAN_WORD_LIMIT,
   defineTemplate,
   measureNothing,

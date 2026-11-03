@@ -121,6 +121,7 @@ non-zero.
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_TEMPLATE_ORPHAN` | warning | no | A paragraph of an artwork ends on a line holding a single word in one format. |
+| `W_TEMPLATE_FILE_MISSING` | warning | no | A file an artwork's template draws with is not in the template's folder in one format. |
 | `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
 | `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration sets a declared value to one of the wrong kind or outside its limits. |
 | `E_TEMPLATE_ALIAS_TAKEN` | error | no | A plugin file gives a configuration an alias that is a template's name. |
@@ -2313,6 +2314,20 @@ Artwork '{artwork}' ends a paragraph on the single word '{word}' in format '{for
 ```
 
 Parameters: `artwork`, `word`, `format`
+
+### `W_TEMPLATE_FILE_MISSING`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0058-a-template-reports-warnings-beside-its-frame.md`
+
+A file an artwork's template draws with is not in the template's folder in one format.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Artwork '{artwork}' is drawn without '{path}' in format '{format}': template '{template}' has no such file in its folder.
+```
+
+Parameters: `artwork`, `path`, `format`, `template`
 
 ### `W_TEMPLATE_VALUE_UNKNOWN`
 

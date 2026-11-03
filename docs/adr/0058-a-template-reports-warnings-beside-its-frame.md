@@ -65,3 +65,20 @@ as it passes `measureNothing`.
 
 Not done: a markup template cannot report, since the markup language has no statement for it;
 and Tyto warns about an overflowing slide but does not move its content to another slide.
+
+## Note, 2026-11-03 — a missing file is the third code (TYTO-502)
+
+A template may report **`W_TEMPLATE_FILE_MISSING`** with the `path` it asked `context.files`
+for, relative to its folder. `compile` adds the artwork, the format and the template's name.
+The product banner of `@tyto/house-style` raised nothing when `assets/bg-<format>.png` was
+missing or misnamed, so a template repository could ship a banner on plain paper in silence;
+it now reads the file through `requiredImage`, which reports the miss and draws the rest.
+
+`files.image` itself still answers `undefined` without a word: an optional file is a
+legitimate miss, and in a plugin's process the host never sees the lookup. Only the template
+knows which file it cannot do without, so the report is its to make.
+
+It is a warning, as every code here is: the frame is still drawn, and a plugin still cannot
+raise an error. The wire carries the path bounded to 1–260 characters (`FILE_PATH_LIMIT`), so
+the plugin protocol is **15**. A template in its own repository can raise the code only in a
+desktop release whose host speaks 15.

@@ -387,6 +387,7 @@ export async function compileDeferred(
       const context = contextOf(
         plan,
         format,
+        manifest.name,
         plans.length,
         options,
         measure,
@@ -450,6 +451,7 @@ function brandKitOf(
 function contextOf(
   plan: Plan,
   format: string,
+  template: string,
   count: number,
   options: CompileOptions,
   measure: TemplateContext['measure'],
@@ -471,7 +473,7 @@ function contextOf(
     brand,
     ...(values === undefined ? {} : { values }),
     report: (report) => {
-      reports.push(reportDiagnostic(report, plan, format));
+      reports.push(reportDiagnostic(report, plan, format, template));
     },
   };
 }
@@ -480,10 +482,22 @@ function contextOf(
  * A template's report as the catalog's diagnostic (ADR 0058): the template said what and
  * how much, and this says where — the artwork, the format and the directive it came from.
  */
-function reportDiagnostic(report: TemplateReport, plan: Plan, format: string): Diagnostic {
+function reportDiagnostic(
+  report: TemplateReport,
+  plan: Plan,
+  format: string,
+  template: string,
+): Diagnostic {
   const where = plan.range === undefined ? {} : { range: plan.range };
   if (report.code === 'W_TEMPLATE_ORPHAN') {
     return diagnostic(report.code, { artwork: plan.id, format, word: report.word }, where);
+  }
+  if (report.code === 'W_TEMPLATE_FILE_MISSING') {
+    return diagnostic(
+      report.code,
+      { artwork: plan.id, format, path: report.path, template },
+      where,
+    );
   }
   return diagnostic(
     report.code,
@@ -525,6 +539,7 @@ function compileWith(
       const context = contextOf(
         plan,
         format,
+        manifest.name,
         plans.length,
         options,
         measure,

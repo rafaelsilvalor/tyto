@@ -3,7 +3,9 @@
  * format.
  *
  * The background is a PNG per format in the template's own folder, read through
- * `context.files` (ADR 0062): `assets/bg-<format>.png`, drawn full-bleed. Over it go the
+ * `context.files` (ADR 0062): `assets/bg-<format>.png`, drawn full-bleed. A format whose file
+ * is missing or misnamed is drawn on paper and reported as `W_TEMPLATE_FILE_MISSING`
+ * (TYTO-502), never a blank banner in silence. Over it go the
  * brand kit's logo, or its placeholder (ADR 0065), in the format's logo box; the kit's
  * wordmark, when it has one and the format has a box for it (ADR 0066); and the text.
  *
@@ -28,7 +30,14 @@ import { BOLD, BOOK, FACE, PAPER } from './tokens.js';
 
 import type { SizeRange } from './balance.js';
 import type { ToneInks } from './kit.js';
-import type { RichText, TemplateBuild, TemplateContext, TextRun, TextSpan } from '@tyto/core';
+import type {
+  AssetRef,
+  RichText,
+  TemplateBuild,
+  TemplateContext,
+  TextRun,
+  TextSpan,
+} from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
 import type { Measure } from '@tyto/template-kit';
 
@@ -80,7 +89,7 @@ const JOINS_A_GROUP = /[\p{L}\p{N}).,!?]/u;
 /** The build for one brand's banner. */
 export function productBanner(style: BannerStyle): TemplateBuild {
   return (context: TemplateContext) => {
-    const background = context.files.image(`assets/bg-${context.format}.png`);
+    const background = requiredImage(context, `assets/bg-${context.format}.png`);
     const layout = style.layouts[context.format] ?? fallbackLayout(context.size);
     // The kit's accent over the template's own (ADR 0155); the logo's tone inks stay the
     // template's, because a tone is a role the template maps (ADR 0066).
@@ -118,6 +127,17 @@ export function productBanner(style: BannerStyle): TemplateBuild {
       children,
     });
   };
+}
+
+/**
+ * An image from the template's own folder that the template cannot do without, or `undefined`
+ * after reporting `W_TEMPLATE_FILE_MISSING` with the path it asked for (TYTO-502). The template
+ * draws the rest; the person sees which file to put back.
+ */
+export function requiredImage(context: TemplateContext, path: string): AssetRef | undefined {
+  const found = context.files.image(path);
+  if (found === undefined) context.report({ code: 'W_TEMPLATE_FILE_MISSING', path });
+  return found;
 }
 
 /* ---------------------------------------------------------------------- the words -- */

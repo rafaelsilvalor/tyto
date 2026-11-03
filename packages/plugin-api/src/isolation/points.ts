@@ -4,6 +4,7 @@ import {
   type ExpandedInline,
   type Inline,
   type TemplateReport,
+  FILE_PATH_LIMIT,
   ORPHAN_WORD_LIMIT,
   artworkSchema,
   assetRefSchema,
@@ -199,7 +200,8 @@ const templateCallSchema = z.strictObject({
 
 /**
  * A template's report, as a plugin may send it back (ADR 0058): one of the closed list of
- * codes and its own numbers — or, for an orphan, the word (ADR 0167), bounded — nothing else.
+ * codes and its own numbers — or, for an orphan, the word (ADR 0167), for a missing file, its
+ * path (TYTO-502), each bounded — nothing else.
  * The host writes the diagnostic, so a plugin cannot put an error, a message or a range of its
  * choosing into the author's run.
  */
@@ -208,6 +210,10 @@ const templateReportSchema = z.discriminatedUnion('code', [
   z.strictObject({
     code: z.literal('W_TEMPLATE_ORPHAN'),
     word: z.string().min(1).max(ORPHAN_WORD_LIMIT),
+  }),
+  z.strictObject({
+    code: z.literal('W_TEMPLATE_FILE_MISSING'),
+    path: z.string().min(1).max(FILE_PATH_LIMIT),
   }),
 ]);
 
