@@ -27,8 +27,8 @@ root file well under that: the home file shares the budget.
 | `.claude/commands/<name>.md`, run as `/<name> <args>` | `.agents/skills/<name>/SKILL.md`, run as `$<name> <args>` or picked from `/skills` |
 | `~/.claude/skills/<name>/SKILL.md` (personal)         | `~/.agents/skills/<name>/SKILL.md` (personal)                                      |
 
-The four repository commands have Codex ports: `next-card`, `handoff`, `coordinate` and
-`new-template`. **Each port names its source, and a rule changed in one is changed in the other
+The five repository commands have Codex ports: `next-card`, `handoff`, `coordinate`,
+`new-template` and `pre-push`. **Each port names its source, and a rule changed in one is changed in the other
 in the same PR.** The two formats differ only in the frontmatter (a skill needs `name` and
 `description`) and in the tools the text names.
 
