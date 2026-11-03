@@ -419,7 +419,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 13 and this host speaks 14.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 14 and this host speaks 15.",
     );
   });
 
@@ -1346,6 +1346,24 @@ describe('an isolated template’s reports (ADR 0058)', () => {
       'E_PLUGIN_PROTOCOL',
       'E_PLUGIN_PROTOCOL',
     ]);
+  });
+
+  it('carries a missing-file report with its path (TYTO-502)', async () => {
+    const answer = await buildIn([{ code: 'W_TEMPLATE_FILE_MISSING', path: 'assets/bg-feed.png' }]);
+
+    expect(answer.ok && answer.value.reports).toEqual([
+      { code: 'W_TEMPLATE_FILE_MISSING', path: 'assets/bg-feed.png' },
+    ]);
+  });
+
+  it('refuses a missing-file report whose path is empty, too long, or smuggles a number', async () => {
+    const empty = await buildIn([{ code: 'W_TEMPLATE_FILE_MISSING', path: '' }]);
+    const long = await buildIn([{ code: 'W_TEMPLATE_FILE_MISSING', path: 'x'.repeat(261) }]);
+    const mixed = await buildIn([{ code: 'W_TEMPLATE_FILE_MISSING', path: 'a', overflow: 1 }]);
+
+    expect(
+      [empty, long, mixed].map((answer) => (answer.ok ? 'ok' : answer.error[0]?.code)),
+    ).toEqual(['E_PLUGIN_PROTOCOL', 'E_PLUGIN_PROTOCOL', 'E_PLUGIN_PROTOCOL']);
   });
 });
 

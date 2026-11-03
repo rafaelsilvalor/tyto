@@ -165,16 +165,36 @@ export type TemplateReport =
        * `reports[0]?.overflow` here and in templates' own repositories — still compiles.
        */
       readonly overflow?: undefined;
+    }
+  | {
+      /**
+       * A file the template draws with is not in its folder: `path`, relative to the folder, as
+       * `context.files` was asked for it (TYTO-502). The template draws without it.
+       */
+      readonly code: 'W_TEMPLATE_FILE_MISSING';
+      readonly path: string;
+      /** Never set, for the reason the orphan report gives. */
+      readonly overflow?: undefined;
     };
 
 /** Every code a template may report, for the checks that cannot read a type. */
-export const templateReportCodes = ['W_TEMPLATE_OVERFLOW', 'W_TEMPLATE_ORPHAN'] as const;
+export const templateReportCodes = [
+  'W_TEMPLATE_OVERFLOW',
+  'W_TEMPLATE_ORPHAN',
+  'W_TEMPLATE_FILE_MISSING',
+] as const;
 
 /**
  * The longest `word` an orphan report carries. A plugin's report is untrusted (ADR 0058), and
  * a word longer than this is a paragraph that never wrapped, not a word.
  */
 export const ORPHAN_WORD_LIMIT = 80;
+
+/**
+ * The longest `path` a missing-file report carries: a plugin's report is untrusted (ADR 0058),
+ * and Windows' own path limit is a generous bound for a file in a template's folder.
+ */
+export const FILE_PATH_LIMIT = 260;
 
 /**
  * The `measure` of a context that has no faces to measure against.

@@ -571,6 +571,29 @@ describe('a template reports beside its frame (ADR 0058)', () => {
     ]);
   });
 
+  it('turns a missing-file report into W_TEMPLATE_FILE_MISSING naming the template and the file', async () => {
+    const missing = defineTemplate(MANIFEST, (context) => {
+      if (context.artwork.index === 1 && context.format === 'feed') {
+        context.report({ code: 'W_TEMPLATE_FILE_MISSING', path: 'assets/bg-feed.png' });
+      }
+      return promoCurso.build(context);
+    });
+
+    const result = compile(await resolved(PLACED), missing, { formats: FORMATS });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diagnostics).toEqual([
+      {
+        severity: 'warning',
+        code: 'W_TEMPLATE_FILE_MISSING',
+        message:
+          "Artwork 'slide-2' is drawn without 'assets/bg-feed.png' in format 'feed': template 'promo-curso' has no such file in its folder.",
+        range: SLIDES[1],
+      },
+    ]);
+  });
+
   it('says nothing for a template that reports nothing, which is the control', async () => {
     const result = compile(await resolved(PLACED), promoCurso, { formats: FORMATS });
 

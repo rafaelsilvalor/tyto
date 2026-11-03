@@ -613,6 +613,14 @@ naming the word. The limits are the caller's — `ORPHAN_LIMITS` is a size at mo
 letter spacing within 0.01 em — and a template that lets a configuration change them declares
 them as values (ADR 0153).
 
+**A file the template cannot do without says so when it is missing** (TYTO-502).
+`context.files.image(path)` answers `undefined` for a file the folder lacks, and stays silent,
+because a file may be optional. One the template needs — a format's background, say — is asked
+for with `context.report({ code: 'W_TEMPLATE_FILE_MISSING', path })` on that `undefined`, and the
+template draws the rest; `requiredImage(context, path)` from `@tyto/house-style` does both. The
+diagnostic names the artwork, the format, the template and the path. A template in a plugin can
+raise it from the desktop release whose plugin protocol is 15.
+
 **A price never splits from its sign** (TYTO-593). Tyto's layout breaks a line only at a plain
 space, so `keepTogether(value)` from `@tyto/template-kit` writes the space inside each protected
 pair as a no-break space (U+00A0) before the text is laid out: a currency sign and its amount

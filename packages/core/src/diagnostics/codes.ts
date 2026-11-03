@@ -1054,6 +1054,19 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // Raised by a template the same way (TYTO-502): a file it draws with, a format's background
+  // say, is not in its folder. A warning, as every template report is (ADR 0058): the rest of
+  // the frame is drawn, and the person sees which file to put back.
+  W_TEMPLATE_FILE_MISSING: {
+    severity: 'warning',
+    summary:
+      "A file an artwork's template draws with is not in the template's folder in one format.",
+    template:
+      "Artwork '{artwork}' is drawn without '{path}' in format '{format}': template '{template}' has no such file in its folder.",
+    spec: 'docs/adr/0058-a-template-reports-warnings-beside-its-frame.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // Warnings and not errors: a configuration is tolerant per value, as a plugin file is per
   // entry (ADR 0151 decision 2). The template draws with its default instead, and says so.
   W_TEMPLATE_VALUE_UNKNOWN: {
