@@ -21,14 +21,22 @@ and name the two or three cards from "To Do" you would suggest, then wait.
 Jira is reached through the Atlassian MCP server configured in the user's Codex config. If no
 Jira tool is available, stop and say so; do not guess a card from the repository.
 
+Jira calls follow `AGENTS.md` › Operational rules › Jira (fields, connector fallback,
+transition ids). The search is `project = TYTO AND status = Ready ORDER BY priority DESC, key
+ASC` with `fields: ["summary", "labels"]`; the picked card is read with
+`fields: ["summary", "description", "status", "labels"]`, both with
+`responseContentFormat: "markdown"`. A `blocked-by-*` dependency is read with
+`fields: ["status"]`.
+
 Then:
 
 1. Say which card you picked and why (one line).
 2. Read the spec files it references in `docs/`. Check its premise against the code with a
    grep before implementing: a card may describe something already removed or fixed.
-3. Move the card to "In Progress".
+3. Move the card to "In Progress" (transition `21`).
 4. Follow the Workflow section of `AGENTS.md` end to end: branch, implementation with tests,
-   `pnpm check` green, Conventional Commit with the key, draft PR, card moved to "Review".
+   `pnpm check` green, Conventional Commit with the key, draft PR, card moved to "Review"
+   (transition `31`).
 5. Report: PR link, what was done, and anything left undone or uncertain, under a
    `## Left open` table in the PR body.
 

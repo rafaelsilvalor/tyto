@@ -39,11 +39,17 @@ and a batch can gain cards, lose cards or be split while it runs.
   appends or single-row changes, and remove your rows when a PR merges or a
   card leaves the batch.
 
+Jira calls follow AGENTS.md › Operational rules › Jira (fields, connector
+fallback, transition ids); each step below names the `fields` it reads.
+
 ## Curate mode
 
-1. List every open card (`project = TYTO AND statusCategory != Done AND issuetype != Epic`).
+1. List every open card (`project = TYTO AND statusCategory != Done AND issuetype != Epic`)
+   with `fields: ["summary", "status", "labels", "parent"]`; the epic is what
+   this step needs `parent` for.
 2. Read the title, status, epic and labels of all of them, and the full text of
-   the ones that decide an order. Say which you read in full.
+   the ones that decide an order (`fields: ["summary", "description"]`). Say
+   which you read in full.
 3. Find duplicates, overlaps and cards already solved by merged work. Check with
    grep and the PR history, not by title alone.
 4. Propose batches by theme and by what they unblock, with a reason each, the
@@ -63,7 +69,8 @@ and a batch can gain cards, lose cards or be split while it runs.
    chips need it to reach you.
 2. **Re-query, never trust the file blindly:** `gh pr list --repo
 rafaelsilvalor/tyto --state open`, the latest ADR on `origin/main`, and the
-   batch in Jira (`labels = batch-<name>`). The file and reality may differ;
+   batch in Jira (`labels = batch-<name>`, `fields: ["summary", "status"]`).
+   The file and reality may differ;
    reality wins, and the file is corrected.
 3. Report to Rafael in 5 to 8 lines: what the batch is, what is open, what runs
    first and why.
@@ -74,8 +81,9 @@ rafaelsilvalor/tyto --state open`, the latest ADR on `origin/main`, and the
   different packages run in parallel. **At most 3 executors at once.**
 - A card labelled `on-hold` is never started, never moved to Ready and never
   given a chip, until Rafael says so and the label is removed.
-- For the next card of each free package: move it to **Ready**, re-read it and
-  check its premise against the code (a card may describe something already
+- For the next card of each free package: move it to **Ready** (transition
+  `2`), re-read it (`fields: ["summary", "description", "status", "labels"]`)
+  and check its premise against the code (a card may describe something already
   removed or fixed), then open an executor chip with `spawn_task`, using the
   prompt template below.
 - The executor sends a plan of 3 to 6 lines. You decide scope, PR split, ADR
@@ -89,8 +97,8 @@ rafaelsilvalor/tyto --state open`, the latest ADR on `origin/main`, and the
   English title and body, why the card exists, an epic, the label
   `batch-<name>` when it belongs to this batch, and a Portuguese half that
   explains what the card adds to Tyto for somebody who does not write code.
-  Check the status after creating: a new card lands in To Do or Ready
-  unpredictably.
+  Check the status after creating (`fields: ["status"]`): a new card lands in
+  To Do or Ready unpredictably.
 
 ### Merging (non-negotiable)
 

@@ -10,14 +10,22 @@ wants it worked. **"To Do" is the backlog.** Never pick from it on your own: if
 suggest, then wait. Before this status existed the two were one, and nothing
 readable through the API told them apart.
 
+Jira calls follow AGENTS.md › Operational rules › Jira (fields, connector fallback,
+transition ids). The search is
+`project = TYTO AND status = Ready ORDER BY priority DESC, key ASC` with
+`fields: ["summary", "labels"]`; the picked card is read with
+`fields: ["summary", "description", "status", "labels"]`, both with
+`responseContentFormat: "markdown"`. A `blocked-by-*` dependency is read with
+`fields: ["status"]`.
+
 Then:
 
 1. Tell me which card you picked and why (one line).
 2. Read the spec files it references in `docs/`.
-3. Move the card to "In Progress".
+3. Move the card to "In Progress" (transition `21`).
 4. Follow the Workflow section of CLAUDE.md end to end: branch, implementation
    with tests, `pnpm check` green, Conventional Commit with the key, draft PR,
-   card moved to "Review".
+   card moved to "Review" (transition `31`).
 5. Report: PR link, what was done, and anything left undone or uncertain.
 
 If the card depends on something that does not exist in the repo yet, stop and

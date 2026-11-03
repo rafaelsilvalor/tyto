@@ -89,7 +89,9 @@ read:packages`, and the maintainer approves it in the browser.
   the name, artwork, formats, brand or neutral, public or private, the contract versions, and
   ask for a card of E18 (TYTO-429) with the label `batch-template-repos`. Wait for its key.
 - **The batch is not active**: create the card yourself, as `AGENTS.md` › _Language_ asks,
-  parent TYTO-429. Re-read its status after creating it. Never move it to Done.
+  parent TYTO-429. Re-read its status after creating it (`fields: ["status"]`). Never move it
+  to Done. Jira calls follow `AGENTS.md` › Operational rules › Jira (fields, connector
+  fallback, transition ids).
 
 ## 4. The repository, only after the maintainer's OK
 
@@ -184,7 +186,7 @@ render` an example with `--json`, paste `status` and the diagnostics verbatim. `
    `references/templates.json` and the line in `references/templates/indice.md`; run
    `scripts/check_brief.py` on the example brief; repackage the zip as the home notes say.
    Uploading it to claude.ai replaces the maintainer's skill: ask first.
-5. **The card** goes to Review with the repository's link, never to Done.
+5. **The card** goes to Review (transition `31`) with the repository's link, never to Done.
 6. **Report** in his style: what exists now, the `gh run view` output, the last PSD comparison
    when there was one, and the "O que ficou" table.
 
