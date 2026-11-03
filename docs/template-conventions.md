@@ -256,6 +256,12 @@ prices, salaries or percentages passes the brief's words through `keepTogether` 
 them out, and a line can no longer end on `R$` with `9,8 mil` on the next. The default rules
 are the ones the house's table already glued; a template's own pairs go beside them as data.
 
+**A line's label is what comes before its first `:`, in every template** (the maintainer,
+2026-11-03; TYTO-594). A template that draws labelled lines reads them with `labelOf`, so
+`Banca: Quintex` has a label wherever it is written, and paints the label with a declared value
+a configuration can change. `**…**` is not a label marker: it is the highlight for something out
+of the ordinary, and it works inside the label or the text.
+
 ## What a template may not do
 
 - **No Node, no DOM.** A template runs wherever the compiler runs (ADR 0010). It cannot

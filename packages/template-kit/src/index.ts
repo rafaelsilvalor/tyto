@@ -56,6 +56,16 @@ export {
   keepTogetherText,
 } from './keep-together.js';
 
+export {
+  LABEL_EXCEPTIONS,
+  LONGEST_LABEL,
+  type LabelException,
+  type LabelOptions,
+  type Labelled,
+  labelOf,
+  labelOfText,
+} from './label.js';
+
 export { type Mark, mark } from './mark.js';
 
 export { imageHeight } from './image.js';

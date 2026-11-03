@@ -623,6 +623,20 @@ data — `KEEP_TOGETHER_RULES`, each a name and two regular-expression sources �
 its own beside them. A template opts in by calling it; no kit helper glues on its own, so one
 that does not call it draws as before. `settle` and `rebreak` move a glued pair as one piece.
 
+**A line's label is what comes before its first `:`** (TYTO-594). `labelOf(line)` from
+`@tyto/template-kit` returns `{ label, text }` — `Banca: Quintex` is the label `Banca:` and the
+text ` Quintex`, its leading space kept so a template drawing the two as runs of one line draws
+what it drew before — or `{ label: undefined, text: line }` when the line has none. It reads a
+line of the brief's rich text and keeps its bold, italic and marked spans on both sides, cutting
+one in two when the separator falls inside it, so `**Label:** text` gives the same label as
+`Label: text`; `labelOfText` does the same to a string. The first separator that counts ends
+the label, wherever it sits. Its options are data: `separator` (`:`), `keepSeparator` (yes),
+`longestLabel` (`LONGEST_LABEL`, 40 characters; a separator further in is a colon in a sentence,
+and the line has no label) and `notLabels` (`LABEL_EXCEPTIONS`: a time's colon, `10:30`, and a
+URL's, each a name and a regular-expression source; a separator inside a match is skipped and
+the next one tried). A blank label, or one across a line break, is no label. The kit never
+styles the label: the template paints it with its own declared values (`label-ink`).
+
 **`files` is how a template draws what lives beside its manifest.** A fixed background, a
 logo or a badge goes in the template's folder, and the template asks for it by the path it
 has there, as a markup template's `src=` does: `context.files.image('assets/bg.png')` answers
