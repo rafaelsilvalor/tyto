@@ -48,6 +48,14 @@ export {
   stack,
 } from './blocks.js';
 
+export {
+  KEEP_TOGETHER_RULES,
+  type KeepTogetherRule,
+  NO_BREAK_SPACE,
+  keepTogether,
+  keepTogetherText,
+} from './keep-together.js';
+
 export { type Mark, mark } from './mark.js';
 
 export { imageHeight } from './image.js';
