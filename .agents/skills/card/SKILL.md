@@ -21,7 +21,7 @@ Jira is project `TYTO`. Every read passes `fields` with only what the step uses 
 `responseContentFormat: "markdown"`; a count uses `searchResultMode: "count"`. A read without
 `fields` returns the whole description of every card, which is most of what a Jira call costs,
 and `parent` brings the epic's status, priority and type with every card: ask for it only in
-step 7.
+step 7. A failing call follows `AGENTS.md` › Operational rules › Jira (connector fallback).
 
 1. **Read the idea against the code.** Grep the files, packages, commands or settings the idea
    names, and say what exists today in one or two lines per idea. A premise may be stale: if

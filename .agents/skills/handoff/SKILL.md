@@ -23,7 +23,8 @@ because that decision was already taken.
 2. **Say what is unfinished, with the evidence, not a summary:**
    - working tree: uncommitted files, unpushed commits, branch versus upstream;
    - open PRs, their draft state and their checks;
-   - Jira cards this thread moved, and the status each sits in now;
+   - Jira cards this thread moved, and the status each sits in now (read with
+     `fields: ["summary", "status"]`; `AGENTS.md` › Operational rules › Jira);
    - anything started and not finished, background commands included.
 
 3. **Delete the dead branches**, every time. A local branch whose pull request is `MERGED` or

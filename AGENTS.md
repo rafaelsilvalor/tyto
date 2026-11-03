@@ -139,3 +139,11 @@ Learned from past mistakes on this repository. Each one cost a red CI run or a w
 - Explain a measured number only after isolating its mechanism in the real artifact; otherwise write "cause unknown".
 - Re-query a card's, a PR's or a check's state right before asserting it.
 - "Espere" (wait) means stop: start nothing until the maintainer answers. A reply that corrects a detail is not a yes.
+
+### Jira
+
+TYTO-570 measured 32 days of calls: a default `getJiraIssue` returns about 4,600 characters, mostly envelope, and 46 of 2,139 calls failed on infrastructure. The repository commands point here.
+
+- Every read passes `fields` with only what the step uses and `responseContentFormat: "markdown"`; a count uses `searchResultMode: "count"`. A read without `fields` returns the whole description of every card, and `parent` brings the epic's status, priority and type with every card: ask for it only when the step needs the epic.
+- At the second failure of a Jira call of any kind (timeout or immediate error), switch to the other Atlassian connector with the same `cloudId`. Never re-run the call that hung; read the state it may have changed before repeating a write. Connector tool names differ per machine: pick by what the tool does, not by its prefix.
+- TYTO transition ids: To Do `11`, In Progress `21`, Review `31`, Done `41`, Ready `2`.
