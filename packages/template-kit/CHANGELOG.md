@@ -1,5 +1,12 @@
 # @tyto/template-kit
 
+## 0.9.0
+
+### Minor Changes
+
+- 28dc351: TYTO-593: `keepTogether` and `keepTogetherText` join a currency sign and its amount, an amount and its scale word, and a number and its percent with a no-break space before layout, so a line never ends on `R$` with the amount on the next. The rules are data (`KEEP_TOGETHER_RULES`, regular-expression sources) a template extends; a template opts in by calling it.
+- cd5d279: TYTO-594: `labelOf` and `labelOfText` split a line into its label, what comes before its first `:`, and its text. The separator, the longest label and the separators that do not count (a time, a URL) are the caller's data, `**…**` is kept on both sides, and the template styles the label.
+
 ## 0.8.0
 
 ### Minor Changes
