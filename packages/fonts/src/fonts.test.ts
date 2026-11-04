@@ -67,7 +67,25 @@ describe('the bundled faces', () => {
   });
 
   it('are the families a scene is allowed to name', () => {
-    expect([...BUNDLED_FONT_FAMILIES]).toEqual(['Source Sans 3']);
+    // Source Sans 3 first: `system.ts` substitutes a missing machine face with the first
+    // family, and the symbol face cannot stand in for a text face.
+    expect([...BUNDLED_FONT_FAMILIES]).toEqual(['Source Sans 3', 'Noto Sans Math']);
+  });
+
+  it('include the symbol face, from both halves of the port (TYTO-484)', () => {
+    const face = { family: 'Noto Sans Math', weight: 400, style: 'normal' } as const;
+    const uri = bundledFont({ font: { family: face.family, source: 'bundled' }, ...face });
+    if (uri === undefined) throw new Error('Noto Sans Math 400 normal is not bundled.');
+    expect(decode(uri).subarray(0, 4).toString('ascii')).toBe('wOF2');
+
+    const path = bundledFontOutlinePath(face);
+    if (path === undefined) throw new Error('Noto Sans Math 400 normal has no outline file.');
+    expect(readFileSync(path).readUInt32BE(0)).toBe(0x00010000);
+    expect(bundledFontSource.outlines(face)?.length).toBe(readFileSync(path).length);
+
+    const licence = readFileSync(`${bundledFontsDirectory()}/noto-sans-math/LICENSE.md`, 'utf8');
+    expect(licence).toContain('SIL OPEN FONT LICENSE Version 1.1');
+    expect(licence).toContain('NotoSansMath-v3.000');
   });
 });
 

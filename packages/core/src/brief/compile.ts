@@ -218,6 +218,18 @@ function layoutText(
     // No face, no measurement: the node keeps the lines its template wrote.
     if (measured === undefined) return node;
 
+    if (measured.missing !== undefined && measured.missing.length > 0) {
+      const { name, range } = provenance(node, slots);
+      const font = node.runs.find((run) => run.kind === 'text')?.font.family ?? '';
+      problems.push(
+        diagnostic(
+          'W_GLYPH_MISSING',
+          { slot: name, glyphs: measured.missing.join(' '), font, format },
+          range === undefined ? {} : { range },
+        ),
+      );
+    }
+
     if (measured.overflow > 0 && node.overflow !== 'grow') {
       const { name, range } = provenance(node, slots);
       problems.push(

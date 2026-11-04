@@ -1,4 +1,5 @@
 import type { FaceCache } from './face.js';
+import { coverRuns } from './fallback.js';
 import { inheritOrigin } from './origin.js';
 import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
 
@@ -51,6 +52,15 @@ export interface TextMeasurement {
   readonly scale: number;
   /** How far past `box.h` it still is, in px; 0 when it fits or when there is no `box.h`. */
   readonly overflow: number;
+  /**
+   * Characters neither the run's face nor the symbol chain draws (ADR 0168), once each.
+   * They are measured as the run's face measures them, `.notdef`, and drawn by whatever the
+   * browser finds, so `compile` warns about them with `W_GLYPH_MISSING`.
+   *
+   * `measureText` always sets it. Optional so a measurement a test or a template builds by
+   * hand still type-checks; absent means nothing was reported missing.
+   */
+  readonly missing?: readonly string[];
 }
 
 /** The largest run in a node, whose size the strut — and so the leading — comes from. */
@@ -123,8 +133,7 @@ export function measureText(
   faces: FaceCache,
   options: LayoutOptions = {},
 ): TextMeasurement | undefined {
-  const reference = referenceRun(node);
-  if (reference === undefined) return undefined;
+  if (referenceRun(node) === undefined) return undefined;
 
   // Every run has to be measurable. A node that mixes a bundled face with an unbundled one
   // would wrap half its text on real widths and half on nothing.
@@ -137,11 +146,19 @@ export function measureText(
     }
   }
 
+  // Glyph by glyph, before anything is measured (ADR 0168): what the run's face lacks is
+  // measured, and then drawn, in the face of the symbol chain that has it.
+  const covered = coverRuns(node.runs, faces);
+  const split: MeasurableText = { ...node, runs: [...covered.runs] };
+  // The strut comes from the largest run, and splitting keeps every size: same reference.
+  const reference = referenceRun(split);
+  if (reference === undefined) return undefined;
+
   const minimum = options.minimumShrink ?? MINIMUM_SHRINK;
   const shrinking = node.overflow === 'shrink' && node.box.h !== undefined;
 
   let scale = 1;
-  let laid = layoutAt(node, faces, reference, scale);
+  let laid = layoutAt(split, faces, reference, scale);
 
   if (shrinking) {
     // A step-down search rather than a binary one: the answer has to be stable across runs
@@ -150,13 +167,13 @@ export function measureText(
     const height = node.box.h ?? 0;
     while (laid.height > height && scale > minimum) {
       scale = Math.max(minimum, Math.round((scale - 0.02) * 1000) / 1000);
-      laid = layoutAt(node, faces, reference, scale);
+      laid = layoutAt(split, faces, reference, scale);
     }
   }
 
   const overflow = node.box.h === undefined ? 0 : Math.max(0, laid.height - node.box.h);
 
-  return { ...laid, scale, overflow };
+  return { ...laid, scale, overflow, missing: covered.missing };
 }
 
 function layoutAt(
@@ -164,7 +181,7 @@ function layoutAt(
   faces: FaceCache,
   reference: TextSpan,
   scale: number,
-): Omit<TextMeasurement, 'scale' | 'overflow'> {
+): Omit<TextMeasurement, 'scale' | 'overflow' | 'missing'> {
   const lines: Line[] = [emptyLine()];
   const limit = node.box.w;
 
@@ -177,33 +194,50 @@ function layoutAt(
     return advance * run.size * scale + node.letterSpacing * [...text].length;
   };
 
+  // A word is placed whole, even when it crosses runs: `Δv` is two spans once the symbol
+  // chain has split it (ADR 0168), and a space is still the only place a line may break.
+  let word: Piece[] = [];
+
+  const place = (): void => {
+    if (word.length === 0) return;
+    const pieces = word;
+    word = [];
+
+    // Only the last piece can end in spaces: a piece that does closes the word. Summed
+    // piece by piece rather than subtracted, so a one-run word measures to the same bits it
+    // did before words could cross runs.
+    let leading = 0;
+    for (const piece of pieces.slice(0, -1)) leading += widthOf(piece.run, piece.text);
+    const last = pieces[pieces.length - 1]!;
+    const flowing = leading + widthOf(last.run, last.text);
+    const visible = leading + widthOf(last.run, last.text.replace(/ +$/, ''));
+
+    const line = lines[lines.length - 1]!;
+    // A word that does not fit starts a line — unless the line is empty, in which case
+    // nothing would be gained by moving it and a word longer than its box would loop.
+    if (limit !== undefined && line.pieces.length > 0 && line.flowing + visible > limit) {
+      lines.push({ pieces, flowing, visible });
+      return;
+    }
+
+    line.pieces.push(...pieces);
+    line.visible = line.flowing + visible;
+    line.flowing += flowing;
+  };
+
   for (const run of node.runs) {
     if (run.kind === 'break') {
+      place();
       lines.push(emptyLine());
       continue;
     }
 
     for (const token of tokenize(run.text)) {
-      const line = lines[lines.length - 1]!;
-      const flowing = widthOf(run, token.text);
-      const visible = widthOf(run, token.trimmed);
-
-      // A token that does not fit starts a line — unless the line is empty, in which case
-      // nothing would be gained by moving it and a word longer than its box would loop.
-      if (limit !== undefined && line.pieces.length > 0 && line.flowing + visible > limit) {
-        const next = emptyLine();
-        next.pieces.push({ run, text: token.text });
-        next.flowing = flowing;
-        next.visible = visible;
-        lines.push(next);
-        continue;
-      }
-
-      line.pieces.push({ run, text: token.text });
-      line.visible = line.flowing + visible;
-      line.flowing += flowing;
+      word.push({ run, text: token.text });
+      if (token.text !== token.trimmed) place();
     }
   }
+  place();
 
   const leading = node.lineHeight * reference.size * scale;
 

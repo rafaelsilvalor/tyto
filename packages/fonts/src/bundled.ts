@@ -88,6 +88,18 @@ const BUNDLED: readonly Bundled[] = [
     outlines: 'SourceSans3-BoldIt.ttf',
     web: 'SourceSans3-BoldIt.ttf.woff2',
   },
+  // The symbol face (TYTO-484, ADR 0168): what a run falls back to, glyph by glyph, for the
+  // math and science symbols its own face lacks. One weight, because the upstream family
+  // has one. Listed after Source Sans 3 on purpose: `system.ts` substitutes a missing
+  // machine face with the first family here, and that has to stay a text face.
+  {
+    family: 'Noto Sans Math',
+    weight: 400,
+    style: 'normal',
+    folder: 'noto-sans-math',
+    outlines: 'NotoSansMath-Regular.ttf',
+    web: 'NotoSansMath-Regular.ttf.woff2',
+  },
 ];
 
 /** The families a scene may name and have answered. `Scene.fonts` has to declare one. */

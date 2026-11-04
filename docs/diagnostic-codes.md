@@ -119,6 +119,7 @@ non-zero.
 | `E_OUTPUT_FILE_BLOCKED` | error | no | Tyto needs to write a file at a path where a folder already is. |
 | `E_FONT_FACE_UNAVAILABLE` | error | no | Text asks for a face the fonts Tyto can read do not have, so it cannot be exported. |
 | `W_TEXT_OVERFLOW` | warning | no | Compiled text does not fit its frame in one of the requested formats. |
+| `W_GLYPH_MISSING` | warning | no | Text uses characters that neither its font nor the bundled symbol faces can draw. |
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_TEMPLATE_ORPHAN` | warning | no | A paragraph of an artwork ends on a line holding a single word in one format. |
 | `W_TEMPLATE_FILE_MISSING` | warning | no | A file an artwork's template draws with is not in the template's folder in one format. |
@@ -2286,6 +2287,20 @@ Text in slot '{slot}' overflows its frame by {overflow}px in format '{format}'.
 ```
 
 Parameters: `slot`, `overflow`, `format`
+
+### `W_GLYPH_MISSING`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0168-a-glyph-its-face-lacks-is-drawn-in-the-symbol-face.md`
+
+Text uses characters that neither its font nor the bundled symbol faces can draw.
+
+The artwork is drawn. The characters are measured as the font measures a glyph it lacks, and the browser draws them in whatever face it finds, so the line around them may break or align wrong.
+
+```
+Text in slot '{slot}' uses {glyphs}, which neither '{font}' nor the bundled symbol faces can draw, in format '{format}'. Another font on this machine may draw them, measured wrong.
+```
+
+Parameters: `slot`, `glyphs`, `font`, `format`
 
 ### `W_TEMPLATE_OVERFLOW`
 

@@ -289,3 +289,59 @@ describe('W_TEXT_OVERFLOW', () => {
     expect(headline.overflow).toBe('clip');
   });
 });
+
+describe('W_GLYPH_MISSING (ADR 0168)', () => {
+  /** The brief's face draws ASCII; the symbol face draws Δ; nothing draws the snowman. */
+  const ASCII: Face = { ...EVEN, has: (codePoint) => codePoint < 128 };
+  const SYMBOLS: Face = { ...EVEN, has: (codePoint) => codePoint === 0x394 };
+  const covering: FaceCache = {
+    get: (face) =>
+      face.family === 'Test' ? ASCII : face.family === 'Noto Sans Math' ? SYMBOLS : undefined,
+  };
+
+  const SYMBOL_BRIEF: BriefAst = {
+    ...BRIEF,
+    directives: [
+      directive('titulo', richText('Δv ☃', { start: 60, end: 110 }), TITULO_RANGE),
+      directive('legenda', richText('cabe', { start: 210, end: 250 }), LEGENDA_RANGE),
+    ],
+  };
+
+  async function compiledSymbols(): Promise<{
+    scene: Scene;
+    warnings: readonly { code: string; range?: unknown; message: string }[];
+  }> {
+    const brief = await resolve(SYMBOL_BRIEF, { registry, assets });
+    if (!brief.ok) throw new Error(brief.error.map((item) => item.message).join('; '));
+    const result = compile(brief.value, templateWith('clip'), {
+      formats: FORMATS,
+      faces: covering,
+    });
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    return { scene: result.value, warnings: result.diagnostics };
+  }
+
+  it('names the glyph no face draws, at the directive, and not the one the chain drew', async () => {
+    const { warnings } = await compiledSymbols();
+    const missing = warnings.filter((item) => item.code === 'W_GLYPH_MISSING');
+
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.message).toContain('☃');
+    expect(missing[0]?.message).not.toContain('Δ');
+    expect(missing[0]?.message).toContain("slot 'titulo'");
+    expect(missing[0]?.range).toEqual(TITULO_RANGE);
+  });
+
+  it('puts the span the symbol face draws in the IR, so the exporters draw what was measured', async () => {
+    const { scene } = await compiledSymbols();
+    const spans = nodeById(scene, 'headline').runs.filter(
+      (run): run is TextSpan => run.kind === 'text',
+    );
+
+    expect(spans.find((run) => run.text === 'Δ')?.font).toEqual({
+      family: 'Noto Sans Math',
+      source: 'bundled',
+    });
+    expect(scene.fonts.map((each) => each.family)).toContain('Noto Sans Math');
+  });
+});
