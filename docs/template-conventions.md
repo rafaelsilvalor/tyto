@@ -262,6 +262,64 @@ are the ones the house's table already glued; a template's own pairs go beside t
 a configuration can change. `**…**` is not a label marker: it is the highlight for something out
 of the ordinary, and it works inside the label or the text.
 
+## Highlights are data the template declares (TYTO-554)
+
+`highlights(spec)` in `@tyto/template-kit` turns what a brief wrote — `**…**`, `*…*`, a mark —
+into a style, from a map and never from a function per template. `highlights.with({ … })` varies
+it in one place (the title's bold in navy) without repeating the rest, and `textBlock`,
+`grownTextBlock` and `naturalWidth` take it as `TextStyle.highlights`.
+
+**House-wide — every template, never opted into:**
+
+- **`**…**` is always the highlight.** It is the house's mark for something out of the ordinary
+  (the maintainer, 2026-11-03), so a brief means the same thing by it in every template. A
+  template with no `highlights` still draws it, at weight 700 in the surrounding colour, which is
+  what `runsOf` has always drawn. `Inscrições até **10/11**` is highlighted wherever it is
+  written.
+- **A colour mark takes the highlight's weight.** A family declared `like: 'bold'` lays the
+  highlight's style under each name's, so `{cor:azul}Direito{/}` is as heavy as `**Direito**`,
+  in blue: a coloured word reads as highlighted too.
+- **The closest wrapper decides.** In `{cor:azul}a **b**{/}` the `b` takes the highlight's
+  colour; in `**a {cor:azul}b{/}**` the `b` is blue. It is the rule nested bold and italic
+  already had (ADR 0015).
+- **The value names are shared**, so a plugin file configures any template the same way (ADR
+  0153). `highlightsFromValues(context, defaults, place?)` reads:
+
+  | Name                      | Kind     | What it sets                                        |
+  | ------------------------- | -------- | --------------------------------------------------- |
+  | `highlight-weight`        | `number` | The weight of `**…**`, and of a `like: 'bold'` mark |
+  | `highlight-color`         | `color`  | The colour of `**…**`                               |
+  | `<place>-highlight-color` | `color`  | The same in one place, over `highlight-color`       |
+  | `mark-<family>-<name>`    | `color`  | The colour one mark name maps to: `mark-cor-azul`   |
+
+  The weight is a `number`, as ADR 0153 has no weight kind: declare it with `min: 100` and
+  `max: 900`, the weights a face can have, so a configuration cannot ask for one that does not
+  exist.
+
+  ```yaml
+  values:
+    highlight-weight: { type: number, default: 700, min: 100, max: 900 }
+    highlight-color: { type: color, default: '#ff5900' }
+    mark-cor-azul: { type: color, default: '#1f6fd1' }
+  ```
+
+  A name the manifest does not declare leaves the template's constant, so declaring nothing draws
+  what `highlights(defaults)` draws.
+
+**The template's own — its vocabulary, not the house's:**
+
+- **Which mark names exist and what colour each is.** Only the template knows what `azul` is in
+  its palette, so `{ cor: { like: 'bold', values: { azul: { color } } } }` is in the template, and
+  a name it does not list passes its text through unchanged — a template that does not use a
+  mark should not have to refuse it.
+- **Which places vary.** A template names its places (`title`, `statement`) by the
+  `<place>-highlight-color` values it declares; the kit does not list them.
+
+**Frontmatter text accepts exactly a subset.** A frontmatter string never reaches the brief
+parser, so `richTextOfPlain` reads it: `**…**` and `{key:value}…{/}`, each over plain text, and
+`\n` as a break. No nesting, no italic, no span across a line break; a `**` or `{` that closes
+nothing stays as written. `titulo: Questão **comentada**` is highlighted; `2 ** 3` is not.
+
 ## What a template may not do
 
 - **No Node, no DOM.** A template runs wherever the compiler runs (ADR 0010). It cannot

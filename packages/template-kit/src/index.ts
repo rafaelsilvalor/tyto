@@ -66,6 +66,17 @@ export {
   labelOfText,
 } from './label.js';
 
+export {
+  HIGHLIGHT_WEIGHT,
+  type HighlightSpec,
+  type HighlightStyle,
+  type Highlights,
+  type MarkFamily,
+  highlights,
+  highlightsFromValues,
+  richTextOfPlain,
+} from './highlight.js';
+
 export { type Mark, mark } from './mark.js';
 
 export { imageHeight } from './image.js';

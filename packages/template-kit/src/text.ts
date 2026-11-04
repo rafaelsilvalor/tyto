@@ -2,6 +2,7 @@ import { group, runsOf, text } from '@tyto/core/template';
 
 import { type Block, block } from './blocks.js';
 
+import type { Highlights } from './highlight.js';
 import type { FontRef, RichText, TemplateContext, TextRun } from '@tyto/core';
 import type { NonEmpty, TextOptions } from '@tyto/core/template';
 
@@ -23,6 +24,11 @@ export interface TextStyle {
   readonly size: number;
   readonly weight: number;
   readonly color: string;
+  /**
+   * What `**…**`, `*…*` and marks look like in this text. Absent is the house default — bold at
+   * 700 in the surrounding colour — because `**…**` works in every template (TYTO-554).
+   */
+  readonly highlights?: Highlights;
 }
 
 /** Everything `text()` takes except what these functions decide themselves. */
@@ -43,7 +49,11 @@ export function atLeastOne(runs: readonly TextRun[]): NonEmpty<TextRun> | undefi
 
 function runsIn(value: RichText, style: TextStyle): NonEmpty<TextRun> | undefined {
   return atLeastOne(
-    runsOf(value, { font: style.font, size: style.size, weight: style.weight, color: style.color }),
+    runsOf(
+      value,
+      { font: style.font, size: style.size, weight: style.weight, color: style.color },
+      style.highlights?.options,
+    ),
   );
 }
 
