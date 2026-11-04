@@ -1,5 +1,14 @@
 # @tyto/raster
 
+## 0.2.4
+
+### Patch Changes
+
+- 6d363a3: TYTO-484: `@tyto/fonts` bundles Noto Sans Math 400, the symbol face. A glyph a run's face
+  lacks is measured and drawn, glyph by glyph, in Noto Sans Math and then Source Sans 3: the
+  split spans enter the IR, so what is measured is what is drawn. `W_GLYPH_MISSING` names a
+  character no face draws. A code template lists the chain under `faces:` (ADR 0168).
+
 ## 0.2.3
 
 ### Patch Changes

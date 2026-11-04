@@ -1,5 +1,24 @@
 # @tyto/template-kit
 
+## 0.10.0
+
+### Minor Changes
+
+- d1cd8ba: TYTO-554: `runsOf` takes bold and italic as a partial style, so bold can change the colour
+  (a number still means a weight). The kit gains `highlights(spec)` — bold, italic and named
+  marks as data, varied per place with `.with()` — `highlightsFromValues` for the shared value
+  names, `richTextOfPlain` for `**…**` and marks in frontmatter text, and `TextStyle.highlights`.
+
+### Patch Changes
+
+- Updated dependencies [6d363a3]
+- Updated dependencies [7c650a4]
+- Updated dependencies [d1cd8ba]
+  - @tyto/core@0.37.0
+  - @tyto/brief-lang@0.7.9
+  - @tyto/export-html@0.7.11
+  - @tyto/template-lang@0.8.10
+
 ## 0.9.0
 
 ### Minor Changes
