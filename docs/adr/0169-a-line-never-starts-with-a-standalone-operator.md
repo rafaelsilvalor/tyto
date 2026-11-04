@@ -49,9 +49,9 @@ each side. A render of `voce-conhece` v0.2.0 ended a line on `Q = U` and started
 - `export-html` sets `white-space: pre-wrap`, so a browser could still break before an operator
   inside a line the IR already found wider than its box: one operand and its operator that do
   not fit even alone. That is overflow either way and was already reported as such.
-- The kit's `rebreak` (TYTO-520) inserts a break of its own before the last word of a line, and
-  can still choose an operator. It is aligned with this rule in a follow-up, through the
-  exported predicate.
+- The kit's `rebreak` (TYTO-520) inserts a break of its own before the last word of a line.
+  Since TYTO-617 it keeps this rule through the exported predicate: the space before a
+  standalone operator is not a place it breaks either.
 
 ## Rejected
 
