@@ -40,8 +40,53 @@ export interface KeepTogetherRule {
 const NUMBER = String.raw`\d[\d.,]*`;
 
 /**
- * The default pairs, the same as the house's table glues (`@tyto/house-style`'s `glue`), so
- * the two never disagree on where a price may break.
+ * The units of measure a number keeps on its line (TYTO-620): a closed list, because a unit is
+ * one or two letters and an open pattern would glue every short word after a number. SI units
+ * and their common multiples, as exam questions and engineering slides write them. A unit
+ * followed by more letters is a word (`3 salas`, `2 metros`), and keeps its break; one followed
+ * by `/` or a superscript (`m/s²`) is still the unit.
+ */
+const UNITS = [
+  's',
+  'ms',
+  'min',
+  'h',
+  'm',
+  'km',
+  'cm',
+  'mm',
+  'kg',
+  'g',
+  'mg',
+  'N',
+  'kN',
+  'J',
+  'kJ',
+  'W',
+  'kW',
+  'kWh',
+  'V',
+  'mV',
+  'A',
+  'mA',
+  'Hz',
+  'kHz',
+  'MHz',
+  'Pa',
+  'kPa',
+  'MPa',
+  'K',
+  '°C',
+  'L',
+  'mL',
+  'rad',
+  'mol',
+  'Ω',
+] as const;
+
+/**
+ * The default pairs. The money ones are the same as the house's table glues
+ * (`@tyto/house-style`'s `glue`), so the two never disagree on where a price may break.
  *
  * A scale word stays a word: `9 milhas` is not `9 mil` and keeps its break.
  */
@@ -53,6 +98,11 @@ export const KEEP_TOGETHER_RULES: readonly KeepTogetherRule[] = [
     after: String.raw`(?:mil|milhão|milhões|bi|bilhão|bilhões)(?!\p{L})`,
   },
   { name: 'number + percent', before: NUMBER, after: '%' },
+  {
+    name: 'number + unit',
+    before: String.raw`[\d⁰¹²³⁴⁵⁶⁷⁸⁹]`,
+    after: String.raw`(?:${UNITS.join('|')})(?!\p{L})`,
+  },
 ];
 
 /**

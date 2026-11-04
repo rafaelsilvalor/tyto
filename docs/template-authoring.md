@@ -625,7 +625,7 @@ raise it from the desktop release whose plugin protocol is 15.
 space, so `keepTogether(value)` from `@tyto/template-kit` writes the space inside each protected
 pair as a no-break space (U+00A0) before the text is laid out: a currency sign and its amount
 (`R$ 9,8`, `US$`, `€`), an amount and its scale word (`9,8 mil`, `milhão`, `milhões`, `bi`,
-`bilhão`, `bilhões`), a number and `%`. It takes the brief's rich text and keeps its bold and
+`bilhão`, `bilhões`), a number and `%`, and a number and its unit of measure from a closed list (`3 s`, `10 kg`, `25 °C`, `9,8 m/s²`; TYTO-620). It takes the brief's rich text and keeps its bold and
 marked spans, gluing across them; `keepTogetherText` does the same to a string. The rules are
 data — `KEEP_TOGETHER_RULES`, each a name and two regular-expression sources — so a template adds
 its own beside them. A template opts in by calling it; no kit helper glues on its own, so one

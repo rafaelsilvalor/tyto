@@ -255,7 +255,7 @@ when it cannot. Neither knows a template: the weights and the limits are the tem
 **A sign, an amount and its scale word stay on one line** (TYTO-593). A template that sets
 prices, salaries or percentages passes the brief's words through `keepTogether` before laying
 them out, and a line can no longer end on `R$` with `9,8 mil` on the next. The default rules
-are the ones the house's table already glued; a template's own pairs go beside them as data.
+for money are the ones the house's table already glued, and a number keeps its unit of measure (`3 s`, `25 °C`, TYTO-620); a template's own pairs go beside them as data.
 
 **A line's label is what comes before its first `:`, in every template** (the maintainer,
 2026-11-03; TYTO-594). A template that draws labelled lines reads them with `labelOf`, so
