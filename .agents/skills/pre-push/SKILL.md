@@ -61,8 +61,8 @@ Linux shell. `node_modules` must exist.
 6. **The pull request body**, when a PR exists (`gh pr view --json body --jq .body`) or a
    body is drafted. No tool checks these two:
    - loose ends sit under a literal `## Left open` heading, which a sweep greps for;
-   - it says which workflows the PR does not exercise: a green PR proves `ci.yml` only,
-     `release.yml` runs on push to main and `desktop.yml` on a `desktop-v*` tag.
+   - it says which workflows the PR does not exercise, derived from the workflows'
+     triggers and skipped jobs as `/pr-watch` step 6 does, never from a fixed list.
 
 7. **New apps and desktop files.** Run the two repo-checks that hold the lists, when the
    branch adds a folder under `apps/` or a file under `apps/desktop/src` or `apps/desktop/e2e`.
