@@ -32,8 +32,14 @@ export interface RunStyle {
 }
 
 export interface RunsOptions {
-  /** The weight `**bold**` takes. 700 is what a template that says nothing means. */
-  readonly bold?: number;
+  /**
+   * What `**bold**` does to the runs it wraps. A number is a weight, as it always was; a
+   * partial style can change the colour too (TYTO-554), and a style that names no weight still
+   * takes 700, because bold that drew no heavier would not read as bold. Nothing at all is 700.
+   */
+  readonly bold?: number | Partial<RunStyle>;
+  /** What `*italic*` does to the runs it wraps; it is always italic, whatever else it changes. */
+  readonly italic?: Partial<RunStyle>;
   /** What `{key:value}` does to the runs it wraps; `undefined` leaves them alone. */
   readonly mark?: (key: string, value: string) => Partial<RunStyle> | undefined;
 }
@@ -126,9 +132,11 @@ function absorbedByPrevious(target: TextRun[], produced: TextSpan, range: Source
 function styled(inline: Inline, style: RunStyle, options: RunsOptions): RunStyle {
   switch (inline.kind) {
     case 'bold':
-      return { ...style, weight: options.bold ?? BOLD };
+      return typeof options.bold === 'object'
+        ? { ...style, weight: BOLD, ...options.bold }
+        : { ...style, weight: options.bold ?? BOLD };
     case 'italic':
-      return { ...style, style: 'italic' };
+      return { ...style, ...options.italic, style: 'italic' };
     case 'mark':
       return { ...style, ...options.mark?.(inline.key, inline.value) };
     default:

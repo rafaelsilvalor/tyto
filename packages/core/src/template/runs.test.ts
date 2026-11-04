@@ -70,6 +70,34 @@ describe('what a brief says about emphasis', () => {
   });
 });
 
+describe('bold and italic as a partial style (TYTO-554)', () => {
+  const boldA: RichText = [{ kind: 'bold', children: plain('a'), range: AT }];
+  const italicB: RichText = [{ kind: 'italic', children: plain('b'), range: AT }];
+
+  it('draws a plain number exactly as before: the same runs as a style naming only that weight', () => {
+    expect(runsOf(boldA, BASE, { bold: 900 })).toEqual(
+      runsOf(boldA, BASE, { bold: { weight: 900 } }),
+    );
+    expect(runsOf(boldA, BASE, {})).toEqual(runsOf(boldA, BASE, { bold: 700 }));
+  });
+
+  it('lets bold change the colour, and keeps 700 when the style names no weight', () => {
+    const [first] = runsOf(boldA, BASE, { bold: { color: '#ff5900' } });
+    expect(first?.kind === 'text' && [first.weight, first.color]).toEqual([
+      700,
+      { kind: 'solid', color: { r: 255, g: 89, b: 0, a: 1 } },
+    ]);
+  });
+
+  it('lets italic change the colour and stays italic whatever the style says', () => {
+    const [first] = runsOf(italicB, BASE, { italic: { color: '#ff5900', style: 'normal' } });
+    expect(first?.kind === 'text' && [first.style, first.color]).toEqual([
+      'italic',
+      { kind: 'solid', color: { r: 255, g: 89, b: 0, a: 1 } },
+    ]);
+  });
+});
+
 describe('a break is a run, not a character (ADR 0016)', () => {
   it('becomes its own run rather than a newline inside one', () => {
     expect(
