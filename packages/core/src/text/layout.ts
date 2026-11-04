@@ -1,5 +1,6 @@
 import type { FaceCache } from './face.js';
 import { coverRuns } from './fallback.js';
+import { isStandaloneOperator } from './operators.js';
 import { inheritOrigin } from './origin.js';
 import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
 
@@ -22,6 +23,10 @@ import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
  * - A break opportunity is a space, and only a space. CSS `break-word` rules, hyphens and
  *   CJK are not implemented; the limit is stated here rather than approximated, since a
  *   wrong break is visible and a missing feature is findable.
+ * - One space is not a break: the one before a standalone math operator (ADR 0169), so a
+ *   formula written `Q = U · A · ΔT` never puts `· ΔT` at the start of a line. A browser
+ *   would break there, but only inside a line the IR already found wider than its box: one
+ *   operand and its operator wider than the box, which is overflow either way.
  *
  * ## What it does not do
  *
@@ -116,6 +121,10 @@ function emptyLine(): Line {
   return { pieces: [], flowing: 0, visible: 0 };
 }
 
+function textOf(pieces: readonly Piece[]): string {
+  return pieces.map((piece) => piece.text).join('');
+}
+
 export interface LayoutOptions {
   /** The floor for `overflow: 'shrink'`. Defaults to {@link MINIMUM_SHRINK}. */
   readonly minimumShrink?: number;
@@ -197,12 +206,30 @@ function layoutAt(
   // A word is placed whole, even when it crosses runs: `Δv` is two spans once the symbol
   // chain has split it (ADR 0168), and a space is still the only place a line may break.
   let word: Piece[] = [];
+  // The last complete word, not placed yet: whether the space after it is a break depends on
+  // the word that follows. Before a standalone operator it is not (ADR 0169), so the operator
+  // joins this word and the line may end on it but never start with it.
+  let held: Piece[] | undefined;
 
-  const place = (): void => {
+  const close = (): void => {
     if (word.length === 0) return;
-    const pieces = word;
+    const next = word;
     word = [];
+    if (held !== undefined && isStandaloneOperator(textOf(next).replace(/ +$/, ''))) {
+      held = [...held, ...next];
+      return;
+    }
+    if (held !== undefined) place(held);
+    held = next;
+  };
 
+  const flush = (): void => {
+    close();
+    if (held !== undefined) place(held);
+    held = undefined;
+  };
+
+  const place = (pieces: readonly Piece[]): void => {
     // Only the last piece can end in spaces: a piece that does closes the word. Summed
     // piece by piece rather than subtracted, so a one-run word measures to the same bits it
     // did before words could cross runs.
@@ -216,7 +243,7 @@ function layoutAt(
     // A word that does not fit starts a line — unless the line is empty, in which case
     // nothing would be gained by moving it and a word longer than its box would loop.
     if (limit !== undefined && line.pieces.length > 0 && line.flowing + visible > limit) {
-      lines.push({ pieces, flowing, visible });
+      lines.push({ pieces: [...pieces], flowing, visible });
       return;
     }
 
@@ -227,17 +254,17 @@ function layoutAt(
 
   for (const run of node.runs) {
     if (run.kind === 'break') {
-      place();
+      flush();
       lines.push(emptyLine());
       continue;
     }
 
     for (const token of tokenize(run.text)) {
       word.push({ run, text: token.text });
-      if (token.text !== token.trimmed) place();
+      if (token.text !== token.trimmed) close();
     }
   }
-  place();
+  flush();
 
   const leading = node.lineHeight * reference.size * scale;
 
