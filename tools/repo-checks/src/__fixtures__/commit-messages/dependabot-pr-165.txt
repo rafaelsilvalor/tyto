@@ -1,0 +1,115 @@
+chore(deps): Bump the prod group across 1 directory with 10 updates
+
+Bumps the prod group with 10 updates in the / directory:
+
+| Package | From | To |
+| --- | --- | --- |
+| [tsup](https://github.com/egoist/tsup) | `8.5.1` | `9.0.0` |
+| [@lezer/common](https://github.com/lezer-parser/common) | `1.5.2` | `1.5.5` |
+| [@lezer/highlight](https://github.com/lezer-parser/highlight) | `1.2.3` | `1.2.5` |
+| [@lezer/lr](https://github.com/lezer-parser/lr) | `1.4.10` | `1.4.12` |
+| [zod](https://github.com/colinhacks/zod) | `4.6.5` | `4.6.7` |
+| [@codemirror/autocomplete](https://github.com/codemirror/autocomplete) | `6.20.3` | `6.20.4` |
+| [@codemirror/language](https://github.com/codemirror/language) | `6.12.4` | `6.13.1` |
+| [@codemirror/view](https://github.com/codemirror/view) | `6.43.13` | `6.43.15` |
+| [playwright](https://github.com/microsoft/playwright) | `1.63.0` | `1.64.1` |
+| [electron-updater](https://github.com/electron-userland/electron-builder/tree/HEAD/packages/electron-updater) | `6.8.9` | `6.8.11` |
+
+
+
+Updates `tsup` from 8.5.1 to 9.0.0
+- [Release notes](https://github.com/egoist/tsup/releases)
+- [Commits](https://github.com/egoist/tsup/compare/v8.5.1...v9.0.0)
+
+Updates `@lezer/common` from 1.5.2 to 1.5.5
+- [Changelog](https://github.com/lezer-parser/common/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/lezer-parser/common/commits)
+
+Updates `@lezer/highlight` from 1.2.3 to 1.2.5
+- [Changelog](https://github.com/lezer-parser/highlight/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/lezer-parser/highlight/commits)
+
+Updates `@lezer/lr` from 1.4.10 to 1.4.12
+- [Changelog](https://github.com/lezer-parser/lr/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/lezer-parser/lr/commits)
+
+Updates `zod` from 4.6.5 to 4.6.7
+- [Release notes](https://github.com/colinhacks/zod/releases)
+- [Commits](https://github.com/colinhacks/zod/compare/v4.6.5...v4.6.7)
+
+Updates `@codemirror/autocomplete` from 6.20.3 to 6.20.4
+- [Changelog](https://github.com/codemirror/autocomplete/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/codemirror/autocomplete/commits)
+
+Updates `@codemirror/language` from 6.12.4 to 6.13.1
+- [Changelog](https://github.com/codemirror/language/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/codemirror/language/commits)
+
+Updates `@codemirror/view` from 6.43.13 to 6.43.15
+- [Changelog](https://github.com/codemirror/view/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/codemirror/view/commits)
+
+Updates `playwright` from 1.63.0 to 1.64.1
+- [Release notes](https://github.com/microsoft/playwright/releases)
+- [Commits](https://github.com/microsoft/playwright/compare/v1.63.0...v1.64.1)
+
+Updates `electron-updater` from 6.8.9 to 6.8.11
+- [Release notes](https://github.com/electron-userland/electron-builder/releases)
+- [Changelog](https://github.com/electron-userland/electron-builder/blob/electron-updater@6.8.11/packages/electron-updater/CHANGELOG.md)
+- [Commits](https://github.com/electron-userland/electron-builder/commits/electron-updater@6.8.11/packages/electron-updater)
+
+---
+updated-dependencies:
+- dependency-name: "@codemirror/autocomplete"
+  dependency-version: 6.20.4
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: prod
+- dependency-name: "@codemirror/language"
+  dependency-version: 6.13.1
+  dependency-type: direct:production
+  update-type: version-update:semver-minor
+  dependency-group: prod
+- dependency-name: "@codemirror/view"
+  dependency-version: 6.43.15
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: prod
+- dependency-name: "@lezer/common"
+  dependency-version: 1.5.3
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: prod
+- dependency-name: "@lezer/highlight"
+  dependency-version: 1.2.5
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: prod
+- dependency-name: "@lezer/lr"
+  dependency-version: 1.4.11
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: prod
+- dependency-name: electron-updater
+  dependency-version: 6.8.11
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: prod
+- dependency-name: playwright
+  dependency-version: 1.64.1
+  dependency-type: direct:production
+  update-type: version-update:semver-minor
+  dependency-group: prod
+- dependency-name: tsup
+  dependency-version: 9.0.0
+  dependency-type: direct:production
+  update-type: version-update:semver-major
+  dependency-group: prod
+- dependency-name: zod
+  dependency-version: 4.6.7
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: prod
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>

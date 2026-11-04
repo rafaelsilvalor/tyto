@@ -58,6 +58,46 @@ export const attributionPlugin = {
   },
 };
 
+/**
+ * The footer tokens a body paragraph may start with (TYTO-603). Any other `Word: ` at the
+ * start of a paragraph is prose that the conventional-commits parser would file as a footer,
+ * moving it out of the body, so `body-no-footer-paragraph` refuses it.
+ *
+ * - `BREAKING CHANGE` and `BREAKING-CHANGE`: the two spellings Conventional Commits gives a
+ *   breaking-change footer, which Changesets and release tooling read.
+ * - `Refs`: the reference footer of Conventional Commits, e.g. `Refs: TYTO-12`.
+ * - `Signed-off-by`: Dependabot ends every commit it writes with one (13 of its 13 PRs, all it
+ *   has opened, measured on 2026-11-03), and `lint` runs on those commits too.
+ *
+ * `Co-authored-by` is not here: `no-attribution-trailers` refuses it on its own.
+ */
+export const ALLOWED_FOOTER_TOKENS = new Set([
+  'BREAKING CHANGE',
+  'BREAKING-CHANGE',
+  'Refs',
+  'Signed-off-by',
+]);
+
+/** A paragraph's first line that a parser reads as `token: value`. */
+const FOOTER_SHAPED_LINE = /^(BREAKING CHANGE|[A-Za-z][A-Za-z-]*): /;
+
+/**
+ * The first line of every body paragraph whose `Word: ` start is not an allowed footer.
+ * Read from `raw` rather than from the parsed `body`, because the parser has already moved
+ * such a paragraph out of the body by the time a rule sees it.
+ */
+export function footerShapedParagraphs(raw) {
+  const lines = (raw ?? '').split(/\r?\n/).slice(1);
+  const offenders = [];
+  let previous = '';
+  for (const line of lines) {
+    const match = previous.trim() === '' ? FOOTER_SHAPED_LINE.exec(line) : null;
+    if (match && !ALLOWED_FOOTER_TOKENS.has(match[1])) offenders.push(line);
+    previous = line;
+  }
+  return offenders;
+}
+
 export default {
   extends: ['@commitlint/config-conventional'],
   plugins: [
@@ -70,6 +110,15 @@ export default {
             'e.g. "feat(core): TYTO-123 add Frame schema". ' +
             'Only chore(deps) and chore(deps-dev) may omit it.',
         ],
+        'body-no-footer-paragraph': ({ raw }) => {
+          const offenders = footerShapedParagraphs(raw);
+          return [
+            offenders.length === 0,
+            'a body paragraph never starts with "Word: ", which the parser files as a ' +
+              `footer; reword it (allowed footers: ${[...ALLOWED_FOOTER_TOKENS].join(', ')}). ` +
+              `Found: ${offenders.map((line) => JSON.stringify(line)).join(', ')}`,
+          ];
+        },
         // Spread into this plugin rather than listed as a second one: commitlint keeps only
         // one unnamed inline plugin, and a second replaced subject-jira-key outright.
         ...attributionPlugin.rules,
@@ -82,7 +131,15 @@ export default {
     'subject-case': [0],
     'subject-jira-key': [2, 'always'],
     'no-attribution-trailers': [2, 'always'],
-    'header-max-length': [2, 'always', 100],
+    'body-no-footer-paragraph': [2, 'always'],
+    // AGENTS.md › Commits: a subject of at most 72 (TYTO-603). `commitlint.yml` lints the PR
+    // title with this file too, so a title is held to 72 as well. GitHub appends " (#n)" to
+    // the squash commit on `main` after that check, and `main` is never re-linted: of its
+    // last 200 subjects 77 exceed 72 with the suffix and 10 without. The rule looks forward
+    // and needs no exemption for history.
+    'header-max-length': [2, 'always', 72],
+    // A warning, not an error: Dependabot's commits are linted by the required `lint` job,
+    // and the markdown table it writes put 12 body lines over 100 in one of them (PR #166).
     'body-max-line-length': [1, 'always', 100],
   },
 };

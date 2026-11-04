@@ -21,28 +21,17 @@ Linux shell. `node_modules` must exist.
    node tools/repo-checks/src/changeset-coverage.mjs --base origin/main
    ```
 
-3. **Commit messages: run what `commitlint.yml` runs**, then the two checks it does not make.
-   commitlint holds the type, the TYTO key, the trailers (`Co-Authored-By`, `Claude-Session`,
-   "Generated with") and a header of at most 100. A body line over 100 is only a warning
-   there, and a short paragraph starting with `Word: ` passes, because commitlint reads it as
-   a footer.
+3. **Commit messages: run what `commitlint.yml` runs.** commitlint holds the type, the
+   TYTO key, the trailers (`Co-Authored-By`, `Claude-Session`, "Generated with"), a header
+   of at most 72, and no body paragraph opening with `Word: ` other than the footers
+   `ALLOWED_FOOTER_TOKENS` lists (TYTO-603). A body line over 100 is only a warning there.
 
    ```bash
    pnpm exec commitlint --from origin/main --to HEAD
    ```
 
-   AGENTS.md is stricter than the config: subject at most 72, body wrapped near 78, and no
-   body paragraph starting with `Word: `. Both lines print nothing when the branch is clean:
-
-   ```bash
-   git log --format=%s origin/main..HEAD | awk 'length > 72 { print length ": " $0 }'
-   ```
-
-   ```bash
-   for c in $(git rev-list origin/main..HEAD); do git log -1 --format=%b "$c" | awk -v c="$(git rev-parse --short "$c")" '(NR == 1 || previous == "") && /^[A-Za-z][A-Za-z-]*: / { print c ": " $0 } { previous = $0 }'; done
-   ```
-
-   Body lines between 79 and 100 are not a failure; name them only if there are many.
+   AGENTS.md also asks for body lines wrapped near 78, which no tool checks. Lines between 79
+   and 100 are not a failure; name them only if there are many.
 
 4. **ADR numbers.** An ADR the branch added must not share its number with one on
    `origin/main`. This prints each clash and nothing when every number is free:
@@ -62,8 +51,8 @@ Linux shell. `node_modules` must exist.
 6. **The pull request body**, when a PR exists (`gh pr view --json body --jq .body`) or a
    body is drafted. No tool checks these two:
    - loose ends sit under a literal `## Left open` heading, which a sweep greps for;
-   - it says which workflows the PR does not exercise: a green PR proves `ci.yml` only,
-     `release.yml` runs on push to main and `desktop.yml` on a `desktop-v*` tag.
+   - it says which workflows the PR does not exercise, derived from the workflows'
+     triggers and skipped jobs as `/pr-watch` step 6 does, never from a fixed list.
 
 7. **New apps and desktop files.** Run the two repo-checks that hold the lists, when the
    branch adds a folder under `apps/` or a file under `apps/desktop/src` or `apps/desktop/e2e`.

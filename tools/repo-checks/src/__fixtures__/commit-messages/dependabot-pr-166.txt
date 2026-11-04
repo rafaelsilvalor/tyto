@@ -1,0 +1,225 @@
+chore(deps-dev): Bump the dev group across 1 directory with 20 updates
+
+Bumps the dev group with 20 updates in the / directory:
+
+| Package | From | To |
+| --- | --- | --- |
+| [@commitlint/cli](https://github.com/conventional-changelog/commitlint/tree/HEAD/@commitlint/cli) | `21.2.3` | `21.2.4` |
+| [@commitlint/config-conventional](https://github.com/conventional-changelog/commitlint/tree/HEAD/@commitlint/config-conventional) | `21.2.3` | `21.2.4` |
+| [@playwright/test](https://github.com/microsoft/playwright) | `1.63.0` | `1.64.1` |
+| [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/HEAD/types/node) | `26.6.2` | `26.6.6` |
+| [eslint](https://github.com/eslint/eslint) | `10.11.0` | `10.14.0` |
+| [globals](https://github.com/sindresorhus/globals) | `17.12.0` | `17.13.0` |
+| [lint-staged](https://github.com/lint-staged/lint-staged) | `17.5.1` | `17.6.0` |
+| [prettier](https://github.com/prettier/prettier) | `3.9.9` | `3.9.10` |
+| [turbo](https://github.com/vercel/turborepo) | `2.11.3` | `2.11.10` |
+| [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint/tree/HEAD/packages/typescript-eslint) | `8.70.1` | `8.72.1` |
+| [vitest](https://github.com/vitest-dev/vitest/tree/HEAD/packages/vitest) | `5.0.1` | `5.0.5` |
+| [@lezer/generator](https://github.com/lezer-parser/generator) | `1.8.0` | `1.8.1` |
+| [esbuild](https://github.com/evanw/esbuild) | `0.27.7` | `0.28.2` |
+| [jsdom](https://github.com/jsdom/jsdom) | `30.1.1` | `30.1.3` |
+| [vite](https://github.com/vitejs/vite/tree/HEAD/packages/vite) | `8.3.0` | `8.3.5` |
+| [pixelmatch](https://github.com/mapbox/pixelmatch) | `7.2.0` | `8.0.0` |
+| [@electron/fuses](https://github.com/electron/fuses) | `1.8.0` | `2.1.3` |
+| [electron](https://github.com/electron/electron) | `44.4.5` | `45.2.1` |
+| [electron-builder](https://github.com/electron-userland/electron-builder/tree/HEAD/packages/electron-builder) | `26.15.3` | `26.18.0` |
+| [electron-vite](https://github.com/alex8088/electron-vite) | `5.0.0` | `6.0.0` |
+
+
+
+Updates `@commitlint/cli` from 21.2.3 to 21.2.4
+- [Release notes](https://github.com/conventional-changelog/commitlint/releases)
+- [Changelog](https://github.com/conventional-changelog/commitlint/blob/master/@commitlint/cli/CHANGELOG.md)
+- [Commits](https://github.com/conventional-changelog/commitlint/commits/v21.2.4/@commitlint/cli)
+
+Updates `@commitlint/config-conventional` from 21.2.3 to 21.2.4
+- [Release notes](https://github.com/conventional-changelog/commitlint/releases)
+- [Changelog](https://github.com/conventional-changelog/commitlint/blob/master/@commitlint/config-conventional/CHANGELOG.md)
+- [Commits](https://github.com/conventional-changelog/commitlint/commits/v21.2.4/@commitlint/config-conventional)
+
+Updates `@playwright/test` from 1.63.0 to 1.64.1
+- [Release notes](https://github.com/microsoft/playwright/releases)
+- [Commits](https://github.com/microsoft/playwright/compare/v1.63.0...v1.64.1)
+
+Updates `@types/node` from 26.6.2 to 26.6.6
+- [Release notes](https://github.com/DefinitelyTyped/DefinitelyTyped/releases)
+- [Commits](https://github.com/DefinitelyTyped/DefinitelyTyped/commits/HEAD/types/node)
+
+Updates `eslint` from 10.11.0 to 10.14.0
+- [Release notes](https://github.com/eslint/eslint/releases)
+- [Commits](https://github.com/eslint/eslint/compare/v10.11.0...v10.14.0)
+
+Updates `globals` from 17.12.0 to 17.13.0
+- [Release notes](https://github.com/sindresorhus/globals/releases)
+- [Commits](https://github.com/sindresorhus/globals/compare/v17.12.0...v17.13.0)
+
+Updates `lint-staged` from 17.5.1 to 17.6.0
+- [Release notes](https://github.com/lint-staged/lint-staged/releases)
+- [Changelog](https://github.com/lint-staged/lint-staged/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/lint-staged/lint-staged/compare/v17.5.1...v17.6.0)
+
+Updates `prettier` from 3.9.9 to 3.9.10
+- [Release notes](https://github.com/prettier/prettier/releases)
+- [Changelog](https://github.com/prettier/prettier/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/prettier/prettier/compare/3.9.9...3.9.10)
+
+Updates `turbo` from 2.11.3 to 2.11.10
+- [Release notes](https://github.com/vercel/turborepo/releases)
+- [Changelog](https://github.com/vercel/turborepo/blob/main/RELEASE.md)
+- [Commits](https://github.com/vercel/turborepo/compare/v2.11.3...v2.11.10)
+
+Updates `typescript-eslint` from 8.70.1 to 8.72.1
+- [Release notes](https://github.com/typescript-eslint/typescript-eslint/releases)
+- [Changelog](https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/typescript-eslint/CHANGELOG.md)
+- [Commits](https://github.com/typescript-eslint/typescript-eslint/commits/v8.72.1/packages/typescript-eslint)
+
+Updates `vitest` from 5.0.1 to 5.0.5
+- [Release notes](https://github.com/vitest-dev/vitest/releases)
+- [Changelog](https://github.com/vitest-dev/vitest/blob/main/docs/releases.md)
+- [Commits](https://github.com/vitest-dev/vitest/commits/v5.0.5/packages/vitest)
+
+Updates `@lezer/generator` from 1.8.0 to 1.8.1
+- [Changelog](https://github.com/lezer-parser/generator/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/lezer-parser/generator/commits)
+
+Updates `esbuild` from 0.27.7 to 0.28.2
+- [Release notes](https://github.com/evanw/esbuild/releases)
+- [Changelog](https://github.com/evanw/esbuild/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/evanw/esbuild/compare/v0.27.7...v0.28.2)
+
+Updates `jsdom` from 30.1.1 to 30.1.3
+- [Release notes](https://github.com/jsdom/jsdom/releases)
+- [Commits](https://github.com/jsdom/jsdom/compare/v30.1.1...v30.1.3)
+
+Updates `vite` from 8.3.0 to 8.3.5
+- [Release notes](https://github.com/vitejs/vite/releases)
+- [Changelog](https://github.com/vitejs/vite/blob/main/packages/vite/CHANGELOG.md)
+- [Commits](https://github.com/vitejs/vite/commits/v8.3.5/packages/vite)
+
+Updates `pixelmatch` from 7.2.0 to 8.0.0
+- [Release notes](https://github.com/mapbox/pixelmatch/releases)
+- [Commits](https://github.com/mapbox/pixelmatch/compare/v7.2.0...v8.0.0)
+
+Updates `@electron/fuses` from 1.8.0 to 2.1.3
+- [Release notes](https://github.com/electron/fuses/releases)
+- [Commits](https://github.com/electron/fuses/compare/v1.8.0...v2.1.3)
+
+Updates `electron` from 44.4.5 to 45.2.1
+- [Release notes](https://github.com/electron/electron/releases)
+- [Commits](https://github.com/electron/electron/compare/v44.4.5...v45.2.1)
+
+Updates `electron-builder` from 26.15.3 to 26.18.0
+- [Release notes](https://github.com/electron-userland/electron-builder/releases)
+- [Changelog](https://github.com/electron-userland/electron-builder/blob/electron-builder@26.18.0/packages/electron-builder/CHANGELOG.md)
+- [Commits](https://github.com/electron-userland/electron-builder/commits/electron-builder@26.18.0/packages/electron-builder)
+
+Updates `electron-vite` from 5.0.0 to 6.0.0
+- [Release notes](https://github.com/alex8088/electron-vite/releases)
+- [Changelog](https://github.com/alex8088/electron-vite/blob/master/CHANGELOG.md)
+- [Commits](https://github.com/alex8088/electron-vite/compare/v5.0.0...v6.0.0)
+
+---
+updated-dependencies:
+- dependency-name: "@commitlint/cli"
+  dependency-version: 21.2.4
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: "@commitlint/config-conventional"
+  dependency-version: 21.2.4
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: "@electron/fuses"
+  dependency-version: 2.1.3
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+  dependency-group: dev
+- dependency-name: "@lezer/generator"
+  dependency-version: 1.8.1
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: "@playwright/test"
+  dependency-version: 1.64.1
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: dev
+- dependency-name: "@types/node"
+  dependency-version: 26.6.5
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: electron
+  dependency-version: 45.0.0
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+  dependency-group: dev
+- dependency-name: electron-builder
+  dependency-version: 26.18.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: dev
+- dependency-name: electron-vite
+  dependency-version: 6.0.0
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+  dependency-group: dev
+- dependency-name: esbuild
+  dependency-version: 0.28.2
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: dev
+- dependency-name: eslint
+  dependency-version: 10.13.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: dev
+- dependency-name: globals
+  dependency-version: 17.13.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: dev
+- dependency-name: jsdom
+  dependency-version: 30.1.3
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: lint-staged
+  dependency-version: 17.6.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: dev
+- dependency-name: pixelmatch
+  dependency-version: 8.0.0
+  dependency-type: direct:development
+  update-type: version-update:semver-major
+  dependency-group: dev
+- dependency-name: prettier
+  dependency-version: 3.9.10
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: turbo
+  dependency-version: 2.11.10
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: typescript-eslint
+  dependency-version: 8.72.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: dev
+- dependency-name: vite
+  dependency-version: 8.3.5
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+- dependency-name: vitest
+  dependency-version: 5.0.5
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: dev
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
