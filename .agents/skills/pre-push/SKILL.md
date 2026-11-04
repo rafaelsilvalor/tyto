@@ -31,28 +31,17 @@ Linux shell. `node_modules` must exist.
    node tools/repo-checks/src/changeset-coverage.mjs --base origin/main
    ```
 
-3. **Commit messages: run what `commitlint.yml` runs**, then the two checks it does not make.
-   commitlint holds the type, the TYTO key, the trailers (`Co-Authored-By`, `Claude-Session`,
-   "Generated with") and a header of at most 100. A body line over 100 is only a warning
-   there, and a short paragraph starting with `Word: ` passes, because commitlint reads it as
-   a footer.
+3. **Commit messages: run what `commitlint.yml` runs.** commitlint holds the type, the
+   TYTO key, the trailers (`Co-Authored-By`, `Claude-Session`, "Generated with"), a header
+   of at most 72, and no body paragraph opening with `Word: ` other than the footers
+   `ALLOWED_FOOTER_TOKENS` lists (TYTO-603). A body line over 100 is only a warning there.
 
    ```bash
    pnpm exec commitlint --from origin/main --to HEAD
    ```
 
-   AGENTS.md is stricter than the config: subject at most 72, body wrapped near 78, and no
-   body paragraph starting with `Word: `. Both lines print nothing when the branch is clean:
-
-   ```bash
-   git log --format=%s origin/main..HEAD | awk 'length > 72 { print length ": " $0 }'
-   ```
-
-   ```bash
-   for c in $(git rev-list origin/main..HEAD); do git log -1 --format=%b "$c" | awk -v c="$(git rev-parse --short "$c")" '(NR == 1 || previous == "") && /^[A-Za-z][A-Za-z-]*: / { print c ": " $0 } { previous = $0 }'; done
-   ```
-
-   Body lines between 79 and 100 are not a failure; name them only if there are many.
+   AGENTS.md also asks for body lines wrapped near 78, which no tool checks. Lines between 79
+   and 100 are not a failure; name them only if there are many.
 
 4. **ADR numbers.** An ADR the branch added must not share its number with one on
    `origin/main`. This prints each clash and nothing when every number is free:

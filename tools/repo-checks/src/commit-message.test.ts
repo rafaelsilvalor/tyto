@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,5 +70,91 @@ describe('the commit message rule', () => {
     const { code, output } = await lintMessage(message);
     expect(code, `"${message}" was accepted`).not.toBe(0);
     expect(output).toContain('subject-jira-key');
+  });
+});
+
+/**
+ * AGENTS.md › Commits, enforced since TYTO-603: a header of at most 72 characters, and no
+ * body paragraph that opens with `Word: `, which the conventional-commits parser files as a
+ * footer. Each rule is pinned at its edge, and the real commits robots write are linted as
+ * they are, because `lint` is a required check on their pull requests too.
+ */
+const KEYED = 'feat(core): TYTO-123 ';
+
+/** A header of exactly `length` characters in the house style. */
+function headerOf(length: number): string {
+  return KEYED + 'a'.repeat(length - KEYED.length);
+}
+
+const SUBJECT = 'chore(repo): TYTO-603 check the commit body';
+
+/**
+ * Real commit messages, copied verbatim from `gh api repos/rafaelsilvalor/tyto/pulls/<n>/
+ * commits` on 2026-11-03: the two Dependabot pull requests open that day. The body tables
+ * carry lines over 100 characters, the `---` block opens with `updated-dependencies:`, and
+ * the message ends in `Signed-off-by:`. The Changesets version PR's own commit (#300) is
+ * the bare `chore(release): TYTO-0 version packages`, accepted below; the body its squash
+ * commit carries on `main` is the PR description, which this config never reads.
+ */
+const fixtures = join(repoRoot, 'tools/repo-checks/src/__fixtures__/commit-messages');
+const robotCommits = [
+  ['Dependabot, PR #165', readFileSync(join(fixtures, 'dependabot-pr-165.txt'), 'utf8')],
+  ['Dependabot, PR #166', readFileSync(join(fixtures, 'dependabot-pr-166.txt'), 'utf8')],
+  ['the Changesets version PR, #300', 'chore(release): TYTO-0 version packages'],
+] as const;
+
+describe('the header length rule', () => {
+  it('accepts a header of 72 characters', async () => {
+    const { code, output } = await lintMessage(headerOf(72));
+    expect(code, output).toBe(0);
+  });
+
+  it('refuses a header of 73 characters', async () => {
+    const { code, output } = await lintMessage(headerOf(73));
+    expect(code).not.toBe(0);
+    expect(output).toContain('header-max-length');
+  });
+});
+
+const paragraphsAccepted = [
+  ['a plain body', `${SUBJECT}\n\nThe body explains why.`],
+  ['a breaking change footer', `${SUBJECT}\n\nWhy.\n\nBREAKING CHANGE: the flag is gone`],
+  ['the hyphenated breaking change footer', `${SUBJECT}\n\nWhy.\n\nBREAKING-CHANGE: gone`],
+  ['a reference footer', `${SUBJECT}\n\nWhy.\n\nRefs: TYTO-570`],
+  ['a sign-off', `${SUBJECT}\n\nWhy.\n\nSigned-off-by: Someone <a@b.c>`],
+  [
+    'a `Word: ` line inside a paragraph rather than opening it',
+    `${SUBJECT}\n\nThe paragraph opens with prose\nContext: and continues here.`,
+  ],
+  ['a colon with no space after it', `${SUBJECT}\n\nNote:the colon is glued.`],
+  ['a paragraph opening with a list item', `${SUBJECT}\n\n- Context: in a list`],
+] as const;
+
+const paragraphsRefused = [
+  ['a paragraph opening with `Context: `', `${SUBJECT}\n\nWhy.\n\nContext: the gap`],
+  ['the first body paragraph opening with one', `${SUBJECT}\n\nPerturbation: put back`],
+  ['a lower-case token', `${SUBJECT}\n\nWhy.\n\nlocal: typecheck and lint`],
+  ['a token that only resembles an allowed one', `${SUBJECT}\n\nWhy.\n\nRef: TYTO-570`],
+  ['a hyphenated token', `${SUBJECT}\n\nWhy.\n\nFollow-up: TYTO-604`],
+  ['one written with Windows line endings', `${SUBJECT}\r\n\r\nWhy.\r\n\r\nLocal: lint`],
+] as const;
+
+describe('the footer-shaped paragraph rule', () => {
+  it.each(paragraphsAccepted)('accepts %s', async (_name, message) => {
+    const { code, output } = await lintMessage(message);
+    expect(code, output).toBe(0);
+  });
+
+  it.each(paragraphsRefused)('refuses %s', async (_name, message) => {
+    const { code, output } = await lintMessage(message);
+    expect(code, `"${message}" was accepted`).not.toBe(0);
+    expect(output).toContain('body-no-footer-paragraph');
+  });
+});
+
+describe('the commits robots write', () => {
+  it.each(robotCommits)('accepts %s as written', async (_name, message) => {
+    const { code, output } = await lintMessage(message);
+    expect(code, output).toBe(0);
   });
 });
