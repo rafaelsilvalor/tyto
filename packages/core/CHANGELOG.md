@@ -1,5 +1,24 @@
 # @tyto/core
 
+## 0.37.0
+
+### Minor Changes
+
+- 6d363a3: TYTO-484: `@tyto/fonts` bundles Noto Sans Math 400, the symbol face. A glyph a run's face
+  lacks is measured and drawn, glyph by glyph, in Noto Sans Math and then Source Sans 3: the
+  split spans enter the IR, so what is measured is what is drawn. `W_GLYPH_MISSING` names a
+  character no face draws. A code template lists the chain under `faces:` (ADR 0168).
+- 7c650a4: A template says which of its files is missing (TYTO-502). `@tyto/core` adds
+  `W_TEMPLATE_FILE_MISSING` to the closed list a template may report, naming the artwork, the
+  format, the template and the path it asked `context.files` for. `@tyto/house-style` gains
+  `requiredImage`, and the product banner reports a format whose `assets/bg-<format>.png` is
+  missing instead of drawing it on plain paper in silence. The report carries the path, so the
+  plugin RPC protocol is 15.
+- d1cd8ba: TYTO-554: `runsOf` takes bold and italic as a partial style, so bold can change the colour
+  (a number still means a weight). The kit gains `highlights(spec)` — bold, italic and named
+  marks as data, varied per place with `.with()` — `highlightsFromValues` for the shared value
+  names, `richTextOfPlain` for `**…**` and marks in frontmatter text, and `TextStyle.highlights`.
+
 ## 0.36.1
 
 ### Patch Changes
