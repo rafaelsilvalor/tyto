@@ -117,6 +117,41 @@ describe('highlights from declared values (ADR 0153)', () => {
     ]);
   });
 
+  // TYTO-619: a configured weight the template has no face for would be drawn in a face its
+  // plugin's process cannot measure, so it snaps to the nearest face the template declares.
+  describe('snapped to the faces the template declares', () => {
+    const FACES = [300, 400, 500, 700, 900].map((weight) => ({ weight }));
+    const boldWeight = (values: TemplateValues, faces?: readonly { weight: number }[]) =>
+      shape(
+        richTextOfPlain('**a**'),
+        highlightsFromValues(context(values), SPEC, undefined, faces).options,
+      )[0];
+
+    it('moves a weight the faces lack to the nearest one, a tie going to the heavier', () => {
+      expect(boldWeight({ 'highlight-weight': 640 }, FACES)).toBe('700/#ff5900/a');
+      expect(boldWeight({ 'highlight-weight': 600 }, FACES)).toBe('700/#ff5900/a');
+      expect(boldWeight({ 'highlight-weight': 450 }, FACES)).toBe('500/#ff5900/a');
+      expect(boldWeight({ 'highlight-weight': 1000 }, FACES)).toBe('900/#ff5900/a');
+    });
+
+    it('snaps the marks drawn like bold with it', () => {
+      const text = richTextOfPlain('{cor:azul}b{/}');
+      const options = highlightsFromValues(
+        context({ 'highlight-weight': 600 }),
+        SPEC,
+        undefined,
+        FACES,
+      ).options;
+      expect(shape(text, options)).toEqual(['700/#1f6fd1/b']);
+    });
+
+    it('keeps a weight the faces have, and any weight when no faces are given, which is the control', () => {
+      expect(boldWeight({ 'highlight-weight': 500 }, FACES)).toBe('500/#ff5900/a');
+      expect(boldWeight({ 'highlight-weight': 600 })).toBe('600/#ff5900/a');
+      expect(boldWeight({ 'highlight-weight': 600 }, [])).toBe('600/#ff5900/a');
+    });
+  });
+
   it('falls back from a place to the house colour when the place declares none', () => {
     const values = context({ 'highlight-color': '#00aa00' });
     expect(

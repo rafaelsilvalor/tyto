@@ -142,16 +142,23 @@ function declaredColor(
  * A value the manifest does not declare, or a context with none, leaves the constant in
  * `defaults` — so a template that declares nothing draws exactly what `highlights(defaults)`
  * draws.
+ *
+ * `faces` are the faces the template declares under `faces:` in its manifest — the same list
+ * its faces test pins to the manifest — or just their weights (TYTO-619). Given, the bold
+ * weight snaps to the nearest of them, a tie going to the heavier as CSS does: a configured
+ * 600 in a template with faces at 500 and 700 is drawn at 700, in a face its plugin's process
+ * can measure, instead of one only the host has. The manifest is YAML and `context` carries
+ * no faces, so the template passes them. Absent or empty, the weight is used as given.
  */
 export function highlightsFromValues(
   context: Pick<TemplateContext, 'values'>,
   defaults: HighlightSpec,
   place?: string,
+  faces?: readonly { readonly weight: number }[],
 ): Highlights {
-  const weight = numberValue(
-    context,
-    'highlight-weight',
-    defaults.bold?.weight ?? HIGHLIGHT_WEIGHT,
+  const weight = nearestWeight(
+    numberValue(context, 'highlight-weight', defaults.bold?.weight ?? HIGHLIGHT_WEIGHT),
+    faces,
   );
   const houseColor = declaredColor(context, 'highlight-color', defaults.bold?.color);
   const color =
@@ -174,6 +181,20 @@ export function highlightsFromValues(
     bold: { ...defaults.bold, weight, ...(color === undefined ? {} : { color }) },
     ...(defaults.marks === undefined ? {} : { marks }),
   });
+}
+
+/** `weight`, or the nearest of the faces' weights to it, a tie going to the heavier face. */
+function nearestWeight(weight: number, faces: readonly { readonly weight: number }[] = []): number {
+  let nearest: number | undefined;
+  for (const { weight: candidate } of faces) {
+    if (
+      nearest === undefined ||
+      Math.abs(candidate - weight) < Math.abs(nearest - weight) ||
+      (Math.abs(candidate - weight) === Math.abs(nearest - weight) && candidate > nearest)
+    )
+      nearest = candidate;
+  }
+  return nearest ?? weight;
 }
 
 /**

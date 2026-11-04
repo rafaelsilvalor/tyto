@@ -41,6 +41,10 @@ export { type RunStyle, type RunsOptions, runsOf } from './runs.js';
 // So the kit keeps layout's rule when it writes a break of its own (ADR 0169).
 export { isStandaloneOperator } from '../text/operators.js';
 
+// So a template's faces test lists the faces its glyphs fall back to by the rule layout
+// uses, not a copy of it that a change to the chain would leave behind (ADR 0168, TYTO-619).
+export { fallbackChain } from '../text/fallback.js';
+
 export {
   type TemplateValue,
   type TemplateValues,

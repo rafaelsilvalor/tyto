@@ -44,6 +44,8 @@ shipped weight]`.** Noto Sans Math is first because it is the face designed for 
    faces under `faces:`**: `{ family: Noto Sans Math, weight: 400 }` and Source Sans 3 at the
    weights it uses. A template that lists neither still renders correctly, because the host lays
    every frame out again. Only the boxes the template sized from its own measure can disagree.
+   The chain itself is exported as `fallbackChain` from `@tyto/core/template` (TYTO-619), so a
+   template's faces test derives those faces from the rule layout uses instead of a copy of it.
 
 5. **A word is placed whole across runs.** Splitting turns `Δv` into two spans, and layout used
    to treat a run boundary as a place a line could break. A word is now the pieces up to the next

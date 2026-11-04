@@ -284,7 +284,7 @@ it in one place (the title's bold in navy) without repeating the rest, and `text
   colour; in `**a {cor:azul}b{/}**` the `b` is blue. It is the rule nested bold and italic
   already had (ADR 0015).
 - **The value names are shared**, so a plugin file configures any template the same way (ADR
-  0153). `highlightsFromValues(context, defaults, place?)` reads:
+  0153). `highlightsFromValues(context, defaults, place?, faces?)` reads:
 
   | Name                      | Kind     | What it sets                                        |
   | ------------------------- | -------- | --------------------------------------------------- |
@@ -295,7 +295,10 @@ it in one place (the title's bold in navy) without repeating the rest, and `text
 
   The weight is a `number`, as ADR 0153 has no weight kind: declare it with `min: 100` and
   `max: 900`, the weights a face can have, so a configuration cannot ask for one that does not
-  exist.
+  exist. A template whose manifest lists only some weights under `faces:` passes that list as
+  `faces` (the same list its faces test pins to the manifest), and the weight snaps to the
+  nearest of them, a tie going to the heavier (TYTO-619): a configured `600` with faces at 500
+  and 700 is drawn at 700, in a face its plugin's process can measure.
 
   ```yaml
   values:
