@@ -1,5 +1,16 @@
 # @tyto/template-kit
 
+## 0.10.1
+
+### Patch Changes
+
+- 2bc82e0: `settle` now moves a word down as a last resort even when the line above is left with one word, judged against the paragraphs the author wrote (TYTO-616).
+- Updated dependencies [b5d2c00]
+  - @tyto/core@0.38.0
+  - @tyto/brief-lang@0.7.10
+  - @tyto/export-html@0.7.12
+  - @tyto/template-lang@0.8.11
+
 ## 0.10.0
 
 ### Minor Changes
