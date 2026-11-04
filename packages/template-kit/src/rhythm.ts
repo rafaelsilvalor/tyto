@@ -1,4 +1,4 @@
-import { ORPHAN_WORD_LIMIT } from '@tyto/core/template';
+import { ORPHAN_WORD_LIMIT, isStandaloneOperator } from '@tyto/core/template';
 
 import type { TemplateContext, TextRun } from '@tyto/core';
 
@@ -269,9 +269,11 @@ function firstOrphaned(
  * last line holds two words (TYTO-520). `undefined` when no paragraph is orphaned, or when the
  * line above has no word that may move.
  *
- * Words move only at an ordinary space, where the layout itself breaks: two words joined by a
- * no-break space go down together or not at all. Whether the result is clean is the caller's
- * to measure — the line above might now end on one word itself.
+ * Words move only where the layout itself breaks: at an ordinary space, and not at the space
+ * before a standalone operator (ADR 0169, TYTO-617), so `U ·` goes down together and no line
+ * starts with `·`. Two words joined by a no-break space go down together or not at all.
+ * Whether the result is clean is the caller's to measure — the line above might now end on
+ * one word itself.
  */
 export function rebreak(
   written: readonly TextRun[],
@@ -279,52 +281,56 @@ export function rebreak(
 ): TextRun[] | undefined {
   const orphaned = firstOrphaned(written, laid);
   if (orphaned === undefined) return undefined;
-  // The layout's own pieces: what lies between ordinary spaces.
-  const pieces = (text: string) => text.split(/ +/u).filter((piece) => piece.trim() !== '');
-  const before = orphaned.lines.slice(0, -1);
-  const moved = before.reduce((sum, line) => sum + pieces(line).length, 0) - 1;
+  const before = orphaned.lines.slice(0, -1).join(' ');
+  const moved = pieceStarts(before).length - 1;
   if (moved <= 0) return undefined;
   return withBreakBefore(written, orphaned.paragraph, moved);
 }
 
 /**
- * `runs` with a break before the `piece`-th space-separated piece of paragraph `paragraph`, the
- * spaces in front of it dropped as a wrap drops them.
+ * Where each of the layout's own pieces starts in `text`: after an ordinary space, unless the
+ * word there is a standalone operator, which layout keeps on the line of the word before it.
+ * The first piece starts wherever the text does.
+ */
+function pieceStarts(text: string): number[] {
+  const starts: number[] = [];
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === ' ' || (index > 0 && text[index - 1] !== ' ')) continue;
+    const end = text.indexOf(' ', index);
+    const word = text.slice(index, end < 0 ? undefined : end);
+    if (starts.length === 0 || !isStandaloneOperator(word)) starts.push(index);
+  }
+  return starts;
+}
+
+/**
+ * `runs` with a break before the `piece`-th piece ({@link pieceStarts}) of paragraph
+ * `paragraph`, the spaces in front of it dropped as a wrap drops them.
  */
 function withBreakBefore(runs: readonly TextRun[], paragraph: number, piece: number): TextRun[] {
+  const cut = pieceStarts(linesOf(runs)[paragraph] ?? '')[piece];
+  if (cut === undefined) return [...runs];
   const result: TextRun[] = [];
   let current = 0;
-  let seen = -1;
-  let afterSpace = true;
+  let offset = 0;
   let done = false;
   for (const run of runs) {
     if (run.kind === 'break') {
       current += 1;
-      afterSpace = true;
       result.push(run);
       continue;
     }
-    if (done || current !== paragraph) {
+    const start = offset;
+    if (current === paragraph) offset += run.text.length;
+    if (done || current !== paragraph || cut >= offset) {
       result.push(run);
       continue;
     }
-    let cut = -1;
-    for (let index = 0; index < run.text.length && cut < 0; index += 1) {
-      const space = run.text[index] === ' ';
-      if (!space && afterSpace) {
-        seen += 1;
-        if (seen === piece) cut = index;
-      }
-      afterSpace = space;
-    }
-    if (cut < 0) {
-      result.push(run);
-      continue;
-    }
-    const head = run.text.slice(0, cut).replace(/ +$/u, '');
+    const at = cut - start;
+    const head = run.text.slice(0, at).replace(/ +$/u, '');
     if (head !== '') result.push({ ...run, text: head });
     else trimLast(result);
-    result.push({ kind: 'break' }, { ...run, text: run.text.slice(cut) });
+    result.push({ kind: 'break' }, { ...run, text: run.text.slice(at) });
     done = true;
   }
   return result;

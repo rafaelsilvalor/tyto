@@ -255,7 +255,7 @@ when it cannot. Neither knows a template: the weights and the limits are the tem
 **A sign, an amount and its scale word stay on one line** (TYTO-593). A template that sets
 prices, salaries or percentages passes the brief's words through `keepTogether` before laying
 them out, and a line can no longer end on `R$` with `9,8 mil` on the next. The default rules
-are the ones the house's table already glued; a template's own pairs go beside them as data.
+for money are the ones the house's table already glued, and a number keeps its unit of measure (`3 s`, `25 °C`, TYTO-620); a template's own pairs go beside them as data.
 
 **A line's label is what comes before its first `:`, in every template** (the maintainer,
 2026-11-03; TYTO-594). A template that draws labelled lines reads them with `labelOf`, so
@@ -284,7 +284,7 @@ it in one place (the title's bold in navy) without repeating the rest, and `text
   colour; in `**a {cor:azul}b{/}**` the `b` is blue. It is the rule nested bold and italic
   already had (ADR 0015).
 - **The value names are shared**, so a plugin file configures any template the same way (ADR
-  0153). `highlightsFromValues(context, defaults, place?)` reads:
+  0153). `highlightsFromValues(context, defaults, place?, faces?)` reads:
 
   | Name                      | Kind     | What it sets                                        |
   | ------------------------- | -------- | --------------------------------------------------- |
@@ -295,7 +295,10 @@ it in one place (the title's bold in navy) without repeating the rest, and `text
 
   The weight is a `number`, as ADR 0153 has no weight kind: declare it with `min: 100` and
   `max: 900`, the weights a face can have, so a configuration cannot ask for one that does not
-  exist.
+  exist. A template whose manifest lists only some weights under `faces:` passes that list as
+  `faces` (the same list its faces test pins to the manifest), and the weight snaps to the
+  nearest of them, a tie going to the heavier (TYTO-619): a configured `600` with faces at 500
+  and 700 is drawn at 700, in a face its plugin's process can measure.
 
   ```yaml
   values:

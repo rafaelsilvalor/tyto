@@ -86,6 +86,15 @@ describe('keepTogetherText', () => {
     ['4 bilhão', '4~bilhão'],
     ['5 bilhões', '5~bilhões'],
     ['10 %', '10~%'],
+    // TYTO-620: a number and its unit of measure.
+    ['3 s', '3~s'],
+    ['10 kg', '10~kg'],
+    ['25 °C', '25~°C'],
+    ['9,8 m/s²', '9,8~m/s²'],
+    ['2,5 kPa e 300 K', '2,5~kPa e 300~K'],
+    ['5 mL.', '5~mL.'],
+    ['10⁵ Pa', '10⁵~Pa'],
+    ['60 min', '60~min'],
   ])('glues %s', (written, glued) => {
     expect(shown(keepTogetherText(written))).toBe(glued);
   });
@@ -96,6 +105,11 @@ describe('keepTogetherText', () => {
     ['9 milhas', '9 milhas'],
     ['3 bicicletas', '3 bicicletas'],
     ['de mil formas', 'de mil formas'],
+    // A word that only starts like a unit, and a unit-like letter with no number before it.
+    ['3 salas', '3 salas'],
+    ['2 metros', '2 metros'],
+    ['5 horas', '5 horas'],
+    ['em s e m', 'em s e m'],
   ])('leaves %s breakable', (written, glued) => {
     expect(shown(keepTogetherText(written))).toBe(glued);
   });

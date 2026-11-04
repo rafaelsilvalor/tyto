@@ -162,6 +162,35 @@ describe('rebreak', () => {
     expect(rebroken).toEqual(words('one', 'two three four'));
   });
 
+  // TYTO-617, ADR 0169: layout never starts a line with a standalone operator, so neither
+  // may the break the kit inserts. The line above ends on `U ·`; the operator goes down with
+  // the operand before it, never alone at the head of the line.
+  it('never starts a line with a standalone operator, moving it with its operand', () => {
+    const rebroken = rebreak(words('Q = U · A'), words('Q = U ·', 'A'));
+
+    expect(rebroken).toEqual(words('Q =', 'U · A'));
+  });
+
+  it('keeps an operator with its operand when the operator is a run of its own', () => {
+    const style = { font: FONT, size: 10, color: '#000000' } as const;
+    const written = [run('Q = U ', style), run('· ', { ...style, weight: 700 }), run('A', style)];
+    const laid = [
+      run('Q = U ', style),
+      run('·', { ...style, weight: 700 }),
+      lineBreak(),
+      run('A', style),
+    ];
+    const rebroken = rebreak(written, laid) ?? [];
+
+    expect(rebroken.map((item) => (item.kind === 'break' ? '|' : item.text))).toEqual([
+      'Q =',
+      '|',
+      'U ',
+      '· ',
+      'A',
+    ]);
+  });
+
   it('breaks inside the right paragraph, across runs, keeping each run’s style', () => {
     const bold = run('two ', { font: FONT, size: 10, weight: 700, color: '#000000' });
     const written = [
