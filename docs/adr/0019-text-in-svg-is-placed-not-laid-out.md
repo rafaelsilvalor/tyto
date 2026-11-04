@@ -69,3 +69,9 @@ Two smaller things follow the same rule of saying what was approximated:
 point off the ninths is snapped and reported; and a mask may only name a node drawn in the
 same frame, which is the only thing the template language can express
 (`docs/template-authoring.md`) and is reported when it is not.
+
+## Note, 2026-11-04 (TYTO-613)
+
+Once lines moved into the IR, a break opportunity was a plain space and only that. ADR 0169
+takes one space out: the one before a standalone math operator, so a formula written
+`Q = U · A · ΔT` never starts a line with `·` or `=`.
