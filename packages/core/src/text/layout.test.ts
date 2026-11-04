@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Face, FaceCache } from './face.js';
 import { MINIMUM_SHRINK, measureText } from './layout.js';
+import { isStandaloneOperator } from './operators.js';
 import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
 
 /**
@@ -137,6 +138,81 @@ describe('where a line ends', () => {
       .filter((run): run is TextSpan => run.kind === 'text')
       .map((run) => run.weight);
     expect(weights).toEqual([400, 700, 700]);
+  });
+});
+
+describe('a formula written with spaces around its operators (ADR 0169)', () => {
+  // 14 characters, 70px. Every space in it used to be a break, so a 30px box ended the first
+  // line on "Q = U" and started the second on "· A ·" — read as a typo in an exam question.
+  const formula = 'Q = U · A · ΔT';
+
+  it('never starts a line with an operator', () => {
+    const measured = measureText(node([span(formula)], { box: { w: 30 } }), faces);
+
+    // Each operator stays on the line of the operand before it, and the line may end on it.
+    expect(linesOf(measured?.runs ?? [])).toEqual(['Q =', 'U ·', 'A · ΔT']);
+  });
+
+  it('keeps the rule when the symbol chain has put the operator in a run of its own', () => {
+    // What `coverRuns` makes of a face without `·` (ADR 0168): the operator is its own span.
+    const measured = measureText(
+      node([span('Q = U '), span('·', { weight: 700 }), span(' A')], { box: { w: 30 } }),
+      faces,
+    );
+
+    expect(linesOf(measured?.runs ?? [])).toEqual(['Q =', 'U · A']);
+  });
+
+  it('still breaks a formula wider than its box, after an operator', () => {
+    const measured = measureText(node([span('a + b + c + d')], { box: { w: 20 } }), faces);
+
+    expect(linesOf(measured?.runs ?? [])).toEqual(['a +', 'b +', 'c +', 'd']);
+  });
+
+  it('leaves an operator glued to its number alone: "−3" is an operand', () => {
+    // "x = −3" is 30px; a 20px box breaks after "=", before the signed number.
+    const measured = measureText(node([span('x = −3')], { box: { w: 20 } }), faces);
+
+    expect(linesOf(measured?.runs ?? [])).toEqual(['x =', '−3']);
+  });
+
+  it('keeps the no-break space an author writes by hand', () => {
+    const measured = measureText(
+      node([span('Q\u00a0=\u00a0U\u00a0·\u00a0A')], { box: { w: 20 } }),
+      faces,
+    );
+
+    expect(linesOf(measured?.runs ?? [])).toEqual(['Q\u00a0=\u00a0U\u00a0·\u00a0A']);
+  });
+});
+
+describe('isStandaloneOperator', () => {
+  it('names a word made only of operators', () => {
+    for (const word of [
+      '·',
+      '=',
+      '×',
+      '÷',
+      '≠',
+      '≤',
+      '≥',
+      '±',
+      '+',
+      '−',
+      '-',
+      '–',
+      '→',
+      '⇒',
+      '<=',
+    ]) {
+      expect(isStandaloneOperator(word), word).toBe(true);
+    }
+  });
+
+  it('refuses an operand, a signed number and an empty word', () => {
+    for (const word of ['ΔT', '−3', 'a+b', '', ' ', '—', '%', 'x²']) {
+      expect(isStandaloneOperator(word), word).toBe(false);
+    }
   });
 });
 

@@ -226,6 +226,8 @@ export {
   referenceRun,
 } from './text/layout.js';
 
+export { isStandaloneOperator } from './text/operators.js';
+
 export type { DirectoryEntry, FileSystem } from './ports/file-system.js';
 
 export {

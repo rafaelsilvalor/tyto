@@ -218,7 +218,8 @@ look at one.
 ## A value that must not break is glued with a no-break space
 
 Tyto decides every line break before an exporter sees the text, and **a break opportunity is
-a plain space (U+0020) and only that** (`packages/core/src/text/layout.ts`). So a template
+a plain space (U+0020) and only that** (`packages/core/src/text/layout.ts`), except the space
+before a standalone math operator, which never starts a line (ADR 0169). So a template
 that must keep `R$ 33.820,39` or `5 + CR` on one line writes their inner spaces as U+00A0. A
 no-break space draws and measures as a space and breaks nothing, in the measurement, in
 `export-html` and in `export-svg` alike. No exporter has to agree to anything.

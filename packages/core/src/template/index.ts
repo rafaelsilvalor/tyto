@@ -38,6 +38,9 @@ export {
 
 export { type RunStyle, type RunsOptions, runsOf } from './runs.js';
 
+// So the kit keeps layout's rule when it writes a break of its own (ADR 0169).
+export { isStandaloneOperator } from '../text/operators.js';
+
 export {
   type TemplateValue,
   type TemplateValues,
