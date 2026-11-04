@@ -268,6 +268,9 @@ describe('settle', () => {
 
     expect(orphanOf(tried.runs, measure(tried)!.runs)).toBe('contrariam');
     expect(settled.setting.runs).toBeUndefined();
+    // Cleared by a setting, not by the last resort that would strand "contrariam" (TYTO-616).
+    expect(settled.orphan).toBeUndefined();
+    expect(settled.setting).not.toEqual({ size: 76, letterSpacing: 0 });
   });
 
   it('leaves a caller that ignores the rebroken runs exactly where it was before rebreak existed', () => {
@@ -301,6 +304,34 @@ describe('settle', () => {
     expect(measure(rebroken)!.lines).toBeGreaterThan(measure(node)!.lines);
     expect(settled.setting.runs).toBeUndefined();
     expect(settled.orphan).toBe('ccc');
+  });
+
+  it('moves a word down even when the line above is left with one word, when nothing else clears it', () => {
+    // voce-conhece's cover (TYTO-616): at 100 px a character is 50 px, 14 to a 700 px line, and
+    // the title lays out as "TROCADOR DE / CALOR E / REGENERADOR / TÉRMICO DE / PLACAS?". Up to
+    // 8% smaller is at most 15 characters, which changes no break, and a hundredth of an em of
+    // tracking moves none either. Only moving "DE" down clears "PLACAS?", and it leaves
+    // "TÉRMICO" alone on a line inside the paragraph, as "REGENERADOR" already is.
+    const title = 'TROCADOR DE CALOR E REGENERADOR TÉRMICO DE PLACAS?';
+    const cover = (setting: Setting) => {
+      const plain = text({
+        runs: [run(title, { font: FONT, size: setting.size, color: '#000000' })],
+        box: { w: 700 },
+        lineHeight: 1.1,
+        letterSpacing: setting.letterSpacing,
+      });
+      const node = setting.runs === undefined ? plain : { ...plain, runs: [...setting.runs] };
+      return { text: node, fits: true, laid: node };
+    };
+    const node = cover({ size: 100, letterSpacing: 0 }).text;
+    const settled = settle({ size: 100, layout: cover, measure });
+    const laid = measure(settled.laid)!;
+
+    expect(orphanOf(node.runs, measure(node)!.runs)).toBe('PLACAS?');
+    expect(settled.orphan).toBeUndefined();
+    expect(settled.setting).toMatchObject({ size: 100, letterSpacing: 0 });
+    expect(orphanOf(node.runs, laid.runs)).toBeUndefined();
+    expect(laid.lines).toBe(measure(node)!.lines);
   });
 
   it('skips every setting at which the text no longer fits its room', () => {

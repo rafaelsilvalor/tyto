@@ -88,6 +88,19 @@ itself, or when the moved word does not fit beside the lonely one; it never spli
 joined by a no-break space. `OrphanLimits.rebreak: false` turns it off. Nothing new crosses
 the plugin RPC: the report list and the protocol are unchanged.
 
+**Amended 2026-11-04 (TYTO-616): a rebreak that leaves one word above is the last resort.**
+`voce-conhece`'s cover title laid out as "TROCADOR DE / CALOR E / REGENERADOR / TÉRMICO DE /
+PLACAS?". Moving "DE" down was the only change that cleared "PLACAS?", and the rule above
+refused it: the rebroken text was read against its own runs, so the inserted break ended a
+paragraph and "TÉRMICO" looked like a new orphan. To a reader it is a short line inside the
+paragraph. Asked whether that trade is acceptable, the maintainer answered "Yes, as a last
+resort". So `settle` keeps the order above and adds one step before giving up: the same
+rebreak, judged against the paragraphs the author wrote, accepted when it fits and no
+paragraph ends on one word. A rebreak whose moved word wraps again still leaves a lone last
+word and is refused, and `W_TEMPLATE_ORPHAN` is reported as before. Body text that letter
+spacing or size can clear (the 76 px case in the kit's tests) is still cleared that way, with
+no one-word line.
+
 ## Consequences
 
 - A template states its rhythm as numbers (the questão's answer slide takes 1 : 1.6 : 1, the

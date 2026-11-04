@@ -136,6 +136,8 @@ export interface Settled<Laid> {
  * smaller, plain and then with the same letter spacing. Wider
  * letters push a word down onto the last line, narrower ones or a smaller size pull the lonely
  * word up — either clears it. A setting at which the text no longer fits its room is skipped.
+ * Last, the same rebreak once more, accepted even when it leaves one word on the line above
+ * (TYTO-616): a short line inside a paragraph is a smaller fault than a lone last word.
  *
  * When none clears it, the text is set as it fitted and `orphan` names the word, for
  * {@link reportOrphan}. When nothing can measure, nothing is known about the lines: the text is
@@ -159,13 +161,17 @@ export function settle<Laid>(request: SettleRequest<Laid>): Settled<Laid> {
     measured === undefined || limits.rebreak === false
       ? undefined
       : rebreak(first.text.runs, measured.runs);
-  if (rebroken !== undefined) {
-    const setting = { size, letterSpacing: 0, runs: rebroken };
-    const tried = layout(setting);
-    // Measured again rather than trusted: the line above may now end on one word, or the moved
-    // word may not fit beside the lonely one and wrap, which leaves an orphan either way.
-    if (tried.fits && orphanAt(tried.text) === undefined) return { setting, laid: tried.laid };
-  }
+  const rebrokenSetting =
+    rebroken === undefined ? undefined : { size, letterSpacing: 0, runs: rebroken };
+  const rebrokenTry = rebrokenSetting === undefined ? undefined : layout(rebrokenSetting);
+  // Measured again rather than trusted: the line above may now end on one word, or the moved
+  // word may not fit beside the lonely one and wrap, which leaves an orphan either way.
+  if (
+    rebrokenSetting !== undefined &&
+    rebrokenTry?.fits === true &&
+    orphanAt(rebrokenTry.text) === undefined
+  )
+    return { setting: rebrokenSetting, laid: rebrokenTry.laid };
 
   const smallest = Math.ceil(size * (1 - limits.shrink));
   for (let candidate = size; candidate >= smallest; candidate -= SIZE_STEP) {
@@ -175,6 +181,16 @@ export function settle<Laid>(request: SettleRequest<Laid>): Settled<Laid> {
       const tried = layout(setting);
       if (tried.fits && orphanAt(tried.text) === undefined) return { setting, laid: tried.laid };
     }
+  }
+
+  // The last resort (TYTO-616): the same rebreak, judged by the paragraphs the author wrote.
+  // Read against its own runs, the inserted break ends a paragraph and a line above left with
+  // one word looks like a new orphan; to a reader it is a short line inside the paragraph,
+  // which the maintainer accepts over a lone last word once no setting clears it.
+  if (rebrokenSetting !== undefined && rebrokenTry?.fits === true) {
+    const remeasured = measure(rebrokenTry.text);
+    if (remeasured !== undefined && orphanOf(first.text.runs, remeasured.runs) === undefined)
+      return { setting: rebrokenSetting, laid: rebrokenTry.laid };
   }
   return { setting: { size, letterSpacing: 0 }, laid: first.laid, orphan: found };
 }
