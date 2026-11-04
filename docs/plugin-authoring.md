@@ -150,6 +150,21 @@ external is a plugin that does not activate.
 
   A face left out measures as `undefined`, and your template falls back to its own guess.
 
+  **A template whose text holds math or science symbols lists the symbol chain too** (TYTO-484,
+  ADR 0168). A glyph the run's face lacks is measured and drawn, glyph by glyph, in Noto Sans
+  Math 400 and then in Source Sans 3 (super- and subscript digits, `·`, `°`). Your `measure`
+  falls back only to the faces that crossed, so list them:
+
+  ```yaml
+  faces:
+    - { family: CircularXX, weight: 400 }
+    - { family: Noto Sans Math, weight: 400 }
+    - { family: Source Sans 3, weight: 400 }
+  ```
+
+  Left out, the art still renders right, because Tyto lays every frame out again with every
+  bundled face. Only the boxes your template sized from its own `measure` can be off.
+
   **A code template that leaves the built-in pack declares `faces:`, and a test pins them**
   (TYTO-436). Built in, it measured in Tyto's process with every face, so its manifest never
   needed the list; installed, it measures nothing without it. Nothing else catches the drop:

@@ -33,10 +33,19 @@ without knowing what a fixture is.
 
 ## What is here
 
-| Family        | Version              | Faces                                              | Licence | Read by                 |
-| ------------- | -------------------- | -------------------------------------------------- | ------- | ----------------------- |
-| Source Sans 3 | 3.052R               | Regular 400, Bold 700, Italic 400, Bold Italic 700 | OFL 1.1 | renders and the window  |
-| IBM Plex Mono | @ibm/plex-mono@2.5.0 | Regular 400, Bold 700                              | OFL 1.1 | the desktop editor only |
+| Family         | Version              | Faces                                              | Licence | Read by                  |
+| -------------- | -------------------- | -------------------------------------------------- | ------- | ------------------------ |
+| Source Sans 3  | 3.052R               | Regular 400, Bold 700, Italic 400, Bold Italic 700 | OFL 1.1 | renders and the window   |
+| IBM Plex Mono  | @ibm/plex-mono@2.5.0 | Regular 400, Bold 700                              | OFL 1.1 | the desktop editor only  |
+| Noto Sans Math | 3.000                | Regular 400                                        | OFL 1.1 | renders: the symbol face |
+
+**Noto Sans Math is the symbol face** (TYTO-484, ADR 0168). A run's face that lacks a glyph
+hands it, at measure time and glyph by glyph, to Noto Sans Math and then to Source Sans 3, and
+the split spans enter the IR. A code template lists it under `faces:` for its own measure to fall
+back the same way. Both files ship. The `.ttf` is what fontkit measures and the `.woff2` is what
+the exporters embed. Upstream ships no `.woff2`, so that file is the `.ttf` beside it compressed
+here, and its `LICENSE.md` says how. It is listed after Source Sans 3, because `system.ts`
+substitutes a missing machine face with the first family in the table.
 
 **IBM Plex Mono is the window's, not a render's** (TYTO-269, ADR 0075). The desktop renderer
 reads its two `.woff2` files through the `@tyto-fonts` alias, as it does Source Sans 3's, so the

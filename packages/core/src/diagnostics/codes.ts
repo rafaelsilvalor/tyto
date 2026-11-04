@@ -1031,6 +1031,21 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // Raised by `compile` while it lays out text, on the host only (ADR 0168): the host lays out
+  // every frame again with every bundled face, a code template's included, so it is the one
+  // place that sees the whole symbol chain and the layout that is drawn.
+  W_GLYPH_MISSING: {
+    severity: 'warning',
+    summary: 'Text uses characters that neither its font nor the bundled symbol faces can draw.',
+    template:
+      "Text in slot '{slot}' uses {glyphs}, which neither '{font}' nor the bundled symbol faces can draw, in format '{format}'. Another font on this machine may draw them, measured wrong.",
+    spec: 'docs/adr/0168-a-glyph-its-face-lacks-is-drawn-in-the-symbol-face.md',
+    fatal: false,
+    fatality:
+      'The artwork is drawn. The characters are measured as the font measures a glyph it ' +
+      'lacks, and the browser draws them in whatever face it finds, so the line around them ' +
+      'may break or align wrong.',
+  },
   // Raised by a template through `context.report` rather than by a stage (ADR 0058). The
   // template names only the code and how far it ran over; `compile` fills in the artwork and
   // the format and points the range at the directive the artwork came from.

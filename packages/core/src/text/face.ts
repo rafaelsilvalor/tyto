@@ -34,12 +34,17 @@ interface FontkitFont {
   readonly ascent: number;
   readonly descent: number;
   layout(text: string): { readonly advanceWidth: number };
+  hasGlyphForCodePoint(codePoint: number): boolean;
 }
 
 function isFont(value: unknown): value is FontkitFont {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as Partial<FontkitFont>;
-  return typeof candidate.unitsPerEm === 'number' && typeof candidate.layout === 'function';
+  return (
+    typeof candidate.unitsPerEm === 'number' &&
+    typeof candidate.layout === 'function' &&
+    typeof candidate.hasGlyphForCodePoint === 'function'
+  );
 }
 
 export interface Face {
@@ -52,6 +57,17 @@ export interface Face {
   advance(text: string): number;
   /** Ascent plus descent, in em. The height of the glyph box, which is not the leading. */
   readonly contentHeight: number;
+  /**
+   * Whether the face draws this code point itself, from its `cmap` (TYTO-484, ADR 0168).
+   *
+   * A face that lacks a glyph still *measures* it, as `.notdef`, while a browser draws it in
+   * whatever face it finds next: the width measured and the width drawn part ways. Layout
+   * asks this first, and hands what the face lacks to the symbol chain.
+   *
+   * Optional so a hand-made face (a test's fixed-width stand-in) still type-checks; left out,
+   * the face is taken to draw everything, which is what layout assumed before ADR 0168.
+   */
+  has?(codePoint: number): boolean;
 }
 
 /**
@@ -119,6 +135,9 @@ function build(bytes: Uint8Array | undefined): Face | undefined {
     },
     // `descent` is negative in a font's own units, which is why this adds its magnitude.
     contentHeight: (font.ascent - font.descent) / unitsPerEm,
+    has(codePoint: number): boolean {
+      return font.hasGlyphForCodePoint(codePoint);
+    },
   };
 }
 
