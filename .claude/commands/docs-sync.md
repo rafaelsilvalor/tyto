@@ -113,26 +113,13 @@ generated (`/fresh-worktree`). Paste each command's output verbatim.
    `apps/docs/src/sections.ts`), those guides exist in English and not in pt-BR, every section
    has an `index.md` in each edition, and every page the sidebar lists exists in each edition.
    It does not compare headings or content, and it cannot see a page **changed** in one edition
-   while its twin stayed as it was: that passes the test, and is flagged here for review.
+   while its twin stayed as it was: that passes the test, and is flagged here for review. The
+   script reads the pages changed against `origin/main`, committed or not, untracked ones
+   included, and the `ENGLISH_ONLY_PAGES` list as text; it prints one line per page,
+   `MISSING HALF`, `ONE EDITION`, `both editions` or `english-only guide`:
 
    ```bash
-   base=apps/docs/pages
-   only=$(sed -n '/ENGLISH_ONLY_PAGES/,/\];/p' apps/docs/src/sections.ts | grep -oE "'[^']+\.md'" | tr -d "'")
-   changes=$( { git diff --name-status origin/main -- "$base"; git ls-files --others --exclude-standard -- "$base" | sed 's/^/A\t/'; } | grep -E '\.md$')
-   paths=$(printf '%s\n' "$changes" | awk -F'\t' '{ print $NF }')
-   printf '%s\n' "$changes" | while IFS=$'\t' read -r status first second; do
-     [ -n "$status" ] || continue
-     path=${second:-$first}; status=${status:0:1}; rel=${path#"$base"/}
-     case $rel in public/*) continue ;; pt-BR/*) rel=${rel#pt-BR/}; twin=$base/$rel ;; *) twin=$base/pt-BR/$rel ;; esac
-     if printf '%s\n' $only | grep -qxF "$rel"; then echo "english-only guide ($status): $path"; continue; fi
-     if [ "$status" = D ]; then
-       [ -f "$twin" ] && echo "MISSING HALF ($status): $path deleted, $twin still exists: parity fails"
-       continue
-     fi
-     if [ ! -f "$twin" ]; then echo "MISSING HALF ($status): $twin does not exist: parity fails"
-     elif ! printf '%s\n' "$paths" | grep -qxF "$twin"; then echo "ONE EDITION ($status): $path changed, $twin did not: review (parity passes)"
-     else echo "both editions ($status): $rel"; fi
-   done
+   node tools/repo-checks/src/docs-edition-pairs.mjs
    ```
 
    With `all`, the file-set half is the parity test itself, which step 6 runs.

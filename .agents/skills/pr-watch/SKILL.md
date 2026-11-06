@@ -91,20 +91,15 @@ arms auto-merge.
    A test red on main too is not this PR's; say which run on main shows it.
 
 6. **Say what the PR does not exercise, from the workflows themselves.** A run is not proof by
-   existing. List every workflow that has no run on `S`, with its trigger keys from the
-   checkout's `.github/workflows` (on the PR's branch these are the PR's own workflows):
+   existing. The script lists every workflow that has no run on `S`, with its triggers and
+   their filters from the checkout's `.github/workflows` (on the PR's branch these are the
+   PR's own workflows), then the jobs that ran but skipped, by workflow and name:
 
    ```bash
-   ran=$(gh api "repos/$R/actions/runs?head_sha=$S&per_page=100" --jq '.workflow_runs[].path'); for f in .github/workflows/*.yml; do echo "$ran" | grep -qx "$f" || awk -v f="$f" '/^on:/ { if ($2 != "") { print f ": " $2; exit } p = 1; next } p && /^[^ #]/ { exit } p && /^  [a-z_]+/ { sub(/^ +/, ""); t = t (t ? "; " : "") $0 } p && /^    (paths|branches|tags|types):/ { v = $0; sub(/^ +/, "", v); sub(/:.*/, "", v); t = t " " v } END { if (t) print f ": " t }' "$f"; done
+   node tools/repo-checks/src/unexercised-workflows.mjs --sha "$S" --repo "$R"
    ```
 
-   Then the jobs that ran but skipped, by workflow and name:
-
-   ```bash
-   for id in $(gh api "repos/$R/actions/runs?head_sha=$S&per_page=100" --jq '.workflow_runs[].id'); do gh api "repos/$R/actions/runs/$id/jobs?per_page=100" --jq '.jobs[] | select(.conclusion == "skipped") | [.workflow_name, .name] | @tsv'; done
-   ```
-
-   Translate both into sentences: a `push` on `main` workflow (`release.yml`) runs only after
+   Translate both lists into sentences: a `push` on `main` workflow (`release.yml`) runs only after
    the merge; a `push` on tags (`desktop.yml`, `docs-pages.yml`) only on a release tag; a
    `pull_request` with `paths` ran nothing because the PR touched none of them;
    `workflow_call` and `workflow_dispatch` run only when called. When `desktop-e2e` shows

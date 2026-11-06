@@ -31,28 +31,6 @@ export interface AllowedOffender {
  * matches an offending block fails too, so the PR that moves a block deletes its entries.
  */
 export const ALLOWED_OFFENDERS: readonly AllowedOffender[] = [
-  ...['.claude/commands/fresh-worktree.md', '.agents/skills/fresh-worktree/SKILL.md'].map(
-    (file) => ({
-      file,
-      step: 'List the stale package folders, then delete them.',
-      removedBy: 'TYTO-629 PR 2',
-    }),
-  ),
-  ...['.claude/commands/loose-ends.md', '.agents/skills/loose-ends/SKILL.md'].map((file) => ({
-    file,
-    step: 'Extract every item.',
-    removedBy: 'TYTO-629 PR 2',
-  })),
-  ...['.claude/commands/pr-watch.md', '.agents/skills/pr-watch/SKILL.md'].map((file) => ({
-    file,
-    step: 'Say what the PR does not exercise, from the workflows themselves.',
-    removedBy: 'TYTO-629 PR 2',
-  })),
-  ...['.claude/commands/docs-sync.md', '.agents/skills/docs-sync/SKILL.md'].map((file) => ({
-    file,
-    step: 'List the manual pages changed in one edition only.',
-    removedBy: 'TYTO-629 PR 2',
-  })),
   ...['.claude/commands/flake-hunt.md', '.agents/skills/flake-hunt/SKILL.md'].flatMap((file) =>
     ['Write the arm script.', 'Compare the failures.'].map((step) => ({
       file,

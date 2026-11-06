@@ -41,11 +41,12 @@ than the card's).
 
 Steps:
 
-1. **Set the window.** With an argument, set `SINCE` to it first; without one, the line
-   below sets it to 7 days ago:
+1. **Set the window.** With an argument, add `--since <YYYY-MM-DD>` to the line below;
+   without one, it prints the date 7 days ago (UTC) and says it is the default. Set `SINCE`
+   to the date it prints:
 
    ```bash
-   SINCE="${SINCE:-$(date -u -d '7 days ago' +%F)}"; echo "since $SINCE"
+   node tools/repo-checks/src/loose-ends.mjs --window
    ```
 
 2. **List the merged PRs.** Count them and read the newest merge, which is the next start
@@ -59,21 +60,16 @@ Steps:
    passes.
 
 3. **Extract every item.** The section runs from `## Left open` to the next `## ` heading;
-   an item is a table row (the header and the `---` row skipped) or a bullet. A PR without
-   the section prints one line that says so; release PRs have none.
+   an item is a table row (each table's header and `---` row skipped) or a top-level bullet.
+   The script prints one `#<PR>` line per item, lowest PR first; a PR without the section
+   prints one line that says so (release PRs have none):
 
    ```bash
-   for n in $(gh pr list --repo "$R" --state merged --search "merged:>=$SINCE" --json number --limit 200 --jq '.[].number' | sort -n); do
-     gh pr view "$n" --repo "$R" --json body --jq .body | tr -d '\r' |
-       awk -v n="$n" '/^## Left open/ { f = 1; seen = 1; next } /^## / { f = 0 }
-         f && /^\|/ { rows++; if (rows > 1 && $0 !~ /^\| *:?-+/) print "#" n "\t" $0 }
-         f && /^[-*] / { print "#" n "\t" $0 }
-         END { if (!seen) print "#" n "\t(no Left open section)" }'
-   done
+   node tools/repo-checks/src/loose-ends.mjs --since "$SINCE" --repo "$R"
    ```
 
-   Say how many items came from how many PRs, and which PRs had no section. Read the card
-   key of each PR from its title.
+   Its last lines say how many items came from how many PRs, which PRs had no section, and
+   which had a section with no item; quote them. Read the card key of each PR from its title.
 
 4. **Drop what the PR already closed.** An item whose status says Fixed, Corrected, By
    design or Noise (or the Portuguese `Corrigido`, `Ruído`) is listed as dropped, with the
