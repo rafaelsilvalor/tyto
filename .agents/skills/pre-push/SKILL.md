@@ -50,6 +50,18 @@ Linux shell. `node_modules` must exist.
    for f in $(git diff --name-only --diff-filter=A origin/main...HEAD -- docs/adr/); do n=$(basename "$f" | cut -c1-4); git ls-tree --name-only origin/main docs/adr/ | grep "/$n-" | sed "s|^|$f clashes with |"; done
    ```
 
+   Nor with one another **open** pull request adds: two open branches have raced for one
+   number before (TYTO-576). This reads every other open PR's file list (the REST list pages
+   past 100 files; this branch's own PR is skipped by its head branch) and prints each clash
+   with the PR's number, and nothing when every number is free:
+
+   ```bash
+   B=$(git branch --show-current); mine=$(git diff --name-only --diff-filter=A origin/main...HEAD -- docs/adr/ | cut -c10-13); for n in $(gh pr list --repo rafaelsilvalor/tyto --state open --limit 200 --json number,headRefName --jq ".[] | select(.headRefName != \"$B\") | .number"); do for f in $(gh api --paginate "repos/rafaelsilvalor/tyto/pulls/$n/files?per_page=100" --jq '.[] | select(.status == "added" or .status == "renamed") | .filename | select(test("^docs/adr/[0-9]{4}-"))'); do if echo "$mine" | grep -qx "$(echo "$f" | cut -c10-13)"; then echo "clashes with PR #$n: $f"; fi; done; done
+   ```
+
+   A clash with an open PR fails this step like one with `origin/main`: name the PR, and agree
+   with whoever owns it (or the coordinator who reserved the number) which branch renumbers.
+
 5. **Size.** About 1,500 changed lines per PR at most; above that, propose a split rather
    than push. The count includes `pnpm-lock.yaml`, snapshots and fixtures; say how much of it
    they are when they push it over.
