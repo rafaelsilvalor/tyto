@@ -9,9 +9,12 @@
       // task hash, and the cache replayed the last green against a document that no longer
       // matches (TYTO-52, ADR 0072). The Reference pages are also rendered from app sources
       // that are not a dependency of this package — the desktop's shared modules, its
-      // command table and its two theme files, and the CLI's program (TYTO-313) — so those
-      // are inputs for the same reason, and so is the built-in pack the template gallery is
-      // read from (TYTO-316).
+      // command table and its two theme files — so those are inputs for the same reason, and
+      // so is the built-in pack the template gallery is read from (TYTO-316). The CLI page
+      // reads `@tyto/command-line` (ADR 0159), no longer `apps/cli/src` (TYTO-313); that
+      // package is a dependency, so `^build` already puts its sources in this hash, and the
+      // input below names it for the reader (measured on TYTO-579: a description changed in
+      // its `program.ts` missed the cache with and without the line).
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/docs/diagnostic-codes.md",
@@ -28,7 +31,7 @@
         "$TURBO_ROOT$/apps/desktop/src/renderer/commands.ts",
         "$TURBO_ROOT$/apps/desktop/src/main/desktop.tyto-plugin.json",
         "$TURBO_ROOT$/apps/desktop/src/main/themes/*.json",
-        "$TURBO_ROOT$/apps/cli/src/**/*.ts"
+        "$TURBO_ROOT$/packages/command-line/src/**/*.ts"
       ]
     }
   }
