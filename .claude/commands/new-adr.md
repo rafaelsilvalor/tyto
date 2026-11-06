@@ -102,8 +102,7 @@ from the local checkout. Run from the repository root, in Git Bash or a Linux sh
 
 7. **Report and hand over.** Paste the outputs of step 2, the number and why, the file's path,
    and the notes added in step 5. End by saying that before pushing, `/pre-push` must run: its
-   step 4 compares every ADR the branch adds with `origin/main` and prints each clash. It does
-   not read open pull requests, so rerun the open-PR loop of step 2 right before the push as
-   well.
+   step 4 compares every ADR the branch adds with `origin/main` and with the ADRs every other
+   open pull request adds, and prints each clash.
 
 Never commit, push or edit anything beyond the new ADR and the notes asked for in step 5.
