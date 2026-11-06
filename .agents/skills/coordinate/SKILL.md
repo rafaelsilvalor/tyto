@@ -18,6 +18,12 @@ Talk to the maintainer in pt-BR, in the plain, short style his home instructions
 Everything you write in the repo and in Jira stays in English, except the Portuguese half of a
 card.
 
+**Paths.** This file is public, so it names folders by shape, never by a machine's path.
+`<coordination folder>` is the maintainer's private batch repository, a local clone that holds
+the batch files and the registry: the environment variable `TYTO_COORDINATION_DIR`; if it is
+unset, the folder the maintainer's own instructions or memory name (his home `AGENTS.md`,
+outside this repository); if neither names one, ask him. Never guess a path.
+
 ## Arguments
 
 - `curate` → **curate mode**.
@@ -31,22 +37,20 @@ order among themselves, and a batch can gain cards, lose cards or be split while
 
 - **Membership is in Jira:** the label `batch-<name>` on every card of the batch. A card
   belongs to at most one batch. A card created while the batch runs is born with the label.
-- **Coordination state is a file** in the maintainer's private batch repository, a local clone
-  whose path his home `AGENTS.md` gives (below, `<batches>`). `<batches>/<name>.md` is written
-  in Portuguese and holds the goal, one queue per package, the executor thread of each card,
-  PRs, decisions and "O que ficou". It is also the handoff: a new coordinator starts by reading
-  it.
+- **Coordination state is a file:** `<coordination folder>/<name>.md`, written in Portuguese.
+  It holds the goal, one queue per package, the executor thread of each card, PRs, decisions
+  and "O que ficou". It is also the handoff: a new coordinator starts by reading it.
 - **The registry shared by all coordinators**, Claude Code and Codex alike:
-  `<batches>/_registro.md`. It holds the active coordinators (**at most 2 at a time**; if 2
-  are active, stop and say so), **ADR reservations** (number → card → batch; reserve when you
-  approve a plan that needs an ADR, and the executor confirms it on `origin/main` right before
-  pushing) and **occupied packages** (package → card → PR → batch; never GO a card whose
-  package another open PR occupies, in any batch).
+  `<coordination folder>/_registro.md`. It holds the active coordinators (**at most 2 at a
+  time**; if 2 are active, stop and say so), **ADR reservations** (number → card → batch;
+  reserve when you approve a plan that needs an ADR, and the executor confirms it on
+  `origin/main` right before pushing) and **occupied packages** (package → card → PR → batch;
+  never GO a card whose package another open PR occupies, in any batch).
 
-  `git -C <batches> pull --rebase` before reading. After each change, one small commit and
-  `git push`; a refused push is pulled and repeated, never forced. Re-read the registry before
-  every GO and every merge, edit it in single-row changes, and remove your rows when a PR
-  merges or a card leaves the batch.
+  `git -C <coordination folder> pull --rebase` before reading. After each change, one small
+  commit and `git push`; a refused push is pulled and repeated, never forced. Re-read the
+  registry before every GO and every merge, edit it in single-row changes, and remove your rows
+  when a PR merges or a card leaves the batch.
 
 Jira calls follow `AGENTS.md` › Operational rules › Jira (fields, connector fallback,
 transition ids); each step below names the `fields` it reads.
@@ -70,8 +74,8 @@ transition ids); each step below names the `fields` it reads.
 
 ### Start
 
-1. Read `<batches>/<name>.md`, the registry and the home agent notes. Name this thread
-   `Coordenadora <name>` and register it in the registry's coordinator table as
+1. Read `<coordination folder>/<name>.md`, the registry and the home agent notes. Name this
+   thread `Coordenadora <name>` and register it in the registry's coordinator table as
    `codex:<thread id>`, so a Claude Code coordinator can tell it apart from its own sessions.
 2. **Re-query, never trust the file blindly:** `gh pr list --repo rafaelsilvalor/tyto --state
 open`, the latest ADR on `origin/main`, and the batch in Jira (`labels = batch-<name>`,
@@ -87,7 +91,7 @@ the same conversation.
 
 ```sh
 git worktree add <worktrees>/<KEY> -b <type>/<KEY>-<slug> origin/main
-codex exec -C <worktrees>/<KEY> --json -o <batches>/<name>/<KEY>.last.md "<executor prompt>"
+codex exec -C <worktrees>/<KEY> --json -o <coordination folder>/<name>/<KEY>.last.md "<executor prompt>"
 ```
 
 - Read the `thread_id` from the first JSON line (`{"type":"thread.started",...}`) and write it
@@ -95,7 +99,7 @@ codex exec -C <worktrees>/<KEY> --json -o <batches>/<name>/<KEY>.last.md "<execu
 - Each executor turn ends with a message: its plan, its question or its report. `-o` writes it
   to `<KEY>.last.md`; read it there.
 - To answer, give GO or send a correction:
-  `codex exec resume <thread_id> -C <worktrees>/<KEY> --json -o <batches>/<name>/<KEY>.last.md "<message>"`.
+  `codex exec resume <thread_id> -C <worktrees>/<KEY> --json -o <coordination folder>/<name>/<KEY>.last.md "<message>"`.
 - Run executor turns as background shell jobs when the shell allows it, and at most **3
   executors at once**. Never fake a wait with a polling loop over the output file; a turn that
   is still running has not reported.

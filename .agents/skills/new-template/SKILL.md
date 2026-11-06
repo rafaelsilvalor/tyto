@@ -15,11 +15,14 @@ Talk to the maintainer in pt-BR, in the plain, short style his home instructions
 Everything you write in the new repository, in Tyto's repository and in Jira stays in English,
 except the Portuguese half of a card.
 
-**Paths.** The folders below are named, not spelled out, because this file is public. The
-maintainer's home `AGENTS.md` gives each one: `<tyto>` (Tyto's main checkout), `<templates>`
-(where template repositories are cloned), `<references>` (one folder of artwork per template),
-`<brief-modeller>` (the brief-modeller skill's source folder) and `<batches>` (the private
-batch repository). The CLI is `node <tyto>/apps/cli/dist/index.js` (below, `tyto`).
+**Paths.** The folders below are named by shape, never by a machine's path, because this file
+is public. `<coordination folder>` (the private batch repository) is the environment variable
+`TYTO_COORDINATION_DIR`, and `<skill source folder>` (the brief-modeller skill's source folder)
+is `TYTO_SKILL_SOURCE_DIR`. When a variable is unset, and for the other three, `<tyto>` (Tyto's
+main checkout), `<templates>` (where template repositories are cloned) and `<references>` (one
+folder of artwork per template), the folder is the one the maintainer's own instructions or
+memory name (his home `AGENTS.md`, outside this repository); if neither names one, ask him.
+Never guess a path. The CLI is `node <tyto>/apps/cli/dist/index.js` (below, `tyto`).
 
 ## Read first
 
@@ -80,13 +83,13 @@ read:packages`, and the maintainer approves it in the browser.
 
 ## 3. The card in E18
 
-`git -C <batches> pull --rebase`, then read `_registro.md`.
+`git -C <coordination folder> pull --rebase`, then read `_registro.md`.
 
 - **The `template-repos` batch is active**: its coordinator creates the card. A Codex
   coordinator is reached with `codex exec resume <thread id>`; a Claude Code coordinator
-  cannot be messaged from Codex, so append the request to `<batches>/template-repos.md`
-  under a dated line, push it, and tell the maintainer to point the coordinator at it. Send
-  the name, artwork, formats, brand or neutral, public or private, the contract versions, and
+  cannot be messaged from Codex, so append the request to
+  `<coordination folder>/template-repos.md` under a dated line, push it, and tell the
+  maintainer to point the coordinator at it. Send the name, artwork, formats, brand or neutral, public or private, the contract versions, and
   ask for a card of E18 (TYTO-429) with the label `batch-template-repos`. Wait for its key.
 - **The batch is not active**: create the card yourself, as `AGENTS.md` › _Language_ asks,
   parent TYTO-429. Re-read its status after creating it (`fields: ["status"]`). Never move it
@@ -181,7 +184,7 @@ bounding box, and give a diff image. Compare layout with a scratch brief holding
 3. **An example brief renders**: copy the formats into the project's `formats.yaml`, `tyto
 render` an example with `--json`, paste `status` and the diagnostics verbatim. `status:
 "ok"` and no `W_PLUGIN_SKIPPED` is done.
-4. **The brief-modeller skill is updated**, every time: in `<brief-modeller>`, a new
+4. **The brief-modeller skill is updated**, every time: in `<skill source folder>`, a new
    `references/templates/<name>.md` (copy `_modelo.md`), the entry in
    `references/templates.json` and the line in `references/templates/indice.md`; run
    `scripts/check_brief.py` on the example brief; repackage the zip as the home notes say.
@@ -195,7 +198,7 @@ render` an example with `--json`, paste `status` and the diagnostics verbatim. `
 - **Never claim what you did not measure.** Say "read in the code" when that is what it was.
 - "Espere" means stop: do not start the next action.
 - Python writing a file: `newline=''`, or a brief gets CRLF and the parser refuses it. Python
-  wants Windows paths (`C:/…`), not `/c/…`.
+  wants Windows paths (`C:/<path>`), not `/c/<path>`.
 - The repository's `.npmrc` never holds a token.
 - **A code template declares `faces:` in its manifest**, every face it measures (TYTO-436); a
   face left out measures as nothing, and only `tests/faces.test.ts` notices.
