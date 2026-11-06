@@ -16,8 +16,8 @@ or a card key, ask for them before step 1.
 AGENTS.md › Commits and pull requests: "An ADR number is used only once reserved; confirm it is
 still free on `origin/main` right before pushing." Two branches have raced for one number
 before, so the number is read from `origin/main` **and** from the open pull requests, never
-from the local checkout. Run from the repository root, in Git Bash or a Linux shell, with
-`R=rafaelsilvalor/tyto`. Paste each command's output verbatim.
+from the local checkout. Run from the repository root, in Git Bash or a Linux shell. Paste each
+command's output verbatim.
 
 1. **Fetch first**, so `origin/main` is fresh:
 
@@ -25,25 +25,18 @@ from the local checkout. Run from the repository root, in Git Bash or a Linux sh
    git fetch origin main
    ```
 
-2. **Find the highest number in use.** On `origin/main` (prints the highest; the second
-   command prints a number two files share, and nothing when none does):
+2. **Find the highest number in use.** On `origin/main` and in every open pull request: the
+   script prints the highest number on `origin/main`, any number two files there share, every
+   ADR an open pull request adds or renames into `docs/adr` (from its file list: the REST list
+   pages past 100 files, where the `files` field of `gh pr list` stops at 100), and the next
+   free number. It reads the repository `origin` points at; `--repo owner/name` names another:
 
    ```bash
-   git ls-tree --name-only origin/main docs/adr/ | cut -c10-13 | sort | tail -1
+   node tools/repo-checks/src/adr-numbers.mjs --next
    ```
 
-   ```bash
-   git ls-tree --name-only origin/main docs/adr/ | cut -c10-13 | sort | uniq -d
-   ```
-
-   Then every ADR an open pull request adds, from its file list (the REST list pages past 100
-   files; the `files` field of `gh pr list` stops at 100):
-
-   ```bash
-   for n in $(gh pr list --repo "$R" --state open --limit 200 --json number --jq '.[].number'); do echo "PR #$n:"; gh api --paginate "repos/$R/pulls/$n/files?per_page=100" --jq '.[] | select(.status == "added" or .status == "renamed") | .filename | select(test("^docs/adr/[0-9]{4}-"))'; done
-   ```
-
-   **The next free number is the highest of both, plus one**, written with four digits.
+   **The next free number is the highest of both, plus one**, written with four digits: the
+   `next free:` line.
 
    **A reserved number.** When a coordinator reserved a number for this card, use that number,
    after checking it is free: no file `docs/adr/<number>-*` on `origin/main`, and no open PR
