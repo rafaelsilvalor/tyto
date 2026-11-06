@@ -32,7 +32,8 @@ folders are the list. **Each port names its source, and a rule changed in one is
 other in the same PR.** `tools/repo-checks/src/codex-ports.test.ts` fails on a command without
 a port, a port without a command (such as a `source-command-<name>` folder the Codex app wrote
 on its own), a port whose frontmatter lacks its `name` or `description`, and a port that does
-not name its source file. The two formats differ only in the frontmatter (a skill needs `name` and
+not name its source file. It also checks the list of command names in `CLAUDE.md` against
+`.claude/commands/`, both ways. The two formats differ only in the frontmatter (a skill needs `name` and
 `description`) and in the tools the text names.
 
 ## What each tool has

@@ -103,3 +103,65 @@ describe('Codex ports of the repository commands (.agents/skills)', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * `CLAUDE.md` names every repository command in one sentence, the first thing an agent reads
+ * about them. Nothing checked that the list kept up with `.claude/commands/` (TYTO-631).
+ *
+ * The parse anchors on that sentence and reads only its parenthesis, which may wrap across
+ * lines; a `/word` elsewhere in the file is not a list item. When the sentence is reworded
+ * and no longer found, the check fails instead of passing on an empty list. `docs/agents.md`
+ * carries no list of its own (it says the two folders are the list), so it is not parsed.
+ */
+const COMMAND_LIST_SENTENCE =
+  /Repository\s+commands\s+are\s+in\s+`\.claude\/commands\/`\s+\(([^)]*)\)/;
+const COMMAND_LIST_ITEM = /`\/([a-z0-9-]+)`/g;
+
+interface CommandList {
+  readonly names: string[];
+  /** Whatever the parenthesis holds besides backticked `/name` items, commas and spaces. */
+  readonly leftover: string;
+}
+
+function commandListIn(text: string): CommandList | undefined {
+  const sentence = COMMAND_LIST_SENTENCE.exec(text);
+  if (sentence === null) return undefined;
+  const inside = sentence[1]!;
+  return {
+    names: [...inside.matchAll(COMMAND_LIST_ITEM)].map((item) => item[1]!).sort(),
+    leftover: inside.replace(COMMAND_LIST_ITEM, '').replace(/[\s,]/g, ''),
+  };
+}
+
+describe('The command list in CLAUDE.md', () => {
+  const commands = commandNames();
+  const list = commandListIn(readFileSync(join(repoRoot, 'CLAUDE.md'), 'utf8'));
+  const listed = list?.names ?? [];
+
+  it('is found, and holds only backticked /name items', () => {
+    expect(
+      list,
+      'CLAUDE.md no longer says "Repository commands are in `.claude/commands/` (...)"; ' +
+        'update COMMAND_LIST_SENTENCE in this file to the new wording',
+    ).toBeDefined();
+    expect(list?.leftover, 'write each item as `/name`, separated by commas').toBe('');
+  });
+
+  it('lists no command that has no file', () => {
+    const missing = listed.filter((name) => !commands.includes(name));
+    expect(
+      missing,
+      'CLAUDE.md lists these, but .claude/commands/<name>.md does not exist; ' +
+        'remove them from the list or add the command',
+    ).toEqual([]);
+  });
+
+  it('lists every command that has a file', () => {
+    const unlisted = commands.filter((name) => !listed.includes(name));
+    expect(
+      unlisted,
+      'add these to the list in CLAUDE.md ("Repository commands are in `.claude/commands/` ' +
+        '(...)"), in the same PR',
+    ).toEqual([]);
+  });
+});
