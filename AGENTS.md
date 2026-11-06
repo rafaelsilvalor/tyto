@@ -75,7 +75,7 @@ Learned from past mistakes on this repository. Each one cost a red CI run or a w
 - A Dependabot PR closes itself once an `ignore` rule matches; GitHub Actions versions in `ignore` are refs (`'2'`), npm versions are semver (`'7.x'`).
 - A new `.github/labeler.yml` rule never labels its own PR. A new `apps/<name>` also needs an entry in the lists of `tools/repo-checks/src/changesets.test.ts`.
 - A push that fails with an LFS lock or a 500 is retried as a plain push a minute later. After any push carrying LFS files, run `git lfs push --all origin <branch>` and require "Uploading LFS objects".
-- Desktop release: bump `apps/desktop/package.json`, push tag `desktop-v<version>`; the release is born draft. List drafts with `gh release view <tag>`, never `gh release list`.
+- Desktop release (`/release-desktop`): the version is read, never chosen; Changesets' version PR bumps `apps/desktop/package.json`, and merging it is the maintainer's. Then a notes PR, then tag `desktop-v<version>` on the merged commit; the release is born draft. List drafts with `gh release view <tag>`, never `gh release list`.
 
 ### Building
 

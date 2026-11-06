@@ -8,6 +8,6 @@ Claude Code reads them. Change a rule there, not here.
 ## Claude Code only
 
 - Repository commands are in `.claude/commands/` (`/next-card`, `/handoff`, `/coordinate`,
-  `/new-template`, `/pre-push`, `/card`, `/evidence`, `/pr-watch`, `/new-adr`, `/fresh-worktree`, `/perturb`, `/e2e-new`, `/docs-sync`, `/flake-hunt`, `/loose-ends`). Each has a Codex port in `.agents/skills/<name>/SKILL.md`; a rule
+  `/new-template`, `/pre-push`, `/card`, `/evidence`, `/pr-watch`, `/new-adr`, `/fresh-worktree`, `/perturb`, `/e2e-new`, `/docs-sync`, `/flake-hunt`, `/loose-ends`, `/release-desktop`). Each has a Codex port in `.agents/skills/<name>/SKILL.md`; a rule
   changed in one is changed in the other in the same PR. `codex-ports.test.ts` in `tools/repo-checks` checks the pair.
 - `docs/agents.md` says how Claude Code sessions and Codex threads reach each other.
