@@ -90,7 +90,7 @@ Learned from past mistakes on this repository. Each one cost a red CI run or a w
 - `pnpm check` can be all cache: use `TURBO_FORCE=1` when anything outside the hash changed, and require `Cached: 0 cached`. It stops at the first failure and runs neither changeset checks nor `*.desktop.test.ts`; for evidence run `TURBO_FORCE=1 pnpm exec turbo run typecheck lint test --continue`.
 - While a check runs in the background, touch nothing in the tree.
 - After switching branches, delete package folders that hold only `.turbo` or `node_modules`; repo-checks scans folders on disk.
-- After settings, commands, status bar or font changes, update the generated reference pages: `cd tools/docs-gen && pnpm exec vitest run --update src/reference/pages.test.ts`.
+- After settings, commands, status bar or font changes, update the generated reference pages with `/docs-sync`, or by hand: `pnpm exec turbo run build --filter=@tyto/docs-gen...`, then `pnpm --filter @tyto/docs-gen exec vitest run --update src/reference/pages.test.ts`. The renderers read the `@tyto/*` packages from `dist`, so an update without the build rewrites the pages from old code and still passes (TYTO-579).
 - Check `pnpm-lock.yaml` for an optional peer before adding a dependency; `auto-install-peers` makes an add irreversible. Never perturb `packageManager` in `package.json`.
 - `@tyto/fonts` and `@tyto/templates` ship without `node_modules`: only Node built-ins may be imported there.
 - To expose a dependency's type, write a local alias (`export type X = Imported`); tsup drops the `type` modifier from `export type { X }`.
