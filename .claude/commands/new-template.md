@@ -7,6 +7,15 @@ Talk to Rafael in pt-BR, in the plain, short style of his global `CLAUDE.md` ("E
 lean mode). Everything you write in the new repository, in Tyto's repository and in Jira stays
 in English, except the Portuguese half of a card.
 
+**Paths.** The folders below are named by shape, never by a machine's path, because this file
+is public. `<coordination folder>` (the private batch repository) is the environment variable
+`TYTO_COORDINATION_DIR`, and `<skill source folder>` (the brief-modeller skill's source folder)
+is `TYTO_SKILL_SOURCE_DIR`. When a variable is unset, and for the other three, `<tyto>` (Tyto's
+main checkout), `<templates>` (where template repositories are cloned) and `<references>` (one
+folder of artwork per template), the folder is the one Rafael's own instructions or memory name
+(outside this repository); if neither names one, ask him. Never guess a path. The CLI is
+`node <tyto>/apps/cli/dist/index.js` (below, `tyto`).
+
 ## Arguments
 
 - `$ARGUMENTS` = `<name>` → the template's name; step 1 starts at the second question.
@@ -19,18 +28,14 @@ in English, except the Portuguese half of a card.
 2. ADRs 0149 (the contract on GitHub Packages), 0150 (`@tyto/plugin-api/testing`), 0151 (plugin
    files; a configuration changes a value, never the composition), 0152
    (`@tyto/template-kit/testing`) and 0153 (`values` in the manifest).
-3. The worked example, `C:\projects\tyto\templates\tyto-template-tabela`: run
-   `git -C C:/projects/tyto/templates/tyto-template-tabela pull --ff-only` first, then read its
+3. The worked example, `<templates>/tyto-template-tabela`: run
+   `git -C <templates>/tyto-template-tabela pull --ff-only` first, then read its
    `README.md`, `package.json`, `tyto-plugin.json`, `src/`, `tests/`, `templates/` and
    `.github/workflows/`.
 4. The memory index, and in full: `templates-own-repos-2026-10-27`, `projects-layout-on-ssd`,
    `build-templates-live-with-the-preview`, `brief-modeller-skill-package`,
    `brand-content-in-public-repo`, `svg-geometry-in-colour-out` and
    `italic-breaks-the-builtin-render`.
-
-Paths: Tyto's main checkout is `C:\projects\tyto\tyto`; template repositories live in
-`C:\projects\tyto\templates\tyto-template-<name>`. The CLI is
-`node C:/projects/tyto/tyto/apps/cli/dist/index.js` (below, `tyto`).
 
 ## 1. Four questions, one at a time
 
@@ -41,10 +46,10 @@ Offer options when there are options.
    becomes the manifest's `name`, the plugin's `name` and the repository
    `tyto-template-<name>`. **Refuse a name already taken**, and say where it was found:
    - a template in the app: every `name:` in
-     `git -C C:/projects/tyto/tyto show origin/main:packages/templates/templates/<folder>/manifest.yaml`
+     `git -C <tyto> show origin/main:packages/templates/templates/<folder>/manifest.yaml`
      for each folder that `git ls-tree --name-only origin/main packages/templates/templates/`
      lists (fetch first; a folder name and a manifest name can differ);
-   - a template repository on disk: every folder under `C:\projects\tyto\templates`, and every
+   - a template repository on disk: every folder under `<templates>`, and every
      `name:` in their `templates/*/manifest.yaml`;
    - a repository on GitHub: `gh repo view rafaelsilvalor/tyto-template-<name>` must fail.
 2. **The artwork and its formats.** What the art is for, and the exact canvases (`1080×1350`,
@@ -65,7 +70,7 @@ memory.** Read them from tabela's current `package.json`, which CI keeps buildin
 published contract:
 
 ```sh
-node -p "Object.entries(require('C:/projects/tyto/templates/tyto-template-tabela/package.json').devDependencies).filter(([name]) => name.startsWith('@tyto/')).map(([name, range]) => name + ' ' + range).join('\n')"
+node -p "Object.entries(require('<templates>/tyto-template-tabela/package.json').devDependencies).filter(([name]) => name.startsWith('@tyto/')).map(([name, range]) => name + ' ' + range).join('\n')"
 ```
 
 Then confirm each one exists on GitHub Packages. Use `users/...` without a leading slash, or
@@ -85,7 +90,7 @@ Enter in the terminal tab after approving in the browser.
 
 ## 3. The card in E18
 
-`git -C C:/Users/rafae/.claude/LOTES pull --rebase`, then read `_registro.md`.
+`git -C <coordination folder> pull --rebase`, then read `_registro.md`.
 
 - **The `template-repos` batch is active** (a row under _Coordenadoras ativas_): tell its
   coordinator with `mcp__ccd_session_mgmt__send_message` to its `session_id`, in one message:
@@ -112,7 +117,7 @@ On his yes:
 
 ```sh
 gh repo create rafaelsilvalor/tyto-template-<name> --private --description "<one line>"
-git clone https://github.com/rafaelsilvalor/tyto-template-<name>.git C:/projects/tyto/templates/tyto-template-<name>
+git clone https://github.com/rafaelsilvalor/tyto-template-<name>.git <templates>/tyto-template-<name>
 ```
 
 (`--public` when he chose public.) Copy tabela's structure, not its template:
@@ -162,7 +167,7 @@ can see and a number you measured.
 
 **Run the live preview on the repository.** In the main checkout, `.claude/launch.json` gets a
 `template-preview` configuration running
-`pnpm template:preview C:/projects/tyto/templates/tyto-template-<name>` on port 4174, started with
+`pnpm template:preview <templates>/tyto-template-<name>` on port 4174, started with
 `preview_start`. The repository needs its `pnpm install` (step 4) first: the preview builds `src/`
 with the repository's own `tsup.config.ts`, which bundles `@tyto/*` from its `node_modules/`.
 
@@ -197,7 +202,7 @@ Rules for the loop:
 
 ## 5a. With a PSD, it is the answer key
 
-Before the first iteration, look for the art in `C:\projects\tyto\references\<name>\` (one
+Before the first iteration, look for the art in `<references>/<name>/` (one
 folder per template, named after it). **No PSD there: skip this step**, and the reference is
 whatever Rafael shows.
 
@@ -264,7 +269,7 @@ PSD's text, kept in the scratchpad, and say that is what the number measures.
    Show him the PNG.
 4. **The brief-modeller skill is updated** — his rule: every new template updates it, and a
    template card is not finished without it. In
-   `C:\Users\rafae\.claude\INSTRUCOES\modelador-de-brief\`: a new
+   `<skill source folder>`: a new
    `references/templates/<name>.md` (copy `_modelo.md`), the entry in
    `references/templates.json` and the line in `references/templates/indice.md`; run
    `scripts/check_brief.py` on the example brief; repackage the zip as the memory
@@ -282,7 +287,7 @@ PSD's text, kept in the scratchpad, and say that is what the number measures.
 - **Never claim what you did not measure.** Say "read in the code" when that is what it was.
 - "Espere" means stop: do not start the next action.
 - Python writing a file: `newline=''`, or a brief gets CRLF and the parser refuses it. Python
-  wants Windows paths (`C:/…`), not `/c/…`.
+  wants Windows paths (`C:/<path>`), not `/c/<path>`.
 - The repository's `.npmrc` never holds a token: pnpm 11 expands no variable in a committed
   `.npmrc`'s credentials, and a public repository would publish it.
 - **A code template declares `faces:` in its manifest**, every face it measures (TYTO-436).

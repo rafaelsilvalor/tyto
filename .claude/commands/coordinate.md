@@ -6,6 +6,14 @@ Talk to Rafael in pt-BR, in the plain, short style of his global `CLAUDE.md`
 ("Estilo Bancada", lean mode). Everything you write in the repo and in Jira
 stays in English, except the Portuguese half of a card.
 
+**Paths.** This file is public, so it names folders by shape, never by a
+machine's path. `<coordination folder>` is the private folder that holds the
+batch files and the registry: the environment variable
+`TYTO_COORDINATION_DIR`; if it is unset, the folder Rafael's own instructions
+or memory name (outside this repository); if neither names one, ask him.
+Never guess a path. `<main checkout>` is the first path `git worktree list`
+prints.
+
 ## Arguments
 
 - `$ARGUMENTS` = `curate` → **curate mode** (below).
@@ -21,12 +29,12 @@ and a batch can gain cards, lose cards or be split while it runs.
 - **Membership is in Jira:** the label `batch-<name>` on every card of the batch.
   A card belongs to at most one batch. A card created while the batch runs is
   born with the label.
-- **Coordination state is a file:** `C:\Users\rafae\.claude\LOTES\<name>.md`
+- **Coordination state is a file:** `<coordination folder>/<name>.md`
   (Portuguese, outside the repo). It holds the goal, one queue per package,
   the executor session of each card, PRs, decisions and "O que ficou". It is
   also the handoff: a new coordinator for the batch starts by reading it.
 - **The registry shared by all coordinators:**
-  `C:\Users\rafae\.claude\LOTES\_registro.md`. It holds:
+  `<coordination folder>/_registro.md`. It holds:
   - the active coordinators (**at most 2 at a time**; if 2 are active, stop and
     tell Rafael);
   - **ADR reservations**: number → card → batch. Reserve the number when you
@@ -62,7 +70,7 @@ fallback, transition ids); each step below names the `fields` it reads.
 
 ### Start
 
-1. Read `C:\Users\rafae\.claude\LOTES\<name>.md`, the registry and the memory
+1. Read `<coordination folder>/<name>.md`, the registry and the memory
    index. Rename this session `Coordenadora <name>` (`set_session_title`), learn
    your own `session_id` with `mcp__ccd_session_mgmt__get_session` on `"self"`,
    and register yourself as an active coordinator with that id. The executor
@@ -181,7 +189,8 @@ Protocol (non-negotiable):
    Smart App Control blocks turbo.exe, `pnpm -r --if-present run
    generate:parser && pnpm -r --workspace-concurrency=2 run build`). With no
    Electron binary in the worktree, use
-   ELECTRON_OVERRIDE_DIST_PATH="C:/projects/tyto/tyto/apps/desktop/node_modules/electron/dist".
+   ELECTRON_OVERRIDE_DIST_PATH="<main checkout>/apps/desktop/node_modules/electron/dist"
+   (<main checkout>: the first path `git worktree list` prints).
    An e2e test asserts only what needs the real window (layout, focus, keys,
    IPC, the package); logic is tested in packages/* or jsdom, and a file has a
    60 s budget on CI (ADR 0105, docs/conventions.md).
