@@ -165,3 +165,266 @@ describe('The command list in CLAUDE.md', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * A port says what its command says (TYTO-630). The checks above prove that a port exists and
+ * names its source; they passed on a PR that edited a command and left its port behind.
+ *
+ * Both files are reduced to a skeleton and the skeletons are compared. The skeleton is
+ * extracted, not declared with markers: markers rot, and nobody adds them to a new command.
+ * It is the ordered list of `##` and `###` headings and, under each, the top-level numbered
+ * steps (`1. `), each with its number and its bold label when it has one (`1. **Label**`),
+ * since that is how a step is named. The frontmatter, the `#` title, prose, nested lists and
+ * everything inside a fenced code block are left out: that is where the two tools' names
+ * differ (`docs/agents.md`).
+ */
+export interface AllowedPortDifference {
+  readonly command: string;
+  /** The skeleton line as the command has it; alone, a line only the command has. */
+  readonly inCommand?: string;
+  /** The skeleton line as the port has it; alone, a line only the port has. */
+  readonly inPort?: string;
+  readonly reason: string;
+}
+
+/**
+ * Every skeleton difference a pair may keep, each because the two tools differ there. With
+ * both sides, the port's line counts as the command's; with one side, the line is skipped.
+ * The last test below fails on an entry that no longer matches anything.
+ */
+export const ALLOWED_PORT_DIFFERENCES: readonly AllowedPortDifference[] = [
+  {
+    command: 'coordinate',
+    inCommand: '### Starting an internal executor',
+    reason: 'the Agent tool is Claude Code only; Codex starts a thread (docs/agents.md)',
+  },
+  {
+    command: 'coordinate',
+    inCommand: '### When a separate session is still right',
+    reason: 'start_session exists only in the Claude desktop app (docs/agents.md)',
+  },
+  {
+    command: 'coordinate',
+    inCommand: '## Session template',
+    reason: 'the prompt for start_session, which Codex lacks (docs/agents.md)',
+  },
+  {
+    command: 'coordinate',
+    inPort: '### Starting and reaching an executor',
+    reason: 'codex exec and resume replace the Agent tool and SendMessage (docs/agents.md)',
+  },
+  {
+    command: 'handoff',
+    inCommand: '5. Propose one name for the next session',
+    inPort: '5. Propose one name for the next thread',
+    reason: 'a Claude Code session is a Codex thread (docs/agents.md)',
+  },
+  {
+    command: 'loose-ends',
+    inCommand: '9. Create on approval, through `/card`.',
+    inPort: '9. Create on approval, through the card skill.',
+    reason: 'a command is a skill in Codex (docs/agents.md)',
+  },
+  {
+    command: 'new-template',
+    inCommand: "## 4. The repository, only after Rafael's OK",
+    inPort: "## 4. The repository, only after the maintainer's OK",
+    reason: 'the ports name the maintainer by his role throughout',
+  },
+  {
+    command: 'new-template',
+    inCommand: '## 5. Build it live with Rafael, measuring on the PNG',
+    inPort: '## 5. Build it live with the maintainer, measuring on the PNG',
+    reason: 'the ports name the maintainer by his role throughout',
+  },
+];
+
+const HEADING = /^(#{2,3})\s+(.*?)\s*#*\s*$/;
+const STEP = /^(\d+)\.\s+(?:\*\*(.+?)\*\*)?/;
+const FENCE = /^\s*(`{3,}|~{3,})/;
+
+function skeletonOf(markdown: string): string[] {
+  const body = markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+  const lines: string[] = [];
+  let openFence: string | undefined;
+  for (const line of body.split(/\r?\n/)) {
+    const fence = FENCE.exec(line)?.[1];
+    if (fence !== undefined) {
+      if (openFence === undefined) openFence = fence;
+      else if (fence[0] === openFence[0] && fence.length >= openFence.length) {
+        openFence = undefined;
+      }
+      continue;
+    }
+    if (openFence !== undefined) continue;
+    const heading = HEADING.exec(line);
+    if (heading !== null) {
+      lines.push(`${heading[1]} ${heading[2]}`);
+      continue;
+    }
+    const step = STEP.exec(line);
+    if (step !== null) lines.push(step[2] === undefined ? `${step[1]}.` : `${step[1]}. ${step[2]}`);
+  }
+  return lines;
+}
+
+function isHeading(line: string | undefined): boolean {
+  return line?.startsWith('#') ?? false;
+}
+
+function shown(line: string | undefined): string {
+  return line === undefined ? 'nothing more' : `"${line}"`;
+}
+
+/** The first place two skeletons differ, named as a reader finds it, or `undefined`. */
+function firstDifference(name: string, command: string[], port: string[]): string | undefined {
+  const length = Math.max(command.length, port.length);
+  for (let index = 0; index < length; index += 1) {
+    const inCommand = command[index];
+    const inPort = port[index];
+    if (inCommand === inPort) continue;
+    const section = command
+      .slice(0, index)
+      .reverse()
+      .find((line) => isHeading(line));
+    const where =
+      section === undefined
+        ? 'before the first heading'
+        : `section "${section.replace(/^#+ /, '')}"`;
+    const stepLine = [inCommand, inPort].find(
+      (line): line is string => line !== undefined && !isHeading(line),
+    );
+    const what = stepLine === undefined ? 'next heading' : `step ${/^\d+/.exec(stepLine)![0]}`;
+    return `${name}: ${where}, ${what}: the command has ${shown(inCommand)}, the port has ${shown(inPort)}`;
+  }
+  return undefined;
+}
+
+function withAllowedDifferences(
+  name: string,
+  command: string[],
+  port: string[],
+): { command: string[]; port: string[] } {
+  let commandLines = command;
+  let portLines = port;
+  for (const allowed of ALLOWED_PORT_DIFFERENCES.filter((entry) => entry.command === name)) {
+    const { inCommand, inPort } = allowed;
+    if (inCommand !== undefined && inPort !== undefined) {
+      portLines = portLines.map((line) => (line === inPort ? inCommand : line));
+    } else if (inCommand !== undefined) {
+      commandLines = commandLines.filter((line) => line !== inCommand);
+    } else if (inPort !== undefined) {
+      portLines = portLines.filter((line) => line !== inPort);
+    }
+  }
+  return { command: commandLines, port: portLines };
+}
+
+/** Whether an allowed difference still matches the pair it names. */
+function isStillNeeded(allowed: AllowedPortDifference, command: string[], port: string[]): boolean {
+  const { inCommand, inPort } = allowed;
+  if (inCommand !== undefined && inPort !== undefined) {
+    return command.includes(inCommand) && port.includes(inPort);
+  }
+  if (inCommand !== undefined) return command.includes(inCommand) && !port.includes(inCommand);
+  if (inPort !== undefined) return port.includes(inPort) && !command.includes(inPort);
+  return false;
+}
+
+describe('The skeleton of a command or a port', () => {
+  it('keeps headings and numbered steps with their labels, and drops the rest', () => {
+    const markdown = [
+      '---',
+      'name: x',
+      '---',
+      '# Title',
+      'Prose with 1. a number inside.',
+      '1. **First.** Before any heading.',
+      '## Section',
+      '2. Unlabeled step.',
+      '   1. A nested step.',
+      '- a bullet',
+      '### Sub ##',
+    ].join('\n');
+    expect(skeletonOf(markdown)).toEqual(['1. First.', '## Section', '2.', '### Sub']);
+  });
+
+  it('ignores headings and steps inside fenced code blocks', () => {
+    const markdown = [
+      '## Real',
+      '```sh',
+      '## not a heading',
+      '1. not a step',
+      '~~~',
+      '```',
+      '   ````md',
+      '   ```',
+      '   2. still inside',
+      '   ````',
+      '3. **After.**',
+    ].join('\n');
+    expect(skeletonOf(markdown)).toEqual(['## Real', '3. After.']);
+  });
+
+  it('names a heading that changed', () => {
+    const command = skeletonOf('## One\n1. **A**\n## Two\n');
+    const port = skeletonOf('## One\n1. **A**\n## Deux\n');
+    expect(firstDifference('x', command, port)).toBe(
+      'x: section "One", next heading: the command has "## Two", the port has "## Deux"',
+    );
+  });
+
+  it('names the step a command added and its port lacks', () => {
+    const command = skeletonOf('## One\n1. **A**\n2. **B**\n## Two\n');
+    const port = skeletonOf('## One\n1. **A**\n## Two\n');
+    expect(firstDifference('x', command, port)).toBe(
+      'x: section "One", step 2: the command has "2. B", the port has "## Two"',
+    );
+  });
+
+  it('names a step whose label changed', () => {
+    const command = skeletonOf('## One\n1. **A**\n2. **B**\n');
+    const port = skeletonOf('## One\n1. **A**\n2. **C**\n');
+    expect(firstDifference('x', command, port)).toBe(
+      'x: section "One", step 2: the command has "2. B", the port has "2. C"',
+    );
+  });
+
+  it('finds no difference between equal skeletons', () => {
+    expect(firstDifference('x', ['## A', '1. B'], ['## A', '1. B'])).toBeUndefined();
+  });
+});
+
+describe('Every Codex port follows its command step by step', () => {
+  const pairs = commandNames()
+    .filter((name) => existsSync(join(skillFolder, name, 'SKILL.md')))
+    .map((name) => ({
+      name,
+      command: skeletonOf(readFileSync(join(commandFolder, `${name}.md`), 'utf8')),
+      port: skeletonOf(readSkill(name)),
+    }));
+
+  it('has the headings and numbered steps of its command', () => {
+    const differences = pairs.flatMap(({ name, command, port }) => {
+      const compared = withAllowedDifferences(name, command, port);
+      return firstDifference(name, compared.command, compared.port) ?? [];
+    });
+    expect(
+      differences,
+      'a heading or step changed in one file and not in the other: change both in the same ' +
+        'PR or, where the two tools truly differ, add an entry with its reason to ' +
+        'ALLOWED_PORT_DIFFERENCES',
+    ).toEqual([]);
+  });
+
+  it('needs every allowed difference', () => {
+    const stale = ALLOWED_PORT_DIFFERENCES.filter((allowed) => {
+      const pair = pairs.find(({ name }) => name === allowed.command);
+      return pair === undefined || !isStillNeeded(allowed, pair.command, pair.port);
+    });
+    expect(
+      stale.map((allowed) => `${allowed.command}: ${allowed.inCommand ?? allowed.inPort}`),
+      'these entries match nothing any more; delete them from ALLOWED_PORT_DIFFERENCES',
+    ).toEqual([]);
+  });
+});
