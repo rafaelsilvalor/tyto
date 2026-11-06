@@ -27,6 +27,7 @@ docs/
   render-result.schema.json  the JSON Schema of result.json (generated)
   conventions.md           stack, tooling, tests
   git-workflow.md          branches, PRs, releases, GitHub workflows
+  executor-protocol.md     the rules an executor follows when a batch coordinator hands it a card
   backlog.md               ordered epics and stories → Jira cards
   patterns-explained.pt-BR.html  the project's patterns, for readers who do not write code
   adr/                     architecture decision records

@@ -79,5 +79,6 @@ direct.
    are where finished work is handed over.
 
 A coordinator of either tool records each executor's address in the batch file: a Claude Code
-session id, or `codex:<thread id>`. That is how the next coordinator, of either tool, finds
-them.
+agent id (an internal executor, resumed with `SendMessage`) or session id, or
+`codex:<thread id>`. That is how the next coordinator, of either tool, finds them. Executors of
+both tools follow the same rules, `docs/executor-protocol.md`.
