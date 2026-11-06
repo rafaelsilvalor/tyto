@@ -232,7 +232,7 @@ reason):
    Claude Code agent left, which is born locked; on one you made, it only prints that the
    worktree is not locked, and the commands after the `;` still run.
 
-## Executor prompt template
+## Executor template
 
 Fill in the brackets and pass it to `codex exec`. Paste the card's text whole, so the executor
 makes no Jira call.

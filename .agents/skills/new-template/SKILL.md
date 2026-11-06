@@ -24,6 +24,11 @@ folder of artwork per template), the folder is the one the maintainer's own inst
 memory name (his home `AGENTS.md`, outside this repository); if neither names one, ask him.
 Never guess a path. The CLI is `node <tyto>/apps/cli/dist/index.js` (below, `tyto`).
 
+## Arguments
+
+- `<name>` → the template's name; step 1 starts at the second question.
+- Nothing → step 1 starts by asking the name.
+
 ## Read first
 
 1. `docs/plugin-authoring.md` › _Develop it in its own repository_ and the three sections under
@@ -181,7 +186,7 @@ bounding box, and give a diff image. Compare layout with a scratch brief holding
 1. **Released.** `pnpm check` green, `dist/` equal to what `src/` builds, CI green on `main`,
    pasted verbatim. Tag `v0.1.0` when the maintainer accepts the art.
 2. **Installed for real**: `tyto plugin install git+https://github.com/rafaelsilvalor/tyto-template-<name>.git`.
-3. **An example brief renders**: copy the formats into the project's `formats.yaml`, `tyto
+3. **An example brief renders.** Copy the formats into the project's `formats.yaml`, `tyto
 render` an example with `--json`, paste `status` and the diagnostics verbatim. `status:
 "ok"` and no `W_PLUGIN_SKIPPED` is done.
 4. **The brief-modeller skill is updated**, every time: in `<skill source folder>`, a new
