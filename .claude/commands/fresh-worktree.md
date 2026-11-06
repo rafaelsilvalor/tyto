@@ -92,28 +92,26 @@ after) and keep its last lines for the report. Paste each command's output verba
    or `.turbo`. **`git status --short` alone cannot find them:** both names are gitignored, so
    a folder holding only them prints nothing at all, never `??`. The proof is two facts: git
    tracks no file under the folder (`git ls-files` prints nothing), and the folder holds no
-   entry besides `.turbo` and `node_modules`. List the candidates with both facts first:
+   entry besides `.turbo` and `node_modules`. List the candidates with both facts first; the
+   script reads `apps/*`, `packages/*` and `tools/*` and deletes nothing:
 
    ```bash
-   for d in apps/*/ packages/*/ tools/*/; do d=${d%/}; [ -z "$(git ls-files -- "$d" | head -1)" ] || continue; rest=$(ls -A "$d" | grep -vxE '\.turbo|node_modules'); if [ -z "$rest" ]; then echo "stale: $d (tracked files: $(git ls-files -- "$d" | wc -l); holds: $(ls -A "$d" | tr '\n' ' '))"; else echo "untracked, holds more, left alone: $d (holds: $(ls -A "$d" | tr '\n' ' '))"; fi; done
+   node tools/repo-checks/src/stale-package-dirs.mjs
    ```
 
-   Nothing printed means nothing to delete. A `left alone` line is somebody's untracked work,
-   or a folder this command does not understand: report it and delete nothing in it. For each
-   `stale:` line, show the proof once more, then delete that folder alone:
+   `no untracked package folder` means nothing to delete. A `left alone` line is somebody's
+   untracked work, or a folder this command does not understand: report it and delete nothing
+   in it. When there are `stale:` lines, run it again with `--delete`: for each stale folder it
+   reads both facts once more, prints them on a `proof for <folder>` line (`tracked files`
+   must be `0`), and deletes that folder alone. A folder that changed between the two runs is
+   printed as `not deleted`:
 
    ```bash
-   d=packages/<name>; git ls-files -- "$d" | wc -l; ls -A "$d"; git status --short --ignored -- "$d"
+   node tools/repo-checks/src/stale-package-dirs.mjs --delete
    ```
 
-   ```bash
-   rm -rf "packages/<name>"
-   ```
-
-   The first command must print `0`, then only `.turbo` and `node_modules`. The last one shows
-   the folder as `!!` (ignored) when they hold files, and prints nothing when they are empty
-   (git lists no empty folder), so it explains what git sees and is not the proof. Delete only
-   inside this worktree, never in the main checkout or another worktree.
+   The script works on the repository the current folder is in: run it inside this worktree,
+   never in the main checkout or another worktree.
 
 6. **Report.** One block per step, with its command, its duration and its last lines verbatim:
    the branch, `origin/main` and `HEAD` from step 1; the install's tail, the empty
