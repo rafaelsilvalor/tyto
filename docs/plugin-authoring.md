@@ -230,6 +230,28 @@ external is a plugin that does not activate.
 
   The warning lists them; nothing is drawn in them unless somebody changes the template.
 
+- **A house template with a grid offers the seal through `selo`** (TYTO-201, TYTO-480). The
+  manifest declares the optional slot and the build glues it to the last grid slide's foot with
+  the kit's `sealed` and the house's `sealOf`; whatever stands on the foot rises by the band:
+
+  ```yaml
+  slots:
+    # The seal art, 1080 × 140, glued to the foot of the last slide (TYTO-201). Optional; with
+    # it the page above shrinks by 140, so nothing is drawn under the seal. In the frontmatter:
+    # `selo: ./selo.png`.
+    selo: { type: image }
+  ```
+
+  ```ts
+  const page = sealed(context.size, sealOf(context));
+  const lift = context.size.h - page.size.h; // the signature and the arrow rise by it
+  return frame({ ...rest, children: [...drawnOnPageSize, ...page.seal] });
+  ```
+
+  A brief without `selo` draws the same bytes as before. A template that renders no grid does
+  not declare it. The whole pattern, and the variant for a composition the house owns, is in
+  `docs/template-conventions.md` › The seal.
+
 - **What a configuration may change is declared in the manifest's `values`** (ADR 0153,
   `docs/template-authoring.md`), and read with `numberValue`, `colorValue`, `faceValue` and
   `imageValue` from `@tyto/core/template`, each with your own constant as the fallback. In your

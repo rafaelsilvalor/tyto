@@ -3,9 +3,17 @@ import { describe, expect, it } from 'vitest';
 
 import { CALL_TO_COMMENT, ROXO, OCRE, VINHO } from './brands.js';
 import { simuladosDaSemana } from './compose.js';
+import { SEAL_HEIGHT } from './seal.js';
 import { SAFETY, TABLE } from './tokens.js';
 
-import type { Inline, RichText, SceneNode, TemplateContext, TemplateReport } from '@tyto/core';
+import type {
+  AssetRef,
+  Inline,
+  RichText,
+  SceneNode,
+  TemplateContext,
+  TemplateReport,
+} from '@tyto/core';
 
 /**
  * The weekly mock-exam agenda is composition (ADR 0047), so what is checked here is that it
@@ -53,7 +61,11 @@ interface Slide {
   readonly week?: string;
   /** The brief's call to comment, when a case writes one. */
   readonly chamada?: string;
+  /** Whether the brief writes a `selo` (TYTO-201). */
+  readonly selo?: boolean;
 }
+
+const SELO: AssetRef = { id: 'selo', source: 'file', path: 'selo.png', hash: 'abc' };
 
 function contextOf(
   slide: Slide,
@@ -66,17 +78,24 @@ function contextOf(
     lamina: rich(slide.week ?? WEEK),
     ...(slide.chamada === undefined ? {} : { chamada: rich(slide.chamada) }),
   };
+  const seal =
+    slide.selo === true
+      ? { selo: { name: 'selo', value: { kind: 'image', asset: SELO }, adjustments: [] } }
+      : {};
   return {
     format: slide.format,
     size: SIZE[slide.format],
     idPrefix: `lamina-${index}-${slide.format}`,
     artwork: { id: `lamina-${index}`, index, count: slide.count ?? 1 },
-    slots: Object.fromEntries(
-      Object.entries(slots).map(([name, text]) => [
-        name,
-        { name, value: { kind: 'rich-text', text }, adjustments: [] },
-      ]),
-    ) as TemplateContext['slots'],
+    slots: {
+      ...Object.fromEntries(
+        Object.entries(slots).map(([name, text]) => [
+          name,
+          { name, value: { kind: 'rich-text', text }, adjustments: [] },
+        ]),
+      ),
+      ...seal,
+    } as TemplateContext['slots'],
     adjustments: {},
     measure,
     report,
@@ -297,5 +316,78 @@ describe('simulados da semana: a slide that runs off the page (TYTO-202)', () =>
     const foot = (signOff?.transform.y ?? 0) + (signOff === undefined ? 0 : boxHeightOf(signOff));
 
     expect(reportsOf({ format: 'grid', week: LONG })[0]?.overflow).toBeCloseTo(foot - SIZE.grid.h);
+  });
+});
+
+/**
+ * The seal against the signature (TYTO-201, TYTO-469, TYTO-480): the house's rule for every
+ * template that offers `selo`, pinned on the one composition the house owns whole. The seal
+ * is the band 1080 × 140 at the frame's foot; the page above shrinks by it, so the sign-off,
+ * the lowest thing drawn, ends above the seal's top and nothing is drawn under it.
+ */
+describe('simulados da semana: the seal clears the signature', () => {
+  const sealTop = SIZE.grid.h - SEAL_HEIGHT;
+  // One day of one exam: at 10 px a character the default week's last grid, with its call to
+  // comment, already runs past 1210, and a middle that tall is pinned under the logo.
+  const week = 'Domingo 26/10 | às 8h\n1º Simulado TX QC';
+  const footOf = (node: SceneNode | undefined) =>
+    (node?.transform.y ?? 0) + (node === undefined ? 0 : boxHeightOf(node));
+
+  it('glues the seal, the frame wide and 140 tall, to the last grid’s foot', () => {
+    const [seal] = named(draw(OCRE, { format: 'grid', selo: true }), 'seal');
+
+    expect(seal?.transform.x).toBe(0);
+    expect(seal?.transform.y).toBe(sealTop);
+    expect(seal !== undefined && 'size' in seal ? seal.size : undefined).toEqual({
+      w: SIZE.grid.w,
+      h: SEAL_HEIGHT,
+    });
+  });
+
+  it('ends the sign-off above the seal’s top, for every brand', () => {
+    for (const brand of [OCRE, VINHO, ROXO]) {
+      const [signOff] = named(draw(brand, { format: 'grid', week, selo: true }), 'sign-off');
+
+      expect(signOff).toBeDefined();
+      expect(footOf(signOff)).toBeLessThanOrEqual(sealTop);
+    }
+  });
+
+  it('centres the middle on the page above the seal, so the sign-off rises with it', () => {
+    const open = draw(OCRE, { format: 'grid', week });
+    const closed = draw(OCRE, { format: 'grid', week, selo: true });
+    const rise = (name: string) =>
+      (named(open, name)[0]?.transform.y ?? 0) - (named(closed, name)[0]?.transform.y ?? 0);
+
+    // Centred on 1350 - 140 rather than on 1350: half the band.
+    expect(rise('middle')).toBe(SEAL_HEIGHT / 2);
+    expect(rise('sign-off')).toBe(SEAL_HEIGHT / 2);
+  });
+
+  it('measures an overflow against the seal’s top, not the frame’s foot', () => {
+    const reports: TemplateReport[] = [];
+    const exams = Array.from({ length: 8 }, (_, exam) => `${String(exam + 1)}º Simulado TX QC`);
+    const slide: Slide = {
+      format: 'grid',
+      selo: true,
+      week: `Domingo 26/10 | Aplicação às 08h30\n${exams.join('\n')}`,
+    };
+    const nodes = simuladosDaSemana(OCRE)(
+      contextOf(slide, tenPerCharacter, (report) => {
+        reports.push(report);
+      }),
+    ).children;
+
+    expect(reports.map((report) => report.code)).toEqual(['W_TEMPLATE_OVERFLOW']);
+    expect(reports[0]?.overflow).toBeCloseTo(footOf(named(nodes, 'sign-off')[0]) - sealTop);
+  });
+
+  it('draws no seal, and the same slide, on a story or an earlier grid', () => {
+    for (const slide of [{ format: 'story' }, { format: 'grid', index: 0, count: 2 }] as const) {
+      const sealed = draw(OCRE, { ...slide, selo: true });
+
+      expect(named(sealed, 'seal')).toEqual([]);
+      expect(sealed).toEqual(draw(OCRE, slide));
+    }
   });
 });
