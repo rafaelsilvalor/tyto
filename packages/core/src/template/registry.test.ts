@@ -321,6 +321,16 @@ describe('a search path of several roots (ADR 0020)', () => {
     expect(result.diagnostics).toEqual([]);
   });
 
+  it('lists what a root left outside its names, with the root’s origin (TYTO-615)', async () => {
+    const result = await loadTemplateRegistry(twoRoots(), [
+      'project',
+      { directory: 'pack', only: new Set(['so-do-pack']), origin: 'promo-pack' },
+    ]);
+    if (!result.ok) throw new Error('expected a registry');
+
+    expect(result.value.unoffered).toEqual([{ name: 'promo', origin: 'promo-pack' }]);
+  });
+
   it('accepts a single string, and behaves exactly as it always did', async () => {
     // Every existing caller passes one root. The string form is not a shim; it is the
     // common case spelled the short way.

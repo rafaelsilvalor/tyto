@@ -205,6 +205,8 @@ export async function resolveTemplateConfigurations(
       .map((entry) => ({ entry, scope: 'machine' as const })),
   ];
 
+  reportUnnamed(input, report);
+
   // A template nobody could load configures nothing: a brief that names its alias gets
   // `E_UNKNOWN_TEMPLATE`, beside the sync's own word on why it is missing.
   // A template another source won the name of configures nothing either: the values were
@@ -589,6 +591,42 @@ async function checkValues(
     values[name] = { value: result.value, ...(supplied.range === undefined ? {} : where) };
   }
   return values;
+}
+
+/**
+ * A fetched pack's templates that no entry names (TYTO-615). A pack offers only what the files
+ * name (ADR 0151 decision 2), so a template added to it in a later release stays unknown until
+ * somebody writes its entry; this says so once per pack, at the first entry that fetched it,
+ * naming what was left out. Only a root the app labelled with its plugin is reached: the
+ * label is what ties the left-out names to the entries that fetched the pack.
+ */
+function reportUnnamed(
+  input: ResolveConfigurationsInput,
+  report: (file: string | undefined, item: Diagnostic) => void,
+): void {
+  const entries = [...input.project, ...input.machine];
+  const named = new Set(entries.map((entry) => entry.template));
+  const byPack = new Map<string, Set<string>>();
+  for (const { name, origin } of input.registry.unoffered ?? []) {
+    if (origin === undefined || named.has(name)) continue;
+    byPack.set(origin, (byPack.get(origin) ?? new Set()).add(name));
+  }
+  for (const [plugin, names] of byPack) {
+    const entry = entries.find((item) => item.plugin === plugin);
+    if (entry === undefined) continue;
+    const unnamed = [...names]
+      .sort((left, right) => left.localeCompare(right))
+      .map((name) => `'${name}'`)
+      .join(', ');
+    report(
+      entry.file,
+      diagnostic(
+        'W_PLUGIN_FILE_TEMPLATE_UNNAMED',
+        { plugin, file: entry.file, template: entry.template, unnamed },
+        atRange(entry.range),
+      ),
+    );
+  }
 }
 
 function atRange(range: SourceRange | undefined): { range?: SourceRange } {

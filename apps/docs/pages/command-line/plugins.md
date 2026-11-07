@@ -124,6 +124,28 @@ In a folder that is not trusted, the project's plugin files are neither loaded n
 
 **The desktop app runs the same sync** when it starts, when it opens a workspace folder, and on **Plugins: Sync Plugin Files** and **Plugins: Update Plugin Files** (Ctrl+K), the second moving every ref as `--update` does. The templates it fetches are in the template list, and so is each alias, in the "/" menu and in New brief from template as well, its line saying the template and configuration it stands for (`aviso · laranja`) and the plugin file that declares it shown on hover in New brief from template and in the panel beside the "/" menu's highlighted row; a repository that did not answer is a row in the problems panel that names it, and the copy fetched before keeps working. A plugin that asks for permissions is asked about in a box. In a folder you have not trusted yet, the project's plugin files are not fetched, and the trust strip counts them among what it left out.
 
+### A repository with several templates
+
+A plugin file names templates, not repositories: a repository that holds two templates needs two entries, one for each, with the same `git` and `ref`. They are fetched once. A template the repository gains in a later version is not offered until an entry names it, so moving the `ref` is not enough.
+
+```yaml
+# ~/.tyto/plugin-files/avisos.yaml
+version: 1
+templates:
+  aviso:
+    source: { git: ../../my-pack, ref: v1.0.0 }
+  aviso-b:
+    source: { git: ../../my-pack, ref: v1.0.0 }
+```
+
+When a fetched repository holds a template no entry names, `tyto render` and the desktop app's problems panel say so at the first entry that fetched it, naming what was left out. A brief that names one of those templates gets the same advice under its `E_UNKNOWN_TEMPLATE`.
+
+<!-- The warning was printed on 2026-11-07 by `tyto render` in packages/command-line's plugin-files test, on the branch fix/TYTO-615-unnamed-pack-templates, on Windows 11, with a repository holding the example pack's aviso and a copy of it named aviso-b. There the file was home\.tyto\plugin-files\templates.yaml; the path here is this page's example's, and the line and column are the same. -->
+
+```
+home\plugin-files\avisos.yaml:3:3: warning W_PLUGIN_FILE_TEMPLATE_UNNAMED The pack of plugin 'example-pack' that 'home\plugin-files\avisos.yaml' fetches for 'aviso' also holds 'aviso-b'; a fetched pack offers only the templates the plugin files name. To offer one, add an entry for it with the same git and ref as 'aviso'.
+```
+
 ### Configurations and aliases
 
 A fetched pack offers only the templates its file names. Each template can have named **configurations**, which set the values the template declares it lets you change, such as a colour, a size, a face or an image. A brief reaches a configuration by its **alias**: write `alias:` to choose it, or leave it out and the alias is the template's name, a dash and the configuration's name. `default:` names the configuration a brief gets when it writes the template's own name, and every other configuration starts from that one and changes only what it lists. An image path is read from the plugin file's own folder and must stay inside the project, or inside `~/.tyto` for the machine's files.

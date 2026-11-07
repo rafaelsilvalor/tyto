@@ -340,6 +340,62 @@ describe('a configuration binds to the template its plugin file fetched (TYTO-46
   });
 });
 
+describe('a fetched pack with templates no entry names (TYTO-615)', () => {
+  /** A registry whose `tabelas-pack` root held `unoffered` outside the names the files gave. */
+  function registryLeaving(
+    unoffered: readonly { name: string; origin?: string }[],
+  ): TemplateRegistry {
+    return { ...registryOf(TABELA), originOf: () => 'tabelas-pack', unoffered };
+  }
+
+  it('warns once per pack, at the entry that fetched it, naming each template left out', async () => {
+    const { diagnostics } = await resolved({
+      project: [entry({ plugin: 'tabelas-pack', range: at(3) })],
+      registry: registryLeaving([
+        { name: 'tabela-larga', origin: 'tabelas-pack' },
+        { name: 'tabela-alta', origin: 'tabelas-pack' },
+      ]),
+    });
+
+    expect(diagnostics).toEqual([
+      {
+        file: 'tabelas.yaml',
+        diagnostic: expect.objectContaining({
+          code: 'W_PLUGIN_FILE_TEMPLATE_UNNAMED',
+          severity: 'warning',
+          range: at(3),
+        }) as unknown,
+      },
+    ]);
+    const message = diagnostics[0]?.diagnostic.message ?? '';
+    expect(message).toContain("'tabela-alta', 'tabela-larga'");
+    expect(message).toContain("same git and ref as 'tabela'");
+  });
+
+  it('says nothing when every template of the pack is named', async () => {
+    const { diagnostics } = await resolved({
+      project: [entry({ plugin: 'tabelas-pack' })],
+      registry: registryLeaving([]),
+    });
+
+    expect(diagnostics).toEqual([]);
+  });
+
+  it('leaves out a name another entry gives, and a root no plugin labels', async () => {
+    const { diagnostics } = await resolved({
+      project: [entry({ plugin: 'tabelas-pack' })],
+      // The machine names `tabela-alta` from the same pack; the project's copy won the plugin.
+      machine: [entry({ template: 'tabela-alta', plugin: 'tabelas-pack', configurations: [] })],
+      registry: registryLeaving([
+        { name: 'tabela-alta', origin: 'tabelas-pack' },
+        { name: 'solta' },
+      ]),
+    });
+
+    expect(diagnostics.map((item) => item.diagnostic.code)).toEqual([]);
+  });
+});
+
 describe('a brief that names an alias', () => {
   const FORMATS = formatCatalogue({ feed: { w: 100, h: 100 } });
 
@@ -389,5 +445,25 @@ describe('a brief that names an alias', () => {
       'tabela, tabela-compacta, tabela-roxa',
     );
     expect(brief.ok ? undefined : brief.error[0]?.hint).toBe("Did you mean 'tabela-roxa'?");
+  });
+
+  it('says a fetched pack holds an unknown name no plugin file names (TYTO-615)', async () => {
+    const ast: BriefAst = {
+      frontmatter: { data: { template: 'tabela-larga' }, ranges: {}, range: sourceRange(0, 20) },
+      directives: [],
+      range: sourceRange(0, 20),
+    };
+    const brief = await resolve(ast, {
+      registry: {
+        ...registryOf(TABELA),
+        unoffered: [{ name: 'tabela-larga', origin: 'tabelas-pack' }],
+      },
+      assets: { base: '', resolve: () => Promise.resolve(undefined) },
+    });
+
+    expect(brief.ok ? '' : brief.error[0]?.code).toBe('E_UNKNOWN_TEMPLATE');
+    expect(brief.ok ? '' : brief.error[0]?.hint).toContain(
+      "The pack of plugin 'tabelas-pack' holds 'tabela-larga', but no plugin file names it",
+    );
   });
 });

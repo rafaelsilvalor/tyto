@@ -72,6 +72,7 @@ non-zero.
 | `E_PLUGIN_FILE_DUPLICATE` | error | no | One name is given twice in one folder's plugin files, so that folder supplies it from neither. |
 | `W_PLUGIN_FILE_OVERRIDDEN` | warning | no | A project's plugin file names what the machine's names too, and the project's wins. |
 | `W_PLUGIN_FILE_TEMPLATE_SHADOWED` | warning | no | A plugin file configures a template from a plugin, and another source wins that name, so the configurations do not apply. |
+| `W_PLUGIN_FILE_TEMPLATE_UNNAMED` | warning | no | A pack a plugin file fetched holds templates no entry names, so they are not offered. |
 | `W_PLUGIN_FILE_REPLACES_INSTALLED` | warning | no | A plugin from the plugin files has the name of one installed with tyto plugin install. |
 | `W_PLUGIN_FILE_FETCH` | warning | no | A source the plugin files name could not be fetched. |
 | `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A commit a plugin file names was fetched and could not be loaded as a plugin. |
@@ -2147,6 +2148,20 @@ The template that won the name renders with its own defaults.
 ```
 
 Parameters: `file`, `template`, `plugin`, `used`
+
+### `W_PLUGIN_FILE_TEMPLATE_UNNAMED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A pack a plugin file fetched holds templates no entry names, so they are not offered.
+
+The templates the files name load; the others are left out, as before.
+
+```
+The pack of plugin '{plugin}' that '{file}' fetches for '{template}' also holds {unnamed}; a fetched pack offers only the templates the plugin files name. To offer one, add an entry for it with the same git and ref as '{template}'.
+```
+
+Parameters: `plugin`, `file`, `template`, `unnamed`
 
 ### `W_PLUGIN_FILE_REPLACES_INSTALLED`
 
