@@ -1050,10 +1050,11 @@
     {
       "paths": [
         "apps/desktop/src/main/plugin-files.ts",
-        "apps/desktop/e2e/plugin-files.desktop.test.ts"
+        "apps/desktop/e2e/plugin-files.desktop.test.ts",
+        "apps/desktop/e2e/fetched-plugin-panel.desktop.test.ts"
       ],
-      "e2e": ["plugin-files.desktop.test.ts"],
-      "why": "reviewed: the plugin files' sync in main, the fetched copies' plugin set and the failures the window lists (TYTO-433)"
+      "e2e": ["fetched-plugin-panel.desktop.test.ts", "plugin-files.desktop.test.ts"],
+      "why": "reviewed: the plugin files' sync in main, the fetched copies' plugin set and the failures the window lists (TYTO-433), and a fetched plugin's panel withdrawn and replaced when the set starts again (TYTO-466)"
     },
     {
       "paths": [

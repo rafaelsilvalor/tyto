@@ -598,6 +598,22 @@ describe('installed plugins in the export (TYTO-48)', () => {
     expect(kinds.map((item) => item.kind)).toEqual(['png', 'jpeg', 'webp', 'svg', 'txt']);
   });
 
+  // TYTO-466: the window's plugins in force change when the fetched set starts again, so a
+  // function is asked at every run rather than once.
+  it('asks a function for the plugins at every run, and offers what it answers now', async () => {
+    let current = installed();
+    const perRun = await createExportService({
+      fileSystem: nodeFileSystem(),
+      sources: await createProjectSources({ fileSystem: nodeFileSystem(), builtIn: packDirectory }),
+      version: '0.0.0-test',
+      plugins: () => Promise.resolve(current),
+    });
+    expect((await perRun.kinds()).map((item) => item.kind)).not.toContain('txt');
+
+    current = installed(texto);
+    expect((await perRun.kinds()).map((item) => item.kind)).toContain('txt');
+  });
+
   it('renders that kind through run, the door the queue uses', async () => {
     const progress = await (
       await serviceWith(installed(texto))

@@ -195,6 +195,8 @@ describe('the event table', () => {
       'explorer:changed',
       // TYTO-207. keybindings.json changed on disk; the push carries its text.
       'keybindings:changed',
+      // TYTO-466. The fetched plugins changed; the window asks for panels and keys again.
+      'plugins:changed',
       // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
       'queue:changed',
       // TYTO-206. settings.json changed, or a screen's change to it was refused.

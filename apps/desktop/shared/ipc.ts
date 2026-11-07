@@ -2599,6 +2599,13 @@ export const IPC_EVENTS = {
    * `queue:changed`'s reason: the window asks `templates:list` and compiles its briefs again.
    */
   'templates:changed': z.object({}),
+
+  /**
+   * The plugins the window runs changed without the window asking (TYTO-466): a sync of the
+   * plugin files started the fetched set again. Empty, for `queue:changed`'s reason: the window
+   * asks `plugins:panels`, `plugins:keymaps`, `plugins:vim` and `theme:current` again.
+   */
+  'plugins:changed': z.object({}),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

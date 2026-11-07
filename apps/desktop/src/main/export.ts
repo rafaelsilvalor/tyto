@@ -215,8 +215,11 @@ export interface ExportServiceOptions {
    *
    * A promise, so the window does not wait for them to open: a plugin whose activation hangs
    * costs its own deadline (ADR 0042) to the first export, not to the app's start.
+   *
+   * A function is asked at every run (TYTO-466): the window's plugins in force change when a
+   * sync of the plugin files starts the fetched set again, and a run takes the set of its start.
    */
-  readonly plugins?: LoadedPlugins | Promise<LoadedPlugins>;
+  readonly plugins?: LoadedPlugins | Promise<LoadedPlugins> | (() => Promise<LoadedPlugins>);
   /**
    * The settings in force, by plugin id (TYTO-254, ADR 0145): what `settings.json` resolved to,
    * which every run's host is configured with **before** the installed plugins are activated
@@ -334,7 +337,9 @@ export function availableOutputs(
 
 export async function createExportService(options: ExportServiceOptions): Promise<ExportService> {
   const { fileSystem, sources } = options;
-  const plugins = Promise.resolve(options.plugins ?? NO_PLUGINS);
+  const given = options.plugins;
+  const fixed = Promise.resolve(typeof given === 'function' ? NO_PLUGINS : (given ?? NO_PLUGINS));
+  const pluginsNow = typeof given === 'function' ? given : () => fixed;
 
   const runs = new Map<string, Run>();
   let counter = 0;
@@ -386,7 +391,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
     const { host, warnings: skipped } = exporterHost(
       layeredExportResources([images, wiring.resources]),
       options.rasterizer,
-      await plugins,
+      await pluginsNow(),
       inForce,
       options.configuration?.(),
     );
@@ -668,7 +673,7 @@ export async function createExportService(options: ExportServiceOptions): Promis
       const { host } = exporterHost(
         {},
         options.rasterizer,
-        await plugins,
+        await pluginsNow(),
         fontsFor([]),
         options.configuration?.(),
       );

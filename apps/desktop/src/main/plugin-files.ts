@@ -8,8 +8,11 @@ import {
   type PluginFilesSyncOptions,
   type SyncedPluginFiles,
   pluginStoreWithCopies,
+  withoutRefused,
 } from '@tyto/io';
 import { type LoadedPlugins, NO_PLUGINS, type PluginStore } from '@tyto/plugin-api';
+
+import type { FetchedPlugins } from './window-plugins.js';
 
 /**
  * The plugin files, for the desktop (ADR 0151, TYTO-433).
@@ -26,8 +29,11 @@ import { type LoadedPlugins, NO_PLUGINS, type PluginStore } from '@tyto/plugin-a
  * again whenever a sync changes which copies load. Each copy is a plugin like any installed
  * one: its own process, every check at every load (ADR 0151 decision 6).
  *
- * **Templates only, in this card.** The set contributes its template packs to the search;
- * directives, panels and themes of a fetched plugin are not wired into the window yet.
+ * **Every extension point, not only templates** (TYTO-466). The set contributes its template
+ * packs to the search, and its plugins to the window's own host beside the installed ones
+ * (`window-plugins.ts`): directives, panels, keys, themes, brand kits, sources, settings and
+ * recipe verbs. Before a start replaces the set, the window withdraws what the old one offered,
+ * so nothing it reads belongs to a process being closed.
  */
 
 /** What one sync asks: the open folder and its trust, and whether refs move. */
@@ -70,7 +76,12 @@ export interface DesktopPluginFilesOptions {
     folderOf: (plugin: string) => string,
   ) => Promise<InstalledPacks>;
   /** Hands what loads to the window's sources, and tells the window to read them again. */
-  readonly apply: (fetched: FetchedTemplates) => Promise<void>;
+  readonly apply: (fetched: FetchedTemplates, plugins: FetchedPlugins) => Promise<void>;
+  /**
+   * Tells the window the running set is about to close (TYTO-466), so it stops offering what
+   * that set contributed before its processes end. `apply` hands over the next one.
+   */
+  readonly withdraw: () => void;
 }
 
 export interface DesktopPluginFiles {
@@ -126,6 +137,7 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
       const before = loaded;
       // Forgotten before the start, so a start that throws leaves the next sync to start one.
       loaded = undefined;
+      if (before !== undefined) options.withdraw();
       await before?.close();
       if (key !== '') loaded = await options.start(copiesOnly(options.home, synced.copies));
       loadedKey = key;
@@ -140,15 +152,23 @@ export function createDesktopPluginFiles(options: DesktopPluginFilesOptions): De
       const copy = byName.get(plugin);
       if (copy !== undefined && !copy.wholePlugin) only.set(directory, new Set(copy.templates));
     }
-    await options.apply({
-      packs,
-      only,
-      replaces: new Set(byName.keys()),
-      problems: [...problems, ...current.warnings, ...packs.warnings],
-      configured: synced.configured,
-      images: synced.images,
-      texts: synced.texts,
-    });
+    await options.apply(
+      {
+        packs,
+        only,
+        replaces: new Set(byName.keys()),
+        problems: [...problems, ...current.warnings, ...packs.warnings],
+        configured: synced.configured,
+        images: synced.images,
+        texts: synced.texts,
+      },
+      {
+        // Without the plugins refused over their pack, which the problems panel says were
+        // skipped: the window activates what the template search loads (TYTO-466).
+        loaded: withoutRefused(current, packs.refused),
+        directoryOf: (plugin) => byName.get(plugin)?.directory,
+      },
+    );
   };
 
   return {
