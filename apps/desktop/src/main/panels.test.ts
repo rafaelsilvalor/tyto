@@ -31,6 +31,9 @@ function contributed(permissions: readonly string[]): WindowPlugins {
       ownedRecipeVerbs: () => [],
       recipeDerivations: () => [],
     }),
+    setFetched: () => undefined,
+    fetchedDirectory: () => undefined,
+    inForce: () => Promise.resolve({ plugins: [], warnings: [], close: () => Promise.resolve() }),
   };
 }
 

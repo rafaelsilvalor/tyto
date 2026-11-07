@@ -6,9 +6,12 @@ import {
   type EditorKeymap,
   type EditorVimContribution,
   type FontSourceContribution,
+  type InProcessHost,
   type LoadedPlugins,
+  NO_PLUGINS,
   type OwnedSource,
   type PanelContribution,
+  type Plugin,
   type RecipeContributions,
   type ThemeContribution,
   createPluginHost,
@@ -18,7 +21,9 @@ import {
 } from '@tyto/plugin-api';
 
 /**
- * What the installed plugins contribute to the window itself (TYTO-49, ADR 0043, ADR 0045).
+ * What the installed plugins contribute to the window itself (TYTO-49, ADR 0043, ADR 0045),
+ * and the plugins the plugin files fetched beside them (TYTO-466): one host for both sets, so
+ * a fetched plugin reaches every extension point an installed one does, through one path.
  *
  * An export builds a host per run and activates the installed plugins into it, so a run
  * resolves through that host. The preview and the panels have no such host — the preview
@@ -80,6 +85,19 @@ export interface WindowPlugins {
    * after start-up finds them.
    */
   recipeContributions(): RecipeContributions;
+  /**
+   * Hands over the fetched set (TYTO-466), or `undefined` when none loads: every contribution
+   * of the previous one is withdrawn and the new one's are offered, fetched before installed.
+   * Before the installed plugins have started it is kept for the activation at `ready`.
+   */
+  setFetched(fetched: FetchedPlugins | undefined): void;
+  /** The folder of a fetched plugin's copy, or `undefined` for a plugin that is not one. */
+  fetchedDirectory(plugin: string): string | undefined;
+  /**
+   * The plugins an export activates into its run's host, in this window's order (fetched
+   * first), once the installed plugins have started.
+   */
+  inForce(): Promise<LoadedPlugins>;
 }
 
 export interface WindowPanel {
@@ -102,75 +120,161 @@ export interface WindowTheme {
   readonly theme: ThemeContribution;
 }
 
-export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
+/**
+ * The plugins the plugin files fetched (TYTO-433, ADR 0151), as their own set: started again
+ * whenever a sync changes which copies load, and handed here each time.
+ */
+export interface FetchedPlugins {
+  readonly loaded: LoadedPlugins;
+  /** The folder of a fetched plugin's copy, which its panel pages and themes are read from. */
+  directoryOf(plugin: string): string | undefined;
+}
+
+const NO_FETCHED: FetchedPlugins = { loaded: NO_PLUGINS, directoryOf: () => undefined };
+
+/** One activation of every plugin in force into a host of its own, and what each one added. */
+interface Activation {
+  readonly host: InProcessHost;
+  readonly panels: readonly WindowPanel[];
+  readonly keymaps: readonly WindowKeymap[];
+  readonly vim: readonly WindowVim[];
+  readonly themes: readonly WindowTheme[];
+  readonly permissions: ReadonlyMap<string, readonly string[]>;
+  readonly ids: readonly string[];
+}
+
+function activateInto(
+  plugins: readonly Plugin[],
+  config: Readonly<Record<string, unknown>> | undefined,
+): Activation {
   const host = createPluginHost();
-  const owned: WindowPanel[] = [];
+  // Before any activation, so a plugin's process is sent its slice as it is activated.
+  if (config !== undefined) host.configure(config);
+  const panels: WindowPanel[] = [];
   const keymaps: WindowKeymap[] = [];
-  const vims: WindowVim[] = [];
+  const vim: WindowVim[] = [];
   const themes: WindowTheme[] = [];
   const permissions = new Map<string, readonly string[]>();
-  const activatedIds: string[] = [];
+  const ids: string[] = [];
+  for (const plugin of plugins) {
+    const before = new Set(host.registry.panels());
+    const keymapsBefore = new Set(host.registry.keymaps());
+    const vimBefore = new Set(host.registry.vim());
+    const themesBefore = new Set(host.registry.themes());
+    // A plugin this host refuses is refused by the export too, where the run reports it;
+    // saying it twice on every keystroke would bury the one that matters.
+    const activated = host.tryActivate(plugin, 'external');
+    if (!activated.ok) continue;
+    ids.push(plugin.id);
+    const manifest = validatePluginManifest(plugin.manifest);
+    permissions.set(plugin.id, manifest.ok ? manifest.value.permissions : []);
+    for (const panel of host.registry.panels()) {
+      if (!before.has(panel)) panels.push({ plugin: plugin.id, panel });
+    }
+    for (const keymap of host.registry.keymaps()) {
+      if (!keymapsBefore.has(keymap)) keymaps.push({ plugin: plugin.id, keymap });
+    }
+    for (const contribution of host.registry.vim()) {
+      if (!vimBefore.has(contribution)) vim.push({ plugin: plugin.id, contribution });
+    }
+    for (const theme of host.registry.themes()) {
+      if (!themesBefore.has(theme)) themes.push({ plugin: plugin.id, theme });
+    }
+  }
+  return { host, panels, keymaps, vim, themes, permissions, ids };
+}
+
+/**
+ * The plugins in force, in the order they are activated: **the fetched ones first, then the
+ * installed ones no fetched copy replaces** (ADR 0151 decision 7). A host refuses a
+ * contribution id another plugin already holds, so the earlier plugin keeps it, as the
+ * template search order says; and an installed plugin named like a fetched one is not
+ * activated at all.
+ */
+export function pluginsInForce(
+  fetched: readonly Plugin[],
+  installed: readonly Plugin[],
+): readonly Plugin[] {
+  const replaced = new Set(fetched.map((plugin) => plugin.id));
+  return [...fetched, ...installed.filter((plugin) => !replaced.has(plugin.id))];
+}
+
+export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
+  let installed: readonly Plugin[] = [];
+  let fetched = NO_FETCHED;
+  let config: Readonly<Record<string, unknown>> | undefined;
+  let current = activateInto([], undefined);
   let started = false;
 
-  const ready = plugins.then(
-    (loaded) => {
-      for (const plugin of loaded.plugins) {
-        const before = new Set(host.registry.panels());
-        const keymapsBefore = new Set(host.registry.keymaps());
-        const vimBefore = new Set(host.registry.vim());
-        const themesBefore = new Set(host.registry.themes());
-        // A plugin this host refuses is refused by the export too, where the run reports it;
-        // saying it twice on every keystroke would bury the one that matters.
-        const activated = host.tryActivate(plugin, 'external');
-        if (!activated.ok) continue;
-        activatedIds.push(plugin.id);
-        const manifest = validatePluginManifest(plugin.manifest);
-        permissions.set(plugin.id, manifest.ok ? manifest.value.permissions : []);
-        for (const panel of host.registry.panels()) {
-          if (!before.has(panel)) owned.push({ plugin: plugin.id, panel });
-        }
-        for (const keymap of host.registry.keymaps()) {
-          if (!keymapsBefore.has(keymap)) keymaps.push({ plugin: plugin.id, keymap });
-        }
-        for (const contribution of host.registry.vim()) {
-          if (!vimBefore.has(contribution)) vims.push({ plugin: plugin.id, contribution });
-        }
-        for (const theme of host.registry.themes()) {
-          if (!themesBefore.has(theme)) themes.push({ plugin: plugin.id, theme });
-        }
-      }
-      started = true;
-    },
-    () => {
-      started = true;
-    },
-  );
+  /**
+   * One host per set of plugins in force, built again whole when the fetched set changes:
+   * activation order is precedence, and a fetched plugin activated after the installed ones
+   * would lose every id they hold. The previous host's contributions are withdrawn, so nothing
+   * it offered (a panel, a key, a theme) is read again.
+   */
+  const rebuild = (): void => {
+    const previous = current;
+    current = activateInto(pluginsInForce(fetched.loaded.plugins, installed), config);
+    for (const id of previous.ids) previous.host.disposePlugin(id);
+  };
 
-  const directives = () => (started ? host.registry.directives() : []);
+  const ready = plugins
+    .then(
+      (loaded) => {
+        installed = loaded.plugins;
+      },
+      () => undefined,
+    )
+    .then(() => {
+      rebuild();
+      started = true;
+    });
+
+  const registry = () => current.host.registry;
+  const directives = () => (started ? registry().directives() : []);
   const noKits: BrandKits = { kits: new Map(), diagnostics: [] };
   const recipes: RecipeContributions = {
-    recipeVerbs: () => (started ? host.registry.recipeVerbs() : []),
-    ownedRecipeVerbs: () => (started ? host.registry.ownedRecipeVerbs() : []),
-    recipeDerivations: () => (started ? host.registry.recipeDerivations() : []),
+    recipeVerbs: () => (started ? registry().recipeVerbs() : []),
+    ownedRecipeVerbs: () => (started ? registry().ownedRecipeVerbs() : []),
+    recipeDerivations: () => (started ? registry().recipeDerivations() : []),
   };
   return {
     resolver: directiveResolverOf(directives),
     names: () => directiveNamesOf(directives()),
     ready,
     // Filtered against the registry, so a panel its plugin withdrew is not offered again.
-    panels: () => owned.filter(({ panel }) => host.registry.panels().includes(panel)),
-    keymaps: () => keymaps.filter(({ keymap }) => host.registry.keymaps().includes(keymap)),
-    vim: () => vims.filter(({ contribution }) => host.registry.vim().includes(contribution)),
-    themes: () => themes.filter(({ theme }) => host.registry.themes().includes(theme)),
-    permissionsOf: (plugin) => permissions.get(plugin),
-    brandKits: () => (started ? host.registry.brandKitsByBrand() : noKits),
-    assetSources: () => (started ? host.registry.assetSources() : []),
-    fontSources: () => (started ? host.registry.fontSources() : []),
-    configurations: () => (started ? host.registry.configurations() : []),
-    configure: (config) => {
-      host.configure(config);
+    panels: () => current.panels.filter(({ panel }) => registry().panels().includes(panel)),
+    keymaps: () => current.keymaps.filter(({ keymap }) => registry().keymaps().includes(keymap)),
+    vim: () => current.vim.filter(({ contribution }) => registry().vim().includes(contribution)),
+    themes: () => current.themes.filter(({ theme }) => registry().themes().includes(theme)),
+    permissionsOf: (plugin) => current.permissions.get(plugin),
+    brandKits: () => (started ? registry().brandKitsByBrand() : noKits),
+    assetSources: () => (started ? registry().assetSources() : []),
+    fontSources: () => (started ? registry().fontSources() : []),
+    configurations: () => (started ? registry().configurations() : []),
+    configure: (next) => {
+      config = next;
+      current.host.configure(next);
     },
-    running: () => (started ? activatedIds : []),
+    running: () => (started ? current.ids : []),
     recipeContributions: () => recipes,
+    setFetched: (next) => {
+      fetched = next ?? NO_FETCHED;
+      // Before start-up the set is only kept: the activation at `ready` takes it.
+      if (started) rebuild();
+    },
+    fetchedDirectory: (plugin) =>
+      fetched.loaded.plugins.some((candidate) => candidate.id === plugin)
+        ? fetched.directoryOf(plugin)
+        : undefined,
+    inForce: async () => {
+      await ready;
+      return {
+        plugins: pluginsInForce(fetched.loaded.plugins, installed),
+        warnings: [],
+        // Each set closes its own processes; an export only activates them.
+        close: () => Promise.resolve(),
+      };
+    },
   };
 }

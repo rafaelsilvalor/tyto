@@ -18,6 +18,7 @@ import {
   createDesktopPluginFiles,
   shownPath,
 } from './plugin-files.js';
+import type { FetchedPlugins } from './window-plugins.js';
 
 /**
  * When the desktop syncs, and what the window gets (TYTO-433). The sync itself is `@tyto/io`'s,
@@ -49,6 +50,10 @@ interface Harness {
   readonly applied: FetchedTemplates[];
   readonly started: PluginStore[];
   readonly closed: string[];
+  /** The fetched plugins each `apply` handed the window (TYTO-466). */
+  readonly handed: FetchedPlugins[];
+  /** `withdraw` and each set's close, in the order they happened. */
+  readonly order: string[];
 }
 
 function harness(
@@ -60,6 +65,8 @@ function harness(
   const applied: FetchedTemplates[] = [];
   const started: PluginStore[] = [];
   const closed: string[] = [];
+  const handed: FetchedPlugins[] = [];
+  const order: string[] = [];
   let next = 0;
   const plugins = createDesktopPluginFiles({
     home: '/home/.tyto',
@@ -76,18 +83,23 @@ function harness(
         ...NO_PLUGINS,
         close: () => {
           closed.push(set);
+          order.push(`close ${set}`);
           return Promise.resolve();
         },
       });
     },
     packs: (loaded) => Promise.resolve(packs(loaded)),
-    apply: (fetched) => {
+    apply: (fetched, fetchedPlugins) => {
       applied.push(fetched);
+      handed.push(fetchedPlugins);
       return Promise.resolve();
+    },
+    withdraw: () => {
+      order.push('withdraw');
     },
     ...overrides,
   });
-  return { plugins, asked, applied, started, closed };
+  return { plugins, asked, applied, started, closed, handed, order };
 }
 
 const synced = (
@@ -247,6 +259,37 @@ describe('what the window gets', () => {
       ['/cache/tabela/one/templates', new Set(['tabela'])],
     ]);
     expect([...(fetched?.replaces ?? [])]).toEqual(['tabela', 'example']);
+  });
+
+  // TYTO-466: the plugins themselves, for the window's host, not only their packs.
+  it('hands the window the started plugins, without one refused over its pack, with each folder', async () => {
+    const plugin = (id: string) => ({ id, manifest: {}, activate: () => undefined });
+    const { plugins, handed } = harness(
+      [synced([copy('tabela'), copy('example', { directory: '/cache/example/one' })])],
+      () => ({ ...NO_INSTALLED_PACKS, refused: new Set(['tabela']) }),
+      {
+        start: () =>
+          Promise.resolve({ ...NO_PLUGINS, plugins: [plugin('tabela'), plugin('example')] }),
+      },
+    );
+
+    await plugins.sync({ update: false });
+
+    expect(handed[0]?.loaded.plugins.map((loaded) => loaded.id)).toEqual(['example']);
+    expect(handed[0]?.directoryOf('example')).toBe('/cache/example/one');
+    expect(handed[0]?.directoryOf('nobody')).toBeUndefined();
+  });
+
+  it('withdraws the old set from the window before closing it, and not on the first start', async () => {
+    const { plugins, order } = harness([
+      synced([copy('tabela')]),
+      synced([copy('tabela', { directory: '/cache/tabela/two' })]),
+    ]);
+
+    await plugins.sync({ update: false });
+    expect(order).toEqual([]);
+    await plugins.sync({ update: true });
+    expect(order).toEqual(['withdraw', 'close set 1']);
   });
 
   it("names a failed fetch's repository, and puts a file's place in front instead of a range", async () => {

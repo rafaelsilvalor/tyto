@@ -849,6 +849,27 @@ async function start(): Promise<void> {
     }
   });
 
+  // What the installed plugins contribute to the window itself: the directives the preview
+  // and the template mode resolve, and the panels (ADR 0043, ADR 0045). The fetched set below
+  // is handed to the same object, activated before the installed plugins (TYTO-466).
+  const contributed = windowPlugins(checked);
+  late.installed = contributed;
+  // A plugin's own folder: its copy's for a fetched one, the store's for an installed one.
+  const pluginFolder = (plugin: string): string =>
+    contributed.fetchedDirectory(plugin) ?? pluginStore.directoryOf(plugin);
+  let contributedStarted = false;
+  // After the fetched set changed once the installed plugins have started (before, their own
+  // start reads it): the brands the kits offer, the settings read again against what is
+  // declared, the theme in force, and a notice the window answers by asking for the panels,
+  // keys and vim contributions again.
+  const fetchedChanged = async (): Promise<void> => {
+    if (!contributedStarted) return;
+    await sources.setKitBrands(new Set(contributed.brandKits().kits.keys()));
+    await late.live?.redeclared();
+    await applying(themes.current());
+    toWindow('plugins:changed', {});
+  };
+
   // **The plugin files** (TYTO-433, ADR 0151): the sync `tyto render` runs, here in main, with
   // the copies in a plugin set of their own that starts again when what loads changes. Synced
   // at start, when a folder opens (above) and on the two commands; never in the renderer.
@@ -870,9 +891,15 @@ async function start(): Promise<void> {
     start: (store) => startDesktopPlugins({ store, launch, capabilities }),
     packs: (loaded, folderOf) =>
       installedPacks(createPluginHost(), loaded, folderOf, { allowCode: true }),
-    apply: async (fetched) => {
+    // The window stops offering the old set before its processes end (TYTO-466).
+    withdraw: () => {
+      contributed.setFetched(undefined);
+    },
+    apply: async (fetched, fetchedPlugins) => {
       for (const problem of fetched.problems) log.warn(problem.message);
+      contributed.setFetched(fetchedPlugins);
       await sources.setFetched(fetched);
+      await fetchedChanged();
       toWindow('templates:changed', {});
     },
   });
@@ -899,10 +926,6 @@ async function start(): Promise<void> {
   // It is told no folder here. Which folder a compile resolves against is a property of the
   // tab the brief is in, and `ipc.ts` looks it up per request from the id that came with
   // it (E9.11) — a service holding one folder assumed one open document.
-  // What the installed plugins contribute to the window itself: the directives the preview
-  // and the template mode resolve, and the panels (ADR 0043, ADR 0045).
-  const contributed = windowPlugins(checked);
-  late.installed = contributed;
   // Which installed plugins exist at all, read once they have started, so a key of one that is
   // not running is named (TYTO-254). Never rejects: an unreadable folder names none.
   const pluginsSettled = contributed.ready
@@ -919,18 +942,20 @@ async function start(): Promise<void> {
   const pluginsConfigured = new Promise<void>((resolve) => {
     markConfigured = resolve;
   });
-  // An installed plugin's theme file is read from its own folder, never outside it (ADR 0077).
+  // A plugin's theme file is read from its own folder, never outside it (ADR 0077): a fetched
+  // plugin's is its copy's (TYTO-466), an installed one's is in the store.
   themeSources.installed = () =>
     contributed.themes().map(({ plugin, theme }) => ({
       plugin,
       theme,
-      read: folderThemeReader(pluginStore.directoryOf(plugin)),
+      read: folderThemeReader(pluginFolder(plugin)),
     }));
   void contributed.ready.then(themesReady);
   // The brands the started plugins' kits offer, the kits the preview draws with, so a plugin
   // file's configuration naming another is a problem row at its `brand:` (TYTO-471, ADR 0155).
   // Kept by `sources` for every read after, so a sync or an install says it again.
   void contributed.ready.then(async () => {
+    contributedStarted = true;
     await sources.setKitBrands(new Set(contributed.brandKits().kits.keys()));
     toWindow('templates:changed', {});
   });
@@ -980,7 +1005,7 @@ async function start(): Promise<void> {
   const templateFolder = createTemplateFolder();
 
   const panels = createPanelService(contributed, capabilities);
-  servePluginPages(contributed, (name) => pluginStore.directoryOf(name));
+  servePluginPages(contributed, pluginFolder);
 
   // The one rasterizer the export and a `tyto` command share (ADR 0159 decision 3), so their
   // captures queue on one adapter under its deadline (ADR 0030).
@@ -989,10 +1014,11 @@ async function start(): Promise<void> {
     fileSystem,
     log,
     sources,
-    plugins: checked.then(async (loaded) => {
+    // The window's plugins in force at each run, fetched before installed (TYTO-466).
+    plugins: async () => {
       await pluginsConfigured;
-      return loaded;
-    }),
+      return contributed.inForce();
+    },
     configuration: () => configuration,
     places: (directory) => workspace.placesFor(directory),
     pluginSources,

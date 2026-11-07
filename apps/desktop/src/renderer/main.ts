@@ -4471,11 +4471,26 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
 
   // Answered once the plugins have started, and main has put their template packs into the
   // search before answering (`index.ts`), so this is also the moment the picker can list them.
-  const { panels } = await bridge['plugins:panels']({});
+  await readPluginContributions(bridge);
   void afterTemplatesReread(bridge);
+}
+
+/** The toggle command of each plugin panel offered now, by its id, to take down when it goes. */
+const pluginPanelToggles = new Map<string, () => void>();
+
+/**
+ * The plugins' panels and keys, read again whole: at start and whenever main says the plugins
+ * in force changed (`plugins:changed`, TYTO-466). A panel no longer offered leaves the layout
+ * and its toggle leaves the bar; a new one arrives closed, as at start.
+ */
+async function readPluginContributions(bridge: TytoBridge): Promise<void> {
+  const { panels } = await bridge['plugins:panels']({});
+  for (const unregister of pluginPanelToggles.values()) unregister();
+  pluginPanelToggles.clear();
+  offeredPanels.clear();
   for (const offered of panels) {
     offeredPanels.set(offered.id, offered);
-    registry.register({
+    const unregister = registry.register({
       id: togglePanelCommandId(offered.id),
       label: offered.title,
       run: () => {
@@ -4484,14 +4499,18 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
         void changeLayout(withPanelOpen(layout, offered.id, !current.open));
       },
     });
+    pluginPanelToggles.set(offered.id, unregister);
   }
   layout = withPluginPanels(layout, panels);
   await applyLayout(false);
   // After the panels, whose toggles a plugin's keys may name.
   const { keymaps } = await bridge['plugins:keymaps']({});
+  const hadKeys = pluginKeybindings.length > 0;
   pluginKeybindings = keymaps.map(pluginKeybindingLayer);
   // The person's layer too: an entry naming a plugin panel's toggle resolves only now.
-  if (pluginKeybindings.length > 0 || userKeybindings.length > 0) applyKeybindings(bridge);
+  if (hadKeys || pluginKeybindings.length > 0 || userKeybindings.length > 0) {
+    applyKeybindings(bridge);
+  }
 }
 
 /**
@@ -6117,6 +6136,17 @@ async function load(): Promise<void> {
     // menu and the problems panel list again, and every open brief is compiled again.
     bridge.on('templates:changed', () => {
       void afterTemplatesReread(bridge);
+    });
+
+    // The same sync started the fetched plugins again (TYTO-466): their panels, keys, vim
+    // contributions and the theme in force are asked again, so none of the old set's stays.
+    bridge.on('plugins:changed', () => {
+      void readPluginContributions(bridge).catch((cause: unknown) => {
+        reportToLog(bridge, cause, 'plugin panels not read again');
+      });
+      if (windowVimPlugins !== undefined) void loadVimPlugins(bridge, windowVimPlugins);
+      void loadSettingsOutline(bridge);
+      showTheme(bridge, () => bridge['theme:current']({}));
     });
 
     // `settings.json` changed or refused a screen's change (TYTO-206).
