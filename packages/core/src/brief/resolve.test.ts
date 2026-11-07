@@ -484,6 +484,69 @@ describe('what counts as markup in a frontmatter scalar', () => {
   });
 });
 
+/**
+ * A template that draws `**…**` and `{key:value}…{/}` in a frontmatter value says so with
+ * `frontmatterMarks` (TYTO-622). Each case is asserted on both manifests: the same text on
+ * the same slot, with and without the declaration, so the declaration is the only variable.
+ */
+describe('a slot whose template reads marks in the frontmatter', () => {
+  const OPTED_IN = MANIFEST.replace('name: promo-curso', 'name: promo-marcas').replace(
+    'subtitulo: { type: rich-text }',
+    'subtitulo: { type: rich-text, frontmatterMarks: true }',
+  );
+
+  async function markupWarnings(
+    template: 'promo-curso' | 'promo-marcas',
+    value: string,
+  ): Promise<readonly string[]> {
+    const ast = brief(frontmatter({ template, subtitulo: value }), [
+      directive('titulo', 'Direito'),
+      directive('slide', 'Um'),
+    ]);
+    const registry = registryOf(manifestOf(MANIFEST), manifestOf(OPTED_IN));
+    return (await problems(ast, { registry }))
+      .filter((item) => item.code === 'W_MARKUP_IN_FRONTMATTER')
+      .map((item) => item.message);
+  }
+
+  it.each([
+    ['bold', 'Direito **Constitucional**', "'**'"],
+    ['a mark', 'Turma {cor:laranja}nova{/} agora', "'{key:value}…{/}'"],
+    ['both', '**Nova** turma {cor:verde}hoje{/}', "'**'"],
+  ])('stays quiet for %s, which it draws', async (_what, value, named) => {
+    expect(await markupWarnings('promo-marcas', value)).toEqual([]);
+    const [message] = await markupWarnings('promo-curso', value);
+    expect(message).toContain(named);
+  });
+
+  it.each([
+    ['italic', '**Nova** turma de *setembro*', "'*'"],
+    ['a trailing break', '{cor:verde}Nova{/} turma \\', "'\\'"],
+    ['an italic inside bold', '**Nova *turma***', "'*'"],
+    ['a mark inside a mark, which the kit does not nest', '{a:b}x {c:d}y{/} z{/}', "'{"],
+  ])('still warns about %s, which it shows as written', async (_what, value, named) => {
+    const [message] = await markupWarnings('promo-marcas', value);
+    expect(message).toBeDefined();
+    expect(message).toContain(named);
+  });
+
+  it('is refused on a slot that is not rich text', () => {
+    const parsed = parseManifest(
+      MANIFEST.replace(
+        'imagem: { type: image }',
+        'imagem: { type: image, frontmatterMarks: true }',
+      ),
+      'manifest.yaml',
+    );
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) {
+      expect(parsed.error.map((item) => item.message).join('; ')).toContain(
+        "frontmatterMarks is only meaningful on a 'rich-text' slot",
+      );
+    }
+  });
+});
+
 describe('the did-you-mean hint', () => {
   it('suggests the declared slot a typo is closest to', async () => {
     const ast = valid({ directives: [directive('slide', 'Um'), directive('titlo', 'x')] });

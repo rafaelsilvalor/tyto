@@ -37,4 +37,4 @@ Um template cuja fonte não tem itálico não consegue exportá-lo. O Tyto avisa
 
 ## Onde a formatação é lida
 
-Só no corpo. No [cabeçalho](./frontmatter.md) um valor é texto simples, e o Tyto avisa com `W_MARKUP_IN_FRONTMATTER` se encontrar formatação ali.
+Só no corpo. No [cabeçalho](./frontmatter.md) um valor é texto simples, e o Tyto avisa com `W_MARKUP_IN_FRONTMATTER` se encontrar formatação ali, a menos que o template declare que desenha `**…**` e `{cor:…}…{/}` naquele campo.

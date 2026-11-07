@@ -37,4 +37,4 @@ A template whose typeface has no italic cannot export it. Tyto says so while you
 
 ## Where formatting is read
 
-In the body only. In the [frontmatter](./frontmatter.md) a value is plain text, and Tyto warns with `W_MARKUP_IN_FRONTMATTER` if it finds formatting there.
+In the body only. In the [frontmatter](./frontmatter.md) a value is plain text, and Tyto warns with `W_MARKUP_IN_FRONTMATTER` if it finds formatting there, unless the template declares that it draws `**…**` and `{cor:…}…{/}` in that field.
