@@ -85,6 +85,7 @@ describe('the IPC contract', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      'recipe:apply',
       'recipe:run',
       'recipe:verbs',
       'session:read',

@@ -191,6 +191,8 @@ export const RECIPE_WIRE_LIMITS = {
   text: 1000,
   cells: 2000,
   diagnostics: 200,
+  /** Lines of a plan, and of an applied plan's outcome, sent per cell (TYTO-378). */
+  operations: 50,
 } as const;
 
 /** A value as the notebook shows it: a list is already joined, a long text already cut. */
@@ -200,6 +202,50 @@ const recipeValue = z.union([
   z.boolean(),
   z.null(),
 ]);
+
+/**
+ * TYTO-378, ADR 0170: what a plan cell carries for Apply. The window sees the first lines of
+ * the plan and the id main stamped on it; it sends the id back, never the plan's contents.
+ * Optional so a cell built before Apply existed still parses.
+ */
+const recipePlanApply = {
+  /** The first `RECIPE_WIRE_LIMITS.operations` lines; `count` says how many there are. */
+  operations: z
+    .array(
+      z.object({
+        write: z.string().max(RECIPE_WIRE_LIMITS.text),
+        rowKey: z.string().max(RECIPE_WIRE_LIMITS.text).optional(),
+        description: z.string().max(RECIPE_WIRE_LIMITS.text),
+      }),
+    )
+    .max(RECIPE_WIRE_LIMITS.operations)
+    .optional(),
+  /** Main's id for this plan as it keeps it; `recipe:apply` names it. */
+  planId: z.number().int().nonnegative().optional(),
+  /** The plan may be applied now: its cell ran, it was not applied, its verb can apply. */
+  applicable: z.boolean().optional(),
+};
+
+/** TYTO-378: how a plan cell's Apply went, counted, with its first operations' outcomes. */
+const recipeCellApplied = {
+  applied: z
+    .object({
+      /** When the host applied it, from its own clock. */
+      at: z.string(),
+      applied: z.number().int().nonnegative(),
+      failed: z.number().int().nonnegative(),
+      skipped: z.number().int().nonnegative(),
+      operations: z
+        .array(
+          z.object({
+            status: z.enum(['applied', 'failed', 'skipped']),
+            reason: z.string().max(RECIPE_WIRE_LIMITS.text).optional(),
+          }),
+        )
+        .max(RECIPE_WIRE_LIMITS.operations),
+    })
+    .optional(),
+};
 
 const recipeCell = z.object({
   /** The step's index among the recipe's cells; `param`, comments and the header are none. */
@@ -224,7 +270,14 @@ const recipeCell = z.object({
     })
     .optional(),
   /** An action's or a sink's plan: what it would write, and nothing written (ADR 0129). */
-  plan: z.object({ target: z.string(), count: z.number().int().nonnegative() }).optional(),
+  plan: z
+    .object({
+      target: z.string(),
+      count: z.number().int().nonnegative(),
+      ...recipePlanApply,
+    })
+    .optional(),
+  ...recipeCellApplied,
   diagnostics: z.array(diagnostic).max(RECIPE_WIRE_LIMITS.diagnostics),
   /** When the host ran this cell, from its own clock (ADR 0138, ADR 0148). */
   ranAt: z.string().optional(),
@@ -2345,10 +2398,32 @@ export const IPC_CHANNELS = {
       /**
        * Why cells were left `stale` this time: `restricted` is a folder not trusted, which
        * runs on Run only; `source` is a source reached while typing, which runs on save or Run.
+       * `apply` (TYTO-378) is an `apply auto` recipe Run outside a trusted folder: its plans
+       * were made and shown, and nothing was applied without a click (ADR 0170 decision 6).
        */
-      held: z.enum(['restricted', 'source']).optional(),
+      held: z.enum(['restricted', 'source', 'apply']).optional(),
       ranAt: z.string(),
     }),
+  ),
+
+  /**
+   * Applies one plan cell's plan (TYTO-378, ADR 0170). The window names the document, the
+   * cell and the `planId` it was shown; main applies the plan object it kept for that cell
+   * only when the id is still that cell's, so a plan replaced by a later run, or applied
+   * already, is refused. The window never sends a plan's contents. A click is the person's
+   * approval, in a restricted folder too, where plugins are handed no section.
+   *
+   * The answer is the cell as main keeps it after the Apply, its diagnostics saying why an
+   * Apply was refused or applied without being remembered; no cell when the document holds
+   * none at that index.
+   */
+  'recipe:apply': channel(
+    z.object({
+      documentId,
+      index: z.number().int().nonnegative(),
+      planId: z.number().int().nonnegative(),
+    }),
+    z.object({ cell: recipeCell.optional() }),
   ),
 
   /**

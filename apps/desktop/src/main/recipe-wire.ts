@@ -2,6 +2,7 @@ import type { Diagnostic } from '@tyto/core';
 import { type CellValue, type Table, cellText } from '@tyto/recipe';
 
 import { type IpcResponse, RECIPE_WIRE_LIMITS } from '../../shared/ipc.js';
+import type { AppliedRecord } from './recipe-apply.js';
 import type { RunnerAnswer, RunnerCell } from './recipe-runner.js';
 
 /**
@@ -25,19 +26,50 @@ export function recipeAnswerToWire(answer: RunnerAnswer): WireAnswer {
   };
 }
 
-function cellToWire(cell: RunnerCell): WireCell {
+export function cellToWire(cell: RunnerCell): WireCell {
   return {
     index: cell.index,
     line: cell.line,
     status: cell.status,
     ...(cell.table === undefined ? {} : { table: tableToWire(cell.table) }),
-    ...(cell.plan === undefined
-      ? {}
-      : { plan: { target: cut(cell.plan.target), count: cell.plan.count } }),
+    ...(cell.plan === undefined ? {} : { plan: planToWire(cell) }),
+    ...(cell.applied === undefined ? {} : { applied: appliedToWire(cell.applied) }),
     diagnostics: diagnosticsToWire(cell.diagnostics),
     ...(cell.ranAt === undefined ? {} : { ranAt: cell.ranAt }),
     ...(cell.oldestFetchedAt === undefined ? {} : { oldestFetchedAt: cell.oldestFetchedAt }),
     ...(cell.source === true ? { source: true } : {}),
+  };
+}
+
+// TYTO-378, ADR 0170: a plan's first lines and the id Apply names; an Apply's outcome, counted.
+
+function planToWire(cell: RunnerCell): NonNullable<WireCell['plan']> {
+  const plan = cell.plan as NonNullable<RunnerCell['plan']>;
+  return {
+    target: cut(plan.target),
+    count: plan.count,
+    operations: plan.operations.slice(0, RECIPE_WIRE_LIMITS.operations).map((operation) => ({
+      write: cut(operation.write),
+      ...(operation.rowKey === undefined ? {} : { rowKey: cut(operation.rowKey) }),
+      description: cut(operation.description),
+    })),
+    ...(cell.planId === undefined ? {} : { planId: cell.planId }),
+    applicable: cell.applicable === true,
+  };
+}
+
+function appliedToWire(applied: AppliedRecord): NonNullable<WireCell['applied']> {
+  const count = (status: string) =>
+    applied.operations.filter((operation) => operation.status === status).length;
+  return {
+    at: applied.at,
+    applied: count('applied'),
+    failed: count('failed'),
+    skipped: count('skipped'),
+    operations: applied.operations.slice(0, RECIPE_WIRE_LIMITS.operations).map((operation) => ({
+      status: operation.status,
+      ...(operation.reason === undefined ? {} : { reason: cut(operation.reason) }),
+    })),
   };
 }
 

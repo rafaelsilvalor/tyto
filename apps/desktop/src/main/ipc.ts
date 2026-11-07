@@ -42,7 +42,7 @@ import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
 import { type RecipeRunner } from './recipe-runner.js';
-import { recipeAnswerToWire } from './recipe-wire.js';
+import { cellToWire, recipeAnswerToWire } from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
 import { type AppliedThemes, type ThemeService, themeVariant } from './themes.js';
@@ -539,6 +539,18 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'recipe:verbs': () => Promise.resolve({ verbs: [...recipes.verbs()] }),
+
+    // TYTO-378, ADR 0170: the window names the cell and the plan's id, never a plan or a path;
+    // main applies the plan it kept for that cell, against the file it holds for the tab.
+    'recipe:apply': async ({ documentId, index, planId }) => {
+      const cell = await recipes.apply({
+        documentId,
+        index,
+        planId,
+        path: documents.pathOf(documentId),
+      });
+      return cell === undefined ? {} : { cell: cellToWire(cell) };
+    },
 
     // TYTO-274, ADR 0125: a label inside the open folder is relative to it, so every open tab is
     // labelled again when the folder changes, and the window applies it as it applies a rename.
