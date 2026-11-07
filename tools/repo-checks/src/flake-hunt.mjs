@@ -245,7 +245,7 @@ function startProcess({ command, args, cwd, env }) {
  * @param {LoggedRequest} request
  * @returns {Promise<number>}
  */
-function runLogged({ command, args, shell, cwd, logPath }) {
+export function runLogged({ command, args, shell, cwd, logPath }) {
   const descriptor = fs.openSync(logPath, 'w');
   return new Promise((resolve) => {
     let settled = false;
