@@ -249,4 +249,18 @@ describe('briefAnalysisField', () => {
 
     expect(state.field(briefAnalysisField)?.manifest?.name).toBe('promo-curso');
   });
+
+  it('keeps a restriction with the manifest it came with, and drops it with that manifest', async () => {
+    const good = await analyzer.analyze(VALID);
+    const broken = await analyzer.analyze('::titulo {cor : azul}\n');
+    const promo = await analyzer.analyze(
+      ['---', 'template: promo-curso', '---', '::titulo Oi'].join('\n'),
+    );
+    const restricted = { ...good, formats: ['feed'] };
+
+    // A pass with no manifest keeps the last one, and its restriction beside it (TYTO-473).
+    expect(stateWith(restricted, broken).field(briefAnalysisField)?.formats).toEqual(['feed']);
+    // A new manifest with no restriction must not inherit the old one's.
+    expect(stateWith(restricted, promo).field(briefAnalysisField)?.formats).toBeUndefined();
+  });
 });

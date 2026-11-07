@@ -110,6 +110,12 @@ export {
 export { briefCompletion, completeBrief } from './completion.js';
 
 export {
+  besideTheirTemplates,
+  type TemplateAliasTarget,
+  templateAliasDetail,
+} from './template-aliases.js';
+
+export {
   type AnalysisEndpoint,
   createWorkerAnalyzer,
   serveBriefAnalysis,

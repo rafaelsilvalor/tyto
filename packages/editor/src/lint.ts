@@ -71,8 +71,10 @@ const candidatesFor = (code: DiagnosticCode, analysis: BriefAnalysis): readonly 
     // because `NAME` refuses it, and that is not built. Leaving the case out says why.
     case 'E_BAD_ADJUSTMENT':
       return manifest === undefined ? [] : Object.keys(manifest.adjustments);
+    // A configuration that restricts its formats refuses the rest (TYTO-475), so the fix
+    // offers only what the name allows: `grid` is no suggestion for a story-only alias.
     case 'E_UNKNOWN_FORMAT':
-      return manifest === undefined ? [] : manifest.formats;
+      return manifest === undefined ? [] : (analysis.formats ?? manifest.formats);
     case 'E_UNKNOWN_TEMPLATE':
       return analysis.templates;
     default:

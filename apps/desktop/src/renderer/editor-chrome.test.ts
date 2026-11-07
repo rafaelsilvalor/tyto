@@ -27,8 +27,10 @@ import {
   slashTemplateChoiceFor,
   slashTemplateDetail,
   slashTemplateNote,
+  aliasTargetsOf,
   templateAliasDeclared,
   templateChoiceFor,
+  templatesInPickOrder,
   templatePickDetail,
   templateEditFor,
 } from './editor-chrome.js';
@@ -333,6 +335,27 @@ describe('an alias in "New brief from template…" and the "/" menu (TYTO-467)',
     expect(slashTemplateDetail('sets the template', ALIAS)).toBe(
       'aviso · laranja — sets the template',
     );
+  });
+
+  it('sits each alias right after its template in the bar, not after every template (TYTO-473)', () => {
+    // As `templates:list` sends them: every template, then every alias.
+    const rows = [
+      { name: 'aviso' },
+      { name: 'banner' },
+      { name: 'banner-escuro', alias: { ...ALIAS, template: 'banner', configuration: 'escuro' } },
+      { name: 'laranja', alias: ALIAS },
+    ];
+
+    expect(templatesInPickOrder(rows).map((row) => row.name)).toEqual([
+      'aviso',
+      'laranja',
+      'banner',
+      'banner-escuro',
+    ]);
+    expect(aliasTargetsOf(rows)).toEqual({
+      'banner-escuro': { template: 'banner', configuration: 'escuro' },
+      laranja: { template: 'aviso', configuration: 'laranja' },
+    });
   });
 
   it('names the plugin file that declared it, for the hover and the panel beside the row', () => {
