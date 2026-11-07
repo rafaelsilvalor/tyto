@@ -30,15 +30,7 @@ export interface AllowedOffender {
  * The blocks still waiting for their script. This list only shrinks: an entry that no longer
  * matches an offending block fails too, so the PR that moves a block deletes its entries.
  */
-export const ALLOWED_OFFENDERS: readonly AllowedOffender[] = [
-  ...['.claude/commands/flake-hunt.md', '.agents/skills/flake-hunt/SKILL.md'].flatMap((file) =>
-    ['Write the arm script.', 'Compare the failures.'].map((step) => ({
-      file,
-      step,
-      removedBy: 'TYTO-629 PR 3',
-    })),
-  ),
-];
+export const ALLOWED_OFFENDERS: readonly AllowedOffender[] = [];
 
 export interface Offender {
   readonly file: string;
