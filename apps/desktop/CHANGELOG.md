@@ -1,5 +1,57 @@
 # @tyto/desktop
 
+## 0.16.0
+
+### Minor Changes
+
+- fb529a1: Apply in the recipe notebook's runner (ADR 0170). Main stamps an id on each plan a cell makes
+  and keeps the plan object itself; `recipe:apply` names a cell and that id, and main hands that
+  kept plan back to its verb, refusing a plan replaced by a later run, one applied already, and
+  one whose cell did not run this time. Applies are one at a time per recipe, and a click applies
+  in a restricted folder too, with its sections withheld. After an Apply the recipe's state is
+  committed from the outcome of every plan cell, a plan never applied counting as skipped, and
+  only while every cell is ok; otherwise the plan is applied and the cell says it was not
+  remembered (`W_RECIPE_NOT_REMEMBERED`, new in core). A recipe whose header says `apply auto`
+  applies the plans a Run makes, in cell order, in a trusted folder only; elsewhere the Run stops
+  at the plan with `held: 'apply'`. The cell on the wire carries its plan's first 50 lines, its id,
+  whether it can be applied, and how its Apply went. The notebook's Apply button follows.
+- b5f3a1a: Apply in the recipe notebook (ADR 0170). A plan cell shows its first 20 operations under its
+  line, then how many it leaves out, and an **Apply** button when main says the plan can be
+  applied now; the button stays `aria-disabled` while its Apply is on its way. Afterwards each
+  operation carries its mark, applied, failed or skipped, with its reason, and a line counts them
+  ("2 applied · 1 failed"). A refusal from `recipe:apply` is shown on the cell until the next
+  run, and an `apply auto` Run outside a trusted folder says it waits for a click. A plan on the
+  wire now always carries its lines and whether it can be applied. The recipe highlighter colours
+  `apply auto` as a header line instead of a step.
+
+### Patch Changes
+
+- 353b0b9: A folded recipe table stays folded when a step is inserted above it (TYTO-451). The notebook
+  keeps each fold by the start of its cell's line and maps it through every edit, so the fold
+  follows its line instead of an index that now names another cell; deleting the line drops its
+  fold. `@tyto/editor` adds `mapLineStarts` and `cellOutputLineStart`, and `onChange` listeners
+  receive a third argument, the edit: its changes and the text before and after them.
+- Updated dependencies [97c8598]
+- Updated dependencies [6b193ff]
+- Updated dependencies [fb529a1]
+- Updated dependencies [b5f3a1a]
+- Updated dependencies [353b0b9]
+  - @tyto/plugin-api@0.15.0
+  - @tyto/command-line@0.2.8
+  - @tyto/recipe@0.2.0
+  - @tyto/core@0.41.0
+  - @tyto/editor@0.15.0
+  - @tyto/export-html@0.7.15
+  - @tyto/export-svg@2.0.15
+  - @tyto/google-fonts@0.1.14
+  - @tyto/io@5.3.1
+  - @tyto/pipeline@0.12.11
+  - @tyto/theme-pack@0.1.14
+  - @tyto/brief-lang@0.7.13
+  - @tyto/fonts@0.5.0
+  - @tyto/template-lang@0.8.14
+  - @tyto/templates@1.2.9
+
 ## 0.15.0
 
 ### Minor Changes
