@@ -264,6 +264,7 @@ export {
   type TemplateFailure,
   type TemplateRegistry,
   type TemplateRoot,
+  type UnofferedTemplate,
   loadTemplateRegistry,
 } from './template/registry.js';
 

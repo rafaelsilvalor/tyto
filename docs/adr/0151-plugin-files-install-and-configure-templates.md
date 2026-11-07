@@ -355,6 +355,17 @@ plugin files, not here (ADR 0127 decision 4).
   old copy loads as before and the next sync asks again; `tyto watch`, which never fetches,
   loads it unchanged. The cleanup keeps a locked copy's record and drops the rest with their
   copies. The decision above is unchanged.
+- **2026-11-07, TYTO-615.** A fetched pack still offers only the templates the files name
+  (decision 2), but a template it holds that no entry names is no longer left out in silence.
+  The registry keeps each name a root with `only` skipped, with the root's plugin
+  (`TemplateRegistry.unoffered`), and `resolveTemplateConfigurations` reports
+  `W_PLUGIN_FILE_TEMPLATE_UNNAMED` once per pack, at the first entry that fetched it, naming
+  the templates left out and saying how to add one: an entry of its own with the same git and
+  ref. A brief that names one of them still gets `E_UNKNOWN_TEMPLATE`, now with a hint that the
+  pack holds it. Found when a pack gained a second template in a release and the plugin file's
+  ref was moved to it: the new template stayed unknown with no word on why. One entry naming a
+  whole pack was the other answer, and was not taken: it would undo decision 2, which keeps a
+  pack's template out until somebody names it. The decision above is unchanged.
 
 ## Rejected
 

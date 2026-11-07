@@ -39,6 +39,12 @@ export interface TemplateRegistry {
    */
   originOf?(name: string): string | undefined;
   /**
+   * The templates a root with `only` held and did not offer, each with the root's `origin`
+   * (TYTO-615): what lets a plugin file be told that a pack it fetched has a template none of
+   * its entries names. Optional, like `originOf`, for a registry built by hand.
+   */
+  readonly unoffered?: readonly UnofferedTemplate[];
+  /**
    * One entry per folder whose manifest could not be read. A broken template is not a
    * broken registry: the other templates still render, and a caller that wants to surface
    * the failures reads them here rather than losing the working ones to an `Err`.
@@ -53,6 +59,12 @@ function readFailure(path: string, cause: unknown): Diagnostics {
       problem: cause instanceof Error ? cause.message : String(cause),
     }),
   ];
+}
+
+/** A template a root held outside its `only`, and the label of the root it was in. */
+export interface UnofferedTemplate {
+  readonly name: string;
+  readonly origin?: string;
 }
 
 /**
@@ -118,6 +130,7 @@ export async function loadTemplateRegistry(
 
   const entries = new Map<string, Entry>();
   const failures: TemplateFailure[] = [];
+  const unoffered: UnofferedTemplate[] = [];
   const warnings: Diagnostic[] = [];
   const unreadable: Diagnostics[] = [];
 
@@ -160,7 +173,12 @@ export async function loadTemplateRegistry(
         continue;
       }
 
-      if (only !== undefined && !only.has(parsed.value.name)) continue;
+      if (only !== undefined && !only.has(parsed.value.name)) {
+        // Still skipped in silence here: whether it is worth a word is the plugin file's
+        // question, which `resolveTemplateConfigurations` answers with this list.
+        unoffered.push({ name: parsed.value.name, ...(origin === undefined ? {} : { origin }) });
+        continue;
+      }
 
       const existing = entries.get(parsed.value.name);
       if (existing !== undefined) {
@@ -219,6 +237,7 @@ export async function loadTemplateRegistry(
       formatsOf: (name) => entries.get(name)?.manifest.formats,
       directoryOf: (name) => entries.get(name)?.directory,
       originOf: (name) => entries.get(name)?.origin,
+      unoffered,
       failures,
     },
     warnings,

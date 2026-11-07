@@ -974,16 +974,22 @@ export async function resolve(
       ...(options.configurations?.aliases().map((entry) => entry.alias) ?? []),
     ].sort((left, right) => left.localeCompare(right));
     const range = ast.frontmatter.ranges.template ?? ast.frontmatter.range ?? ast.range;
+    // A fetched pack that holds the name and was not asked for it is the likelier story than
+    // a typo (TYTO-615): the name is right, the plugin file is one entry short.
+    const unoffered = options.registry.unoffered?.find((item) => item.name === name);
+    const suggestion = didYouMean(name, available);
+    const hint =
+      unoffered?.origin !== undefined
+        ? `The pack of plugin '${unoffered.origin}' holds '${name}', but no plugin file names it: ` +
+          'add an entry for it with the same git and ref as that pack’s other entries.'
+        : suggestion === undefined
+          ? undefined
+          : `Did you mean '${suggestion}'?`;
     return err([
       diagnostic(
         'E_UNKNOWN_TEMPLATE',
         { template: name, available: available.length === 0 ? 'none' : available.join(', ') },
-        {
-          range,
-          ...(didYouMean(name, available) === undefined
-            ? {}
-            : { hint: `Did you mean '${didYouMean(name, available) ?? ''}'?` }),
-        },
+        { range, ...(hint === undefined ? {} : { hint }) },
       ),
     ]);
   }

@@ -560,6 +560,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The template that won the name renders with its own defaults.',
   },
+  W_PLUGIN_FILE_TEMPLATE_UNNAMED: {
+    severity: 'warning',
+    summary:
+      'A pack a plugin file fetched holds templates no entry names, so they are not offered.',
+    template:
+      "The pack of plugin '{plugin}' that '{file}' fetches for '{template}' also holds {unnamed}; a fetched pack offers only the templates the plugin files name. To offer one, add an entry for it with the same git and ref as '{template}'.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'The templates the files name load; the others are left out, as before.',
+  },
   W_PLUGIN_FILE_REPLACES_INSTALLED: {
     severity: 'warning',
     summary:
