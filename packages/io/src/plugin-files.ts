@@ -31,6 +31,7 @@ import {
   readIfPresent,
   writeAtomically,
 } from './fs-plugin-store.js';
+import { type HomePathOptions, checkHomePath } from './home-path.js';
 
 /**
  * Plugin files on a disk: reading a folder, fetching with `git`, the lock and the cache
@@ -270,6 +271,8 @@ export interface SyncPluginFolderOptions {
    * diagnostics have no range, so this is how a caller prints them under that file.
    */
   readonly onSourceProblem?: SourceProblemListener;
+  /** The platform and limit a fetch's paths under `home` are checked against (TYTO-470). */
+  readonly homePath?: HomePathOptions;
 }
 
 /** The plugin file, as `shown` names it, a source's range-less diagnostics are about. */
@@ -326,6 +329,17 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
     );
   };
 
+  // Checked once, and said once, before the first fetch: a home too deep for its copies
+  // fetches nothing, and a copy already cached still loads (TYTO-470).
+  const homeTooDeep = options.fetches ? checkHomePath(home, options.homePath) : undefined;
+  let homeReported = false;
+  const mayFetch = (): boolean => {
+    if (homeTooDeep === undefined) return true;
+    if (!homeReported) diagnostics.push(homeTooDeep);
+    homeReported = true;
+    return false;
+  };
+
   for (const step of planPluginSync(named.sources, read.lock, options.update)) {
     const { source, locked } = step;
     const location = locationOf(source.git, directory);
@@ -363,6 +377,10 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
         keepLocked();
         continue;
       }
+      if (!mayFetch()) {
+        keepLocked();
+        continue;
+      }
       // The locked id, fetched again, never the ref: a pinned source does not move. A lock
       // written before TYTO-472 may name an annotated tag's object, which peels to the commit
       // it points at, and the lock is rewritten to it; a commit stays as it is.
@@ -379,6 +397,10 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
       continue;
     }
 
+    if (!mayFetch()) {
+      keepLocked();
+      continue;
+    }
     const fetched = await fetchToCache(home, location, source.ref);
     if (!fetched.ok) {
       failed(source, fetched.error, lockedCopy === undefined ? undefined : locked?.commit);

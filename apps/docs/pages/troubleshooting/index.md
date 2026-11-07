@@ -24,6 +24,8 @@ Almost everything that goes wrong in Tyto is said in the Problems panel — a br
 
 **`tyto render` stops with `E_FORMATS_READ`.** The file `--formats-file` names is not there. Check the path, or leave the option out: without it, the `formats.yaml` in the folder you run from is read, and without that, the sizes that come with Tyto; see [Command line](../command-line/#before-the-first-render-sizes-and-templates).
 
+**`tyto render` or `tyto plugin sync` stops with `E_TYTO_HOME_PATH_TOO_LONG`.** The folder `TYTO_HOME` names is too deep for the copies of templates fetched under it: on Windows a path stops at 259 characters, and a copy needs about 172 below the folder. Set `TYTO_HOME` to a shorter folder, such as one directly under your user folder.
+
 ## The log
 
 Tyto writes a log of what the window did: when it started, each time `settings.json` or `keybindings.json` changed, and the warnings it met. **Help ▸ Open the log folder** opens the folder; the file is `tyto.log`. It is in the `logs` folder of your version's folder — see [Where Tyto keeps your things](../get-started/install.md#where-tyto-keeps-your-things).

@@ -6,6 +6,7 @@ import { type Diagnostics, diagnostic } from '@tyto/core';
 import { GALLERY_INDEX_FILE, parseGalleryIndex } from '@tyto/plugin-api';
 import { z } from 'zod';
 
+import { homePathProblem } from './home-path.js';
 import { git, problemOf } from './plugin-files.js';
 
 /**
@@ -156,8 +157,16 @@ export async function fetchGalleryIndex(
   const pictures = join(dirname(cached), PREVIEWS);
   const previewsOf = async (text: string): Promise<ReadonlyMap<string, string>> =>
     options.previews === true ? keptPreviews(pictures, previewPaths(text, index)) : new Map();
-  await mkdir(dirname(cached), { recursive: true });
-  const staging = await mkdtemp(join(dirname(cached), '.fetching-'));
+  let staging: string;
+  try {
+    await mkdir(dirname(cached), { recursive: true });
+    staging = await mkdtemp(join(dirname(cached), '.fetching-'));
+  } catch (cause) {
+    // A home too deep for the cache's folders says so, not a stack trace (TYTO-470).
+    const tooDeep = homePathProblem(cause, home);
+    if (tooDeep === undefined) throw cause;
+    return { previews: new Map(), diagnostics: [tooDeep] };
+  }
   let problem: string;
   try {
     await git(['init', '--quiet'], staging);
