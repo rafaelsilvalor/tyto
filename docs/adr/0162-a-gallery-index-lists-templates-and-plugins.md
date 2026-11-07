@@ -222,3 +222,22 @@ Install and update are the operations above, followed by the window's own plugin
 so approvals use its box and failures reach its problems panel. **The window has no
 `--force`**: a place changed by hand since the gallery wrote it is refused there, and the
 refusal names `tyto gallery update <id> --force` for a terminal.
+
+## Note, 2026-11-07 — how a new tag reaches the gallery (TYTO-507)
+
+The consequence above, a curator who forgets to bump `latest`, is now a reminder rather than a
+memory. **The gallery pulls**: a scheduled workflow in the gallery repository
+(`release-watch.yml`, daily plus `workflow_dispatch`) lists each entry's tags with plain
+`git ls-remote --tags`, takes the highest `v<major>.<minor>.<patch>` above `latest` (a
+pre-release or any other name opens nothing), reads `engine` from `tyto-plugin.json` at that
+tag and `changes` from the annotated tag's subject, and opens or updates one pull request per
+entry that moves those three lines and nothing else of `index.yaml`. **The curator still
+merges** each one, so decision 1's approval per version holds, and Tyto reads nothing new.
+
+A robot in each template repository, pushing to the gallery on its own tag, was not built: a
+workflow's `GITHUB_TOKEN` cannot write to another repository, so every template repository
+would hold a personal token, the secret ADR 0154 rejected. Pulling costs a day's latency at
+most and keeps every credential in the one repository that changes. No hosting service's API
+is read (ADR 0127); the bump pull request's CI is dispatched with `workflow_dispatch`, the run
+that needs no approval (ADR 0154). The gallery's `CONTRIBUTING.md` holds the details and the
+repository setting it needs.
