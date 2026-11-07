@@ -530,6 +530,58 @@ describe('a slot whose template reads marks in the frontmatter', () => {
     expect(message).toContain(named);
   });
 
+  /**
+   * `min` and `max` count what the template draws (TYTO-634). Two marks put 22 characters of
+   * syntax around 13 drawn ones; counted as written, a title that fits `max: 20` as a
+   * directive was refused in the frontmatter and its template drew its default instead.
+   */
+  describe('counts the length the template draws', () => {
+    const TITLE_OPTED_IN = MANIFEST.replace('name: promo-curso', 'name: promo-marcas').replace(
+      'titulo: { type: rich-text, required: true, min: 5, max: 20 }',
+      'titulo: { type: rich-text, required: true, min: 5, max: 20, frontmatterMarks: true }',
+    );
+
+    async function resolvedTitle(template: 'promo-curso' | 'promo-marcas', titulo: string) {
+      const ast = brief(frontmatter({ template, titulo }), [directive('slide', 'Um')]);
+      const registry = registryOf(manifestOf(MANIFEST), manifestOf(TITLE_OPTED_IN));
+      const result = await resolve(ast, optionsFor({ registry }));
+      const found = result.ok ? result.diagnostics : result.error;
+      return {
+        value: result.ok ? result.value.slots.titulo?.value : undefined,
+        slotErrors: found
+          .filter((item) => item.code === 'E_BAD_SLOT_VALUE')
+          .map((item) => item.message),
+      };
+    }
+
+    const TWO_MARKS = 'Nova {cor:azul}de{/} {cor:laranja}turma{/}';
+
+    it('hands two marks in one value to the template, both of them', async () => {
+      const { value, slotErrors } = await resolvedTitle('promo-marcas', TWO_MARKS);
+      expect(slotErrors).toEqual([]);
+      expect(value).toEqual({ kind: 'rich-text', text: text(TWO_MARKS, sourceRange(0, 40)) });
+    });
+
+    it('still counts every character where the template shows the marks as written', async () => {
+      const { value, slotErrors } = await resolvedTitle('promo-curso', TWO_MARKS);
+      expect(value).toBeUndefined();
+      expect(slotErrors).toEqual([
+        `Slot 'titulo' is invalid: is ${TWO_MARKS.length} characters and the manifest allows 20.`,
+      ]);
+    });
+
+    it('still refuses a value whose drawn words are too long or too short', async () => {
+      const long = await resolvedTitle('promo-marcas', '{cor:azul}Direito Constitucional{/} hoje');
+      expect(long.slotErrors).toEqual([
+        "Slot 'titulo' is invalid: is 27 characters and the manifest allows 20.",
+      ]);
+      const short = await resolvedTitle('promo-marcas', '{cor:azul}Nova{/}');
+      expect(short.slotErrors).toEqual([
+        "Slot 'titulo' is invalid: is 4 characters and the manifest needs 5.",
+      ]);
+    });
+  });
+
   it('is refused on a slot that is not rich text', () => {
     const parsed = parseManifest(
       MANIFEST.replace(

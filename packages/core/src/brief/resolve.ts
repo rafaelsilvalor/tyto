@@ -578,9 +578,14 @@ class Resolver {
 
     switch (slot.type) {
       case 'rich-text': {
-        const markup = fromFrontmatter
-          ? markupIn(slot.frontmatterMarks === true ? withoutReadMarks(plain) : plain)
-          : undefined;
+        // What the template draws, and so what `min` and `max` count: a directive's text
+        // arrives with its marks already read, and a frontmatter value whose template reads
+        // its marks is counted the same way. Counting the `{cor:azul}` and `{/}` too refused a
+        // two-mark title that fit as a directive, and the template drew its default in its
+        // place, with no colour at all (TYTO-634).
+        const drawn =
+          fromFrontmatter && slot.frontmatterMarks === true ? withoutReadMarks(plain) : plain;
+        const markup = fromFrontmatter ? markupIn(drawn) : undefined;
         if (markup !== undefined) {
           this.report(
             diagnostic(
@@ -597,22 +602,22 @@ class Resolver {
         // one end unenforced was a rule the manifest accepted and nothing applied
         // (TYTO-67); making it a warning instead would have given one pair three
         // behaviours across two slot kinds.
-        if (!slot.repeat && slot.min !== undefined && plain.length < slot.min) {
+        if (!slot.repeat && slot.min !== undefined && drawn.length < slot.min) {
           this.report(
             badValue(
               candidate.name,
-              `is ${plain.length} characters and the manifest needs ${slot.min}`,
+              `is ${drawn.length} characters and the manifest needs ${slot.min}`,
               candidate.range,
             ),
           );
           return undefined;
         }
 
-        if (!slot.repeat && slot.max !== undefined && plain.length > slot.max) {
+        if (!slot.repeat && slot.max !== undefined && drawn.length > slot.max) {
           this.report(
             badValue(
               candidate.name,
-              `is ${plain.length} characters and the manifest allows ${slot.max}`,
+              `is ${drawn.length} characters and the manifest allows ${slot.max}`,
               candidate.range,
             ),
           );
