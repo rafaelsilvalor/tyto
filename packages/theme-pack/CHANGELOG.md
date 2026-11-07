@@ -1,5 +1,11 @@
 # @tyto/theme-pack
 
+## 0.1.13
+
+### Patch Changes
+
+- @tyto/plugin-api@0.14.3
+
 ## 0.1.12
 
 ### Patch Changes

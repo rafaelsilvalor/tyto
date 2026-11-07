@@ -1,6 +1,6 @@
 {
   "name": "@tyto/io",
-  "version": "5.2.4",
+  "version": "5.3.0",
   "type": "module",
   "description": "BriefSource and OutputSink ports with filesystem adapters.",
   "license": "UNLICENSED",

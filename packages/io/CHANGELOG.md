@@ -1,5 +1,30 @@
 # @tyto/io
 
+## 5.3.0
+
+### Minor Changes
+
+- 4a7c29d: A `TYTO_HOME` too deep for the copies fetched under it is now reported instead of crashing:
+  `E_TYTO_HOME_PATH_TOO_LONG` names the folder and the length of the longest path a fetch writes
+  there. The plugin files' sync checks it before the first fetch (on Windows a copy reaches the
+  home's length plus 172, against a limit of 259), and turns a path the system refuses under the
+  home (`ENAMETOOLONG`, or Windows' `ENOENT` over the limit) into the same error, as the gallery's
+  index fetch does. `tyto render`, `tyto plugin sync` and the gallery commands print it
+  (TYTO-470).
+
+### Patch Changes
+
+- Updated dependencies [6f4c86e]
+- Updated dependencies [f658466]
+- Updated dependencies [4a7c29d]
+- Updated dependencies [8d081ec]
+  - @tyto/core@0.40.0
+  - @tyto/export-html@0.7.14
+  - @tyto/export-svg@2.0.14
+  - @tyto/pipeline@0.12.10
+  - @tyto/plugin-api@0.14.3
+  - @tyto/template-lang@0.8.13
+
 ## 5.2.4
 
 ### Patch Changes

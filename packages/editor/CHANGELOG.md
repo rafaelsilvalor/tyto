@@ -1,5 +1,25 @@
 # @tyto/editor
 
+## 0.14.0
+
+### Minor Changes
+
+- 5f87868: TYTO-473: the frontmatter `template:` completion marks an alias with what it stands for
+  (`aviso · laranja`) and lists it right after its template, as the command bar now does too.
+  The quick fix for `E_UNKNOWN_FORMAT` offers only a format the name's configuration allows.
+  New in `@tyto/editor`: `besideTheirTemplates`, `templateAliasDetail` and `BriefAnalysis`'s
+  optional `aliases` and `formats`.
+
+### Patch Changes
+
+- Updated dependencies [6f4c86e]
+- Updated dependencies [f658466]
+- Updated dependencies [4a7c29d]
+- Updated dependencies [8d081ec]
+  - @tyto/core@0.40.0
+  - @tyto/brief-lang@0.7.12
+  - @tyto/template-lang@0.8.13
+
 ## 0.13.4
 
 ### Patch Changes
