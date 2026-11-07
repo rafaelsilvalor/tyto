@@ -147,6 +147,15 @@ git clone https://github.com/rafaelsilvalor/tyto-template-<name>.git <templates>
   example briefs' scenes set, and no other. Copy it from `tyto-template-agenda-semana`;
   `docs/plugin-authoring.md` › A code template has the reason.
 
+**The seal, when the template has the house's kit and a format named `grid`** (TYTO-480):
+declare the optional `selo: { type: image }` slot with the comment the other house manifests
+carry, draw it with `sealed(context.size, sealOf(context))`, lay the slide out on `page.size`,
+lift whatever stands on the foot (signature, arrow, page number) by the band, and spread
+`...page.seal` last. Add a test that a sealed brief draws a `seal` node 140 tall at the last
+grid's foot with the signature's foot above it, and keep the examples seal-less so their
+snapshots say a brief without it is unchanged. A template with no grid does not declare it.
+`docs/template-conventions.md` › The seal has the whole pattern.
+
 Install with the token from the user-level `~/.npmrc`, never from the repository:
 
 ```sh
