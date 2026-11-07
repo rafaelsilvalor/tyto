@@ -62,10 +62,13 @@ function contextOf(more: Partial<CellViewContext> = {}) {
     runFrom: vi.fn<(index: number) => void>(),
     fetchAgain: vi.fn<() => void>(),
     toggled: vi.fn<(index: number, collapsed: boolean) => void>(),
+    apply: vi.fn<(index: number, planId: number) => void>(),
   } satisfies CellViewActions;
   const context: CellViewContext = {
     locale: 'en',
     collapsed: new Set(),
+    applying: new Set(),
+    refusals: new Map(),
     now: () => NOW,
     actions,
     ...more,
@@ -186,7 +189,12 @@ describe("a cell's buttons", () => {
   });
 
   it('offers them on a plan, and none on a cell with neither a table nor a plan', () => {
-    const plan = render(cellOf({ table: undefined, plan: { target: 'sheet', count: 2 } }));
+    const plan = render(
+      cellOf({
+        table: undefined,
+        plan: { target: 'sheet', count: 2, operations: [], applicable: false },
+      }),
+    );
     expect(texts(plan.element, '.recipe-cell__action')).toEqual(['Run from here']);
     const failed = render(cellOf({ status: 'failed', table: undefined, source: true }));
     expect(failed.element.querySelector('button')).toBeNull();
@@ -225,7 +233,12 @@ describe('folding a table', () => {
   });
 
   it('has no toggle on a cell with no table', () => {
-    const { element } = render(cellOf({ table: undefined, plan: { target: 'sheet', count: 1 } }));
+    const { element } = render(
+      cellOf({
+        table: undefined,
+        plan: { target: 'sheet', count: 1, operations: [], applicable: false },
+      }),
+    );
     expect(element.querySelector('.recipe-cell__toggle')).toBeNull();
   });
 });

@@ -518,6 +518,23 @@ export interface Catalogue {
   readonly 'recipe.cell.fetchAgain': string;
   readonly 'recipe.cell.collapse': string;
   readonly 'recipe.cell.expand': string;
+  /**
+   * TYTO-378, a plan cell (`recipe-plan-view.ts`): Apply, what the lines leave out, each
+   * line's mark, the summary's counts, `apply auto` held outside a trusted folder, and the
+   * words for a refusal that came with no reason.
+   */
+  readonly 'recipe.plan.apply': string;
+  readonly 'recipe.plan.more': string;
+  readonly 'recipe.plan.more.one': string;
+  readonly 'recipe.plan.mark.applied': string;
+  readonly 'recipe.plan.mark.failed': string;
+  readonly 'recipe.plan.mark.skipped': string;
+  readonly 'recipe.plan.summary.applied': string;
+  readonly 'recipe.plan.summary.failed': string;
+  readonly 'recipe.plan.summary.skipped': string;
+  readonly 'recipe.plan.summary.none': string;
+  readonly 'recipe.plan.held': string;
+  readonly 'recipe.plan.refused': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -1133,6 +1150,18 @@ export const CATALOGUE_KEYS = [
   'recipe.cell.fetchAgain',
   'recipe.cell.collapse',
   'recipe.cell.expand',
+  'recipe.plan.apply',
+  'recipe.plan.more',
+  'recipe.plan.more.one',
+  'recipe.plan.mark.applied',
+  'recipe.plan.mark.failed',
+  'recipe.plan.mark.skipped',
+  'recipe.plan.summary.applied',
+  'recipe.plan.summary.failed',
+  'recipe.plan.summary.skipped',
+  'recipe.plan.summary.none',
+  'recipe.plan.held',
+  'recipe.plan.refused',
   'status.problems.new',
   'menu.about',
   'shell.about.version',

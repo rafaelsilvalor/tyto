@@ -15,6 +15,10 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  * - **Run from here** and **Fetch again** are Run too (`explicit`), with `from` a cell or
  *   `fresh`: each fetches and runs in a folder not trusted, so each is the person's approval.
  *
+ * - **Apply** (TYTO-378, ADR 0170) names the cell and the plan's id over `recipe:apply`. The cell
+ *   main answers replaces the shown one when it still holds that plan; an answer with no new
+ *   outcome is a refusal, kept here, on that cell, until the next run's answer.
+ *
  * It keeps, per document, the last answer shown with its text, so a change of language shows it
  * again ({@link RecipeNotebook.reshow}), and which tables the person folded, for as long as the
  * tab is open: none of it outlives the tab, and none of it is written anywhere.
@@ -25,6 +29,8 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 
 export type RecipeRunRequest = IpcRequest<'recipe:run'>;
 export type RecipeRunAnswer = IpcResponse<'recipe:run'>;
+export type RecipeApplyRequest = IpcRequest<'recipe:apply'>;
+export type RecipeApplyAnswer = IpcResponse<'recipe:apply'>;
 type WireCell = RecipeRunAnswer['cells'][number];
 
 /** How a run was asked for: a pause in typing, a save, or Run recipe. */
@@ -39,6 +45,10 @@ export interface RecipeRunScope {
 export interface RecipeNotebookOptions {
   /** `recipe:run` over the bridge. */
   readonly run: (request: RecipeRunRequest) => Promise<RecipeRunAnswer>;
+  /** `recipe:apply` over the bridge. */
+  readonly apply: (request: RecipeApplyRequest) => Promise<RecipeApplyAnswer>;
+  /** Why an Apply was refused when main gave no reason, in the window's language. */
+  readonly refusedWithoutReason: () => string;
   /** The document's text now, or `undefined` once its tab is gone. */
   readonly textOf: (documentId: string) => string | undefined;
   /** The newest answer for a document, with the text its request carried. */
@@ -61,6 +71,12 @@ export interface RecipeNotebook {
   runFrom(documentId: string, index: number): Promise<void>;
   /** Fetch again: Run, the whole document, every source skipping its cache. */
   fetchAgain(documentId: string): Promise<void>;
+  /** Apply: the plan main stamped `planId` on cell `index`, shown again once main answers. */
+  apply(documentId: string, index: number, planId: number): Promise<void>;
+  /** The cells whose Apply is on its way, by index. */
+  applyingOf(documentId: string): ReadonlySet<number>;
+  /** Why a cell's last Apply was refused, by index, until the next run's answer. */
+  refusalsOf(documentId: string): ReadonlyMap<number, string>;
   /** Shows every open recipe's last answer again: the window's language changed. */
   reshow(): void;
   /** The last answer shown for a document, with the text its request carried. */
@@ -86,7 +102,14 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const newest = new Map<string, number>();
   const last = new Map<string, { readonly text: string; readonly answer: RecipeRunAnswer }>();
   const collapsed = new Map<string, Set<number>>();
+  const applying = new Map<string, Set<number>>();
+  const refusals = new Map<string, Map<number, string>>();
   let requests = 0;
+
+  const reshowOne = (documentId: string): void => {
+    const shown = last.get(documentId);
+    if (shown !== undefined) options.show(documentId, shown.text, shown.answer);
+  };
 
   const cancel = (documentId: string): void => {
     const handle = waiting.get(documentId);
@@ -117,7 +140,45 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     });
     if (!isNewest(newest, documentId, answer.requestId)) return;
     last.set(documentId, { text, answer });
+    // A refusal is said once: the run that follows it has the cell's own word.
+    refusals.delete(documentId);
     options.show(documentId, text, answer);
+  };
+
+  const apply = async (documentId: string, index: number, planId: number): Promise<void> => {
+    const cells = applying.get(documentId) ?? new Set<number>();
+    if (cells.has(index)) return;
+    cells.add(index);
+    applying.set(documentId, cells);
+    reshowOne(documentId);
+    let answer: RecipeApplyAnswer | undefined;
+    try {
+      answer = await options.apply({ documentId, index, planId });
+    } catch {
+      answer = undefined;
+    }
+    cells.delete(index);
+    const shown = last.get(documentId);
+    if (shown === undefined) return;
+    const before = shown.answer.cells.find((cell) => cell.index === index);
+    const after = answer?.cell;
+    if (after?.applied !== undefined && after.applied.at !== before?.applied?.at) {
+      // Only onto the cell still showing this plan: a run since may have planned it again.
+      if (before?.plan?.planId === planId) {
+        const cellsNow = shown.answer.cells.map((cell) => (cell.index === index ? after : cell));
+        last.set(documentId, { text: shown.text, answer: { ...shown.answer, cells: cellsNow } });
+      }
+      refusals.get(documentId)?.delete(index);
+    } else {
+      const said = new Set(before?.diagnostics.map((found) => found.message) ?? []);
+      const reasons = (after?.diagnostics ?? [])
+        .filter((found) => found.severity === 'error' && !said.has(found.message))
+        .map((found) => found.message);
+      const kept = refusals.get(documentId) ?? new Map<number, string>();
+      kept.set(index, reasons.length > 0 ? reasons.join(' ') : options.refusedWithoutReason());
+      refusals.set(documentId, kept);
+    }
+    reshowOne(documentId);
   };
 
   return {
@@ -135,6 +196,9 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     // Both are Run, the person's approval: they fetch, and they run in a folder not trusted.
     runFrom: (documentId, index) => runNow(documentId, 'explicit', { from: index }),
     fetchAgain: (documentId) => runNow(documentId, 'explicit', { fresh: true }),
+    apply,
+    applyingOf: (documentId) => applying.get(documentId) ?? new Set(),
+    refusalsOf: (documentId) => refusals.get(documentId) ?? new Map(),
     reshow() {
       for (const [documentId, shown] of last) options.show(documentId, shown.text, shown.answer);
     },
@@ -151,6 +215,8 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       newest.delete(documentId);
       last.delete(documentId);
       collapsed.delete(documentId);
+      applying.delete(documentId);
+      refusals.delete(documentId);
     },
   };
 }
@@ -228,6 +294,7 @@ function statusText(
     case 'stale':
       if (held === 'source') return say('recipe.cell.held.source');
       if (held === 'restricted') return say('recipe.cell.held.restricted');
+      // `apply` holds no cell stale (it stops after the plans): the plan view says it.
       return say('recipe.cell.stale');
     case 'ok':
       if (cell.table !== undefined) {

@@ -87,6 +87,18 @@ describe('the recipe colours', () => {
     ]);
   });
 
+  it('colours apply auto as a header line, not as a step (TYTO-378)', () => {
+    const source = ['recipe sync', 'apply auto', 'example.mark done', ''].join('\n');
+
+    expect(spans(source)).toEqual([
+      ['recipe', 'keyword'],
+      ['sync', 'name'],
+      ['apply', 'keyword'],
+      ['auto', 'value'],
+      ['example.mark', 'verb'],
+    ]);
+  });
+
   it('colours a namespaced verb as one verb, and a data reference', () => {
     const source = [
       'jira.pull project={project}',

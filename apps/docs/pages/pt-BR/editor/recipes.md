@@ -1,7 +1,7 @@
 # Receitas
 
 ::: info Como esta página foi conferida
-Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. Os menus e rótulos abaixo são os da janela em português.
+Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. Os menus e rótulos abaixo são os da janela em português.
 :::
 
 Uma receita (`.recipe`) é uma lista de passos, um por linha, que buscam linhas de uma fonte, filtram e reorganizam essas linhas e planejam o que gravar. O Tyto abre uma receita numa aba como um caderno: **embaixo de cada passo, o resultado dele**, uma tabela que você lê enquanto escreve a próxima linha.
@@ -48,6 +48,20 @@ O cache da própria fonte continua respondendo, então **Executar daqui** num pa
 **Buscar de novo** fica na linha de um passo que busca: uma fonte, ou um `run` de uma receita que tem uma. Ele roda a receita inteira de novo, e cada fonte busca em vez de responder pelo cache. O comando **Executar receita buscando de novo** faz o mesmo de qualquer ponto da aba.
 
 Use quando os dados mudaram onde moram e a tabela embaixo da fonte está mais antiga do que você quer: o _dados buscados …_ da linha diz quão antiga ela é.
+
+## Aplicar um plano
+
+Um passo que grava (uma ação ou um destino) não grava enquanto a receita roda: ele responde um **plano**, o que gravaria. Ele diz quantas gravações e onde (_Plano: 3 a gravar em example items_), na linha dele, ou embaixo da tabela quando o passo também repassa as linhas; embaixo disso vêm as primeiras 20 operações do plano, uma por linha, e quantas ficaram de fora (_mais 40 operações_).
+
+**Aplicar**, na linha do plano, grava esse plano: exatamente as operações que você está lendo, não um plano novo feito no clique. O botão só aparece quando o plano pode ser aplicado agora: o passo rodou desta vez, o plano ainda não foi aplicado e o verbo sabe aplicar. Enquanto as gravações estão a caminho, o botão fica, esmaecido, e um segundo clique não faz nada. O clique é a sua aprovação, numa pasta não confiável também.
+
+Depois, cada operação ganha a sua marca, _aplicada_, _falhou_ ou _pulada_, com o motivo quando há um (uma linha que mudou desde que o plano foi feito falha em vez de ser sobrescrita), e uma linha conta as marcas: _2 aplicadas · 1 falharam_. Um plano se aplica uma vez; para aplicar de novo, rode o passo de novo para ter um plano novo.
+
+Quando Aplicar é recusado, o motivo aparece embaixo do plano, em vermelho, até a próxima execução: o plano foi trocado por uma execução mais nova, ou o passo não rodou desta vez. Rode a receita de novo e olhe o plano novo.
+
+### apply auto
+
+Uma receita cujo cabeçalho tem a linha `apply auto` aplica os seus planos sem clique, mas só em **Executar receita** (ou **Executar daqui**, **Buscar de novo**) numa pasta confiável. Uma pausa na digitação ou um salvamento nunca aplicam. Numa pasta não confiável os planos são feitos e mostrados, e o plano diz _apply auto espera: esta pasta não é confiável, então Aplicar pede um clique_.
 
 ## Trocar o idioma
 

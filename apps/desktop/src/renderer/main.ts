@@ -786,6 +786,12 @@ const recipeNotebook = createRecipeNotebook({
     if (bridge === undefined) return { requestId: -1, cells: [], diagnostics: [], ranAt: '' };
     return bridge['recipe:run'](request);
   },
+  apply: async (request) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return {};
+    return bridge['recipe:apply'](request);
+  },
+  refusedWithoutReason: () => translate(state.locale, 'recipe.plan.refused'),
   textOf: (documentId) => {
     const document_ = documentOf(workspace, documentId);
     return document_ === undefined ? undefined : contentOf(document_);
@@ -821,10 +827,13 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
   const context: CellViewContext = {
     locale: state.locale,
     collapsed: recipeNotebook.collapsedOf(documentId),
+    applying: recipeNotebook.applyingOf(documentId),
+    refusals: recipeNotebook.refusalsOf(documentId),
     now: Date.now,
     actions: {
       runFrom: (index) => void recipeNotebook.runFrom(documentId, index),
       fetchAgain: () => void recipeNotebook.fetchAgain(documentId),
+      apply: (index, planId) => void recipeNotebook.apply(documentId, index, planId),
       toggled: (index, collapsed) => {
         recipeNotebook.setCollapsed(documentId, index, collapsed);
       },

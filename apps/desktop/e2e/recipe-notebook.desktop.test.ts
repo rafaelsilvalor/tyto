@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -23,6 +31,9 @@ import { firstWindow } from './first-window.js';
  * fresh data (`refresh`, ADR 0148 decision 10); otherwise it fetches from this file's own
  * server, which counts the requests. **Every request counted is a fetch the window caused.**
  *
+ * The example recipe plugin of `examples/plugins/`, installed the same way, plans `example.mark`
+ * and applies it (TYTO-378): the last case clicks Apply on its plan and reads each line's mark.
+ *
  * Its own `--user-data-dir` and `TYTO_HOME` (TYTO-139), and no workspace folder, so the recipe
  * runs as one outside any workspace does (ADR 0148 decision 5). `--lang=en`. With
  * `TYTO_RECIPE_NOTEBOOK_SHOTS` set to a folder it leaves a picture of the window.
@@ -38,6 +49,16 @@ for (const file of [built, cli]) {
 }
 
 const PLUGIN = 'fixture-rows';
+const EXAMPLE = resolve(
+  here,
+  '..',
+  '..',
+  '..',
+  'examples',
+  'plugins',
+  'tyto-plugin-example-recipe',
+);
+const MARK = 'example.mark';
 const VERB = 'fixture.rows';
 const ROWS = 30;
 
@@ -100,6 +121,7 @@ const RECIPE = [
 let scratch: string;
 let home: string;
 let recipePath: string;
+let marksPath: string;
 let app: ElectronApplication | undefined;
 let page: Page;
 let server: Server;
@@ -126,6 +148,28 @@ function install(base: string): void {
       namespace: 'fixture',
     }),
   );
+  installFolder(folder);
+}
+
+/**
+ * The example recipe plugin, its code as committed. Its manifest asks for the plugin API that
+ * ships `apply` (`>=0.15`), which `@tyto/plugin-api` reaches only when Changesets bumps it; the
+ * copy asks for the API this build has, as the fixture above does, so the suite tests the code
+ * and not the release order.
+ */
+function installExample(): void {
+  const folder = join(scratch, 'plugin', 'example-recipe');
+  mkdirSync(join(folder, 'dist'), { recursive: true });
+  copyFileSync(join(EXAMPLE, 'dist', 'index.js'), join(folder, 'dist', 'index.js'));
+  const manifest = JSON.parse(readFileSync(join(EXAMPLE, 'tyto-plugin.json'), 'utf8')) as object;
+  writeFileSync(
+    join(folder, 'tyto-plugin.json'),
+    JSON.stringify({ ...manifest, engine: `>=${PLUGIN_API_VERSION}` }),
+  );
+  installFolder(folder);
+}
+
+function installFolder(folder: string): void {
   const installed = spawnSync(process.execPath, [cli, 'plugin', 'install', folder, '--yes'], {
     env: { ...process.env, TYTO_HOME: home },
     encoding: 'utf8',
@@ -187,6 +231,9 @@ beforeAll(async () => {
   recipePath = join(scratch, 'recipes', 'notebook.recipe');
   mkdirSync(dirname(recipePath), { recursive: true });
   writeFileSync(recipePath, RECIPE);
+  installExample();
+  marksPath = join(scratch, 'recipes', 'marks.recipe');
+  writeFileSync(marksPath, ['recipe marks', 'example.pull count=3', `${MARK} done`, ''].join('\n'));
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`, '--lang=en'],
@@ -207,8 +254,9 @@ beforeAll(async () => {
       ).tyto;
       return (await bridge?.['recipe:verbs']?.({}))?.verbs ?? [];
     });
-    if (verbs.includes(VERB)) break;
-    if (Date.now() > deadline) throw new Error(`no '${VERB}' among ${verbs.join(', ')}`);
+    if (verbs.includes(VERB) && verbs.includes(MARK)) break;
+    if (Date.now() > deadline)
+      throw new Error(`no '${VERB}' or '${MARK}' among ${verbs.join(', ')}`);
     await page.waitForTimeout(250);
   }
 }, 180_000);
@@ -325,5 +373,67 @@ describe('the recipe notebook against a source (TYTO-377)', () => {
     note('scrolled out and back, still folded,');
     // To stdout and not console: the default reporter hides a passing test's console.
     process.stdout.write(`[TYTO-377] fetches after each step: ${proof.join(', ')}\n`);
+  }, 30_000);
+});
+
+describe('Apply on a plan cell (TYTO-378)', () => {
+  /** The plan cell's lines: each one's text and mark, and the summary under them. */
+  const planLines = () =>
+    page.evaluate(() => {
+      const cell = [...document.querySelectorAll('#editor .recipe-cell')].find(
+        (each) => each.querySelector('.recipe-plan') !== null,
+      );
+      return {
+        lines: [...(cell?.querySelectorAll('.recipe-plan__operation') ?? [])].map((line) => ({
+          description: line.querySelector('.recipe-plan__description')?.textContent ?? '',
+          mark: line.querySelector('.recipe-plan__mark')?.textContent ?? '',
+        })),
+        summary: cell?.querySelector('.recipe-plan__summary')?.textContent ?? '',
+        buttons: [...(cell?.querySelectorAll('.recipe-cell__action') ?? [])].map(
+          (button) => button.textContent,
+        ),
+      };
+    });
+
+  it('shows the example plan, applies it on a click, and marks every line', async () => {
+    await app?.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, marksPath);
+    // Opened, the source is held until Run, and the plan under it with it.
+    await run('editor.open');
+    await expect
+      .poll(async () => (await cells()).map((cell) => cell.summary), { timeout: 15_000 })
+      .toEqual(['Fetches on save or Run', 'Fetches on save or Run']);
+    await run('recipe.run');
+    await expect
+      .poll(async () => (await cells()).map((cell) => cell.summary), { timeout: 15_000 })
+      .toEqual(['3 rows · 2 columns', '3 rows · 2 columns']);
+    // An action passes its table on, so the plan's count and target head its lines.
+    expect(
+      await page.evaluate(
+        () => document.querySelector('#editor .recipe-plan__heading')?.textContent ?? '',
+      ),
+    ).toBe('Plan: 3 to write to example items');
+    expect((await planLines()).buttons).toEqual(['Apply', 'Run from here']);
+    expect((await planLines()).lines.map((line) => line.description)).toEqual([
+      "Mark EX-1 as 'done'",
+      "Mark EX-2 as 'done'",
+      "Mark EX-3 as 'done'",
+    ]);
+
+    await page.locator('#editor .recipe-cell [data-action="apply"]').click();
+    await expect
+      .poll(async () => (await planLines()).summary, { timeout: 15_000 })
+      .toBe('3 applied');
+    const after = await planLines();
+    expect(after.lines.map((line) => line.mark)).toEqual(['applied', 'applied', 'applied']);
+    // Applied once: the cell offers no second Apply of the same plan.
+    expect(after.buttons).toEqual(['Run from here']);
+    const shots = process.env['TYTO_RECIPE_NOTEBOOK_SHOTS'];
+    if (shots !== undefined) {
+      mkdirSync(shots, { recursive: true });
+      await page.screenshot({ path: join(shots, 'recipe-notebook-apply.png') });
+    }
+    process.stdout.write(`[TYTO-378] marks after Apply: ${JSON.stringify(after)}\n`);
   }, 30_000);
 });

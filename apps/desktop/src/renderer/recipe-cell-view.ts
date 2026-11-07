@@ -2,6 +2,7 @@ import { type CellOutput, remeasureCellOutput } from '@tyto/editor';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { CellStatus } from './recipe-notebook.js';
+import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js';
 
 /**
  * What goes under a recipe's cell (TYTO-377, ADR 0148): a header line and the cell's table.
@@ -9,7 +10,8 @@ import type { CellStatus } from './recipe-notebook.js';
  * The header is the line pull request C drew (`.recipe-cell-status`): a fold toggle when there
  * is a table, the cell's summary, its age, and two buttons, **Run from here** on any cell with a
  * table or a plan and **Fetch again** on a cell that fetches. The buttons are always shown, not
- * on hover: a person should see what a cell offers before reaching for it.
+ * on hover: a person should see what a cell offers before reaching for it. A plan cell's header
+ * also carries **Apply**, and its body the plan's lines (`recipe-plan-view.ts`, TYTO-378).
  *
  * The table is a preview: the first {@link SHOWN_ROWS} of the rows the wire carries, then how
  * many it leaves out. It scrolls sideways inside the cell, and a long value is cut with an
@@ -17,7 +19,8 @@ import type { CellStatus } from './recipe-notebook.js';
  *
  * **The element is built once per key** (`cell-outputs.ts`), so the key holds everything the
  * element shows except the age, which {@link tickAges} rewrites in place: the cell, its status,
- * when it ran, why it was held, the language, and whether it was folded when built. A cell main
+ * when it ran, why it was held, the language, and whether it was folded when built; for a plan,
+ * its id, when it was applied, whether its Apply is on its way and its refusal. A cell main
  * kept and did not rerun keeps its `ranAt`, so its element stays and does not flicker.
  *
  * Pure apart from `document`: what a click does is the host's, through {@link CellViewActions}.
@@ -36,12 +39,18 @@ export interface CellViewActions {
   readonly fetchAgain: () => void;
   /** The person folded or unfolded a cell's table. */
   readonly toggled: (index: number, collapsed: boolean) => void;
+  /** Apply: the plan main stamped `planId` on this cell (TYTO-378). */
+  readonly apply: (index: number, planId: number) => void;
 }
 
 export interface CellViewContext {
   readonly locale: Locale;
   /** The cells folded in this tab, by index. */
   readonly collapsed: ReadonlySet<number>;
+  /** The cells whose Apply is on its way, by index. */
+  readonly applying: ReadonlySet<number>;
+  /** Why a cell's last Apply was refused, by index, until the next answer. */
+  readonly refusals: ReadonlyMap<number, string>;
   /** Milliseconds since the epoch; injected so a test fixes the clock. */
   readonly now: () => number;
   readonly actions: CellViewActions;
@@ -67,6 +76,11 @@ export function cellOutputOf(status: CellStatus, context: CellViewContext): Cell
       cell.source === true ? 'source' : '',
       context.locale,
       collapsed ? 'folded' : 'open',
+      cell.plan?.planId ?? '',
+      cell.plan?.applicable === true ? 'applicable' : '',
+      cell.applied?.at ?? '',
+      context.applying.has(status.index) ? 'applying' : '',
+      context.refusals.get(status.index) ?? '',
     ].join('\u0000'),
     render: () => renderCell(status, context, collapsed),
   };
@@ -76,6 +90,11 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
   const { cell } = status;
   const { locale, actions } = context;
   const say = (key: CatalogueKey): string => translate(locale, key);
+  const plan: PlanViewState = {
+    locale,
+    applying: context.applying.has(status.index),
+    refusal: context.refusals.get(status.index),
+  };
   const root = element('div', 'recipe-cell');
   root.classList.toggle('recipe-cell--collapsed', collapsed);
   const header = element('div', 'recipe-cell-status');
@@ -109,6 +128,10 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
   if (age !== undefined) header.append(age);
 
   if (table !== undefined || cell.plan !== undefined) {
+    const apply = applyButton(cell, plan, (planId) => {
+      actions.apply(status.index, planId);
+    });
+    if (apply !== undefined) header.append(apply);
     header.append(
       button(say('recipe.cell.runFrom'), 'run-from', () => {
         actions.runFrom(status.index);
@@ -124,6 +147,8 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
   }
 
   if (table !== undefined) root.append(tableBody(table, locale));
+  const planned = planBody(cell, status.held, plan);
+  if (planned !== undefined) root.append(planned);
   return root;
 }
 

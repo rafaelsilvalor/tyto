@@ -947,6 +947,20 @@ describe('switching the language', () => {
     'recipe.cell.fetchAgain',
     'recipe.cell.collapse',
     'recipe.cell.expand',
+    // TYTO-378: drawn only under a plan cell; `recipe-plan-view.test.ts` paints them in both
+    // languages, and `recipe-notebook.desktop.test.ts` clicks Apply in the real window.
+    'recipe.plan.apply',
+    'recipe.plan.more',
+    'recipe.plan.more.one',
+    'recipe.plan.mark.applied',
+    'recipe.plan.mark.failed',
+    'recipe.plan.mark.skipped',
+    'recipe.plan.summary.applied',
+    'recipe.plan.summary.failed',
+    'recipe.plan.summary.skipped',
+    'recipe.plan.summary.none',
+    'recipe.plan.held',
+    'recipe.plan.refused',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and
