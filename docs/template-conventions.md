@@ -175,6 +175,39 @@ a footer standing on the bottom edge stands on the seal. When a slide carries it
 house's rule, in `house-style/src/seal.ts`; a template only passes `sealOf(context)` to `sealed`
 and spreads the seal into its frame's children.
 
+**Every house template with a grid offers it the same way** (TYTO-480), so a brief writes the
+seal without knowing which template it is in:
+
+- **The slot.** `selo: { type: image }` in the manifest, optional, with this comment: the art,
+  1080 × 140, glued to the foot of the last slide (TYTO-201). The brief writes it in its
+  frontmatter, `selo: ./selo.png`, relative to the brief; a configuration's `brief.slots` may
+  set it for every brief (`docs/plugin-authoring.md`). The art is drawn with `cover`, so an art
+  a few pixels off 1080 × 140 still fills the band.
+- **The drawing.** `const page = sealed(context.size, sealOf(context))` before anything is
+  placed; the layout works on `page.size`, and `...page.seal` is the frame's last child, so it
+  paints over the paper and nothing else.
+- **The signature clears it** (TYTO-469). Whatever stands on the foot — the signature, the
+  arrow to the next slide, a page number — rises by the band, `context.size.h - page.size.h`,
+  and keeps its distance to the page's foot; `reportOverflow` measures against `page.size.h`.
+  Nothing is drawn under the seal. `house-style/src/compose.test.ts` pins it on the
+  composition the house owns whole: the sign-off ends above the seal's top, the middle centres
+  above it, and an overflow is measured to it.
+- **A brief without it draws the same bytes.** `sealed` with no seal returns the frame's size
+  and nothing to draw, so adding the slot changes no example's render; each repository's PR
+  shows it with a hash table of its example PNGs and unchanged HTML snapshots, and a test
+  compiles a sealed brief and checks the seal and the signature's foot.
+- **When the composition is the house's** (the one-image table's `oneImageTable`), the
+  template lays it out on the shorter page and frames it again: build with
+  `{ ...context, size: page.size }`, then `frame()` at `context.size` with the build's
+  background and children and `...page.seal`. The children keep their ids, and the seal takes
+  the next one.
+- **Where it is not offered.** `sealOf` answers only for a format named `grid`, so a template
+  that renders no grid — the product banner's three sizes — does not declare `selo`: the slot
+  would be accepted and never drawn. A template with a grid and a story declares it, and the
+  story ignores it, as the maintainer never asked for a sealed story. On 2026-11-07 the
+  repositories of `agenda-semana`, `aprovados`, `simulados-semana`, `concursos-abertos`,
+  `questao-estrategica` (both its templates) and `tabela` offer it; `banner` does not.
+
 ## Names
 
 - **Slots are Portuguese** — they are the brief's vocabulary (`titulo`, `slide`).
@@ -318,6 +351,14 @@ it in one place (the title's bold in navy) without repeating the rest, and `text
   mark should not have to refuse it.
 - **Which places vary.** A template names its places (`title`, `statement`) by the
   `<place>-highlight-color` values it declares; the kit does not list them.
+- **A mark's colour on a place that is not paper is `<place>-mark-cor-<name>`** (TYTO-623). A
+  swatch chosen for white paper can vanish on a dark cover, so the template declares the colour
+  each name takes there beside the place's own colour: `deep-mark-cor-azul`, `-vermelho`,
+  `-verde` and `-ocre` in `questao-estrategica`, whose place is `deep`, while `mark-cor-<name>`
+  stays the colour on paper. The kit reads only `<place>-highlight-color` and
+  `mark-<family>-<name>`, so the template reads these itself with `colorValue`, one call per
+  name with its own constant as the fallback, and lays them over that place's highlights with
+  `highlights.with()`.
 
 **Frontmatter text accepts exactly a subset.** A frontmatter string never reaches the brief
 parser, so `richTextOfPlain` reads it: `**…**` and `{key:value}…{/}`, each over plain text, and
