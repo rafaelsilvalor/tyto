@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type RecipeApplyAnswer,
+  type RecipeApplyRequest,
   type RecipeRunAnswer,
   type RecipeRunRequest,
   cellAtOrAbove,
@@ -37,6 +39,9 @@ function harness() {
   const asked: RecipeRunRequest[] = [];
   const replies: ((reply: RecipeRunAnswer) => void)[] = [];
   const shown: { documentId: string; text: string; requestId: number }[] = [];
+  const applies: RecipeApplyRequest[] = [];
+  const applied: ((reply: RecipeApplyAnswer) => void)[] = [];
+  const lastShown: { answer?: RecipeRunAnswer } = {};
   const timers: (() => void)[] = [];
   const texts = new Map([['tab-1', TEXT]]);
   const notebook = createRecipeNotebook({
@@ -44,9 +49,15 @@ function harness() {
       asked.push(request);
       return new Promise((resolve) => replies.push(resolve));
     },
+    apply: (request) => {
+      applies.push(request);
+      return new Promise((resolve) => applied.push(resolve));
+    },
+    refusedWithoutReason: () => 'Not applied: run the recipe again',
     textOf: (documentId) => texts.get(documentId),
     show: (documentId, text, reply) => {
       shown.push({ documentId, text, requestId: reply.requestId });
+      lastShown.answer = reply;
     },
     delay: 200,
     timers: {
@@ -59,7 +70,7 @@ function harness() {
       },
     },
   });
-  return { notebook, asked, replies, shown, timers, texts };
+  return { notebook, asked, replies, shown, timers, texts, applies, applied, lastShown };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -231,8 +242,99 @@ describe('the line under each cell', () => {
     );
     expect(said({ status: 'stale' })?.text).toBe('Not run: the recipe has an error');
     expect(said({ status: 'skipped' })?.text).toBe('Skipped: a cell above failed');
-    expect(said({ plan: { target: 'sheet', count: 3 } })?.text).toBe('Plan: 3 to write to sheet');
+    expect(
+      said({ plan: { target: 'sheet', count: 3, operations: [], applicable: false } })?.text,
+    ).toBe('Plan: 3 to write to sheet');
     // A cell that answered neither a table nor a plan has no line.
     expect(said({})).toBeUndefined();
+  });
+});
+
+describe('Apply (TYTO-378)', () => {
+  const planCell = (more: Partial<Cell> = {}): Cell => ({
+    index: 0,
+    line: 3,
+    status: 'ok',
+    plan: {
+      target: 'example items',
+      count: 1,
+      operations: [{ write: 'mark', rowKey: 'EX-1', description: 'Mark EX-1' }],
+      planId: 7,
+      applicable: true,
+    },
+    diagnostics: [],
+    ...more,
+  });
+
+  async function shownPlan() {
+    const made = harness();
+    void made.notebook.runNow('tab-1', 'explicit');
+    made.replies[0]?.(answer(1, [planCell()]));
+    await settle();
+    return made;
+  }
+
+  it('names the cell and its plan, holds the cell as applying, and shows the cell main answers', async () => {
+    const { notebook, applies, applied, shown, lastShown } = await shownPlan();
+    void notebook.apply('tab-1', 0, 7);
+    void notebook.apply('tab-1', 0, 7);
+
+    expect(applies).toEqual([{ documentId: 'tab-1', index: 0, planId: 7 }]);
+    expect([...notebook.applyingOf('tab-1')]).toEqual([0]);
+    expect(shown).toHaveLength(2);
+
+    const done = planCell({
+      plan: { ...(planCell().plan as NonNullable<Cell['plan']>), applicable: false },
+      applied: {
+        at: '2026-11-07T12:00:00.000Z',
+        applied: 1,
+        failed: 0,
+        skipped: 0,
+        operations: [{ status: 'applied' }],
+      },
+    });
+    applied[0]?.({ cell: done });
+    await settle();
+
+    expect([...notebook.applyingOf('tab-1')]).toEqual([]);
+    expect(lastShown.answer?.cells[0]?.applied?.applied).toBe(1);
+    expect(notebook.lastOf('tab-1')?.answer.cells[0]).toEqual(done);
+    expect(notebook.refusalsOf('tab-1').size).toBe(0);
+  });
+
+  it('keeps a refusal on the cell until the next run, and the plan as it was', async () => {
+    const { notebook, applied, asked, replies } = await shownPlan();
+    void notebook.apply('tab-1', 0, 7);
+    applied[0]?.({
+      cell: planCell({
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'E_RECIPE_APPLY',
+            message: "Applying the plan of 'example.mark' was refused: it was applied already.",
+          },
+        ],
+      }),
+    });
+    await settle();
+
+    expect(notebook.refusalsOf('tab-1').get(0)).toBe(
+      "Applying the plan of 'example.mark' was refused: it was applied already.",
+    );
+    expect(notebook.lastOf('tab-1')?.answer.cells[0]?.diagnostics).toEqual([]);
+
+    void notebook.runNow('tab-1', 'explicit');
+    replies[asked.length - 1]?.(answer(asked.length, [planCell()]));
+    await settle();
+    expect(notebook.refusalsOf('tab-1').size).toBe(0);
+  });
+
+  it('says a refusal with no reason, or no cell, in its own words', async () => {
+    const { notebook, applied } = await shownPlan();
+    void notebook.apply('tab-1', 0, 7);
+    applied[0]?.({});
+    await settle();
+
+    expect(notebook.refusalsOf('tab-1').get(0)).toBe('Not applied: run the recipe again');
   });
 });

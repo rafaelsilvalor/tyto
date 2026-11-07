@@ -594,7 +594,7 @@
         "recipe-tab.desktop.test.ts",
         "window.desktop.test.ts"
       ],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, and its logic is in recipe-apply.test.ts until the notebook's Apply button"
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
@@ -605,6 +605,11 @@
       "paths": ["apps/desktop/src/renderer/recipe-cell-view.ts"],
       "e2e": ["recipe-notebook.desktop.test.ts", "recipe-tab.desktop.test.ts"],
       "why": "reviewed: the header and table under a recipe's cell (TYTO-377); the logic is in recipe-cell-view.test.ts, and only the real window lays the table out and scrolls it"
+    },
+    {
+      "paths": ["apps/desktop/src/renderer/recipe-plan-view.ts"],
+      "e2e": ["recipe-notebook.desktop.test.ts"],
+      "why": "reviewed: a plan cell's lines, Apply and its marks (TYTO-378); the logic is in recipe-plan-view.test.ts, and the notebook suite clicks Apply on the example plugin's plan in the real window"
     },
     {
       "paths": ["apps/desktop/src/main/quit.ts"],

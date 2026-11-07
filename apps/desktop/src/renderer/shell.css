@@ -1003,6 +1003,55 @@ tyto-preview-pane[hidden] {
   color: var(--tyto-text-muted);
 }
 
+/* Apply while its answer is on its way (TYTO-378): still there, plainly not clickable. */
+.recipe-cell__action[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A plan cell's operations (TYTO-378, recipe-plan-view.ts): one quiet line each, its mark and
+   reason after it once applied; a failed mark takes the error colour, the rest stay muted. */
+.recipe-plan {
+  padding: 0 0 var(--tyto-space-2) var(--tyto-space-2);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+  user-select: text;
+}
+
+.recipe-plan__operations {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recipe-plan__operation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--tyto-space-3);
+}
+
+.recipe-plan__write,
+.recipe-plan__row,
+.recipe-plan__heading {
+  color: var(--tyto-text);
+}
+
+.recipe-plan__mark {
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-plan__operation[data-status='failed'] .recipe-plan__mark,
+.recipe-plan__refusal {
+  color: var(--tyto-error);
+}
+
+.recipe-plan__more,
+.recipe-plan__summary,
+.recipe-plan__refusal,
+.recipe-plan__held {
+  padding-top: var(--tyto-space-1);
+}
+
 /* The bar is a header row (TYTO-288): the formats take what the toggle, zoom and lock leave. */
 .preview__tabs {
   display: flex;

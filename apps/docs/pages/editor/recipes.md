@@ -1,7 +1,7 @@
 # Recipes
 
 ::: info How this page was checked
-Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. Menus and labels below are the English window's.
+Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. Menus and labels below are the English window's.
 :::
 
 A recipe (`.recipe`) is a list of steps, one per line, that fetch rows from a source, filter and reshape them, and plan what to write. Tyto opens a recipe in a tab as a notebook: **under each step, its result**, a table you can read while you write the next line.
@@ -48,6 +48,20 @@ A source's own cache still answers, so **Run from here** on a source step does n
 **Fetch again** is on the line of a step that fetches: a source, or a `run` of a recipe that holds one. It runs the whole recipe again, and every source fetches instead of answering from its cache. The command **Run recipe, fetching again** does the same from anywhere in the tab.
 
 Use it when the data changed where it lives and the table under the source is older than you want: the line's _data fetched …_ says how old it is.
+
+## Apply a plan
+
+A step that writes (an action or a sink) does not write while the recipe runs: it answers a **plan**, what it would write. It says how many writes and where (_Plan: 3 to write to example items_), on its line, or under its table when the step also passes its rows on; under that are the plan's first 20 operations, one per line, then how many it leaves out (_40 more operations_).
+
+**Apply**, on the plan's line, writes that plan: exactly the operations you are reading, not a new plan made at the click. It is offered only when the plan can be applied now: its step ran this time, its plan was not applied yet, and its verb can apply. While the writes are on their way the button stays, dimmed, and a second click does nothing. A click is your approval, in a folder not trusted too.
+
+Afterwards each operation carries its mark, _applied_, _failed_ or _skipped_, with the reason when there is one (a row that changed since the plan was made fails rather than being written over), and a line counts them: _2 applied · 1 failed_. A plan is applied once; to apply again, run the step again for a new plan.
+
+When Apply is refused, the reason shows under the plan, in red, until the next run: the plan was replaced by a later run, or its step did not run this time. Run the recipe again and look at the new plan.
+
+### apply auto
+
+A recipe whose header has the line `apply auto` applies its plans without a click, but only on **Run recipe** (or **Run from here**, **Fetch again**) in a trusted folder. A pause in typing or a save never applies. In a folder not trusted the plans are made and shown, and the plan says _apply auto waits: this folder is not trusted, so Apply asks for a click_.
 
 ## Change the language
 

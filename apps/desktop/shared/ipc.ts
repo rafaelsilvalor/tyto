@@ -206,7 +206,8 @@ const recipeValue = z.union([
 /**
  * TYTO-378, ADR 0170: what a plan cell carries for Apply. The window sees the first lines of
  * the plan and the id main stamped on it; it sends the id back, never the plan's contents.
- * Optional so a cell built before Apply existed still parses.
+ * The lines and `applicable` are always sent; `planId` is absent only for a plan main did not
+ * stamp, which no run makes today, and such a plan offers no Apply.
  */
 const recipePlanApply = {
   /** The first `RECIPE_WIRE_LIMITS.operations` lines; `count` says how many there are. */
@@ -218,12 +219,11 @@ const recipePlanApply = {
         description: z.string().max(RECIPE_WIRE_LIMITS.text),
       }),
     )
-    .max(RECIPE_WIRE_LIMITS.operations)
-    .optional(),
+    .max(RECIPE_WIRE_LIMITS.operations),
   /** Main's id for this plan as it keeps it; `recipe:apply` names it. */
   planId: z.number().int().nonnegative().optional(),
   /** The plan may be applied now: its cell ran, it was not applied, its verb can apply. */
-  applicable: z.boolean().optional(),
+  applicable: z.boolean(),
 };
 
 /** TYTO-378: how a plan cell's Apply went, counted, with its first operations' outcomes. */

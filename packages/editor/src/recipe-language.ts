@@ -9,8 +9,9 @@ import { LanguageSupport, StreamLanguage, type StringStream } from '@codemirror/
  * tells the constructs apart, with tags the theme already colours:
  *
  * - `#` at the start of a line is a comment (`lineComment`); a `#` inside a data reference is not.
- * - `recipe` and `param` are `definitionKeyword`; the recipe's name is a `labelName`, and a
- *   parameter's name a `propertyName`.
+ * - `recipe`, `param` and `apply` are `definitionKeyword`; the recipe's name is a `labelName`, a
+ *   parameter's name a `propertyName`, and the word after `apply` (`auto`, TYTO-378, ADR 0170)
+ *   an `attributeValue`.
  * - A `|` line under the header is the recipe's description, coloured as `meta`.
  * - The first word of any other line is the verb — `where`, or a plugin's namespaced
  *   `jira.pull` — coloured as a function name, the dot included: one verb, one name.
@@ -23,7 +24,7 @@ import { LanguageSupport, StreamLanguage, type StringStream } from '@codemirror/
  * and the parser is the one that says so.
  */
 
-type LineKind = 'fresh' | 'header' | 'param' | 'step';
+type LineKind = 'fresh' | 'header' | 'param' | 'apply' | 'step';
 
 interface RecipeState {
   /** What the current line turned out to be, decided by its first word. */
@@ -80,6 +81,11 @@ function lineStart(stream: StringStream, state: RecipeState): string | null {
   }
   if (stream.match(/^param(?=\s|$)/u)) {
     state.line = 'param';
+    return 'definitionKeyword';
+  }
+  // A header word like `param`, reserved by the parser: no verb is named `apply`.
+  if (stream.match(/^apply(?=\s|$)/u)) {
+    state.line = 'apply';
     return 'definitionKeyword';
   }
   state.line = 'step';
@@ -155,6 +161,9 @@ function token(stream: StringStream, state: RecipeState): string | null {
       return headerRest(stream);
     case 'param':
       return paramRest(stream, state);
+    case 'apply':
+      readWord(stream);
+      return 'attributeValue';
     case 'step':
       return stepRest(stream, state);
   }

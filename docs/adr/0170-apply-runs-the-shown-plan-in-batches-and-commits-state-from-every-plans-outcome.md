@@ -66,3 +66,18 @@ desktop notebook; and `apply auto`.
   has it overwritten on an applied row.
 - The apply contribution changes the plugin protocol's messages, so the second pull request
   bumps it from 15 to 16: ADR 0135 decision 8 kept it only because no message changed shape.
+
+## Note, 2026-11-07 — choices the desktop's Apply made (TYTO-378, pull requests 3 and 4)
+
+- **A stale cell's own plan is refused.** A cell the notebook kept but did not run this time
+  still holds its plan and its id, and Apply on it answers `E_RECIPE_APPLY` ("its cell did not
+  run this time"): its inputs may have changed since the plan was made, so the plan shown is
+  not known to be the one its rows call for. Run the cell again for a plan that is.
+- **Applies are serialised per document.** Main runs one Apply at a time per recipe, an
+  `apply auto` run's included, so two outcomes never commit state over each other; Applies of
+  different documents do not wait for each other.
+- **Refusals are shown transiently, not kept on the cell.** A refusal comes only in the
+  `recipe:apply` answer; the window shows it under the plan until the recipe's next run
+  answers, and main keeps nothing of it. The cell it named may hold another plan by then, so a
+  kept refusal could describe a plan nobody is looking at. A warning about an Apply that wrote
+  and was not remembered (`W_RECIPE_NOT_REMEMBERED`) is the cell's own, and stays on it.
