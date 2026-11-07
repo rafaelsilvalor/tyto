@@ -38,13 +38,13 @@ the two tools need is listed, with its reason, in `ALLOWED_PORT_DIFFERENCES` in 
 also checks the list of command names in `CLAUDE.md` against `.claude/commands/`, both ways. The two formats differ only in the frontmatter (a skill needs `name` and
 `description`) and in the tools the text names.
 
-Neither a command nor its port carries a shell loop or a multi-line pipeline: what needs one is
-a script in `tools/repo-checks/src`, with tests and arguments instead of edited constants, and
-the command calls it in one line (`adr-numbers.mjs`, TYTO-629).
-`tools/repo-checks/src/command-shell.test.ts` fails on a fenced block holding a `for`/`while`
-loop, a pipeline split across lines or a trailing `\`, naming the file and line. Its
-`ALLOWED_OFFENDERS` lists the blocks still waiting for their script, and only shrinks: an entry
-that no longer matches fails too.
+**A repository command calls scripts in `tools/repo-checks/src/`, never multi-line shell.**
+Neither a command nor its port carries a shell loop, a multi-line pipeline or a script for the
+agent to write: what needs one is a script in `tools/repo-checks/src`, with tests and arguments
+instead of edited constants, and the command calls it in one line (`adr-numbers.mjs`,
+`flake-hunt.mjs`, `perturb-cycle.mjs`; TYTO-629). `tools/repo-checks/src/command-shell.test.ts`
+fails on a fenced block holding a `for`/`while` loop, a pipeline split across lines or a
+trailing `\`, naming the file and line. It has no allowlist.
 
 ## What each tool has
 

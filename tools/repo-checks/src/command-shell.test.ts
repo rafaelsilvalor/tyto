@@ -14,23 +14,9 @@ import { describe, expect, it } from 'vitest';
  * Only fenced code blocks count, so "done" or a table row in prose does not. A line fails when
  * it holds a `for`/`while`/`until` loop (`… ; do`, a line that is `do`, or `done` where the shell
  * reads a keyword), when it starts or ends with `|` (a pipeline split across lines), or when it
- * ends with `\` (a continued command).
+ * ends with `\` (a continued command). There is no allowlist: the last block moved into a script
+ * in TYTO-629's fourth PR, and a new one fails.
  */
-
-export interface AllowedOffender {
-  /** The file, relative to the repository root, with forward slashes. */
-  readonly file: string;
-  /** The bold label of the numbered step that holds the block, as written. */
-  readonly step: string;
-  /** The pull request of TYTO-629 that moves the block into a script. */
-  readonly removedBy: string;
-}
-
-/**
- * The blocks still waiting for their script. This list only shrinks: an entry that no longer
- * matches an offending block fails too, so the PR that moves a block deletes its entries.
- */
-export const ALLOWED_OFFENDERS: readonly AllowedOffender[] = [];
 
 export interface Offender {
   readonly file: string;
@@ -90,9 +76,6 @@ function commandFiles(): string[] {
     .map((entry) => `.agents/skills/${entry.name}/SKILL.md`);
   return [...commands, ...ports].sort();
 }
-
-const isAllowed = (offender: Offender, allowed: readonly AllowedOffender[]) =>
-  allowed.some(({ file, step }) => file === offender.file && step === offender.step);
 
 describe('findOffenders', () => {
   const lines = (...content: string[]) => content.join('\n');
@@ -158,21 +141,13 @@ describe('Repository commands and their Codex ports (TYTO-629)', () => {
     findOffenders(file, readFileSync(join(repoRoot, file), 'utf8')),
   );
 
-  it('carry no shell loop or multi-line pipeline, beyond the allowlist', () => {
-    const found = offenders
-      .filter((offender) => !isAllowed(offender, ALLOWED_OFFENDERS))
-      .map(({ file, line, step, reason }) => `${file}:${line} (step "${step}"): ${reason}`);
+  it('carry no shell loop or multi-line pipeline', () => {
+    const found = offenders.map(
+      ({ file, line, step, reason }) => `${file}:${line} (step "${step}"): ${reason}`,
+    );
     expect(
       found,
       'move the block into a script under tools/repo-checks/src and call it in one line',
     ).toEqual([]);
-  });
-
-  it('keep no allowlist entry that no longer matches an offending block', () => {
-    const stale = ALLOWED_OFFENDERS.filter(
-      ({ file, step }) =>
-        !offenders.some((offender) => offender.file === file && offender.step === step),
-    ).map(({ file, step }) => `${file} (step "${step}")`);
-    expect(stale, 'the block moved out: delete its entry from ALLOWED_OFFENDERS').toEqual([]);
   });
 });
