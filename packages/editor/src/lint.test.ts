@@ -274,6 +274,17 @@ describe('suggestionFor', () => {
     expect(suggestionFor(item, analysis(CARROSSEL), 'stor')).toEqual({ text: 'story' });
   });
 
+  /**
+   * TYTO-473: a configuration that restricts its formats (TYTO-475) refuses the rest, so the
+   * fix must not offer one of them: `grid` for a story-only alias was the case found.
+   */
+  it('suggests only a format the configuration allows, not every format the manifest has', () => {
+    const item = { severity: 'error', code: 'E_UNKNOWN_FORMAT', message: '' } as const;
+    const restricted = { ...analysis(CARROSSEL), formats: ['feed'] };
+    expect(suggestionFor(item, restricted, 'stor')).toBeUndefined();
+    expect(suggestionFor(item, restricted, 'fed')).toEqual({ text: 'feed' });
+  });
+
   it('refuses anything that is not a bare name, whatever the code says', () => {
     const item = { severity: 'error', code: 'E_UNKNOWN_SLOT', message: '' } as const;
     expect(suggestionFor(item, analysis(CARROSSEL), '::titlo Lista')).toBeUndefined();

@@ -43,6 +43,7 @@ import {
   resolveKeybindings,
   selectionOf,
   type SystemClipboard,
+  type TemplateAliasTarget,
   setVimContributions,
   setVimSystemClipboard,
   setVimYankFlash,
@@ -94,8 +95,10 @@ import {
   slashTemplateChoiceFor,
   slashTemplateDetail,
   slashTemplateNote,
+  aliasTargetsOf,
   templateAliasDeclared,
   templatePickDetail,
+  templatesInPickOrder,
 } from './editor-chrome.js';
 import { readKeybindingsText } from './keybindings-file.js';
 import { type KeybindingCommand, keybindingsAssist } from './keybindings-assist.js';
@@ -408,6 +411,7 @@ const analysis = previewAnalysis(
   (documentId) => {
     relintPanesOf(documentId);
   },
+  () => state.templateAliases,
 );
 
 /** The installed plugins' panels by layout id, once main has said which there are (ADR 0045). */
@@ -418,6 +422,8 @@ const state = {
   version: '—',
   platform: '—',
   templates: [] as readonly string[],
+  /** Which of `templates` are aliases, for the `template:` completion (TYTO-473). */
+  templateAliases: {} as Readonly<Record<string, TemplateAliasTarget>>,
   /** The folder searched before the built-in pack, and how many it brought (TYTO-122). */
   templatesFolder: null as string | null,
   templatesFound: 0,
@@ -3394,8 +3400,11 @@ const slashNoteText = (note: SlashTemplateNote): string => {
  */
 async function refreshTemplates(bridge: TytoBridge, raise = true): Promise<void> {
   const answer = await bridge['templates:list']({});
-  panel.templates = answer.templates;
-  state.templates = answer.templates.map((template) => template.name);
+  // Each alias right after its template (TYTO-473): the bar, the "/" menu and the
+  // `template:` completion all read this order.
+  panel.templates = templatesInPickOrder(answer.templates);
+  state.templates = panel.templates.map((template) => template.name);
+  state.templateAliases = aliasTargetsOf(panel.templates);
 
   // A folder that meant to be a template and is broken is why a template is missing from the
   // picker, and nothing else in the app would ever say so: the preview service replays the

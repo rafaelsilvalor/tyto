@@ -11,6 +11,7 @@ import { type TemplateManifest } from '@tyto/core';
 import { type BriefAnalysis, briefAnalysisField } from './analysis.js';
 import { briefLanguage } from './brief-language.js';
 import { treeAt } from './syntax.js';
+import { besideTheirTemplates, templateAliasDetail } from './template-aliases.js';
 
 /**
  * Completion driven by the active template's manifest, positioned by the syntax tree.
@@ -92,6 +93,33 @@ const result = (
   return { from: written.from, options: [...options], validFor };
 };
 
+/**
+ * The names `template:` can take, each alias right after its template and marked with what it
+ * stands for (TYTO-473), as "New brief from template…" and the "/" menu show it.
+ *
+ * `sortText` holds that order: CodeMirror sorts rows of equal match by label otherwise, and the
+ * alphabet puts an alias beside its template only when the alias's name happens to extend the
+ * template's. A typed query still ranks by how well a name matches it first.
+ */
+const templateOptions = (analysis: BriefAnalysis): Completion[] => {
+  const aliases = analysis.aliases ?? {};
+  const ordered = besideTheirTemplates(
+    analysis.templates,
+    (name) => name,
+    (name) => aliases[name]?.template,
+  );
+  const width = String(ordered.length).length;
+  return ordered.map((name, index) => {
+    const alias = aliases[name];
+    return {
+      label: name,
+      type: 'class',
+      sortText: String(index).padStart(width, '0'),
+      ...(alias === undefined ? {} : { detail: templateAliasDetail(alias) }),
+    };
+  });
+};
+
 const directiveOption = (name: string): Completion => ({
   label: name,
   type: 'function',
@@ -142,19 +170,18 @@ const completeFrontmatter = (
 
   const template = /^\s*template\s*:\s*([a-zA-Z0-9_-]*)$/u.exec(before);
   if (template) {
-    return result(
-      at(template, 1),
-      analysis.templates.map((name) => ({ label: name, type: 'class' })),
-    );
+    return result(at(template, 1), templateOptions(analysis));
   }
 
   if (manifest === undefined) return null;
 
   // `formats: [feed, st` — a YAML flow sequence, completed item by item. The optional `[`
   // is what tells this apart from the generic `key: value` below, which would otherwise
-  // match the same line.
+  // match the same line. A configuration's restriction narrows the list (TYTO-473).
   const formats = /^\s*formats\s*:\s*(?:\[)?(?:[^[\]]*,)?\s*([a-zA-Z0-9_-]*)$/u.exec(before);
-  if (formats) return result(at(formats, 1), manifest.formats.map(valueOption));
+  if (formats) {
+    return result(at(formats, 1), (analysis.formats ?? manifest.formats).map(valueOption));
+  }
 
   const scalar = /^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*([a-zA-Z0-9_-]*)$/u.exec(before);
   if (scalar) {

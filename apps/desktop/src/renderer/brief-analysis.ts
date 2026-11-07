@@ -1,5 +1,5 @@
 import type { Diagnostic } from '@tyto/core';
-import type { BriefAnalysis, BriefAnalyzer } from '@tyto/editor';
+import type { BriefAnalysis, BriefAnalyzer, TemplateAliasTarget } from '@tyto/editor';
 
 import type { IpcResponse } from '../../shared/ipc.js';
 
@@ -52,12 +52,14 @@ interface Wait {
 
 /**
  * `documentOf` names the document a pane shows; a pane it does not know shares one queue.
- * `relint` is told the document every answer was about, after the answer is kept.
+ * `relint` is told the document every answer was about, after the answer is kept. `aliases`
+ * names which of `templates` are aliases, for the `template:` completion (TYTO-473).
  */
 export function previewAnalysis(
   templates: () => readonly string[],
   documentOf: (view: object | undefined) => string | undefined = () => undefined,
   relint: (documentId: string) => void = () => undefined,
+  aliases: () => Readonly<Record<string, TemplateAliasTarget>> = () => ({}),
 ): PreviewAnalysis {
   const latest = new Map<string, BriefAnalysis>();
   let waiting: Wait[] = [];
@@ -82,10 +84,14 @@ export function previewAnalysis(
         // they cross.
         diagnostics: answer.diagnostics as readonly Diagnostic[],
         templates: templates(),
+        aliases: aliases(),
         directives: answer.completion.directives,
         ...(answer.completion.manifest === undefined
           ? {}
           : { manifest: answer.completion.manifest }),
+        // What the name's configuration lets it ask for (TYTO-475), so a "did you mean" for a
+        // format never offers one the render would refuse (TYTO-473).
+        ...(answer.completion.formats === undefined ? {} : { formats: answer.completion.formats }),
       };
       latest.set(documentId, analysis);
       // Before the waits are released, and whether or not any are: a lint that is waiting

@@ -219,7 +219,7 @@ describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
   // itself through its brief side (TYTO-440): a subtitle the brief leaves unset.
   const SUBTITLE = 'Vagas limitadas';
 
-  it('draws the template the alias reaches, with its configuration under the brief', async () => {
+  const aliasPreview = async (): Promise<PreviewService> => {
     const sources = await createProjectSources({
       fileSystem: nodeFileSystem(),
       builtIn: packDirectory,
@@ -243,6 +243,13 @@ describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
                 values: {},
                 brief: { slots: { subtitulo: { value: SUBTITLE } } },
               },
+              // Story only (ADR 0155 decision 6): what the editor's format fix may offer.
+              {
+                name: 'vertical',
+                alias: 'promo-vertical',
+                values: {},
+                formats: { value: ['story'], range: { start: 0, end: 1 } },
+              },
             ],
           },
         ],
@@ -250,7 +257,11 @@ describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
       images: NO_PLUGIN_FILES.images,
       texts: new Map(),
     });
-    const withAlias = await createPreviewService({ fileSystem: nodeFileSystem(), sources });
+    return createPreviewService({ fileSystem: nodeFileSystem(), sources });
+  };
+
+  it('draws the template the alias reaches, with its configuration under the brief', async () => {
+    const withAlias = await aliasPreview();
     const example = exampleBrief('promo-curso', 'promo.brief');
     const brief = example.slice(0, example.indexOf('::subtitulo'));
 
@@ -263,5 +274,20 @@ describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
     expect(aliased.frames.length).toBe(plain.frames.length);
     expect(aliased.frames[0]?.html).toContain(SUBTITLE);
     expect(plain.frames[0]?.html).not.toContain(SUBTITLE);
+  });
+
+  it("hands the editor the alias's template and the formats its configuration allows (TYTO-473)", async () => {
+    const withAlias = await aliasPreview();
+    const example = exampleBrief('promo-curso', 'promo.brief');
+
+    const plain = await withAlias.preview(example);
+    const vertical = await withAlias.preview(
+      example.replace('template: promo-curso', 'template: promo-vertical'),
+    );
+
+    expect(vertical.completion.manifest?.name).toBe('promo-curso');
+    expect(vertical.completion.formats).toEqual(['story']);
+    expect(plain.completion.manifest?.name).toBe('promo-curso');
+    expect(plain.completion).not.toHaveProperty('formats');
   });
 });

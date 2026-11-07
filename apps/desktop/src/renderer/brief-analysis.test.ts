@@ -29,6 +29,22 @@ describe('previewAnalysis', () => {
     expect(analysis.diagnostics.map((item) => item.code)).toEqual(['E_UNKNOWN_DIRECTIVE']);
   });
 
+  it('carries the aliases and the configuration formats to the editor (TYTO-473)', async () => {
+    const aliases = { 'aviso-laranja': { template: 'aviso', configuration: 'laranja' } };
+    const { analyzer, publish } = previewAnalysis(
+      () => ['aviso', 'aviso-laranja'],
+      () => undefined,
+      () => undefined,
+      () => aliases,
+    );
+    const waiting = analyzer.analyze('x');
+    publish('', { ...answer('x'), completion: { directives: [], formats: ['story'] } });
+
+    const analysis = await waiting;
+    expect(analysis.aliases).toEqual(aliases);
+    expect(analysis.formats).toEqual(['story']);
+  });
+
   it('answers at once when the preview already compiled that text', async () => {
     const { analyzer, publish } = previewAnalysis(() => []);
     publish('', answer('a'));

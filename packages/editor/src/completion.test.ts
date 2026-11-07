@@ -208,12 +208,60 @@ describe('completeBrief', () => {
     expect(labelsOf(result)).toEqual(['carrossel-lista', 'promo-curso']);
   });
 
+  describe('aliases in the template: list (TYTO-473)', () => {
+    // Out of order on purpose: `templates:list` sends aliases after every template.
+    const withAliases: BriefAnalysis = {
+      ...analysisOf(),
+      templates: ['aviso', 'banner', 'laranja-aviso', 'z-banner', 'roxo-aviso'],
+      aliases: {
+        'laranja-aviso': { template: 'aviso', configuration: 'laranja' },
+        'roxo-aviso': { template: 'aviso', configuration: 'roxo' },
+        'z-banner': { template: 'banner', configuration: 'escuro' },
+      },
+    };
+
+    /** The order CodeMirror shows rows of equal match in: its default `compareCompletions`. */
+    const shownOrder = (result: CompletionResult | null): string[] =>
+      [...(result?.options ?? [])]
+        .sort((a, b) => (a.sortText ?? a.label).localeCompare(b.sortText ?? b.label))
+        .map((option) => option.label);
+
+    it('marks an alias with its template and configuration, and a template not at all', () => {
+      const result = completeAt('---\ntemplate: |\n---\n', withAliases);
+      const detailOf = (label: string): string | undefined =>
+        result?.options.find((option) => option.label === label)?.detail;
+
+      expect(detailOf('laranja-aviso')).toBe('aviso · laranja');
+      expect(detailOf('z-banner')).toBe('banner · escuro');
+      expect(detailOf('aviso')).toBeUndefined();
+    });
+
+    it('lists each alias right after its template, templates in the order they came', () => {
+      const result = completeAt('---\ntemplate: |\n---\n', withAliases);
+
+      expect(shownOrder(result)).toEqual([
+        'aviso',
+        'laranja-aviso',
+        'roxo-aviso',
+        'banner',
+        'z-banner',
+      ]);
+    });
+  });
+
   it('completes format ids inside the frontmatter list', () => {
     const first = completeAt(frontmatter('formats: [|'), analysisOf(CARROSSEL));
     const second = completeAt(frontmatter('formats: [feed, |'), analysisOf(CARROSSEL));
 
     expect(labelsOf(first)).toEqual(['feed', 'story']);
     expect(labelsOf(second)).toEqual(['feed', 'story']);
+  });
+
+  it('completes only the formats a configuration restricts the name to (TYTO-473)', () => {
+    const restricted = { ...analysisOf(CARROSSEL), formats: ['story'] };
+    const result = completeAt(frontmatter('formats: [|'), restricted);
+
+    expect(labelsOf(result)).toEqual(['story']);
   });
 
   it('completes an enum slot set as a frontmatter scalar', () => {

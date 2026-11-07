@@ -1,4 +1,10 @@
-import { type LanguageName, type jsonAssist } from '@tyto/editor';
+import {
+  type LanguageName,
+  type TemplateAliasTarget,
+  besideTheirTemplates,
+  type jsonAssist,
+  templateAliasDetail,
+} from '@tyto/editor';
 
 import {
   PREVIEW_OPEN,
@@ -285,10 +291,42 @@ export interface TemplateAliasOf {
  * The template and configuration an alias stands for, as one quiet line: `aviso · laranja`
  * (TYTO-467). Undefined for a template that is not an alias, whose row stays as it was: an
  * alias row is otherwise its target's, so without this `aviso-laranja` reads as a template of
- * its own.
+ * its own. The line is `@tyto/editor`'s, which the `template:` completion shows too (TYTO-473).
  */
 export function templateAliasLine(alias: TemplateAliasOf | undefined): string | undefined {
-  return alias === undefined ? undefined : `${alias.template} · ${alias.configuration}`;
+  return alias === undefined ? undefined : templateAliasDetail(alias);
+}
+
+/** A `templates:list` row, as far as the order of a list of names reads it. */
+interface NamedTemplateRow {
+  readonly name: string;
+  readonly alias?: TemplateAliasOf | undefined;
+}
+
+/**
+ * The rows in the order every list of templates shows them: each alias right after the
+ * template it stands for (TYTO-473), not after every template as `templates:list` sends them.
+ * The rule is `@tyto/editor`'s, which orders the `template:` completion by it too.
+ */
+export function templatesInPickOrder<Row extends NamedTemplateRow>(rows: readonly Row[]): Row[] {
+  return besideTheirTemplates(
+    rows,
+    (row) => row.name,
+    (row) => row.alias?.template,
+  );
+}
+
+/** Which names are aliases and what each stands for, for the `template:` completion. */
+export function aliasTargetsOf(
+  rows: readonly NamedTemplateRow[],
+): Readonly<Record<string, TemplateAliasTarget>> {
+  return Object.fromEntries(
+    rows.flatMap((row) =>
+      row.alias === undefined
+        ? []
+        : [[row.name, { template: row.alias.template, configuration: row.alias.configuration }]],
+    ),
+  );
 }
 
 /**
