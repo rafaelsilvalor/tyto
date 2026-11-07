@@ -206,7 +206,9 @@ seal without knowing which template it is in:
   would be accepted and never drawn. A template with a grid and a story declares it, and the
   story ignores it, as the maintainer never asked for a sealed story. On 2026-11-07 the
   repositories of `agenda-semana`, `aprovados`, `simulados-semana`, `concursos-abertos`,
-  `questao-estrategica` (both its templates) and `tabela` offer it; `banner` does not.
+  `concursos-abertos-ec`, `news-da-semana`, `questao-estrategica` (both its templates) and
+  `tabela` offer it; `banner` does not, having no grid; `voce-conhece` has a grid and does not
+  yet.
 
 ## Names
 
