@@ -584,6 +584,7 @@
     },
     {
       "paths": [
+        "apps/desktop/src/main/recipe-apply.ts",
         "apps/desktop/src/main/recipe-clock.ts",
         "apps/desktop/src/main/recipe-runner.ts",
         "apps/desktop/src/main/recipe-wire.ts"
@@ -593,7 +594,7 @@
         "recipe-tab.desktop.test.ts",
         "window.desktop.test.ts"
       ],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts"
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, and its logic is in recipe-apply.test.ts until the notebook's Apply button"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],

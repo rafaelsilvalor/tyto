@@ -213,6 +213,7 @@ non-zero.
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 | `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
+| `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
 | `E_VIM_CONTRIBUTION` | error | no | A vim contribution names an operation the editor does not have, or a bad mapping. |
 
 ## What is fatal, and why
@@ -3118,6 +3119,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `count`, `column`, `parents`
+
+### `W_RECIPE_NOT_REMEMBERED`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0170-apply-runs-the-shown-plan-in-batches-and-commits-state-from-every-plans-outcome.md`
+
+A plan was applied but the recipe's state was not committed, so the next run plans those rows again.
+
+A warning never replaces a value (ADR 0013).
+
+```
+The plan of '{verb}' was applied, not remembered: {problem}.
+```
+
+Parameters: `verb`, `problem`
 
 ## Codes the desktop window mints
 

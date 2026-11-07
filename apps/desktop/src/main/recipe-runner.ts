@@ -21,11 +21,14 @@ import {
   type Plan,
   type RecipeAst,
   type RunClock,
+  type StateWrite,
   type Step,
   type Table,
   parseRecipe,
   runRecipe,
 } from '@tyto/recipe';
+
+import { type AppliedRecord, applyCell } from './recipe-apply.js';
 
 /**
  * The recipe notebook's runner, in main (TYTO-377, ADR 0148).
@@ -68,6 +71,8 @@ export interface RecipePlace {
 export interface RecipeRegistryRequest {
   readonly sectionOf: (plugin: string) => unknown;
   readonly refresh: boolean;
+  /** The host clock as ISO 8601, which stamps an applied operation (TYTO-378, ADR 0170). */
+  readonly now?: (() => string) | undefined;
 }
 
 export interface RecipeRunnerOptions {
@@ -118,10 +123,20 @@ export interface RunnerCell {
   readonly oldestFetchedAt?: string;
   /** The step fetches: a source verb, or a `run` whose recipe holds one (Fetch again's cell). */
   readonly source?: true;
+  // TYTO-378, ADR 0170: Apply.
+  /** Main's id for the cell's plan, which `apply` names; stamped when the cell planned it. */
+  readonly planId?: number;
+  /** The plan may be applied now: the cell is ok, not applied, and its verb can apply. */
+  readonly applicable?: boolean;
+  /** How the cell's last Apply went. */
+  readonly applied?: AppliedRecord;
 }
 
-/** Why cells were left `stale`: a folder not trusted, or a source reached while typing. */
-export type RunHeld = 'restricted' | 'source';
+/**
+ * Why cells were left `stale`: a folder not trusted, or a source reached while typing. `apply`
+ * is an `apply auto` recipe Run outside a trusted folder: it stopped at the plan (ADR 0170).
+ */
+export type RunHeld = 'restricted' | 'source' | 'apply';
 
 export interface RunnerAnswer {
   readonly cells: readonly RunnerCell[];
@@ -131,8 +146,22 @@ export interface RunnerAnswer {
   readonly ranAt: string;
 }
 
+/** Apply a plan cell's kept plan (TYTO-378): the window names the cell and the plan's id. */
+export interface RecipeApplyInput {
+  readonly documentId: string;
+  readonly index: number;
+  readonly planId: number;
+  /** The document's file, which main holds. */
+  readonly path: string | undefined;
+}
+
 export interface RecipeRunner {
   run(input: RecipeRunInput): Promise<RunnerAnswer>;
+  /**
+   * Applies the plan the document's cell `index` keeps, when its id is still `planId`; the cell
+   * as kept afterwards, with why it was refused or not remembered. `undefined` for no such cell.
+   */
+  apply(input: RecipeApplyInput): Promise<RunnerCell | undefined>;
   /** Every verb a recipe may name: the generic ones and every running plugin's. */
   verbs(): readonly string[];
   /** Forgets a document's cells, when its tab closes. */
@@ -140,7 +169,16 @@ export interface RecipeRunner {
 }
 
 /** A kept cell: the step it answered for, by signature, and the answer. */
-type KeptCell = Omit<RunnerCell, 'index'> & { readonly signature: string };
+type KeptCell = Omit<RunnerCell, 'index' | 'applicable'> & {
+  readonly signature: string;
+  // TYTO-378: what Apply needs of a cell the notebook reuses without running it again.
+  /** The verb its step names, which its plan is handed back to. */
+  readonly verb?: string;
+  /** `Cell.remembers`: its `remember` writes, committed on Apply (ADR 0170 decision 4). */
+  readonly remembers?: readonly StateWrite[];
+  /** Said by its last Apply: why it was not remembered. Shown after its own diagnostics. */
+  readonly applyNotes?: readonly Diagnostic[];
+};
 
 interface Kept {
   readonly header: string;
@@ -158,12 +196,16 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
   /** The latest run started per document: an older one finishing later keeps nothing. */
   const latest = new Map<string, number>();
   let runs = 0;
+  // TYTO-378: plan ids, and the Apply under way per document, which the next one waits for.
+  let plans = 0;
+  const applying = new Map<string, Promise<unknown>>();
   const registriesOf =
     options.registries ??
     ((request: RecipeRegistryRequest) =>
       recipeRegistriesOf(options.contributions, {
         sectionOf: request.sectionOf,
         refresh: request.refresh,
+        ...(request.now === undefined ? {} : { now: request.now }),
       }));
   const stateOf = options.state ?? recipeStateStore;
   const dataOf = options.data ?? workspaceDataResolver;
@@ -219,6 +261,8 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       }));
       const diagnostics: Diagnostic[] = [];
 
+      // TYTO-378: the plans this run made, which alone `apply auto` may apply.
+      const plannedNow = new Set<number>();
       if (stop > start) {
         const input = next[start - 1]?.table;
         const result = await runRecipe(
@@ -238,7 +282,11 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         );
         if (result.ok) {
           for (const cell of result.value.cells) {
-            next.push(keptOf(cell, signatures[next.length] ?? '', lineOf(cell.step), ranAt));
+            const planId = cell.plan === undefined ? undefined : (plans += 1);
+            if (planId !== undefined) plannedNow.add(planId);
+            next.push(
+              keptOf(cell, signatures[next.length] ?? '', lineOf(cell.step), ranAt, planId),
+            );
           }
         } else {
           diagnostics.push(...result.error);
@@ -256,22 +304,51 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         });
       }
 
-      if (latest.get(request.documentId) === run) {
+      const current = latest.get(request.documentId) === run;
+      if (current) {
         kept.set(request.documentId, { header, cells: next });
       }
+
+      // TYTO-378, ADR 0170 decision 6: `apply auto` applies the plans this run made, in cell
+      // order, on Run in a trusted folder only. A cell reused from an earlier run is never
+      // applied by itself, and a pause in typing or a save never applies.
+      const planned = next
+        .map((cell, index) => ({ cell, index }))
+        .filter(({ cell }) => cell.planId !== undefined && plannedNow.has(cell.planId));
+      let autoHeld: RunHeld | undefined;
+      if (recipe.apply === 'auto' && request.explicit === true && planned.length > 0) {
+        if (place.trust !== 'trusted') {
+          autoHeld = 'apply';
+        } else if (current) {
+          for (const { cell, index } of planned) {
+            await queued(request.documentId, () =>
+              applyKept(request.documentId, index, cell.planId ?? -1, request.path),
+            );
+          }
+        }
+      }
+      const final = current ? (kept.get(request.documentId)?.cells ?? next) : next;
+
       // Which cells fetch, for the notebook's Fetch again; the reader already holds every text.
       const sources = await Promise.all(
         steps.map((step) => holdsSource(step, registries, read, new Set(), 0)),
       );
+      const reason = held ?? autoHeld;
       return {
-        cells: next.map((cell, index) => ({
-          ...shown(cell, index),
+        cells: final.map((cell, index) => ({
+          ...shown(cell, index, registries),
           ...(sources[index] === true ? { source: true as const } : {}),
         })),
         diagnostics,
-        ...(held === undefined ? {} : { held }),
+        ...(reason === undefined ? {} : { held: reason }),
         ranAt,
       };
+    },
+
+    apply(request) {
+      return queued(request.documentId, () =>
+        applyKept(request.documentId, request.index, request.planId, request.path),
+      );
     },
 
     verbs() {
@@ -283,6 +360,76 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       latest.delete(documentId);
     },
   };
+
+  // TYTO-378, ADR 0170: Apply.
+
+  /** Runs `work` after every Apply already queued for the document: one at a time per recipe. */
+  function queued<T>(documentId: string, work: () => Promise<T>): Promise<T> {
+    const before = applying.get(documentId) ?? Promise.resolve();
+    const done = before.then(work, work);
+    const settled = done.then(
+      () => undefined,
+      () => undefined,
+    );
+    applying.set(documentId, settled);
+    void settled.then(() => {
+      if (applying.get(documentId) === settled) applying.delete(documentId);
+    });
+    return done;
+  }
+
+  /**
+   * One Apply of the plan cell `index` keeps, against the cells kept when it starts. Its outcome
+   * lands on whichever kept cell still holds that plan when it ends: a run started meanwhile
+   * may have reused the cell, and one that planned it again holds another id and is left alone.
+   */
+  async function applyKept(
+    documentId: string,
+    index: number,
+    planId: number,
+    path: string | undefined,
+  ): Promise<RunnerCell | undefined> {
+    const cells = kept.get(documentId)?.cells;
+    const cell = cells?.[index];
+    if (cells === undefined || cell === undefined) return undefined;
+    const clock = options.clock();
+    const now = () => clock.now().toISOString();
+    const directory = path === undefined ? undefined : dirname(path);
+    const place = await options.placeOf(directory);
+    const registries = registriesOf({
+      // A click is the approval in a restricted folder too, as Run is; its sections stay withheld.
+      sectionOf: (plugin) =>
+        place.trust === 'trusted' ? options.sectionFor(directory, plugin) : undefined,
+      refresh: false,
+      now,
+    });
+    const answer = await applyCell({
+      cells,
+      index,
+      planId,
+      registries,
+      state: writableStateFor(place, path, options.home, stateOf),
+      now,
+    });
+    const applied = answer.applied;
+    if (applied !== undefined) {
+      const holding = kept.get(documentId);
+      if (holding !== undefined) {
+        kept.set(documentId, {
+          ...holding,
+          cells: holding.cells.map((each) =>
+            each.planId === planId ? { ...each, applied, applyNotes: answer.diagnostics } : each,
+          ),
+        });
+      }
+    }
+    const after = kept.get(documentId)?.cells[index] ?? cell;
+    const view = shown(after, index, registries);
+    // A refusal is said to this answer only: the cell it names may hold another plan by now.
+    return applied === undefined
+      ? { ...view, diagnostics: [...view.diagnostics, ...answer.diagnostics] }
+      : view;
+  }
 }
 
 /**
@@ -412,14 +559,24 @@ function firstChanged(signatures: readonly string[], kept: readonly KeptCell[]):
   return index === -1 ? signatures.length : index;
 }
 
-function keptOf(cell: Cell, signature: string, line: number, ranAt: string): KeptCell {
+function keptOf(
+  cell: Cell,
+  signature: string,
+  line: number,
+  ranAt: string,
+  planId: number | undefined,
+): KeptCell {
   const oldest = cell.table === undefined ? undefined : oldestFetchedAt(cell.table);
   return {
     signature,
     line,
     status: cell.status,
+    verb: cell.step.verb,
     ...(cell.table === undefined ? {} : { table: cell.table }),
+    // The plan object itself, never a copy: Apply hands this one back (ADR 0170).
     ...(cell.plan === undefined ? {} : { plan: cell.plan }),
+    ...(planId === undefined ? {} : { planId }),
+    ...(cell.remembers === undefined ? {} : { remembers: cell.remembers }),
     diagnostics: cell.diagnostics,
     // A skipped cell did not run, so it has no time of its own.
     ...(cell.status === 'skipped' ? {} : { ranAt }),
@@ -427,9 +584,29 @@ function keptOf(cell: Cell, signature: string, line: number, ranAt: string): Kep
   };
 }
 
-function shown(cell: KeptCell, index: number): RunnerCell {
-  const { signature: _signature, ...rest } = cell;
-  return { index, ...rest };
+function shown(cell: KeptCell, index: number, registries?: RecipeRegistries): RunnerCell {
+  const {
+    signature: _signature,
+    verb,
+    remembers: _remembers,
+    applyNotes,
+    diagnostics,
+    ...rest
+  } = cell;
+  const applicable =
+    registries !== undefined &&
+    cell.status === 'ok' &&
+    cell.planId !== undefined &&
+    cell.applied === undefined &&
+    (cell.plan?.count ?? 0) > 0 &&
+    verb !== undefined &&
+    registries.verbs.get(verb)?.apply !== undefined;
+  return {
+    index,
+    ...rest,
+    diagnostics: applyNotes === undefined ? diagnostics : [...diagnostics, ...applyNotes],
+    ...(cell.planId === undefined ? {} : { applicable }),
+  };
 }
 
 /**
@@ -479,6 +656,20 @@ function stateFor(
 ): RecipeState | undefined {
   if (place.folder === undefined || path === undefined) return undefined;
   return readOnlyState(stateOf({ home, workspace: place.folder, recipe: path }));
+}
+
+/**
+ * The recipe's state for an Apply (TYTO-378, ADR 0170): the store itself, **writable**, bound
+ * as a run's is. None outside a workspace or for a recipe in no file.
+ */
+function writableStateFor(
+  place: RecipePlace,
+  path: string | undefined,
+  home: string,
+  stateOf: (options: RecipeStateOptions) => RecipeState,
+): RecipeState | undefined {
+  if (place.folder === undefined || path === undefined) return undefined;
+  return stateOf({ home, workspace: place.folder, recipe: path });
 }
 
 /** `state` with its reads and without its write, which answers `E_RECIPE_STATE`. */

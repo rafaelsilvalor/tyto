@@ -1980,6 +1980,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // An Apply wrote, but the recipe's state was not committed (TYTO-378, ADR 0170 decision 4):
+  // another cell was stale or failed, or the state store refused the write. The next run sees
+  // the rows as changed and plans them again, so the person has to know.
+  W_RECIPE_NOT_REMEMBERED: {
+    severity: 'warning',
+    summary:
+      "A plan was applied but the recipe's state was not committed, so the next run plans those rows again.",
+    template: "The plan of '{verb}' was applied, not remembered: {problem}.",
+    spec: 'docs/adr/0170-apply-runs-the-shown-plan-in-batches-and-commits-state-from-every-plans-outcome.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // A vim contribution names operations the editor implements (TYTO-417, ADR 0141). One that
   // cannot be applied is left out whole, so half of a plugin's keys never land.
   E_VIM_CONTRIBUTION: {

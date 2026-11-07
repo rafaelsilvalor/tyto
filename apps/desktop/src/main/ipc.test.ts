@@ -11,7 +11,7 @@ import {
 import { type Credentials } from './credentials.js';
 import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
-import { type RecipeRunInput, type RecipeRunner } from './recipe-runner.js';
+import { type RecipeApplyInput, type RecipeRunInput, type RecipeRunner } from './recipe-runner.js';
 import { createTemplateFolder } from './session.js';
 import { BUILT_IN_THEMES, builtInThemeSource, createThemeService } from './themes.js';
 
@@ -700,12 +700,37 @@ const windowThemes = (): WindowThemes => {
 const recipeRunner = () => {
   const asked: RecipeRunInput[] = [];
   const closed: string[] = [];
+  const applies: RecipeApplyInput[] = [];
   const runner: RecipeRunner & {
     readonly asked: RecipeRunInput[];
     readonly closed: string[];
+    readonly applies: RecipeApplyInput[];
   } = {
     asked,
     closed,
+    applies,
+    // TYTO-378: document-1 keeps a plan cell at index 1, applied; nothing else is kept.
+    apply: (input) => {
+      applies.push(input);
+      return Promise.resolve(
+        input.documentId === 'document-1' && input.index === 1
+          ? {
+              index: 1,
+              line: 3,
+              status: 'ok' as const,
+              plan: {
+                target: 'example items',
+                operations: [{ write: 'mark', rowKey: 'EX-1', description: 'Mark EX-1' }],
+                count: 1,
+              },
+              planId: input.planId,
+              applicable: false,
+              applied: { at: '2026-10-27T12:00:00.000Z', operations: [{ status: 'applied' }] },
+              diagnostics: [],
+            }
+          : undefined,
+      );
+    },
     run: (input) => {
       asked.push(input);
       return Promise.resolve({
@@ -1013,6 +1038,39 @@ describe('the tab a message is about (E9.11)', () => {
     ]);
     expect(injected.recipes.asked[0]?.explicit).toBe(true);
     expect(await handlers['recipe:verbs']({})).toEqual({ verbs: ['acme.pull', 'where'] });
+  });
+
+  // TYTO-378, ADR 0170: Apply names a cell and a plan id; main holds the file and the plan.
+  it('applies a kept plan against the file main holds for the tab, and answers the cell', async () => {
+    const injected = dependencies();
+    const handlers = createHandlers(injected);
+
+    const answer = await handlers['recipe:apply']({
+      documentId: 'document-1',
+      index: 1,
+      planId: 7,
+    });
+    const none = await handlers['recipe:apply']({ documentId: 'document-2', index: 0, planId: 1 });
+
+    expect(answer.cell?.plan).toEqual({
+      target: 'example items',
+      count: 1,
+      operations: [{ write: 'mark', rowKey: 'EX-1', description: 'Mark EX-1' }],
+      planId: 7,
+      applicable: false,
+    });
+    expect(answer.cell?.applied).toEqual({
+      at: '2026-10-27T12:00:00.000Z',
+      applied: 1,
+      failed: 0,
+      skipped: 0,
+      operations: [{ status: 'applied' }],
+    });
+    expect(none).toEqual({});
+    expect(injected.recipes.applies).toEqual([
+      { documentId: 'document-1', index: 1, planId: 7, path: '/recipes/weekly.recipe' },
+      { documentId: 'document-2', index: 0, planId: 1, path: undefined },
+    ]);
   });
 
   it('passes a confirmation straight through, strings and all', async () => {
