@@ -138,6 +138,9 @@ export {
 } from './host.js';
 
 export {
+  type AppliedBatch,
+  type AppliedBatchOperation,
+  type ApplyRequest,
   type OwnedRecipeVerb,
   type PageRequest,
   type PlanRequest,
@@ -150,6 +153,9 @@ export {
   type RecipeVerbKind,
   type TransformRequest,
   type VerbRequest,
+  APPLY_BATCH,
+  APPLY_NO_ANSWER,
+  APPLY_REASON_MAX_LENGTH,
   RECIPE_VERB_KINDS,
   recipeRegistriesOf,
 } from './recipes.js';

@@ -38,9 +38,11 @@ import { z } from 'zod';
  * image (ADR 0158, TYTO-481); 14 since a template may report `W_TEMPLATE_ORPHAN`, a code the
  * strict report schema of a host on 13 would refuse with the whole answer (ADR 0167, TYTO-516);
  * 15 since a template may report `W_TEMPLATE_FILE_MISSING`, which a host on 14 would refuse the
- * same way (ADR 0058, TYTO-502).
+ * same way (ADR 0058, TYTO-502); 16 since a planned operation may carry its `payload` and an
+ * action or a sink may register `apply`, a field and a callable the strict plan and verb
+ * schemas of a side on 15 would refuse (ADR 0170, TYTO-378).
  */
-export const RPC_PROTOCOL_VERSION = 15;
+export const RPC_PROTOCOL_VERSION = 16;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

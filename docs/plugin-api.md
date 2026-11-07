@@ -407,11 +407,24 @@ interface RecipeVerbContribution {
   transform?(request: { arguments; table; section? }): Result<Table>;
   writes?: string[]; // an action's or a sink's: a subset of the manifest's 'writes'
   plan?(request: { arguments; table; section? }): Result<Plan>; // an action's or a sink's
+  // An action's or a sink's, optional: one batch of the plan as shown (ADR 0170).
+  apply?(request: {
+    arguments; // the step's, as `plan` was handed them
+    operations: PlannedOperation[]; // at most 100, in the shown plan's order
+    target: string;
+    section?: unknown;
+  }): Result<{ operations: { status: 'applied' | 'failed' | 'skipped'; reason?: string }[] }>;
 }
 interface Plan {
   target: string;
-  operations: { write: string; rowKey?: string; description: string }[];
+  operations: PlannedOperation[];
   count: number; // operations.length
+}
+interface PlannedOperation {
+  write: string;
+  rowKey?: string;
+  description: string;
+  payload?: JsonValue; // the plugin's own data for applying it; at most 2,048 bytes as JSON
 }
 interface RecipeDerivationContribution {
   id: string; // '<namespace>.<name>'; bare names are Tyto's
@@ -458,11 +471,42 @@ the cell reads and answers a `Plan`, which the runner returns as the cell's `pla
 passes through unchanged to the next cell. The host refuses a plan with `E_RECIPE_PLAN`, at the
 verb, when an operation's `write` is one the verb did not declare, when `count` is not the
 number of operations, when a `rowKey` is not a key of the table, or past 10,000 operations or a
-500-character description (`PLAN_LIMITS`, provisional). **There is no `apply` in this
-version**: nothing a plan describes is written. TYTO-378 adds it, and may add fields to `Plan`
-but never remove or retype one, so a plan written today stays valid.
+500-character description, or a `payload` over 2,048 bytes as UTF-8 JSON (`PLAN_LIMITS`,
+provisional). Fields may be added to `Plan`, never removed or retyped, so a plan written today
+stays valid.
+
+**`apply` carries out the plan a person was shown, and nothing else** (ADR 0170). It is
+optional: an action or a sink without it still plans, and the host has nothing to apply its
+plans with. The host hands back the plan it kept, never a new one, in batches of 100
+operations (`APPLY_BATCH`, which fits the 30 s call deadline), with the arguments the step was
+planned with, the plan's `target` and the plugin's current section. **Plan what you need to
+apply into `payload`**: the record's id, the status you read, a join's right-hand target. The host
+never reads it, and handing it back is how you apply without planning again and how you notice
+that a target moved: answer that operation `failed` with a `reason` and the others still run.
+The answer holds one entry per operation, in the request's order; a `failed` entry needs a
+`reason` of at most 500 characters. The host maps each entry onto the shown plan's `rowKey`,
+never anything the plugin says, and stamps `appliedAt` from its own clock.
+
+**A batch the host cannot read stops the Apply.** A throw, a refusal, the deadline, a crash, a
+wrong number of entries or a `failed` entry with no reason makes every operation of that batch
+`failed` with the reason `no answer; some may have been written` (`APPLY_NO_ANSWER`), since the
+host cannot tell which ones the plugin carried out, and every later batch `skipped` without a
+call. **Before the first call, the host checks the kept plan again**: the verb is looked up in
+the live registry, so a plugin withdrawn since the plan was shown is refused, and the plan must
+pass `checkPlan` against the writes the verb declares now, so an update that dropped a write
+refuses the whole Apply with `E_RECIPE_APPLY` before any write. A plan the verb never answered —
+a copy, or another verb's — is refused the same way. **This is a contract check, not a
+sandbox**: it holds the plugin to the writes a person read before installing it and to the plan
+they confirmed, and it cannot see what the plugin's code then does; what a plugin can reach at
+all is the isolation's and the permissions' business (ADR 0049, ADR 0041).
+
+**A plugin that registers `apply` needs protocol 16**, which `@tyto/plugin-api` 0.15 carries:
+write `"engine": ">=0.15"` in its manifest, so an older Tyto refuses to install it rather than
+meeting a `payload` or an `apply` its strict schemas refuse at `hello`.
 `examples/plugins/tyto-plugin-example-recipe/` contributes `example.pull`, `example.tag`,
-`example.parity` and the action `example.mark`, which plans one `mark` per row.
+`example.parity` and the action `example.mark`, which plans one `mark` per row with the mark
+the row had in its payload, and whose `apply` keeps the marks in the plugin's private cache and
+fails a row whose mark changed since the plan.
 
 ### `editor.vim`, in full
 
@@ -653,7 +697,7 @@ Six optional ports on `HostCapabilities` answer them: `cacheGet`, `cachePut`, `c
 
 ```
 host (CLI process)                               guest (plugin's process)
-  connectIsolatedPlugin ◀── hello {protocol: 9, sandbox} ── runGuest
+  connectIsolatedPlugin ◀── hello {protocol: 16, sandbox} ── runGuest
                            canary denied? else E_PLUGIN_SANDBOX
                         ── activate {config} ──▶   plugin.activate(guestHost)
                         ◀── activated {registrations: data + {$call: n}}
@@ -663,7 +707,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan` and `derive` on the recipe points (ADR 0135), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel`, `theme` and `configuration` — as a form, ADR 0145 — cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan`, `apply` and `derive` on the recipe points (ADR 0135, ADR 0170), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel`, `theme` and `configuration` — as a form, ADR 0145 — cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 
