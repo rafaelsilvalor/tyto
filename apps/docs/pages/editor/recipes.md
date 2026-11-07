@@ -1,7 +1,7 @@
 # Recipes
 
 ::: info How this page was checked
-Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. Menus and labels below are the English window's.
+Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Menus and labels below are the English window's.
 :::
 
 A recipe (`.recipe`) is a list of steps, one per line, that fetch rows from a source, filter and reshape them, and plan what to write. Tyto opens a recipe in a tab as a notebook: **under each step, its result**, a table you can read while you write the next line.
@@ -31,7 +31,18 @@ Under each step is one line, then its table:
 - **Its age**: when the step ran and how old its data is, such as _ran 2 min. ago · data fetched 3 hr. ago_. The data's age is when the source fetched it, which can be long before the step ran. The ages count up while the tab is open.
 - **The table** shows the step's first 20 rows, then how many it leaves out (_30 more rows_). A wide table scrolls sideways inside the step. A long value is cut with an ellipsis; point at it to read it whole, and point at a column's name to see its type.
 
-The table is a preview: the step still works on every row.
+The table is a preview: the step still works on every row. To see all of them, see [Show a table whole](#show-a-table-whole).
+
+## Show a table whole
+
+A `show table` line draws every step from it down in the **Table view** instead of the preview: all of the table's rows, however many, in a box of twelve rows that scrolls. Only the rows in sight are drawn, so a table of thousands scrolls as quickly as one of ten. `show summary` draws the same view with a **Grand total** line under it, summing each number column.
+
+- **Sort**: click a column's name to sort by it, again to reverse it, a third time to go back to the recipe's order. The sort is the view's: the next step still reads the rows in the order the recipe made them.
+- **Filter**: type in _Filter rows_ to keep the rows that hold the text in any column shown, without minding case or accents. _Rows: 111 of 5,000_ says how many it kept. A Summary's totals add up the rows the filter keeps.
+- **Columns**: the **Columns** button lists the columns with a box each; clear one to hide it. A hidden column is not searched by the filter. The last column shown stays.
+- **Select and copy**: click a cell, then Shift-click another to select the rectangle between them; Ctrl+A (⌘A on macOS) in the table selects every row. **Copy**, or Ctrl+C, puts the selection on the clipboard as tab-separated text that pastes into a spreadsheet as cells, whole values included, up to 50,000 rows.
+
+Numbers are aligned to the right and grouped, dates are written in the window's language, and a `link` column's web addresses (`http` and `https`) open in your browser. An address of any other kind stays plain text: Tyto never hands it to the system.
 
 ## Fold a table
 

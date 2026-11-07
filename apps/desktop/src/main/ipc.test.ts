@@ -1189,6 +1189,26 @@ describe('the tab a message is about (E9.11)', () => {
     ]);
   });
 
+  it('copies some of the shown columns without changing the rows the filter keeps', async () => {
+    const injected = dependencies();
+    const handlers = createHandlers(injected);
+
+    // "plain" is a note: filtered over key and note it keeps K-1 and K-4, copied by key only.
+    const answer = await handlers['recipe:copy']({
+      documentId: 'document-1',
+      index: 1,
+      ranAt: KEPT_RAN_AT,
+      offset: 0,
+      limit: 10,
+      filter: 'plain',
+      columns: ['key', 'note'],
+      copyColumns: ['key'],
+    });
+
+    expect(answer).toEqual({ rows: 2, columns: 1 });
+    expect(injected.clipboard).toEqual(['K-1\r\nK-4']);
+  });
+
   it('passes a confirmation straight through, strings and all', async () => {
     const asked: unknown[] = [];
     const handlers = createHandlers({

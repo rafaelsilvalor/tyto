@@ -3,6 +3,8 @@ import { type CellOutput, cellOutputLineStart, remeasureCellOutput } from '@tyto
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { CellStatus } from './recipe-notebook.js';
 import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js';
+import type { CopyAnswer, CopyRequest, RowsAnswer, RowsRequest } from './recipe-table-view.js';
+import { viewBody } from './recipe-views.js';
 
 /**
  * What goes under a recipe's cell (TYTO-377, ADR 0148): a header line and the cell's table.
@@ -13,8 +15,9 @@ import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js
  * on hover: a person should see what a cell offers before reaching for it. A plan cell's header
  * also carries **Apply**, and its body the plan's lines (`recipe-plan-view.ts`, TYTO-378).
  *
- * The table is a preview: the first {@link SHOWN_ROWS} of the rows the wire carries, then how
- * many it leaves out. It scrolls sideways inside the cell, and a long value is cut with an
+ * A cell under `show table` or `show summary` draws its view instead of the table
+ * (`recipe-views.ts`, TYTO-379). Under no `show`, the table is a preview: the first
+ * {@link SHOWN_ROWS} of the rows the wire carries, then how many it leaves out. It scrolls sideways inside the cell, and a long value is cut with an
  * ellipsis, its whole text in the cell's `title`.
  *
  * **The element is built once per key** (`cell-outputs.ts`), so the key holds everything the
@@ -44,6 +47,10 @@ export interface CellViewActions {
   readonly toggled: (at: number, collapsed: boolean) => void;
   /** Apply: the plan main stamped `planId` on this cell (TYTO-378). */
   readonly apply: (index: number, planId: number) => void;
+  /** A page of a kept cell's table, for its view: `recipe:rows` for this tab (TYTO-379). */
+  readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
+  /** Copy rows of a kept cell's table: `recipe:copy` for this tab (TYTO-379). */
+  readonly copy: (request: CopyRequest) => Promise<CopyAnswer>;
 }
 
 export interface CellViewContext {
@@ -84,6 +91,7 @@ export function cellOutputOf(status: CellStatus, context: CellViewContext): Cell
       cell.applied?.at ?? '',
       context.applying.has(status.index) ? 'applying' : '',
       context.refusals.get(status.index) ?? '',
+      cell.view?.name ?? '',
     ].join('\u0000'),
     render: () => renderCell(status, context, collapsed),
   };
@@ -151,7 +159,12 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
     }
   }
 
-  if (table !== undefined) root.append(tableBody(table, locale));
+  // TYTO-379: a cell under `show` is drawn by its view (`recipe-views.ts`); one under none
+  // keeps the preview. Only the body changes: the header and a plan's lines stay as they are.
+  if (table !== undefined) {
+    const view = viewBody(cell, table, { locale, rows: actions.rows, copy: actions.copy });
+    root.append(view ?? tableBody(table, locale));
+  }
   const planned = planBody(cell, status.held, plan);
   if (planned !== undefined) root.append(planned);
   return root;

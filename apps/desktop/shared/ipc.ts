@@ -2512,6 +2512,15 @@ export const IPC_CHANNELS = {
     z.object({
       ...recipeRowsQuery,
       limit: z.number().int().positive().max(RECIPE_WIRE_LIMITS.copy),
+      /**
+       * TYTO-379: the columns copied, of `columns`; all of `columns` when absent. Apart from
+       * `columns` because the filter matches over every shown column, so copying two of them
+       * must not change which rows the filter keeps.
+       */
+      copyColumns: z
+        .array(z.string().max(RECIPE_WIRE_LIMITS.text))
+        .max(RECIPE_WIRE_LIMITS.columns)
+        .optional(),
     }),
     z.union([
       recipeStale,

@@ -63,6 +63,9 @@ function contextOf(more: Partial<CellViewContext> = {}) {
     fetchAgain: vi.fn<() => void>(),
     toggled: vi.fn<(at: number, collapsed: boolean) => void>(),
     apply: vi.fn<(index: number, planId: number) => void>(),
+    // TYTO-379: no cell here is under `show`, so no view asks main for rows.
+    rows: vi.fn(() => Promise.resolve({ stale: true as const })),
+    copy: vi.fn(() => Promise.resolve({ stale: true as const })),
   } satisfies CellViewActions;
   const context: CellViewContext = {
     locale: 'en',
@@ -129,6 +132,59 @@ describe("a cell's table", () => {
     expect(failed.element.querySelector('.recipe-cell-status')?.hasAttribute('data-failed')).toBe(
       true,
     );
+  });
+});
+
+describe("a cell's view (TYTO-379)", () => {
+  const plan = {
+    target: 'example items',
+    count: 1,
+    operations: [{ write: 'mark', description: 'mark T-0' }],
+    planId: 3,
+    applicable: true,
+  };
+
+  it('swaps only the table for the view a `show` chose, header and plan staying', () => {
+    const { element, actions } = render(cellOf({ view: { name: 'summary', options: {} }, plan }));
+
+    expect(element.querySelector('table')).toBeNull();
+    expect(element.querySelector<HTMLElement>('.recipe-table')?.dataset['view']).toBe('summary');
+    // The view sits in the body a fold hides, and the header and the plan are as they were.
+    expect(element.querySelector('.recipe-cell__body.recipe-table')).not.toBeNull();
+    expect(texts(element, '.recipe-cell__action[data-action="run-from"]')).toEqual([
+      'Run from here',
+    ]);
+    expect(element.querySelector('.recipe-plan')).not.toBeNull();
+    expect(actions.rows.mock.calls).toEqual([
+      [
+        {
+          index: 0,
+          ranAt: '2026-10-28T11:58:00.000Z',
+          offset: 0,
+          limit: 100,
+          columns: ['key', 'title'],
+        },
+      ],
+    ]);
+  });
+
+  it('keeps the preview under no `show`, and asks main for nothing', () => {
+    const { element, actions } = render(cellOf());
+
+    expect(element.querySelector('table')).not.toBeNull();
+    expect(element.querySelector('.recipe-table')).toBeNull();
+    expect(actions.rows).not.toHaveBeenCalled();
+  });
+
+  it('builds a new element when the view changes', () => {
+    const { context } = contextOf();
+    const keyOf = (view?: string) =>
+      cellOutputOf(
+        statusOf(cellOf(view === undefined ? {} : { view: { name: view, options: {} } })),
+        context,
+      ).key;
+
+    expect(new Set([keyOf(), keyOf('table'), keyOf('summary')]).size).toBe(3);
   });
 });
 

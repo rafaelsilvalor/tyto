@@ -594,9 +594,10 @@
       "e2e": [
         "recipe-notebook.desktop.test.ts",
         "recipe-tab.desktop.test.ts",
+        "recipe-table.desktop.test.ts",
         "window.desktop.test.ts"
       ],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages and copy (TYTO-379) and the view list every run checks show against have no window caller until the Table view; their logic is in recipe-rows.test.ts and ipc.test.ts"
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
@@ -605,8 +606,26 @@
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-cell-view.ts"],
-      "e2e": ["recipe-notebook.desktop.test.ts", "recipe-tab.desktop.test.ts"],
-      "why": "reviewed: the header and table under a recipe's cell (TYTO-377); the logic is in recipe-cell-view.test.ts, and only the real window lays the table out and scrolls it"
+      "e2e": [
+        "recipe-notebook.desktop.test.ts",
+        "recipe-tab.desktop.test.ts",
+        "recipe-table.desktop.test.ts"
+      ],
+      "why": "reviewed: the header and table under a recipe's cell (TYTO-377), and the seam that hands a cell under show to its view (TYTO-379); the logic is in recipe-cell-view.test.ts, and only the real window lays the table out and scrolls it"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/renderer/recipe-table-model.ts",
+        "apps/desktop/src/renderer/recipe-table-view.ts",
+        "apps/desktop/src/renderer/recipe-views.ts"
+      ],
+      "e2e": ["recipe-table.desktop.test.ts"],
+      "why": "reviewed: the Table and Summary views (TYTO-379); the arithmetic is in recipe-table-model.test.ts and the drawing in recipe-table-view.test.ts, and only the real window scrolls 5,000 rows with the wheel"
+    },
+    {
+      "paths": ["apps/desktop/shared/external-url.ts"],
+      "e2e": ["recipe-table.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: which links leave the app for the system browser (TYTO-379), read by window.ts and the Table view's anchors; the rule is in external-url.test.ts, and no suite opens the system browser"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-plan-view.ts"],
