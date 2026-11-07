@@ -18,7 +18,7 @@
   "dependencies": {
     "@tyto/command-line": "workspace:*",
     "@tyto/raster": "workspace:*",
-    "playwright": "^1.63.0"
+    "playwright": "^1.64.1"
   },
   "devDependencies": {
     "vitest": "^5.0.1"
