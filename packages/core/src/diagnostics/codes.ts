@@ -560,6 +560,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The template that won the name renders with its own defaults.',
   },
+  W_PLUGIN_FILE_TEMPLATE_UNNAMED: {
+    severity: 'warning',
+    summary:
+      'A pack a plugin file fetched holds templates no entry names, so they are not offered.',
+    template:
+      "The pack of plugin '{plugin}' that '{file}' fetches for '{template}' also holds {unnamed}; a fetched pack offers only the templates the plugin files name. To offer one, add an entry for it with the same git and ref as '{template}'.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality: 'The templates the files name load; the others are left out, as before.',
+  },
   W_PLUGIN_FILE_REPLACES_INSTALLED: {
     severity: 'warning',
     summary:
@@ -578,6 +588,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality:
       'The copy fetched earlier loads when there is one; a brief that needs one that is missing says so on its own.',
+  },
+  // TYTO-470: a deep TYTO_HOME on Windows used to end a render or a sync in a stack trace
+  // from `mkdtemp`. The cache layout stays; the run says which folder is too deep instead.
+  E_TYTO_HOME_PATH_TOO_LONG: {
+    severity: 'error',
+    summary: 'A path Tyto writes under TYTO_HOME is longer than the system accepts.',
+    template:
+      "TYTO_HOME '{home}' is too deep a folder: a path Tyto writes under it reaches {length} characters, {reason}. Set TYTO_HOME to a shorter folder.",
+    spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
+    fatal: false,
+    fatality:
+      'Nothing is fetched under that folder; copies already in its cache still load, and a brief that needs a missing one says so on its own.',
   },
   E_PLUGIN_FILE_SOURCE_REFUSED: {
     severity: 'error',

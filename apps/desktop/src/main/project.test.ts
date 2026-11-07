@@ -360,6 +360,29 @@ describe('the packs the plugin files fetched (TYTO-433, ADR 0151 decision 7)', (
     expect(snapshot.roots).toEqual([builtIn, projectFiles, machineFiles]);
     expect(snapshot.registry?.get('selo')).toBeUndefined();
   });
+
+  it('says, among the plugin files’ problems, which templates of a pack no entry names (TYTO-615)', async () => {
+    const sources = await sourcesOver();
+    const named = (template: string) => ({
+      template,
+      file: 'tabelas.yaml',
+      directory: scratch,
+      configurations: [],
+      plugin: 'project-pack',
+    });
+
+    const snapshot = await sources.setFetched({
+      ...fetched(),
+      configured: { project: [named('tabela'), named('aviso')], machine: [] },
+      texts: new Map([['tabelas.yaml', 'version: 1\n']]),
+    });
+
+    const unnamed = snapshot.pluginFiles.filter(
+      (item) => item.code === 'W_PLUGIN_FILE_TEMPLATE_UNNAMED',
+    );
+    expect(unnamed).toHaveLength(1);
+    expect(unnamed[0]?.message).toContain("also holds 'rascunho'");
+  });
 });
 
 describe("the plugin files' configurations and aliases (TYTO-433, ADR 0151)", () => {

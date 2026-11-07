@@ -506,11 +506,45 @@ describe('configurations and aliases (TYTO-439)', () => {
       await git(pack, 'commit', '--quiet', '-m', 'a second template');
       await machineFile({ aviso: { git: urlOf(pack), ref: 'main' } });
 
-      expect((await render()).code, stderr()).toBe(EXIT_OK);
+      const named = await render();
+      expect(named.code, stderr()).toBe(EXIT_OK);
+      // The pack's other template is named in a warning at the entry that fetched it
+      // (TYTO-615), and the render still succeeds.
+      expect(named.codes).toEqual(['W_PLUGIN_FILE_TEMPLATE_UNNAMED']);
+      expect(stderr()).toMatch(/templates\.yaml:3:3: warning W_PLUGIN_FILE_TEMPLATE_UNNAMED/u);
+      expect(stderr()).toContain("also holds 'aviso-b'; a fetched pack offers only");
+
+      errors = [];
       const unnamed = await render(await briefNaming('aviso-b'));
 
       expect(unnamed.code).toBe(EXIT_DIAGNOSTICS);
       expect(stderr()).toContain('E_UNKNOWN_TEMPLATE');
+      expect(stderr()).toContain("The pack of plugin 'example-pack' holds 'aviso-b'");
+    },
+    SLOW,
+  );
+
+  it(
+    'says nothing about a pack whose every template the file names (TYTO-615)',
+    async () => {
+      const pack = await repository('pack');
+      await cp(join(pack, 'templates', 'aviso'), join(pack, 'templates', 'aviso-b'), {
+        recursive: true,
+      });
+      await edit(join(pack, 'templates', 'aviso-b', 'manifest.yaml'), (text) =>
+        text.replace(/^name: aviso$/mu, 'name: aviso-b'),
+      );
+      await git(pack, 'add', '.');
+      await git(pack, 'commit', '--quiet', '-m', 'a second template');
+      await machineFile({
+        aviso: { git: urlOf(pack), ref: 'main' },
+        'aviso-b': { git: urlOf(pack), ref: 'main' },
+      });
+
+      const rendered = await render(await briefNaming('aviso-b'));
+
+      expect(rendered.code, stderr()).toBe(EXIT_OK);
+      expect(rendered.codes).toEqual([]);
     },
     SLOW,
   );

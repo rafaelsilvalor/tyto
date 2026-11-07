@@ -62,6 +62,14 @@ describe('fetchGalleryIndex', () => {
     expect(fetched.text).toBeUndefined();
     expect(fetched.diagnostics.map((item) => item.code)).toEqual(['E_GALLERY_INDEX_FETCH']);
   });
+
+  it('says the home is too deep, not a stack trace, when its cache folder is refused (TYTO-470)', async () => {
+    const url = await indexRepository('version: 1\nentries: []\n');
+    // One name over 255 characters: every system refuses it, with or without long paths.
+    const fetched = await fetchGalleryIndex(join(root, 'h'.repeat(300)), url);
+    expect(fetched.text).toBeUndefined();
+    expect(fetched.diagnostics.map((item) => item.code)).toEqual(['E_TYTO_HOME_PATH_TOO_LONG']);
+  });
 });
 
 describe('the previews (TYTO-504)', () => {

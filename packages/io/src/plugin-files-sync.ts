@@ -19,6 +19,7 @@ import {
 } from '@tyto/plugin-api';
 
 import { PLUGIN_MANIFEST_FILE, fsPluginStore } from './fs-plugin-store.js';
+import { type HomePathOptions, homePathProblem } from './home-path.js';
 import { pluginFileImages } from './plugin-file-images.js';
 import {
   type FileReadListener,
@@ -72,6 +73,8 @@ export interface PluginFilesSyncOptions {
   readonly onSourceProblem?: SourceProblemListener;
   /** Absent: nobody is asked, and a plugin that needs a yes is left unapproved. */
   readonly approve?: PluginFilesApproval;
+  /** The platform and limit paths under `home` are checked against; the machine's by default. */
+  readonly homePath?: HomePathOptions;
 }
 
 export interface SyncedPluginFiles {
@@ -119,7 +122,30 @@ function fetchedBy(
   });
 }
 
+/**
+ * The sync, or one error when the system refused a path under `TYTO_HOME` for its length: a
+ * home deeper than its check expected says so instead of ending the run in a stack trace
+ * (TYTO-470). Any other failure stays what it is.
+ */
 export async function syncPluginFiles(options: PluginFilesSyncOptions): Promise<SyncedPluginFiles> {
+  try {
+    return await syncBothFolders(options);
+  } catch (cause) {
+    const problem = homePathProblem(cause, options.home, options.homePath?.platform);
+    if (problem === undefined) throw cause;
+    return { ...NO_PLUGIN_FILES, diagnostics: [problem] };
+  }
+}
+
+/** One home, one line: the project's folder and the machine's both stop at the same check. */
+function onceEach(diagnostics: readonly Diagnostic[]): Diagnostic[] {
+  const home = diagnostics.findIndex((item) => item.code === 'E_TYTO_HOME_PATH_TOO_LONG');
+  return diagnostics.filter(
+    (item, index) => item.code !== 'E_TYTO_HOME_PATH_TOO_LONG' || index === home,
+  );
+}
+
+async function syncBothFolders(options: PluginFilesSyncOptions): Promise<SyncedPluginFiles> {
   const { shown } = options;
   const texts = new Map<string, string>();
   const folder = (directory: string) =>
@@ -136,6 +162,7 @@ export async function syncPluginFiles(options: PluginFilesSyncOptions): Promise<
       ...(options.onSourceProblem === undefined
         ? {}
         : { onSourceProblem: options.onSourceProblem }),
+      ...(options.homePath === undefined ? {} : { homePath: options.homePath }),
     });
 
   const projectDirectory =
@@ -147,11 +174,11 @@ export async function syncPluginFiles(options: PluginFilesSyncOptions): Promise<
   const machineDirectory = machinePluginFiles(options.home);
   const machine = await folder(machineDirectory);
   const chosen = chooseCopies(project.copies, machine.copies);
-  const diagnostics: Diagnostic[] = [
+  const diagnostics: Diagnostic[] = onceEach([
     ...project.diagnostics,
     ...machine.diagnostics,
     ...chosen.diagnostics,
-  ];
+  ]);
 
   const copies = chosen.copies.filter((copy) => {
     if (!options.builtInNames.has(copy.plugin)) return true;
