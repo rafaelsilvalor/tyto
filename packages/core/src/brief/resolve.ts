@@ -248,6 +248,46 @@ function markupIn(plain: string): string | undefined {
   return FRONTMATTER_MARKUP.find(([pattern]) => pattern.test(plain))?.[1];
 }
 
+/**
+ * `plain` with every `**…**` and `{key:value}…{/}` that template-kit's `richTextOfPlain`
+ * would draw replaced by its inner text, for a slot whose manifest says `frontmatterMarks`
+ * (TYTO-622). What is left is what that template still shows as written, so `markupIn` on it
+ * warns about exactly that: an italic, a trailing `\`, a `**` that closes nothing.
+ *
+ * A second copy of the kit's subset, and it has to be: `core` may not import the kit. The
+ * rules are the kit's, kept the same: plain inner text, not empty, no line break, and no `{`
+ * inside a mark.
+ */
+function withoutReadMarks(plain: string): string {
+  let rest = '';
+  let at = 0;
+  while (at < plain.length) {
+    if (plain.startsWith('**', at)) {
+      const close = plain.indexOf('**', at + 2);
+      const inner = close < 0 ? '' : plain.slice(at + 2, close);
+      if (inner !== '' && !inner.includes('\n')) {
+        rest += inner;
+        at = close + 2;
+        continue;
+      }
+    }
+    const opening = /^\{([\p{L}\d-]+):([^{}\n]+)\}/u.exec(plain.slice(at));
+    if (opening !== null) {
+      const contentStart = at + opening[0].length;
+      const close = plain.indexOf('{/}', contentStart);
+      const inner = close < 0 ? '' : plain.slice(contentStart, close);
+      if (inner !== '' && !inner.includes('\n') && !inner.includes('{')) {
+        rest += inner;
+        at = close + 3;
+        continue;
+      }
+    }
+    rest += plain[at];
+    at += 1;
+  }
+  return rest;
+}
+
 /** What the brief said a slot is, before the manifest has had its say. */
 interface Candidate {
   readonly name: string;
@@ -538,7 +578,9 @@ class Resolver {
 
     switch (slot.type) {
       case 'rich-text': {
-        const markup = fromFrontmatter ? markupIn(plain) : undefined;
+        const markup = fromFrontmatter
+          ? markupIn(slot.frontmatterMarks === true ? withoutReadMarks(plain) : plain)
+          : undefined;
         if (markup !== undefined) {
           this.report(
             diagnostic(

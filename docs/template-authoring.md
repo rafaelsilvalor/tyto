@@ -113,6 +113,14 @@ These are the rules it enforces beyond the shape:
   `slots.lamina.value` stays the opening text and `slots.imagem` the first picture.
   `blocks` is present only when the manifest declares a `multiple` slot. Only an `image`
   slot that declares `per` may say `multiple`.
+- **`frontmatterMarks: true` says the template draws marks in a frontmatter value**
+  (TYTO-622): `titulo: { type: rich-text, frontmatterMarks: true }` for a template that
+  reads `slots.titulo` through template-kit's `richTextOfPlain` when it came from the
+  frontmatter, and so draws `**…**` and `{key:value}…{/}` there. The host then stops calling
+  that subset literal in `W_MARKUP_IN_FRONTMATTER`; anything outside it still warns.
+  Declare it only when the template really reads the value that way, and only on a
+  `rich-text` slot (anything else is refused). A slot that does not declare it warns as
+  before (`docs/brief-language.md`).
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's
   identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by
   any brief.

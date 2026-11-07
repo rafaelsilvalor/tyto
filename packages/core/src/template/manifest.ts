@@ -75,6 +75,14 @@ export const slotSchema = z
      * never says it parses to the same object it did before.
      */
     multiple: z.boolean().optional(),
+    /**
+     * The template reads `**…**` and `{key:value}…{/}` in a frontmatter value of this
+     * rich-text slot, through template-kit's `richTextOfPlain` (TYTO-554), and draws them.
+     * The host cannot tell that from the outside, so the template says it, and
+     * `W_MARKUP_IN_FRONTMATTER` stops calling that subset literal (TYTO-622). Optional
+     * rather than defaulted, like `multiple`, so a manifest that never says it parses as before.
+     */
+    frontmatterMarks: z.boolean().optional(),
     min: z.number().int().nonnegative().optional(),
     max: z.number().int().positive().optional(),
     /** The accepted values of an `enum` slot, and nothing else's. */
@@ -118,6 +126,16 @@ export const slotSchema = z
           message: `${bound} counts characters on a non-repeatable slot, and a '${slot.type}' slot has none; it is only meaningful on 'rich-text' or with repeat: true`,
         });
       }
+    }
+
+    // Only a rich-text slot has text for a frontmatter value to carry marks in; on any other
+    // kind the key would read like a promise and change nothing.
+    if (slot.frontmatterMarks !== undefined && slot.type !== 'rich-text') {
+      context.addIssue({
+        code: 'custom',
+        path: ['frontmatterMarks'],
+        message: `frontmatterMarks is only meaningful on a 'rich-text' slot, not on '${slot.type}'`,
+      });
     }
 
     if (slot.min !== undefined && slot.max !== undefined && slot.min > slot.max) {

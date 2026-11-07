@@ -21,6 +21,6 @@ Um slot de valor curto e fixo fica mais legível aqui do que no corpo. Três tip
 
 - **Uma escolha de uma lista**, como `tom: verde`. A galeria mostra os valores que cada um aceita e o padrão quando você não escreve nada. Qualquer outro valor dá `E_BAD_SLOT_VALUE`, que diz os valores permitidos.
 - **Uma imagem**, como `imagem: ./photo.png`. O caminho é lido a partir da pasta do brief; se não houver nada lá, a partir de uma pasta `assets` ao lado do brief. Uma imagem que não está em nenhuma das duas dá `E_ASSET_NOT_FOUND`.
-- **Uma linha de texto simples**, como `subtitulo: Saturday, 10 am to 4 pm`. Simples quer dizer simples: negrito, itálico e marcas de cor não são lidos no cabeçalho, e o Tyto avisa com `W_MARKUP_IN_FRONTMATTER`. Texto que precisa de formatação vai no corpo, como [diretiva](./directives.md).
+- **Uma linha de texto simples**, como `subtitulo: Saturday, 10 am to 4 pm`. Simples quer dizer simples: negrito, itálico e marcas de cor não são lidos no cabeçalho, e o Tyto avisa com `W_MARKUP_IN_FRONTMATTER`. Texto que precisa de formatação vai no corpo, como [diretiva](./directives.md). A exceção é um template que desenha `**…**` e `{cor:…}…{/}` num valor do cabeçalho: o manifesto dele declara isso para aquele campo, e então essas duas marcas são desenhadas e não geram aviso.
 
 Um valor com dois-pontos seguidos de espaço, ou que começa com aspas ou colchete, precisa de aspas em volta: `subtitulo: "Aberto: 10h"`.

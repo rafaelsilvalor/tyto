@@ -21,6 +21,6 @@ A slot whose value is short and fixed reads better here than in the body. Three 
 
 - **A choice from a list**, like `tom: verde`. The gallery lists the values each one accepts, and its default when you leave it out. Any other value is `E_BAD_SLOT_VALUE`, which names the values allowed.
 - **An image**, like `imagem: ./photo.png`. The path is read from the folder the brief is in; when nothing is there, from an `assets` folder beside the brief. An image that is in neither is `E_ASSET_NOT_FOUND`.
-- **A line of plain text**, like `subtitulo: Saturday, 10 am to 4 pm`. Plain is the word: bold, italic and colour marks are not read in the frontmatter and Tyto warns with `W_MARKUP_IN_FRONTMATTER`. Text that needs formatting goes in the body, as a [directive](./directives.md).
+- **A line of plain text**, like `subtitulo: Saturday, 10 am to 4 pm`. Plain is the word: bold, italic and colour marks are not read in the frontmatter and Tyto warns with `W_MARKUP_IN_FRONTMATTER`. Text that needs formatting goes in the body, as a [directive](./directives.md). The exception is a template that draws `**…**` and `{cor:…}…{/}` in a frontmatter value itself: its manifest says so for that field, and then those two marks are drawn and not warned about.
 
 A value with a colon followed by a space, or one that starts with a quote or a bracket, needs quotes around it: `subtitulo: "Open: 10 am"`.

@@ -30,7 +30,7 @@ write briefs; this document is the grammar for people who change it.
 
 ## Rules
 
-- **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest; a run's requested formats (`--formats`, the Export dialog) narrow the brief's list and never widen it (ADR 0107). A scalar on a rich-text slot is one run of plain text, and inline markup in it is `W_MARKUP_IN_FRONTMATTER` — see below.
+- **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest; a run's requested formats (`--formats`, the Export dialog) narrow the brief's list and never widen it (ADR 0107). A scalar on a rich-text slot is one run of plain text, and inline markup in it is `W_MARKUP_IN_FRONTMATTER`, unless the slot declares `frontmatterMarks` and the markup is the subset its template draws — see below.
 - **Slot directive** `::name value` — inline value to end of line, or an indented block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
 - **Repeatable directive** (`::lamina`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
 - **A slide's own slot** (`::imagem` after a `::lamina`) — a slot the manifest declares `per: lamina` belongs to the occurrence written last before it, so each slide carries its own picture (ADR 0160). One per slide; before any `::lamina`, a second one for the same slide, or in the frontmatter, it is `E_BAD_SLOT_VALUE`. A `required` one is required on every slide, and `E_MISSING_REQUIRED_SLOT` points at the slide that lacks it. An image resolves like any other: same folders, same `E_ASSET_NOT_FOUND`, at that line.
@@ -338,6 +338,14 @@ templates, the compiler knows a template and nothing about the brief that fed it
   warning and not an error because the brief still means something, and it is not parsed
   because `core` may not import `brief-lang`; parsing it would mean moving the inline layer,
   which is a bigger decision than this one (TYTO-59).
+- **A template that draws marks in the frontmatter opts in, per slot.** A rich-text slot the
+  manifest declares `frontmatterMarks: true` is one whose template reads `**…**` and
+  `{key:value}…{/}` in a frontmatter value itself, through template-kit's `richTextOfPlain`
+  (TYTO-554), and draws them. On such a slot that subset is not `W_MARKUP_IN_FRONTMATTER`;
+  everything else still is, judged on the text with the subset's marks taken out: an italic,
+  a trailing `\`, a mark inside a mark. The host cannot tell from outside whether a template
+  draws marks, so the template says it; every slot that does not say it warns as before
+  (TYTO-622). `frontmatterMarks` on a slot that is not rich text is a manifest error.
 - **The markup detector is deliberately crude, and errs quiet.** It is a second reader of
   the inline syntax rather than the parser itself, so it asks for two asterisks before it
   calls something italic, for a `{/}` before it calls something a mark, and for the
