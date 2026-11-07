@@ -18,15 +18,19 @@ import {
 } from '@tyto/plugin-api';
 import {
   type Cell,
+  type CellView,
   type Plan,
   type RecipeAst,
   type RunClock,
   type StateWrite,
   type Step,
   type Table,
+  type ViewSpecs,
   parseRecipe,
   runRecipe,
 } from '@tyto/recipe';
+
+import { RECIPE_VIEWS } from '../../shared/recipe-views.js';
 
 import { type AppliedRecord, applyCell } from './recipe-apply.js';
 
@@ -90,6 +94,8 @@ export interface RecipeRunnerOptions {
   readonly registries?: (request: RecipeRegistryRequest) => RecipeRegistries;
   readonly state?: (options: RecipeStateOptions) => RecipeState;
   readonly data?: (options: WorkspaceDataOptions) => DataResolver;
+  /** TYTO-379, ADR 0171: the views `show` is checked against; the notebook's when absent. */
+  readonly views?: ViewSpecs;
 }
 
 export interface RecipeRunInput {
@@ -123,6 +129,9 @@ export interface RunnerCell {
   readonly oldestFetchedAt?: string;
   /** The step fetches: a source verb, or a `run` whose recipe holds one (Fetch again's cell). */
   readonly source?: true;
+  // TYTO-379, ADR 0171: views.
+  /** The view the cell is drawn in: the last `show` at or above it, with its arguments. */
+  readonly view?: CellView;
   // TYTO-378, ADR 0170: Apply.
   /** Main's id for the cell's plan, which `apply` names; stamped when the cell planned it. */
   readonly planId?: number;
@@ -162,10 +171,23 @@ export interface RecipeRunner {
    * as kept afterwards, with why it was refused or not remembered. `undefined` for no such cell.
    */
   apply(input: RecipeApplyInput): Promise<RunnerCell | undefined>;
+  /**
+   * TYTO-379, ADR 0171: the whole table the document's cell `index` keeps, for a view that reads
+   * it in pages, with the instant it ran, which a page request must name. `undefined` for no
+   * such cell or one without a table.
+   */
+  table(documentId: string, index: number): KeptTable | undefined;
   /** Every verb a recipe may name: the generic ones and every running plugin's. */
   verbs(): readonly string[];
   /** Forgets a document's cells, when its tab closes. */
   close(documentId: string): void;
+}
+
+/** TYTO-379: a kept cell's whole table, as a view reads it in pages. */
+export interface KeptTable {
+  readonly table: Table;
+  readonly ranAt: string | undefined;
+  readonly view?: CellView;
 }
 
 /** A kept cell: the step it answered for, by signature, and the answer. */
@@ -278,6 +300,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
             resolveData: dataFor(place, directory, dataOf),
             clock,
             state: stateFor(place, request.path, options.home, stateOf),
+            views: options.views ?? RECIPE_VIEWS,
           },
         );
         if (result.ok) {
@@ -349,6 +372,17 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       return queued(request.documentId, () =>
         applyKept(request.documentId, request.index, request.planId, request.path),
       );
+    },
+
+    // TYTO-379, ADR 0171: a view's pages read the table main kept, never a copy the window holds.
+    table(documentId, index) {
+      const cell = kept.get(documentId)?.cells[index];
+      if (cell?.table === undefined) return undefined;
+      return {
+        table: cell.table,
+        ranAt: cell.ranAt,
+        ...(cell.view === undefined ? {} : { view: cell.view }),
+      };
     },
 
     verbs() {
@@ -577,6 +611,7 @@ function keptOf(
     ...(cell.plan === undefined ? {} : { plan: cell.plan }),
     ...(planId === undefined ? {} : { planId }),
     ...(cell.remembers === undefined ? {} : { remembers: cell.remembers }),
+    ...(cell.view === undefined ? {} : { view: cell.view }),
     diagnostics: cell.diagnostics,
     // A skipped cell did not run, so it has no time of its own.
     ...(cell.status === 'skipped' ? {} : { ranAt }),

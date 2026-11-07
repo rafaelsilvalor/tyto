@@ -11,6 +11,8 @@ import {
 import { type Credentials } from './credentials.js';
 import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import type { Table } from '@tyto/recipe';
+
 import { type RecipeApplyInput, type RecipeRunInput, type RecipeRunner } from './recipe-runner.js';
 import { createTemplateFolder } from './session.js';
 import { BUILT_IN_THEMES, builtInThemeSource, createThemeService } from './themes.js';
@@ -697,6 +699,29 @@ const windowThemes = (): WindowThemes => {
  * The recipe runner, recorded (TYTO-377). What it decides is `recipe-runner.test.ts`'s; here
  * the handler has to hand it the tab's own file and echo the id.
  */
+// TYTO-379: the table document-1 keeps at cells 0 (drawn as a Summary) and 1 (a Table).
+const KEPT_RAN_AT = '2026-11-07T10:00:00.000Z';
+const KEPT_TABLE: Table = {
+  columns: [
+    { name: 'key', type: 'text', origin: 'test' },
+    { name: 'note', type: 'text', origin: 'test' },
+    { name: 'points', type: 'number', origin: 'test' },
+  ],
+  rows: (
+    [
+      ['K-1', 'plain', 5],
+      ['K-2', 'with\ttab', 1],
+      ['K-3', 'say "yes" now', 9],
+      ['K-4', 'plain', 3],
+      ['K-5', 'line\nbreak', 7],
+    ] as const
+  ).map(([key, note, points]) => ({
+    key,
+    values: { key, note, points },
+    provenance: { source: 'test', id: key, fetchedAt: KEPT_RAN_AT },
+  })),
+};
+
 const recipeRunner = () => {
   const asked: RecipeRunInput[] = [];
   const closed: string[] = [];
@@ -740,6 +765,14 @@ const recipeRunner = () => {
         ranAt: '2026-10-27T12:00:00.000Z',
       });
     },
+    table: (documentId, index) =>
+      documentId === 'document-1' && index <= 1
+        ? {
+            table: KEPT_TABLE,
+            ranAt: KEPT_RAN_AT,
+            view: { name: index === 0 ? 'summary' : 'table', options: {} },
+          }
+        : undefined,
     verbs: () => ['acme.pull', 'where'],
     close: (documentId) => {
       closed.push(documentId);
@@ -750,7 +783,12 @@ const recipeRunner = () => {
 
 const dependencies = () => {
   const keychain = credentials();
+  const clipboard: string[] = [];
   return {
+    clipboard,
+    writeClipboard: (text: string) => {
+      clipboard.push(text);
+    },
     cli: {
       start: () => ({ runId: 'cli-1' }),
       cancel: () => {},
@@ -1070,6 +1108,84 @@ describe('the tab a message is about (E9.11)', () => {
     expect(injected.recipes.applies).toEqual([
       { documentId: 'document-1', index: 1, planId: 7, path: '/recipes/weekly.recipe' },
       { documentId: 'document-2', index: 0, planId: 1, path: undefined },
+    ]);
+  });
+
+  // TYTO-379, ADR 0171: a view reads the kept table in pages, sorted and filtered in main.
+  it('pages a kept table sorted in main, and leaves the kept rows as the recipe made them', async () => {
+    const handlers = createHandlers(dependencies());
+    const before = KEPT_TABLE.rows.map((row) => row.key);
+    const ask = (offset: number, limit: number) =>
+      handlers['recipe:rows']({
+        documentId: 'document-1',
+        index: 1,
+        ranAt: KEPT_RAN_AT,
+        offset,
+        limit,
+        sort: { column: 'points', direction: 'desc' },
+        columns: ['points', 'key'],
+      });
+
+    const first = await ask(0, 2);
+    const second = await ask(2, 2);
+    const last = await ask(4, 2);
+
+    const keys = (page: Awaited<ReturnType<typeof ask>>) =>
+      'rows' in page ? page.rows.map((row) => row.key) : 'stale';
+    expect(first).toEqual({
+      columns: ['points', 'key'],
+      rows: [
+        { key: 'K-3', values: [9, 'K-3'] },
+        { key: 'K-5', values: [7, 'K-5'] },
+      ],
+      total: 5,
+      matched: 5,
+    });
+    expect(keys(second)).toEqual(['K-1', 'K-4']);
+    expect(keys(last)).toEqual(['K-2']);
+    expect(KEPT_TABLE.rows.map((row) => row.key)).toEqual(before);
+  });
+
+  it('filters with one text, totals a Summary over what it keeps, and refuses a stale run', async () => {
+    const handlers = createHandlers(dependencies());
+    const query = { documentId: 'document-1', ranAt: KEPT_RAN_AT, offset: 0, limit: 10 };
+
+    const summary = await handlers['recipe:rows']({ ...query, index: 0, filter: 'PLAIN' });
+    const table = await handlers['recipe:rows']({ ...query, index: 1, filter: 'plain' });
+
+    expect(summary).toMatchObject({ total: 5, matched: 2, totals: { points: 8 } });
+    expect('totals' in table).toBe(false);
+    expect(
+      await handlers['recipe:rows']({ ...query, index: 1, ranAt: '2026-11-07T09:00:00.000Z' }),
+    ).toEqual({ stale: true });
+    expect(await handlers['recipe:rows']({ ...query, index: 5 })).toEqual({ stale: true });
+  });
+
+  it('copies the rows asked as quoted TSV in main, and answers counts only', async () => {
+    const injected = dependencies();
+    const handlers = createHandlers(injected);
+
+    const answer = await handlers['recipe:copy']({
+      documentId: 'document-1',
+      index: 1,
+      ranAt: KEPT_RAN_AT,
+      offset: 1,
+      limit: 3,
+      sort: { column: 'key', direction: 'asc' },
+      columns: ['key', 'note'],
+    });
+    const stale = await handlers['recipe:copy']({
+      documentId: 'document-1',
+      index: 1,
+      ranAt: 'another run',
+      offset: 0,
+      limit: 1,
+    });
+
+    expect(answer).toEqual({ rows: 3, columns: 2 });
+    expect(stale).toEqual({ stale: true });
+    expect(injected.clipboard).toEqual([
+      'K-2\t"with\ttab"\r\nK-3\t"say ""yes"" now"\r\nK-4\tplain',
     ]);
   });
 

@@ -1785,6 +1785,17 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  // The notebook owns the view names (ADR 0128) and passes them in; a run without the list,
+  // as the CLI's, never answers this (ADR 0171).
+  E_RECIPE_VIEW: {
+    severity: 'error',
+    summary: "A recipe's 'show' names a view the notebook does not draw.",
+    template: "No view named '{view}' is drawn here. Available: {available}.",
+    spec: 'docs/adr/0171-the-recipes-views-read-rows-from-main-in-pages-and-show-checks-its-view.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
+  },
   E_RECIPE_WHERE: {
     severity: 'error',
     summary: "A 'where' expression does not match the filter grammar.",

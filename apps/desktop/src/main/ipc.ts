@@ -14,6 +14,7 @@ import {
   type MenuModel,
   type MenuMove,
   IPC_CHANNEL_NAMES,
+  RECIPE_WIRE_LIMITS,
   parseIpc,
 } from '../../shared/ipc.js';
 import { TAB_EXTENSIONS, isTextFile } from '../../shared/file-icons.js';
@@ -41,8 +42,9 @@ import { type SessionService, type TemplateFolder } from './session.js';
 import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
+import { type RowsQuery, createRowViews, rowsAsTsv, visibleColumns } from './recipe-rows.js';
 import { type RecipeRunner } from './recipe-runner.js';
-import { cellToWire, recipeAnswerToWire } from './recipe-wire.js';
+import { cellToWire, cut, recipeAnswerToWire, valueToWire } from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
 import { type AppliedThemes, type ThemeService, themeVariant } from './themes.js';
@@ -387,6 +389,11 @@ export interface IpcDependencies {
    * forgotten when its tab closes.
    */
   readonly recipes: RecipeRunner;
+  /**
+   * TYTO-379, ADR 0171: writes text to the system clipboard, `clipboard.writeText` in the app.
+   * `recipe:copy` builds the text in main, so a copy of thousands of rows never crosses.
+   */
+  readonly writeClipboard: (text: string) => void;
 }
 
 /** A setting's outline as the contract writes it: the same fields, in arrays of its own. */
@@ -479,7 +486,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     templateFolder,
     templates,
     updates,
+    writeClipboard,
   } = dependencies;
+  // TYTO-379, ADR 0171: one sorted and filtered view per document, as a view pages through it.
+  const rowViews = createRowViews();
 
   return {
     'app:info': () => Promise.resolve(info()),
@@ -550,6 +560,39 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         path: documents.pathOf(documentId),
       });
       return cell === undefined ? {} : { cell: cellToWire(cell) };
+    },
+
+    // TYTO-379, ADR 0171: a view's pages and copies read the table main kept for the cell, and
+    // only while the cell still holds the run the window was shown.
+    'recipe:rows': ({ documentId, index, ranAt, offset, limit, sort, filter, columns }) => {
+      const kept = recipes.table(documentId, index);
+      if (kept === undefined || kept.ranAt !== ranAt) return Promise.resolve({ stale: true });
+      const query: RowsQuery = { sort, filter, columns };
+      const view = rowViews.view(documentId, index, ranAt, kept.table, query);
+      const shown = visibleColumns(kept.table, columns).slice(0, RECIPE_WIRE_LIMITS.columns);
+      return Promise.resolve({
+        columns: shown.map((column) => cut(column.name)),
+        rows: view.permutation.slice(offset, offset + limit).map((at) => {
+          const row = kept.table.rows[at];
+          return {
+            key: cut(row?.key ?? ''),
+            values: shown.map((column) => valueToWire(row?.values[column.name])),
+          };
+        }),
+        total: kept.table.rows.length,
+        matched: view.permutation.length,
+        ...(kept.view?.name === 'summary' ? { totals: { ...view.totals } } : {}),
+      });
+    },
+
+    'recipe:copy': ({ documentId, index, ranAt, offset, limit, sort, filter, columns }) => {
+      const kept = recipes.table(documentId, index);
+      if (kept === undefined || kept.ranAt !== ranAt) return Promise.resolve({ stale: true });
+      const view = rowViews.view(documentId, index, ranAt, kept.table, { sort, filter, columns });
+      const shown = visibleColumns(kept.table, columns);
+      const end = Math.min(offset + limit, view.permutation.length);
+      writeClipboard(rowsAsTsv(kept.table, view.permutation, offset, end, shown));
+      return Promise.resolve({ rows: Math.max(0, end - offset), columns: shown.length });
     },
 
     // TYTO-274, ADR 0125: a label inside the open folder is relative to it, so every open tab is
@@ -675,6 +718,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       documents.close(documentId);
       // A recipe's cells die with its tab (ADR 0148): nothing of them outlives the document.
       recipes.close(documentId);
+      rowViews.forget(documentId);
       // Awaited: a settings tab closed unsaved may still owe the file a screen's change.
       await settings.closed(documentId);
       return {};
