@@ -1,5 +1,37 @@
 # @tyto/command-line
 
+## 0.2.8
+
+### Patch Changes
+
+- 97c8598: An action or a sink may register `apply` (TYTO-378, ADR 0170). `apply(request)` is handed one
+  batch of at most 100 operations of the plan a person was shown (`APPLY_BATCH`), with the
+  step's arguments, the plan's target and the plugin's section, and answers one
+  `{ status, reason? }` per operation in the same order. A planned operation may carry the
+  plugin's own `payload`, which now crosses the isolation boundary. `recipeRegistriesOf` gives
+  such a verb `apply(plan)`: before any call it looks the verb up again and checks the kept plan
+  against the writes the verb declares now, refusing the whole Apply with `E_RECIPE_APPLY`; it
+  maps each answer onto the shown plan's row and stamps `appliedAt` from its own clock (the new
+  `now` option); a batch with no readable answer is `failed` with `APPLY_NO_ANSWER` and every
+  later batch `skipped`. **Breaking for plugins: the isolation protocol is 16**, so a plugin
+  process on 15 is refused at `hello`; a plugin that registers `apply` writes
+  `"engine": ">=0.15"`. The example recipe plugin's `example.mark` applies its plan into its
+  private cache. `@tyto/command-line` changes only a test.
+- Updated dependencies [97c8598]
+- Updated dependencies [6b193ff]
+- Updated dependencies [fb529a1]
+  - @tyto/plugin-api@0.15.0
+  - @tyto/core@0.41.0
+  - @tyto/export-html@0.7.15
+  - @tyto/export-svg@2.0.15
+  - @tyto/google-fonts@0.1.14
+  - @tyto/io@5.3.1
+  - @tyto/pipeline@0.12.11
+  - @tyto/fonts@0.5.0
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.14
+  - @tyto/templates@1.2.9
+
 ## 0.2.7
 
 ### Patch Changes
