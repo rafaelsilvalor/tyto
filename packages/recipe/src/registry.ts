@@ -4,7 +4,7 @@ import type { RecipeAst, Step } from './ast.js';
 import type { RunClock } from './clock.js';
 import type { DataResolver } from './data.js';
 import type { Plan } from './plan.js';
-import type { RecipeState, StateWrite } from './state.js';
+import type { ApplyOutcome, RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
 import { genericVerbs } from './verbs.js';
 
@@ -75,11 +75,21 @@ export type VerbResult = Result<VerbOutput, readonly Diagnostic[]>;
 export interface Verb {
   readonly kind: VerbKind;
   run(context: VerbContext): VerbResult | Promise<VerbResult>;
+  /**
+   * An action's or a sink's: carries out operations of a plan its `run` answered, exactly as
+   * shown (ADR 0129 decision 2, ADR 0170). The host hands them over in batches, after checking
+   * them again against the writes the verb declares now, and reads one answer per operation in
+   * the order given. The answer's `rowKey` and `appliedAt` are not trusted: the host takes the
+   * row from the shown plan and the time from its own clock. An operation whose target moved
+   * since the plan answers `failed` with a reason, and the others still run.
+   */
+  apply?(plan: Plan): Promise<Result<ApplyOutcome, readonly Diagnostic[]>>;
 }
 
 /** The verbs Tyto owns. A contributed verb is namespaced, so it can never take one of these. */
 export const GENERIC_VERBS = [
   'param',
+  'apply',
   'run',
   'where',
   'select',
@@ -161,8 +171,8 @@ function createRegistry<Entry>(
 /**
  * A registry holding the generic verbs, to which plugins add theirs. Only a namespaced name
  * (`jira.pull`) can be registered: bare names are Tyto's vocabulary, and a plugin that could
- * take `where` would change what every shared recipe means. `param` is in the vocabulary and
- * not in the registry, because the parser reads it and it is never a cell.
+ * take `where` would change what every shared recipe means. `param` and `apply` are in the
+ * vocabulary and not in the registry, because the parser reads them and they are never cells.
  */
 export function createVerbRegistry(): VerbRegistry {
   const registry = createRegistry<Verb>('verb', (name) =>

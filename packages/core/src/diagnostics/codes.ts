@@ -1747,6 +1747,17 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
   },
+  // Apply runs the plan as shown, so a kept plan the verb's current writes no longer cover is
+  // refused whole, before any call, rather than applied in part (ADR 0170).
+  E_RECIPE_APPLY: {
+    severity: 'error',
+    summary:
+      'An Apply was refused before any write: the shown plan holds a write its verb no longer declares, or the verb cannot apply.',
+    template: "Applying the plan of '{verb}' was refused: {problem}.",
+    spec: 'docs/adr/0170-apply-runs-the-shown-plan-in-batches-and-commits-state-from-every-plans-outcome.md',
+    fatal: false,
+    fatality: 'Nothing of that plan is written, and no recipe state is committed.',
+  },
   E_RECIPE_VERB: {
     severity: 'error',
     summary: 'A verb a plugin contributes could not do its work, in its own words.',

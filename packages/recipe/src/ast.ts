@@ -39,5 +39,10 @@ export interface RecipeAst {
   readonly name: string;
   readonly description: string;
   readonly params: readonly RecipeParam[];
+  /**
+   * `auto` when the header says `apply auto`: an explicit Run in a trusted folder applies the
+   * plans without a click (ADR 0129 decision 4, ADR 0170). Absent otherwise.
+   */
+  readonly apply?: 'auto';
   readonly steps: readonly Step[];
 }

@@ -23,7 +23,9 @@ import type { Argument, NamedArgument, RecipeAst, RecipeParam, Step } from './as
  * show table
  * ```
  *
- * A header names the recipe and `|` lines describe it; `param` lines declare what varies;
+ * A header names the recipe and `|` lines describe it; `apply auto` in the header lets an
+ * explicit Run in a trusted folder apply its plans without a click (ADR 0170); `param` lines
+ * declare what varies;
  * every other line is one verb and its arguments, and so one cell. `#` starts a comment line.
  * It is a line format and not a grammar on purpose: a one-step change is a one-line diff,
  * and the chain of verbs is what the person reads.
@@ -34,6 +36,7 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
   const steps: Step[] = [];
   const description: string[] = [];
   let name: string | undefined;
+  let apply: 'auto' | undefined;
 
   for (const line of linesOf(text)) {
     const content = line.text.trim();
@@ -55,7 +58,7 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
     }
 
     if (content.startsWith('|')) {
-      if (steps.length > 0 || params.length > 0) {
+      if (steps.length > 0 || params.length > 0 || apply !== undefined) {
         syntax("a '|' description line belongs right under the 'recipe' line");
       } else {
         description.push(content.slice(1).trim());
@@ -66,6 +69,18 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
     const verb = /^\S+/u.exec(content)?.[0] ?? '';
     if (verb === 'recipe') {
       syntax("a file holds one recipe, so 'recipe' appears once, on its first line");
+      continue;
+    }
+    if (verb === 'apply') {
+      if (!/^apply\s+auto$/u.test(content)) {
+        syntax("the header line 'apply' takes one word, auto, as in 'apply auto'");
+      } else if (steps.length > 0) {
+        syntax("'apply auto' belongs in the header, before the first step");
+      } else if (apply !== undefined) {
+        syntax("'apply auto' is written once");
+      } else {
+        apply = 'auto';
+      }
       continue;
     }
     if (verb === 'param') {
@@ -110,7 +125,13 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
   }
   problems.push(...undeclaredPlaceholders(steps, params));
   if (problems.length > 0 || name === undefined) return err(problems);
-  return ok({ name, description: description.join('\n'), params, steps });
+  return ok({
+    name,
+    description: description.join('\n'),
+    params,
+    ...(apply === undefined ? {} : { apply }),
+    steps,
+  });
 }
 
 interface Line {

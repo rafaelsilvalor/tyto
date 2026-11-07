@@ -48,6 +48,12 @@ export interface Cell {
   readonly table?: Table;
   /** An action's or a sink's plan, shown under the cell; nothing was written (ADR 0129). */
   readonly plan?: Plan;
+  /**
+   * What this cell asked `remember` to store, a `run` cell's being everything its recipe did.
+   * Held by the cell so a host that reuses it on a later run, without running it, still has
+   * its writes to commit (ADR 0170). Present only when there are some.
+   */
+  readonly remembers?: readonly StateWrite[];
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -129,13 +135,15 @@ export async function runRecipe(
     table = outcome.value.table;
     view = outcome.value.view ?? view;
     keeps.push(...(outcome.value.keeps ?? []));
-    remembers.push(...(outcome.value.remembers ?? []));
+    const cellRemembers = outcome.value.remembers ?? [];
+    remembers.push(...cellRemembers);
     const { plan } = outcome.value;
     cells.push({
       step: written,
       status: 'ok',
       table,
       ...(plan === undefined ? {} : { plan }),
+      ...(cellRemembers.length === 0 ? {} : { remembers: cellRemembers }),
       diagnostics: outcome.diagnostics,
     });
     diagnostics.push(...outcome.diagnostics);
