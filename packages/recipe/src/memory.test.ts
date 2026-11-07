@@ -175,6 +175,25 @@ describe('the state in an included recipe', () => {
     expect(column(table, 'last_status')).toEqual([null, 'review', null]);
     expect(ran.remembers).toHaveLength(3);
   });
+
+  it('holds each cell its own writes, a `run` cell those of its recipe, which commit alone', async () => {
+    const { run: ran, errors } = await run(
+      ['remember sync columns=status when="status = done"', 'select key, status', 'run inner'],
+      SHEET,
+      memoryState(),
+      { inner: 'recipe inner\nremember parents columns=status when="status = todo"' },
+    );
+    expect(errors).toEqual([]);
+    const [own, plain, included] = ran.cells;
+    expect(own?.remembers?.map(({ store, key }) => [store, key])).toEqual([['sync', 'T-1']]);
+    expect(plain !== undefined && 'remembers' in plain).toBe(false);
+    expect(included?.remembers?.map(({ store, key }) => [store, key])).toEqual([
+      ['parents', 'T-2'],
+    ]);
+    // A host that reuses the cells without running them commits the same as the run's own list.
+    const reused = ran.cells.flatMap((cell) => cell.remembers ?? []);
+    expect(stateToCommit(reused, applied)).toEqual(stateToCommit(ran.remembers, applied));
+  });
 });
 
 describe('stateToCommit', () => {
@@ -224,6 +243,43 @@ describe('stateToCommit', () => {
 
   it('commits nothing when an operation that stands for no row failed', () => {
     expect(stateToCommit(remembers, { operations: [{ status: 'failed' }] })).toEqual([]);
+  });
+
+  it("stamps an applied row's puts with the latest time its operations applied", () => {
+    const commits = stateToCommit(remembers, {
+      operations: [
+        { rowKey: 'T-1', status: 'applied', appliedAt: '2026-11-07T10:00:00.000Z' },
+        { rowKey: 'T-1', status: 'applied', appliedAt: '2026-11-07T10:00:02.000Z' },
+        { rowKey: 'T-1', status: 'applied', appliedAt: '2026-11-07T10:00:01.000Z' },
+        { rowKey: 'T-3', status: 'failed', reason: 'T-3 moved to done since the plan' },
+      ],
+    });
+    const stamp = '2026-11-07T10:00:02.000Z';
+    expect(commits).toEqual([
+      {
+        store: 'sync',
+        puts: [
+          { key: 'T-0', values: { status: 'doing' } },
+          { key: 'T-1', values: { status: 'done', applied_at: stamp } },
+        ],
+        deletes: ['T-2'],
+      },
+      {
+        store: 'parents',
+        puts: [{ key: 'P-1', values: { status: 'review', applied_at: stamp } }],
+        deletes: [],
+      },
+    ]);
+  });
+
+  it('commits nothing when a failure stamped with no row sits beside applied ones', () => {
+    const outcome: ApplyOutcome = {
+      operations: [
+        { rowKey: 'T-0', status: 'applied', appliedAt: '2026-11-07T10:00:00.000Z' },
+        { status: 'failed', reason: 'the sheet was renamed' },
+      ],
+    };
+    expect(stateToCommit(remembers, outcome)).toEqual([]);
   });
 
   it('folds writes to one key in order: puts merge, a forget starts it over', () => {

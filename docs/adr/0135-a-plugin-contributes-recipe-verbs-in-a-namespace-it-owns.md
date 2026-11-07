@@ -70,6 +70,12 @@ description }], count }`, minimal on purpose. TYTO-378 adds `apply` and may only
     the table the verb read does not hold. The table passes through an action or a sink
     unchanged, so a cell after it reads the same rows.
 
+    > **Amended by ADR 0170 (TYTO-378, 2026-11-07).** An operation gains `payload?`, the
+    > plugin's own JSON for applying it as shown, at most 2,048 bytes (`maxPayloadBytes`), and a
+    > verb gains `apply`. The apply contribution changes a message's shape, so its pull request
+    > bumps the protocol from 15 to 16: decision 8 kept the version only because no message
+    > changed shape, and that is the precedent it follows.
+
 ## Consequences
 
 - TYTO-376 ships in two pull requests. The first carries decisions 1–8: sources, transforms,

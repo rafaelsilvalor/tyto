@@ -23,6 +23,10 @@ because Jira has no "go to status X".
 4. **A scheduled recipe applies without a click only when** its header says `apply auto` **and**
    the workspace is trusted (ADR 0111). A restricted folder's recipe always stops at the plan.
 
+   > **Amended by ADR 0170 (TYTO-378, 2026-11-07).** Tyto has no scheduler yet, so for now
+   > "scheduled" means the notebook: `apply auto` applies without a click only on an explicit
+   > Run in a trusted folder. A scheduler, when it comes, follows the same two conditions.
+
 ## Consequences
 
 - A designer can run a colleague's recipe and see exactly what it would change before anything

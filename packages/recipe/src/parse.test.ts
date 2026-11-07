@@ -64,6 +64,10 @@ describe('parseRecipe', () => {
     ['a parameter declared twice', 'recipe x\nparam a\nparam a = 1', 'param a = 1', 'twice'],
     ['a parameter without a name', 'recipe x\nparam = 1', 'param = 1', "'param <name>'"],
     ['a description after a step', 'recipe x\nshow table\n| late', '| late', 'right under'],
+    ['apply with another word', 'recipe x\napply always', 'apply always', "'apply auto'"],
+    ['apply with no word', 'recipe x\napply', 'apply', 'takes one word, auto'],
+    ['apply auto twice', 'recipe x\napply auto\napply auto', 'apply auto', 'written once'],
+    ['apply auto after a step', 'recipe x\nshow table\napply auto', 'apply auto', 'header'],
   ])('refuses %s, at the line that is wrong', (_case, source, wrong, message) => {
     const parsed = parseRecipe(source);
     expect(parsed.ok).toBe(false);
@@ -89,5 +93,16 @@ where b matches "\p{Lu}\P{Nd}\u{FF}{a}"`;
     const parsed = parseRecipe(source);
     if (!parsed.ok) throw new Error(parsed.error.map(({ message }) => message).join('\n'));
     expect(parsed.value.steps[0]?.text).toContain(String.raw`\p{Lu}`);
+  });
+
+  it("reads 'apply auto' in the header as the recipe's apply, and leaves it absent otherwise", () => {
+    const source = 'recipe x\n  | Moves the cards.\napply   auto\nparam a = 1\nshow table';
+    const parsed = parseRecipe(source);
+    if (!parsed.ok) throw new Error(parsed.error.map(({ message }) => message).join('\n'));
+    expect(parsed.value.apply).toBe('auto');
+    expect(parsed.value.description).toBe('Moves the cards.');
+    expect(parsed.value.steps.map((step) => step.verb)).toEqual(['show']);
+    const plain = parseRecipe('recipe x\nshow table');
+    expect(plain.ok && 'apply' in plain.value).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type Plan, type PlanContext, checkPlan } from './plan.js';
+import { PLAN_LIMITS, type Plan, type PlanContext, checkPlan } from './plan.js';
 import type { Table } from './table.js';
 
 const TABLE: Table = {
@@ -44,7 +44,11 @@ describe('checkPlan', () => {
       "'test.mark' answered a plan that names no target.",
     );
     expect(
-      problemOf(planOf([...one, ...one, ...one]), { maxOperations: 2, maxDescriptionLength: 10 }),
+      problemOf(planOf([...one, ...one, ...one]), {
+        ...PLAN_LIMITS,
+        maxOperations: 2,
+        maxDescriptionLength: 10,
+      }),
     ).toBe("'test.mark' answered a plan that has 3 operations, over 2.");
   });
 
@@ -57,12 +61,31 @@ describe('checkPlan', () => {
           { write: 'mark', description: '' },
           { write: 'mark', description: 'x'.repeat(11) },
         ]),
-        { maxOperations: 10, maxDescriptionLength: 10 },
+        { ...PLAN_LIMITS, maxOperations: 10, maxDescriptionLength: 10 },
       ),
     ).toBe(
       "'test.mark' answered a plan that operation 1 writes 'delete', and the verb declares " +
         "mark; operation 2 names the row 'T-9', which the table does not hold; operation 3 has " +
         'no description; operation 4 has a description of 11 characters, over 10.',
+    );
+  });
+
+  it('passes a payload at the ceiling and refuses one a byte past it, counted as UTF-8', () => {
+    // `"é…"` is two quotes and two bytes per letter: 20 letters are 42 bytes of JSON.
+    const limits = { ...PLAN_LIMITS, maxPayloadBytes: 42 };
+    const at = { write: 'mark', rowKey: 'T-1', description: 'Mark', payload: 'é'.repeat(20) };
+    const checked = checkPlan(planOf([at]), CONTEXT, limits);
+    expect(checked.ok && checked.value.operations[0]?.payload).toBe('é'.repeat(20));
+    expect(problemOf(planOf([{ ...at, payload: 'é'.repeat(20) + 'x' }]), limits)).toBe(
+      "'test.mark' answered a plan that operation 1 has a payload of 43 bytes, over 42.",
+    );
+  });
+
+  it('holds a payload to 2,048 bytes by default', () => {
+    expect(PLAN_LIMITS.maxPayloadBytes).toBe(2048);
+    const payload = { target: 'T-9', read: 'x'.repeat(2048) };
+    expect(problemOf(planOf([{ write: 'mark', description: 'Mark', payload }]))).toBe(
+      "'test.mark' answered a plan that operation 1 has a payload of 2074 bytes, over 2048.",
     );
   });
 });

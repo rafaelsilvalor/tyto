@@ -91,3 +91,13 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
   is the declared limitation of decisions 3 and 8, and a later card's.
 - The store has no ceiling, like the plugin cache (ADR 0130): it holds a row's few values per
   key, and a flow's rows are hundreds.
+
+  > **Amended by TYTO-378 (2026-11-07).** The sentence above is wrong: the adapter
+  > `recipeStateStore` (`@tyto/io`, #190) refuses a store file over **32 MiB**, the per-entry
+  > ceiling of ADR 0138. A row's few values stay far under it.
+
+> **Amended by ADR 0170 (TYTO-378, 2026-11-07).** Decision 4 is wired to Apply: the outcome
+> covers every plan cell of the run, a plan never applied counting as `skipped`, and nothing is
+> committed while a cell is stale or failed. `stateToCommit` also merges `applied_at`, the latest
+> time the host stamped on a row's applied operations, into that row's puts, so a later run
+> reads `last_applied_at`. `AppliedOperation` gains `reason?` and `appliedAt?`.

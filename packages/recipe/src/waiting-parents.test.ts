@@ -6,7 +6,7 @@ import { EXPIRY, PARENT_RULES } from './__fixtures__/parents.js';
 import { column, memoryState, runWithState as run } from './__fixtures__/state-harness.js';
 import type { RunClock } from './clock.js';
 import type { Verb } from './registry.js';
-import { stateToCommit } from './state.js';
+import { type ApplyOutcome, stateToCommit } from './state.js';
 import type { CellValue, Table } from './table.js';
 
 /**
@@ -85,8 +85,60 @@ const FILES = {
   },
 };
 
+/**
+ * Stands in for the tracker plugin's sink that pushes each artwork task (TYTO-386, not built): one
+ * `push` per row, which a test's apply outcome then applies or fails.
+ */
+const push: Verb = {
+  kind: 'sink',
+  run: ({ table }) => {
+    const input = table ?? { columns: [], rows: [] };
+    const operations = input.rows.map((row) => ({
+      write: 'push',
+      rowKey: row.key,
+      description: `Push ${row.key}`,
+    }));
+    return ok({ table: input, plan: { target: 'tracker', operations, count: operations.length } });
+  },
+};
+
+/**
+ * Pushes the artwork tasks of `input` in a run of their own and commits it as the host would
+ * after Apply (ADR 0170): an applied push stamps the row's `applied_at`, a failed one leaves the
+ * row as it was. Buraqueira read "did it reach the tracker?" from the same run; a recipe reads it
+ * from the last applied one.
+ */
+async function pushArtwork(
+  state: ReturnType<typeof memoryState>,
+  input: Table,
+  result: 'applied' | 'failed',
+) {
+  const ran = await run(
+    ['test.push', 'remember pushed columns=status'],
+    input,
+    state,
+    {},
+    { verbs: { 'test.push': push } },
+  );
+  expect(ran.errors).toEqual([]);
+  const plan = ran.run.cells[0]?.plan;
+  const outcome: ApplyOutcome = {
+    operations: (plan?.operations ?? []).map(({ rowKey = '' }) =>
+      result === 'applied'
+        ? { rowKey, status: 'applied', appliedAt: '2026-09-30T18:00:00.000Z' }
+        : { rowKey, status: 'failed', reason: 'the tracker refused it' },
+    ),
+  };
+  for (const commit of stateToCommit(ran.run.remembers, outcome)) {
+    await state.write(commit.store, commit.puts, commit.deletes);
+  }
+}
+
 const WAITING_PARENTS = [
-  'where status = done AND reached = yes',
+  'last pushed columns=applied_at',
+  'where status = done AND last_applied_at is not empty',
+  // EXPIRY's own `last` adds `last_stored_at` again.
+  'select without=last_applied_at,last_stored_at',
   'recall waiting by=parent mark=recalled',
   'test.refetch',
   'rules into=decision using=@./parents.json#/decision',
@@ -97,12 +149,12 @@ const WAITING_PARENTS = [
 ];
 
 /** The artwork task `T-0` in `status`, under the parent `P-100`. */
-function artwork(status: string, reached: 'yes' | 'no' = 'yes'): Table {
-  return tasks(['status', 'reached', 'parent'], [[status, reached, 'P-100']]);
+function artwork(status: string): Table {
+  return tasks(['status', 'parent'], [[status, 'P-100']]);
 }
 
 /** The sheet once the artwork task has left it. */
-const EMPTY_SHEET = tasks(['status', 'reached', 'parent'], []);
+const EMPTY_SHEET = tasks(['status', 'parent'], []);
 
 const START = Date.parse('2026-10-01T09:00:00Z');
 const HOUR = 3_600_000;
@@ -113,14 +165,21 @@ function after(hours: number): RunClock {
 
 /**
  * One run at `hours` after the first, committing what it remembers as an applied plan would, or
- * nothing at all when `dryRun` stands for a run whose plan was never applied.
+ * nothing at all when `dryRun` stands for a run whose plan was never applied. The input's
+ * artwork tasks were pushed before it, and that push `applied` or `failed`.
  */
 async function runOnce(
   state: ReturnType<typeof memoryState>,
   tracker: Tracker,
   input: Table,
-  { hours = 0, dryRun = false, lines = WAITING_PARENTS } = {},
+  {
+    hours = 0,
+    dryRun = false,
+    lines = WAITING_PARENTS,
+    pushed = 'applied' as 'applied' | 'failed',
+  } = {},
 ) {
+  await pushArtwork(state, input, pushed);
   const ran = await run(
     lines,
     input,
@@ -164,6 +223,9 @@ describe('waiting parents, ported from processar_pais', () => {
     const first = await runOnce(state, tracker, artwork('done'));
     expect(column(first, 'decision')).toEqual(['wait-animation']);
     expect(column(first, 'move')).toEqual([null]);
+    expect(stored(state, 'pushed')).toEqual({
+      'T-0': { status: 'done', applied_at: '2026-09-30T18:00:00.000Z' },
+    });
     expect(stored(state, 'waiting')).toEqual({
       'P-100': { since: '2026-10-01 09:00', decision: 'wait-animation' },
     });
@@ -197,7 +259,10 @@ describe('waiting parents, ported from processar_pais', () => {
 
   it('design_que_ainda_nao_chegou_nao_move_a_pai: an artwork the tracker lacks moves nothing', async () => {
     const state = memoryState();
-    const table = await runOnce(state, parentWithAnimation('doing', true), artwork('done', 'no'));
+    const table = await runOnce(state, parentWithAnimation('doing', true), artwork('done'), {
+      pushed: 'failed',
+    });
+    expect(stored(state, 'pushed')).toEqual({});
     expect(column(table, 'key')).toEqual([]);
     expect(stored(state, 'waiting')).toEqual({});
   });
@@ -237,6 +302,6 @@ describe('waiting parents, ported from processar_pais', () => {
       dryRun: true,
     });
     expect(column(table, 'move')).toEqual([['doing', 'to-post']]);
-    expect(state.stores.size).toBe(0);
+    expect([...state.stores.keys()]).toEqual(['pushed']);
   });
 });

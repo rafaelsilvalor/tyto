@@ -20,7 +20,7 @@ export { PAGE_LIMITS, pagedSource } from './paging.js';
 export { parseRecipe } from './parse.js';
 export type { CompiledPattern } from './pattern.js';
 export { PATTERN_DIALECT, PATTERN_LIMITS, boundedInput, compilePattern } from './pattern.js';
-export type { Plan, PlanContext, PlanLimits, PlannedOperation } from './plan.js';
+export type { JsonValue, Plan, PlanContext, PlanLimits, PlannedOperation } from './plan.js';
 export { PLAN_LIMITS, checkPlan } from './plan.js';
 export type {
   Derivation,
@@ -46,7 +46,7 @@ export type {
   StateWrite,
   StoredEntry,
 } from './state.js';
-export { stateToCommit } from './state.js';
+export { APPLIED_AT, stateToCommit } from './state.js';
 export type { Summary } from './summary.js';
 export { summarize } from './summary.js';
 export type { CellValue, Column, ColumnType, Provenance, Row, Table } from './table.js';

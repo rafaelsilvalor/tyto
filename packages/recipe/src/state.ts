@@ -72,7 +72,8 @@ export type StateWrite =
 
 /**
  * How an apply went, operation by operation, as much of it as deciding the state needs. The
- * apply itself is TYTO-378's, which hands this over and may add fields, never remove one.
+ * host builds it from every plan cell of the run, in the shown plans' order (ADR 0170). Fields
+ * may be added, never removed.
  */
 export interface ApplyOutcome {
   readonly operations: readonly AppliedOperation[];
@@ -81,8 +82,15 @@ export interface ApplyOutcome {
 export interface AppliedOperation {
   /** The row the planned operation stood for, when it stood for one. */
   readonly rowKey?: string;
-  /** `skipped` is an operation an earlier failure stopped; it did not happen either. */
+  /**
+   * `skipped` did not happen either: an earlier failure stopped it, or its plan was never
+   * applied.
+   */
   readonly status: 'applied' | 'failed' | 'skipped';
+  /** Why it failed or was skipped, in the plugin's or the host's words. */
+  readonly reason?: string;
+  /** ISO 8601 in UTC, from the host's clock when the plugin answered that it applied. */
+  readonly appliedAt?: string;
 }
 
 /** One store's writes, in the shape {@link RecipeState.write} takes. */
@@ -101,6 +109,10 @@ export interface StateCommit {
  *
  * Writes to one key fold in order: puts merge, a forget drops what came before it, and a put
  * after a forget starts the entry over (the key is deleted, then put).
+ *
+ * A put of a row whose operations applied also stores {@link APPLIED_AT}, the latest time the
+ * host stamped on them, so a later run reads `last_applied_at` (ADR 0170). A row no operation
+ * stood for is stored without it: nothing was applied for it.
  */
 export function stateToCommit(
   remembers: readonly StateWrite[],
@@ -110,6 +122,7 @@ export function stateToCommit(
   const unapplied = outcome.operations.filter((operation) => operation.status !== 'applied');
   if (unapplied.some((operation) => operation.rowKey === undefined)) return [];
   const failedRows = new Set(unapplied.map((operation) => operation.rowKey));
+  const appliedAt = latestAppliedAt(outcome);
 
   const stores = new Map<
     string,
@@ -123,7 +136,10 @@ export function stateToCommit(
     if (write.kind === 'forget') {
       keys.set(write.key, { forget: true });
     } else {
-      keys.set(write.key, { ...folded, values: { ...folded.values, ...write.values } });
+      const values = { ...folded.values, ...write.values };
+      const stamp = appliedAt.get(write.rowKey);
+      if (stamp !== undefined) values[APPLIED_AT] = stamp;
+      keys.set(write.key, { ...folded, values });
     }
   }
 
@@ -134,4 +150,20 @@ export function stateToCommit(
       .map(([key, folded]) => ({ key, values: folded.values ?? {} })),
     deletes: [...keys].filter(([, folded]) => folded.forget).map(([key]) => key),
   }));
+}
+
+/** The column an applied row's put carries: when the host saw its operations apply. */
+export const APPLIED_AT = 'applied_at';
+
+/** By row key, the latest `appliedAt` of that row's applied operations. */
+function latestAppliedAt(outcome: ApplyOutcome): ReadonlyMap<string, string> {
+  const latest = new Map<string, string>();
+  for (const operation of outcome.operations) {
+    const { rowKey, appliedAt } = operation;
+    if (operation.status !== 'applied' || rowKey === undefined || appliedAt === undefined) continue;
+    const known = latest.get(rowKey);
+    // ISO 8601 in UTC from one clock orders as text.
+    if (known === undefined || appliedAt > known) latest.set(rowKey, appliedAt);
+  }
+  return latest;
 }
