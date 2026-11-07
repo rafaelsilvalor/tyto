@@ -865,6 +865,12 @@ export const IPC_CHANNELS = {
       completion: z.object({
         manifest: templateManifestSchema.optional(),
         directives: z.array(z.string().min(1).max(200)).max(500),
+        /**
+         * The formats the name's configuration restricts it to (TYTO-475), absent when the
+         * manifest's stand: the editor's "did you mean" for a format offers only these
+         * (TYTO-473).
+         */
+        formats: z.array(z.string().min(1).max(200)).max(500).optional(),
       }),
     }),
   ),

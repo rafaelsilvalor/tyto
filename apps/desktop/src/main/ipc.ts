@@ -506,6 +506,9 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
             ? {}
             : { manifest: result.completion.manifest }),
           directives: [...result.completion.directives],
+          ...(result.completion.formats === undefined
+            ? {}
+            : { formats: [...result.completion.formats] }),
         },
       };
     },

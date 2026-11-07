@@ -97,6 +97,12 @@ export interface PreviewCompletion {
   /** Absent when the brief does not parse or names a template the registry lacks. */
   readonly manifest?: TemplateManifest;
   readonly directives: readonly string[];
+  /**
+   * The formats the name's configuration restricts it to (ADR 0155 decision 6), absent when
+   * the manifest's stand — the allowed set `resolve` checks, so the editor's "did you mean"
+   * cannot offer a format the render refuses (TYTO-473).
+   */
+  readonly formats?: readonly string[];
 }
 
 export interface PreviewServiceOptions {
@@ -215,9 +221,19 @@ export async function createPreviewService(
       const ast = parseBrief(brief);
       if (!ast.ok) return failed(ast.error);
 
+      // An alias reaches its template's manifest, as `resolve` does (TYTO-433), and carries
+      // its configuration's restriction with it (TYTO-473).
       const named = ast.value.frontmatter.data['template'];
-      const manifest = typeof named === 'string' ? templates.get(named.trim()) : undefined;
-      if (manifest !== undefined) completion = { ...completion, manifest };
+      const selection = typeof named === 'string' ? configurations.select(named.trim()) : undefined;
+      const manifest =
+        typeof named === 'string' ? templates.get(selection?.template ?? named.trim()) : undefined;
+      if (manifest !== undefined) {
+        completion = {
+          ...completion,
+          manifest,
+          ...(selection?.formats === undefined ? {} : { formats: selection.formats }),
+        };
+      }
 
       // Built per preview, because the folder is a property of what is open rather than of
       // the service. `confine` stays on, its default: a brief is often written by something

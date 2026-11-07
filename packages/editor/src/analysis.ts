@@ -10,6 +10,8 @@ import {
 } from '@tyto/core';
 import { parseBrief } from '@tyto/brief-lang';
 
+import type { TemplateAliasTarget } from './template-aliases.js';
+
 /**
  * What the editor knows about the brief in front of it, and who is allowed to work it out.
  *
@@ -34,6 +36,18 @@ export interface BriefAnalysis {
   readonly manifest?: TemplateManifest;
   /** Every template name the registry knows, for completing `template:` in the frontmatter. */
   readonly templates: readonly string[];
+  /**
+   * The names in `templates` that are aliases, with what each stands for (TYTO-473): the
+   * completion marks them and lists each right after its template. Absent when the host
+   * knows of none.
+   */
+  readonly aliases?: Readonly<Record<string, TemplateAliasTarget>>;
+  /**
+   * The formats the name the frontmatter wrote may ask for, when a configuration restricts
+   * them below the manifest's (ADR 0155 decision 6, TYTO-475). Absent, the manifest's stand.
+   * Travels with `manifest`: a "did you mean" for a format reads this first (TYTO-473).
+   */
+  readonly formats?: readonly string[];
   /**
    * Every plugin directive the host offers, as `namespace/name`, for completing after `::`
    * (TYTO-49). Absent when the host activated none.
@@ -217,8 +231,17 @@ export const briefAnalysisField = StateField.define<BriefAnalysis | undefined>({
     for (const effect of transaction.effects) {
       if (!effect.is(setBriefAnalysis)) continue;
       const incoming = effect.value;
-      const manifest = incoming.manifest ?? next?.manifest;
-      next = { ...incoming, ...(manifest === undefined ? {} : { manifest }) };
+      // The restriction is the manifest's companion: kept with a kept manifest, replaced
+      // (or dropped) with a new one, so a sticky manifest never pairs with another's formats.
+      const kept = incoming.manifest === undefined ? next : incoming;
+      const manifest = kept?.manifest;
+      const formats = kept?.formats;
+      const { formats: _incomingFormats, ...rest } = incoming;
+      next = {
+        ...rest,
+        ...(manifest === undefined ? {} : { manifest }),
+        ...(formats === undefined ? {} : { formats }),
+      };
     }
     return next;
   },
