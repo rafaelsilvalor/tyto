@@ -117,7 +117,8 @@ These are the rules it enforces beyond the shape:
   (TYTO-622): `titulo: { type: rich-text, frontmatterMarks: true }` for a template that
   reads `slots.titulo` through template-kit's `richTextOfPlain` when it came from the
   frontmatter, and so draws `**…**` and `{key:value}…{/}` there. The host then stops calling
-  that subset literal in `W_MARKUP_IN_FRONTMATTER`; anything outside it still warns.
+  that subset literal in `W_MARKUP_IN_FRONTMATTER`; anything outside it still warns, and
+  the slot's `min` and `max` count the drawn words, not the marks' syntax (TYTO-634).
   Declare it only when the template really reads the value that way, and only on a
   `rich-text` slot (anything else is refused). A slot that does not declare it warns as
   before (`docs/brief-language.md`).

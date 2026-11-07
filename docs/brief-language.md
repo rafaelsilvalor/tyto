@@ -345,7 +345,11 @@ templates, the compiler knows a template and nothing about the brief that fed it
   everything else still is, judged on the text with the subset's marks taken out: an italic,
   a trailing `\`, a mark inside a mark. The host cannot tell from outside whether a template
   draws marks, so the template says it; every slot that does not say it warns as before
-  (TYTO-622). `frontmatterMarks` on a slot that is not rich text is a manifest error.
+  (TYTO-622). Such a slot's `min` and `max` count the same text, the marks' syntax taken
+  out, as they count a directive's parsed text: counted as written, two marks in a title
+  overran a `max` the same words met as a directive, and the template drew its default in
+  their place (TYTO-634). `frontmatterMarks` on a slot that is not rich text is a manifest
+  error.
 - **The markup detector is deliberately crude, and errs quiet.** It is a second reader of
   the inline syntax rather than the parser itself, so it asks for two asterisks before it
   calls something italic, for a `{/}` before it calls something a mark, and for the
