@@ -48,6 +48,12 @@ Three things have to be settled before a renderer can show anything:
    the 50 rows the wire carries under each cell, then how many it leaves out. Which tables the
    person folded is the renderer's alone, per open tab: never sent to main, never written, and
    forgotten when the tab closes or the app restarts.
+   _Amended 2026-11-07 (TYTO-451):_ a fold is kept by the start of its cell's line, not by the
+   cell's index, and follows that line through each edit the person types, as the output
+   under it does (`mapLineStarts` in `@tyto/editor`): a step inserted above a folded table
+   leaves that table folded, and deleting the line drops its fold. The editor's `onChange`
+   hands the edit over, once per edit and not again for its copy in a second pane. A text the
+   window writes itself (`setValue`) maps nothing, so a fold whose line it moved folds no cell.
 3. **A pause in typing runs from the changed line down, and stops before the first source.**
    A source fetches only on save (`saved`) or Run (`explicit`), as a brief's images do (ADR
    0119). The source's cell and the ones after it are `stale`: they show the table they had and

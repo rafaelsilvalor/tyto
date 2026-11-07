@@ -18,6 +18,7 @@ import {
   cellOutputs,
   directiveLabel,
   formatBriefInView,
+  mapLineStarts,
   previewBlock,
   recipeCompletion,
   setCellOutputs,
@@ -834,8 +835,8 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
       runFrom: (index) => void recipeNotebook.runFrom(documentId, index),
       fetchAgain: () => void recipeNotebook.fetchAgain(documentId),
       apply: (index, planId) => void recipeNotebook.apply(documentId, index, planId),
-      toggled: (index, collapsed) => {
-        recipeNotebook.setCollapsed(documentId, index, collapsed);
+      toggled: (at, collapsed) => {
+        recipeNotebook.setCollapsed(documentId, at, collapsed);
       },
     },
   };
@@ -6318,7 +6319,7 @@ async function load(): Promise<void> {
     if (bridge !== undefined) {
       // Repainted on every keystroke and not only on the answer: the picker shows the
       // template the *brief* names, so typing the line by hand has to move it too.
-      handle.onChange((_value, view) => {
+      handle.onChange((_value, view, edit) => {
         // The id is read now rather than inside the timeout: a person can switch tabs
         // before the compile fires, and this edit belongs to the document the pane it was
         // typed in was showing (TYTO-286) when the key was pressed.
@@ -6354,7 +6355,15 @@ async function load(): Promise<void> {
         if (isAppFile(edited.kind)) askAppFile(bridge, documentId);
         else if (isBrief(edited.kind)) ask(bridge, documentId, contentOf(edited));
         else if (edited.kind === 'markdown') askMarkdown(documentId);
-        else if (isRecipe(edited.kind)) recipeNotebook.typed(documentId);
+        else if (isRecipe(edited.kind)) {
+          // Folds follow their lines now, not on the next answer: a fold keyed by a line that
+          // moved would show on whichever cell landed there (TYTO-451).
+          recipeNotebook.edited(
+            documentId,
+            (at) => mapLineStarts([at], edit.before, edit.changes, edit.after)[0],
+          );
+          recipeNotebook.typed(documentId);
+        }
         // Typing changes no tab but the draft, and a draft is what a crash would cost.
         keepSessionSoon();
       });

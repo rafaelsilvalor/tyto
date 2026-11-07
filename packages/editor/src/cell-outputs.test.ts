@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
-import { EditorState } from '@codemirror/state';
+import { type ChangeSet, type ChangeSpec, EditorState, type Text } from '@codemirror/state';
 import { EditorView, type WidgetType } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   type CellOutput,
+  cellOutputLineStart,
   cellOutputs,
   cellOutputsOf,
   clearCellOutputs,
+  mapLineStarts,
   remeasureCellOutput,
   setCellOutputs,
 } from './cell-outputs.js';
@@ -226,5 +228,57 @@ describe('cell outputs', () => {
     });
 
     expect(cellOutputsOf(on.state)).toEqual([]);
+  });
+
+  it("reads the line an output's element sits under now, and nothing for a loose element", () => {
+    const on = open();
+    on.dispatch({ effects: setCellOutputs.of([output(3, 'select', on)]) });
+    on.dispatch({ changes: { from: 0, insert: '# a comment\n' } });
+    const element = outputElement(on, 'select');
+    if (!(element instanceof HTMLElement)) throw new Error('no output');
+
+    expect(cellOutputLineStart(element)).toBe(on.state.doc.line(4).from);
+    expect(cellOutputLineStart(document.createElement('div'))).toBeUndefined();
+  });
+});
+
+describe('mapLineStarts (TYTO-451)', () => {
+  const edit = (
+    changes: (state: EditorState) => ChangeSpec,
+  ): { before: Text; changes: ChangeSet; after: Text } => {
+    const state = EditorState.create({ doc: DOC });
+    const transaction = state.update({ changes: changes(state) });
+    return { before: state.doc, changes: transaction.changes, after: transaction.newDoc };
+  };
+  const starts = (lines: readonly number[]): number[] => {
+    const doc = EditorState.create({ doc: DOC }).doc;
+    return lines.map((line) => doc.line(line).from);
+  };
+
+  it('moves each start down with its line when a line is inserted at the start of one', () => {
+    const { before, changes, after } = edit((state) => ({
+      from: state.doc.line(3).from,
+      insert: 'sort points desc\n',
+    }));
+
+    const mapped = mapLineStarts(starts([2, 3, 4]), before, changes, after);
+
+    expect(mapped.map((at) => (at === undefined ? undefined : after.lineAt(at).number))).toEqual([
+      2, 4, 5,
+    ]);
+    expect(mapped.every((at) => at === undefined || after.lineAt(at).from === at)).toBe(true);
+  });
+
+  it("gives undefined for a deleted line, keeps the others', and refuses a far position", () => {
+    const { before, changes, after } = edit((state) => ({
+      from: state.doc.line(2).from,
+      to: state.doc.line(2).to + 1,
+    }));
+
+    const mapped = mapLineStarts([...starts([2, 3]), 10_000], before, changes, after);
+
+    expect(mapped[0]).toBeUndefined();
+    expect(mapped[1]).toBe(after.line(2).from);
+    expect(mapped[2]).toBeUndefined();
   });
 });

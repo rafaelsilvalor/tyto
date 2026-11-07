@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { type EditorHandle, createEditor, mapLineStarts } from '@tyto/editor';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   type RecipeApplyAnswer,
   type RecipeApplyRequest,
+  type RecipeNotebook,
   type RecipeRunAnswer,
   type RecipeRunRequest,
   cellAtOrAbove,
@@ -162,6 +164,77 @@ describe('when a recipe runs', () => {
     expect([...notebook.collapsedOf('tab-2')]).toEqual([]);
     notebook.close('tab-1');
     expect([...notebook.collapsedOf('tab-1')]).toEqual([]);
+  });
+
+  describe('a fold follows its line through an edit (TYTO-451)', () => {
+    let editor: EditorHandle | undefined;
+    afterEach(() => {
+      editor?.destroy();
+      editor = undefined;
+    });
+
+    /** An editor on TEXT whose edits reach the notebook as `main.ts` hands them over. */
+    const typedInto = (notebook: RecipeNotebook): EditorHandle => {
+      const parent = document.createElement('div');
+      document.body.append(parent);
+      editor = createEditor(parent, { doc: TEXT });
+      editor.onChange((_value, _view, edit) => {
+        notebook.edited(
+          'tab-1',
+          (at) => mapLineStarts([at], edit.before, edit.changes, edit.after)[0],
+        );
+      });
+      return editor;
+    };
+    const cell = (index: number, line: number): Cell => ({
+      index,
+      line,
+      status: 'ok',
+      diagnostics: [],
+      table: table(2, 2),
+    });
+    /** The cells shown folded for an answer on `text`, by index, as the cell view reads them. */
+    const foldedCells = (notebook: RecipeNotebook, text: string, cells: Cell[]): number[] =>
+      cellStatuses(text, answer(1, cells), 'en')
+        .filter((status) => notebook.collapsedOf('tab-1').has(status.at))
+        .map((status) => status.index);
+
+    it('keeps the folded cell folded when a step is inserted above it', () => {
+      const { notebook } = harness();
+      const on = typedInto(notebook);
+      const shown = cellStatuses(TEXT, answer(1, [cell(0, 3), cell(1, 4)]), 'en');
+      notebook.setCollapsed('tab-1', shown[0]?.at ?? -1, true);
+      expect(foldedCells(notebook, TEXT, [cell(0, 3), cell(1, 4)])).toEqual([0]);
+
+      // A step typed at the very start of `acme.pull`'s line, so above it: `acme.pull` moves
+      // down a line and an index on, and the new step takes its old line and index.
+      on.view.dispatch({ changes: { from: on.view.state.doc.line(3).from, insert: 'acme.x\n' } });
+
+      const cells = [cell(0, 3), cell(1, 4), cell(2, 5)];
+      expect(foldedCells(notebook, on.getValue(), cells)).toEqual([1]);
+    });
+
+    it('drops the fold of a line that was deleted, and keeps the others', () => {
+      const { notebook } = harness();
+      const on = typedInto(notebook);
+      const shown = cellStatuses(TEXT, answer(1, [cell(0, 2), cell(1, 3)]), 'en');
+      for (const status of shown) notebook.setCollapsed('tab-1', status.at, true);
+
+      // Line 3 goes with its break: the line below takes its place, and must not take its fold.
+      const line = on.view.state.doc.line(3);
+      on.view.dispatch({ changes: { from: line.from, to: line.to + 1 } });
+
+      expect(foldedCells(notebook, on.getValue(), [cell(0, 2), cell(1, 3)])).toEqual([0]);
+      expect(notebook.collapsedOf('tab-1').size).toBe(1);
+    });
+
+    it('maps nothing for a write by the host, which reports no edit', () => {
+      const { notebook } = harness();
+      const on = typedInto(notebook);
+      notebook.setCollapsed('tab-1', 0, true);
+      on.setValue(`# new\n${TEXT}`);
+      expect([...notebook.collapsedOf('tab-1')]).toEqual([0]);
+    });
   });
 
   it('drops every answer for a tab that closed, and asks nothing for a tab that is gone', async () => {
