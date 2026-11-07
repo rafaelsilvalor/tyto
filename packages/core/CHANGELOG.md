@@ -1,5 +1,36 @@
 # @tyto/core
 
+## 0.40.0
+
+### Minor Changes
+
+- f658466: A rich-text slot may declare `frontmatterMarks: true` in the manifest when its template draws
+  `**…**` and `{key:value}…{/}` in a frontmatter value itself (through template-kit's
+  `richTextOfPlain`). On such a slot `W_MARKUP_IN_FRONTMATTER` no longer calls that subset
+  literal text; any other markup still warns, and every slot that does not declare it warns as
+  before (TYTO-622).
+- 4a7c29d: A `TYTO_HOME` too deep for the copies fetched under it is now reported instead of crashing:
+  `E_TYTO_HOME_PATH_TOO_LONG` names the folder and the length of the longest path a fetch writes
+  there. The plugin files' sync checks it before the first fetch (on Windows a copy reaches the
+  home's length plus 172, against a limit of 259), and turns a path the system refuses under the
+  home (`ENAMETOOLONG`, or Windows' `ENOENT` over the limit) into the same error, as the gallery's
+  index fetch does. `tyto render`, `tyto plugin sync` and the gallery commands print it
+  (TYTO-470).
+- 8d081ec: A plugin file now says when a pack it fetched holds templates none of its entries names:
+  `W_PLUGIN_FILE_TEMPLATE_UNNAMED`, once per pack at the first entry that fetched it, names them
+  and says to add an entry for each with the same git and ref. A brief naming one of them still
+  gets `E_UNKNOWN_TEMPLATE`, now with a hint that the pack holds it. `tyto render` and the
+  desktop app's problems panel show both. The registry keeps what a root with `only` skipped, in
+  `TemplateRegistry.unoffered` (TYTO-615).
+
+### Patch Changes
+
+- 6f4c86e: On a rich-text slot that declares `frontmatterMarks: true`, `min` and `max` now count the
+  words a frontmatter value draws, without the `**` and `{key:value}`…`{/}` syntax, as they
+  count a directive's text. Counted as written, two colour marks in one title overran a `max`
+  the same words met as a directive: the slot was refused with `E_BAD_SLOT_VALUE` and the
+  template drew its default title in its place, with neither colour (TYTO-634).
+
 ## 0.39.0
 
 ### Minor Changes

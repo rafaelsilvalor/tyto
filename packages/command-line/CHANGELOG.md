@@ -1,5 +1,31 @@
 # @tyto/command-line
 
+## 0.2.7
+
+### Patch Changes
+
+- 8d081ec: A plugin file now says when a pack it fetched holds templates none of its entries names:
+  `W_PLUGIN_FILE_TEMPLATE_UNNAMED`, once per pack at the first entry that fetched it, names them
+  and says to add an entry for each with the same git and ref. A brief naming one of them still
+  gets `E_UNKNOWN_TEMPLATE`, now with a hint that the pack holds it. `tyto render` and the
+  desktop app's problems panel show both. The registry keeps what a root with `only` skipped, in
+  `TemplateRegistry.unoffered` (TYTO-615).
+- Updated dependencies [6f4c86e]
+- Updated dependencies [f658466]
+- Updated dependencies [4a7c29d]
+- Updated dependencies [8d081ec]
+  - @tyto/core@0.40.0
+  - @tyto/io@5.3.0
+  - @tyto/export-html@0.7.14
+  - @tyto/export-svg@2.0.14
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.13
+  - @tyto/pipeline@0.12.10
+  - @tyto/plugin-api@0.14.3
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.13
+  - @tyto/templates@1.2.8
+
 ## 0.2.6
 
 ### Patch Changes
