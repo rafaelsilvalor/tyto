@@ -95,10 +95,13 @@ export async function include(context: VerbContext): Promise<VerbResult> {
     state: context.state,
     aliases: Object.fromEntries(context.aliases),
     within: context.recipes,
+    views: context.views,
   });
   if (!included.ok) return err(inside(name, included.error, range));
   const reported = inside(name, included.diagnostics, range);
   const { table, view, keeps, remembers } = included.value;
+  // Every cell ran when there is a table, so the last one holds the view and its arguments.
+  const shown = included.value.cells.at(-1)?.view;
   if (table === undefined) {
     const failed = included.value.cells.some((cell) => cell.status === 'failed');
     if (failed) return err(reported);
@@ -110,7 +113,16 @@ export async function include(context: VerbContext): Promise<VerbResult> {
       ),
     ]);
   }
-  return ok({ table, keeps, remembers, ...(view === undefined ? {} : { view }) }, reported);
+  return ok(
+    {
+      table,
+      keeps,
+      remembers,
+      ...(view === undefined ? {} : { view }),
+      ...(shown === undefined ? {} : { viewOptions: shown.options }),
+    },
+    reported,
+  );
 }
 
 /** Diagnostics from the included file, moved to the `run` line and labelled with the recipe. */

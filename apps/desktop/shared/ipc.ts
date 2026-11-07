@@ -193,6 +193,10 @@ export const RECIPE_WIRE_LIMITS = {
   diagnostics: 200,
   /** Lines of a plan, and of an applied plan's outcome, sent per cell (TYTO-378). */
   operations: 50,
+  /** Rows of one `recipe:rows` page (TYTO-379, ADR 0171). */
+  page: 500,
+  /** Rows one `recipe:copy` puts on the clipboard, a table's most (`PAGE_LIMITS`). */
+  copy: 50_000,
 } as const;
 
 /** A value as the notebook shows it: a list is already joined, a long text already cut. */
@@ -285,6 +289,22 @@ const recipeCell = z.object({
   oldestFetchedAt: z.string().optional(),
   /** The step fetches, a source or a `run` holding one: the notebook offers Fetch again on it. */
   source: z.boolean().optional(),
+  /**
+   * TYTO-379, ADR 0171: the view the cell is drawn in, the last `show` at or above it, with the
+   * arguments `show` checked against `shared/recipe-views.ts`. Absent while no `show` ran.
+   */
+  view: z
+    .object({
+      name: z.string().max(RECIPE_WIRE_LIMITS.text),
+      options: z.record(
+        z.string().max(RECIPE_WIRE_LIMITS.text),
+        z.union([
+          z.string().max(RECIPE_WIRE_LIMITS.text),
+          z.array(z.string().max(RECIPE_WIRE_LIMITS.text)).max(RECIPE_WIRE_LIMITS.columns),
+        ]),
+      ),
+    })
+    .optional(),
 });
 
 /** Whether a source is trusted; `revoked` is trust taken back while it is open (ADR 0111). */
@@ -413,6 +433,35 @@ const openDocument = z.object({
  * own subject cannot be wrong about it.
  */
 const documentId = z.string().min(1).max(100);
+
+/**
+ * TYTO-379, ADR 0171: which rows of a kept cell's table a view asks for. `ranAt` is the cell's,
+ * as the window was shown it: a cell that ran again since answers `stale`, never another
+ * table's rows. `sort`, `filter` and `columns` are the view's own and change no row of the
+ * recipe's: main orders indices into a copy.
+ */
+const recipeRowsQuery = {
+  documentId,
+  index: z.number().int().nonnegative(),
+  ranAt: z.string().max(100),
+  offset: z.number().int().nonnegative(),
+  sort: z
+    .object({
+      column: z.string().max(RECIPE_WIRE_LIMITS.text),
+      direction: z.enum(['asc', 'desc']),
+    })
+    .optional(),
+  /** The quick filter: one text, matched in any visible column without case or accents. */
+  filter: z.string().max(RECIPE_WIRE_LIMITS.text).optional(),
+  /** The columns shown, in order; every column when absent. */
+  columns: z
+    .array(z.string().max(RECIPE_WIRE_LIMITS.text))
+    .max(RECIPE_WIRE_LIMITS.columns)
+    .optional(),
+};
+
+/** The cell ran again, or closed, since the window was shown the `ranAt` it named. */
+const recipeStale = z.object({ stale: z.literal(true) });
 
 /** A terminal main opened (TYTO-497, ADR 0164), and the size xterm measured for it. */
 const terminalId = z.string().min(1).max(100);
@@ -2424,6 +2473,53 @@ export const IPC_CHANNELS = {
       planId: z.number().int().nonnegative(),
     }),
     z.object({ cell: recipeCell.optional() }),
+  ),
+
+  /**
+   * One page of a kept cell's table, as a view shows it (TYTO-379, ADR 0171): sorted with the
+   * `sort` verb's comparator and filtered by the quick filter, in main, over the whole table.
+   * `total` is every row the table has and `matched` those the filter keeps; `totals` are the
+   * Summary view's, over the matched rows, sent only for a cell drawn in it. Values are cut as a
+   * cell's preview is.
+   */
+  'recipe:rows': channel(
+    z.object({
+      ...recipeRowsQuery,
+      limit: z.number().int().positive().max(RECIPE_WIRE_LIMITS.page),
+    }),
+    z.union([
+      recipeStale,
+      z.object({
+        /** The columns the values follow, in order: those asked that exist, or all. */
+        columns: z.array(z.string().max(RECIPE_WIRE_LIMITS.text)).max(RECIPE_WIRE_LIMITS.columns),
+        rows: z
+          .array(z.object({ key: z.string(), values: z.array(recipeValue) }))
+          .max(RECIPE_WIRE_LIMITS.page),
+        total: z.number().int().nonnegative(),
+        matched: z.number().int().nonnegative(),
+        totals: z.record(z.string().max(RECIPE_WIRE_LIMITS.text), z.number()).optional(),
+      }),
+    ]),
+  ),
+
+  /**
+   * Copies rows of a kept cell's table as the view orders them, as tab-separated text (TYTO-379,
+   * ADR 0171). Main builds the text from the whole values, never the cut ones, quotes it as a
+   * spreadsheet does and writes the clipboard itself, so a copy of thousands of rows never
+   * crosses to the window; the answer counts what was copied.
+   */
+  'recipe:copy': channel(
+    z.object({
+      ...recipeRowsQuery,
+      limit: z.number().int().positive().max(RECIPE_WIRE_LIMITS.copy),
+    }),
+    z.union([
+      recipeStale,
+      z.object({
+        rows: z.number().int().nonnegative(),
+        columns: z.number().int().nonnegative(),
+      }),
+    ]),
   ),
 
   /**

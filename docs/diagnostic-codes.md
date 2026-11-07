@@ -194,6 +194,7 @@ non-zero.
 | `E_RECIPE_VERB` | error | no | A verb a plugin contributes could not do its work, in its own words. |
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
 | `E_RECIPE_ARGUMENTS` | error | no | A recipe verb was given arguments it does not accept. |
+| `E_RECIPE_VIEW` | error | no | A recipe's 'show' names a view the notebook does not draw. |
 | `E_RECIPE_WHERE` | error | no | A 'where' expression does not match the filter grammar. |
 | `E_RECIPE_PATTERN` | error | no | A pattern is empty, longer than 512 characters, or not a valid regular expression. |
 | `E_RECIPE_PATTERN_UNSAFE` | error | no | A pattern uses a backreference, a lookaround, a nested quantifier or another construct the pattern guard refuses. |
@@ -341,6 +342,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_ARGUMENTS` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_VIEW` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_WHERE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_PATTERN` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_PATTERN_UNSAFE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
@@ -1899,6 +1901,20 @@ That cell has no table and the cells after it do not run; earlier cells keep the
 ```
 
 Parameters: `verb`, `problem`
+
+### `E_RECIPE_VIEW`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0171-the-recipes-views-read-rows-from-main-in-pages-and-show-checks-its-view.md`
+
+A recipe's 'show' names a view the notebook does not draw.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs.
+
+```
+No view named '{view}' is drawn here. Available: {available}.
+```
+
+Parameters: `view`, `available`
 
 ### `E_RECIPE_WHERE`
 

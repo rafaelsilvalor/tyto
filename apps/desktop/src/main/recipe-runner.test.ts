@@ -14,6 +14,7 @@ import {
   oldestFetchedAt,
   readOnlyState,
 } from './recipe-runner.js';
+import { recipeAnswerToWire } from './recipe-wire.js';
 
 /**
  * The recipe notebook's runner (TYTO-377, ADR 0148), on a real folder for its data files and
@@ -299,6 +300,44 @@ describe('running a recipe cell by cell', () => {
     expect(runner.verbs()).toEqual(
       expect.arrayContaining(['where', 'run', 'acme.pull', 'acme.tag']),
     );
+  });
+});
+
+// TYTO-379, ADR 0171: every run checks `show` against the notebook's views, and keeps the
+// whole table a view reads in pages.
+describe('the views a cell is drawn in', () => {
+  it('names a view the notebook does not draw at its word', async () => {
+    const { run } = harness();
+    const text = ['recipe weekly', 'acme.pull', 'show tables', ''].join('\n');
+
+    const answer = await run(text, { saved: true });
+
+    const problem = answer.cells[1]?.diagnostics[0];
+    expect(problem?.code).toBe('E_RECIPE_VIEW');
+    expect(problem?.message).toBe(
+      "No view named 'tables' is drawn here. Available: table, summary.",
+    );
+    expect(text.slice(problem?.range?.start, problem?.range?.end)).toBe('tables');
+  });
+
+  it('gives each cell the last show above it, wired, and keeps its whole table', async () => {
+    const { runner, run } = harness();
+    const text = ['recipe weekly', 'acme.pull', 'show summary', 'where status = done', ''].join(
+      '\n',
+    );
+
+    const answer = await run(text, { saved: true });
+
+    expect(answer.cells.map((cell) => cell.view)).toEqual([
+      undefined,
+      { name: 'summary', options: {} },
+      { name: 'summary', options: {} },
+    ]);
+    expect(recipeAnswerToWire(answer).cells[2]?.view).toEqual({ name: 'summary', options: {} });
+    expect(runner.table('tab-1', 0)).toEqual({ table: TASKS, ranAt: NOW });
+    expect(runner.table('tab-1', 2)?.view?.name).toBe('summary');
+    expect(runner.table('tab-1', 3)).toBeUndefined();
+    expect(runner.table('tab-2', 0)).toBeUndefined();
   });
 });
 

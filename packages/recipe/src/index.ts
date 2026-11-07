@@ -53,5 +53,13 @@ export type { CellValue, Column, ColumnType, Provenance, Row, Table } from './ta
 export { COLUMN_TYPES, cellText, comparable, findColumn } from './table.js';
 export type { BoundTemplate, FillMode, Template, TemplateFilter } from './template.js';
 export { TEMPLATE_FILTERS, bindTemplate, parseTemplate } from './template.js';
+export { compareCells } from './verbs.js';
+export type {
+  CellView,
+  ViewArgumentKind,
+  ViewArgumentSpec,
+  ViewOptionValue,
+  ViewSpecs,
+} from './views.js';
 export type { Operator, Predicate } from './where.js';
 export { parseWhere, satisfies } from './where.js';

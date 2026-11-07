@@ -586,15 +586,17 @@
       "paths": [
         "apps/desktop/src/main/recipe-apply.ts",
         "apps/desktop/src/main/recipe-clock.ts",
+        "apps/desktop/src/main/recipe-rows.ts",
         "apps/desktop/src/main/recipe-runner.ts",
-        "apps/desktop/src/main/recipe-wire.ts"
+        "apps/desktop/src/main/recipe-wire.ts",
+        "apps/desktop/shared/recipe-views.ts"
       ],
       "e2e": [
         "recipe-notebook.desktop.test.ts",
         "recipe-tab.desktop.test.ts",
         "window.desktop.test.ts"
       ],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply"
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages and copy (TYTO-379) and the view list every run checks show against have no window caller until the Table view; their logic is in recipe-rows.test.ts and ipc.test.ts"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],

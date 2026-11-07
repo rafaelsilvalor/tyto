@@ -20,6 +20,7 @@ import { stamp } from './stamp.js';
 import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
 import { type CellValue, type Column, type Row, type Table, comparable } from './table.js';
 import { urls } from './urls.js';
+import { readView } from './views.js';
 
 /**
  * The generic verbs this build implements (ADR 0128). Each reads the previous cell's table and
@@ -155,7 +156,15 @@ function sort(context: VerbContext): VerbResult {
   return ok({ table: { columns: table.value.columns, rows } });
 }
 
-function compareCells(first: CellValue | undefined, second: CellValue | undefined, sign: number) {
+/**
+ * The order `sort` puts two values in, `sign` 1 ascending and -1 descending. Exported so a view
+ * that sorts what it shows sorts as the recipe would (ADR 0171): an empty cell last both ways.
+ */
+export function compareCells(
+  first: CellValue | undefined,
+  second: CellValue | undefined,
+  sign: number,
+): number {
   const left = comparable(first);
   const right = comparable(second);
   if (left === '' || right === '') return (left === '' ? 1 : 0) - (right === '' ? 1 : 0);
@@ -166,12 +175,19 @@ function compareCells(first: CellValue | undefined, second: CellValue | undefine
 
 /**
  * `show <view>` picks how the notebook draws the table, and never which rows or columns it
- * has (ADR 0128). The view's name is the notebook's to check, since views arrive with it.
+ * has (ADR 0128). The views are the notebook's: when the host passes its list, the name and
+ * the arguments are checked against it (ADR 0171); without one, any single name passes.
  */
 function show(context: VerbContext): VerbResult {
+  const table = requireTable(context);
+  if (context.views !== undefined) {
+    if (!table.ok) return table;
+    const view = readView(context, table.value, context.views);
+    if (!view.ok) return view;
+    return ok({ table: table.value, view: view.value.name, viewOptions: view.value.options });
+  }
   const named = refuseNamed(context, []);
   if (named !== undefined) return named;
-  const table = requireTable(context);
   if (!table.ok) return table;
   const [view, extra] = context.step.positional;
   if (view === undefined || extra !== undefined) {

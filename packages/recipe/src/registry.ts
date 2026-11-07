@@ -7,6 +7,7 @@ import type { Plan } from './plan.js';
 import type { ApplyOutcome, RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
 import { genericVerbs } from './verbs.js';
+import type { ViewOptionValue, ViewSpecs } from './views.js';
 
 /** The four kinds of verb a plugin can contribute (ADR 0128). The generic verbs transform. */
 export type VerbKind = 'source' | 'transform' | 'action' | 'sink';
@@ -50,11 +51,18 @@ export interface VerbContext {
   readonly verbs: VerbRegistry;
   /** The recipes running, outermost first and this one last, so `run` can refuse a cycle. */
   readonly recipes: readonly string[];
+  /**
+   * The views the host draws and the arguments each reads (ADR 0171), which `show` checks and
+   * `run` hands on. Absent where the host draws none: `show` then takes any one name.
+   */
+  readonly views?: ViewSpecs | undefined;
 }
 
 export interface VerbOutput {
   readonly table: Table;
   readonly view?: string;
+  /** The view's arguments as `show` read them, by name (ADR 0171). */
+  readonly viewOptions?: Readonly<Record<string, ViewOptionValue>>;
   /** Several when the cell is a `run` whose recipe keeps more than one table. */
   readonly keeps?: readonly KeepRequest[];
   /** What `remember` asks the host to store once the run's plan is applied (ADR 0140). */

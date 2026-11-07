@@ -8,6 +8,7 @@ import type { Plan } from './plan.js';
 import type { DerivationRegistry, KeepRequest, RecipeResolver, VerbRegistry } from './registry.js';
 import type { RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
+import type { CellView, ViewSpecs } from './views.js';
 
 export interface RunOptions {
   /** The table the first cell reads; absent when the recipe starts with a source. */
@@ -36,6 +37,11 @@ export interface RunOptions {
   readonly aliases?: Readonly<Record<string, string>>;
   /** The recipes that include this one through `run`, outermost first. */
   readonly within?: readonly string[];
+  /**
+   * The views the host draws, by name, with the arguments each reads (ADR 0171): `show` checks
+   * its view and arguments against them. Absent, `show` takes any one name, as a CLI run does.
+   */
+  readonly views?: ViewSpecs | undefined;
 }
 
 /**
@@ -54,6 +60,11 @@ export interface Cell {
    * its writes to commit (ADR 0170). Present only when there are some.
    */
   readonly remembers?: readonly StateWrite[];
+  /**
+   * The view the cell is drawn in: the last `show` at or above it, with its arguments (ADR
+   * 0171). Absent while no `show` has run.
+   */
+  readonly view?: CellView;
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -96,6 +107,7 @@ export async function runRecipe(
   const diagnostics: Diagnostic[] = [];
   let table = options.input;
   let view: string | undefined;
+  let cellView: CellView | undefined;
   let failed = false;
   const recipes = [...(options.within ?? []), recipe.name];
   const clock = options.clock ?? systemClock;
@@ -125,6 +137,7 @@ export async function runRecipe(
       state: options.state,
       verbs: options.verbs,
       recipes,
+      views: options.views,
     });
     if (!outcome.ok) {
       cells.push({ step: written, status: 'failed', diagnostics: outcome.error });
@@ -134,6 +147,9 @@ export async function runRecipe(
     }
     table = outcome.value.table;
     view = outcome.value.view ?? view;
+    if (outcome.value.view !== undefined) {
+      cellView = { name: outcome.value.view, options: outcome.value.viewOptions ?? {} };
+    }
     keeps.push(...(outcome.value.keeps ?? []));
     const cellRemembers = outcome.value.remembers ?? [];
     remembers.push(...cellRemembers);
@@ -144,6 +160,7 @@ export async function runRecipe(
       table,
       ...(plan === undefined ? {} : { plan }),
       ...(cellRemembers.length === 0 ? {} : { remembers: cellRemembers }),
+      ...(cellView === undefined ? {} : { view: cellView }),
       diagnostics: outcome.diagnostics,
     });
     diagnostics.push(...outcome.diagnostics);

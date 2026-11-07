@@ -38,6 +38,23 @@ export function cellToWire(cell: RunnerCell): WireCell {
     ...(cell.ranAt === undefined ? {} : { ranAt: cell.ranAt }),
     ...(cell.oldestFetchedAt === undefined ? {} : { oldestFetchedAt: cell.oldestFetchedAt }),
     ...(cell.source === true ? { source: true } : {}),
+    ...(cell.view === undefined ? {} : { view: viewToWire(cell.view) }),
+  };
+}
+
+// TYTO-379, ADR 0171: the cell's view and its arguments, every word cut as a value is.
+
+function viewToWire(view: NonNullable<RunnerCell['view']>): NonNullable<WireCell['view']> {
+  return {
+    name: cut(view.name),
+    options: Object.fromEntries(
+      Object.entries(view.options).map(([name, value]) => [
+        cut(name),
+        typeof value === 'string'
+          ? cut(value)
+          : value.slice(0, RECIPE_WIRE_LIMITS.columns).map((word) => cut(word)),
+      ]),
+    ),
   };
 }
 

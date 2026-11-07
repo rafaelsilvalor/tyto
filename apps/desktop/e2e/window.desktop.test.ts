@@ -361,6 +361,10 @@ describe('the bridge', () => {
       // `recipe:apply` has no window caller until the notebook's Apply button; its logic is in
       // `recipe-apply.test.ts`.
       'recipe:apply',
+      // TYTO-379, ADR 0171: a view's pages and its copy. No window caller until the Table view
+      // (TYTO-379's second pull request); `ipc.test.ts` and `recipe-rows.test.ts` cover them.
+      'recipe:copy',
+      'recipe:rows',
       'recipe:run',
       'recipe:verbs',
       // TYTO-113: the tabs kept for the next launch. Exercised by `e2e/session.desktop.test.ts`.

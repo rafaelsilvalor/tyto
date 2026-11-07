@@ -9,6 +9,7 @@ import {
   type BrowserWindow,
   Menu,
   app,
+  clipboard,
   dialog,
   ipcMain,
   nativeTheme,
@@ -1802,6 +1803,8 @@ async function start(): Promise<void> {
     },
     preview,
     recipes,
+    // TYTO-379, ADR 0171: `recipe:copy` writes the text it built in main.
+    writeClipboard: (text) => clipboard.writeText(text),
     templates,
     templateEditor,
     templateFolder,
