@@ -18,7 +18,14 @@ import {
   sizeSchema,
   templateManifestSchema,
 } from '@tyto/core';
-import { COLUMN_TYPES, type CellValue, type Plan, type Table } from '@tyto/recipe';
+import {
+  COLUMN_TYPES,
+  type CellValue,
+  type JsonValue,
+  type Plan,
+  type PlannedOperation,
+  type Table,
+} from '@tyto/recipe';
 import { z } from 'zod';
 
 import type { ContributionPoint } from '../manifest.js';
@@ -300,18 +307,48 @@ const tableSchema = z.strictObject({
   ),
 }) as unknown as z.ZodType<Table>;
 
+/** Any JSON value: a planned operation's `payload`, whose size is `checkPlan`'s to bound. */
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ]),
+);
+
+/**
+ * One planned operation as it crosses, in a plan and again in an `apply` request. `payload` is
+ * the plugin's own data for applying it (ADR 0170), which made this protocol 16.
+ */
+const plannedOperationSchema = z.strictObject({
+  write: z.string(),
+  rowKey: z.string().optional(),
+  description: z.string(),
+  payload: jsonValueSchema.optional(),
+}) as unknown as z.ZodType<PlannedOperation>;
+
 /** A plan as it crosses (ADR 0135 decision 10): its shape, strictly; the rest is `checkPlan`'s. */
 const planSchema = z.strictObject({
   target: z.string(),
-  operations: z.array(
-    z.strictObject({
-      write: z.string(),
-      rowKey: z.string().optional(),
-      description: z.string(),
-    }),
-  ),
+  operations: z.array(plannedOperationSchema),
   count: z.number().int().nonnegative(),
 }) as unknown as z.ZodType<Plan>;
+
+/**
+ * An `apply` answer as it crosses: its shape, strictly. Its length, and a `failed` entry's
+ * reason, are the host's to check (`recipeRegistriesOf`), the same for an in-process plugin.
+ */
+const appliedBatchSchema = z.strictObject({
+  operations: z.array(
+    z.strictObject({
+      status: z.enum(['applied', 'failed', 'skipped']),
+      reason: z.string().optional(),
+    }),
+  ),
+});
 
 const argumentValuesSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
 
@@ -599,6 +636,23 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
         ]),
         send: ([request]) => [request],
         result: resultSchema(planSchema),
+        failed: (problems) => err(problems),
+        optional: true,
+      },
+      // An action's or a sink's, optional: one batch of the plan as shown (ADR 0170). A call
+      // that fails here — a deadline, a crash, a refused answer — is answered as a refusal,
+      // which the host reads as a batch with no answer.
+      apply: {
+        args: z.tuple([
+          z.strictObject({
+            arguments: argumentValuesSchema,
+            operations: z.array(plannedOperationSchema),
+            target: z.string(),
+            ...verbSection,
+          }),
+        ]),
+        send: ([request]) => [request],
+        result: resultSchema(appliedBatchSchema),
         failed: (problems) => err(problems),
         optional: true,
       },

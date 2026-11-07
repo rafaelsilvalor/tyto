@@ -523,39 +523,53 @@ describe('a plugin under the permission model', () => {
   }, 60_000);
 });
 
-describe('the example recipe plugin in a child process (TYTO-376)', () => {
+describe('the example recipe plugin in a child process (TYTO-376, TYTO-378)', () => {
   const EXAMPLE = fileURLToPath(
     new URL('../../../../examples/plugins/tyto-plugin-example-recipe/', import.meta.url),
   );
 
   // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
-  it('pages example.pull, tags with example.tag and derives example.parity', async () => {
+  it('pages, tags, derives, plans example.mark and applies the plan as shown', async () => {
     const manifest: unknown = JSON.parse(await readFile(join(EXAMPLE, 'tyto-plugin.json'), 'utf8'));
     const launch = pluginProcessLauncher({ guest: inject('pluginGuest') });
+    const hellos: unknown[] = [];
+    const channel = launch({
+      name: 'example-recipe',
+      entry: join(EXAMPLE, 'dist', 'index.js'),
+      directory: EXAMPLE,
+    });
     const connected = await connectIsolatedPlugin({
       name: 'example-recipe',
       manifest,
-      channel: launch({
-        name: 'example-recipe',
-        entry: join(EXAMPLE, 'dist', 'index.js'),
-        directory: EXAMPLE,
-      }),
+      channel: {
+        ...channel,
+        onMessage: (listener) =>
+          channel.onMessage((message) => {
+            const hello = message as { type?: string; protocol?: unknown };
+            if (hello.type === 'hello') hellos.push(hello.protocol);
+            listener(message);
+          }),
+      },
       requireSandbox: true,
+      // The plugin keeps its marks in its private cache, under this test's own home.
+      capabilities: pluginCapabilities({}, { hostName: 'test', home: join(root, 'home') }),
     });
     if (!connected.ok) throw new Error(connected.error[0]?.message);
     const host = createPluginHost();
     expect(host.tryActivate(connected.value.plugin).ok).toBe(true);
+    const registries = recipeRegistriesOf(host.registry, { now: () => '2026-11-07T12:00:00Z' });
 
     const recipe = parseRecipe(
       'recipe example\nexample.pull count=7 size=3\nexample.tag ready\nderive example.parity\n' +
         'example.mark done',
     );
     if (!recipe.ok) throw new Error('the recipe must parse');
-    const run = await runRecipe(recipe.value, {
-      ...recipeRegistriesOf(host.registry),
-      resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
-    });
-    await connected.value.close();
+    const runOnce = () =>
+      runRecipe(recipe.value, {
+        ...registries,
+        resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
+      });
+    const run = await runOnce();
 
     expect(run.ok && run.value.cells.flatMap((cell) => cell.diagnostics)).toEqual([]);
     const rows = run.ok ? (run.value.table?.rows ?? []) : [];
@@ -571,11 +585,43 @@ describe('the example recipe plugin in a child process (TYTO-376)', () => {
     expect(rows[6]?.values).toEqual({ title: 'Item 7', number: 7, tag: 'ready', parity: 'odd' });
     // `example.mark` is an action: it plans a write per row, crosses back, and writes nothing.
     const plan = run.ok ? run.value.cells[3]?.plan : undefined;
-    expect(plan?.count).toBe(7);
-    expect(plan?.operations[6]).toEqual({
+    if (plan === undefined) throw new Error('example.mark must plan');
+    expect(plan.count).toBe(7);
+    expect(plan.operations[6]).toEqual({
       write: 'mark',
       rowKey: 'EX-7',
       description: "Mark EX-7 as 'done'",
+      payload: { id: 'EX-7', expected: null, mark: 'done' },
+    });
+
+    // Applied once, every row is marked; the same plan applied again finds each mark moved
+    // from the `null` it was planned against, and fails it rather than writing over it.
+    const mark = registries.verbs.get('example.mark');
+    const first = await mark?.apply?.(plan);
+    const again = await mark?.apply?.(plan);
+    // A new run plans against the marks the first Apply kept.
+    const rerun = await runOnce();
+    await connected.value.close();
+
+    expect(hellos).toEqual([16]);
+    expect(first?.ok && first.value.operations[6]).toEqual({
+      rowKey: 'EX-7',
+      status: 'applied',
+      appliedAt: '2026-11-07T12:00:00Z',
+    });
+    expect(first?.ok && first.value.operations.map((operation) => operation.status)).toEqual(
+      Array.from({ length: 7 }, () => 'applied'),
+    );
+    expect(again?.ok && again.value.operations[0]).toEqual({
+      rowKey: 'EX-1',
+      status: 'failed',
+      reason: "EX-1 is marked 'done' now, not 'null' as planned",
+    });
+    const replanned = rerun.ok ? rerun.value.cells[3]?.plan : undefined;
+    expect(replanned?.operations[0]?.payload).toEqual({
+      id: 'EX-1',
+      expected: 'done',
+      mark: 'done',
     });
   }, 60_000);
 });

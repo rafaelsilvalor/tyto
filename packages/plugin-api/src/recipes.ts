@@ -1,6 +1,7 @@
 import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import {
   type ArgumentSpec,
+  type AppliedOperation,
   type ArgumentValues,
   type Derivation,
   type DerivationRegistry,
@@ -9,6 +10,7 @@ import {
   type PageLimits,
   type Plan,
   type PlanLimits,
+  type PlannedOperation,
   type SourcePage,
   type Table,
   type Verb,
@@ -78,6 +80,49 @@ export interface TransformRequest extends VerbRequest {
 /** What an action's or a sink's `plan` is handed: the table it would write from. */
 export type PlanRequest = TransformRequest;
 
+/**
+ * What an action's or a sink's `apply` is handed (ADR 0170): one batch of the plan a person was
+ * shown, in its order, with the arguments the step was planned with and the plan's target. The
+ * operations are the plan's own, `payload` included, so the plugin applies what it planned and
+ * never plans again; an operation whose target moved since answers `failed` with a reason.
+ */
+export interface ApplyRequest extends VerbRequest {
+  readonly arguments: ArgumentValues;
+  readonly operations: readonly PlannedOperation[];
+  readonly target: string;
+}
+
+/** How one operation of a batch went, in the plugin's words. */
+export interface AppliedBatchOperation {
+  readonly status: 'applied' | 'failed' | 'skipped';
+  /** Why it failed or was skipped; a `failed` operation must say. At most 500 characters. */
+  readonly reason?: string;
+}
+
+/**
+ * An `apply` answer: one entry per operation of the request, in the same order. No `rowKey` and
+ * no time: the host takes the row from the plan it showed and the time from its own clock.
+ */
+export interface AppliedBatch {
+  readonly operations: readonly AppliedBatchOperation[];
+}
+
+/**
+ * Operations handed to one `apply` call. A plan holds up to 10,000 (`PLAN_LIMITS`), which no one
+ * call fits under `PLUGIN_CALL_DEADLINE_MS`; a hundred writes at a tenth of a second each do.
+ */
+export const APPLY_BATCH = 100;
+
+/** Of a `reason` a plugin answers, in characters, as a planned operation's description. */
+export const APPLY_REASON_MAX_LENGTH = 500;
+
+/**
+ * The reason of every operation of a batch that got no usable answer: a throw, a deadline, a
+ * refused or malformed answer. The plugin may have written some of them before it stopped, so
+ * the host cannot say which, and says so.
+ */
+export const APPLY_NO_ANSWER = 'no answer; some may have been written';
+
 type Answer<T> = Result<T, Diagnostics> | Promise<Result<T, Diagnostics>>;
 
 /** What the host read in the plugin's manifest that its recipe verbs are held to (ADR 0135). */
@@ -106,8 +151,13 @@ export interface RecipeVerbContribution extends Contribution {
    * `writes`. Absent on a source or a transform, which write nothing.
    */
   readonly writes?: readonly string[];
-  /** An action's or a sink's. Nothing is written: applying a plan is TYTO-378's. */
+  /** An action's or a sink's. Nothing is written: `apply` writes, once a person confirms. */
   plan?(request: PlanRequest): Answer<Plan>;
+  /**
+   * An action's or a sink's, optional: carries out one batch of a plan its `plan` answered,
+   * exactly as shown (ADR 0170). Without it the verb plans and nothing applies its plans.
+   */
+  apply?(request: ApplyRequest): Answer<AppliedBatch>;
 }
 
 /** A derivation for `derive` (ADR 0133), named `<namespace>.<name>`. */
@@ -160,6 +210,14 @@ export function checkRecipeVerb(
   const kind = `${verb.kind === 'action' ? 'an' : 'a'} ${verb.kind}`;
   const callable = CALLABLE[verb.kind];
   if (typeof verb[callable] !== 'function') refuse(`as ${kind} with no '${callable}'`);
+  // `apply` is optional, so a verb that only plans is still an action; but one given to a verb
+  // that writes nothing, or given as anything but a function, is a mistake said at load.
+  if (verb.apply !== undefined) {
+    if (verb.kind === 'source' || verb.kind === 'transform') {
+      refuse(`as ${kind} with 'apply', and only an action or a sink writes`);
+    }
+    if (typeof verb.apply !== 'function') refuse(`as ${kind} with an 'apply' that is no function`);
+  }
   checkWrites(verb, declared.writes ?? [], (problem) => refuse(`as ${kind} ${problem}`));
   const names = new Set<string>();
   for (const argument of verb.arguments) {
@@ -241,6 +299,11 @@ export interface RecipeRegistryOptions {
   readonly refresh?: boolean;
   readonly limits?: PageLimits;
   readonly planLimits?: PlanLimits;
+  /**
+   * The host's clock, as ISO 8601 in UTC, which stamps an applied operation's `appliedAt`
+   * (ADR 0170 decision 2). The system clock when absent.
+   */
+  readonly now?: () => string;
 }
 
 /**
@@ -258,6 +321,7 @@ export function recipeRegistriesOf(
   const planLimits = options.planLimits ?? PLAN_LIMITS;
   const sectionOf = options.sectionOf ?? (() => undefined);
   const refresh = options.refresh === true;
+  const now = options.now ?? (() => new Date().toISOString());
   const ownVerbs = createVerbRegistry();
   const ownDerivations = createDerivationRegistry();
   const contributedVerb = (name: string) =>
@@ -276,9 +340,18 @@ export function recipeRegistriesOf(
           ? undefined
           : verbOf(contributed.verb, {
               sectionOfOwner: () => sectionOf(contributed.plugin),
+              // Apply reads the verb again, at the time of the click: the plugin may have been
+              // withdrawn or updated since the plan was shown.
+              live: () => {
+                const current = contributedVerb(name);
+                return current === undefined
+                  ? undefined
+                  : { verb: current.verb, section: () => sectionOf(current.plugin) };
+              },
               refresh,
               limits,
               planLimits,
+              now,
             });
       },
       names: () => namesOf(ownVerbs.names(), contributions.recipeVerbs()),
@@ -310,10 +383,32 @@ function withSection(section: unknown): VerbRequest {
 
 interface VerbBinding {
   readonly sectionOfOwner: () => unknown;
+  readonly live: () => LiveVerb | undefined;
   readonly refresh: boolean;
   readonly limits: PageLimits;
   readonly planLimits: PlanLimits;
+  readonly now: () => string;
 }
+
+interface LiveVerb {
+  readonly verb: RecipeVerbContribution;
+  readonly section: () => unknown;
+}
+
+/** What a plan was answered from, which Apply hands the plugin again and checks the plan against. */
+interface ShownPlan {
+  readonly verb: string;
+  readonly arguments: ArgumentValues;
+  readonly table: Table;
+}
+
+/**
+ * Every plan a contributed verb answered, by the plan object the runner keeps (ADR 0170). Weak,
+ * so a plan the notebook forgets is forgotten here too. Apply finds the arguments and the table
+ * here rather than trusting a caller with them, and a plan this verb never answered — a copy, or
+ * another verb's — is refused rather than applied.
+ */
+const shownPlans = new WeakMap<Plan, ShownPlan>();
 
 /**
  * `sectionOfOwner` is bound to the plugin that registered the verb, so the verb is handed its
@@ -323,6 +418,9 @@ function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Ver
   const { sectionOfOwner, refresh, limits, planLimits } = binding;
   return {
     kind: contribution.kind,
+    ...(contribution.kind === 'action' || contribution.kind === 'sink'
+      ? { apply: (plan: Plan) => applyPlan(contribution.id, plan, binding) }
+      : {}),
     async run(context) {
       const values = readArguments(context, contribution.arguments);
       if (!values.ok) return values;
@@ -366,7 +464,15 @@ function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Ver
       }
       if (plan !== undefined && (contribution.kind === 'action' || contribution.kind === 'sink')) {
         const answer = await plan.call(contribution, request);
-        return placed(context, checkedPlan(answer, contribution, context.table, planLimits));
+        const checked = checkedPlan(answer, contribution, context.table, planLimits);
+        if (checked.ok && checked.value.plan !== undefined) {
+          shownPlans.set(checked.value.plan, {
+            verb: contribution.id,
+            arguments: values.value,
+            table: context.table,
+          });
+        }
+        return placed(context, checked);
       }
       // Registration refuses every other shape, so only a contribution changed after it was
       // registered reaches this.
@@ -379,6 +485,130 @@ function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Ver
       ]);
     },
   };
+}
+
+/**
+ * Apply (ADR 0170 decisions 2 and 3). Before any call: the plan must be one this verb answered,
+ * the verb must still be contributed and able to apply, and the plan must pass `checkPlan`
+ * against the writes the verb declares **now**; any failure refuses the whole Apply with
+ * `E_RECIPE_APPLY` and the plugin is never called. This is a contract check, not a sandbox: it
+ * holds the plugin to what the person read, and cannot see what the plugin then does.
+ *
+ * Then the operations go in batches of {@link APPLY_BATCH}. Each answer maps onto the shown
+ * plan's `rowKey`, never anything the plugin said. A batch with no usable answer is `failed`
+ * with {@link APPLY_NO_ANSWER}, and every later batch is `skipped` without a call: the plugin
+ * may be stuck or gone, and nobody can say what it wrote.
+ */
+async function applyPlan(
+  id: string,
+  plan: Plan,
+  binding: VerbBinding,
+): Promise<Result<{ readonly operations: readonly AppliedOperation[] }, readonly Diagnostic[]>> {
+  const refuse = (problem: string) => err([diagnostic('E_RECIPE_APPLY', { verb: id, problem })]);
+  const shown = shownPlans.get(plan);
+  if (shown?.verb !== id) {
+    return refuse('this verb did not answer that plan in this session; run its cell again');
+  }
+  const live = binding.live();
+  if (live === undefined) return refuse('no installed plugin contributes the verb any more');
+  const { verb } = live;
+  const { apply } = verb;
+  if ((verb.kind !== 'action' && verb.kind !== 'sink') || apply === undefined) {
+    return refuse('the verb only plans; its plugin gives it no apply');
+  }
+  const checked = checkPlan(
+    plan,
+    { verb: id, writes: verb.writes ?? [], table: shown.table },
+    binding.planLimits,
+  );
+  if (!checked.ok) {
+    const problem = checked.error.map((found) => found.message.replace(/\.$/u, '')).join('; ');
+    return refuse(`the plan as shown no longer passes the verb's check (${problem})`);
+  }
+
+  const operations: AppliedOperation[] = [];
+  let answering = true;
+  for (let start = 0; start < plan.operations.length; start += APPLY_BATCH) {
+    const batch = plan.operations.slice(start, start + APPLY_BATCH);
+    if (!answering) {
+      operations.push(
+        ...batch.map((operation) =>
+          outcomeOf(operation, { status: 'skipped', reason: 'an earlier batch had no answer' }),
+        ),
+      );
+      continue;
+    }
+    const answered = await askBatch(verb, apply, {
+      arguments: shown.arguments,
+      operations: batch,
+      target: plan.target,
+      ...withSection(live.section()),
+    });
+    if (answered === undefined) {
+      answering = false;
+      operations.push(
+        ...batch.map((operation) =>
+          outcomeOf(operation, { status: 'failed', reason: APPLY_NO_ANSWER }),
+        ),
+      );
+      continue;
+    }
+    const appliedAt = binding.now();
+    operations.push(
+      ...batch.map((operation, index) => {
+        // `askBatch` answered as many entries as the batch holds.
+        const answer = answered[index] as AppliedBatchOperation;
+        return outcomeOf(operation, answer, answer.status === 'applied' ? appliedAt : undefined);
+      }),
+    );
+  }
+  return ok({ operations });
+}
+
+/** One applied operation: the row is the shown plan's, the status and reason the answer's. */
+function outcomeOf(
+  operation: PlannedOperation,
+  answer: AppliedBatchOperation,
+  appliedAt?: string,
+): AppliedOperation {
+  return {
+    ...(operation.rowKey === undefined ? {} : { rowKey: operation.rowKey }),
+    status: answer.status,
+    ...(answer.reason === undefined ? {} : { reason: answer.reason }),
+    ...(appliedAt === undefined ? {} : { appliedAt }),
+  };
+}
+
+const APPLIED_STATUSES: ReadonlySet<unknown> = new Set(['applied', 'failed', 'skipped']);
+
+/**
+ * One `apply` call, and its answer if it is one the host can read: as many entries as the batch,
+ * each a known status, a `failed` one with a reason, no reason over the ceiling. `undefined` for
+ * anything else — a throw, a refusal, a deadline (which isolation answers as a refusal) — since
+ * the host cannot tell then which operations the plugin carried out.
+ */
+async function askBatch(
+  verb: RecipeVerbContribution,
+  apply: NonNullable<RecipeVerbContribution['apply']>,
+  request: ApplyRequest,
+): Promise<readonly AppliedBatchOperation[] | undefined> {
+  let answer: Result<AppliedBatch, Diagnostics>;
+  try {
+    answer = await apply.call(verb, request);
+  } catch {
+    return undefined;
+  }
+  if (!answer.ok) return undefined;
+  const entries: unknown = (answer.value as { operations?: unknown }).operations;
+  if (!Array.isArray(entries) || entries.length !== request.operations.length) return undefined;
+  const readable = entries.every((entry: unknown) => {
+    if (typeof entry !== 'object' || entry === null) return false;
+    const { status, reason } = entry as { status?: unknown; reason?: unknown };
+    if (!APPLIED_STATUSES.has(status)) return false;
+    if (reason === undefined) return status !== 'failed';
+    return typeof reason === 'string' && reason !== '' && reason.length <= APPLY_REASON_MAX_LENGTH;
+  });
+  return readable ? (entries as readonly AppliedBatchOperation[]) : undefined;
 }
 
 function derivationOf(contribution: RecipeDerivationContribution, limits: PageLimits): Derivation {

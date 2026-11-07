@@ -419,7 +419,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 14 and this host speaks 15.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 15 and this host speaks 16.",
     );
   });
 
@@ -2260,5 +2260,96 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     expect(activated.ok ? '' : activated.error[0]?.message).toContain(
       "writing 'delete', which its tyto-plugin.json does not declare in 'writes' (mark)",
     );
+  });
+
+  /**
+   * `demo.mark` over 250 rows, each operation carrying its row in a payload; `apply` answers
+   * from the payload, and `stall` names the call that waits past the 200 ms deadline.
+   */
+  async function appliedAcross(stall?: number) {
+    const calls: number[] = [];
+    const { connected } = await isolate(
+      (host) => {
+        host.registerRecipeVerb({
+          id: 'demo.pull',
+          kind: 'source',
+          arguments: [],
+          page: () =>
+            ok({
+              table: {
+                columns: COLUMNS,
+                rows: Array.from({ length: 250 }, (_, i) => rowOf(i + 1)),
+              },
+            }),
+        });
+        host.registerRecipeVerb({
+          id: 'demo.mark',
+          kind: 'action',
+          arguments: [],
+          writes: ['mark'],
+          plan: ({ table }) =>
+            ok({
+              target: 'demo items',
+              operations: table.rows.map((row) => ({
+                write: 'mark',
+                rowKey: row.key,
+                description: `Mark ${row.key}`,
+                payload: { id: row.key, expected: [null, { since: 1 }] },
+              })),
+              count: table.rows.length,
+            }),
+          apply: async ({ operations }) => {
+            calls.push(operations.length);
+            if (calls.length === stall) await later(400, undefined);
+            return ok({
+              operations: operations.map((operation) =>
+                (operation.payload as { id?: unknown } | undefined)?.id === operation.rowKey
+                  ? { status: 'applied' as const }
+                  : { status: 'failed' as const, reason: 'the payload did not cross' },
+              ),
+            });
+          },
+        });
+      },
+      { contributes: ['recipe-verb'], namespace: 'demo', writes: ['mark'], deadlineMs: 200 },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const registries = recipeRegistriesOf(host.registry);
+    const parsed = parseRecipe('recipe test\ndemo.pull\ndemo.mark');
+    if (!parsed.ok) throw new Error('the recipe must parse');
+    const run = await runRecipe(parsed.value, {
+      ...registries,
+      resolveRecipe: () => Promise.resolve({ ok: false, error: [] }),
+    });
+    const plan = run.ok ? run.value.cells[1]?.plan : undefined;
+    if (plan === undefined) throw new Error('the action must plan');
+    const outcome = await registries.verbs.get('demo.mark')?.apply?.(plan);
+    if (outcome?.ok !== true) throw new Error('the apply must start');
+    const statuses = outcome.value.operations.map((operation) =>
+      `${operation.status} ${operation.reason ?? ''}`.trim(),
+    );
+    return { plan, calls, statuses };
+  }
+
+  it('carries a payload in the plan and back in apply, a hundred operations a call', async () => {
+    const { plan, calls, statuses } = await appliedAcross();
+    expect(plan.operations[0]?.payload).toEqual({ id: 'N-1', expected: [null, { since: 1 }] });
+    expect(calls).toEqual([100, 100, 50]);
+    expect(new Set(statuses)).toEqual(new Set(['applied']));
+  });
+
+  it('fails a batch past its deadline with no answer, and skips every later one', async () => {
+    const { calls, statuses } = await appliedAcross(2);
+    expect(calls).toEqual([100, 100]);
+    expect([statuses[0], statuses[100], statuses[200]]).toEqual([
+      'applied',
+      'failed no answer; some may have been written',
+      'skipped an earlier batch had no answer',
+    ]);
+    expect(new Set(statuses.slice(100, 200)).size).toBe(1);
+    expect(new Set(statuses.slice(200)).size).toBe(1);
   });
 });
