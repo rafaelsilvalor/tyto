@@ -1,4 +1,4 @@
-import { type CellOutput, remeasureCellOutput } from '@tyto/editor';
+import { type CellOutput, cellOutputLineStart, remeasureCellOutput } from '@tyto/editor';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { CellStatus } from './recipe-notebook.js';
@@ -37,15 +37,18 @@ export interface CellViewActions {
   readonly runFrom: (index: number) => void;
   /** Fetch again: the whole document, forgetting every kept cell. */
   readonly fetchAgain: () => void;
-  /** The person folded or unfolded a cell's table. */
-  readonly toggled: (index: number, collapsed: boolean) => void;
+  /**
+   * The person folded or unfolded a cell's table: `at` is the start of the cell's line in the
+   * text as it is now, read from the editor on the click (TYTO-451).
+   */
+  readonly toggled: (at: number, collapsed: boolean) => void;
   /** Apply: the plan main stamped `planId` on this cell (TYTO-378). */
   readonly apply: (index: number, planId: number) => void;
 }
 
 export interface CellViewContext {
   readonly locale: Locale;
-  /** The cells folded in this tab, by index. */
+  /** The cells folded in this tab, by the start of their line ({@link CellStatus.at}). */
   readonly collapsed: ReadonlySet<number>;
   /** The cells whose Apply is on its way, by index. */
   readonly applying: ReadonlySet<number>;
@@ -64,7 +67,7 @@ const tableOf = (cell: WireCell): WireTable | undefined =>
   cell.status === 'ok' || cell.status === 'stale' ? cell.table : undefined;
 
 export function cellOutputOf(status: CellStatus, context: CellViewContext): CellOutput {
-  const collapsed = context.collapsed.has(status.index);
+  const collapsed = context.collapsed.has(status.at);
   const { cell } = status;
   return {
     at: status.at,
@@ -117,7 +120,9 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
       const folded = !root.classList.contains('recipe-cell--collapsed');
       root.classList.toggle('recipe-cell--collapsed', folded);
       label(folded);
-      actions.toggled(status.index, folded);
+      // The line as it is now: `status.at` is the text the answer ran, which typing since may
+      // have moved, and the next answer looks the fold up where the line is then.
+      actions.toggled(cellOutputLineStart(root) ?? status.at, folded);
       remeasureCellOutput(root);
     });
     header.append(toggle);

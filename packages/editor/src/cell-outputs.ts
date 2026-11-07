@@ -88,12 +88,51 @@ function mapPlaced(
 ): Placed[] {
   const mapped: Placed[] = [];
   for (const output of placed) {
-    const line = before.lineAt(output.lineStart);
-    if (lineDeleted(changes, line.from, line.to)) continue;
-    const moved = changes.mapPos(output.lineStart, 1);
-    mapped.push({ ...output, lineStart: after.lineAt(moved).from });
+    const lineStart = mapLineStart(output.lineStart, before, changes, after);
+    if (lineStart !== undefined) mapped.push({ ...output, lineStart });
   }
   return mapped;
+}
+
+function mapLineStart(
+  position: number,
+  before: Text,
+  changes: ChangeDesc,
+  after: Text,
+): number | undefined {
+  if (!Number.isInteger(position) || position < 0 || position > before.length) return undefined;
+  const line = before.lineAt(position);
+  if (lineDeleted(changes, line.from, line.to)) return undefined;
+  return after.lineAt(changes.mapPos(line.from, 1)).from;
+}
+
+/**
+ * Maps line starts through an edit as the outputs map (TYTO-451), for a host that keys its own
+ * per-cell state by line, as the notebook keys a folded table: each start follows its line, and
+ * a line the edit deleted, or a position past `before`, gives `undefined`.
+ */
+export function mapLineStarts(
+  starts: readonly number[],
+  before: Text,
+  changes: ChangeDesc,
+  after: Text,
+): readonly (number | undefined)[] {
+  return starts.map((start) => mapLineStart(start, before, changes, after));
+}
+
+/**
+ * The start of the line an output's element sits under, in the document its pane shows now,
+ * or `undefined` when the element is in no editor. A host reads it on a click, since the
+ * position it built the element with may be some edits old by then.
+ */
+export function cellOutputLineStart(element: HTMLElement): number | undefined {
+  const view = EditorView.findFromDOM(element);
+  if (view === null) return undefined;
+  try {
+    return view.state.doc.lineAt(view.posAtDOM(element)).from;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The elements already built, per pane and key: one element can only be in one pane. */

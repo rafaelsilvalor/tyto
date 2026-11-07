@@ -20,8 +20,9 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  *   outcome is a refusal, kept here, on that cell, until the next run's answer.
  *
  * It keeps, per document, the last answer shown with its text, so a change of language shows it
- * again ({@link RecipeNotebook.reshow}), and which tables the person folded, for as long as the
- * tab is open: none of it outlives the tab, and none of it is written anywhere.
+ * again ({@link RecipeNotebook.reshow}), and which tables the person folded, by their line and
+ * following it through each edit, for as long as the tab is open: none of it outlives the tab,
+ * and none of it is written anywhere.
  *
  * Nothing here touches the DOM or the editor: `recipe-cell-view.ts` builds what goes under each
  * cell, and `main.ts` hands each answer to the tab.
@@ -83,9 +84,17 @@ export interface RecipeNotebook {
   lastOf(
     documentId: string,
   ): { readonly text: string; readonly answer: RecipeRunAnswer } | undefined;
-  /** The cells whose table the person folded, by index, while the tab is open. */
+  /**
+   * The cells whose table the person folded, while the tab is open, by the start of the cell's
+   * line ({@link CellStatus.at}): an index names another cell once a step is inserted above.
+   */
   collapsedOf(documentId: string): ReadonlySet<number>;
-  setCollapsed(documentId: string, index: number, collapsed: boolean): void;
+  setCollapsed(documentId: string, at: number, collapsed: boolean): void;
+  /**
+   * The person edited the text: each fold follows its line through `map`, which answers where a
+   * line start went, or `undefined` when its line is gone, and then the fold is too (TYTO-451).
+   */
+  edited(documentId: string, map: (at: number) => number | undefined): void;
   /** The tab closed: nothing waits for it, an answer on its way is dropped, and all is forgotten. */
   close(documentId: string): void;
 }
@@ -204,11 +213,21 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     },
     lastOf: (documentId) => last.get(documentId),
     collapsedOf: (documentId) => collapsed.get(documentId) ?? new Set(),
-    setCollapsed(documentId, index, folded) {
+    setCollapsed(documentId, at, folded) {
       const cells = collapsed.get(documentId) ?? new Set<number>();
-      if (folded) cells.add(index);
-      else cells.delete(index);
+      if (folded) cells.add(at);
+      else cells.delete(at);
       collapsed.set(documentId, cells);
+    },
+    edited(documentId, map) {
+      const cells = collapsed.get(documentId);
+      if (cells === undefined || cells.size === 0) return;
+      const moved = new Set<number>();
+      for (const at of cells) {
+        const now = map(at);
+        if (now !== undefined) moved.add(now);
+      }
+      collapsed.set(documentId, moved);
     },
     close(documentId) {
       cancel(documentId);

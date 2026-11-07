@@ -61,7 +61,7 @@ function contextOf(more: Partial<CellViewContext> = {}) {
   const actions = {
     runFrom: vi.fn<(index: number) => void>(),
     fetchAgain: vi.fn<() => void>(),
-    toggled: vi.fn<(index: number, collapsed: boolean) => void>(),
+    toggled: vi.fn<(at: number, collapsed: boolean) => void>(),
     apply: vi.fn<(index: number, planId: number) => void>(),
   } satisfies CellViewActions;
   const context: CellViewContext = {
@@ -202,8 +202,9 @@ describe("a cell's buttons", () => {
 });
 
 describe('folding a table', () => {
-  it('starts open, folds in place, and tells the host which cell', () => {
-    const { element, actions } = render(cellOf({ index: 2 }));
+  it("starts open, folds in place, and tells the host the cell's line, not its index", () => {
+    // Line 3 starts at 24: an index would say 2. Outside an editor the line is the status's.
+    const { element, actions } = render(cellOf({ index: 2, line: 3 }));
     const toggle = element.querySelector('.recipe-cell__toggle') as HTMLButtonElement;
     expect(element.classList.contains('recipe-cell--collapsed')).toBe(false);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
@@ -213,14 +214,18 @@ describe('folding a table', () => {
     expect(toggle.getAttribute('aria-label')).toBe('Show table');
     toggle.click();
     expect(actions.toggled.mock.calls).toEqual([
-      [2, true],
-      [2, false],
+      [24, true],
+      [24, false],
     ]);
   });
 
   it('survives a rebuild: a folded cell has its own key and is built folded', () => {
     const open = contextOf();
-    const folded = contextOf({ collapsed: new Set([0]) });
+    // Folded by its line's start, as the notebook keeps it; its index, 0, folds nothing.
+    expect(
+      cellOutputOf(statusOf(cellOf()), contextOf({ collapsed: new Set([0]) }).context).key,
+    ).toBe(cellOutputOf(statusOf(cellOf()), open.context).key);
+    const folded = contextOf({ collapsed: new Set([statusOf(cellOf()).at]) });
     const openOutput = cellOutputOf(statusOf(cellOf()), open.context);
     const foldedOutput = cellOutputOf(statusOf(cellOf()), folded.context);
 

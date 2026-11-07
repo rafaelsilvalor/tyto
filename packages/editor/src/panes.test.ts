@@ -114,6 +114,16 @@ describe('one document in two panes', () => {
     expect(textOf(second.state())).toBe('hello!');
   });
 
+  it('hands the edit once, as typed, so a host maps its positions once (TYTO-451)', () => {
+    const { editor, second } = twoPanes('hello');
+    const edits: [string, string, number][] = [];
+    editor.onChange((_value, _view, edit) => {
+      edits.push([edit.before.toString(), edit.after.toString(), edit.changes.mapPos(5, 1)]);
+    });
+    second.view.dispatch({ changes: { from: 0, insert: 'a\n' } });
+    expect(edits).toEqual([['hello', 'a\nhello', 7]]);
+  });
+
   it('a pane showing another document is left alone', () => {
     const { editor, second } = twoPanes('hello');
     const third = editor.createPane(mount());

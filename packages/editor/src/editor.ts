@@ -1,8 +1,10 @@
 import { defaultKeymap, historyKeymap, indentWithTab, undoDepth } from '@codemirror/commands';
 import { foldGutter, foldKeymap, indentOnInput } from '@codemirror/language';
 import {
+  type ChangeDesc,
   type Extension,
   type StateEffect,
+  type Text,
   Annotation,
   Compartment,
   Transaction,
@@ -209,6 +211,16 @@ export interface ScrollPosition {
   readonly top: number;
 }
 
+/** What an author's edit did to the text: the changes, and the text before and after them. */
+export interface DocumentEdit {
+  readonly changes: ChangeDesc;
+  readonly before: Text;
+  readonly after: Text;
+}
+
+/** {@link EditorHandle.onChange}'s listener. */
+export type ChangeListener = (value: string, view: EditorView, edit: DocumentEdit) => void;
+
 /** The main selection as two document positions, which is what a session can write down. */
 export interface SelectionRange {
   readonly anchor: number;
@@ -397,8 +409,12 @@ export interface EditorHandle extends EditorPane {
    * The author changed the text, in `view`. Not fired for `setValue`, nor for a change copied
    * in from another pane showing the same document — that one was already reported where it
    * was typed. Returns the function that stops the listener.
+   *
+   * `edit` is what moved the text, so a host keeping its own positions in the document maps
+   * them once per edit (TYTO-451): a copy into another pane fires nothing, so nothing is mapped
+   * twice.
    */
-  onChange(listener: (value: string, view: EditorView) => void): () => void;
+  onChange(listener: ChangeListener): () => void;
   setTheme(theme: ThemeName): void;
   /**
    * Changes the search panel's language, now and for every document opened afterwards.
@@ -502,7 +518,7 @@ const baseExtensions = (): Extension[] => [
 ];
 
 export function createEditor(parent: HTMLElement, options: EditorOptions = {}): EditorHandle {
-  const changeListeners = new Set<(value: string, view: EditorView) => void>();
+  const changeListeners = new Set<ChangeListener>();
   const updateListeners = new Set<(state: EditorState, view: EditorView) => void>();
   /** Every pane's view, the first one included: what a theme or a keymap change reaches. */
   const views = new Set<EditorView>();
@@ -631,7 +647,12 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       return;
     }
     const value = textOf(update.state);
-    for (const listener of changeListeners) listener(value, update.view);
+    const edit: DocumentEdit = {
+      changes: update.changes,
+      before: update.startState.doc,
+      after: update.state.doc,
+    };
+    for (const listener of changeListeners) listener(value, update.view, edit);
   });
 
   const readOnly = options.readOnly ?? false;
@@ -799,7 +820,7 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
       });
     },
 
-    onChange: (listener: (value: string, view: EditorView) => void) => {
+    onChange: (listener: ChangeListener) => {
       changeListeners.add(listener);
       return () => {
         changeListeners.delete(listener);

@@ -15,9 +15,11 @@ export { brief, briefLanguage } from './brief-language.js';
 export { type MarkedDiagnostic } from './diagnostic-markers.js';
 
 export {
+  type ChangeListener,
   createEditor,
   type CursorPosition,
   cursorOf,
+  type DocumentEdit,
   type EditorHandle,
   type EditorOptions,
   type EditorPane,
@@ -232,9 +234,11 @@ export {
 
 export {
   type CellOutput,
+  cellOutputLineStart,
   cellOutputs,
   cellOutputsOf,
   clearCellOutputs,
+  mapLineStarts,
   remeasureCellOutput,
   setCellOutputs,
 } from './cell-outputs.js';
