@@ -1,7 +1,7 @@
 # Receitas
 
 ::: info Como esta página foi conferida
-Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. Os menus e rótulos abaixo são os da janela em português.
+Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Os menus e rótulos abaixo são os da janela em português.
 :::
 
 Uma receita (`.recipe`) é uma lista de passos, um por linha, que buscam linhas de uma fonte, filtram e reorganizam essas linhas e planejam o que gravar. O Tyto abre uma receita numa aba como um caderno: **embaixo de cada passo, o resultado dele**, uma tabela que você lê enquanto escreve a próxima linha.
@@ -31,7 +31,18 @@ Embaixo de cada passo há uma linha e, depois, a tabela dele:
 - **A idade**: quando o passo rodou e quão antigos são os dados, como _rodou há 2 min. · dados buscados há 3 h_. A idade dos dados é quando a fonte os buscou, que pode ser bem antes de o passo rodar. As idades vão aumentando enquanto a aba está aberta.
 - **A tabela** mostra as 20 primeiras linhas do passo e quantas ficaram de fora (_mais 30 linhas_). Uma tabela larga rola para o lado dentro do passo. Um valor longo é cortado com reticências; pare o mouse sobre ele para ler inteiro, e sobre o nome de uma coluna para ver o tipo dela.
 
-A tabela é uma prévia: o passo continua trabalhando com todas as linhas.
+A tabela é uma prévia: o passo continua trabalhando com todas as linhas. Para ver todas, veja [Mostrar uma tabela inteira](#mostrar-uma-tabela-inteira).
+
+## Mostrar uma tabela inteira
+
+Uma linha `show table` desenha cada passo dali para baixo na **visão de Tabela** em vez da prévia: todas as linhas da tabela, quantas forem, numa caixa de doze linhas que rola. Só as linhas à vista são desenhadas, então uma tabela de milhares rola tão rápido quanto uma de dez. `show summary` desenha a mesma visão com uma linha de **Total geral** embaixo, somando cada coluna de números.
+
+- **Ordenar**: clique no nome de uma coluna para ordenar por ela, de novo para inverter, uma terceira vez para voltar à ordem da receita. A ordem é da visão: o passo seguinte continua lendo as linhas na ordem em que a receita as fez.
+- **Filtrar**: digite em _Filtrar linhas_ para manter as linhas que têm o texto em alguma coluna mostrada, sem ligar para maiúsculas ou acentos. _Linhas: 111 de 5.000_ diz quantas ficaram. Os totais de um Summary somam as linhas que o filtro mantém.
+- **Colunas**: o botão **Colunas** lista as colunas com uma caixa cada; desmarque uma para escondê-la. O filtro não procura numa coluna escondida. A última coluna mostrada fica.
+- **Selecionar e copiar**: clique numa célula e depois, com Shift, em outra para selecionar o retângulo entre elas; Ctrl+A (⌘A no macOS) na tabela seleciona todas as linhas. **Copiar**, ou Ctrl+C, põe a seleção na área de transferência como texto separado por tabulações, que cola numa planilha como células, com os valores inteiros, até 50.000 linhas.
+
+Números ficam alinhados à direita e agrupados, datas são escritas no idioma da janela, e os endereços web (`http` e `https`) de uma coluna `link` abrem no seu navegador. Um endereço de qualquer outro tipo fica como texto: o Tyto nunca o entrega ao sistema.
 
 ## Recolher uma tabela
 

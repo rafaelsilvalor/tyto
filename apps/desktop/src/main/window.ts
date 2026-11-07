@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 import { BrowserWindow, shell } from 'electron';
 
+import { externalUrlAllowed } from '../../shared/external-url.js';
 import { frameNavigationAllowed } from './plugin-protocol.js';
 
 /**
@@ -82,8 +83,10 @@ export function createMainWindow(options: WindowOptions): BrowserWindow {
     if (!frameNavigationAllowed(details.frame?.url ?? '', details.url)) details.preventDefault();
   });
 
+  // Only the web's two schemes reach the system (TYTO-379): `openExternal` on a `file:` or a
+  // custom scheme would run whatever program owns it, with a link a source fetched.
   window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    if (externalUrlAllowed(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
 

@@ -1003,6 +1003,112 @@ tyto-preview-pane[hidden] {
   color: var(--tyto-text-muted);
 }
 
+/* The Table view (TYTO-379, recipe-table-view.ts): a bar, then a viewport of fixed height in
+   which only the rows in sight exist, each placed at its own top over a canvas as tall as every
+   row. Every row has the same height and every column the same width (ROW_HEIGHT and
+   COLUMN_WIDTH in recipe-table-model.ts, set on the element as --recipe-table-row and
+   --recipe-table-column), so the header, the rows and the totals line up without measuring. */
+.recipe-table__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tyto-space-2) var(--tyto-space-4);
+  padding-bottom: var(--tyto-space-2);
+  color: var(--tyto-text-muted);
+}
+
+.recipe-table__filter {
+  min-width: 14rem;
+  padding: 0 var(--tyto-space-2);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  background: var(--tyto-surface);
+  color: var(--tyto-text);
+  font: inherit;
+}
+
+.recipe-table__picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tyto-space-1) var(--tyto-space-4);
+  padding-bottom: var(--tyto-space-2);
+}
+
+/* `display` above would override the `hidden` attribute the picker and the totals toggle. */
+.recipe-table__picker[hidden],
+.recipe-table__totals[hidden] {
+  display: none;
+}
+
+.recipe-table__viewport {
+  position: relative;
+  overflow: auto;
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  outline-offset: -1px;
+}
+
+.recipe-table__head,
+.recipe-table__row,
+.recipe-table__totals {
+  display: grid;
+  height: var(--recipe-table-row);
+}
+
+.recipe-table__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tyto-surface);
+}
+
+.recipe-table__canvas {
+  position: relative;
+}
+
+.recipe-table__row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  user-select: none;
+}
+
+.recipe-table__heading,
+.recipe-table__cell {
+  padding: 0 var(--tyto-space-4);
+  overflow: hidden;
+  border-right: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-border);
+  line-height: var(--recipe-table-row);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-table__heading {
+  border-top: none;
+  border-left: none;
+  background: none;
+  color: var(--tyto-text-muted);
+  font: inherit;
+  font-weight: var(--tyto-weight-strong);
+  cursor: pointer;
+}
+
+.recipe-table__cell--number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe-table__cell--selected {
+  background: var(--tyto-selection);
+  color: var(--tyto-text);
+}
+
+.recipe-table__totals {
+  overflow: hidden;
+  font-weight: var(--tyto-weight-strong);
+}
+
 /* Apply while its answer is on its way (TYTO-378): still there, plainly not clickable. */
 .recipe-cell__action[aria-disabled='true'] {
   opacity: 0.5;

@@ -838,6 +838,17 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
       toggled: (at, collapsed) => {
         recipeNotebook.setCollapsed(documentId, at, collapsed);
       },
+      // TYTO-379, ADR 0171: a view's pages and copies, for this tab's kept tables.
+      rows: (request) => {
+        const bridge = window.tyto;
+        if (bridge === undefined) return Promise.resolve({ stale: true });
+        return bridge['recipe:rows']({ documentId, ...request });
+      },
+      copy: (request) => {
+        const bridge = window.tyto;
+        if (bridge === undefined) return Promise.resolve({ stale: true });
+        return bridge['recipe:copy']({ documentId, ...request });
+      },
     },
   };
   const statuses = cellStatuses(text, answer, state.locale);

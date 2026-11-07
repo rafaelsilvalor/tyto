@@ -535,6 +535,19 @@ export interface Catalogue {
   readonly 'recipe.plan.summary.none': string;
   readonly 'recipe.plan.held': string;
   readonly 'recipe.plan.refused': string;
+  /**
+   * TYTO-379, the Table and Summary views (`recipe-table-view.ts`): the quick filter, the column
+   * picker, Copy, the row count with and without a filter, what a copy wrote, the Summary's
+   * totals line, and a page refused because the cell ran again.
+   */
+  readonly 'recipe.table.filter': string;
+  readonly 'recipe.table.columns': string;
+  readonly 'recipe.table.copy': string;
+  readonly 'recipe.table.rows': string;
+  readonly 'recipe.table.matched': string;
+  readonly 'recipe.table.copied': string;
+  readonly 'recipe.table.total': string;
+  readonly 'recipe.table.stale': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -1162,6 +1175,14 @@ export const CATALOGUE_KEYS = [
   'recipe.plan.summary.none',
   'recipe.plan.held',
   'recipe.plan.refused',
+  'recipe.table.filter',
+  'recipe.table.columns',
+  'recipe.table.copy',
+  'recipe.table.rows',
+  'recipe.table.matched',
+  'recipe.table.copied',
+  'recipe.table.total',
+  'recipe.table.stale',
   'status.problems.new',
   'menu.about',
   'shell.about.version',

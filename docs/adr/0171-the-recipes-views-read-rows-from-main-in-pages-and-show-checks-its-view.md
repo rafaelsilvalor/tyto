@@ -67,3 +67,13 @@ offset, limit ≤ 500, sort?, filter?, columns?}` answers `{columns, rows, total
 - A copy of thousands of rows never crosses to the window, and is never cut at 1,000 characters.
 - Two new channels, `recipe:rows` and `recipe:copy`, have no window caller until the Table view
   lands (TYTO-379's second pull request).
+
+## Notes from the build
+
+- 2026-11-07 (TYTO-379, second pull request): a cell with no `show` line at or above it keeps
+  the compact preview of its first rows (TYTO-377); only `show table` and `show summary` draw
+  the paged view. Decision 9 is read as "the view chosen above it, when one was".
+- 2026-11-07 (TYTO-379, second pull request): `recipe:copy` gained an optional `copyColumns`,
+  the columns written, apart from `columns`, which the quick filter matches over. Filtering over
+  the copied columns, as the first pull request did, could copy different rows than the view
+  showed when the selection spanned only some of the shown columns (decision 6).

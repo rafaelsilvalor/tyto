@@ -361,8 +361,9 @@ describe('the bridge', () => {
       // `recipe:apply` has no window caller until the notebook's Apply button; its logic is in
       // `recipe-apply.test.ts`.
       'recipe:apply',
-      // TYTO-379, ADR 0171: a view's pages and its copy. No window caller until the Table view
-      // (TYTO-379's second pull request); `ipc.test.ts` and `recipe-rows.test.ts` cover them.
+      // TYTO-379, ADR 0171: a view's pages and its copy, which the Table view calls.
+      // `recipe-table.desktop.test.ts` scrolls, sorts and filters through `recipe:rows`; copy
+      // writes the real clipboard, which no suite should, so `ipc.test.ts` holds it.
       'recipe:copy',
       'recipe:rows',
       'recipe:run',
@@ -965,6 +966,16 @@ describe('switching the language', () => {
     'recipe.plan.summary.none',
     'recipe.plan.held',
     'recipe.plan.refused',
+    // TYTO-379: drawn only under a cell in a Table or Summary view; `recipe-table-view.test.ts`
+    // paints them, and `recipe-table.desktop.test.ts` reads the bar in the real window.
+    'recipe.table.filter',
+    'recipe.table.columns',
+    'recipe.table.copy',
+    'recipe.table.rows',
+    'recipe.table.matched',
+    'recipe.table.copied',
+    'recipe.table.total',
+    'recipe.table.stale',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and

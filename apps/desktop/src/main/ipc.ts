@@ -585,11 +585,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       });
     },
 
-    'recipe:copy': ({ documentId, index, ranAt, offset, limit, sort, filter, columns }) => {
+    'recipe:copy': (request) => {
+      const { documentId, index, ranAt, offset, limit, sort, filter, columns } = request;
       const kept = recipes.table(documentId, index);
       if (kept === undefined || kept.ranAt !== ranAt) return Promise.resolve({ stale: true });
       const view = rowViews.view(documentId, index, ranAt, kept.table, { sort, filter, columns });
-      const shown = visibleColumns(kept.table, columns);
+      // The filter kept rows over every shown column; the copy writes the ones selected.
+      const shown = visibleColumns(kept.table, request.copyColumns ?? columns);
       const end = Math.min(offset + limit, view.permutation.length);
       writeClipboard(rowsAsTsv(kept.table, view.permutation, offset, end, shown));
       return Promise.resolve({ rows: Math.max(0, end - offset), columns: shown.length });
