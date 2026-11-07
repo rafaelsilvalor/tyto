@@ -26,6 +26,8 @@ Quase tudo o que dá errado no Tyto aparece no painel de Problemas — num brief
 
 **`tyto render` para com `E_FORMATS_READ`.** O arquivo que `--formats-file` aponta não existe. Confira o caminho, ou tire a opção: sem ela, vale o `formats.yaml` da pasta em que você executa o comando e, sem ele, os tamanhos que vêm com o Tyto; veja [Linha de comando](../command-line/#antes-da-primeira-renderizacao-tamanhos-e-templates).
 
+**`tyto render` ou `tyto plugin sync` para com `E_TYTO_HOME_PATH_TOO_LONG`.** A pasta que `TYTO_HOME` aponta é funda demais para as cópias de templates buscadas dentro dela: no Windows um caminho para em 259 caracteres, e uma cópia precisa de uns 172 abaixo da pasta. Aponte `TYTO_HOME` para uma pasta mais curta, como uma logo abaixo da sua pasta de usuário.
+
 ## O log
 
 O Tyto grava um log do que a janela fez: quando abriu, cada vez que o `settings.json` ou o `keybindings.json` mudou, e os avisos que encontrou. **Ajuda ▸ Abrir a pasta do log** abre a pasta; o arquivo é o `tyto.log`. Ele fica na pasta `logs` dentro da pasta da sua versão — veja [Onde o Tyto guarda as suas coisas](../get-started/install.md#onde-o-tyto-guarda-as-suas-coisas).

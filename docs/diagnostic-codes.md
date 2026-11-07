@@ -75,6 +75,7 @@ non-zero.
 | `W_PLUGIN_FILE_TEMPLATE_UNNAMED` | warning | no | A pack a plugin file fetched holds templates no entry names, so they are not offered. |
 | `W_PLUGIN_FILE_REPLACES_INSTALLED` | warning | no | A plugin from the plugin files has the name of one installed with tyto plugin install. |
 | `W_PLUGIN_FILE_FETCH` | warning | no | A source the plugin files name could not be fetched. |
+| `E_TYTO_HOME_PATH_TOO_LONG` | error | no | A path Tyto writes under TYTO_HOME is longer than the system accepts. |
 | `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A commit a plugin file names was fetched and could not be loaded as a plugin. |
 | `E_GALLERY_INDEX_SYNTAX` | error | no | The gallery index could not be read or is not YAML of the shape it needs. |
 | `E_GALLERY_INDEX_ENTRY` | error | no | An entry of the gallery index is refused, and the others stand. |
@@ -279,6 +280,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_FILE_SYNTAX` | no | Only what that file names is missing; a brief that needs it says so on its own. |
 | `E_PLUGIN_FILE_ENTRY` | no | Only that entry is missing; the rest of the file loads. |
 | `E_PLUGIN_FILE_DUPLICATE` | no | Only that name is missing; a brief that needs it says so on its own. |
+| `E_TYTO_HOME_PATH_TOO_LONG` | no | Nothing is fetched under that folder; copies already in its cache still load, and a brief that needs a missing one says so on its own. |
 | `E_PLUGIN_FILE_SOURCE_REFUSED` | no | The commit locked before loads when there is one; otherwise nothing from that source does. |
 | `E_GALLERY_INDEX_SYNTAX` | no | The gallery lists nothing; templates and plugins already installed still load. |
 | `E_GALLERY_INDEX_ENTRY` | no | Only that entry is missing from the gallery. |
@@ -1068,6 +1070,20 @@ Only that name is missing; a brief that needs it says so on its own.
 ```
 
 Parameters: `name`, `file`, `other`
+
+### `E_TYTO_HOME_PATH_TOO_LONG`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
+
+A path Tyto writes under TYTO_HOME is longer than the system accepts.
+
+Nothing is fetched under that folder; copies already in its cache still load, and a brief that needs a missing one says so on its own.
+
+```
+TYTO_HOME '{home}' is too deep a folder: a path Tyto writes under it reaches {length} characters, {reason}. Set TYTO_HOME to a shorter folder.
+```
+
+Parameters: `home`, `length`, `reason`
 
 ### `E_PLUGIN_FILE_SOURCE_REFUSED`
 

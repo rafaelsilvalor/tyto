@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { longestPathUnder } from './home-path.js';
 import {
   type PluginFilesSyncOptions,
   machinePluginFiles,
@@ -182,5 +183,51 @@ describe('the configured templates', () => {
     expect(synced.configured.machine.map(({ template, plugin }) => ({ template, plugin }))).toEqual(
       [{ template: 'tabela', plugin: 'tabelas-pack' }],
     );
+  });
+});
+
+describe('a TYTO_HOME too deep for its copies (TYTO-470)', () => {
+  const workspace = (): { folder: string; trusted: boolean } => ({
+    folder: join(root, 'project'),
+    trusted: true,
+  });
+
+  it('stops before the first fetch with one error for both folders, and writes no cache', async () => {
+    const git = await repository('deep-pack');
+    await pluginFile(machinePluginFiles(home), git);
+    await pluginFile(projectPluginFiles(workspace().folder), git);
+    // The limit, not a real deep folder: Linux CI checks Windows' arithmetic this way.
+    const limit = longestPathUnder(home, process.platform) - 1;
+
+    const synced = await syncPluginFiles(options({ workspace: workspace(), homePath: { limit } }));
+
+    expect(synced.diagnostics.map((item) => item.code)).toEqual(['E_TYTO_HOME_PATH_TOO_LONG']);
+    expect(synced.diagnostics[0]?.message).toContain(home);
+    expect(synced.copies).toEqual([]);
+    expect(await readdir(home)).not.toContain('cache');
+  });
+
+  it('fetches as before from a home that fits', async () => {
+    const git = await repository('shallow-pack');
+    await pluginFile(machinePluginFiles(home), git);
+
+    const synced = await syncPluginFiles(options());
+
+    expect(synced.diagnostics).toEqual([]);
+    expect(synced.copies.map((copy) => copy.plugin)).toEqual(['shallow-pack']);
+  });
+
+  it('turns a path the system refuses under the home into the same error, not a throw', async () => {
+    const git = await repository('refused-pack');
+    await pluginFile(projectPluginFiles(workspace().folder), git);
+    // One name over 255 characters: every system refuses it, with or without long paths.
+    const deepHome = join(root, 'h'.repeat(300));
+
+    const synced = await syncPluginFiles(
+      options({ home: deepHome, workspace: workspace(), homePath: { limit: 100_000 } }),
+    );
+
+    expect(synced.diagnostics.map((item) => item.code)).toEqual(['E_TYTO_HOME_PATH_TOO_LONG']);
+    expect(synced.diagnostics[0]?.message).toContain('the system refused it');
   });
 });

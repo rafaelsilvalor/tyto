@@ -182,6 +182,7 @@ export {
   syncPluginFolder,
 } from './plugin-files.js';
 export { type PluginFileImagesOptions, pluginFileImages } from './plugin-file-images.js';
+export { type HomePathOptions, checkHomePath, homePathProblem } from './home-path.js';
 export {
   type PluginFilesApproval,
   type PluginFilesSyncOptions,
