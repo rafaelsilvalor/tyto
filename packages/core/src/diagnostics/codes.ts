@@ -467,6 +467,27 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
+  // Browser sign-in is the host's (ADR 0174): a plugin asks for an access token and never
+  // opens a browser, so "nobody signed in" and "this host cannot sign in" are two answers a
+  // plugin can tell apart and say to a person.
+  E_SIGNIN_REQUIRED: {
+    severity: 'error',
+    summary: 'A plugin asked for an access token of a sign-in it declared, and nobody signed in.',
+    template:
+      "Plugin '{plugin}' needs sign-in '{id}', and nobody has signed in to it on {host}; sign in from the plugins screen.",
+    spec: 'docs/adr/0174-a-plugin-signs-in-through-the-host-with-pkce-on-loopback.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_SIGNIN_UNAVAILABLE: {
+    severity: 'error',
+    summary: 'A plugin asked for an access token on a host that cannot sign in through a browser.',
+    template:
+      "Plugin '{plugin}' asked for sign-in '{id}', and {host} cannot sign in through a browser.",
+    spec: 'docs/adr/0174-a-plugin-signs-in-through-the-host-with-pkce-on-loopback.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
   // A plugin's private cache and the workspace files it reaches through the host (ADR 0138,
   // completing ADR 0130). Three codes, so a plugin can tell "trust the folder" from the rest.
   E_PLUGIN_CACHE: {

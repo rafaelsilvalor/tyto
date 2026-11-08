@@ -83,6 +83,79 @@ const ENGINE_RANGE =
 /** `major.minor.patch`, with an optional prerelease tag. Narrower than the engine range. */
 const VERSION = /^\d+\.\d+\.\d+(-[0-9A-Za-z-.]+)?$/;
 
+/**
+ * The runtime's own URL parser, read off `globalThis` as `capabilities.ts` reads it: this
+ * package compiles against no platform's types (ADR 0010).
+ */
+const { URL } = globalThis as unknown as {
+  URL: new (input: string) => {
+    readonly protocol: string;
+    readonly hostname: string;
+    readonly username: string;
+    readonly password: string;
+    readonly hash: string;
+  };
+};
+
+/**
+ * The two hosts a sign-in endpoint may reach over plain `http` (ADR 0174): a test provider on
+ * this machine. Anything else carries a person's authorization code or refresh token, which
+ * travels over `https` or not at all.
+ */
+const LOOPBACK_HOSTS: readonly string[] = ['127.0.0.1', 'localhost'];
+
+/** Why a sign-in endpoint is refused, or `undefined` when it is one. */
+function signinUrlProblem(value: string): string | undefined {
+  let parsed: InstanceType<typeof URL>;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return 'must be an absolute URL';
+  }
+  if (parsed.username !== '' || parsed.password !== '') return 'must not carry a user or password';
+  // RFC 6749 section 3.1: an endpoint URI must not include a fragment.
+  if (parsed.hash !== '') return 'must not carry a fragment';
+  if (parsed.protocol === 'https:') return undefined;
+  if (parsed.protocol === 'http:' && LOOPBACK_HOSTS.includes(parsed.hostname)) return undefined;
+  return 'must be an https URL, or http on 127.0.0.1 or localhost';
+}
+
+const signinUrl = z.string().superRefine((value, context) => {
+  const problem = signinUrlProblem(value);
+  if (problem !== undefined) context.addIssue({ code: 'custom', message: problem });
+});
+
+/** A sign-in's id: the `<id>` of `signin:<id>` and of `host.signin.accessToken(id)`. */
+const SIGNIN_ID = /^[a-z][a-z0-9-]*$/;
+
+/** The prefix of the permission that grants a sign-in, `signin:<id>`. */
+const SIGNIN_PERMISSION = 'signin:';
+
+/**
+ * One OAuth 2.0 provider a plugin signs in to through the host (ADR 0174): authorization code
+ * with PKCE, run by the host in the system browser. Tyto keeps no provider list; the plugin
+ * names its own endpoints here, where a person reads them before installing.
+ */
+const signinSchema = z.strictObject({
+  /** The authorization endpoint the browser opens. */
+  authorize: signinUrl,
+  /** The token endpoint the host exchanges the code at, and refreshes at. */
+  token: signinUrl,
+  clientId: z.string().min(1, 'must not be empty'),
+  scopes: z
+    .array(z.string().min(1, 'must not be empty'))
+    .refine((values) => new Set(values).size === values.length, 'must not repeat a scope'),
+  /**
+   * **Not a secret.** An installed app cannot keep one: Google issues its desktop clients a
+   * "client secret" its own documentation calls non-confidential, and its token endpoint asks
+   * for it anyway. Optional, sent only when declared, and readable by anybody who reads the
+   * manifest, so a provider that treats it as confidential cannot be declared this way.
+   */
+  clientSecret: z.string().min(1, 'must not be empty').optional(),
+});
+
+export type SigninDeclaration = z.infer<typeof signinSchema>;
+
 export const pluginManifestSchema = z
   .strictObject({
     name: z
@@ -110,7 +183,8 @@ export const pluginManifestSchema = z
      * Validated as shape only: non-empty strings, no duplicates. The *vocabulary* stays open
      * because the vocabulary is still growing — `net:<host>` gates `host.fetch` and
      * `credentials:<key>` gates `host.credentials` (ADR 0042), `font:<family>` sends a code template
-     * a face installed on this machine (ADR 0048) — and closing an enum now would
+     * a face installed on this machine (ADR 0048), `signin:<id>` gates `host.signin` and must
+     * match a `signin` entry (ADR 0174) — and closing an enum now would
      * reject the next scope before it is written. E11 closes it; until then a typo in a
      * permission is caught by the grant prompt, which a person reads.
      */
@@ -152,6 +226,16 @@ export const pluginManifestSchema = z
       )
       .refine((values) => new Set(values).size === values.length, 'must not repeat a write')
       .optional(),
+    /**
+     * The providers this plugin signs in to through the host, by id (ADR 0174). Each entry
+     * needs the permission `signin:<id>`, and each `signin:<id>` permission needs its entry.
+     */
+    signin: z
+      .record(
+        z.string().regex(SIGNIN_ID, 'must be lowercase letters, digits and hyphens'),
+        signinSchema,
+      )
+      .optional(),
   })
   .superRefine((manifest, context) => {
     const namespaced = manifest.contributes.filter((point) => NAMESPACED_POINTS.includes(point));
@@ -169,6 +253,36 @@ export const pluginManifestSchema = z
         message: 'is declared by a plugin that contributes no recipe-verb, so nothing could write',
       });
     }
+    const declared = Object.keys(manifest.signin ?? {});
+    for (const id of declared) {
+      if (!manifest.permissions.includes(`${SIGNIN_PERMISSION}${id}`)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['signin', id],
+          message: `needs the permission ${SIGNIN_PERMISSION}${id}`,
+        });
+      }
+    }
+    manifest.permissions.forEach((permission, index) => {
+      if (
+        permission.startsWith(SIGNIN_PERMISSION) &&
+        !declared.includes(permission.slice(SIGNIN_PERMISSION.length))
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['permissions', index],
+          message: `grants a sign-in the manifest does not declare under signin`,
+        });
+      }
+      // A sign-in's tokens are the host's (ADR 0174): no permission reaches them as a credential.
+      if (permission.startsWith(`credentials:${SIGNIN_PERMISSION}`)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['permissions', index],
+          message: "names a sign-in's tokens, which only the host holds; use host.signin",
+        });
+      }
+    });
   });
 
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;

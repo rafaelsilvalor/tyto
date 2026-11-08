@@ -33,6 +33,7 @@ my-plugin/
 | `config`      | optional `{ "$schema": "…" }`, never dereferenced by the host                                                                 |
 | `namespace`   | lowercase letters, digits and hyphens; required with `recipe-verb` or `recipe-derivation`, one plugin's alone (ADR 0135)      |
 | `writes`      | optional; the kinds of write the plugin's recipe actions and sinks may plan, lowercase words, no repeats (ADR 0129, ADR 0135) |
+| `signin`      | optional; the providers the host signs in to for the plugin, by id, each paired with a `signin:<id>` permission (ADR 0174)    |
 
 Unknown keys are refused, one complaint per stray key rather than one for the object holding them.
 
@@ -673,6 +674,7 @@ interface PluginHost {
   fetch(url, init?): Promise<HostFetchResponse>; // net:<host> only; redirects not followed
   cache: HostCache;                             // private, no permission; get/put/delete/list (ADR 0138)
   workspace: HostWorkspace;                     // workspace:read / workspace:write; read/write (ADR 0138)
+  signin: HostSignin;                           // signin:<id>; accessToken(id), never a browser (ADR 0174)
   log: Logger; events: TypedEmitter<HostEvents>;
 }
 ```
@@ -692,7 +694,7 @@ interface PluginHost {
 
 **A plugin can store and forget its own declared keys** (ADR 0134). `host.credentials` is a function with two methods: `host.credentials(key)` reads, as it always has; `host.credentials.set(key, value)` stores and resolves to nothing; `host.credentials.delete(key)` forgets and resolves to `true` when there was a value. Both sit behind the same `credentials:<key>` permission and the same `checkedCapabilities`, so an undeclared key is `E_PERMISSION` on either side of the isolation boundary. A value is a non-empty string of at most **16 KiB in UTF-8** (`CREDENTIAL_VALUE_LIMIT_BYTES`); over it is `E_CREDENTIAL_TOO_LARGE`, and an empty one is refused as a `TypeError` — forgetting is `delete`. The writers are optional on `HostCapabilities` (`storeCredential`, `deleteCredential`): a host without them answers both with `E_CREDENTIAL_READ_ONLY`, naming where it reads from.
 
-The network and the secrets are a port, `HostCapabilities`. **In the CLI a credential is an environment variable**, `TYTO_PLUGIN_<NAME>_<KEY>`, both halves upper-cased with every character that is not a letter or a digit turned into `_` — plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN` — and an empty variable is unset. **The CLI's credentials are read-only**: a plugin's `set` or `delete` there is `E_CREDENTIAL_READ_ONLY`, naming the variable, because the environment is the person's to set and a value written into it would vanish with the process. **On the desktop a credential is a keychain entry and nothing else** (`CLAUDE.md`): `safeStorage`, under the account `plugin:<name>:<key>`, with no environment fallback. A person stores one in the plugins screen, beside the plugin that declares it (TYTO-187), or the plugin stores one itself with `host.credentials.set`; until then a declared key answers `E_CREDENTIAL_MISSING`, and its message points to that screen. The window can set or forget only a key an installed manifest declares, within the same 16 KiB, and it never reads one back: the screen learns whether a key is set and nothing more. **The account prefix `signin:<plugin>:<id>` is reserved** for the tokens browser sign-in will keep (ADR 0131): `plugin:<name>:<key>` can never produce it, so no `credentials:<key>` reaches a sign-in token. The desktop's network is Electron's `net.fetch`, with `redirect: 'manual'`, so it honours the system's proxy.
+The network and the secrets are a port, `HostCapabilities`. **In the CLI a credential is an environment variable**, `TYTO_PLUGIN_<NAME>_<KEY>`, both halves upper-cased with every character that is not a letter or a digit turned into `_` — plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN` — and an empty variable is unset. **The CLI's credentials are read-only**: a plugin's `set` or `delete` there is `E_CREDENTIAL_READ_ONLY`, naming the variable, because the environment is the person's to set and a value written into it would vanish with the process. **On the desktop a credential is a keychain entry and nothing else** (`CLAUDE.md`): `safeStorage`, under the account `plugin:<name>:<key>`, with no environment fallback. A person stores one in the plugins screen, beside the plugin that declares it (TYTO-187), or the plugin stores one itself with `host.credentials.set`; until then a declared key answers `E_CREDENTIAL_MISSING`, and its message points to that screen. The window can set or forget only a key an installed manifest declares, within the same 16 KiB, and it never reads one back: the screen learns whether a key is set and nothing more. **The account prefix `signin:<plugin>:<id>` is reserved** for the tokens browser sign-in keeps (ADR 0131, ADR 0174): `plugin:<name>:<key>` can never produce it, so no `credentials:<key>` reaches a sign-in token. The desktop's network is Electron's `net.fetch`, with `redirect: 'manual'`, so it honours the system's proxy.
 
 ### `host.cache` and `host.workspace` (ADR 0138)
 
@@ -707,6 +709,36 @@ The network and the secrets are a port, `HostCapabilities`. **In the CLI a crede
 **The workspace is the folder the person opened**, read and written only through the host. `read(path)` resolves to the bytes; `write(path, bytes | string)` writes the file whole and resolves to `null`. A path is relative to the folder: an absolute one, a `..` that leaves it, a link that lands outside it, a missing file, a file over 32 MiB, no folder open, and a write into `.tyto/` — refused even in a trusted folder — are `E_WORKSPACE_FILE`; a restricted folder is `E_WORKSPACE_FILE_RESTRICTED`, whose remedy is trusting it. The folder and its trust are read on every call. `checkedCapabilities` refuses the permission, the sizes and the lexical path; the adapter confines the path again after `realpath`.
 
 Six optional ports on `HostCapabilities` answer them: `cacheGet`, `cachePut`, `cacheDelete`, `cacheList`, `workspaceRead`, `workspaceWrite`, each taking the plugin's name first. A host without the cache ports answers `E_PLUGIN_CACHE`, without the workspace ports `E_WORKSPACE_FILE`, naming itself by `hostName`. **In the CLI `tyto render` has both and `tyto watch` the cache only** (ADR 0118). On disk an entry is `TYTO_HOME/cache/plugins/<plugin>/<sha256(key)>.bin` with a `.json` sidecar `{ key, storedAt, size, sha256 }`, both written atomically; an entry whose bytes do not match the sidecar's size or digest is a miss. **The desktop has both**, against the folder open in the window at each call.
+
+### `host.signin` (ADR 0131, ADR 0174)
+
+A plugin that needs a person's own sign-in — a connector that creates files in somebody's storage — declares the provider in its manifest and asks the host for an access token. **The host runs the browser flow; the plugin never opens a browser and never holds the refresh token.**
+
+```json
+{
+  "permissions": ["signin:storage"],
+  "signin": {
+    "storage": {
+      "authorize": "https://accounts.example.com/o/oauth2/v2/auth",
+      "token": "https://oauth2.example.com/token",
+      "clientId": "1234.apps.example.com",
+      "scopes": ["openid", "email"]
+    }
+  }
+}
+```
+
+| Permission    | Allows                                                          |
+| ------------- | --------------------------------------------------------------- |
+| `signin:<id>` | `host.signin.accessToken('<id>')`, with its `signin.<id>` entry |
+
+**The permission and the entry come in pairs**: a `signin.<id>` entry without `signin:<id>`, or the permission without the entry, is refused at install with its field path. An id is lowercase letters, digits and hyphens; the entry is strict (`authorize`, `token`, `clientId`, `scopes`, optional `clientSecret`). `authorize` and `token` are absolute `https` URLs; plain `http` is accepted only on `127.0.0.1` and `localhost`, for a test provider, and a user, a password or a fragment in the URL is refused. **`clientSecret` is not a secret**: an installed app cannot keep one, and a provider such as Google issues its desktop clients a non-confidential one that its token endpoint still asks for. Declare it only when the provider says it is public. A `credentials:signin:…` permission is refused: a sign-in's tokens are the host's.
+
+`host.signin.accessToken(id)` resolves to a current access token, refreshed by the host when it has expired. An undeclared id is `E_PERMISSION`; a declared one nobody has signed in to is `E_SIGNIN_REQUIRED`, whose message points to the plugins screen; **a host that cannot sign in through a browser — the CLI — answers `E_SIGNIN_UNAVAILABLE`**. Only a person starts a sign-in, from the host's screen, so a plugin that is answered `E_SIGNIN_REQUIRED` says so on its own surfaces rather than retrying. `host.credentials` on any key beginning `signin:` is `E_PERMISSION`, whatever the manifest declares.
+
+The port is `HostCapabilities.signinAccessToken(plugin, id)`, optional: it answers the token or `undefined` when nobody signed in, and `checkedCapabilities` refuses an answer that is not a non-empty string, so an adapter's token record cannot reach the plugin. Across the isolation boundary it is one request, `signinAccessToken`, with the id out and the token back (protocol 18). A plugin that calls it needs `@tyto/plugin-api` 0.16: write `"engine": ">=0.16"`. In a plugin's own tests, `testPlugin({ signins: { storage: 'token' } })` answers that token and `harness.signOut('storage')` makes the next call `E_SIGNIN_REQUIRED` (ADR 0150).
+
+**The desktop's flow** (ADR 0174, landing in TYTO-374's later pull requests): PKCE `S256` with a random `state`, a redirect listener on `127.0.0.1` at a port the system picks, one callback and a five-minute limit, the code exchanged through `net.fetch`; the keychain keeps `{ refresh, label, since }` under `signin:<plugin>:<id>`, the access token stays in main's memory, a refresh answered `invalid_grant` deletes the entry, and signing out deletes it.
 
 ## Isolation
 

@@ -7,6 +7,7 @@ import {
   type PluginCacheStored,
   hostCache,
   hostCredentials,
+  hostSignin,
   hostWorkspace,
   responseOf,
 } from '../capabilities.js';
@@ -34,6 +35,7 @@ import {
   describeIssues,
   fetchedResponseSchema,
   hostMessageSchema,
+  signinTokenSchema,
   workspaceBytesSchema,
 } from './protocol.js';
 
@@ -260,6 +262,10 @@ export function runGuest(
       workspaceWrite: async (path, bytes) => {
         await request('workspaceWrite', [path, bytes], storedSchema);
       },
+    }),
+    signin: hostSignin({
+      signinAccessToken: async (id) =>
+        (await request('signinAccessToken', [id], signinTokenSchema)) as string,
     }),
     log,
     events: {

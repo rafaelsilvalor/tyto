@@ -62,6 +62,8 @@ non-zero.
 | `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
 | `E_CREDENTIAL_TOO_LARGE` | error | no | A credential to store is larger than the ceiling every host keeps (ADR 0134). |
 | `E_CREDENTIAL_READ_ONLY` | error | no | A plugin tried to store or forget a credential on a host that only reads them. |
+| `E_SIGNIN_REQUIRED` | error | no | A plugin asked for an access token of a sign-in it declared, and nobody signed in. |
+| `E_SIGNIN_UNAVAILABLE` | error | no | A plugin asked for an access token on a host that cannot sign in through a browser. |
 | `E_PLUGIN_CACHE` | error | no | A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache. |
 | `E_WORKSPACE_FILE` | error | no | A plugin's workspace file was refused: outside the folder, through a link, missing, too large, inside .tyto/, or no folder is open. |
 | `E_WORKSPACE_FILE_RESTRICTED` | error | no | A plugin asked for a file of a workspace the person has not trusted. |
@@ -279,6 +281,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_TOO_LARGE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_READ_ONLY` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_SIGNIN_REQUIRED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_SIGNIN_UNAVAILABLE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_CACHE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WORKSPACE_FILE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WORKSPACE_FILE_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
@@ -995,6 +999,34 @@ Plugin '{plugin}' tried to change credential '{key}', and {source} is read-only 
 ```
 
 Parameters: `plugin`, `key`, `source`
+
+### `E_SIGNIN_REQUIRED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0174-a-plugin-signs-in-through-the-host-with-pkce-on-loopback.md`
+
+A plugin asked for an access token of a sign-in it declared, and nobody signed in.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' needs sign-in '{id}', and nobody has signed in to it on {host}; sign in from the plugins screen.
+```
+
+Parameters: `plugin`, `id`, `host`
+
+### `E_SIGNIN_UNAVAILABLE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0174-a-plugin-signs-in-through-the-host-with-pkce-on-loopback.md`
+
+A plugin asked for an access token on a host that cannot sign in through a browser.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for sign-in '{id}', and {host} cannot sign in through a browser.
+```
+
+Parameters: `plugin`, `id`, `host`
 
 ### `E_PLUGIN_CACHE`
 

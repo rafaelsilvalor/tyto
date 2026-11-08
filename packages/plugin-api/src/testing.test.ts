@@ -128,6 +128,60 @@ describe('testPlugin', () => {
     await harness.value.close();
   });
 
+  it('hands a declared sign-in its access token, and E_SIGNIN_REQUIRED after sign-out', async () => {
+    const signing = (host: PluginHost): void => {
+      host.registerRecipeVerb({
+        id: 'demo.pull',
+        kind: 'source',
+        arguments: [],
+        page: async () => {
+          const token = await host.signin.accessToken('provider').then(
+            (value) => value,
+            (cause: { code: string }) => cause.code,
+          );
+          return ok({
+            table: {
+              columns: [{ name: 'token', type: 'text', origin: 'demo' }],
+              rows: [
+                {
+                  key: 'D-1',
+                  values: { token },
+                  provenance: { source: 'demo', id: 'D-1', fetchedAt: '2026-10-27' },
+                },
+              ],
+            },
+          });
+        },
+      });
+    };
+    const harness = await testPlugin({
+      manifest: manifestText({
+        contributes: ['recipe-verb'],
+        permissions: ['signin:provider'],
+        signin: {
+          provider: {
+            authorize: 'http://127.0.0.1:1/auth',
+            token: 'http://127.0.0.1:1/token',
+            clientId: 'client',
+            scopes: [],
+          },
+        },
+      }),
+      load: moduleOf(signing),
+      signins: { provider: 'access-token' },
+    });
+    if (!harness.ok) throw new Error(harness.error[0]?.message);
+    const tokenOf = async (): Promise<unknown> => {
+      const run = await harness.value.runRecipe('demo.pull');
+      return run.ok ? run.value.table?.rows[0]?.values['token'] : run.error[0]?.code;
+    };
+
+    expect(await tokenOf()).toBe('access-token');
+    expect(harness.value.signOut('provider')).toBe(true);
+    expect(await tokenOf()).toBe('E_SIGNIN_REQUIRED');
+    await harness.value.close();
+  });
+
   it('refuses an answer that could not cross a process, as the app does', async () => {
     const harness = await testPlugin({
       manifest: manifestText(),

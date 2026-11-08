@@ -41,9 +41,11 @@ import { z } from 'zod';
  * same way (ADR 0058, TYTO-502); 16 since a planned operation may carry its `payload` and an
  * action or a sink may register `apply`, a field and a callable the strict plan and verb
  * schemas of a side on 15 would refuse (ADR 0170, TYTO-378); 17 since a panel may register
- * `call`, a callable the strict panel schema of a side on 16 would refuse (ADR 0173, TYTO-372).
+ * `call`, a callable the strict panel schema of a side on 16 would refuse (ADR 0173, TYTO-372);
+ * 18 since a plugin may ask for a sign-in's access token, a request a host on 17 would refuse
+ * as an unknown capability (ADR 0174, TYTO-374).
  */
-export const RPC_PROTOCOL_VERSION = 17;
+export const RPC_PROTOCOL_VERSION = 18;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -195,6 +197,7 @@ const requestedCapabilitySchema = z.enum([
   'cacheList',
   'workspaceRead',
   'workspaceWrite',
+  'signinAccessToken',
 ]);
 export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
 
@@ -226,7 +229,7 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
   }),
   /**
    * The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`
-   * and its `.set` and `.delete`, `host.cache` and `host.workspace`.
+   * and its `.set` and `.delete`, `host.cache`, `host.workspace` and `host.signin`.
    */
   z.strictObject({
     protocol,
@@ -287,6 +290,13 @@ export const cacheListingSchema = z.array(
   }),
 );
 export const workspaceBytesSchema = bytesSchema;
+
+/**
+ * `host.signin.accessToken` (ADR 0174): the id goes out, the access token comes back, and that
+ * is the whole exchange. No message carries a refresh token, in either direction.
+ */
+export const signinArgsSchema = z.tuple([z.string().min(1)]);
+export const signinTokenSchema = z.string().min(1);
 
 /** What `host.fetch` answers, checked by the guest before the plugin sees it. */
 export const fetchedResponseSchema = z.strictObject({

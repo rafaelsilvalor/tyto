@@ -62,6 +62,12 @@ export interface TestPluginOptions {
   /** Credentials by key. `host.credentials.set` and `delete` change this harness's copy. */
   readonly secrets?: Readonly<Record<string, string>>;
   /**
+   * Access tokens by sign-in id, as though a person had signed in through the host (ADR 0174).
+   * A declared id left out answers `E_SIGNIN_REQUIRED`, as a host where nobody signed in does;
+   * {@link PluginHarness.signOut} removes one mid-test.
+   */
+  readonly signins?: Readonly<Record<string, string>>;
+  /**
    * Answers `host.fetch`, after the manifest's permissions allowed the URL. Absent, a fetch
    * rejects naming the URL, so a test that forgot to stub one is told which.
    */
@@ -103,6 +109,8 @@ export interface PluginHarness {
   readonly log: readonly string[];
   /** The credential the plugin holds now, after any `set` or `delete` of its own. */
   secret(key: string): string | undefined;
+  /** Forgets a sign-in, as the person signing out would; `true` when there was one. */
+  signOut(id: string): boolean;
   /** The reason, if the plugin's side of the channel ended without being asked to. */
   crashed(): string | undefined;
   close(): Promise<void>;
@@ -112,6 +120,7 @@ function capabilitiesOf(
   plugin: string,
   options: TestPluginOptions,
   secrets: Map<string, string>,
+  signins: Map<string, string>,
 ): HostCapabilities {
   const fetch =
     options.fetch ??
@@ -129,6 +138,7 @@ function capabilitiesOf(
       return Promise.resolve();
     },
     deleteCredential: (_plugin, key) => Promise.resolve(secrets.delete(key)),
+    signinAccessToken: (_plugin, id) => Promise.resolve(signins.get(id)),
     ...options.capabilities,
   };
 }
@@ -147,13 +157,14 @@ export async function testPlugin(
 
   const log: string[] = [];
   const secrets = new Map(Object.entries(options.secrets ?? {}));
+  const signins = new Map(Object.entries(options.signins ?? {}));
   const channel = inProcessChannel((guest) => runGuest(guest, options.load, IN_PROCESS));
   const connected = await connectIsolatedPlugin({
     name: manifest.name,
     manifest: manifest as unknown,
     channel,
     requireSandbox: false,
-    capabilities: capabilitiesOf(manifest.name, options, secrets),
+    capabilities: capabilitiesOf(manifest.name, options, secrets, signins),
     ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
     log: {
       debug: (line) => log.push(`debug: ${line}`),
@@ -211,6 +222,7 @@ export async function testPlugin(
       });
     },
     secret: (key) => secrets.get(key),
+    signOut: (id) => signins.delete(id),
     crashed: () => isolated.crashed(),
     close: () => isolated.close(),
   });

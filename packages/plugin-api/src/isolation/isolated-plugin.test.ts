@@ -175,6 +175,7 @@ async function isolate(
     readonly contributes?: readonly string[];
     readonly namespace?: string;
     readonly writes?: readonly string[];
+    readonly signin?: Readonly<Record<string, unknown>>;
     /** `texto` unless a test holds two plugins in one host. */
     readonly name?: string;
   } = {},
@@ -191,6 +192,7 @@ async function isolate(
       contributes: options.contributes ?? MANIFEST.contributes,
       ...(options.namespace === undefined ? {} : { namespace: options.namespace }),
       ...(options.writes === undefined ? {} : { writes: options.writes }),
+      ...(options.signin === undefined ? {} : { signin: options.signin }),
     },
     channel: pair.host,
     ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
@@ -423,7 +425,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 16 and this host speaks 17.",
+      `Plugin 'texto' failed to activate: its process speaks protocol ${String(RPC_PROTOCOL_VERSION - 1)} and this host speaks ${String(RPC_PROTOCOL_VERSION)}.`,
     );
   });
 
@@ -786,6 +788,101 @@ describe('host.fetch and host.credentials across the boundary', () => {
     const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
     expect(answer.ok && answer.value).toBe('E_CREDENTIAL_TOO_LARGE');
     expect(stored.get('token')).toHaveLength(CREDENTIAL_VALUE_LIMIT_BYTES);
+  });
+});
+
+describe('host.signin across the boundary (ADR 0174)', () => {
+  const PROVIDER = {
+    authorize: 'https://accounts.example.com/auth',
+    token: 'https://accounts.example.com/token',
+    clientId: 'client',
+    scopes: ['email'],
+  };
+
+  /**
+   * A host that ran a sign-in: its keychain holds the refresh token under the key the desktop
+   * keeps it at, and its sign-in port answers the access token.
+   */
+  const SIGNED_IN: HostCapabilities = {
+    fetch: () => Promise.reject(new Error('no network here')),
+    credential: (_plugin, key) =>
+      Promise.resolve(key === 'signin:provider' ? 'refresh-token' : undefined),
+    describeCredential: () => 'the keychain',
+    signinAccessToken: (_plugin, id) =>
+      Promise.resolve(id === 'provider' ? 'access-token' : undefined),
+  };
+
+  const asking = (ask: (host: PluginHost) => Promise<string>) => (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () => ok(await ask(host)),
+    });
+
+  const codeOf = (attempt: Promise<unknown>): Promise<string> =>
+    attempt.then(
+      (value) => String(value),
+      (cause: { code?: string }) => cause.code ?? 'thrown',
+    );
+
+  it('hands the plugin the access token and nothing else crosses the wire', async () => {
+    const wire: string[] = [];
+    const pair = channelPair((guest) =>
+      runConfined(guest, () =>
+        Promise.resolve({
+          activate: asking(async (host) => {
+            const token = await host.signin.accessToken('provider');
+            const other = await codeOf(host.signin.accessToken('other'));
+            const refresh = await codeOf(host.credentials('signin:provider'));
+            return `${token} ${other} ${refresh}`;
+          }),
+        }),
+      ),
+    );
+    const spied: PluginChannel = {
+      ...pair.host,
+      send: (message) => {
+        wire.push(JSON.stringify(message));
+        pair.host.send(message);
+      },
+      onMessage: (listener) =>
+        pair.host.onMessage((message) => {
+          wire.push(JSON.stringify(message));
+          listener(message);
+        }),
+    };
+    const connected = await connectIsolatedPlugin({
+      requireSandbox: true,
+      name: 'texto',
+      manifest: { ...MANIFEST, permissions: ['signin:provider'], signin: { provider: PROVIDER } },
+      channel: spied,
+      capabilities: SIGNED_IN,
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value).toBe('access-token E_PERMISSION E_PERMISSION');
+    expect(wire.filter((line) => line.includes('access-token'))).toHaveLength(2);
+    expect(wire.filter((line) => line.includes('refresh-token'))).toEqual([]);
+  });
+
+  it('answers E_SIGNIN_REQUIRED and E_SIGNIN_UNAVAILABLE with the code the host decided', async () => {
+    const ask = asking(async (host) => codeOf(host.signin.accessToken('provider')));
+    const declared = { permissions: ['signin:provider'], signin: { provider: PROVIDER } };
+
+    const nobody = await isolate(ask, {
+      ...declared,
+      capabilities: { ...SIGNED_IN, signinAccessToken: () => Promise.resolve(undefined) },
+    });
+    const { signinAccessToken: _port, ...withoutSignin } = SIGNED_IN;
+    const cli = await isolate(ask, { ...declared, capabilities: withoutSignin });
+    const answers = await Promise.all(
+      [nobody, cli].map(async ({ connected }) => {
+        if (!connected.ok) throw new Error(connected.error[0]?.message);
+        const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+        return answer.ok ? answer.value : '';
+      }),
+    );
+    expect(answers).toEqual(['E_SIGNIN_REQUIRED', 'E_SIGNIN_UNAVAILABLE']);
   });
 });
 
