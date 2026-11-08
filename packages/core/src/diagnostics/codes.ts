@@ -1758,6 +1758,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'Nothing of that plan is written, and no recipe state is committed.',
   },
+  // `to-brief` checks its rows against the template and the workspace before it plans, so a
+  // brief that could not compile, or a file outside the workspace, is never shown (ADR 0172).
+  E_RECIPE_BRIEF: {
+    severity: 'error',
+    summary:
+      "'to-brief' cannot plan its briefs: an unknown template or slot, a value brief text cannot hold, two rows with one file name, or a folder it may not write.",
+    template: "'to-brief' {problem}.",
+    spec: 'docs/adr/0172-to-brief-writes-one-brief-per-row-through-host-ports.md',
+    fatal: false,
+    fatality:
+      'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
+  },
   E_RECIPE_VERB: {
     severity: 'error',
     summary: 'A verb a plugin contributes could not do its work, in its own words.',

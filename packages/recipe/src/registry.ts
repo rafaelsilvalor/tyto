@@ -6,6 +6,7 @@ import type { DataResolver } from './data.js';
 import type { Plan } from './plan.js';
 import type { ApplyOutcome, RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
+import { type ToBriefPorts, toBriefVerb } from './to-brief.js';
 import { genericVerbs } from './verbs.js';
 import type { ViewOptionValue, ViewSpecs } from './views.js';
 
@@ -124,6 +125,7 @@ export const GENERIC_VERBS = [
   'stamp',
   'group',
   'count',
+  'to-brief',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;
@@ -181,15 +183,24 @@ function createRegistry<Entry>(
  * (`jira.pull`) can be registered: bare names are Tyto's vocabulary, and a plugin that could
  * take `where` would change what every shared recipe means. `param` and `apply` are in the
  * vocabulary and not in the registry, because the parser reads them and they are never cells.
+ *
+ * `briefs` lends `to-brief` the host's templates and workspace files (ADR 0172), bound to the
+ * workspace and the recipe the run belongs to. Without it `to-brief` is still in the vocabulary
+ * and says this host writes no briefs.
  */
-export function createVerbRegistry(): VerbRegistry {
+export function createVerbRegistry(options: VerbRegistryOptions = {}): VerbRegistry {
   const registry = createRegistry<Verb>('verb', (name) =>
     CONTRIBUTED_NAME.test(name)
       ? undefined
       : "a contributed verb is namespaced as '<plugin>.<verb>', in lower case",
   );
   for (const [name, verb] of Object.entries(genericVerbs)) registry.entries.set(name, verb);
+  registry.entries.set('to-brief', toBriefVerb(options.briefs));
   return registry;
+}
+
+export interface VerbRegistryOptions {
+  readonly briefs?: ToBriefPorts | undefined;
 }
 
 /**

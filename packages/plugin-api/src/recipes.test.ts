@@ -230,7 +230,26 @@ describe('recipeRegistriesOf', () => {
     expect(problem).toBe(
       "No verb named 'demo.number' is available. Available: age, collect, compose, count, " +
         'decide, demo.numbers, derive, extract, group, join, keep, last, map, nearest, path, recall, remember, ' +
-        'rewrite, rollup, rules, run, select, show, sort, stamp, urls, where.',
+        'rewrite, rollup, rules, run, select, show, sort, stamp, to-brief, urls, where.',
+    );
+  });
+
+  it("lends to-brief the host's briefs ports, and to-brief says so without them", async () => {
+    const host = createPluginHost();
+    host.tryActivate(pluginOf('first', (plugin) => numbers(plugin)));
+    const line = 'to-brief template=aula into=briefs name=number slots=titulo:number';
+    const without = await run(recipeRegistriesOf(host.registry), 'demo.numbers', line);
+    expect(without.problem).toBe("'to-brief' cannot run here: this host writes no briefs.");
+    const lent = recipeRegistriesOf(host.registry, {
+      briefs: {
+        template: () => Promise.resolve(undefined),
+        folder: () => undefined,
+        stat: () => Promise.resolve(ok(undefined)),
+        write: () => Promise.resolve(ok(undefined)),
+      },
+    });
+    expect((await run(lent, 'demo.numbers', line)).problem).toBe(
+      "'to-brief' writes only inside a workspace, and this recipe is in none.",
     );
   });
 });

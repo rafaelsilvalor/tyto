@@ -13,6 +13,7 @@ import {
   type PlannedOperation,
   type SourcePage,
   type Table,
+  type ToBriefPorts,
   type Verb,
   type VerbContext,
   type VerbRegistry,
@@ -304,6 +305,12 @@ export interface RecipeRegistryOptions {
    * (ADR 0170 decision 2). The system clock when absent.
    */
   readonly now?: () => string;
+  /**
+   * The host's templates and workspace files lent to the generic `to-brief` (ADR 0172), bound
+   * to the workspace and recipe of this run. Without them `to-brief` says the host writes no
+   * briefs.
+   */
+  readonly briefs?: ToBriefPorts;
 }
 
 /**
@@ -322,7 +329,7 @@ export function recipeRegistriesOf(
   const sectionOf = options.sectionOf ?? (() => undefined);
   const refresh = options.refresh === true;
   const now = options.now ?? (() => new Date().toISOString());
-  const ownVerbs = createVerbRegistry();
+  const ownVerbs = createVerbRegistry({ briefs: options.briefs });
   const ownDerivations = createDerivationRegistry();
   const contributedVerb = (name: string) =>
     contributions.ownedRecipeVerbs().find((owned) => owned.verb.id === name);

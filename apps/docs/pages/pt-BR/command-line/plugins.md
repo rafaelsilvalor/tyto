@@ -10,7 +10,7 @@ Os plugins instalados ficam em `~/.tyto/plugins` (`%USERPROFILE%\.tyto\plugins` 
 
 ## Instalar
 
-`tyto plugin install` aceita uma pasta, uma URL git ou o nome de um pacote npm. Ele mostra o que o plugin acrescenta e as permissões que pede, e quer a sua aprovação antes de instalar. `--yes` a dá na própria linha de comando; sem ele, uma execução sem ninguém no terminal para responder — um script — para com _Nobody is at a terminal to answer; run again with --yes._
+`tyto plugin install` aceita uma pasta, um arquivo `.tgz` ou `.tar.gz`, uma URL git ou o nome de um pacote npm. O arquivo é descompactado neste computador, sem npm e sem rede; o plugin pode estar na raiz dele ou uma ou duas pastas abaixo. Ele mostra o que o plugin acrescenta e as permissões que pede, e quer a sua aprovação antes de instalar. `--yes` a dá na própria linha de comando; sem ele, uma execução sem ninguém no terminal para responder — um script — para com _Nobody is at a terminal to answer; run again with --yes._
 
 <!-- A pergunta feita num terminal de verdade não foi medida: as execuções do autor não tinham terminal (TYTO-317). -->
 

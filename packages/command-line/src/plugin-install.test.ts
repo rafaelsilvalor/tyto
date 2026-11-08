@@ -210,10 +210,10 @@ describe('installing from each of the three sources', () => {
     await execInShell(`npm pack "${folder}" --pack-destination "${packed}" --silent`);
     const [tarball] = await readdir(packed);
 
-    // Relative, with a forward slash and no `./`: what a person types, and what npm on its
-    // own reads as a GitHub `user/repo` shorthand rather than as a file.
+    // As a `file:` spec: a bare `.tgz` path is an archive Tyto unpacks itself (TYTO-373), so
+    // the spelling that still reaches `npm pack` is npm's own.
     const code = await run(
-      ['plugin', 'install', `packed/${tarball ?? 'missing.tgz'}`, '--yes'],
+      ['plugin', 'install', `file:${join(packed, tarball ?? 'missing.tgz')}`, '--yes'],
       environment(),
     );
 

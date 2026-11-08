@@ -10,7 +10,7 @@ Installed plugins live in `~/.tyto/plugins` (`%USERPROFILE%\.tyto\plugins` on Wi
 
 ## Install
 
-`tyto plugin install` takes a folder, a git URL or an npm package name. It shows what the plugin adds and the permissions it asks for, and wants your approval before installing. `--yes` gives it on the command line; without it, a run with nobody at the terminal to answer — a script — stops with _Nobody is at a terminal to answer; run again with --yes._
+`tyto plugin install` takes a folder, a `.tgz` or `.tar.gz` archive, a git URL or an npm package name. An archive is unpacked on this computer, with no npm and no network; the plugin may sit at its root or a folder or two down. It shows what the plugin adds and the permissions it asks for, and wants your approval before installing. `--yes` gives it on the command line; without it, a run with nobody at the terminal to answer — a script — stops with _Nobody is at a terminal to answer; run again with --yes._
 
 <!-- The question asked in a real terminal was not measured: the author's runs had no terminal attached (TYTO-317). -->
 

@@ -1,24 +1,16 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-
 import { type Diagnostic, type Diagnostics, diagnostic } from '@tyto/core';
-import { PLUGIN_MANIFEST_FILE } from '@tyto/io';
 import {
-  PLUGIN_API_VERSION,
   type PluginManifest,
   type PluginCrash,
   type PluginOrigin,
-  type PluginState,
-  checkInstallable,
   validatePluginManifest,
-  withPluginEntry,
 } from '@tyto/plugin-api';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
-import { type InstalledPlugins, readInstalledPlugins, writeCrash } from './plugins/external.js';
+import { type PluginStateChange, changePluginState, installPlugin } from './plugin-actions.js';
+import { readInstalledPlugins } from './plugins/external.js';
 import { type ListedPluginFiles, listPluginFiles } from './plugin-files-list.js';
-import { fetchPlugin } from './plugins/fetch.js';
 import { BUILT_IN_MANIFESTS } from './plugins/index.js';
 import { formatDiagnostics, json } from './report.js';
 
@@ -271,16 +263,6 @@ function homeOf(environment: CliEnvironment): string {
   return environment.home;
 }
 
-/** Reads the state, or reports why it cannot be read and answers nothing. */
-function stateOf(
-  installed: InstalledPlugins,
-  environment: CliEnvironment,
-): PluginState | undefined {
-  if (installed.state !== undefined) return installed.state;
-  environment.console.err(formatDiagnostics(installed.stateProblems));
-  return undefined;
-}
-
 function fail(problems: Diagnostics, environment: CliEnvironment): ExitCode {
   environment.console.err(formatDiagnostics(problems));
   return EXIT_DIAGNOSTICS;
@@ -306,7 +288,25 @@ export function permissionPrompt(manifest: PluginManifest, source: string): stri
     'read your other files, write anywhere, or start programs. It is not confined on the\n' +
     'network: net: permissions filter host.fetch only, and a plugin that opens its own\n' +
     'connection is not stopped. credentials: permissions filter host.credentials.\n' +
+    workspaceNotice(manifest.permissions) +
     fontNotice(manifest.permissions)
+  );
+}
+
+/**
+ * `workspace:read` and `workspace:write` in words, only for a plugin that asks for either
+ * (ADR 0138): the plugin's process still reads no file of its own, but Tyto reads and writes
+ * the open folder's files on its behalf, confined to that folder, never inside `.tyto/`, and
+ * not at all while the folder is restricted.
+ */
+function workspaceNotice(permissions: readonly string[]): string {
+  const reads = permissions.includes('workspace:read');
+  const writes = permissions.includes('workspace:write');
+  if (!reads && !writes) return '';
+  const verbs = reads && writes ? 'read and write' : reads ? 'read' : 'write';
+  return (
+    `workspace: permissions let Tyto ${verbs} files for it in the folder open in Tyto:\n` +
+    'never outside that folder or inside its .tyto/, and nothing while it is restricted.\n'
   );
 }
 
@@ -331,82 +331,38 @@ export async function pluginInstallCommand(
   options: PluginInstallOptions,
   environment: CliEnvironment,
 ): Promise<ExitCode> {
-  const home = homeOf(environment);
-  const installed = await readInstalledPlugins(home);
-  const state = stateOf(installed, environment);
-  if (state === undefined) return EXIT_DIAGNOSTICS;
-
-  const fetched = await fetchPlugin(
-    spec,
-    environment.cwd,
-    environment.shellRefusal === undefined ? {} : { shellRefusal: environment.shellRefusal },
-  );
-  if (!fetched.ok) return fail(fetched.error, environment);
-
-  try {
-    const manifestPath = join(fetched.value.directory, PLUGIN_MANIFEST_FILE);
-    let manifestSource: string;
-    try {
-      manifestSource = await readFile(manifestPath, 'utf8');
-    } catch {
-      return fail(
-        [
-          diagnostic('E_PLUGIN_FETCH', {
-            source: spec,
-            problem: `it has no ${PLUGIN_MANIFEST_FILE}`,
-          }),
-        ],
-        environment,
-      );
-    }
-
-    const checked = checkInstallable(manifestSource, manifestPath, PLUGIN_API_VERSION);
-    if (!checked.ok) return fail(checked.error, environment);
-    const manifest = checked.value;
-
-    // A built-in's name is never available. An installed plugin's is: installing it again
-    // is how an update lands, and how new permissions get approved.
-    const builtIn = builtInManifests().manifests.some((item) => item.name === manifest.name);
-    if (builtIn) {
-      return fail(
-        [diagnostic('E_PLUGIN_NAME_TAKEN', { plugin: manifest.name, origin: 'built-in' })],
-        environment,
-      );
-    }
-
-    environment.console.err(permissionPrompt(manifest, spec));
-    if (!options.yes) {
-      if (environment.confirm === undefined) {
-        environment.console.err('Nobody is at a terminal to answer; run again with --yes.\n');
-        return EXIT_DIAGNOSTICS;
+  const { confirm } = environment;
+  let nobodyToAsk = false;
+  const answer = await installPlugin(spec, {
+    home: homeOf(environment),
+    cwd: environment.cwd,
+    ...(environment.shellRefusal === undefined ? {} : { shellRefusal: environment.shellRefusal }),
+    approve: async (manifest, source) => {
+      environment.console.err(permissionPrompt(manifest, source));
+      if (options.yes) return true;
+      if (confirm === undefined) {
+        nobodyToAsk = true;
+        return false;
       }
-      if (!(await environment.confirm('Install it? [y/N] '))) {
-        environment.console.err('Not installed.\n');
-        return EXIT_DIAGNOSTICS;
-      }
-    }
+      return confirm('Install it? [y/N] ');
+    },
+  });
+  if (!answer.ok) return fail(answer.error, environment);
 
-    const added = await installed.store.add(manifest.name, fetched.value.directory);
-    if (!added.ok) return fail(added.error, environment);
-    await installed.store.writeState(
-      withPluginEntry(state, manifest.name, {
-        enabled: true,
-        permissions: manifest.permissions,
-        source: spec,
-      }),
+  const { manifest } = answer.value;
+  if (answer.value.status === 'declined') {
+    environment.console.err(
+      nobodyToAsk
+        ? 'Nobody is at a terminal to answer; run again with --yes.\n'
+        : 'Not installed.\n',
     );
-    // A new install is new code: the old one's crash is not its history.
-    await writeCrash(installed.store, manifest.name, undefined);
-    environment.console.out(`Installed ${manifest.name} ${manifest.version}.\n`);
-    return EXIT_OK;
-  } finally {
-    await fetched.value.cleanup();
+    return EXIT_DIAGNOSTICS;
   }
+  environment.console.out(`Installed ${manifest.name} ${manifest.version}.\n`);
+  return EXIT_OK;
 }
 
-type StateChange = 'remove' | 'disable' | 'enable';
-
-const DONE: Record<StateChange, string> = {
+const DONE: Record<PluginStateChange, string> = {
   remove: 'Removed',
   disable: 'Disabled',
   enable: 'Enabled',
@@ -414,33 +370,12 @@ const DONE: Record<StateChange, string> = {
 
 /** `remove`, `disable` and `enable`: one entry of the state, and for `remove` its folder. */
 export async function pluginStateCommand(
-  change: StateChange,
+  change: PluginStateChange,
   name: string,
   environment: CliEnvironment,
 ): Promise<ExitCode> {
-  const installed = await readInstalledPlugins(homeOf(environment));
-  const state = stateOf(installed, environment);
-  if (state === undefined) return EXIT_DIAGNOSTICS;
-
-  const entry = state.plugins[name];
-  const folder = installed.entries.some((item) => item.folder === name);
-  // A folder with no entry can still be removed — that is how somebody cleans up a folder
-  // copied in by hand — but it cannot be enabled, because nobody approved it.
-  if (entry === undefined && !(change === 'remove' && folder)) {
-    return fail([diagnostic('E_PLUGIN_NOT_INSTALLED', { plugin: name })], environment);
-  }
-
-  if (change === 'remove') {
-    await installed.store.remove(name);
-    await installed.store.writeState(withPluginEntry(state, name, undefined));
-  } else if (entry !== undefined) {
-    await installed.store.writeState(
-      withPluginEntry(state, name, { ...entry, enabled: change === 'enable' }),
-    );
-  }
-  // Enabling and removing clear a recorded crash: somebody looked, and chose.
-  if (change !== 'disable') await writeCrash(installed.store, name, undefined);
-
+  const changed = await changePluginState(change, name, { home: homeOf(environment) });
+  if (!changed.ok) return fail(changed.error, environment);
   environment.console.out(`${DONE[change]} ${name}.\n`);
   return EXIT_OK;
 }
