@@ -201,6 +201,8 @@ export const RECIPE_WIRE_LIMITS = {
   facets: 200,
   /** Groups one `recipe:rows` page may be kept to (`facet.keys`). */
   facetKeys: 64,
+  /** Rows a day cell of the Calendar asks for at most (`facet.perDay`, TYTO-383). */
+  perDay: 50,
 } as const;
 
 /** A value as the notebook shows it: a list is already joined, a long text already cut. */
@@ -470,6 +472,12 @@ const recipeRowsQuery = {
  * are one group; the window hands it back in `recipe:rows`' `facet.keys` and never reads it.
  */
 const recipeFacetKey = z.string().max(RECIPE_WIRE_LIMITS.text + 2);
+
+/** TYTO-383: how `recipe:facets` groups, by value (the Board) or by day (the Calendar). */
+const recipeBucket = z.enum(['value', 'day']);
+
+/** TYTO-383: a calendar day, as `day` groups are keyed. */
+const recipeDayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
 
 /** The cell ran again, or closed, since the window was shown the `ranAt` it named. */
 const recipeStale = z.object({ stale: z.literal(true) });
@@ -2505,6 +2513,14 @@ export const IPC_CHANNELS = {
         .object({
           column: z.string().max(RECIPE_WIRE_LIMITS.text),
           keys: z.array(recipeFacetKey).min(1).max(RECIPE_WIRE_LIMITS.facetKeys),
+          /**
+           * TYTO-383: `day` keys are days (`recipeDayKey`); the rows then come by day, then by
+           * the wall time `time` names (or the date's own), each with its `day` and `time`.
+           * `perDay` keeps each day's first rows only, what a calendar's day cell draws.
+           */
+          bucket: recipeBucket.optional(),
+          time: z.string().max(RECIPE_WIRE_LIMITS.text).optional(),
+          perDay: z.number().int().positive().max(RECIPE_WIRE_LIMITS.perDay).optional(),
         })
         .optional(),
     }),
@@ -2514,7 +2530,18 @@ export const IPC_CHANNELS = {
         /** The columns the values follow, in order: those asked that exist, or all. */
         columns: z.array(z.string().max(RECIPE_WIRE_LIMITS.text)).max(RECIPE_WIRE_LIMITS.columns),
         rows: z
-          .array(z.object({ key: z.string(), values: z.array(recipeValue) }))
+          .array(
+            z.object({
+              key: z.string(),
+              values: z.array(recipeValue),
+              /** TYTO-383, a `day` facet's: the row's day key and wall time, `09:05`. */
+              day: recipeFacetKey.optional(),
+              time: z
+                .string()
+                .regex(/^\d{2}:\d{2}$/u)
+                .optional(),
+            }),
+          )
           .max(RECIPE_WIRE_LIMITS.page),
         total: z.number().int().nonnegative(),
         matched: z.number().int().nonnegative(),
@@ -2543,6 +2570,14 @@ export const IPC_CHANNELS = {
         .array(z.string().max(RECIPE_WIRE_LIMITS.text))
         .max(RECIPE_WIRE_LIMITS.facets)
         .optional(),
+      /**
+       * TYTO-383, the Calendar: `day` groups by the day a date column falls on in the run's zone
+       * (ADR 0148 decision 7), in date order, then `?` (unreadable) and `""` (no date); `order`
+       * is not read. `days` keeps the days from `from` to `to`, counting the dated rows outside
+       * in `earlier` and `later`; the answer says `today` in the same zone.
+       */
+      bucket: recipeBucket.optional(),
+      days: z.object({ from: recipeDayKey, to: recipeDayKey }).optional(),
     }),
     z.union([
       recipeStale,
@@ -2559,6 +2594,9 @@ export const IPC_CHANNELS = {
         total: z.number().int().nonnegative(),
         matched: z.number().int().nonnegative(),
         more: z.number().int().nonnegative(),
+        earlier: z.number().int().nonnegative().optional(),
+        later: z.number().int().nonnegative().optional(),
+        today: recipeDayKey.optional(),
       }),
     ]),
   ),

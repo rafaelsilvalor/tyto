@@ -2,6 +2,8 @@ import type { Locale } from '../../shared/i18n/index.js';
 import { RECIPE_VIEWS, type RecipeViewName } from '../../shared/recipe-views.js';
 import { boardOptions } from './recipe-board-model.js';
 import { type FacetsAnswer, type FacetsRequest, boardView } from './recipe-board-view.js';
+import { calendarOptions } from './recipe-calendar-model.js';
+import { calendarView } from './recipe-calendar-view.js';
 import type { RecipeRunAnswer } from './recipe-notebook.js';
 import {
   type CopyAnswer,
@@ -73,10 +75,30 @@ const board: ViewRenderer = (cell, context) => {
   });
 };
 
+/** TYTO-383: a calendar `show` did not give `date=` keeps the table, as a board without `by=`. */
+const calendar: ViewRenderer = (cell, context) => {
+  const options = calendarOptions(
+    cell.options,
+    cell.table.columns.map((column) => column.name),
+  );
+  if (options === undefined) return tableOf(false)(cell, context);
+  return calendarView({
+    index: cell.index,
+    ranAt: cell.ranAt,
+    columns: cell.table.columns,
+    total: cell.table.total,
+    locale: context.locale,
+    calendar: options,
+    facets: context.facets,
+    rows: context.rows,
+  });
+};
+
 export const VIEW_RENDERERS: Readonly<Record<RecipeViewName, ViewRenderer>> = {
   table: tableOf(false),
   summary: tableOf(true),
   board,
+  calendar,
 };
 
 const isViewName = (name: string): name is RecipeViewName => Object.hasOwn(RECIPE_VIEWS, name);

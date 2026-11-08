@@ -983,6 +983,16 @@ describe('switching the language', () => {
     'recipe.board.none',
     'recipe.board.more',
     'recipe.board.groups',
+    // TYTO-383: drawn only under a cell in a Calendar view; `recipe-calendar-view.test.ts`
+    // paints them, and `recipe-views.desktop.test.ts` reads the calendar in the real window.
+    'recipe.calendar.previous',
+    'recipe.calendar.next',
+    'recipe.calendar.week',
+    'recipe.calendar.month',
+    'recipe.calendar.earlier',
+    'recipe.calendar.later',
+    'recipe.calendar.more',
+    'recipe.calendar.undated',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and
