@@ -12,6 +12,7 @@ import type {
   TemplateContext,
   TemplateManifest,
 } from '@tyto/core';
+import type { JsonValue } from '@tyto/recipe';
 
 import type { ShippedFace } from './isolation/faces.js';
 import type { ShippedFiles } from './isolation/files.js';
@@ -305,4 +306,23 @@ export interface PanelContribution extends Contribution {
    * `panel/index.html`. A path that leaves the folder is never served.
    */
   readonly entry: string;
+  /**
+   * What the page may ask the plugin's own process to do (ADR 0173): a method the plugin names
+   * and JSON parameters, answered with JSON. Optional: a panel without it is refused with
+   * `E_PANEL_CALL` when its page calls. The host finds the panel from the frame the page runs
+   * in, so a page reaches this function and no other plugin's; it checks the method, both
+   * sizes and the answer, and an isolated plugin's call has the 30 s deadline of every call.
+   */
+  call?(request: PanelCallRequest): PanelCallAnswer;
 }
+
+/** What a panel's page sends its plugin (ADR 0173). `params` is at most 1 MiB of JSON. */
+export interface PanelCallRequest {
+  /** `^[a-z][\w.-]{0,99}$`: a name the plugin chose, such as `token.test` or `folder.list`. */
+  readonly method: string;
+  readonly params?: JsonValue;
+}
+
+/** A panel call's answer: JSON of at most 1 MiB, or the plugin's own refusal. */
+export type PanelCallAnswer =
+  Result<JsonValue, Diagnostics> | Promise<Result<JsonValue, Diagnostics>>;

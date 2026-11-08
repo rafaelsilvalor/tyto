@@ -21,6 +21,8 @@ export type {
   ExportFrameOptions,
   Exporter,
   ExporterRegistry,
+  PanelCallAnswer,
+  PanelCallRequest,
   PanelContribution,
   Provided,
   RasterizerContribution,
@@ -43,6 +45,14 @@ export {
 } from './sources.js';
 
 export { directiveNamesOf, directiveResolverOf } from './directives.js';
+
+export {
+  type PanelContributions,
+  PANEL_CALL_MAX_BYTES,
+  PANEL_CALL_METHOD,
+  callPanel,
+  panelCallerOf,
+} from './panels.js';
 
 export {
   type ResolvedThemeColors,

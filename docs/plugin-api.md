@@ -227,6 +227,8 @@ interface PanelContribution {
   title: string;
   location?: 'left' | 'right' | 'bottom';
   entry: string; // a page inside the plugin's folder: 'panel/index.html'
+  // what the page may ask the plugin's own process (ADR 0173)
+  call?(request: { method: string; params?: JsonValue }): Result<JsonValue> | Promise<…>;
 }
 ```
 
@@ -254,6 +256,18 @@ says so on that plugin's row. A panel's `fetch` answers with the body as text. *
 and forget its own plugin's declared keys** (ADR 0134, extending ADR 0045), under the same check
 and ceiling as the plugin's process; it still reads only what `credentials` reads, and nothing of
 another plugin's.
+
+**A panel may ask its own plugin's process to do work** through `call` (ADR 0173): `method`
+matches `^[a-z][\w.-]{0,99}$`, `params` and the answer are JSON of at most 1 MiB each, and an
+isolated plugin's call has the 30 s deadline of every call. The host finds the panel from the
+frame the page runs in, never from the request, which is strict: a `plugin` or `panel` key is
+refused. A panel without `call` is refused with `E_PANEL_CALL`, as is a bad method or an answer
+over the ceiling; the plugin's own refusal reaches the page as it is. `callPanel` and
+`panelCallerOf` are the host's half. `call` is the way forward for a panel that needs a secret's
+effect rather than its value; the `credentials` read stays for the panels that use it today. The
+desktop's bridge does not offer `call` yet (TYTO-372's second pull request). A plugin that
+registers `call` needs protocol 17, which `@tyto/plugin-api` 0.16 carries: write
+`"engine": ">=0.16"`, so an older Tyto refuses it rather than meeting a callable it cannot read.
 
 ### `template-pack`, and the host it belongs to
 
@@ -707,7 +721,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan`, `apply` and `derive` on the recipe points (ADR 0135, ADR 0170), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel`, `theme` and `configuration` — as a form, ADR 0145 — cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan`, `apply` and `derive` on the recipe points (ADR 0135, ADR 0170), and a panel's `call` (ADR 0173), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel` (but for its `call`), `theme` and `configuration` — as a form, ADR 0145 — cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

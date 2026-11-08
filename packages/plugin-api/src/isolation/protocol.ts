@@ -40,9 +40,10 @@ import { z } from 'zod';
  * 15 since a template may report `W_TEMPLATE_FILE_MISSING`, which a host on 14 would refuse the
  * same way (ADR 0058, TYTO-502); 16 since a planned operation may carry its `payload` and an
  * action or a sink may register `apply`, a field and a callable the strict plan and verb
- * schemas of a side on 15 would refuse (ADR 0170, TYTO-378).
+ * schemas of a side on 15 would refuse (ADR 0170, TYTO-378); 17 since a panel may register
+ * `call`, a callable the strict panel schema of a side on 16 would refuse (ADR 0173, TYTO-372).
  */
-export const RPC_PROTOCOL_VERSION = 16;
+export const RPC_PROTOCOL_VERSION = 17;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

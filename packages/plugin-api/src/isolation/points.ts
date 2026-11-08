@@ -21,14 +21,15 @@ import {
 import {
   COLUMN_TYPES,
   type CellValue,
-  type JsonValue,
   type Plan,
   type PlannedOperation,
   type Table,
 } from '@tyto/recipe';
 import { z } from 'zod';
 
+import { jsonValueSchema } from '../json.js';
 import type { ContributionPoint } from '../manifest.js';
+import { panelCallAnswerSchema, panelCallRequestSchema } from '../panels.js';
 import { RECIPE_VERB_KINDS } from '../recipes.js';
 import { settingFormSchema } from '../setting-form.js';
 import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
@@ -307,18 +308,6 @@ const tableSchema = z.strictObject({
   ),
 }) as unknown as z.ZodType<Table>;
 
-/** Any JSON value: a planned operation's `payload`, whose size is `checkPlan`'s to bound. */
-const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(jsonValueSchema),
-    z.record(z.string(), jsonValueSchema),
-  ]),
-);
-
 /**
  * One planned operation as it crosses, in a plan and again in an `apply` request. `payload` is
  * the plugin's own data for applying it (ADR 0170), which made this protocol 16.
@@ -503,8 +492,10 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
     }),
     callables: {},
   },
-  // Data: the page is a file the host serves, and the page talks to the host through the
-  // window's bridge, never to the plugin's process (ADR 0045).
+  // Data plus an optional `call`: the page is a file the host serves and talks to the host
+  // through the window's bridge (ADR 0045); what it asks of its own plugin reaches the plugin's
+  // process here, checked on both sides with the same schemas, under the deadline of every call
+  // (ADR 0173). Which panel's `call` runs is the host's to know from the frame, never the page's.
   panel: {
     method: 'registerPanel',
     data: z.strictObject({
@@ -513,7 +504,15 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       location: z.enum(['left', 'right', 'bottom']).optional(),
       entry: z.string().min(1).max(500),
     }),
-    callables: {},
+    callables: {
+      call: {
+        args: z.tuple([panelCallRequestSchema]),
+        send: ([request]) => [request],
+        result: resultSchema(panelCallAnswerSchema),
+        failed: (problems) => err(problems),
+        optional: true,
+      },
+    },
   },
   // Data: a setting's rules cross as a form, and the host builds the schema from it, so the
   // value is validated on the host and nothing is called back (ADR 0145). No `schema`, no

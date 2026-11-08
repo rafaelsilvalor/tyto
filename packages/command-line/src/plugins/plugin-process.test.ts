@@ -9,6 +9,7 @@ import type { Scene, Trust } from '@tyto/core';
 import {
   type HostCapabilities,
   type PluginChannel,
+  RPC_PROTOCOL_VERSION,
   connectIsolatedPlugin,
   createPluginHost,
   recipeRegistriesOf,
@@ -603,7 +604,7 @@ describe('the example recipe plugin in a child process (TYTO-376, TYTO-378)', ()
     const rerun = await runOnce();
     await connected.value.close();
 
-    expect(hellos).toEqual([16]);
+    expect(hellos).toEqual([RPC_PROTOCOL_VERSION]);
     expect(first?.ok && first.value.operations[6]).toEqual({
       rowKey: 'EX-7',
       status: 'applied',
