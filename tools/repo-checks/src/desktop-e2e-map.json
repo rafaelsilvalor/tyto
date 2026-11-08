@@ -153,6 +153,19 @@
       "why": "reviewed: credentials reach plugins through installed-plugins"
     },
     {
+      "paths": [
+        "apps/desktop/src/main/loopback.ts",
+        "apps/desktop/src/main/oauth.ts",
+        "apps/desktop/src/main/signin.ts"
+      ],
+      "e2e": [
+        "installed-plugins.desktop.test.ts",
+        "plugins.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: browser sign-in reaches plugins through the capabilities main composes"
+    },
+    {
       "paths": ["apps/desktop/src/main/desktop.tyto-plugin.json"],
       "e2e": "all",
       "why": "reviewed: the built-in plugin manifest every window loads"

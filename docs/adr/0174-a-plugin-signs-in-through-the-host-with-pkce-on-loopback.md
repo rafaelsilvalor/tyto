@@ -101,3 +101,12 @@ then the plugins screen, the user manual and an end-to-end test against a fake p
   with Buraqueira and Jacurutu (Rafael, 2026-11-08).
 - The host sends `authorize` exactly as declared, with its own query parameters added; a provider
   that needs extra parameters (`access_type=offline`, `prompt=consent`) declares them in the URL.
+
+## Notes
+
+- 2026-11-08 (TYTO-374, the desktop's service): three details decision 8 left open. A token
+  answer without `expires_in` is trusted for an hour, and every access token is refreshed a
+  minute before its expiry. A code exchange that returns no refresh token stores nothing and
+  says so, because the window would otherwise claim a sign-in that ends when the app quits.
+  Two plugin calls that find the token expired share one refresh, so a provider that rotates
+  refresh tokens does not refuse the second.
