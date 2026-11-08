@@ -1,7 +1,7 @@
 import { type CellOutput, cellOutputLineStart, remeasureCellOutput } from '@tyto/editor';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
-import type { CellStatus } from './recipe-notebook.js';
+import { type CellStatus, statusText } from './recipe-notebook.js';
 import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js';
 import type { FacetsAnswer, FacetsRequest } from './recipe-board-view.js';
 import type { RowAnswer, RowRequest } from './recipe-cards-view.js';
@@ -16,6 +16,12 @@ import { viewBody } from './recipe-views.js';
  * table or a plan and **Fetch again** on a cell that fetches. The buttons are always shown, not
  * on hover: a person should see what a cell offers before reaching for it. A plan cell's header
  * also carries **Apply**, and its body the plan's lines (`recipe-plan-view.ts`, TYTO-378).
+ *
+ * A `run` cell also carries a second toggle that opens it onto the included recipe's own cells
+ * (TYTO-449), closed until the person opens it. They are drawn read-only from the answer, which
+ * already holds them: opening asks main for nothing, and no included cell offers a button. Each
+ * draws the preview of its table: a view pages its rows from main by the outer cell's index,
+ * which an included cell does not have.
  *
  * A cell under `show table` or `show summary` draws its view instead of the table
  * (`recipe-views.ts`, TYTO-379). Under no `show`, the table is a preview: the first
@@ -47,6 +53,8 @@ export interface CellViewActions {
    * text as it is now, read from the editor on the click (TYTO-451).
    */
   readonly toggled: (at: number, collapsed: boolean) => void;
+  /** The person opened or closed a `run` cell onto its included cells, by line (TYTO-449). */
+  readonly expandedIncluded: (at: number, expanded: boolean) => void;
   /** Apply: the plan main stamped `planId` on this cell (TYTO-378). */
   readonly apply: (index: number, planId: number) => void;
   /** A page of a kept cell's table, for its view: `recipe:rows` for this tab (TYTO-379). */
@@ -63,6 +71,8 @@ export interface CellViewContext {
   readonly locale: Locale;
   /** The cells folded in this tab, by the start of their line ({@link CellStatus.at}). */
   readonly collapsed: ReadonlySet<number>;
+  /** The `run` cells opened onto their included cells, by the start of their line. */
+  readonly expanded: ReadonlySet<number>;
   /** The cells whose Apply is on its way, by index. */
   readonly applying: ReadonlySet<number>;
   /** Why a cell's last Apply was refused, by index, until the next answer. */
@@ -74,6 +84,7 @@ export interface CellViewContext {
 
 type WireCell = CellStatus['cell'];
 type WireTable = NonNullable<WireCell['table']>;
+type WireIncluded = NonNullable<WireCell['included']>[number];
 
 /** The table a cell shows: an ok cell's, and a stale cell's when it kept one. */
 const tableOf = (cell: WireCell): WireTable | undefined =>
@@ -81,6 +92,7 @@ const tableOf = (cell: WireCell): WireTable | undefined =>
 
 export function cellOutputOf(status: CellStatus, context: CellViewContext): CellOutput {
   const collapsed = context.collapsed.has(status.at);
+  const expanded = context.expanded.has(status.at);
   const { cell } = status;
   return {
     at: status.at,
@@ -100,12 +112,18 @@ export function cellOutputOf(status: CellStatus, context: CellViewContext): Cell
       cell.view?.name ?? '',
       // TYTO-381: `show board by=status` and `by=owner` draw different boards.
       JSON.stringify(cell.view?.options ?? {}),
+      expanded ? 'included' : '',
     ].join('\u0000'),
-    render: () => renderCell(status, context, collapsed),
+    render: () => renderCell(status, context, collapsed, expanded),
   };
 }
 
-function renderCell(status: CellStatus, context: CellViewContext, collapsed: boolean): HTMLElement {
+function renderCell(
+  status: CellStatus,
+  context: CellViewContext,
+  collapsed: boolean,
+  expanded: boolean,
+): HTMLElement {
   const { cell } = status;
   const { locale, actions } = context;
   const say = (key: CatalogueKey): string => translate(locale, key);
@@ -142,6 +160,11 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
       remeasureCellOutput(root);
     });
     header.append(toggle);
+  }
+
+  const included = includedOf(cell);
+  if (included !== undefined) {
+    header.append(includedToggle(root, status, included, context, expanded));
   }
 
   header.append(text(element('span', 'recipe-cell-summary'), status.text));
@@ -181,7 +204,76 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
   }
   const planned = planBody(cell, status.held, plan);
   if (planned !== undefined) root.append(planned);
+  if (included !== undefined && expanded) root.append(includedBody(included, locale));
   return root;
+}
+
+// TYTO-449: a `run` cell opened onto its included recipe's cells.
+
+/** The included cells a cell shows: a `run` cell that ran, or kept them from its last run. */
+const includedOf = (cell: WireCell): readonly WireIncluded[] | undefined =>
+  (cell.status === 'ok' || cell.status === 'stale') && (cell.included?.length ?? 0) > 0
+    ? cell.included
+    : undefined;
+
+function includedToggle(
+  root: HTMLElement,
+  status: CellStatus,
+  included: readonly WireIncluded[],
+  context: CellViewContext,
+  expanded: boolean,
+): HTMLButtonElement {
+  const toggle = element('button', 'recipe-cell__toggle recipe-cell__included-toggle');
+  toggle.type = 'button';
+  toggle.dataset['action'] = 'included';
+  const label = (open: boolean): void => {
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.textContent = translate(
+      context.locale,
+      open ? 'recipe.cell.included.hide' : 'recipe.cell.included.show',
+    );
+  };
+  label(expanded);
+  toggle.addEventListener('click', () => {
+    const shown = root.querySelector(':scope > .recipe-included');
+    // Built on the first open only, from the cells the answer carried: nothing is asked of main.
+    if (shown === null) root.append(includedBody(included, context.locale));
+    else shown.remove();
+    label(shown === null);
+    context.actions.expandedIncluded(cellOutputLineStart(root) ?? status.at, shown === null);
+    remeasureCellOutput(root);
+  });
+  return toggle;
+}
+
+/** Each included cell, read-only: its recipe and step, its status, its table or its plan. */
+function includedBody(cells: readonly WireIncluded[], locale: Locale): HTMLElement {
+  const body = element('div', 'recipe-included');
+  for (const nested of cells) {
+    const item = element('div', 'recipe-included__cell');
+    item.dataset['depth'] = String(nested.depth);
+    item.style.setProperty('--recipe-included-depth', String(nested.depth - 1));
+    const header = element('div', 'recipe-cell-status');
+    if (nested.status === 'failed') header.dataset['failed'] = '';
+    header.append(
+      text(element('span', 'recipe-included__recipe'), nested.recipe),
+      text(element('span', 'recipe-included__step'), nested.step),
+    );
+    const said = statusText(nested, undefined, locale);
+    if (said !== undefined) header.append(text(element('span', 'recipe-cell-summary'), said));
+    item.append(header);
+    if (nested.status === 'ok' && nested.table !== undefined) {
+      item.append(tableBody(nested.table, locale));
+    }
+    // No Apply: an included plan is shown, and only the recipe that holds it applies it.
+    const planned = planBody(nested, undefined, { locale, applying: false, refusal: undefined });
+    if (planned !== undefined) item.append(planned);
+    for (const problem of nested.diagnostics) {
+      item.append(text(element('div', 'recipe-included__problem'), problem.message));
+    }
+    body.append(item);
+  }
+  return body;
 }
 
 function tableBody(table: WireTable, locale: Locale): HTMLElement {

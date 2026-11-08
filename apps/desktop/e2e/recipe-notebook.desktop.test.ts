@@ -32,7 +32,8 @@ import { firstWindow } from './first-window.js';
  * server, which counts the requests. **Every request counted is a fetch the window caused.**
  *
  * The example recipe plugin of `examples/plugins/`, installed the same way, plans `example.mark`
- * and applies it (TYTO-378): the last case clicks Apply on its plan and reads each line's mark.
+ * and applies it (TYTO-378): a case clicks Apply on its plan and reads each line's mark. The
+ * last opens a recipe that runs that one, opens its `run` cell, and reads the included cells.
  *
  * Its own `--user-data-dir` and `TYTO_HOME` (TYTO-139), and no workspace folder, so the recipe
  * runs as one outside any workspace does (ADR 0148 decision 5). `--lang=en`. With
@@ -122,6 +123,7 @@ let scratch: string;
 let home: string;
 let recipePath: string;
 let marksPath: string;
+let outerPath: string;
 let app: ElectronApplication | undefined;
 let page: Page;
 let server: Server;
@@ -234,6 +236,8 @@ beforeAll(async () => {
   installExample();
   marksPath = join(scratch, 'recipes', 'marks.recipe');
   writeFileSync(marksPath, ['recipe marks', 'example.pull count=3', `${MARK} done`, ''].join('\n'));
+  outerPath = join(scratch, 'recipes', 'outer.recipe');
+  writeFileSync(outerPath, ['recipe outer', 'run marks', ''].join('\n'));
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`, '--lang=en'],
@@ -435,5 +439,54 @@ describe('Apply on a plan cell (TYTO-378)', () => {
       await page.screenshot({ path: join(shots, 'recipe-notebook-apply.png') });
     }
     process.stdout.write(`[TYTO-378] marks after Apply: ${JSON.stringify(after)}\n`);
+  }, 30_000);
+});
+
+describe("a run cell's included cells (TYTO-449)", () => {
+  /** The included cells drawn under the `run` cell: each one's header, rows, lines and buttons. */
+  const includedCells = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('#editor .recipe-included__cell')].map((cell) => ({
+        recipe: cell.querySelector('.recipe-included__recipe')?.textContent ?? '',
+        step: cell.querySelector('.recipe-included__step')?.textContent ?? '',
+        rows: [...cell.querySelectorAll('tbody tr')].map((row) => row.textContent),
+        plan: cell.querySelectorAll('.recipe-plan__operation').length,
+        buttons: cell.querySelectorAll('button').length,
+      })),
+    );
+
+  it("opens the run cell onto the included recipe's cells, reading its table", async () => {
+    await app?.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, outerPath);
+    await run('editor.open');
+    await expect
+      .poll(async () => (await cells()).map((cell) => cell.summary), { timeout: 15_000 })
+      .toEqual(['Fetches on save or Run']);
+    await run('recipe.run');
+    await expect
+      .poll(async () => (await cells()).map((cell) => cell.summary), { timeout: 15_000 })
+      .toEqual(['3 rows · 2 columns']);
+    // Closed until opened.
+    expect(await includedCells()).toEqual([]);
+
+    // Opened in place: the same element, not one a new answer built, so nothing ran again.
+    await markFirstCell();
+    await clickInFirstCell('[data-action="included"]');
+    await expect.poll(async () => (await includedCells()).length, { timeout: 5_000 }).toBe(2);
+    expect(await firstCellReplaced()).toBe(false);
+    const shown = await includedCells();
+    expect(shown.map((cell) => [cell.recipe, cell.step, cell.plan, cell.buttons])).toEqual([
+      ['marks', 'example.pull count=3', 0, 0],
+      ['marks', `${MARK} done`, 3, 0],
+    ]);
+    expect(shown[0]?.rows).toHaveLength(3);
+    expect(shown[1]?.rows).toHaveLength(3);
+    const shots = process.env['TYTO_RECIPE_NOTEBOOK_SHOTS'];
+    if (shots !== undefined) {
+      mkdirSync(shots, { recursive: true });
+      await page.screenshot({ path: join(shots, 'recipe-notebook-included.png') });
+    }
+    process.stdout.write(`[TYTO-449] included cells: ${JSON.stringify(shown)}\n`);
   }, 30_000);
 });

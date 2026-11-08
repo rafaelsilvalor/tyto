@@ -5,7 +5,13 @@ import { type RunClock, systemClock } from './clock.js';
 import type { DataResolver } from './data.js';
 import { fillPlaceholders } from './parse.js';
 import type { Plan } from './plan.js';
-import type { DerivationRegistry, KeepRequest, RecipeResolver, VerbRegistry } from './registry.js';
+import type {
+  DerivationRegistry,
+  IncludedRecipe,
+  KeepRequest,
+  RecipeResolver,
+  VerbRegistry,
+} from './registry.js';
 import type { RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
 import type { CellView, ViewSpecs } from './views.js';
@@ -65,6 +71,11 @@ export interface Cell {
    * 0171). Absent while no `show` has run.
    */
   readonly view?: CellView;
+  /**
+   * A `run` cell's: the cells of the recipe it included, each holding its own table, for a
+   * notebook to open the cell onto (TYTO-449). Present only when the `run` succeeded.
+   */
+  readonly included?: IncludedRecipe;
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -153,7 +164,7 @@ export async function runRecipe(
     keeps.push(...(outcome.value.keeps ?? []));
     const cellRemembers = outcome.value.remembers ?? [];
     remembers.push(...cellRemembers);
-    const { plan } = outcome.value;
+    const { plan, included } = outcome.value;
     cells.push({
       step: written,
       status: 'ok',
@@ -161,6 +172,7 @@ export async function runRecipe(
       ...(plan === undefined ? {} : { plan }),
       ...(cellRemembers.length === 0 ? {} : { remembers: cellRemembers }),
       ...(cellView === undefined ? {} : { view: cellView }),
+      ...(included === undefined ? {} : { included }),
       diagnostics: outcome.diagnostics,
     });
     diagnostics.push(...outcome.diagnostics);

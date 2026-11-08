@@ -956,6 +956,10 @@ describe('switching the language', () => {
     'recipe.cell.fetchAgain',
     'recipe.cell.collapse',
     'recipe.cell.expand',
+    // TYTO-449: drawn only on a `run` cell; `recipe-cell-view.test.ts` paints both, and
+    // `recipe-notebook.desktop.test.ts` opens one in the real window.
+    'recipe.cell.included.show',
+    'recipe.cell.included.hide',
     // TYTO-378: drawn only under a plan cell; `recipe-plan-view.test.ts` paints them in both
     // languages, and `recipe-notebook.desktop.test.ts` clicks Apply in the real window.
     'recipe.plan.apply',

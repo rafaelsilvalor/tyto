@@ -208,6 +208,13 @@ export const RECIPE_WIRE_LIMITS = {
    * whole, so it is cut much later than a cell's preview.
    */
   opened: 10_000,
+  /**
+   * Cells of the recipes one `run` cell included, every depth together, sent in the order
+   * they ran (TYTO-449); each table is cut at `rows` as any cell's is.
+   */
+  included: 200,
+  /** Recipes inside recipes a `run` cell's included cells reach at most (TYTO-449). */
+  depth: 8,
 } as const;
 
 /** A value as the notebook shows it: a list is already joined, a long text already cut. */
@@ -262,6 +269,46 @@ const recipeCellApplied = {
     .optional(),
 };
 
+/** A cell's first rows and how many it has. */
+const recipeTable = z.object({
+  columns: z
+    .array(z.object({ name: z.string(), type: z.string() }))
+    .max(RECIPE_WIRE_LIMITS.columns),
+  rows: z
+    .array(z.object({ key: z.string(), values: z.array(recipeValue) }))
+    .max(RECIPE_WIRE_LIMITS.rows),
+  /** Every row the table has, of which `rows` are the first. */
+  total: z.number().int().nonnegative(),
+});
+
+/** A plan's target, its size and its first lines. */
+const recipePlanLines = {
+  target: z.string(),
+  count: z.number().int().nonnegative(),
+  operations: recipePlanApply.operations,
+};
+
+/**
+ * TYTO-449: one cell of a recipe a `run` cell included, shown read-only when the person opens
+ * the `run` cell. The list is flat, in the order the cells ran, a recipe included inside an
+ * included one following its `run` cell one `depth` further in. Its lines live in another
+ * file, so a cell says its step and no line, its diagnostics carry no range, and its plan
+ * carries no id: nothing here is applied, run or marked in the editor.
+ */
+const recipeIncludedCell = z.object({
+  depth: z.number().int().min(1).max(RECIPE_WIRE_LIMITS.depth),
+  /** The name the `run` line gave the recipe this cell belongs to. */
+  recipe: z.string().max(RECIPE_WIRE_LIMITS.text),
+  /** The cell's index among its own recipe's cells. */
+  index: z.number().int().nonnegative(),
+  /** The step as written: its verb and what follows it. */
+  step: z.string().max(RECIPE_WIRE_LIMITS.text),
+  status: z.enum(['ok', 'failed', 'skipped']),
+  table: recipeTable.optional(),
+  plan: z.object(recipePlanLines).optional(),
+  diagnostics: z.array(diagnostic.omit({ range: true })).max(RECIPE_WIRE_LIMITS.diagnostics),
+});
+
 const recipeCell = z.object({
   /** The step's index among the recipe's cells; `param`, comments and the header are none. */
   index: z.number().int().nonnegative(),
@@ -272,23 +319,11 @@ const recipeCell = z.object({
    * restricted folder before Run, everything after a syntax error — and shows the table it had.
    */
   status: z.enum(['ok', 'failed', 'skipped', 'stale']),
-  table: z
-    .object({
-      columns: z
-        .array(z.object({ name: z.string(), type: z.string() }))
-        .max(RECIPE_WIRE_LIMITS.columns),
-      rows: z
-        .array(z.object({ key: z.string(), values: z.array(recipeValue) }))
-        .max(RECIPE_WIRE_LIMITS.rows),
-      /** Every row the table has, of which `rows` are the first. */
-      total: z.number().int().nonnegative(),
-    })
-    .optional(),
+  table: recipeTable.optional(),
   /** An action's or a sink's plan: what it would write, and nothing written (ADR 0129). */
   plan: z
     .object({
-      target: z.string(),
-      count: z.number().int().nonnegative(),
+      ...recipePlanLines,
       ...recipePlanApply,
     })
     .optional(),
@@ -316,6 +351,8 @@ const recipeCell = z.object({
       ),
     })
     .optional(),
+  /** A `run` cell's: the included recipe's cells, sent only when the `run` succeeded. */
+  included: z.array(recipeIncludedCell).max(RECIPE_WIRE_LIMITS.included).optional(),
 });
 
 /** Whether a source is trusted; `revoked` is trust taken back while it is open (ADR 0111). */

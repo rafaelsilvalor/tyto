@@ -107,6 +107,7 @@ import { type SettingOutline, settingsAssist } from './settings-assist.js';
 import { readSnippetsText } from './snippets-file.js';
 import {
   type RecipeRunAnswer,
+  answerDiagnostics,
   cellAtOrAbove,
   cellStatuses,
   createRecipeNotebook,
@@ -819,15 +820,13 @@ function openedRecipe(documentId: string): void {
  * state for when it is.
  */
 function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAnswer): void {
-  setFileDiagnostics(documentId, text, [
-    ...answer.diagnostics,
-    ...answer.cells.flatMap((cell) => cell.diagnostics),
-  ]);
+  setFileDiagnostics(documentId, text, answerDiagnostics(answer));
   const target = documentOf(workspace, documentId);
   if (target?.state === undefined || contentOf(target) !== text) return;
   const context: CellViewContext = {
     locale: state.locale,
     collapsed: recipeNotebook.collapsedOf(documentId),
+    expanded: recipeNotebook.expandedOf(documentId),
     applying: recipeNotebook.applyingOf(documentId),
     refusals: recipeNotebook.refusalsOf(documentId),
     now: Date.now,
@@ -837,6 +836,10 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
       apply: (index, planId) => void recipeNotebook.apply(documentId, index, planId),
       toggled: (at, collapsed) => {
         recipeNotebook.setCollapsed(documentId, at, collapsed);
+      },
+      // TYTO-449: opening a `run` cell draws what the answer carried; it asks main for nothing.
+      expandedIncluded: (at, open) => {
+        recipeNotebook.setExpanded(documentId, at, open);
       },
       // TYTO-379, ADR 0171: a view's pages and copies, for this tab's kept tables.
       rows: (request) => {

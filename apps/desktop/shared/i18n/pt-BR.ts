@@ -274,6 +274,8 @@ export const ptBR: Catalogue = {
   'recipe.cell.fetchAgain': 'Buscar de novo',
   'recipe.cell.collapse': 'Ocultar tabela',
   'recipe.cell.expand': 'Mostrar tabela',
+  'recipe.cell.included.show': 'Mostrar as células da receita incluída',
+  'recipe.cell.included.hide': 'Ocultar as células da receita incluída',
   'recipe.plan.apply': 'Aplicar',
   'recipe.plan.more': 'mais {count} operações',
   'recipe.plan.more.one': 'mais {count} operação',

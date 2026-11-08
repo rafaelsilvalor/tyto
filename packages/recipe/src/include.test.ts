@@ -105,4 +105,33 @@ describe('run', () => {
     expect(at).toBe('run broken');
     expect(result.cells.map((cell) => cell.status)).toEqual(['failed', 'skipped']);
   });
+
+  // TYTO-449: a notebook opens a `run` cell onto the included recipe's own cells.
+  it("carries the included recipe's cells on the run cell, nested runs inside theirs", async () => {
+    const { result } = await run(['run outer-map', 'where copy_match = paired'], {
+      'outer-map': 'recipe outer-map\nrun campaign-map\nsort key',
+      'campaign-map': campaignMap,
+    });
+    const included = result.cells[0]?.included;
+    expect(included?.recipe).toBe('outer-map');
+    expect(included?.cells.map((cell) => [cell.step.verb, cell.status])).toEqual([
+      ['run', 'ok'],
+      ['sort', 'ok'],
+    ]);
+    const nested = included?.cells[0]?.included;
+    expect(nested?.recipe).toBe('campaign-map');
+    expect(nested?.cells.every((cell) => cell.table !== undefined)).toBe(true);
+    expect(included?.cells.at(-1)?.table?.rows.length).toBe(
+      nested?.cells.at(-1)?.table?.rows.length,
+    );
+    expect(result.cells[1]?.included).toBeUndefined();
+  });
+
+  it('carries no included cells when the run fails', async () => {
+    const { result } = await run(['run broken'], {
+      broken: 'recipe broken\nwhere colour = red',
+    });
+    expect(result.cells[0]?.status).toBe('failed');
+    expect(result.cells[0]?.included).toBeUndefined();
+  });
 });

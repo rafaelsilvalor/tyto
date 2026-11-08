@@ -71,4 +71,9 @@ consumed, a key per row, and the rule that a key answering to two rows pairs wit
   kind never pairs, and a `where` reads it; parity with `flow.py` on this decides in TYTO-391.
 - The notebook (TYTO-377) shows a `run` as one cell. Showing the included recipe's own cells
   under it would need the cell to carry them; nothing does yet.
+  _Amended 2026-11-08 (TYTO-449):_ the run's answer carries them now. `VerbOutput.included`
+  holds the included recipe's name and its cells, and `runRecipe` copies it onto the `run`
+  cell as `Cell.included`, only when the `run` succeeded. The `run` stays one cell: its
+  diagnostics are still moved to its line, and the notebook shows the included cells read-only
+  under it (ADR 0148 decision 9).
 - Named tables remain out (ADR 0128): `join` is still a self-join over the one table.

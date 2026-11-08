@@ -272,6 +272,8 @@ export const en: Catalogue = {
   'recipe.cell.fetchAgain': 'Fetch again',
   'recipe.cell.collapse': 'Hide table',
   'recipe.cell.expand': 'Show table',
+  'recipe.cell.included.show': "Show the included recipe's cells",
+  'recipe.cell.included.hide': "Hide the included recipe's cells",
   'recipe.plan.apply': 'Apply',
   'recipe.plan.more': '{count} more operations',
   'recipe.plan.more.one': '{count} more operation',

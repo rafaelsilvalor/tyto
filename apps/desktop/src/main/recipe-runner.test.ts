@@ -465,6 +465,50 @@ describe('a recipe a run includes', () => {
   });
 });
 
+// TYTO-449: a `run` cell carries its included recipe's cells, kept with it as its table is.
+describe("a run cell's included cells", () => {
+  const write = (name: string, lines: readonly string[]) =>
+    writeFile(join(workspace, 'recipes', `${name}.recipe`), [...lines, ''].join('\n'));
+  const steps = (answer: Awaited<ReturnType<ReturnType<typeof harness>['run']>>) =>
+    (answer.cells[1]?.included?.cells ?? []).map((cell) => [cell.step.verb, cell.status]);
+
+  it('keeps them on a run cell it did not rerun, and refreshes them when the file changes', async () => {
+    await write('done', ['recipe done', 'acme.tag']);
+    const { run, calls } = harness();
+    const outer = ['recipe outer', 'acme.pull', 'run done', 'acme.tag', ''].join('\n');
+    const first = await run(outer, { saved: true });
+    expect(first.cells[1]?.included?.recipe).toBe('done');
+    expect(steps(first)).toEqual([['acme.tag', 'ok']]);
+
+    // An edit below the run: the run cell is reused, and its included cells with it.
+    const below = await run(outer.replace('acme.tag\n', 'where status = done\n'));
+    expect(calls.tag).toBe(2);
+    expect(steps(below)).toEqual([['acme.tag', 'ok']]);
+    expect(recipeAnswerToWire(below).cells[1]?.included?.[0]?.table?.total).toBe(2);
+
+    await write('done', ['recipe done', 'acme.tag', 'where status = done']);
+    const changed = await run(outer);
+    expect(steps(changed)).toEqual([
+      ['acme.tag', 'ok'],
+      ['where', 'ok'],
+    ]);
+    expect(changed.cells[1]?.included?.cells.at(-1)?.table?.rows.map((row) => row.key)).toEqual([
+      'T-1',
+    ]);
+  });
+
+  it('carries none on a run that failed inside', async () => {
+    await write('broken', ['recipe broken', 'where colour = red']);
+    const { run } = harness();
+    const answer = await run(['recipe outer', 'acme.pull', 'run broken', ''].join('\n'), {
+      saved: true,
+    });
+    expect(answer.cells[1]?.status).toBe('failed');
+    expect(answer.cells[1]?.included).toBeUndefined();
+    expect(recipeAnswerToWire(answer).cells[1]).not.toHaveProperty('included');
+  });
+});
+
 describe('what a run may read beside it', () => {
   it('includes a recipe from its own folder, and from nowhere else', async () => {
     await writeFile(

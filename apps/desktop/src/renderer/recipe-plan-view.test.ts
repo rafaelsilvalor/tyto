@@ -68,6 +68,7 @@ function render(
     runFrom: vi.fn<(index: number) => void>(),
     fetchAgain: vi.fn<() => void>(),
     toggled: vi.fn<(index: number, collapsed: boolean) => void>(),
+    expandedIncluded: vi.fn<(at: number, expanded: boolean) => void>(),
     apply: vi.fn<(index: number, planId: number) => void>(),
     // TYTO-379: no cell here is under `show`, so no view asks main for rows.
     rows: vi.fn(() => Promise.resolve({ stale: true as const })),
@@ -78,6 +79,7 @@ function render(
   const context: CellViewContext = {
     locale,
     collapsed: new Set(),
+    expanded: new Set(),
     applying: new Set(),
     refusals: new Map(),
     now: () => Date.parse('2026-11-07T12:00:00.000Z'),
