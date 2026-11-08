@@ -640,8 +640,17 @@ const pluginList = (keychain: Credentials) => ({
               return { key, set: await keychain.has(`plugin:${name}:${key}`) };
             }),
         ),
+        configurable: false,
+        running: false,
       })),
     ),
+  // What each request reached main as; the real steps are `plugin-manage.test.ts`'s.
+  manage: {
+    install: (from: 'folder' | 'archive') =>
+      Promise.resolve({ status: 'installed' as const, plugin: `from-${from}`, problems: [] }),
+    change: (name: string, change: 'remove' | 'disable' | 'enable') =>
+      Promise.resolve({ status: 'changed' as const, problems: [`${change} ${name}`] }),
+  },
 });
 
 /** The update notice, recording what clicking it asked for (TYTO-131). */
@@ -1678,6 +1687,27 @@ describe('plugins:list', () => {
     ]);
     // What main sends must satisfy the contract the preload validates it against.
     expect(IPC_CHANNELS['plugins:list'].response.safeParse(answer).success).toBe(true);
+  });
+});
+
+describe('plugins:install and plugins:change (TYTO-373)', () => {
+  it('hands the request to the plugin manager and answers in the validated shape', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const installed = await handlers['plugins:install']({ from: 'archive' });
+    expect(installed.plugin).toBe('from-archive');
+    expect(IPC_CHANNELS['plugins:install'].response.safeParse(installed).success).toBe(true);
+
+    const changed = await handlers['plugins:change']({ name: 'pdf', change: 'remove' });
+    expect(changed.problems).toEqual(['remove pdf']);
+    expect(IPC_CHANNELS['plugins:change'].response.safeParse(changed).success).toBe(true);
+  });
+
+  it('takes no path from the window: an install names only where to pick from', () => {
+    const request = IPC_CHANNELS['plugins:install'].request;
+    expect(request.safeParse({ from: 'folder' }).success).toBe(true);
+    expect(request.safeParse({ from: 'folder', path: 'C:/anything' }).success).toBe(false);
+    expect(request.safeParse({ from: 'npm' }).success).toBe(false);
   });
 });
 

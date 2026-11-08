@@ -32,6 +32,7 @@ import { type Terminals } from './terminal.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
+import { type PluginManager } from './plugin-manage.js';
 import { type DeliveryService } from './delivery.js';
 import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
@@ -361,10 +362,14 @@ export interface IpcDependencies {
     open: (documentId: string) => Promise<IpcResponse<'snippets:open'>>;
     read: () => Promise<string>;
   };
-  /** The plugins screen (TYTO-47): built-ins and installed plugins, read and never run. */
+  /**
+   * The plugins screen (TYTO-47): built-ins and installed plugins, read and never run, and
+   * since TYTO-373 installed and changed through the CLI's own steps (`plugin-manage.ts`).
+   */
   readonly plugins: {
     readonly folder: string;
     list: () => Promise<readonly IpcResponse<'plugins:list'>['plugins'][number][]>;
+    readonly manage: PluginManager;
   };
   /** The installed plugins' panels and their bridge (ADR 0045). */
   readonly panels: PanelService;
@@ -976,6 +981,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'plugins:list': async () => ({ folder: plugins.folder, plugins: [...(await plugins.list())] }),
+    'plugins:install': ({ from }) => plugins.manage.install(from),
+    'plugins:change': ({ name, change }) => plugins.manage.change(name, change),
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),

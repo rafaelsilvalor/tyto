@@ -2,7 +2,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { translate } from '../../shared/i18n/index.js';
-import { type PluginsDialog, type PluginsView, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
+import {
+  type PluginInstall,
+  type PluginsDialog,
+  type PluginsView,
+  PLUGINS_DIALOG_TAG,
+  settingKeyOffset,
+} from './plugins-dialog.js';
 
 /**
  * The plugins screen's states, as jsdom can see them: which rows, which words, which notice.
@@ -22,6 +28,8 @@ const VIEW: PluginsView = {
       permissions: [],
       problems: [],
       credentials: [],
+      configurable: false,
+      running: false,
     },
     {
       name: 'pdf',
@@ -32,6 +40,8 @@ const VIEW: PluginsView = {
       permissions: ['net:api.example.com'],
       problems: [],
       credentials: [],
+      configurable: false,
+      running: false,
     },
     {
       name: 'velho',
@@ -42,6 +52,8 @@ const VIEW: PluginsView = {
       permissions: [],
       problems: ["Plugin 'velho' needs plugin API >=99, and this Tyto provides plugin API 0.4.0."],
       credentials: [],
+      configurable: false,
+      running: false,
     },
   ],
 };
@@ -283,5 +295,157 @@ describe('a plugin’s credentials on the screen (TYTO-187)', () => {
       translate('en', 'plugins.credential.failed'),
     );
     expect(line(element, 'api-token').querySelector('.plugins__credential-failed')).toBeNull();
+  });
+});
+
+describe('installing and changing a plugin from the screen (TYTO-373)', () => {
+  type Answer = Awaited<ReturnType<PluginInstall>>;
+  const asked: string[] = [];
+
+  async function managed(
+    view: PluginsView = VIEW,
+    answer: Answer = { status: 'installed', plugin: 'novo', problems: [] },
+  ): Promise<PluginsDialog> {
+    asked.length = 0;
+    const element = await dialog(view);
+    element.onInstall = (from) => {
+      asked.push(`install ${from}`);
+      return Promise.resolve(answer);
+    };
+    element.onChange = (name, change) => {
+      asked.push(`${change} ${name}`);
+      return Promise.resolve(
+        change === 'remove'
+          ? { status: 'cancelled', problems: [] }
+          : { status: 'changed', problems: [] },
+      );
+    };
+    element.onSettings = (plugin) => {
+      asked.push(`settings ${plugin}`);
+    };
+    await element.updateComplete;
+    return element;
+  }
+
+  const actions = (element: Element, name: string): (string | undefined)[] =>
+    [...element.querySelectorAll<HTMLElement>(`[data-plugin="${name}"] .plugins__action`)].map(
+      (button) => button.dataset['action'],
+    );
+
+  const settle = async (element: PluginsDialog): Promise<void> => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+  };
+
+  it('offers a built-in nothing, a disabled install Enable and Remove, a refused one Remove', async () => {
+    const element = await managed();
+
+    expect(actions(element, 'svg')).toEqual([]);
+    expect(actions(element, 'pdf')).toEqual(['enable', 'remove']);
+    expect(actions(element, 'velho')).toEqual(['remove']);
+  });
+
+  it('draws no install or row buttons while nobody owns the bridge', async () => {
+    const element = await dialog();
+
+    expect(element.querySelector('.plugins__install-folder')).toBeNull();
+    expect(element.querySelector('.plugins__action')).toBeNull();
+  });
+
+  it('offers Disable on an enabled install, and Settings on one that declares settings', async () => {
+    const element = await managed({
+      folder: VIEW.folder,
+      plugins: [
+        {
+          ...VIEW.plugins[1]!,
+          name: 'ajustes',
+          status: 'enabled',
+          configurable: true,
+          running: true,
+        },
+      ],
+    });
+
+    expect(actions(element, 'ajustes')).toEqual(['disable', 'remove', 'settings']);
+    element.querySelector<HTMLButtonElement>('[data-action="settings"]')!.click();
+    element.querySelector<HTMLButtonElement>('[data-action="disable"]')!.click();
+    await settle(element);
+
+    expect(asked).toEqual(['settings ajustes', 'disable ajustes']);
+    expect(text(element, '.plugins__outcome')).toBe("'ajustes' changed. Restart Tyto to apply it.");
+  });
+
+  it('says restart to apply where the disk and the running set disagree', async () => {
+    const element = await managed({
+      folder: VIEW.folder,
+      plugins: [
+        { ...VIEW.plugins[1]!, name: 'novo', status: 'enabled', running: false },
+        { ...VIEW.plugins[1]!, name: 'parado', status: 'disabled', running: true },
+        { ...VIEW.plugins[1]!, name: 'quieto', status: 'disabled', running: false },
+        { ...VIEW.plugins[0]!, name: 'svg', running: true },
+      ],
+    });
+    const restart = (name: string): boolean =>
+      element.querySelector(`[data-plugin="${name}"] .plugins__restart`) !== null;
+
+    expect(['novo', 'parado', 'quieto', 'svg'].map(restart)).toEqual([true, true, false, false]);
+  });
+
+  it('hands each install button its source kind, and says what was installed', async () => {
+    const element = await managed();
+
+    element.querySelector<HTMLButtonElement>('.plugins__install-archive')!.click();
+    await settle(element);
+    element.querySelector<HTMLButtonElement>('.plugins__install-folder')!.click();
+    await settle(element);
+
+    expect(asked).toEqual(['install archive', 'install folder']);
+    expect(text(element, '.plugins__outcome')).toBe(
+      "Installed 'novo'. It starts the next time Tyto starts.",
+    );
+  });
+
+  it('says an unapproved install installed nothing', async () => {
+    const element = await managed(VIEW, { status: 'declined', plugin: 'novo', problems: [] });
+
+    element.querySelector<HTMLButtonElement>('.plugins__install-folder')!.click();
+    await settle(element);
+
+    expect(text(element, '.plugins__outcome')).toBe(
+      "'novo' was not installed: its permissions were not approved.",
+    );
+  });
+
+  it("shows main's problems when it refused, such as a built-in's name", async () => {
+    const problem = "A plugin named 'svg' is already here (built-in).";
+    const element = await managed(VIEW, { status: 'refused', plugin: 'svg', problems: [problem] });
+
+    element.querySelector<HTMLButtonElement>('.plugins__install-folder')!.click();
+    await settle(element);
+
+    expect(element.querySelector('.plugins__outcome')?.getAttribute('data-key')).toBe(
+      'plugins.result.refused',
+    );
+    expect(text(element, '.plugins__outcome .plugins__problems')).toBe(problem);
+  });
+
+  it('says nothing when the remove box was dismissed', async () => {
+    const element = await managed();
+
+    element.querySelector<HTMLButtonElement>('[data-plugin="pdf"] [data-action="remove"]')!.click();
+    await settle(element);
+
+    expect(asked).toEqual(['remove pdf']);
+    expect(element.querySelector('.plugins__outcome')).toBeNull();
+  });
+});
+
+describe('settingKeyOffset', () => {
+  it("is just inside the quote of the plugin's first key, and nothing without one", () => {
+    const settings = '{\n  "zoom": 1,\n  "ajustes.cor": "azul",\n  "ajustes.tamanho": 2\n}';
+
+    expect(settingKeyOffset(settings, 'ajustes')).toBe(settings.indexOf('ajustes.cor'));
+    // A key that merely starts with the name is another plugin's.
+    expect(settingKeyOffset('{ "ajustes-extra.cor": 1 }', 'ajustes')).toBeUndefined();
   });
 });

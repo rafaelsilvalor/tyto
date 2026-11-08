@@ -51,7 +51,8 @@ function writeHome(): void {
         name,
         version: '1.0.0',
         engine: `>=${PLUGIN_API_VERSION}`,
-        contributes: ['exporter'],
+        // pdf declares settings, so its row offers Settings (TYTO-373).
+        contributes: name === 'pdf' ? ['exporter', 'configuration'] : ['exporter'],
         permissions: ['net:api.example.com'],
       }),
     );
@@ -70,6 +71,12 @@ beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-plugins-screen-'));
   home = join(scratch, 'tyto-home');
   writeHome();
+  // A settings file holding one of pdf's keys on its third line, for the Settings button.
+  mkdirSync(join(scratch, 'user-data'), { recursive: true });
+  writeFileSync(
+    join(scratch, 'user-data', 'settings.json'),
+    '{\n  "zoom": 1,\n  "pdf.cor": "azul"\n}\n',
+  );
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'user-data')}`],
@@ -140,8 +147,81 @@ describe('the plugins screen', () => {
     await page.screenshot({ path: join(here, '..', 'out', 'plugins-screen.png') });
   });
 
+  it('installs a folder after the permission box, and removes it only once confirmed (TYTO-373)', async () => {
+    const source = join(scratch, 'source', 'novo');
+    mkdirSync(join(source, 'dist'), { recursive: true });
+    writeFileSync(
+      join(source, 'tyto-plugin.json'),
+      JSON.stringify({
+        name: 'novo',
+        version: '1.0.0',
+        engine: `>=${PLUGIN_API_VERSION}`,
+        contributes: ['exporter'],
+        permissions: ['net:api.example.com', 'workspace:read'],
+      }),
+    );
+    writeFileSync(join(source, 'dist', 'index.js'), 'export function activate() {}\n');
+
+    // The picker and the boxes are the OS's: stubbed in main, each box recorded, and each
+    // answered with whatever `answer` holds when it opens.
+    await app.evaluate(({ dialog }, folder) => {
+      const state = globalThis as unknown as { shown: string[]; answer: number };
+      state.shown = [];
+      state.answer = 0;
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
+      dialog.showMessageBox = ((...given: unknown[]) => {
+        const box = given.at(-1) as { message: string; detail?: string };
+        state.shown.push(`${box.message}\n${box.detail ?? ''}`);
+        return Promise.resolve({ response: state.answer, checkboxChecked: false });
+      }) as typeof dialog.showMessageBox;
+    }, source);
+    const shown = (): Promise<string[]> =>
+      app.evaluate(() => (globalThis as unknown as { shown: string[] }).shown);
+
+    await page.click('.plugins__install-folder');
+    // Installed while the window runs: enabled on disk, started at the next launch.
+    await page.waitForSelector('.plugins__row[data-plugin="novo"] .plugins__restart');
+    const [approval] = await shown();
+    expect(approval).toContain('novo 1.0.0 from');
+    expect(approval).toContain('  - workspace:read');
+    expect(existsSync(join(home, 'plugins', 'novo', 'tyto-plugin.json'))).toBe(true);
+
+    // Dismissed: the box's Cancel, so nothing is removed.
+    await app.evaluate(() => {
+      (globalThis as unknown as { answer: number }).answer = 1;
+    });
+    await page.click('.plugins__row[data-plugin="novo"] [data-action="remove"]');
+    await expect.poll(async () => (await shown()).length).toBe(2);
+    expect((await shown())[1]).toContain(
+      translate(locale, 'plugins.remove.message').replace('{plugin}', 'novo'),
+    );
+    expect(existsSync(join(home, 'plugins', 'novo'))).toBe(true);
+
+    await app.evaluate(() => {
+      (globalThis as unknown as { answer: number }).answer = 0;
+    });
+    await page.click('.plugins__row[data-plugin="novo"] [data-action="remove"]');
+    await page.waitForSelector('.plugins__row[data-plugin="novo"]', { state: 'detached' });
+    expect(existsSync(join(home, 'plugins', 'novo'))).toBe(false);
+  });
+
   it('closes with its button', async () => {
     await page.click('.plugins__close');
     await page.waitForSelector('.plugins__panel', { state: 'detached' });
+  });
+
+  it("opens settings.json on the plugin's first key from its Settings button", async () => {
+    await app.evaluate(({ Menu }) => {
+      Menu.getApplicationMenu()?.getMenuItemById('plugins.show')?.click();
+    });
+    await page.click('.plugins__row[data-plugin="pdf"] [data-action="settings"]');
+
+    // `  "pdf.cor"` is line 3, and the caret lands just inside the quote: column 4.
+    await page.waitForFunction(() =>
+      /^(Ln|Lin) 3, Col 4$/u.test(
+        document.querySelector('tyto-status-bar .status-bar__position')?.textContent ?? '',
+      ),
+    );
+    expect(await page.textContent('[role="tab"][aria-selected="true"]')).toContain('settings.json');
   });
 });

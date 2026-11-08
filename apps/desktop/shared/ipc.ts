@@ -1891,10 +1891,10 @@ export const IPC_CHANNELS = {
    * The plugins screen (TYTO-47): the built-ins this app activated and what `tyto plugin
    * install` put under `~/.tyto`, with the reason when one would be refused.
    *
-   * Read-only on purpose. Installing, removing and disabling are the CLI's, and the window
-   * activates no installed plugin yet — that is the desktop half of TYTO-48. `folder` is where
-   * the plugins live, so the screen can say where to look; `problems` are already-rendered
-   * sentences, because the renderer shows them and has no catalogue of diagnostic codes.
+   * Read-only: installing and changing go through `plugins:install` and `plugins:change`
+   * (TYTO-373). `folder` is where the plugins live, so the screen can say where to look;
+   * `problems` are already-rendered sentences, because the renderer shows them and has no
+   * catalogue of diagnostic codes.
    */
   'plugins:list': channel(
     z.object({}),
@@ -1916,9 +1916,55 @@ export const IPC_CHANNELS = {
              * credential the renderer gets.
              */
             credentials: z.array(z.object({ key: z.string().min(1), set: z.boolean() })),
+            /**
+             * An installed plugin that contributes settings, so the screen can open
+             * `settings.json` at its `"<plugin>.` keys (TYTO-373). Never a built-in, whose
+             * keys carry no prefix.
+             */
+            configurable: z.boolean(),
+            /**
+             * Whether this window started it. Installed plugins start once, when the window
+             * opens (ADR 0044), so a row whose `status` and `running` disagree is a change
+             * that applies the next time Tyto starts.
+             */
+            running: z.boolean(),
           }),
         )
         .max(500),
+    }),
+  ),
+
+  /**
+   * Installs a plugin from a folder or a `.tgz` archive (TYTO-373). **Main opens the picker**,
+   * so no path crosses from the window, then shows the permissions `tyto plugin install`
+   * prints in a native box. Only Install in that box installs; a dismissed box answers
+   * `declined`. `cancelled` is a picker closed with nothing chosen. `refused` carries the
+   * already-rendered problems, as `plugins:list` does. The plugin starts the next time Tyto
+   * starts.
+   */
+  'plugins:install': channel(
+    z.strictObject({ from: z.enum(['folder', 'archive']) }),
+    z.object({
+      status: z.enum(['installed', 'declined', 'cancelled', 'refused']),
+      plugin: z.string().min(1).optional(),
+      problems: z.array(z.string()),
+    }),
+  ),
+
+  /**
+   * Removes, disables or enables an installed plugin (TYTO-373), as `tyto plugin remove`,
+   * `disable` and `enable` do. Remove asks first in a native box whose default is Cancel;
+   * `cancelled` is that box dismissed. **Rejected** for a built-in's name, which the screen
+   * never offers. Takes effect the next time Tyto starts.
+   */
+  'plugins:change': channel(
+    z.strictObject({
+      name: z.string().min(1).max(214),
+      change: z.enum(['remove', 'disable', 'enable']),
+    }),
+    z.object({
+      status: z.enum(['changed', 'cancelled', 'refused']),
+      problems: z.array(z.string()),
     }),
   ),
 

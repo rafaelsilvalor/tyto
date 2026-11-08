@@ -74,8 +74,44 @@ describe('listPlugins', () => {
         contributes: ['exporter'],
         permissions: [],
         problems: [],
+        configurable: false,
+        running: true,
         credentials: [],
       },
+    ]);
+  });
+
+  it('says which installed rows declare settings and which this window started (TYTO-373)', async () => {
+    const store = fsPluginStore(home);
+    for (const [name, contributes] of [
+      ['ajustes', ['configuration']],
+      ['novo', ['exporter']],
+    ] as const) {
+      const folder = join(home, 'plugins', name);
+      await mkdir(folder, { recursive: true });
+      await writeFile(
+        join(folder, 'tyto-plugin.json'),
+        JSON.stringify({
+          name,
+          version: '1.0.0',
+          engine: `>=${PLUGIN_API_VERSION}`,
+          contributes,
+          permissions: [],
+        }),
+      );
+    }
+    const approved = { enabled: true, permissions: [], source: './x' };
+    await store.writeState(
+      withPluginEntry(withPluginEntry(EMPTY_PLUGIN_STATE, 'ajustes', approved), 'novo', approved),
+    );
+
+    const rows = await listPlugins([svg], store, nothingStored, () => ['ajustes']);
+
+    expect(rows.map((row) => [row.name, row.configurable, row.running])).toEqual([
+      ['svg', false, true],
+      ['ajustes', true, true],
+      // Installed after the window started: enabled on disk, not running until the next start.
+      ['novo', false, false],
     ]);
   });
 

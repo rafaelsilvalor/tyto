@@ -6,15 +6,19 @@ import {
   DEFAULT_LOCALE,
   translate,
 } from '../../shared/i18n/index.js';
-import type { IpcResponse } from '../../shared/ipc.js';
+import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 
 /**
  * The plugins screen (TYTO-47): the list `tyto plugin list` prints, in the window.
  *
  * **It reads and runs nothing.** Like the export dialog it is handed what to show — the
- * answer to `plugins:list`, asked by whoever opened it — and has no bridge of its own. It
- * installs nothing either: install, remove and disable are the CLI's, and the screen says so
- * rather than offering buttons that would lead there.
+ * answer to `plugins:list`, asked by whoever opened it — and has no bridge of its own.
+ *
+ * **Install, remove, disable and enable (TYTO-373)** are buttons that hand the request to
+ * `onInstall` and `onChange`; main opens the picker, asks in a native box and runs the CLI's
+ * own steps, and whoever opened the screen asks the list again. A built-in has no buttons: it
+ * ships inside Tyto. Nothing applies before the next start, so a row whose state on disk and
+ * whether it is running disagree says "restart to apply".
  *
  * **One thing it writes: a plugin's credentials (TYTO-187).** Beside each `credentials:<key>`
  * a plugin declares, a field to set it and a button to clear it, handed to `onCredential`
@@ -38,6 +42,47 @@ export type CredentialChange = (change: {
   readonly secret?: string;
 }) => Promise<void>;
 
+/** Install from a folder or an archive; main picks the file and asks. Rejects on failure. */
+export type PluginInstall = (
+  from: IpcRequest<'plugins:install'>['from'],
+) => Promise<IpcResponse<'plugins:install'>>;
+
+/** Remove, disable or enable one installed plugin. Rejects when main refused the request. */
+export type PluginChange = (
+  name: string,
+  change: IpcRequest<'plugins:change'>['change'],
+) => Promise<IpcResponse<'plugins:change'>>;
+
+/** What the last install or change said, on the line above the buttons. */
+interface Outcome {
+  readonly key: CatalogueKey;
+  readonly plugin?: string;
+  readonly problems: readonly string[];
+}
+
+const outcomeOf = (key: CatalogueKey, plugin: string | undefined): Outcome =>
+  plugin === undefined ? { key, problems: [] } : { key, plugin, problems: [] };
+
+/**
+ * A change that applies at the next start: the window starts installed plugins once, so an
+ * enabled one it did not start, or a disabled one it did, is waiting for a restart.
+ */
+export function waitsForRestart(plugin: PluginRow): boolean {
+  if (plugin.origin !== 'external') return false;
+  if (plugin.status === 'enabled') return !plugin.running;
+  if (plugin.status === 'disabled') return plugin.running;
+  return false;
+}
+
+/**
+ * Where the plugin's first key starts in a settings file's text: just inside the quote of its
+ * first `"<plugin>.`. `undefined` when the file holds none of its keys yet.
+ */
+export function settingKeyOffset(text: string, plugin: string): number | undefined {
+  const at = text.indexOf(`"${plugin}.`);
+  return at === -1 ? undefined : at + 1;
+}
+
 const ORIGIN_KEYS: Record<PluginRow['origin'], CatalogueKey> = {
   'built-in': 'plugins.origin.builtIn',
   external: 'plugins.origin.external',
@@ -56,7 +101,12 @@ export class PluginsDialog extends LitElement {
     locale: { attribute: false },
     view: { attribute: false },
     onCredential: { attribute: false },
+    onInstall: { attribute: false },
+    onChange: { attribute: false },
+    onSettings: { attribute: false },
     failedCredential: { state: true },
+    outcome: { state: true },
+    busy: { state: true },
   };
 
   declare open: boolean;
@@ -67,6 +117,15 @@ export class PluginsDialog extends LitElement {
   declare onCredential: CredentialChange | undefined;
   /** `plugin:key` of the change main refused last, so its row can say so. */
   declare failedCredential: string | undefined;
+  /** Where an install goes. The install buttons are not drawn while it is absent. */
+  declare onInstall: PluginInstall | undefined;
+  /** Where a remove, disable or enable goes. No row buttons while it is absent. */
+  declare onChange: PluginChange | undefined;
+  /** Opens `settings.json` at the plugin's keys (TYTO-373). */
+  declare onSettings: ((plugin: string) => void) | undefined;
+  declare outcome: Outcome | undefined;
+  /** While an install or a change is out, so a second click does not start another. */
+  declare busy: boolean;
 
   constructor() {
     super();
@@ -74,7 +133,58 @@ export class PluginsDialog extends LitElement {
     this.locale = DEFAULT_LOCALE;
     this.view = undefined;
     this.onCredential = undefined;
+    this.onInstall = undefined;
+    this.onChange = undefined;
+    this.onSettings = undefined;
     this.failedCredential = undefined;
+    this.outcome = undefined;
+    this.busy = false;
+  }
+
+  private async act(step: () => Promise<Outcome | undefined>): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      this.outcome = await step();
+    } catch {
+      this.outcome = { key: 'plugins.result.refused', problems: [] };
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private install(from: IpcRequest<'plugins:install'>['from']): void {
+    const install = this.onInstall;
+    if (install === undefined) return;
+    void this.act(async () => {
+      const answer = await install(from);
+      switch (answer.status) {
+        case 'cancelled':
+          return undefined;
+        case 'installed':
+          return outcomeOf('plugins.result.installed', answer.plugin);
+        case 'declined':
+          return outcomeOf('plugins.result.declined', answer.plugin);
+        case 'refused':
+          return { key: 'plugins.result.refused', problems: answer.problems };
+      }
+    });
+  }
+
+  private change(name: string, change: IpcRequest<'plugins:change'>['change']): void {
+    const run = this.onChange;
+    if (run === undefined) return;
+    void this.act(async () => {
+      const answer = await run(name, change);
+      switch (answer.status) {
+        case 'cancelled':
+          return undefined;
+        case 'changed':
+          return { key: 'plugins.result.changed', plugin: name, problems: [] };
+        case 'refused':
+          return { key: 'plugins.result.refused', problems: answer.problems };
+      }
+    });
   }
 
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
@@ -113,7 +223,71 @@ export class PluginsDialog extends LitElement {
               </ul>`
         }
       </td>
+      <td><div class="plugins__row-actions">${this.rowActions(say, plugin)}</div></td>
     </tr>`;
+  }
+
+  /**
+   * An installed plugin's buttons: Disable or Enable by its state, Remove, and Settings when it
+   * declares settings. A built-in gets none. A refused folder can only be removed: enabling it
+   * would not approve it, which only an install does.
+   */
+  private rowActions(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
+    const restart = waitsForRestart(plugin)
+      ? html`<span class="plugins__restart">${say('plugins.restart')}</span>`
+      : nothing;
+    if (plugin.origin !== 'external' || this.onChange === undefined) return restart;
+
+    const button = (action: 'disable' | 'enable' | 'remove', key: CatalogueKey): TemplateResult =>
+      html`<button
+        class="plugins__action"
+        type="button"
+        data-action=${action}
+        ?disabled=${this.busy}
+        @click=${() => {
+          this.change(plugin.name, action);
+        }}
+      >
+        ${say(key)}
+      </button>`;
+
+    const toggle =
+      plugin.status === 'disabled'
+        ? button('enable', 'plugins.action.enable')
+        : plugin.status === 'refused'
+          ? nothing
+          : button('disable', 'plugins.action.disable');
+    const settings =
+      plugin.configurable && this.onSettings !== undefined
+        ? html`<button
+            class="plugins__action"
+            type="button"
+            data-action="settings"
+            @click=${() => {
+              this.onSettings?.(plugin.name);
+            }}
+          >
+            ${say('plugins.action.settings')}
+          </button>`
+        : nothing;
+    return html`${restart}${toggle}${button('remove', 'plugins.action.remove')}${settings}`;
+  }
+
+  /** The last install's or change's result, and main's problems when it refused. */
+  private outcomeLine(say: (key: CatalogueKey) => string): unknown {
+    const outcome = this.outcome;
+    if (outcome === undefined) return nothing;
+    const line = say(outcome.key).replaceAll('{plugin}', outcome.plugin ?? '');
+    return html`<div class="plugins__outcome" role="status" data-key=${outcome.key}>
+      <p>${line}</p>
+      ${
+        outcome.problems.length === 0
+          ? nothing
+          : html`<ul class="plugins__problems">
+              ${outcome.problems.map((problem) => html`<li>${problem}</li>`)}
+            </ul>`
+      }
+    </div>`;
   }
 
   /**
@@ -245,6 +419,7 @@ export class PluginsDialog extends LitElement {
             <th>${say('plugins.column.status')}</th>
             <th>${say('plugins.column.contributes')}</th>
             <th>${say('plugins.column.permissions')}</th>
+            <th>${say('plugins.column.actions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -272,7 +447,32 @@ export class PluginsDialog extends LitElement {
       <p class="plugins__inactive">${say('plugins.inactive')}</p>
       ${this.body(say)}
       <p class="plugins__install">${say('plugins.install')}</p>
+      ${this.outcomeLine(say)}
       <div class="plugins__actions">
+        ${
+          this.onInstall === undefined
+            ? nothing
+            : html`<button
+                  class="plugins__install-folder"
+                  type="button"
+                  ?disabled=${this.busy}
+                  @click=${() => {
+                    this.install('folder');
+                  }}
+                >
+                  ${say('plugins.action.installFolder')}
+                </button>
+                <button
+                  class="plugins__install-archive"
+                  type="button"
+                  ?disabled=${this.busy}
+                  @click=${() => {
+                    this.install('archive');
+                  }}
+                >
+                  ${say('plugins.action.installArchive')}
+                </button>`
+        }
         <button
           class="plugins__close"
           type="button"

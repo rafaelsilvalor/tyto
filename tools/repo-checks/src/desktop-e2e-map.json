@@ -376,6 +376,11 @@
       "why": "reviewed: plugin processes: every file that installs or reads a plugin"
     },
     {
+      "paths": ["apps/desktop/src/main/plugin-manage.ts"],
+      "e2e": ["installed-plugins.desktop.test.ts", "plugins.desktop.test.ts"],
+      "why": "reviewed: the plugins screen's install, remove, disable and enable (TYTO-373)"
+    },
+    {
       "paths": ["apps/desktop/src/main/plugin-list.ts"],
       "e2e": [
         "assets.desktop.test.ts",

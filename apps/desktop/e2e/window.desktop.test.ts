@@ -340,6 +340,10 @@ describe('the bridge', () => {
       // TYTO-433: Plugins: Sync / Update Plugin Files. Exercised by
       // `e2e/plugin-files.desktop.test.ts`.
       'plugin-files:sync',
+      // TYTO-373: install and change from the plugins screen. Exercised by
+      // `e2e/plugins.desktop.test.ts`.
+      'plugins:change',
+      'plugins:install',
       // TYTO-207: the plugins' keymaps. Exercised by `e2e/keybindings.desktop.test.ts`.
       'plugins:keymaps',
       'plugins:list',

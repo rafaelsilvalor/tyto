@@ -12,17 +12,38 @@ Execute **Mostrar plugins** pela barra de comandos ou pelo menu **Arquivo**, ou 
 
 ## Instalar, desligar e remover
 
-A janela mostra os plugins; ela não os instala. Isso se faz pelo terminal, com os comandos de [Plugins](../command-line/plugins.md):
+::: info Conferida de outro jeito
+Esta seção entrou em 2026-11-08. Instalar a partir de uma pasta, remover e Configurações foram conferidos pelos testes de ponta a ponta do app, com o seletor de arquivos e as caixas do sistema respondidos pelo teste; instalar a partir de um arquivo foi conferido por testes de unidade. Ninguém a seguiu à mão ainda.
+:::
 
-| Para                                                        | Execute                        |
-| ----------------------------------------------------------- | ------------------------------ |
-| instalar um a partir de uma pasta, de uma URL git ou do npm | `tyto plugin install <origem>` |
-| desligar um sem removê-lo                                   | `tyto plugin disable <nome>`   |
-| religá-lo                                                   | `tyto plugin enable <nome>`    |
-| remover um                                                  | `tyto plugin remove <nome>`    |
+Pela caixa de plugins, sem terminal:
 
-A janela inicia os plugins quando abre, então uma mudança feita com ela aberta vale na próxima vez que você abrir. Um plugin desligado aparece como _desativado_ na caixa, e o que ele acrescentou — os templates, os temas — some da janela até você religá-lo.
+1. Clique em **Instalar de uma pasta…** e escolha a pasta do plugin, ou em **Instalar de um arquivo…** e escolha o arquivo `.tgz` ou `.tar.gz` dele.
+2. Uma caixa mostra o nome do plugin, o que ele acrescenta e cada permissão que ele pede — o mesmo texto que o `tyto plugin install` mostra. Clique em **Instalar** para aprovar. **Cancelar**, Esc ou fechar a caixa não instala nada.
+3. O plugin aparece na lista com _reinicie para aplicar_.
+
+Na linha de um plugin instalado:
+
+| Botão             | O que faz                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| **Desativar**     | desliga o plugin sem removê-lo                                                               |
+| **Ativar**        | religa o plugin                                                                              |
+| **Remover**       | apaga a pasta dele e as permissões que você aprovou, depois de uma caixa que vem em Cancelar |
+| **Configurações** | abre o `settings.json` na primeira configuração do plugin, para um plugin que tem as suas    |
+
+Um plugin que vem com o Tyto não tem botões. Os plugins instalados pela galeria se gerenciam na galeria.
+
+A janela inicia os plugins quando abre, então toda mudança vale na próxima vez que você abrir o Tyto: até lá a linha diz _reinicie para aplicar_. Um plugin desligado aparece como _desativado_, e o que ele acrescentou — os templates, os temas — some da janela quando o Tyto abrir de novo.
+
+As mesmas mudanças se fazem pelo terminal, com os comandos de [Plugins](../command-line/plugins.md):
+
+| Para                                                                   | Execute                        |
+| ---------------------------------------------------------------------- | ------------------------------ |
+| instalar um a partir de uma pasta, de um arquivo `.tgz`, de git ou npm | `tyto plugin install <origem>` |
+| desligar um sem removê-lo                                              | `tyto plugin disable <nome>`   |
+| religá-lo                                                              | `tyto plugin enable <nome>`    |
+| remover um                                                             | `tyto plugin remove <nome>`    |
 
 ## Um plugin é seguro?
 
-Cada plugin instalado roda separado da janela, então um plugin que trava para a si mesmo e não o Tyto, e ele só alcança o que as permissões deixam. A caixa mostra essas permissões, e o `tyto plugin install` as mostra antes de você aprovar. Escrever um plugin está no [guia de autoria de plugins](../extend/), em inglês.
+Cada plugin instalado roda separado da janela, então um plugin que trava para a si mesmo e não o Tyto, e ele só alcança o que as permissões deixam. A caixa mostra essas permissões, e tanto a caixa de instalação quanto o `tyto plugin install` as mostram antes de você aprovar. Escrever um plugin está no [guia de autoria de plugins](../extend/), em inglês.

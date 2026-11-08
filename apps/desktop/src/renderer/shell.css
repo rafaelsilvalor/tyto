@@ -3296,7 +3296,27 @@ tyto-plugins-dialog[open] {
 
 .plugins__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: var(--tyto-space-3);
+}
+
+/* TYTO-373: an installed plugin's buttons, stacked so the table does not widen. */
+.plugins__row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tyto-space-2);
+}
+
+.plugins__restart {
+  color: var(--tyto-warning);
+  white-space: nowrap;
+}
+
+.plugins__outcome p {
+  margin: 0;
+  font-size: var(--tyto-text-sm);
 }
 
 /* The gallery (TYTO-504): the plugins screen's overlay and panel, holding a grid of cards

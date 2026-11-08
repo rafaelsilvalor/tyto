@@ -7,6 +7,7 @@ import { basename, dirname, join } from 'node:path';
 
 import {
   type BrowserWindow,
+  type OpenDialogOptions,
   Menu,
   app,
   clipboard,
@@ -81,6 +82,12 @@ import { fileRecentFiles, fileRecentFolders } from './recent-files.js';
 import { createRecentFoldersService, folderKeyFor } from './recent-folders.js';
 import { registerIpcHandlers } from './ipc.js';
 import { exporterBuiltIns, listPlugins, tytoHome } from './plugin-list.js';
+import {
+  type ShowBox,
+  approveInstallInABox,
+  confirmRemoveInABox,
+  createPluginManager,
+} from './plugin-manage.js';
 import desktopManifest from './desktop.tyto-plugin.json';
 import { activateBuiltIns, builtInTemplatesDirectory } from './plugins.js';
 import { bundledNodeLauncher, bundledNodePaths } from './plugin-process.js';
@@ -874,6 +881,13 @@ async function start(): Promise<void> {
   // **The plugin files** (TYTO-433, ADR 0151): the sync `tyto render` runs, here in main, with
   // the copies in a plugin set of their own that starts again when what loads changes. Synced
   // at start, when a folder opens (above) and on the two commands; never in the renderer.
+  // The plugins screen's two boxes (TYTO-373), over the window when there is one.
+  const showManageBox: ShowBox = (box) => {
+    const options = { ...box, buttons: [...box.buttons] };
+    return mainWindow === undefined
+      ? dialog.showMessageBox(options)
+      : dialog.showMessageBox(mainWindow, options);
+  };
   const pluginFiles = createDesktopPluginFiles({
     home: pluginsHome,
     builtInNames: new Set(
@@ -1707,7 +1721,42 @@ async function start(): Promise<void> {
           [...exporterBuiltIns(), ...host.registry.plugins()],
           pluginStore,
           credentials.has,
+          () => late.installed?.running() ?? [],
         ),
+      // TYTO-373: the CLI's install and state change, asked through native boxes. The picker
+      // is main's, so no path crosses from the window; nothing applies before the next start.
+      manage: createPluginManager({
+        home: pluginsHome,
+        cwd: pluginsHome,
+        shellRefusal: SHELL_REFUSED,
+        builtInNames: () =>
+          new Set(
+            [...exporterBuiltIns(), ...host.registry.plugins()].map(
+              (plugin) => plugin.manifest.name,
+            ),
+          ),
+        choose: async (from) => {
+          const options: OpenDialogOptions =
+            from === 'folder'
+              ? { properties: ['openDirectory'] }
+              : {
+                  properties: ['openFile'],
+                  filters: [
+                    {
+                      name: translate(uiLocale, 'plugins.picker.archive'),
+                      extensions: ['tgz', 'gz'],
+                    },
+                  ],
+                };
+          const answer =
+            mainWindow === undefined
+              ? await dialog.showOpenDialog(options)
+              : await dialog.showOpenDialog(mainWindow, options);
+          return answer.canceled ? undefined : answer.filePaths[0];
+        },
+        approve: approveInstallInABox(showManageBox, (key) => translate(uiLocale, key)),
+        confirmRemove: confirmRemoveInABox(showManageBox, (key) => translate(uiLocale, key)),
+      }),
     },
     panels,
     // The themes the `theme` setting chooses, and the picker (TYTO-208). A choice is written

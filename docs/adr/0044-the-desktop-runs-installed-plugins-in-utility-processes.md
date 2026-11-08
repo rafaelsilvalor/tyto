@@ -10,7 +10,8 @@ The rule above, one loader and two compositions, now covers the write half too. 
 plugin and removing, disabling or enabling one are `installPlugin` and `changePluginState` in
 `@tyto/command-line`, steps that answer a `Result` and print nothing. `tyto plugin install`,
 `remove`, `disable` and `enable` wrap them with the terminal's prompt; the window's plugins
-screen is to wrap the same steps with a native box. The validation, the built-in-name refusal
+screen wraps the same steps with a native picker and box (`apps/desktop/src/main/plugin-manage.ts`,
+the second half of TYTO-373). The validation, the built-in-name refusal
 and what `plugins.json` records are therefore one implementation behind both apps. As this ADR
 already says for installs, a change takes effect the next time the window starts plugins.
 

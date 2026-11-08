@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { gzipSync } from 'node:zlib';
 
 import { PLUGIN_API_VERSION, type PluginManifest } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -137,6 +138,93 @@ describe('installing from a .tgz archive', () => {
     expect(answer.ok).toBe(false);
     expect(JSON.stringify(answer)).toContain('more than one tyto-plugin.json');
     expect(await installedFolders()).toEqual([]);
+  }, 30_000);
+});
+
+/** One ustar entry: a 512-byte header, then the body padded to 512. `type` 0 file, 2 symlink. */
+function tarEntry(name: string, body: string, type: '0' | '2' = '0', link = ''): Buffer {
+  const header = Buffer.alloc(512);
+  const data = Buffer.from(type === '0' ? body : '');
+  header.write(name, 0, 100, 'utf8');
+  header.write('0000644\0', 100);
+  header.write('0000000\0', 108);
+  header.write('0000000\0', 116);
+  header.write(`${data.length.toString(8).padStart(11, '0')}\0`, 124);
+  header.write('00000000000\0', 136);
+  header.write('        ', 148);
+  header.write(type, 156);
+  header.write(link, 157, 100, 'utf8');
+  header.write('ustar\0', 257);
+  header.write('00', 263);
+  let sum = 0;
+  for (const byte of header) sum += byte;
+  header.write(`${sum.toString(8).padStart(6, '0')}\0 `, 148);
+  const padding = Buffer.alloc((512 - (data.length % 512)) % 512);
+  return Buffer.concat([header, data, padding]);
+}
+
+/**
+ * An archive a hostile author wrote by hand, as no `tar -c` would (TYTO-373): written byte by
+ * byte, so the entries are exactly the attack and not what this machine's `tar` would pack.
+ */
+async function hostileArchive(entries: readonly Buffer[]): Promise<string> {
+  const manifest = tarEntry(
+    'tyto-plugin.json',
+    JSON.stringify({
+      name: 'texto',
+      version: '1.0.0',
+      engine: `>=${PLUGIN_API_VERSION}`,
+      contributes: ['exporter'],
+      permissions: [],
+    }),
+  );
+  const archive = join(scratch, 'hostile.tgz');
+  await writeFile(archive, gzipSync(Buffer.concat([manifest, ...entries, Buffer.alloc(1024)])));
+  return archive;
+}
+
+describe('an archive that tries to write outside the folder it is unpacked into', () => {
+  // The unpack folder is `<tmp>/tyto-plugin-*/extracted`, so `<tmp>` is pointed at a folder of
+  // this test's: anything that lands in it survives the fetch's cleanup and is an escape.
+  let tmp: string;
+  const saved: Record<string, string | undefined> = {};
+  const VARIABLES = ['TMPDIR', 'TMP', 'TEMP'] as const;
+
+  beforeEach(async () => {
+    tmp = join(scratch, 'tmp');
+    await mkdir(tmp);
+    for (const name of VARIABLES) {
+      saved[name] = process.env[name];
+      process.env[name] = tmp;
+    }
+  });
+
+  afterEach(() => {
+    for (const name of VARIABLES) {
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    }
+  });
+
+  it('writes nothing for a ../ entry, and installs nothing', async () => {
+    const archive = await hostileArchive([tarEntry('../../escaped.txt', 'out')]);
+
+    const answer = await installPlugin(archive, { home, cwd: scratch, approve: approveAll });
+
+    expect(await readdir(tmp)).toEqual([]);
+    expect(answer.ok).toBe(false);
+    expect(await installedFolders()).toEqual([]);
+  }, 30_000);
+
+  it('writes nothing through a symlink an earlier entry planted', async () => {
+    const archive = await hostileArchive([
+      tarEntry('link', '', '2', '../..'),
+      tarEntry('link/through-the-link.txt', 'out'),
+    ]);
+
+    await installPlugin(archive, { home, cwd: scratch, approve: approveAll });
+
+    expect(await readdir(tmp)).toEqual([]);
   }, 30_000);
 });
 

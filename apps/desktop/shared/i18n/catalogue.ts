@@ -704,6 +704,32 @@ export interface Catalogue {
   readonly 'plugins.credential.clear': string;
   readonly 'plugins.credential.kept': string;
   readonly 'plugins.credential.failed': string;
+  /**
+   * TYTO-373: installing from a folder or a `.tgz` archive, and removing, disabling and enabling
+   * an installed plugin, from the screen. `restart` is beside a row whose change applies at the
+   * next start; the results carry `{plugin}`. `approve.*` and `remove.*` are the native boxes'
+   * words, and `picker.archive` the open dialog's filter name: never element text.
+   */
+  readonly 'plugins.column.actions': string;
+  readonly 'plugins.action.installFolder': string;
+  readonly 'plugins.action.installArchive': string;
+  readonly 'plugins.action.disable': string;
+  readonly 'plugins.action.enable': string;
+  readonly 'plugins.action.remove': string;
+  readonly 'plugins.action.settings': string;
+  readonly 'plugins.restart': string;
+  readonly 'plugins.result.installed': string;
+  readonly 'plugins.result.declined': string;
+  readonly 'plugins.result.changed': string;
+  readonly 'plugins.result.refused': string;
+  readonly 'plugins.approve.message': string;
+  readonly 'plugins.approve.install': string;
+  readonly 'plugins.approve.cancel': string;
+  readonly 'plugins.remove.message': string;
+  readonly 'plugins.remove.detail': string;
+  readonly 'plugins.remove.confirm': string;
+  readonly 'plugins.remove.cancel': string;
+  readonly 'plugins.picker.archive': string;
 
   /**
    * The local queue panel (TYTO-45). Closed in the default layout, so none of these is on
@@ -1335,6 +1361,26 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.clear',
   'plugins.credential.kept',
   'plugins.credential.failed',
+  'plugins.column.actions',
+  'plugins.action.installFolder',
+  'plugins.action.installArchive',
+  'plugins.action.disable',
+  'plugins.action.enable',
+  'plugins.action.remove',
+  'plugins.action.settings',
+  'plugins.restart',
+  'plugins.result.installed',
+  'plugins.result.declined',
+  'plugins.result.changed',
+  'plugins.result.refused',
+  'plugins.approve.message',
+  'plugins.approve.install',
+  'plugins.approve.cancel',
+  'plugins.remove.message',
+  'plugins.remove.detail',
+  'plugins.remove.confirm',
+  'plugins.remove.cancel',
+  'plugins.picker.archive',
   'command.settings.open',
   'settings.assist.type',
   'settings.assist.default',
