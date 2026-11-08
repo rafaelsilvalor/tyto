@@ -1,7 +1,7 @@
 # Receitas
 
 ::: info Como esta página foi conferida
-Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo numa aba foi conferido em 2026-11-08 pela mesma suíte, desenhando as 5.000 linhas em tamanho cheio e fechando a receita. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Os menus e rótulos abaixo são os da janela em português.
+Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo numa aba foi conferido em 2026-11-08 pela mesma suíte, desenhando as 5.000 linhas em tamanho cheio e fechando a receita. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Escrever briefs com `to-brief` foi conferido em 2026-11-08 por um teste do processo principal do app de mesa que planeja três linhas numa pasta, aplica o plano e renderiza cada brief com `tyto render`, não na janela. Os menus e rótulos abaixo são os da janela em português.
 :::
 
 Uma receita (`.recipe`) é uma lista de passos, um por linha, que buscam linhas de uma fonte, filtram e reorganizam essas linhas e planejam o que gravar. O Tyto abre uma receita numa aba como um caderno: **embaixo de cada passo, o resultado dele**, uma tabela que você lê enquanto escreve a próxima linha.
@@ -114,6 +114,25 @@ Quando Aplicar é recusado, o motivo aparece embaixo do plano, em vermelho, até
 ### apply auto
 
 Uma receita cujo cabeçalho tem a linha `apply auto` aplica os seus planos sem clique, mas só em **Executar receita** (ou **Executar daqui**, **Buscar de novo**) numa pasta confiável. Uma pausa na digitação ou um salvamento nunca aplicam. Numa pasta não confiável os planos são feitos e mostrados, e o plano diz _apply auto espera: esta pasta não é confiável, então Aplicar pede um clique_.
+
+## Escrever um brief por linha
+
+`to-brief` é um passo que transforma cada linha da tabela num brief, no template que você nomeia, numa pasta do espaço de trabalho:
+
+```
+to-brief template=promo-curso into=../briefs name=slug slots=titulo:title,subtitulo:summary
+```
+
+- `template=` é o template, encontrado do jeito que a linha `template:` de um brief o encontra.
+- `into=` é a pasta onde os briefs vão, lida a partir da pasta da receita. Ela fica dentro do espaço de trabalho e nunca nomeia `.tyto`.
+- `name=` é a coluna que dá nome a cada arquivo: `lesson-1` vira `lesson-1.brief`. Duas linhas que gravariam o mesmo arquivo param o passo e nomeiam as duas.
+- `slots=` liga cada slot do template a uma coluna, como `slot:coluna` separados por vírgulas. `slots=@./slots.json#/lesson` lê os pares de um arquivo de dados.
+
+Como todo passo que grava, ele não grava nada enquanto a receita roda: responde um plano com uma linha por brief, `briefs/lesson-1.brief: new`, ou `briefs/lesson-1.brief: overwrites` quando o arquivo já existe. **Aplicar** grava os briefs. Um brief que alguém editou depois que o plano foi feito falha com _changed since the plan_ e fica como está; os outros são gravados.
+
+Um valor é texto de brief, então `**negrito**` numa célula é negrito no brief. Um valor com `{` ou `}` para o passo e nomeia a linha e a coluna: briefs não têm como escrever uma chave, então corrija os dados antes, com `rewrite`. Um valor vazio deixa o slot com o padrão do template.
+
+`to-brief` só grava numa pasta confiável: numa pasta não confiável, ou numa receita fora de qualquer espaço de trabalho, o passo diz isso e não planeja nada. Rode `tyto render` nos briefs depois, como em briefs escritos à mão; um slot obrigatório que ficou de fora é apontado ali.
 
 ## Trocar o idioma
 

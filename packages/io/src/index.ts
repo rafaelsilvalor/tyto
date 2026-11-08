@@ -159,6 +159,12 @@ export {
 } from './workspace-files.js';
 
 export {
+  type WorkspaceBriefOptions,
+  briefDigest,
+  workspaceBriefPorts,
+} from './workspace-briefs.js';
+
+export {
   type FsTrustStore,
   type FsTrustStoreOptions,
   TRUST_FILE,

@@ -1,7 +1,7 @@
 # Recipes
 
 ::: info How this page was checked
-Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a step in a tab was checked on 2026-11-08 by the same suite, drawing the 5,000 rows full size and closing the recipe. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Menus and labels below are the English window's.
+Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a step in a tab was checked on 2026-11-08 by the same suite, drawing the 5,000 rows full size and closing the recipe. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Writing briefs with `to-brief` was checked on 2026-11-08 by a test of the desktop's main process that plans three rows into a folder, applies the plan and renders each brief with `tyto render`, not in the window. Menus and labels below are the English window's.
 :::
 
 A recipe (`.recipe`) is a list of steps, one per line, that fetch rows from a source, filter and reshape them, and plan what to write. Tyto opens a recipe in a tab as a notebook: **under each step, its result**, a table you can read while you write the next line.
@@ -114,6 +114,25 @@ When Apply is refused, the reason shows under the plan, in red, until the next r
 ### apply auto
 
 A recipe whose header has the line `apply auto` applies its plans without a click, but only on **Run recipe** (or **Run from here**, **Fetch again**) in a trusted folder. A pause in typing or a save never applies. In a folder not trusted the plans are made and shown, and the plan says _apply auto waits: this folder is not trusted, so Apply asks for a click_.
+
+## Write a brief per row
+
+`to-brief` is a step that turns each row of the table into a brief, in the template you name, in a folder of the workspace:
+
+```
+to-brief template=promo-curso into=../briefs name=slug slots=titulo:title,subtitulo:summary
+```
+
+- `template=` is the template, found the way a brief's `template:` line finds it.
+- `into=` is the folder the briefs go in, read from the recipe's folder. It stays inside the workspace and never names `.tyto`.
+- `name=` is the column that names each file: `lesson-1` becomes `lesson-1.brief`. Two rows that would write the same file stop the step and name both.
+- `slots=` pairs each slot of the template with a column, as `slot:column` separated by commas. `slots=@./slots.json#/lesson` reads the pairs from a data file instead.
+
+Like every step that writes, it writes nothing while the recipe runs: it answers a plan with one line per brief, `briefs/lesson-1.brief: new`, or `briefs/lesson-1.brief: overwrites` when the file is already there. **Apply** writes them. A brief somebody edited after the plan was made fails with _changed since the plan_ and is left as it is; the others are written.
+
+A value is brief text, so `**bold**` in a cell is bold in the brief. A value that holds `{` or `}` stops the step and names the row and the column: briefs have no way to write a brace, so fix the data first, with `rewrite`. An empty value leaves the slot to the template's default.
+
+`to-brief` writes only in a trusted folder: in a folder not trusted, or a recipe in no workspace, the step says so and plans nothing. Run `tyto render` on the briefs afterwards, as for briefs written by hand; a required slot left out is reported there.
 
 ## Change the language
 

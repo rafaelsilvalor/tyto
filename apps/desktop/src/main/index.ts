@@ -103,7 +103,7 @@ import { desktopSources } from './plugin-sources.js';
 import { googleFontsOptionsFor, windowGoogleFonts } from './google-fonts.js';
 import { createPreviewService } from './preview.js';
 import { recipeClock } from './recipe-clock.js';
-import { createRecipeRunner } from './recipe-runner.js';
+import { createRecipeRunner, templateManifestsOf } from './recipe-runner.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
@@ -973,6 +973,8 @@ async function start(): Promise<void> {
     sectionFor: (directory, plugin) => workspace.sectionFor(directory, plugin),
     home: pluginsHome,
     clock: () => recipeClock(recipeTimeZone),
+    // `to-brief`'s templates (TYTO-380, ADR 0172), as the preview finds a brief's.
+    templates: templateManifestsOf(sources),
   });
   // The images and faces installed plugins supply, in one cache for the process, which the
   // preview and the export share (ADR 0117, ADR 0119).

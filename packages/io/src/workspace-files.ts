@@ -49,7 +49,7 @@ function overCeiling(size: number): string {
 }
 
 /** `.tyto`, as Windows resolves a name: without case and without trailing dots or spaces. */
-function isTytoFolder(segment: string): boolean {
+export function isTytoFolder(segment: string): boolean {
   return segment.replace(/[. ]+$/u, '').toLowerCase() === '.tyto';
 }
 

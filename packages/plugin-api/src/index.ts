@@ -182,6 +182,12 @@ export type { DataResolver } from '@tyto/recipe';
  */
 export type { RecipeState } from '@tyto/recipe';
 
+/**
+ * The ports `to-brief` plans and applies through, named here for the same reason: the host's
+ * workspace adapter implements a port from this package (ADR 0172).
+ */
+export type { BriefFolder, ToBriefPorts } from '@tyto/recipe';
+
 export type {
   GuestChannel,
   PluginChannel,

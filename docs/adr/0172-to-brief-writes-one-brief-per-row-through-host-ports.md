@@ -82,3 +82,14 @@ then the file-system adapter, the desktop's wiring, the manual and the acceptanc
   brief, as for a brief written by hand.
 - `fileSafeName` keeps `artifactName`'s rule exactly, accents collapsed to `-` included; Windows
   reserved names (`CON`, `NUL`) and a trailing dot are not handled by it yet.
+
+## Note, 2026-11-08 (TYTO-380, second pull request)
+
+The desktop lends the ports through `@tyto/io`'s `workspaceBriefPorts`, bound per run and per
+Apply to the workspace and trust main's workspace answers then. Its digest is SHA-256 of the
+file's bytes. `stat` and `write` both confine the real path with `confineToWorkspace`, following
+the nearest existing ancestor, so a link to outside the workspace or into `.tyto` is refused
+when the plan is made, before an Apply could reach it, and both refuse a folder that is not
+trusted. Templates are looked up as the preview looks up a brief's `template:`, aliases
+included. A recipe in no workspace still gets ports whose folder is nowhere, so the verb says
+where it may write instead of "this host writes no briefs".
