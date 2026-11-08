@@ -296,6 +296,14 @@ export interface Catalogue {
   readonly 'crash.detail': string;
   readonly 'crash.noLog': string;
   /**
+   * TYTO-385, ADR 0175: the body of the OS notification a scheduled recipe raises when a run
+   * has a problem and no error diagnostic to name: operations of its plan that failed, with
+   * `{count}`, or a step that failed without saying why. The title is the recipe's name, and an
+   * error's body is its code, which is not translated.
+   */
+  readonly 'schedule.notification.operations': string;
+  readonly 'schedule.notification.failed': string;
+  /**
    * The button that dismisses the crash box (TYTO-144). The other button is `menu.revealLogs`,
    * reused rather than copied, because it does exactly what the Help menu item does.
    */
@@ -1127,6 +1135,8 @@ export const CATALOGUE_KEYS = [
   'crash.title',
   'crash.detail',
   'crash.noLog',
+  'schedule.notification.operations',
+  'schedule.notification.failed',
   'crash.close',
   'import.message',
   'import.detail',

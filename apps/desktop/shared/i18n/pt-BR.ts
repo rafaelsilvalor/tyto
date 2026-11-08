@@ -149,6 +149,8 @@ export const ptBR: Catalogue = {
   'crash.noLog':
     'Este não deu nem para anotar: o Tyto não tem permissão de escrever na própria pasta de configuração.',
   'crash.close': 'Fechar',
+  'schedule.notification.operations': '{count} operações do plano não foram aplicadas',
+  'schedule.notification.failed': 'Um passo falhou',
   'import.message': 'Trazer suas configurações da versão {version}?',
   'import.detail':
     'A pasta de templates, a posição dos painéis, os arquivos recentes, seus atalhos de teclado e as abas que estavam abertas. A versão {version} continua com a cópia dela de qualquer jeito, e esta pergunta não volta.',

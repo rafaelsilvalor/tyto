@@ -443,6 +443,11 @@ describe('hearing a change', () => {
     vi.advanceTimersByTime(1);
 
     expect(onChange).toHaveBeenCalledTimes(1);
+    // TYTO-385: the burst's names, for the recipe scheduler, and the next burst starts empty.
+    expect(onChange).toHaveBeenLastCalledWith(['a.brief', 'b.brief']);
+    watchers[0]?.fire(null);
+    vi.advanceTimersByTime(150);
+    expect(onChange).toHaveBeenLastCalledWith([null]);
   });
 
   it('does not hear .git or node_modules, at any depth', async () => {

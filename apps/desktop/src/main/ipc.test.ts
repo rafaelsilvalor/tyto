@@ -787,6 +787,30 @@ const CARD_TABLE: Table = {
   ],
 };
 
+/** TYTO-385: one schedule, `schedule-1`, and the ids Run now was asked for. */
+const scheduleFake = () => {
+  const ran: string[] = [];
+  return {
+    ran,
+    list: () => [
+      {
+        scheduleId: 'schedule-1',
+        name: 'watch',
+        file: 'recipes/watch.recipe',
+        minutes: 5,
+        needs: [] as readonly string[],
+        running: false,
+      },
+    ],
+    runNow: (scheduleId: string) => {
+      ran.push(scheduleId);
+      return scheduleId === 'schedule-1';
+    },
+    pathOf: (scheduleId: string) =>
+      scheduleId === 'schedule-1' ? '/work/recipes/watch.recipe' : undefined,
+  };
+};
+
 const recipeRunner = () => {
   const asked: RecipeRunInput[] = [];
   const closed: string[] = [];
@@ -965,6 +989,8 @@ const dependencies = () => {
     },
     preview: preview(),
     recipes: recipeRunner(),
+    // TYTO-385: what Run now was asked for; the scheduler is `recipe-schedule.test.ts`'s.
+    schedule: scheduleFake(),
     project: projectFolder(),
     workspace: workspaceFolder(),
     pluginFiles: { sync: () => Promise.resolve() },
@@ -1160,6 +1186,42 @@ describe('the tab a message is about (E9.11)', () => {
     ]);
     expect(injected.recipes.asked[0]?.explicit).toBe(true);
     expect(await handlers['recipe:verbs']({})).toEqual({ verbs: ['acme.pull', 'where'] });
+  });
+
+  // TYTO-385, ADR 0175: the window names a schedule by main's id, never by a path.
+  it('lists the schedules, runs one now and opens it, by id and nothing else', async () => {
+    const injected = dependencies();
+    const handlers = createHandlers(injected);
+
+    expect(await handlers['schedule:list']({})).toEqual({
+      schedules: [
+        {
+          scheduleId: 'schedule-1',
+          name: 'watch',
+          file: 'recipes/watch.recipe',
+          minutes: 5,
+          needs: [],
+          running: false,
+        },
+      ],
+    });
+    expect(await handlers['schedule:run-now']({ scheduleId: 'schedule-1' })).toEqual({
+      started: true,
+    });
+    expect(await handlers['schedule:run-now']({ scheduleId: '/work/watch.recipe' })).toEqual({
+      started: false,
+    });
+    expect(injected.schedule.ran).toEqual(['schedule-1', '/work/watch.recipe']);
+
+    const opened = await handlers['schedule:open']({
+      documentId: 'document-5',
+      scheduleId: 'schedule-1',
+    });
+    expect(opened.document?.path).toBe('/work/recipes/watch.recipe');
+    expect(opened.documentId).toBe('document-5');
+    expect(
+      await handlers['schedule:open']({ documentId: 'document-6', scheduleId: '../secret' }),
+    ).toEqual({ document: null, documentId: null });
   });
 
   // TYTO-378, ADR 0170: Apply names a cell and a plan id; main holds the file and the plan.

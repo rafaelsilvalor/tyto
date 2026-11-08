@@ -376,6 +376,11 @@ describe('the bridge', () => {
       'recipe:rows',
       'recipe:run',
       'recipe:verbs',
+      // TYTO-385, ADR 0175: the recipes run on an interval. The Schedules panel that calls
+      // them is the card's third pull request; `src/main/ipc.test.ts` holds what they do.
+      'schedule:list',
+      'schedule:open',
+      'schedule:run-now',
       // TYTO-113: the tabs kept for the next launch. Exercised by `e2e/session.desktop.test.ts`.
       'session:read',
       'session:write',
@@ -666,6 +671,10 @@ describe('switching the language', () => {
     'crash.noLog',
     // TYTO-144: the crash box's second button; `e2e/crash.desktop.test.ts` holds it to the box.
     'crash.close',
+    // TYTO-385: the body of a scheduled recipe's OS notification, which main shows outside the
+    // document; `recipe-schedule.test.ts` holds when one is raised.
+    'schedule.notification.operations',
+    'schedule.notification.failed',
     // TYTO-151: the first-run question about the previous version's settings, a native box
     // main shows before the window exists — and never to a folder named with `--user-data-dir`
     // or under `TYTO_HEADLESS`, and this suite has both.

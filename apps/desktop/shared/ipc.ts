@@ -701,6 +701,26 @@ const restoredBuffer = z.object({ draft: z.string().nullable(), stale: z.boolean
  */
 const taskId = z.string().min(1).max(255);
 
+/**
+ * A scheduled recipe, as main lists it (TYTO-385, ADR 0175): `scheduleId` is main's, minted when
+ * it found the recipe, and is what Run now and Open name; `file` is where it is relative to the
+ * workspace folder, for display only. `needs` are parameters without a default: such a recipe is
+ * listed and never run. Times are ISO 8601.
+ */
+const scheduleId = z.string().min(1).max(100);
+const scheduleView = z.object({
+  scheduleId,
+  name: z.string().max(200),
+  file: z.string().max(4096),
+  minutes: z.number().int().positive(),
+  needs: z.array(z.string().max(200)).max(100),
+  running: z.boolean(),
+  lastRunAt: z.string().max(40).optional(),
+  nextRunAt: z.string().max(40).optional(),
+  outcome: z.enum(['ok', 'problem', 'held', 'waiting']).optional(),
+  code: z.string().max(100).optional(),
+});
+
 /** What the local queue panel draws (TYTO-45). */
 const queueView = z.object({
   /** The folder holding `inbox/`, `outbox/` and `done/`, or `null` before one is chosen. */
@@ -2827,6 +2847,28 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The recipes main runs on an interval in the open workspace (TYTO-385, ADR 0175). It has no
+   * subject: there is one workspace, and main walked it. At most 500, as main schedules.
+   */
+  'schedule:list': channel(z.object({}), z.object({ schedules: z.array(scheduleView).max(500) })),
+
+  /**
+   * Runs a scheduled recipe now, **by the id main gave it, never a path** (ADR 0086). Answers at
+   * once: `started` is false for an id main does not know, a recipe needing a parameter, or one
+   * still running. How the run ends arrives with `schedule:changed`.
+   */
+  'schedule:run-now': channel(z.strictObject({ scheduleId }), z.object({ started: z.boolean() })),
+
+  /**
+   * Opens a scheduled recipe in a tab, by its id, `queue:open-brief`'s way: main opens only the
+   * file it found under that id. The answer is `file:open`'s.
+   */
+  'schedule:open': channel(
+    z.strictObject({ documentId, scheduleId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
    * Runs a `tyto` command in main (TYTO-495, ADR 0159). `argv` is the words after `tyto`, an
    * array and never a command line: nothing reads `|`, `>`, `&&`, `$VAR` or a glob, and a word
    * that looks like one is an argument like any other (decision 8). Answers at once with the
@@ -3079,6 +3121,13 @@ export const IPC_EVENTS = {
    * open plugins screen asks `signin:list` again.
    */
   'signin:changed': z.object({}),
+
+  /**
+   * The scheduled recipes changed (TYTO-385, ADR 0175): one found or gone, a run started or
+   * ended. The window asks `schedule:list` again. `open` names the recipe whose notification
+   * was clicked, which the window opens with `schedule:open`.
+   */
+  'schedule:changed': z.object({ open: scheduleId.optional() }),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

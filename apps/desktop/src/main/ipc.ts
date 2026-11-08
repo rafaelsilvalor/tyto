@@ -55,6 +55,7 @@ import {
 } from './recipe-facets.js';
 import { type RowsQuery, createRowViews, rowsAsTsv, visibleColumns } from './recipe-rows.js';
 import { type KeptTable, type RecipeRunner } from './recipe-runner.js';
+import { type RecipeSchedule } from './recipe-schedule.js';
 import { cellToWire, cut, recipeAnswerToWire, valueToWire } from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
@@ -415,6 +416,11 @@ export interface IpcDependencies {
    */
   readonly recipes: RecipeRunner;
   /**
+   * TYTO-385, ADR 0175: the recipes main runs on an interval in the open workspace, named by
+   * the ids it gave them.
+   */
+  readonly schedule: Pick<RecipeSchedule, 'list' | 'runNow' | 'pathOf'>;
+  /**
    * TYTO-379, ADR 0171: writes text to the system clipboard, `clipboard.writeText` in the app.
    * `recipe:copy` builds the text in main, so a copy of thousands of rows never crosses.
    */
@@ -504,6 +510,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     explorer,
     queue,
     recipes,
+    schedule,
     session,
     settings,
     templateDialogs,
@@ -574,6 +581,20 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'recipe:verbs': () => Promise.resolve({ verbs: [...recipes.verbs()] }),
+
+    // TYTO-385, ADR 0175: by the ids main gave, never a path (ADR 0086). Run now answers at once;
+    // how the run ends arrives with `schedule:changed`.
+    'schedule:list': () =>
+      Promise.resolve({
+        schedules: schedule.list().map((each) => ({ ...each, needs: [...each.needs] })),
+      }),
+    'schedule:run-now': ({ scheduleId }) =>
+      Promise.resolve({ started: schedule.runNow(scheduleId) }),
+    'schedule:open': async ({ documentId, scheduleId }) => {
+      const path = schedule.pathOf(scheduleId);
+      if (path === undefined) return { document: null, documentId: null };
+      return documents.openPath(documentId, path);
+    },
 
     // TYTO-378, ADR 0170: the window names the cell and the plan's id, never a plan or a path;
     // main applies the plan it kept for that cell, against the file it holds for the tab.

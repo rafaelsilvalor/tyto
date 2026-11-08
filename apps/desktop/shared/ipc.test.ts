@@ -95,6 +95,10 @@ describe('the IPC contract', () => {
       'recipe:rows',
       'recipe:run',
       'recipe:verbs',
+      // TYTO-385, ADR 0175: the recipes run on an interval, by main's ids.
+      'schedule:list',
+      'schedule:open',
+      'schedule:run-now',
       'session:read',
       'session:write',
       'settings:open',
@@ -211,6 +215,8 @@ describe('the event table', () => {
       'plugins:changed',
       // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
       'queue:changed',
+      // TYTO-385. The scheduled recipes changed, or a notification about one was clicked.
+      'schedule:changed',
       // TYTO-206. settings.json changed, or a screen's change to it was refused.
       'settings:changed',
       // TYTO-374. A sign-in was stored or deleted; an open plugins screen lists them again.
@@ -524,6 +530,8 @@ describe('what the contract does not promise', () => {
       'plugins:vim',
       // TYTO-377. Nor "which verbs may a recipe name": the generic ones and every plugin's.
       'recipe:verbs',
+      // TYTO-385. Nor "which recipes run on an interval": the open workspace's, main's.
+      'schedule:list',
       // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.
       'keybindings:read',
       // TYTO-277. Nor "what does snippets.json say", for the same reason.

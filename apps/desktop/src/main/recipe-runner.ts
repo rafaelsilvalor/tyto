@@ -129,6 +129,12 @@ export interface RecipeRunInput {
   readonly saved?: boolean | undefined;
   /** Forget this document's cells first. */
   readonly fresh?: boolean | undefined;
+  /**
+   * TYTO-385, ADR 0175 decision 4: a run the scheduler started, with nobody at the window. It
+   * counts as Run in a trusted folder, so `apply auto` applies there; in a restricted folder or
+   * outside any workspace it is held as restricted and runs nothing.
+   */
+  readonly scheduled?: boolean | undefined;
 }
 
 export type RunnerCellStatus = 'ok' | 'failed' | 'skipped' | 'stale';
@@ -264,6 +270,15 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
     async run(request) {
       const clock = options.clock();
       const ranAt = clock.now().toISOString();
+      // TYTO-385, ADR 0175 decision 4: a scheduled run is the approval only a trusted folder
+      // gives by itself; anywhere else nobody is there to give it, so nothing runs, not even the
+      // parse, whose error would otherwise reach a notification.
+      if (request.scheduled === true) {
+        const where = request.path === undefined ? undefined : dirname(request.path);
+        if ((await options.placeOf(where)).trust !== 'trusted') {
+          return { cells: [], diagnostics: [], held: 'restricted', ranAt };
+        }
+      }
       if (request.fresh === true) kept.delete(request.documentId);
       runs += 1;
       const run = runs;
@@ -282,6 +297,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       const recipe = parsed.value;
       const directory = request.path === undefined ? undefined : dirname(request.path);
       const place = await options.placeOf(directory);
+      const explicitRun = request.explicit === true || request.scheduled === true;
       const header = headerSignature(recipe, request.path, place);
       const previous = kept.get(request.documentId);
       const reusable = previous?.header === header ? previous.cells : [];
@@ -302,7 +318,14 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       const signatures = await Promise.all(steps.map((step) => signatureOf(step, read)));
       const changed = firstChanged(signatures, reusable);
       const start = request.from === undefined ? changed : Math.min(changed, request.from);
-      const { stop, held } = await runPolicy(steps, start, place, request, registries, read);
+      const { stop, held } = await runPolicy(
+        steps,
+        start,
+        place,
+        { explicit: explicitRun, saved: request.saved === true },
+        registries,
+        read,
+      );
 
       const lines = createLineIndex(request.text);
       const lineOf = (step: Step): number => lineColumnAtIndex(lines, step.range.start).line;
@@ -368,12 +391,13 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         .map((cell, index) => ({ cell, index }))
         .filter(({ cell }) => cell.planId !== undefined && plannedNow.has(cell.planId));
       let autoHeld: RunHeld | undefined;
-      if (recipe.apply === 'auto' && request.explicit === true && planned.length > 0) {
+      if (recipe.apply === 'auto' && explicitRun && planned.length > 0) {
         if (place.trust !== 'trusted') {
           autoHeld = 'apply';
         } else if (current) {
+          const lane = await applyLaneOf(request.documentId, request.path);
           for (const { cell, index } of planned) {
-            await queued(request.documentId, () =>
+            await queued(lane, () =>
               applyKept(request.documentId, index, cell.planId ?? -1, request.path),
             );
           }
@@ -397,8 +421,8 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       };
     },
 
-    apply(request) {
-      return queued(request.documentId, () =>
+    async apply(request) {
+      return queued(await applyLaneOf(request.documentId, request.path), () =>
         applyKept(request.documentId, request.index, request.planId, request.path),
       );
     },
@@ -428,17 +452,21 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
 
   // TYTO-378, ADR 0170: Apply.
 
-  /** Runs `work` after every Apply already queued for the document: one at a time per recipe. */
-  function queued<T>(documentId: string, work: () => Promise<T>): Promise<T> {
-    const before = applying.get(documentId) ?? Promise.resolve();
+  /**
+   * Runs `work` after every Apply already queued in `lane`: one at a time per recipe file. The
+   * lane is the recipe's real path, not the document, so a scheduled run's Apply and a tab's
+   * Apply of the same file never commit its state at the same time (TYTO-385, ADR 0175).
+   */
+  function queued<T>(lane: string, work: () => Promise<T>): Promise<T> {
+    const before = applying.get(lane) ?? Promise.resolve();
     const done = before.then(work, work);
     const settled = done.then(
       () => undefined,
       () => undefined,
     );
-    applying.set(documentId, settled);
+    applying.set(lane, settled);
     void settled.then(() => {
-      if (applying.get(documentId) === settled) applying.delete(documentId);
+      if (applying.get(lane) === settled) applying.delete(lane);
     });
     return done;
   }
@@ -506,19 +534,32 @@ async function runPolicy(
   steps: readonly Step[],
   start: number,
   place: RecipePlace,
-  request: RecipeRunInput,
+  request: { readonly explicit: boolean; readonly saved: boolean },
   registries: RecipeRegistries,
   read: IncludedReader,
 ): Promise<{ readonly stop: number; readonly held?: RunHeld }> {
-  const explicit = request.explicit === true;
+  const { explicit } = request;
   if (place.trust === 'restricted' && !explicit) return { stop: start, held: 'restricted' };
-  if (explicit || request.saved === true) return { stop: steps.length };
+  if (explicit || request.saved) return { stop: steps.length };
   for (let index = start; index < steps.length; index += 1) {
     if (await holdsSource(steps[index] as Step, registries, read, new Set(), 0)) {
       return { stop: index, held: 'source' };
     }
   }
   return { stop: steps.length };
+}
+
+/**
+ * The queue an Apply waits in: the recipe file's real path, so two documents on one file share
+ * it whatever spelling each holds the path in. A tab never saved has only its document.
+ */
+async function applyLaneOf(documentId: string, path: string | undefined): Promise<string> {
+  if (path === undefined) return `document:${documentId}`;
+  try {
+    return `file:${await realpath(path)}`;
+  } catch {
+    return `file:${path}`;
+  }
 }
 
 /** The verb that includes another recipe: `run x` reads `x.recipe`. */
