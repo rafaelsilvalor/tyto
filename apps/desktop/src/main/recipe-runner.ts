@@ -1,12 +1,20 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { type Diagnostic, createLineIndex, diagnostic, err, lineColumnAtIndex } from '@tyto/core';
+import {
+  type Diagnostic,
+  type TemplateManifest,
+  createLineIndex,
+  diagnostic,
+  err,
+  lineColumnAtIndex,
+} from '@tyto/core';
 import {
   type RecipeStateOptions,
   type WorkspaceDataOptions,
   isInside,
   recipeStateStore,
+  workspaceBriefPorts,
   workspaceDataResolver,
 } from '@tyto/io';
 import {
@@ -14,6 +22,7 @@ import {
   type RecipeContributions,
   type RecipeRegistries,
   type RecipeState,
+  type ToBriefPorts,
   recipeRegistriesOf,
 } from '@tyto/plugin-api';
 import {
@@ -33,6 +42,7 @@ import {
 
 import { RECIPE_VIEWS } from '../../shared/recipe-views.js';
 
+import type { ProjectSources } from './project.js';
 import { type AppliedRecord, applyCell } from './recipe-apply.js';
 
 /**
@@ -78,6 +88,8 @@ export interface RecipeRegistryRequest {
   readonly refresh: boolean;
   /** The host clock as ISO 8601, which stamps an applied operation (TYTO-378, ADR 0170). */
   readonly now?: (() => string) | undefined;
+  /** TYTO-380, ADR 0172: `to-brief`'s ports, bound to this run's workspace and recipe. */
+  readonly briefs?: ToBriefPorts | undefined;
 }
 
 export interface RecipeRunnerOptions {
@@ -91,6 +103,11 @@ export interface RecipeRunnerOptions {
   readonly home: string;
   /** The clock in the zone the setting names, read at each run so a save applies at once. */
   readonly clock: () => RunClock;
+  /**
+   * TYTO-380, ADR 0172: a template's manifest by name, looked up as the preview looks up a
+   * brief's `template:`. Absent, `to-brief` says this host writes no briefs.
+   */
+  readonly templates?: (name: string) => Promise<TemplateManifest | undefined>;
   /** Overrides for a test; the app takes the defaults. */
   readonly registries?: (request: RecipeRegistryRequest) => RecipeRegistries;
   readonly state?: (options: RecipeStateOptions) => RecipeState;
@@ -238,6 +255,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         sectionOf: request.sectionOf,
         refresh: request.refresh,
         ...(request.now === undefined ? {} : { now: request.now }),
+        ...(request.briefs === undefined ? {} : { briefs: request.briefs }),
       }));
   const stateOf = options.state ?? recipeStateStore;
   const dataOf = options.data ?? workspaceDataResolver;
@@ -275,6 +293,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         sectionOf: (plugin) =>
           place.trust === 'trusted' ? options.sectionFor(directory, plugin) : undefined,
         refresh: request.fresh === true,
+        briefs: briefsFor(place, directory, options.templates),
       });
       const steps = recipe.steps;
       // Each included recipe is read once per run, so the signatures, the policy and the run
@@ -448,6 +467,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         place.trust === 'trusted' ? options.sectionFor(directory, plugin) : undefined,
       refresh: false,
       now,
+      briefs: briefsFor(place, directory, options.templates, now),
     });
     const answer = await applyCell({
       cells,
@@ -688,6 +708,43 @@ function dataFor(
     workspaceFolder: place.folder,
     recipeFolder: directory,
     trust: place.trust,
+  });
+}
+
+/**
+ * `to-brief`'s templates (TYTO-380, ADR 0172), found as the preview finds a brief's `template:`
+ * in the snapshot in force: an alias a plugin file names reaches its template's manifest.
+ */
+export function templateManifestsOf(
+  sources: Pick<ProjectSources, 'current'>,
+): (name: string) => Promise<TemplateManifest | undefined> {
+  return (name) => {
+    const { registry, configurations } = sources.current();
+    return Promise.resolve(registry?.get(configurations.select(name)?.template ?? name));
+  };
+}
+
+/**
+ * `to-brief`'s ports (ADR 0172), bound to the recipe's workspace and folder as main's workspace
+ * answers them now: a run and an Apply each ask again, so a folder restricted since the plan
+ * stops the Apply. A recipe in no workspace still gets ports, whose folder is nowhere, so the
+ * verb says where it may write rather than that this host writes no briefs.
+ */
+function briefsFor(
+  place: RecipePlace,
+  directory: string | undefined,
+  templates: ((name: string) => Promise<TemplateManifest | undefined>) | undefined,
+  now?: () => string,
+): ToBriefPorts | undefined {
+  if (templates === undefined) return undefined;
+  const inWorkspace = place.trust !== 'none' && place.folder !== undefined;
+  const trust = place.trust === 'trusted' ? 'trusted' : 'restricted';
+  return workspaceBriefPorts({
+    workspaceFolder: inWorkspace ? place.folder : undefined,
+    recipeFolder: inWorkspace ? directory : undefined,
+    trust: () => trust,
+    template: templates,
+    ...(now === undefined ? {} : { now }),
   });
 }
 
