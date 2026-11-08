@@ -301,9 +301,9 @@ describe('the recipe notebook against a source (TYTO-377)', () => {
       [20, '6 more rows'],
     ]);
     expect(shown.map((cell) => cell.buttons)).toEqual([
-      ['Run from here', 'Fetch again'],
-      ['Run from here'],
-      ['Run from here'],
+      ['Run from here', 'Fetch again', 'Open in a tab'],
+      ['Run from here', 'Open in a tab'],
+      ['Run from here', 'Open in a tab'],
     ]);
     expect(shown[0]?.age).toMatch(/^ran now · data fetched 3 hr\. ago$/u);
     // A real table, laid out: it has a height, and its first long value is cut, not wrapped.
@@ -418,7 +418,7 @@ describe('Apply on a plan cell (TYTO-378)', () => {
         () => document.querySelector('#editor .recipe-plan__heading')?.textContent ?? '',
       ),
     ).toBe('Plan: 3 to write to example items');
-    expect((await planLines()).buttons).toEqual(['Apply', 'Run from here']);
+    expect((await planLines()).buttons).toEqual(['Apply', 'Run from here', 'Open in a tab']);
     expect((await planLines()).lines.map((line) => line.description)).toEqual([
       "Mark EX-1 as 'done'",
       "Mark EX-2 as 'done'",
@@ -432,7 +432,7 @@ describe('Apply on a plan cell (TYTO-378)', () => {
     const after = await planLines();
     expect(after.lines.map((line) => line.mark)).toEqual(['applied', 'applied', 'applied']);
     // Applied once: the cell offers no second Apply of the same plan.
-    expect(after.buttons).toEqual(['Run from here']);
+    expect(after.buttons).toEqual(['Run from here', 'Open in a tab']);
     const shots = process.env['TYTO_RECIPE_NOTEBOOK_SHOTS'];
     if (shots !== undefined) {
       mkdirSync(shots, { recursive: true });
