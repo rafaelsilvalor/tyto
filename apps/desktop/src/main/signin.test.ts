@@ -12,9 +12,14 @@ import {
   type SigninService,
   createSigninService,
   installedSigninDeclarations,
+  listSignins,
   signinAccount,
+  signinCallbackPage,
   signinCapabilities,
+  signinWindow,
 } from './signin.js';
+import type { CallbackPage } from './loopback.js';
+import { translate } from '../../shared/i18n/index.js';
 
 /**
  * The sign-in service end to end in main, with the real loopback listener and a fake
@@ -97,7 +102,15 @@ interface Rig {
 }
 
 /** `callbackState` stands in for a callback that came from somewhere else. */
-function rig(options: { callbackState?: string } = {}): Rig {
+function rig(
+  options: {
+    callbackState?: string;
+    onChanged?: () => void;
+    callbackPage?: () => CallbackPage;
+    /** Where the "browser" puts the landing page it was answered. */
+    landed?: string[];
+  } = {},
+): Rig {
   const keys = keychain();
   const fake = provider();
   const clock = { now: Date.parse('2026-11-08T12:00:00.000Z') };
@@ -107,6 +120,8 @@ function rig(options: { callbackState?: string } = {}): Rig {
       Promise.resolve(plugin === 'drive-plugin' && id === 'drive' ? declaration : undefined),
     fetch: fake.fetch,
     now: () => clock.now,
+    ...(options.onChanged === undefined ? {} : { onChanged: options.onChanged }),
+    ...(options.callbackPage === undefined ? {} : { callbackPage: options.callbackPage }),
     openBrowser: async (url) => {
       const authorize = new URL(url);
       fake.challenge = authorize.searchParams.get('code_challenge') ?? undefined;
@@ -119,8 +134,13 @@ function rig(options: { callbackState?: string } = {}): Rig {
       // The browser following the redirect to the loopback listener.
       await new Promise<void>((resolve, reject) => {
         get(callback, (response) => {
-          response.resume();
-          response.on('end', resolve);
+          let page = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk: string) => (page += chunk));
+          response.on('end', () => {
+            options.landed?.push(page);
+            resolve();
+          });
         }).on('error', reject);
       });
     },
@@ -335,5 +355,124 @@ describe('installedSigninDeclarations', () => {
     expect(await declarations('drive-plugin', 'drive')).toEqual(declaration);
     expect(await declarations('drive-plugin', 'other')).toBeUndefined();
     expect(await declarations('somebody-else', 'drive')).toBeUndefined();
+  });
+});
+
+describe('the window side (TYTO-374)', () => {
+  const manifest = (name: string, ids: readonly string[]): string =>
+    JSON.stringify({
+      name,
+      version: '1.0.0',
+      engine: '>=0.1',
+      contributes: ['template-pack'],
+      permissions: ids.map((id) => `signin:${id}`),
+      ...(ids.length === 0
+        ? {}
+        : { signin: Object.fromEntries(ids.map((id) => [id, declaration])) }),
+    });
+  const store = {
+    list: () =>
+      Promise.resolve([
+        { folder: 'drive-plugin', manifestSource: manifest('drive-plugin', ['drive']) },
+        { folder: 'plain', manifestSource: manifest('plain', []) },
+        { folder: 'broken', manifestSource: '{ not json' },
+        { folder: 'empty', manifestSource: undefined },
+      ]),
+  };
+
+  it('lists every declared sign-in with who is signed in, and never a token', async () => {
+    const { service } = rig();
+    expect(await listSignins(store, service)).toEqual([
+      { plugin: 'drive-plugin', id: 'drive', signedIn: false },
+    ]);
+
+    await service.start('drive-plugin', 'drive');
+    const rows = await listSignins(store, service);
+
+    expect(rows).toEqual([
+      {
+        plugin: 'drive-plugin',
+        id: 'drive',
+        signedIn: true,
+        label: 'person@example.test',
+        since: '2026-11-08T12:00:00.000Z',
+      },
+    ]);
+    expect(JSON.stringify(rows)).not.toMatch(/refresh-1|access-1/u);
+  });
+
+  it('leaves the English default label out, so the window says it in its own words', async () => {
+    const { service, provider: fake } = rig();
+    fake.codeAnswer = { access_token: 'access-1', refresh_token: 'refresh-1' };
+    await service.start('drive-plugin', 'drive');
+
+    expect(await listSignins(store, service)).toEqual([
+      { plugin: 'drive-plugin', id: 'drive', signedIn: true, since: '2026-11-08T12:00:00.000Z' },
+    ]);
+  });
+
+  it('rejects a plugin or id nobody declares, before anything runs or is deleted', async () => {
+    const { service, keys, provider: fake } = rig();
+    keys.entries.set(signinAccount('plain', 'drive'), 'kept');
+    const window = signinWindow(store, service);
+
+    await expect(window.start('drive-plugin', 'other')).rejects.toThrow(TypeError);
+    await expect(window.out('plain', 'drive')).rejects.toThrow(
+      "No installed plugin 'plain' declares the sign-in 'drive'",
+    );
+    expect(fake.challenge).toBeUndefined();
+    expect(keys.entries.get(signinAccount('plain', 'drive'))).toBe('kept');
+  });
+
+  it('signs in and out, and answers whether it worked with no token in the answer', async () => {
+    const { service, keys } = rig();
+    const window = signinWindow(store, service);
+
+    expect(await window.start('drive-plugin', 'drive')).toEqual({ ok: true });
+    expect(keys.entries.has(ACCOUNT)).toBe(true);
+    expect(await window.out('drive-plugin', 'drive')).toEqual({ signedOut: true });
+    expect(keys.entries.has(ACCOUNT)).toBe(false);
+    expect(await window.out('drive-plugin', 'drive')).toEqual({ signedOut: false });
+  });
+
+  it('answers failed with the message when the keychain refuses to store', async () => {
+    const { service, keys } = rig();
+    keys.set = () => Promise.reject(new Error('Encryption is not available on this machine'));
+
+    expect(await signinWindow(store, service).start('drive-plugin', 'drive')).toEqual({
+      ok: false,
+      reason: 'failed',
+      message: 'Encryption is not available on this machine',
+    });
+  });
+
+  it('tells the window after a sign-in, a sign-out and an invalid_grant, not after a no-op', async () => {
+    let told = 0;
+    const { service, provider: fake, clock } = rig({ onChanged: () => (told += 1) });
+
+    await service.start('drive-plugin', 'drive');
+    expect(told).toBe(1);
+    clock.now += 2 * 3600 * 1000;
+    fake.refreshAnswer = { status: 400, body: { error: 'invalid_grant' } };
+    await service.accessToken('drive-plugin', 'drive');
+    expect(told).toBe(2);
+    await service.start('drive-plugin', 'drive');
+    await service.signOut('drive-plugin', 'drive');
+    await service.signOut('drive-plugin', 'drive');
+    expect(told).toBe(4);
+  });
+
+  it("lands the browser on a page in the window's language", async () => {
+    const landed: string[] = [];
+    const { service } = rig({
+      landed,
+      callbackPage: () => signinCallbackPage((key) => translate('pt-BR', key), 'pt-BR'),
+    });
+
+    await service.start('drive-plugin', 'drive');
+
+    expect(landed[0]).toContain('<html lang="pt-BR">');
+    expect(landed[0]).toContain(translate('pt-BR', 'plugins.signin.page.signedIn'));
+    expect(landed[0]).toContain(translate('pt-BR', 'plugins.signin.page.close'));
   });
 });

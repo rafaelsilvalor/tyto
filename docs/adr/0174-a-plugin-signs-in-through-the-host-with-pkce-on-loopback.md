@@ -110,3 +110,10 @@ then the plugins screen, the user manual and an end-to-end test against a fake p
   says so, because the window would otherwise claim a sign-in that ends when the app quits.
   Two plugin calls that find the token expired share one refresh, so a provider that rotates
   refresh tokens does not refuse the second.
+- 2026-11-08 (TYTO-374, the plugins screen): **the page the browser lands on after the callback
+  is in the window's language**, not English only. Main already knows the language the window
+  last chose, a person reads that page right after clicking Sign in in the window, and the words
+  are fixed catalogue strings (`plugins.signin.page.*`) escaped into a static page, so nothing
+  from the query reaches it. The screen reaches `signin:list`, `signin:start` and `signin:out`
+  and hears `signin:changed`; none carries a token. `signin:list` leaves the label out when the
+  keychain holds the English default, so the window says "Signed in" in its own words.

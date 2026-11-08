@@ -33,6 +33,7 @@ import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { declaredCredentialKeys } from './plugin-list.js';
 import { type PluginManager } from './plugin-manage.js';
+import { type SigninWindow } from './signin.js';
 import { type DeliveryService } from './delivery.js';
 import { type DesktopLog } from './log.js';
 import { type DocumentService } from './documents.js';
@@ -371,6 +372,11 @@ export interface IpcDependencies {
     list: () => Promise<readonly IpcResponse<'plugins:list'>['plugins'][number][]>;
     readonly manage: PluginManager;
   };
+  /**
+   * Browser sign-in from the plugins screen (TYTO-374, ADR 0174): who is signed in, and
+   * signing in and out. Never a token.
+   */
+  readonly signin: SigninWindow;
   /** The installed plugins' panels and their bridge (ADR 0045). */
   readonly panels: PanelService;
   /** The installed plugins' keymaps, once they have started (TYTO-207). */
@@ -983,6 +989,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'plugins:list': async () => ({ folder: plugins.folder, plugins: [...(await plugins.list())] }),
     'plugins:install': ({ from }) => plugins.manage.install(from),
     'plugins:change': ({ name, change }) => plugins.manage.change(name, change),
+
+    'signin:list': () => dependencies.signin.list(),
+    'signin:start': ({ plugin, id }) => dependencies.signin.start(plugin, id),
+    'signin:out': ({ plugin, id }) => dependencies.signin.out(plugin, id),
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),

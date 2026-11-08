@@ -6,6 +6,8 @@ import {
   type PluginInstall,
   type PluginsDialog,
   type PluginsView,
+  type SigninRows,
+  type SigninStart,
   PLUGINS_DIALOG_TAG,
   settingKeyOffset,
 } from './plugins-dialog.js';
@@ -447,5 +449,113 @@ describe('settingKeyOffset', () => {
     expect(settingKeyOffset(settings, 'ajustes')).toBe(settings.indexOf('ajustes.cor'));
     // A key that merely starts with the name is another plugin's.
     expect(settingKeyOffset('{ "ajustes-extra.cor": 1 }', 'ajustes')).toBeUndefined();
+  });
+});
+
+describe('browser sign-in on a plugin row (TYTO-374)', () => {
+  const asked: string[] = [];
+
+  /** `pdf` declares two sign-ins: one signed in with a label, one not signed in. */
+  async function withSignins(
+    signins: SigninRows = [
+      {
+        plugin: 'pdf',
+        id: 'drive',
+        signedIn: true,
+        label: 'ana@example.test',
+        since: '2026-11-08T12:00:00.000Z',
+      },
+      { plugin: 'pdf', id: 'sheets', signedIn: false },
+    ],
+    start: SigninStart = () => Promise.resolve({ ok: true }),
+  ): Promise<PluginsDialog> {
+    asked.length = 0;
+    const element = await dialog();
+    element.signins = signins;
+    element.onSigninStart = (plugin, id) => {
+      asked.push(`start ${plugin} ${id}`);
+      return start(plugin, id);
+    };
+    element.onSigninOut = (plugin, id) => {
+      asked.push(`out ${plugin} ${id}`);
+      return Promise.resolve();
+    };
+    await element.updateComplete;
+    return element;
+  }
+
+  const signin = (element: Element, id: string): HTMLElement =>
+    element.querySelector<HTMLElement>(`[data-plugin="pdf"] [data-signin="${id}"]`)!;
+
+  const settle = async (element: PluginsDialog): Promise<void> => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+  };
+
+  it('says who is signed in and offers Sign out, or Not signed in and Sign in', async () => {
+    const element = await withSignins();
+
+    expect(text(signin(element, 'drive'), '.plugins__signin-state')).toBe(
+      'Signed in as ana@example.test',
+    );
+    expect(signin(element, 'drive').querySelector('.plugins__signin-out')).not.toBeNull();
+    expect(text(signin(element, 'sheets'), '.plugins__signin-state')).toBe('Not signed in');
+    expect(signin(element, 'sheets').querySelector('.plugins__signin-start')).not.toBeNull();
+    expect(text(element, '[data-plugin="pdf"] .plugins__signins')).toContain(
+      translate('en', 'plugins.signin.kept'),
+    );
+    // Nothing on a row that declares none.
+    expect(element.querySelector('[data-plugin="velho"] .plugins__signin')).toBeNull();
+  });
+
+  it('says Signed in, in its own words, when the provider sent no name', async () => {
+    const element = await withSignins([
+      { plugin: 'pdf', id: 'drive', signedIn: true, since: '2026-11-08T12:00:00.000Z' },
+    ]);
+    element.locale = 'pt-BR';
+    await element.updateComplete;
+
+    expect(text(signin(element, 'drive'), '.plugins__signin-state')).toBe(
+      translate('pt-BR', 'plugins.signin.signedIn'),
+    );
+  });
+
+  it('starts nothing until the person clicks, then hands main the plugin and the id', async () => {
+    const element = await withSignins();
+    expect(asked).toEqual([]);
+
+    signin(element, 'sheets').querySelector<HTMLButtonElement>('.plugins__signin-start')!.click();
+    signin(element, 'drive').querySelector<HTMLButtonElement>('.plugins__signin-out')!.click();
+    await settle(element);
+
+    expect(asked).toEqual(['start pdf sheets', 'out pdf drive']);
+  });
+
+  it('waits on the browser with every Sign in disabled, and says why it did not finish', async () => {
+    let finish: (answer: Awaited<ReturnType<SigninStart>>) => void = () => undefined;
+    const element = await withSignins(
+      [
+        { plugin: 'pdf', id: 'sheets', signedIn: false },
+        { plugin: 'pdf', id: 'mail', signedIn: false },
+      ],
+      () => new Promise((resolve) => (finish = resolve)),
+    );
+
+    signin(element, 'sheets').querySelector<HTMLButtonElement>('.plugins__signin-start')!.click();
+    await element.updateComplete;
+    expect(text(signin(element, 'sheets'), '.plugins__signin-waiting')).toBe(
+      'Finish signing in in your browser.',
+    );
+    expect(
+      signin(element, 'mail').querySelector<HTMLButtonElement>('.plugins__signin-start')!.disabled,
+    ).toBe(true);
+
+    finish({ ok: false, reason: 'timeout', message: 'nothing came back within five minutes' });
+    await settle(element);
+
+    expect(signin(element, 'sheets').querySelector('.plugins__signin-waiting')).toBeNull();
+    expect(text(signin(element, 'sheets'), '.plugins__signin-failed')).toBe(
+      'The sign-in did not finish: nothing came back within five minutes',
+    );
   });
 });

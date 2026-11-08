@@ -730,6 +730,27 @@ export interface Catalogue {
   readonly 'plugins.remove.confirm': string;
   readonly 'plugins.remove.cancel': string;
   readonly 'plugins.picker.archive': string;
+  /**
+   * TYTO-374, ADR 0174: a plugin's browser sign-ins on its row, who is signed in and the two
+   * buttons. `as` carries `{label}`, the provider's email or name. `page.*` are the words of the
+   * page the browser lands on after signing in, in the window's language: never element text.
+   */
+  readonly 'plugins.signin.label': string;
+  readonly 'plugins.signin.as': string;
+  readonly 'plugins.signin.signedIn': string;
+  readonly 'plugins.signin.notSignedIn': string;
+  readonly 'plugins.signin.start': string;
+  readonly 'plugins.signin.out': string;
+  readonly 'plugins.signin.waiting': string;
+  readonly 'plugins.signin.failed': string;
+  readonly 'plugins.signin.kept': string;
+  readonly 'plugins.signin.page.signedIn': string;
+  readonly 'plugins.signin.page.unfinished': string;
+  readonly 'plugins.signin.page.refused': string;
+  readonly 'plugins.signin.page.timeout': string;
+  readonly 'plugins.signin.page.cancelled': string;
+  readonly 'plugins.signin.page.notFound': string;
+  readonly 'plugins.signin.page.close': string;
 
   /**
    * The local queue panel (TYTO-45). Closed in the default layout, so none of these is on
@@ -1381,6 +1402,22 @@ export const CATALOGUE_KEYS = [
   'plugins.remove.confirm',
   'plugins.remove.cancel',
   'plugins.picker.archive',
+  'plugins.signin.label',
+  'plugins.signin.as',
+  'plugins.signin.signedIn',
+  'plugins.signin.notSignedIn',
+  'plugins.signin.start',
+  'plugins.signin.out',
+  'plugins.signin.waiting',
+  'plugins.signin.failed',
+  'plugins.signin.kept',
+  'plugins.signin.page.signedIn',
+  'plugins.signin.page.unfinished',
+  'plugins.signin.page.refused',
+  'plugins.signin.page.timeout',
+  'plugins.signin.page.cancelled',
+  'plugins.signin.page.notFound',
+  'plugins.signin.page.close',
   'command.settings.open',
   'settings.assist.type',
   'settings.assist.default',

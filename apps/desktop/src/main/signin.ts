@@ -7,8 +7,15 @@ import {
 } from '@tyto/plugin-api';
 import { z } from 'zod';
 
+import type { CatalogueKey } from '../../shared/i18n/index.js';
+import type { IpcResponse } from '../../shared/ipc.js';
 import type { Credentials } from './credentials.js';
-import { type CallbackListener, type ListenOptions, listenForCallback } from './loopback.js';
+import {
+  type CallbackListener,
+  type CallbackPage,
+  type ListenOptions,
+  listenForCallback,
+} from './loopback.js';
 import {
   type RandomBytes,
   type TokenFetch,
@@ -95,6 +102,13 @@ export interface SigninServiceOptions {
   readonly openBrowser: (url: string) => Promise<void>;
   readonly listen?: (options: ListenOptions) => Promise<CallbackListener>;
   readonly random?: RandomBytes;
+  /** The words of the page the browser lands on, asked at each sign-in; English when absent. */
+  readonly callbackPage?: () => CallbackPage;
+  /**
+   * Told after an entry was stored or deleted — a sign-in, a sign-out, or a refresh the
+   * provider answered `invalid_grant` — so the window can ask who is signed in again.
+   */
+  readonly onChanged?: () => void;
 }
 
 export interface SigninService {
@@ -116,6 +130,9 @@ interface HeldToken {
 export function createSigninService(options: SigninServiceOptions): SigninService {
   const { credentials, now } = options;
   const listen = options.listen ?? listenForCallback;
+  const changed = (): void => {
+    options.onChanged?.();
+  };
   const held = new Map<string, HeldToken>();
   // One refresh per account at a time: two plugin calls at expiry would otherwise both spend
   // the refresh token, and a provider that rotates it refuses the second.
@@ -157,6 +174,7 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
         // to do, instead of the same refusal from the provider on every call.
         await credentials.delete(account);
         held.delete(account);
+        changed();
         return undefined;
       }
       throw new Error(
@@ -194,7 +212,8 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
       }
       const pkce = await createPkce(options.random);
       const state = createState(options.random);
-      const listener = await listen({ state });
+      const page = options.callbackPage?.();
+      const listener = await listen(page === undefined ? { state } : { state, page });
       try {
         await options.openBrowser(
           authorizeUrl({
@@ -261,6 +280,7 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
       const account = signinAccount(plugin, id);
       await credentials.set(account, plaintext);
       hold(account, answered.tokens);
+      changed();
       return { ok: true, label: record.label, since: record.since };
     },
 
@@ -272,7 +292,9 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
     async signOut(plugin, id) {
       const account = signinAccount(plugin, id);
       held.delete(account);
-      return credentials.delete(account);
+      const deleted = await credentials.delete(account);
+      if (deleted) changed();
+      return deleted;
     },
   };
 }
@@ -300,5 +322,119 @@ export function installedSigninDeclarations(
     const parsed = parsePluginManifest(stored.manifestSource);
     if (!parsed.ok) return undefined;
     return parsed.value.signin?.[id];
+  };
+}
+
+/** One declared sign-in, for the plugins screen: who is signed in, never a token. */
+export interface SigninRow {
+  /** The plugin's folder under `TYTO_HOME/plugins`, which is its name. */
+  readonly plugin: string;
+  readonly id: string;
+  readonly signedIn: boolean;
+  /**
+   * The `id_token`'s email or name, absent when the provider sent none: the window then says
+   * "Signed in" in its own language rather than the English default the keychain holds.
+   */
+  readonly label?: string;
+  readonly since?: string;
+}
+
+/**
+ * Every `signin.<id>` of every installed plugin whose manifest reads, in folder order, with
+ * who is signed in to each. A refused folder declares nothing the host would run, so it has
+ * no rows; a disabled plugin keeps its rows, since signing out of it still makes sense.
+ */
+export async function listSignins(
+  store: Pick<PluginStore, 'list'>,
+  service: Pick<SigninService, 'status'>,
+): Promise<readonly SigninRow[]> {
+  const rows: SigninRow[] = [];
+  for (const stored of await store.list()) {
+    if (stored.manifestSource === undefined) continue;
+    const parsed = parsePluginManifest(stored.manifestSource);
+    if (!parsed.ok) continue;
+    for (const id of Object.keys(parsed.value.signin ?? {})) {
+      const status = await service.status(stored.folder, id);
+      if (status === undefined) {
+        rows.push({ plugin: stored.folder, id, signedIn: false });
+        continue;
+      }
+      rows.push({
+        plugin: stored.folder,
+        id,
+        signedIn: true,
+        since: status.since,
+        ...(status.label === DEFAULT_SIGNIN_LABEL ? {} : { label: status.label }),
+      });
+    }
+  }
+  return rows;
+}
+
+/** What the plugins screen reaches through `signin:list`, `signin:start` and `signin:out`. */
+export interface SigninWindow {
+  list(): Promise<IpcResponse<'signin:list'>>;
+  start(plugin: string, id: string): Promise<IpcResponse<'signin:start'>>;
+  out(plugin: string, id: string): Promise<IpcResponse<'signin:out'>>;
+}
+
+/**
+ * The window's side of the service (TYTO-374). A plugin or id nobody declares is rejected
+ * before anything runs, so the window cannot sign in to, or delete, an account under
+ * `signin:` that no installed manifest names. A sign-in that throws — no keychain to encrypt
+ * with, a browser that would not open — answers `failed` with its message, so the screen can
+ * say what happened; **the answer carries no token either way**, only whether it worked.
+ */
+export function signinWindow(
+  store: Pick<PluginStore, 'list'>,
+  service: Pick<SigninService, 'start' | 'status' | 'signOut'>,
+): SigninWindow {
+  const declarationOf = installedSigninDeclarations(store);
+  const declared = async (plugin: string, id: string): Promise<void> => {
+    if ((await declarationOf(plugin, id)) === undefined) {
+      throw new TypeError(`No installed plugin '${plugin}' declares the sign-in '${id}'`);
+    }
+  };
+  return {
+    list: async () => ({ signins: [...(await listSignins(store, service))] }),
+    start: async (plugin, id) => {
+      await declared(plugin, id);
+      try {
+        const outcome = await service.start(plugin, id);
+        if (outcome.ok) return { ok: true };
+        // `undeclared` was refused above; a reinstall in between lands here.
+        const reason = outcome.reason === 'undeclared' ? 'failed' : outcome.reason;
+        return { ok: false, reason, message: outcome.message };
+      } catch (cause) {
+        return {
+          ok: false,
+          reason: 'failed',
+          message: cause instanceof Error ? cause.message : String(cause),
+        };
+      }
+    },
+    out: async (plugin, id) => {
+      await declared(plugin, id);
+      return { signedOut: await service.signOut(plugin, id) };
+    },
+  };
+}
+
+/**
+ * The callback page in the window's language (ADR 0174, note of 2026-11-08). Keys under
+ * `plugins.signin.page.`, which are never element text: the browser shows them, not the window.
+ */
+export function signinCallbackPage(say: (key: CatalogueKey) => string, lang: string): CallbackPage {
+  return {
+    lang,
+    messages: {
+      code: say('plugins.signin.page.signedIn'),
+      error: say('plugins.signin.page.unfinished'),
+      'state-mismatch': say('plugins.signin.page.refused'),
+      timeout: say('plugins.signin.page.timeout'),
+      closed: say('plugins.signin.page.cancelled'),
+      notFound: say('plugins.signin.page.notFound'),
+    },
+    close: say('plugins.signin.page.close'),
   };
 }

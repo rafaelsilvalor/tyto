@@ -1536,13 +1536,45 @@ function openPluginsDialog(): void {
       revealSettingKey(plugin);
     });
   };
+  // TYTO-374: a click is the only thing that starts a sign-in. Main opens the system browser
+  // and answers once it came back; who is signed in is asked again on `signin:changed`, and
+  // after every answer, since a failed sign-in can still have changed nothing.
+  dialog.signins = undefined;
+  dialog.onSigninStart = async (plugin, id) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    const answer = await bridge['signin:start']({ plugin, id });
+    await relistSignins(bridge);
+    return answer;
+  };
+  dialog.onSigninOut = async (plugin, id) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    await bridge['signin:out']({ plugin, id });
+    await relistSignins(bridge);
+  };
   void withBridge(async (bridge) => {
     try {
       dialog.view = await bridge['plugins:list']({});
     } catch {
       dialog.view = 'failed';
     }
+    await relistSignins(bridge);
   });
+}
+
+/**
+ * Who is signed in, for the plugins screen (TYTO-374). A list that cannot be read leaves the
+ * rows without sign-in lines rather than claiming nobody is signed in.
+ */
+async function relistSignins(bridge: TytoBridge): Promise<void> {
+  const dialog = elements.pluginsDialog;
+  if (dialog === null || dialog === undefined) return;
+  try {
+    dialog.signins = (await bridge['signin:list']({})).signins;
+  } catch {
+    dialog.signins = undefined;
+  }
 }
 
 /**
@@ -6319,6 +6351,12 @@ async function load(): Promise<void> {
 
     // The same sync started the fetched plugins again (TYTO-466): their panels, keys, vim
     // contributions and the theme in force are asked again, so none of the old set's stays.
+    // A sign-in was stored or deleted (TYTO-374): an open plugins screen says so at once, a
+    // refresh the provider refused included.
+    bridge.on('signin:changed', () => {
+      if (elements.pluginsDialog?.open === true) void relistSignins(bridge);
+    });
+
     bridge.on('plugins:changed', () => {
       void readPluginContributions(bridge).catch((cause: unknown) => {
         reportToLog(bridge, cause, 'plugin panels not read again');

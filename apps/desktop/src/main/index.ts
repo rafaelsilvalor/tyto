@@ -73,7 +73,13 @@ import { createDesktopGallery } from './gallery.js';
 import { fileLayoutStore } from './layout-store.js';
 import { createSessionService, createTemplateFolder } from './session.js';
 import { fileSessionStore } from './session-store.js';
-import { createSigninService, installedSigninDeclarations, signinCapabilities } from './signin.js';
+import {
+  createSigninService,
+  installedSigninDeclarations,
+  signinCallbackPage,
+  signinCapabilities,
+  signinWindow,
+} from './signin.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
@@ -800,6 +806,11 @@ async function start(): Promise<void> {
     fetch: (url, init) => net.fetch(url, init),
     now: () => Date.now(),
     openBrowser: (url) => shell.openExternal(url),
+    // The page the browser lands on speaks the window's language, read at each sign-in.
+    callbackPage: () => signinCallbackPage((key) => translate(uiLocale, key), uiLocale),
+    onChanged: () => {
+      toWindow('signin:changed', {});
+    },
   });
   const capabilities = {
     ...desktopCapabilities(credentials, (url, init) => net.fetch(url, init), {
@@ -1725,6 +1736,8 @@ async function start(): Promise<void> {
       },
       read: () => liveSnippets.read().catch(() => ''),
     },
+    // TYTO-374: who is signed in, and signing in and out, only when the person clicks.
+    signin: signinWindow(pluginStore, signin),
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.
     plugins: {

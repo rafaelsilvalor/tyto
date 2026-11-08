@@ -44,6 +44,22 @@ The same changes can be made from a terminal, with the commands in [Plugins](../
 | switch it back on                                        | `tyto plugin enable <name>`    |
 | remove one                                               | `tyto plugin remove <name>`    |
 
+## Sign in for a plugin
+
+::: info Checked differently
+This section was added on 2026-11-08 and checked by the app's end-to-end test against a test sign-in service on this computer, with the browser's part answered by the test. Nobody has followed it by hand with a real provider yet.
+:::
+
+Some plugins work with your own account somewhere else — a connector that creates files in your storage, say. Such a plugin asks for a `signin:` permission, and its row in the plugins dialog shows one line per sign-in it declares:
+
+1. The line says **Not signed in**. Click **Sign in**.
+2. Your browser opens on the provider's page. Sign in there and approve. The browser then shows a page from Tyto saying you are signed in; you can close that tab.
+3. Back in the dialog, the line says **Signed in as** and the account, or just **Signed in** when the provider does not say who.
+
+Click **Sign out** to end it. Nothing else starts a sign-in: a plugin that needs one when you are signed out stops and tells you to sign in from this dialog, and it never opens your browser by itself.
+
+Tyto keeps the sign-in in your system's keychain, and the plugin gets only a short-lived access token from Tyto, never what keeps you signed in. On a computer with no keychain to encrypt with, the sign-in does not finish and the line says why. The command line cannot sign in through a browser: a recipe that needs a sign-in works only in the window.
+
 ## Is a plugin safe?
 
 Each installed plugin runs apart from the window, so a plugin that crashes stops itself and not Tyto, and it can only reach what its permissions allow. The dialog shows those permissions, and both its install box and `tyto plugin install` show them before you approve. Writing a plugin is in the [plugin author's guide](../extend/plugin-authoring.md).

@@ -4046,3 +4046,37 @@ tyto-recent-folders[open] {
   margin: 0;
   color: var(--tyto-error);
 }
+
+/* TYTO-374: a plugin's browser sign-ins, laid out as its credentials are. */
+.plugins__signins {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--tyto-space-3);
+  gap: var(--tyto-space-2);
+}
+
+.plugins__signin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tyto-space-3);
+}
+
+.plugins__signin-state {
+  color: var(--tyto-text-muted);
+}
+
+.plugins__signin[data-signed-in='true'] .plugins__signin-state {
+  color: inherit;
+  font-weight: var(--tyto-weight-strong);
+}
+
+.plugins__signin-waiting,
+.plugins__signin-failed {
+  width: 100%;
+  margin: 0;
+}
+
+.plugins__signin-failed {
+  color: var(--tyto-error);
+}

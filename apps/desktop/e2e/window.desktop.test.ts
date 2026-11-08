@@ -385,6 +385,11 @@ describe('the bridge', () => {
       // `e2e/settings-assist.desktop.test.ts`.
       'settings:outline',
       'settings:validate',
+      // TYTO-374: browser sign-in from the plugins screen. Exercised by
+      // `e2e/signin.desktop.test.ts`.
+      'signin:list',
+      'signin:out',
+      'signin:start',
       // TYTO-277: the snippets tab and the file's text. Exercised by
       // `e2e/snippets-file.desktop.test.ts`.
       'snippets:open',
