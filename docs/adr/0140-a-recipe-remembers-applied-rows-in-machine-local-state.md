@@ -66,6 +66,17 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
    - `remember <store> columns=a,b [by=<column>] [when="<where>"] [forget-when="<where>"]` asks
      to store each row's listed values under its key. `when=` leaves the rows it rejects alone;
      `forget-when=` deletes the entries of the rows it keeps. It adds no column.
+
+   > **Amended by TYTO-421 (2026-11-08).** `decide`, the verb between them, takes
+   > `tie=local|remote`: the side that wins a row both sides changed since the last run, `local`
+   > when not given, which is the sheet-wins rule above. It writes `<column>_push`, the decided
+   > value on push rows and empty elsewhere, for the write to the remote side to read, and
+   > `<column>_overwritten`, the losing side's value where both changed (`_overrides` is true
+   > there whichever side wins). The decided column may be the `local=` column itself, rewritten
+   > in place as `map` rewrites its `into=`, so a synced sheet's column keeps its header. A
+   > failed write still leaves that row's state as it was (decision 4), now covered end to end
+   > by `last`, `decide`, `remember` and `stateToCommit` in one test.
+
 6. **A host without state is an error, never an empty store.** `last` and `remember` fail with
    `E_RECIPE_STATE` there. If `last` read null instead, every run would be a first run, and the
    first-run rule would let a sheet's done beat the tracker forever.

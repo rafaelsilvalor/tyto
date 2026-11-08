@@ -18,7 +18,16 @@ import { type CellValue, type Column, type Row, cellText, comparable } from './t
 const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const VALUES = z.array(z.string());
 
-const NAMES = ['local', 'remote', 'last', 'values', 'first-run-wins', 'hold-when-empty'] as const;
+const NAMES = [
+  'local',
+  'remote',
+  'last',
+  'values',
+  'first-run-wins',
+  'hold-when-empty',
+  'tie',
+] as const;
+const TIES = ['local', 'remote'] as const;
 const REQUIRED = ['local', 'remote', 'last'] as const;
 const USAGE =
   'takes one column and local=, remote= and last=, as in decide status local=sheet ' +
@@ -31,12 +40,17 @@ const USAGE =
  */
 export type DecideAction = 'push' | 'pull' | 'same' | 'hold';
 
+/** The side that wins a row both sides changed since the last run. */
+export type DecideTie = (typeof TIES)[number];
+
 export interface Decision {
   readonly action: DecideAction;
   /** What the local side holds after the run, spelt as the side it came from spells it. */
   readonly value: CellValue;
-  /** A push over a remote value that also changed since the last run. */
+  /** Both sides changed since the last run, and the winner overwrites the other's change. */
   readonly overrides: boolean;
+  /** When `overrides`, the losing side's value, as it spells it; empty otherwise. */
+  readonly overwritten: CellValue;
   /** The rule that fired, in a few words. */
   readonly reason: string;
 }
@@ -55,11 +69,14 @@ export interface DecideRules {
   readonly isValid: (folded: string) => boolean;
   /** The folded value that beats the remote side on a first run, when there is one. */
   readonly firstRunWins?: string;
+  /** The side that wins when both changed since the last run; `local` when not given. */
+  readonly tie?: DecideTie;
 }
 
 /**
  * Which side wins a row, ported from Buraqueira's `decidir` (`lib_status.py`): whichever side
- * moved since the last run wins, and when both moved the local side does, saying it overrides.
+ * moved since the last run wins, and when both moved the side `tie` names does (the local one
+ * unless told otherwise), saying it overrides and which value it overwrote.
  * Values compare by `comparable`, so accents, case and surrounding blanks do not count.
  *
  * With no last value, a first run or a lost state, any local value may be a stale mirror of
@@ -75,22 +92,29 @@ export function decideValue(sides: DecideSides, rules: DecideRules): Decision {
   const last = comparable(sides.last);
   const valid = local !== '' && rules.isValid(local);
   const hasRemote = remote !== '';
-  const push = (overrides: boolean, reason: string): Decision => ({
+  const push = (reason: string, overwritten?: CellValue): Decision => ({
     action: 'push',
     value: spelt(sides.local),
-    overrides,
+    overrides: overwritten !== undefined,
+    overwritten: overwritten === undefined ? null : spelt(overwritten),
     reason,
   });
-  const pull = (value: CellValue | undefined, reason: string): Decision => ({
+  const pull = (
+    value: CellValue | undefined,
+    reason: string,
+    overwritten?: CellValue,
+  ): Decision => ({
     action: 'pull',
     value: spelt(value),
-    overrides: false,
+    overrides: overwritten !== undefined,
+    overwritten: overwritten === undefined ? null : spelt(overwritten),
     reason,
   });
   const same = (reason: string): Decision => ({
     action: 'same',
     value: spelt(sides.local),
     overrides: false,
+    overwritten: null,
     reason,
   });
 
@@ -102,7 +126,7 @@ export function decideValue(sides: DecideSides, rules: DecideRules): Decision {
     }
     if (local === remote) return same('no state, both agree');
     if (rules.firstRunWins !== undefined && local === rules.firstRunWins) {
-      return push(false, 'no state, local first-run value wins');
+      return push('no state, local first-run value wins');
     }
     if (!hasRemote) return same('no state, remote intermediate');
     return pull(
@@ -117,7 +141,10 @@ export function decideValue(sides: DecideSides, rules: DecideRules): Decision {
   const remoteChanged = hasRemote && remote !== last;
   if (localChanged) {
     if (local === remote) return same('both already agree');
-    return remoteChanged ? push(true, 'both changed, local wins') : push(false, 'local changed');
+    if (!remoteChanged) return push('local changed');
+    return (rules.tie ?? 'local') === 'local'
+      ? push('both changed, local wins', sides.remote ?? null)
+      : pull(sides.remote, 'both changed, remote wins', sides.local ?? null);
   }
   if (remoteChanged) return pull(sides.remote, 'remote changed');
   if (!valid) {
@@ -134,7 +161,7 @@ function spelt(value: CellValue | undefined): CellValue {
 
 /**
  * `decide <column> local=<column> remote=<column> last=<column> [values=a,b|@ref]
- * [first-run-wins=<value>] [hold-when-empty=<column>]` decides, for each row, which side of a
+ * [first-run-wins=<value>] [hold-when-empty=<column>] [tie=local|remote]` decides, for each row, which side of a
  * sync wins (ADR 0140), as in `decide status local=sheet remote=tracker last=last_status
  * values=@./flows.json#/statuses first-run-wins=done hold-when-empty=tracker_key`.
  *
@@ -149,9 +176,17 @@ function spelt(value: CellValue | undefined): CellValue {
  * there a push becomes `hold`, the decided value stays the local one, and a `remember` with
  * `when="<column>_action != hold"` leaves the row's state as it was, so the next run tries again.
  *
- * It adds four columns: `<column>`, the decided value; `<column>_action`, push, pull, same or
- * hold; `<column>_overrides`, true on a push over a remote value that also changed; and
- * `<column>_reason`, the rule that fired. Each must be new to the table.
+ * `tie=` names the side that wins a row both sides changed since the last run: `local`, the
+ * default, pushes the local value; `remote` pulls the remote one. Either way the row says it
+ * overrides, and which value it overwrote (TYTO-421).
+ *
+ * It writes six columns: `<column>`, the decided value; `<column>_action`, push, pull, same or
+ * hold; `<column>_push`, the decided value on a push row and empty on every other, which is what
+ * a write to the remote side reads; `<column>_overrides`, true where both sides changed and the
+ * winner overwrites the other's change; `<column>_overwritten`, the losing side's value there,
+ * and empty elsewhere; and `<column>_reason`, the rule that fired. `<column>` may be the `local=`
+ * column itself, which is then rewritten in place, as `map` rewrites its `into=`, so a synced
+ * sheet's column keeps its header; every other column must be new to the table.
  */
 export async function decide(context: VerbContext): Promise<VerbResult> {
   const named = refuseNamed(context, [...NAMES]);
@@ -198,13 +233,27 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
     return argumentsProblem(context, USAGE);
   }
 
+  const tieArgument = written.get('tie');
+  const tie = tieArgument === undefined ? 'local' : tieArgument.value;
+  if (!isTie(tie)) {
+    return argumentsProblem(
+      context,
+      `takes tie=local or tie=remote, not tie=${tie}`,
+      tieArgument === undefined ? undefined : at(tieArgument.range),
+    );
+  }
+
+  const origin = `decide ${name}`;
+  const inPlace = name.toLowerCase() === localColumn.name.toLowerCase();
+  const decidedColumn: Column = { name: inPlace ? localColumn.name : name, type: 'text', origin };
   const added: Column[] = [
-    { name, type: 'text', origin: `decide ${name}` },
-    { name: `${name}_action`, type: 'text', origin: `decide ${name}` },
-    { name: `${name}_overrides`, type: 'boolean', origin: `decide ${name}` },
-    { name: `${name}_reason`, type: 'text', origin: `decide ${name}` },
+    { name: `${name}_action`, type: 'text', origin },
+    { name: `${name}_push`, type: 'text', origin },
+    { name: `${name}_overrides`, type: 'boolean', origin },
+    { name: `${name}_overwritten`, type: 'text', origin },
+    { name: `${name}_reason`, type: 'text', origin },
   ];
-  const taken = added.filter((column) =>
+  const taken = (inPlace ? added : [decidedColumn, ...added]).filter((column) =>
     table.value.columns.some(
       (existing) => existing.name.toLowerCase() === column.name.toLowerCase(),
     ),
@@ -258,6 +307,7 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
   const rules: DecideRules = {
     isValid: (folded) => recognised === undefined || recognised.has(folded),
     ...(firstRunWins === undefined ? {} : { firstRunWins }),
+    tie,
   };
   const rows = table.value.rows.map((row): Row => {
     let decision = decideValue(
@@ -277,18 +327,30 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
         ...decision,
         action: 'hold',
         overrides: false,
+        overwritten: null,
         reason: 'remote did not return the row',
       };
     }
     const decided: Record<string, CellValue> = {
-      [name]: decision.value,
+      [decidedColumn.name]: decision.value,
       [`${name}_action`]: decision.action,
+      [`${name}_push`]: decision.action === 'push' ? decision.value : null,
       [`${name}_overrides`]: decision.overrides,
+      [`${name}_overwritten`]: decision.overwritten,
       [`${name}_reason`]: decision.reason,
     };
     return { ...row, values: { ...row.values, ...decided } };
   });
-  return ok({ table: { columns: [...table.value.columns, ...added], rows } });
+  const columns = inPlace
+    ? table.value.columns.map((column) =>
+        column.name === localColumn.name ? decidedColumn : column,
+      )
+    : [...table.value.columns, decidedColumn];
+  return ok({ table: { columns: [...columns, ...added], rows } });
+}
+
+function isTie(value: string): value is DecideTie {
+  return (TIES as readonly string[]).includes(value);
 }
 
 async function readValues(

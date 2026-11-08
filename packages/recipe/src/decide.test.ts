@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { tasks } from './__fixtures__/flows.js';
 import { columnOf, runOverShop } from './__fixtures__/rules-harness.js';
 import { column, memoryState, runWithState } from './__fixtures__/state-harness.js';
-import { type DecideRules, type Decision, decideValue } from './decide.js';
+import { type DecideRules, type DecideTie, type Decision, decideValue } from './decide.js';
 import { stateToCommit } from './state.js';
 import { type CellValue, comparable } from './table.js';
 
@@ -83,7 +83,7 @@ describe('decideValue, ported from decidir', () => {
 
   it('nothing changed is same, and every decision names its rule', () => {
     const decision = decideValue({ local: 'doing', remote: 'doing', last: 'doing' }, STATUS);
-    expect(decision).toEqual({ ...same('doing'), reason: 'nothing changed' });
+    expect(decision).toEqual({ ...same('doing'), overwritten: null, reason: 'nothing changed' });
     expect(decideValue({ local: 'done', remote: 'approval', last: 'doing' }, STATUS).reason).toBe(
       'both changed, local wins',
     );
@@ -120,6 +120,48 @@ describe('decideValue without first-run-wins, ported from decidir_responsavel', 
   });
 });
 
+/** TYTO-421: each case of a shared field under both tie rules. */
+describe.each<DecideTie>(['local', 'remote'])('decideValue with tie=%s', (tie) => {
+  const rules: DecideRules = { ...STATUS, tie };
+  const full = (local: CellValue, remote: CellValue, last: CellValue) => {
+    const { action, value, overrides, overwritten } = decideValue({ local, remote, last }, rules);
+    return { action, value, overrides, overwritten };
+  };
+
+  it('only the sheet changed: pushes, overwriting nothing', () => {
+    expect(full('done', 'doing', 'doing')).toEqual({ ...push('done'), overwritten: null });
+  });
+
+  it('only the tracker changed: pulls, overwriting nothing', () => {
+    expect(full('doing', 'approval', 'doing')).toEqual({ ...pull('approval'), overwritten: null });
+  });
+
+  it('both changed: the tie side wins and the losing value is reported', () => {
+    expect(full('done', 'Approval', 'doing')).toEqual(
+      tie === 'local'
+        ? { action: 'push', value: 'done', overrides: true, overwritten: 'Approval' }
+        : { action: 'pull', value: 'Approval', overrides: true, overwritten: 'done' },
+    );
+    expect(decideValue({ local: 'done', remote: 'approval', last: 'doing' }, rules).reason).toBe(
+      `both changed, ${tie} wins`,
+    );
+  });
+
+  it('nothing changed: same', () => {
+    expect(full('doing', 'doing', 'doing')).toEqual({ ...same('doing'), overwritten: null });
+  });
+
+  it('no state: the first-run rule decides, whatever the tie', () => {
+    expect(full('done', 'todo', null)).toEqual({ ...push('done'), overwritten: null });
+    expect(full('todo', 'doing', null)).toEqual({ ...pull('doing'), overwritten: null });
+  });
+});
+
+it('decideValue lets the local side win a tie when no tie is given', () => {
+  const decision = decideValue({ local: 'done', remote: 'approval', last: 'doing' }, STATUS);
+  expect([decision.action, decision.overwritten]).toEqual(['push', 'approval']);
+});
+
 describe('decideValue folds accents, case and blanks', () => {
   it('compares the three sides folded', () => {
     expect(decided(' Dóne', 'DONE', 'doing')).toEqual(same(' Dóne'));
@@ -154,10 +196,12 @@ describe('decide', () => {
   it('writes the decided value, the action, whether it overrides and why', async () => {
     const { table, problem } = await run([`${DECIDE} first-run-wins=done`]);
     expect(problem).toBeUndefined();
-    expect(table?.columns.slice(-4).map(({ name, type }) => [name, type])).toEqual([
+    expect(table?.columns.slice(-6).map(({ name, type }) => [name, type])).toEqual([
       ['status', 'text'],
       ['status_action', 'text'],
+      ['status_push', 'text'],
       ['status_overrides', 'boolean'],
+      ['status_overwritten', 'text'],
       ['status_reason', 'text'],
     ]);
     expect(Object.values(columnOf(table, 'status'))).toEqual([
@@ -222,7 +266,101 @@ describe('decide', () => {
     expect(columnOf(table, 'status_action')['T-4']).toBe('pull');
   });
 
+  describe.each<DecideTie>(['local', 'remote'])('with tie=%s', (tie) => {
+    const line = `${DECIDE} first-run-wins=done hold-when-empty=found tie=${tie}`;
+
+    it('writes _push on push rows only, and _overwritten where both changed', async () => {
+      const { table, problem } = await run([line]);
+      expect(problem).toBeUndefined();
+      // T-0 no state, a first-run push; T-1 no state, a pull; T-2 held; T-3 both changed;
+      // T-4 a value out of the list.
+      expect(Object.values(columnOf(table, 'status_action'))).toEqual([
+        'push',
+        'pull',
+        'hold',
+        tie === 'local' ? 'push' : 'pull',
+        'pull',
+      ]);
+      expect(Object.values(columnOf(table, 'status_push'))).toEqual([
+        'done',
+        null,
+        null,
+        tie === 'local' ? 'done' : null,
+        null,
+      ]);
+      expect(Object.values(columnOf(table, 'status_overrides'))).toEqual([
+        false,
+        false,
+        false,
+        true,
+        false,
+      ]);
+      expect(Object.values(columnOf(table, 'status_overwritten'))).toEqual([
+        null,
+        null,
+        null,
+        tie === 'local' ? 'approval' : 'done',
+        null,
+      ]);
+      expect(columnOf(table, 'status')['T-3']).toBe(tie === 'local' ? 'done' : 'approval');
+    });
+
+    it('rewrites the local= column in place when the name is that column', async () => {
+      const shared = tasks(
+        ['tracker', 'Status', 'last_status'],
+        [
+          ['doing', 'done', 'doing'],
+          ['approval', 'doing', 'doing'],
+          ['approval', 'done', 'doing'],
+          ['doing', 'doing', 'doing'],
+        ],
+      );
+      const { table, problem } = await runOverShop(
+        [`decide status local=Status remote=tracker last=last_status ${VALUES} tie=${tie}`],
+        {},
+        shared,
+      );
+      expect(problem).toBeUndefined();
+      expect(table?.columns.map(({ name }) => name)).toEqual([
+        'key',
+        'tracker',
+        'Status',
+        'last_status',
+        'status_action',
+        'status_push',
+        'status_overrides',
+        'status_overwritten',
+        'status_reason',
+      ]);
+      expect(Object.values(columnOf(table, 'Status'))).toEqual([
+        'done',
+        'approval',
+        tie === 'local' ? 'done' : 'approval',
+        'doing',
+      ]);
+      expect(Object.values(columnOf(table, 'status_push'))).toEqual([
+        'done',
+        null,
+        tie === 'local' ? 'done' : null,
+        null,
+      ]);
+    });
+  });
+
   describe('refuses', () => {
+    it('a tie that is neither local nor remote', async () => {
+      const { problem, at } = await run([`${DECIDE} tie=sheet`]);
+      expect([problem?.code, at]).toEqual(['E_RECIPE_ARGUMENTS', 'tie=sheet']);
+      expect(problem?.message).toContain('tie=local or tie=remote');
+    });
+
+    it('a name that is a column other than local=', async () => {
+      const { problem, at } = await run([
+        'decide tracker local=sheet remote=tracker last=last_status',
+      ]);
+      expect([problem?.code, at]).toEqual(['E_RECIPE_ARGUMENTS', 'tracker']);
+    });
+
     async function refusal(line: string, files: Record<string, unknown> = {}) {
       const { problem, at } = await run([line], files);
       return [problem?.code, at];
@@ -325,5 +463,82 @@ describe('last, decide and remember', () => {
     expect(column(second.table, 'last_status')).toEqual(['done', 'done', null]);
     expect(column(second.table, 'status_action')).toEqual(['pull', 'push', 'push']);
     expect(column(second.table, 'status')).toEqual(['approval', 'review', 'done']);
+  });
+});
+
+/**
+ * TYTO-421: a shared field through a run that is applied with one write failing. The failed row
+ * keeps its old state, so the next run decides it the same way and tries again.
+ */
+describe.each<DecideTie>(['local', 'remote'])('a shared field synced with tie=%s', (tie) => {
+  const LINES = [
+    'last sync columns=status',
+    `decide status local=status remote=tracker last=last_status ${VALUES} ` +
+      `hold-when-empty=found tie=${tie}`,
+    'remember sync columns=status when="status_action != hold"',
+  ];
+  const INPUT = tasks(
+    ['status', 'tracker', 'found'],
+    [
+      ['done', 'doing', 'T-0'],
+      ['doing', 'review', 'T-1'],
+      ['done', 'approval', 'T-2'],
+      ['doing', 'doing', 'T-3'],
+    ],
+  );
+  const INITIAL = {
+    sync: {
+      'T-0': { status: 'doing' },
+      'T-1': { status: 'doing' },
+      'T-2': { status: 'doing' },
+      'T-3': { status: 'doing' },
+    },
+  };
+
+  it('advances the state of every row but the one whose write failed', async () => {
+    const state = memoryState(INITIAL);
+    const first = await runWithState(LINES, INPUT, state);
+    expect(first.errors).toEqual([]);
+    const both = tie === 'local' ? 'push' : 'pull';
+    expect(column(first.table, 'status_action')).toEqual(['push', 'pull', both, 'same']);
+    expect(column(first.table, 'status_push')).toEqual([
+      'done',
+      null,
+      tie === 'local' ? 'done' : null,
+      null,
+    ]);
+
+    const outcome = {
+      operations: [
+        { rowKey: 'T-0', status: 'applied' as const, appliedAt: '2026-11-08T12:00:00.000Z' },
+        { rowKey: 'T-1', status: 'applied' as const, appliedAt: '2026-11-08T12:00:01.000Z' },
+        { rowKey: 'T-2', status: 'failed' as const, reason: 'the write was refused' },
+      ],
+    };
+    for (const commit of stateToCommit(first.run.remembers, outcome)) {
+      await state.write(commit.store, commit.puts, commit.deletes);
+    }
+    const stored = state.stores.get('sync');
+    expect(stored?.get('T-0')?.values.status).toBe('done');
+    expect(stored?.get('T-1')?.values.status).toBe('review');
+    expect(stored?.get('T-2')?.values).toEqual({ status: 'doing' });
+    expect(stored?.get('T-3')?.values.status).toBe('doing');
+
+    // What the applied writes left on both sides; T-2's write did not happen.
+    const after = tasks(
+      ['status', 'tracker', 'found'],
+      [
+        ['done', 'done', 'T-0'],
+        ['review', 'review', 'T-1'],
+        ['done', 'approval', 'T-2'],
+        ['doing', 'doing', 'T-3'],
+      ],
+    );
+    const second = await runWithState(LINES, after, state);
+    expect(second.errors).toEqual([]);
+    expect(column(second.table, 'status_action')).toEqual(['same', 'same', both, 'same']);
+    expect(column(second.table, 'status_overwritten')[2]).toBe(
+      tie === 'local' ? 'approval' : 'done',
+    );
   });
 });
