@@ -1,3 +1,7 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -25,7 +29,7 @@ describe('the scene list', () => {
     expect(sceneProblems(SCENES)).toEqual([]);
   });
 
-  it('has the five scenes the card names, and the preview’s two modes (TYTO-323)', () => {
+  it('has the five scenes the card names, the preview’s two modes and a recipe (TYTO-450)', () => {
     expect(SCENES.map((each) => each.name)).toEqual([
       'window-tour',
       'command-bar-open',
@@ -34,7 +38,20 @@ describe('the scene list', () => {
       'settings-tab',
       'preview-strip',
       'preview-all-slides',
+      'recipe-notebook',
     ]);
+  });
+
+  it('names only plugin folders that exist, each with its manifest and entry (TYTO-450)', () => {
+    const plugins = join(dirname(fileURLToPath(import.meta.url)), '__fixtures__', 'plugins');
+    const named = SCENES.flatMap((each) => each.plugins ?? []);
+    expect(named).toEqual(['reading-list']);
+    const missing = named.flatMap((plugin) =>
+      ['tyto-plugin.json', join('dist', 'index.js')]
+        .map((file) => join(plugins, plugin, file))
+        .filter((path) => !existsSync(path)),
+    );
+    expect(missing).toEqual([]);
   });
 
   it('refuses a window larger than the CI display, which would come back cut', () => {

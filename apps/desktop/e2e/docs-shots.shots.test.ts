@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -50,6 +51,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const built = join(here, '..', 'out', 'main', 'index.js');
 const BRIEFS = join(here, 'docs-shots', '__fixtures__', 'briefs');
 const TEMPLATES = join(here, 'docs-shots', '__fixtures__', 'templates');
+const RECIPES = join(here, 'docs-shots', '__fixtures__', 'recipes');
+const PLUGINS = join(here, 'docs-shots', '__fixtures__', 'plugins');
+// The command-line app a person installs plugins with; a scene with plugins needs it built.
+const CLI = join(here, '..', '..', 'cli', 'dist', 'index.js');
 // `pages/public` and not `public`: the site's `srcDir` is `pages`, and VitePress serves static
 // files from `<srcDir>/public`.
 const DEFAULT_OUT = join(here, '..', '..', 'docs', 'pages', 'public', 'screenshots');
@@ -78,13 +83,18 @@ async function runCommand(page: Page, commandId: string): Promise<void> {
   if (!ran) throw new Error(`the window refused '${commandId}'`);
 }
 
-/** Opens a fixture brief through File > Open, with main's file picker answering it. */
-async function openBrief(launched: ElectronApplication, page: Page, file: string): Promise<void> {
+/** Opens a fixture file through File > Open, with main's file picker answering it. */
+async function openFixture(
+  launched: ElectronApplication,
+  page: Page,
+  folder: string,
+  file: string,
+): Promise<void> {
   await launched.evaluate(
     ({ dialog }, path) => {
       dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [path] });
     },
-    join(BRIEFS, file),
+    join(folder, file),
   );
   await runCommand(page, 'editor.open');
   await page.waitForFunction(
@@ -106,6 +116,23 @@ async function useLocale(page: Page, locale: string): Promise<void> {
   });
 }
 
+/** Installs the scene's fixture plugins in `home` the way a person does: `tyto plugin install`. */
+function installPlugins(plugins: readonly string[], home: string): void {
+  if (plugins.length > 0 && !existsSync(CLI)) {
+    throw new Error(`${CLI} is missing — run \`pnpm build\` before the shots`);
+  }
+  for (const plugin of plugins) {
+    const installed = spawnSync(
+      process.execPath,
+      [CLI, 'plugin', 'install', join(PLUGINS, plugin), '--yes'],
+      { env: { ...process.env, TYTO_HOME: home }, encoding: 'utf8' },
+    );
+    if (installed.status !== 0) {
+      throw new Error(`installing '${plugin}' failed: ${installed.stderr}${installed.stdout}`);
+    }
+  }
+}
+
 /** Launches the app for one picture, in its own folders, in the shot's theme and language. */
 async function launchFor(shot: Shot): Promise<Page> {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-docs-shots-'));
@@ -117,6 +144,8 @@ async function launchFor(shot: Shot): Promise<Page> {
     ...(shot.scene.brief === undefined ? {} : { templatesFolder: TEMPLATES }),
   };
   writeFileSync(join(userData, 'settings.json'), `${JSON.stringify(settings, null, 2)}\n`);
+  const home = join(scratch, 'tyto-home');
+  installPlugins(shot.scene.plugins ?? [], home);
   app = await _electron.launch({
     args: [
       '.',
@@ -125,7 +154,7 @@ async function launchFor(shot: Shot): Promise<Page> {
       '--force-device-scale-factor=1',
     ],
     cwd: join(here, '..'),
-    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
+    env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: home },
   });
   const page = await firstWindow(app);
   // `runCommand` is refused until the editor exists, and `.shell` is in the static markup.
@@ -183,7 +212,8 @@ describe('the manual’s pictures of the window', () => {
       const sceneWindow: SceneWindow = {
         page,
         run: (commandId) => runCommand(page, commandId),
-        openBrief: (file) => openBrief(launched, page, file),
+        openBrief: (file) => openFixture(launched, page, BRIEFS, file),
+        openRecipe: (file) => openFixture(launched, page, RECIPES, file),
       };
       if (shot.scene.brief !== undefined) await sceneWindow.openBrief(shot.scene.brief);
       await shot.scene.arrange(sceneWindow);

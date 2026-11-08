@@ -25,6 +25,11 @@ Só os passos que mudaram rodam de novo: um passo cuja linha não mudou guarda a
 
 ## O que um passo mostra
 
+<Screenshot
+  scene="recipe-notebook"
+  alt="Uma receita depois de Executar receita: embaixo do passo da fonte, a linha 30 linhas · 5 colunas com a idade e os botões Executar daqui e Buscar de novo, uma tabela com as 20 primeiras linhas e mais 10 linhas embaixo; o passo where logo abaixo mostra a própria linha e a tabela."
+/>
+
 Embaixo de cada passo há uma linha e, depois, a tabela dele:
 
 - **A linha** diz o que o passo respondeu: _12 linhas · 4 colunas_, um plano (_Plano: 3 a gravar em Pauta_), _Falhou: veja Problemas_ ou por que ele não rodou.
