@@ -186,6 +186,8 @@ export {
   resolveProject,
 } from './project/project.js';
 
+export { fileSafeName } from './project/file-safe-name.js';
+
 export { isAbsolutePath, isInsidePath, resolvePath } from './project/paths.js';
 
 export { DEFAULT_PRESET_TYPES, EXPORT_PRESETS_KEY, type ExportPreset } from './project/presets.js';

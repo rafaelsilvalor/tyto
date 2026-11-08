@@ -35,6 +35,13 @@ export { briefHighlighting } from './highlight.js';
 export { parseBrief } from './parse-brief.js';
 
 export {
+  type BriefSlotValue,
+  type BriefToWrite,
+  type BriefWriteProblem,
+  writeBrief,
+} from './write-brief.js';
+
+export {
   DEFAULT_INDENT_UNIT,
   type FormatOptions,
   type TextEdit,
