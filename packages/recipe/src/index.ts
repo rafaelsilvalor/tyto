@@ -6,7 +6,14 @@
 
 export type { ArgumentSpec, ArgumentType, ArgumentValue, ArgumentValues } from './arguments.js';
 export { readArguments } from './arguments.js';
-export type { Argument, NamedArgument, RecipeAst, RecipeParam, Step } from './ast.js';
+export type {
+  Argument,
+  NamedArgument,
+  RecipeAst,
+  RecipeInterval,
+  RecipeParam,
+  Step,
+} from './ast.js';
 export { checkTable } from './check-table.js';
 export type { RunClock } from './clock.js';
 export { systemClock } from './clock.js';
@@ -17,7 +24,7 @@ export { decideValue } from './decide.js';
 export { resolveColumn } from './columns.js';
 export type { PageFetcher, PageLimits, PageResult, SourcePage } from './paging.js';
 export { PAGE_LIMITS, pagedSource } from './paging.js';
-export { parseRecipe } from './parse.js';
+export { MINIMUM_INTERVAL_MINUTES, parseRecipe } from './parse.js';
 export type { CompiledPattern } from './pattern.js';
 export { PATTERN_DIALECT, PATTERN_LIMITS, boundedInput, compilePattern } from './pattern.js';
 export type { JsonValue, Plan, PlanContext, PlanLimits, PlannedOperation } from './plan.js';
