@@ -13,6 +13,7 @@ import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
 import type { Table } from '@tyto/recipe';
 
+import { zoneClock } from './recipe-clock.js';
 import { type RecipeApplyInput, type RecipeRunInput, type RecipeRunner } from './recipe-runner.js';
 import { createTemplateFolder } from './session.js';
 import { BUILT_IN_THEMES, builtInThemeSource, createThemeService } from './themes.js';
@@ -722,6 +723,30 @@ const KEPT_TABLE: Table = {
   })),
 };
 
+// TYTO-383: the table the document `calendar` keeps, run in São Paulo; "today" is the 8th there.
+const SAO_PAULO = zoneClock('America/Sao_Paulo', () => new Date('2026-11-09T02:30:00.000Z'));
+const DATED_TABLE: Table = {
+  columns: [
+    { name: 'key', type: 'text', origin: 'test' },
+    { name: 'due', type: 'datetime', origin: 'test' },
+    { name: 'at', type: 'text', origin: 'test' },
+  ],
+  rows: (
+    [
+      ['E-1', '2026-11-08T12:00:00Z', null],
+      ['E-2', '2026-11-09T01:30:00Z', null],
+      ['E-3', '2026-11-08', '07:15'],
+      ['E-4', null, null],
+      ['E-5', 'soon', null],
+      ['E-6', '2026-11-20', null],
+    ] as const
+  ).map(([key, due, at]) => ({
+    key,
+    values: { key, due, at },
+    provenance: { source: 'test', id: key, fetchedAt: KEPT_RAN_AT },
+  })),
+};
+
 const recipeRunner = () => {
   const asked: RecipeRunInput[] = [];
   const closed: string[] = [];
@@ -766,13 +791,15 @@ const recipeRunner = () => {
       });
     },
     table: (documentId, index) =>
-      documentId === 'document-1' && index <= 1
-        ? {
-            table: KEPT_TABLE,
-            ranAt: KEPT_RAN_AT,
-            view: { name: index === 0 ? 'summary' : 'table', options: {} },
-          }
-        : undefined,
+      documentId === 'calendar' && index === 0
+        ? { table: DATED_TABLE, ranAt: KEPT_RAN_AT, clock: SAO_PAULO }
+        : documentId === 'document-1' && index <= 1
+          ? {
+              table: KEPT_TABLE,
+              ranAt: KEPT_RAN_AT,
+              view: { name: index === 0 ? 'summary' : 'table', options: {} },
+            }
+          : undefined,
     verbs: () => ['acme.pull', 'where'],
     close: (documentId) => {
       closed.push(documentId);
@@ -1250,6 +1277,74 @@ describe('the tab a message is about (E9.11)', () => {
     });
     expect(
       await handlers['recipe:facets']({ ...asked, ranAt: 'another run', column: 'note' }),
+    ).toEqual({ stale: true });
+  });
+
+  // TYTO-383, ADR 0177: a Calendar's days are counted in main, in the zone its run read.
+  it("counts a span's days in the run's zone, and pages them by day and time", async () => {
+    const handlers = createHandlers(dependencies());
+    const asked = { documentId: 'calendar', index: 0, ranAt: KEPT_RAN_AT };
+    const facet = { column: 'due', bucket: 'day' as const, time: 'at' };
+
+    const days = await handlers['recipe:facets']({
+      ...asked,
+      column: 'due',
+      bucket: 'day',
+      days: { from: '2026-11-02', to: '2026-11-08' },
+    });
+    const page = await handlers['recipe:rows']({
+      ...asked,
+      offset: 0,
+      limit: 10,
+      columns: ['key'],
+      facet: { ...facet, keys: ['2026-11-08'] },
+    });
+    const first = await handlers['recipe:rows']({
+      ...asked,
+      offset: 0,
+      limit: 10,
+      columns: ['key'],
+      facet: { ...facet, keys: ['2026-11-08'], perDay: 2 },
+    });
+    const undated = await handlers['recipe:rows']({
+      ...asked,
+      offset: 0,
+      limit: 10,
+      columns: ['key'],
+      facet: { ...facet, keys: ['?', ''] },
+    });
+
+    // E-2 is 01:30 on the 9th in UTC and 22:30 on the 8th in São Paulo, where the run was.
+    expect(days).toEqual({
+      facets: [
+        { key: '2026-11-08', label: '2026-11-08', count: 3 },
+        { key: '?', label: '?', count: 1 },
+        { key: '', label: '', count: 1 },
+      ],
+      total: 6,
+      matched: 6,
+      more: 0,
+      earlier: 0,
+      later: 1,
+      today: '2026-11-08',
+    });
+    expect(page).toEqual({
+      columns: ['key'],
+      rows: [
+        { key: 'E-3', values: ['E-3'], day: '2026-11-08', time: '07:15' },
+        { key: 'E-1', values: ['E-1'], day: '2026-11-08', time: '09:00' },
+        { key: 'E-2', values: ['E-2'], day: '2026-11-08', time: '22:30' },
+      ],
+      total: 6,
+      matched: 3,
+    });
+    expect('rows' in first && first.rows.map((row) => row.key)).toEqual(['E-3', 'E-1']);
+    expect('rows' in undated && undated.rows.map((row) => [row.key, row.day])).toEqual([
+      ['E-5', '?'],
+      ['E-4', ''],
+    ]);
+    expect(
+      await handlers['recipe:facets']({ ...asked, ranAt: 'another run', column: 'due' }),
     ).toEqual({ stale: true });
   });
 

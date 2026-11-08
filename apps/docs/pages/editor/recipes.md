@@ -54,6 +54,16 @@ Numbers are aligned to the right and grouped, dates are written in the window's 
 
 A column draws fifty cards; **50 more** draws the next ones. _Filter rows_ works as in the Table view, and the columns count only the rows it keeps. The board is for reading: dragging a card changes nothing. To change a status, write the step that does it, which shows its plan before anything is written.
 
+## Show rows on a calendar
+
+`show calendar date=due` draws every step from it down as a **Calendar**: each row on the day of its `due` column. A whole line reads `show calendar date=due time=hour span=week`.
+
+- **`date=`** names the column that places a row: a date, or a date and time. A date and time with a zone (`2026-11-09T01:30Z`) falls on the day it is in the recipes' time zone (the `recipeTimeZone` setting, your computer's when unset), so a delivery at 22:30 in São Paulo is on that evening, not the next day.
+- **`time=`** names a column with the hour, as `14:30` or a date and time. A day lists its rows by it; without it, by the hour in `date=` when there is one.
+- **`span=`** is `week` or `month`, a month when absent. The **Week** and **Month** buttons switch between them.
+
+The calendar opens on the week or month that holds today; **Previous** and **Next** move a span at a time, and _3 earlier · 12 later_ says how many dated rows lie outside it. A day shows its first three rows and **+2 more** for the rest. Rows with no date, or a date that names no day (such as `soon`), are never dropped: they are listed under the calendar as _No date (14)_, a wrong date written beside its row. The week starts on the day your language starts it. _Filter rows_ works as in the Table view. The calendar is for reading: a row is not moved by dragging it.
+
 ## Fold a table
 
 The arrow at the start of the line folds the step's table away and brings it back. Every table starts open. A folded table stays folded while the tab is open, through new runs and when it scrolls out of view; closing the tab or quitting Tyto opens them all again.

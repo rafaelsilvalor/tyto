@@ -66,6 +66,26 @@ export function activate(host) {
 }
 `;
 
+/** A day on this machine's wall clock, `days` from today: the zone the app reads dates in. */
+function localDay(days: number): string {
+  const at = new Date();
+  at.setDate(at.getDate() + days);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+}
+
+/**
+ * TYTO-383: rows 1–5 are due today at these times, rows 6–7 a week later, row 8 on a date that
+ * names no day; the other 292 have none.
+ */
+const TODAY_TIMES = ['13:00', '09:30', '11:00', '08:00', '10:15'];
+
+function dueOf(index: number): { due: string | null; at: string | null } {
+  if (index < 5) return { due: localDay(0), at: TODAY_TIMES[index] ?? null };
+  if (index < 7) return { due: localDay(7), at: null };
+  return { due: index === 7 ? 'soon' : null, at: null };
+}
+
 function rowsTable(): string {
   const fetchedAt = new Date().toISOString();
   const statuses = STATUSES.flatMap(([status, count]) =>
@@ -77,6 +97,8 @@ function rowsTable(): string {
       { name: 'title', type: 'text', origin: 'fixture' },
       { name: 'status', type: 'text', origin: 'fixture' },
       { name: 'owner', type: 'text', origin: 'fixture' },
+      { name: 'due', type: 'date', origin: 'fixture' },
+      { name: 'at', type: 'text', origin: 'fixture' },
     ],
     rows: statuses.map((status, index) => ({
       key: `C-${String(index + 1)}`,
@@ -85,6 +107,7 @@ function rowsTable(): string {
         title: `Card ${String(index + 1)}`,
         status,
         owner: index % 2 === 0 ? 'Ana' : 'Rui',
+        ...dueOf(index),
       },
       provenance: { source: 'fixture', id: String(index + 1), fetchedAt },
     })),
@@ -98,9 +121,17 @@ const RECIPE = [
   '',
 ].join('\n');
 
+const CALENDAR_RECIPE = [
+  'recipe calendar',
+  VERB,
+  'show calendar date=due time=at span=week',
+  '',
+].join('\n');
+
 let scratch: string;
 let home: string;
 let recipePath: string;
+let calendarPath: string;
 let app: ElectronApplication | undefined;
 let page: Page;
 let server: Server;
@@ -166,6 +197,8 @@ beforeAll(async () => {
   recipePath = join(scratch, 'recipes', 'board.recipe');
   mkdirSync(dirname(recipePath), { recursive: true });
   writeFileSync(recipePath, RECIPE);
+  calendarPath = join(scratch, 'recipes', 'calendar.recipe');
+  writeFileSync(calendarPath, CALENDAR_RECIPE);
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`, '--lang=en'],
@@ -267,4 +300,93 @@ describe('the Board view over 300 rows (TYTO-381)', () => {
       ['Blocked', '2'],
     ]);
   }, 45_000);
+});
+
+const CALENDAR = '#editor .recipe-calendar';
+
+/** A day cell of the calendar: its rows' text and its "+k more" button. */
+const dayCell = (key: string) =>
+  page.evaluate(
+    ([selector, wanted]) => {
+      const cell = document.querySelector(
+        `${selector} .recipe-calendar__day[data-day="${wanted}"]`,
+      );
+      return {
+        rows: [...(cell?.querySelectorAll('.recipe-calendar__row') ?? [])].map(
+          (row) => row.textContent,
+        ),
+        more: cell?.querySelector('.recipe-calendar__more')?.textContent ?? '',
+      };
+    },
+    [CALENDAR, key] as const,
+  );
+
+describe('the Calendar view over the same 300 rows (TYTO-383)', () => {
+  it('places the dated rows on their days by time, and lists the undated apart', async () => {
+    await app?.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, calendarPath);
+    await run('editor.open');
+    await page.waitForSelector(`${CALENDAR}, #editor .recipe-cell`);
+    await run('recipe.run');
+    await page.waitForFunction(
+      (selector) =>
+        document.querySelectorAll(`${selector} .recipe-calendar__day .recipe-calendar__row`)
+          .length === 3,
+      CALENDAR,
+      { timeout: 20_000 },
+    );
+
+    // The week holding today, with today's first three rows by time and main's count of the rest.
+    expect(await dayCell(localDay(0))).toEqual({
+      rows: ['08:00C-4', '09:30C-2', '10:15C-5'],
+      more: '+2 more',
+    });
+    const said = await page.evaluate(
+      (selector) => ({
+        outside: document.querySelector(`${selector} .recipe-calendar__outside`)?.textContent,
+        undated: document.querySelector(`${selector} .recipe-calendar__heading`)?.textContent,
+        listed: document.querySelectorAll(
+          `${selector} .recipe-calendar__undated .recipe-calendar__row`,
+        ).length,
+        first: document.querySelector(`${selector} .recipe-calendar__undated .recipe-calendar__row`)
+          ?.textContent,
+        days: document.querySelectorAll(`${selector} .recipe-calendar__day`).length,
+      }),
+      CALENDAR,
+    );
+    // 292 rows with no date and the one dated 'soon', listed first with its date as written;
+    // fifty drawn, the rest a click away.
+    expect(said).toEqual({
+      outside: '2 later',
+      undated: 'No date (293)',
+      listed: 50,
+      first: 'C-8soon',
+      days: 7,
+    });
+
+    await page.locator('#editor .recipe-cell').first().locator('.recipe-cell__toggle').click();
+    const shots = process.env['TYTO_RECIPE_VIEWS_SHOTS'];
+    if (shots !== undefined) {
+      await page.screenshot({ path: join(shots, 'recipe-calendar.png') });
+    }
+
+    await page.locator(`${CALENDAR} .recipe-calendar__next`).click();
+    await page.waitForFunction(
+      ([selector, wanted]) =>
+        document.querySelectorAll(
+          `${selector} .recipe-calendar__day[data-day="${wanted}"] .recipe-calendar__row`,
+        ).length === 2,
+      [CALENDAR, localDay(7)] as const,
+      { timeout: 10_000 },
+    );
+    expect(await dayCell(localDay(7))).toEqual({ rows: ['C-6', 'C-7'], more: '' });
+
+    await page.locator(`${CALENDAR} [data-span="month"]`).click();
+    await page.waitForFunction(
+      (selector) => document.querySelectorAll(`${selector} .recipe-calendar__day`).length === 42,
+      CALENDAR,
+      { timeout: 10_000 },
+    );
+  }, 30_000);
 });

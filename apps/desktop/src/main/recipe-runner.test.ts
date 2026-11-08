@@ -315,7 +315,7 @@ describe('the views a cell is drawn in', () => {
     const problem = answer.cells[1]?.diagnostics[0];
     expect(problem?.code).toBe('E_RECIPE_VIEW');
     expect(problem?.message).toBe(
-      "No view named 'tables' is drawn here. Available: table, summary, board.",
+      "No view named 'tables' is drawn here. Available: table, summary, board, calendar.",
     );
     expect(text.slice(problem?.range?.start, problem?.range?.end)).toBe('tables');
   });
@@ -334,7 +334,8 @@ describe('the views a cell is drawn in', () => {
       { name: 'summary', options: {} },
     ]);
     expect(recipeAnswerToWire(answer).cells[2]?.view).toEqual({ name: 'summary', options: {} });
-    expect(runner.table('tab-1', 0)).toEqual({ table: TASKS, ranAt: NOW });
+    // TYTO-383: with the run's clock, whose zone a Calendar's days are read in.
+    expect(runner.table('tab-1', 0)).toEqual({ table: TASKS, ranAt: NOW, clock });
     expect(runner.table('tab-1', 2)?.view?.name).toBe('summary');
     expect(runner.table('tab-1', 3)).toBeUndefined();
     expect(runner.table('tab-2', 0)).toBeUndefined();
