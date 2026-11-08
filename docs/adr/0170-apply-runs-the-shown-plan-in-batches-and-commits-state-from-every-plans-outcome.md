@@ -81,3 +81,11 @@ desktop notebook; and `apply auto`.
   answers, and main keeps nothing of it. The cell it named may hold another plan by then, so a
   kept refusal could describe a plan nobody is looking at. A warning about an Apply that wrote
   and was not remembered (`W_RECIPE_NOT_REMEMBERED`) is the cell's own, and stays on it.
+
+## Note, 2026-11-08 — decision 6 and the scheduler (TYTO-385)
+
+"There is no scheduler yet" stops being true with ADR 0175. A scheduler follows the same two
+conditions: a scheduled run in a trusted folder counts as an explicit Run, so `apply auto`
+applies its plans, and in a restricted folder it runs nothing. `every` is a second header
+line, parsed into `RecipeAst.every` and refused the same ways `apply auto` is: a malformed
+one, a second one, or one after the first step.

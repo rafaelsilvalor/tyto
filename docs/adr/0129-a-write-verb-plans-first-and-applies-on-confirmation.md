@@ -35,3 +35,11 @@ because Jira has no "go to status X".
   The failure is per operation and visible, which is the trade for "what you saw is what ran".
 - A plan is also the report: Buraqueira's `sync_report.json` and its text summary become the
   plan and its applied result.
+
+## Note, 2026-11-08 — decision 4 gets its scheduler (TYTO-385)
+
+ADR 0175 adds the `every <n>m|<n>h` header and a scheduler that runs recipes while the app is
+open. Decision 4 holds as written: a scheduled run applies without a click only when the header
+says `apply auto` and the folder is trusted. In a restricted folder, or with no workspace, a
+scheduled run is held and runs nothing at all, which is stricter than stopping at the plan:
+nobody is there to read a plan that waits.

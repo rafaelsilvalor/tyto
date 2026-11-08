@@ -35,6 +35,11 @@ export interface RecipeParam {
   readonly range: SourceRange;
 }
 
+/** How often a scheduled recipe runs, always in whole minutes (`every 2h` is 120). */
+export interface RecipeInterval {
+  readonly minutes: number;
+}
+
 export interface RecipeAst {
   readonly name: string;
   readonly description: string;
@@ -44,5 +49,10 @@ export interface RecipeAst {
    * plans without a click (ADR 0129 decision 4, ADR 0170). Absent otherwise.
    */
   readonly apply?: 'auto';
+  /**
+   * The interval from an `every 30m` or `every 2h` header line: the host runs the recipe that
+   * often while the app is open (ADR 0175). Absent when the recipe runs only when asked.
+   */
+  readonly every?: RecipeInterval;
   readonly steps: readonly Step[];
 }

@@ -68,6 +68,12 @@ describe('parseRecipe', () => {
     ['apply with no word', 'recipe x\napply', 'apply', 'takes one word, auto'],
     ['apply auto twice', 'recipe x\napply auto\napply auto', 'apply auto', 'written once'],
     ['apply auto after a step', 'recipe x\nshow table\napply auto', 'apply auto', 'header'],
+    ['every below five minutes', 'recipe x\nevery 4m', 'every 4m', 'at most every 5 minutes'],
+    ['every with no unit', 'recipe x\nevery 30', 'every 30', "as in 'every 30m'"],
+    ['every in seconds', 'recipe x\nevery 300s', 'every 300s', 'minutes or hours'],
+    ['every twice', 'recipe x\nevery 5m\nevery 1h', 'every 1h', 'written once'],
+    ['every after a step', 'recipe x\nshow table\nevery 5m', 'every 5m', 'header'],
+    ['a description after every', 'recipe x\nevery 5m\n| late', '| late', 'right under'],
   ])('refuses %s, at the line that is wrong', (_case, source, wrong, message) => {
     const parsed = parseRecipe(source);
     expect(parsed.ok).toBe(false);
@@ -104,5 +110,23 @@ where b matches "\p{Lu}\P{Nd}\u{FF}{a}"`;
     expect(parsed.value.steps.map((step) => step.verb)).toEqual(['show']);
     const plain = parseRecipe('recipe x\nshow table');
     expect(plain.ok && 'apply' in plain.value).toBe(false);
+  });
+
+  it.each([
+    ['every 5m', 5],
+    ['every 2h', 120],
+    ['every   90m', 90],
+  ])("reads '%s' in the header as an interval of %i minutes", (line, minutes) => {
+    const source = `recipe x\n  | Checks the cards.\n${line}\napply auto\nshow table`;
+    const parsed = parseRecipe(source);
+    if (!parsed.ok) throw new Error(parsed.error.map(({ message }) => message).join('\n'));
+    expect(parsed.value.every).toEqual({ minutes });
+    expect(parsed.value.apply).toBe('auto');
+    expect(parsed.value.steps.map((step) => step.verb)).toEqual(['show']);
+  });
+
+  it("leaves 'every' absent when the header does not ask for an interval", () => {
+    const parsed = parseRecipe('recipe x\nshow table');
+    expect(parsed.ok && 'every' in parsed.value).toBe(false);
   });
 });
