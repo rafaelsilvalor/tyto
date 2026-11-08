@@ -32,8 +32,11 @@ export type {
   VerbKind,
   VerbOutput,
   VerbRegistry,
+  VerbRegistryOptions,
   VerbResult,
 } from './registry.js';
+export type { BriefFolder, ToBriefPorts } from './to-brief.js';
+export { TO_BRIEF_PLAN_LIMITS, TO_BRIEF_WRITE, briefFolder } from './to-brief.js';
 export { GENERIC_VERBS, createDerivationRegistry, createVerbRegistry } from './registry.js';
 export type { Cell, RecipeRun, RunOptions } from './run.js';
 export { runRecipe } from './run.js';

@@ -23,6 +23,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@tyto/brief-lang": "workspace:*",
     "@tyto/core": "workspace:*",
     "zod": "^4.6.5"
   }

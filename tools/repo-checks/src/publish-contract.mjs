@@ -49,9 +49,10 @@ export const REGISTRY = 'https://npm.pkg.github.com';
  */
 export const CONTRACT_PACKAGES = [
   { name: '@tyto/core', directory: 'packages/core' },
+  // Before `recipe`, whose `to-brief` writes briefs with it (ADR 0172).
+  { name: '@tyto/brief-lang', directory: 'packages/brief-lang' },
   { name: '@tyto/recipe', directory: 'packages/recipe' },
   { name: '@tyto/plugin-api', directory: 'packages/plugin-api' },
-  { name: '@tyto/brief-lang', directory: 'packages/brief-lang' },
   { name: '@tyto/template-lang', directory: 'packages/template-lang' },
   { name: '@tyto/export-html', directory: 'packages/export-html' },
   { name: '@tyto/template-kit', directory: 'packages/template-kit' },

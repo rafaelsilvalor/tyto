@@ -1,4 +1,4 @@
-import type { Diagnostics } from '@tyto/core';
+import { type Diagnostics, fileSafeName } from '@tyto/core';
 import type { Exporter } from '@tyto/plugin-api';
 import { type RasterFormat, rasterExtension, rasterMimeType } from '@tyto/raster';
 
@@ -115,12 +115,12 @@ export function artifactEncoding(
  * program maps a file back to its slide, and leaves the name a person reads in a folder.
  *
  * Format ids are the project's, and a project's `formats.yaml` can hold anything its id rule
- * allows, so anything a filesystem or a URL would argue about is collapsed to `-`. It is done
- * here, once, rather than in each sink: two sinks that sanitized differently would answer
- * "which file is slide 2?" two ways.
+ * allows, so anything a filesystem or a URL would argue about is collapsed to `-` by core's
+ * `fileSafeName`. It is done here, once, rather than in each sink: two sinks that sanitized
+ * differently would answer "which file is slide 2?" two ways.
  */
 export function artifactName(format: string, number: string, extension: string): string {
-  return `${fileSafe(format)}-${number}.${extension}`;
+  return `${fileSafeName(format)}-${number}.${extension}`;
 }
 
 /**
@@ -131,12 +131,4 @@ export function artifactName(format: string, number: string, extension: string):
 export function artworkNumber(index: number, count: number): string {
   const width = Math.max(2, String(count).length);
   return String(index + 1).padStart(width, '0');
-}
-
-const UNSAFE = /[^a-zA-Z0-9._-]+/gu;
-
-function fileSafe(part: string): string {
-  // Leading dots go too: `.slide` would be a hidden file on Unix, and an artwork nobody
-  // can see in a folder listing is an artwork nobody knows was produced.
-  return part.replace(UNSAFE, '-').replace(/^[.-]+/u, '') || 'untitled';
 }
