@@ -99,10 +99,12 @@ function harness(answers: readonly RunnerAnswer[] = [clean]) {
 
 /**
  * Lets the disk answer: a run reads its file before it reaches the runner, and fake time does
- * not wait for that. `setImmediate` is left real for this.
+ * not wait for that. `setImmediate` and `performance` are left real for this, and the wait is
+ * bounded by real time, not by turns: a loaded CI machine took more than a thousand turns.
  */
 async function until(done: () => boolean): Promise<void> {
-  for (let turn = 0; turn < 1000 && !done(); turn += 1) {
+  const deadline = performance.now() + 10_000;
+  while (!done() && performance.now() < deadline) {
     await new Promise((resolve) => setImmediate(resolve));
   }
 }
