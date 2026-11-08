@@ -960,6 +960,13 @@ describe('switching the language', () => {
     // `recipe-notebook.desktop.test.ts` opens one in the real window.
     'recipe.cell.included.show',
     'recipe.cell.included.hide',
+    // TYTO-379: a cell drawn full size in a tab, drawn only with a recipe open: the command, the
+    // cell's button, the tab's label and its empty line. `recipe-cell-view.test.ts` paints the
+    // button, and `recipe-table.desktop.test.ts` opens the tab and reads its label.
+    'command.recipe.openCellView',
+    'recipe.cell.openTab',
+    'recipe.view.tab',
+    'recipe.view.empty',
     // TYTO-378: drawn only under a plan cell; `recipe-plan-view.test.ts` paints them in both
     // languages, and `recipe-notebook.desktop.test.ts` clicks Apply in the real window.
     'recipe.plan.apply',

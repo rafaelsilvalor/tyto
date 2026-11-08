@@ -10,6 +10,7 @@ import {
   PREVIEW_OPEN,
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_TOGGLE_LOCK,
+  RECIPE_OPEN_CELL_VIEW,
   RECIPE_RUN,
   RECIPE_RUN_FRESH,
   RECIPE_RUN_FROM_CELL,
@@ -47,10 +48,11 @@ export interface EditorChrome {
 }
 
 /**
- * What the tab in front holds: a document's kind, a brief's preview (TYTO-287), or a Markdown
- * file's preview (TYTO-247), which has neither the brief's commands nor any text.
+ * What the tab in front holds: a document's kind, a brief's preview (TYTO-287), a Markdown
+ * file's preview (TYTO-247), which has neither the brief's commands nor any text, or a recipe
+ * cell's result drawn full size (TYTO-379), which has neither either.
  */
-export type TabKind = DocumentState['kind'] | 'preview' | 'markdown-preview';
+export type TabKind = DocumentState['kind'] | 'preview' | 'markdown-preview' | 'recipe-view';
 type Kind = TabKind;
 
 const BRIEF: EditorChrome = {
@@ -98,6 +100,9 @@ export function editorChromeFor(kind: Kind): EditorChrome {
     case 'markdown-preview':
       // A Markdown file drawn (TYTO-247): nothing to export, zoom or edit from here.
       return { ...TEXT, textCommands: false };
+    case 'recipe-view':
+      // A cell's rows (TYTO-379): no text in front, and no brief.
+      return { ...TEXT, textCommands: false };
     case 'settings':
     case 'keybindings':
     case 'snippets':
@@ -121,11 +126,15 @@ const MARKDOWN_PREVIEW_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_TOGGLE_LOCK,
 ]);
 
-/** Run recipe, Run from the cursor's cell and Run fetching again (TYTO-377). */
+/**
+ * Run recipe, Run from the cursor's cell and Run fetching again (TYTO-377), and opening the
+ * cursor's cell in a tab of its own (TYTO-379).
+ */
 const RECIPE_COMMANDS: ReadonlySet<string> = new Set([
   RECIPE_RUN,
   RECIPE_RUN_FROM_CELL,
   RECIPE_RUN_FRESH,
+  RECIPE_OPEN_CELL_VIEW,
 ]);
 
 const isMarkdownKind = (kind: Kind): boolean => kind === 'markdown' || kind === 'markdown-preview';
@@ -156,7 +165,14 @@ export const commandOffered = (kind: Kind, id: string): boolean => {
  * `recipe` (TYTO-377) and a `.txt` tab `plain`.
  */
 export const languageOf = (kind: Kind): LanguageName | undefined => {
-  if (kind === undefined || kind === 'preview' || kind === 'markdown-preview') return undefined;
+  if (
+    kind === undefined ||
+    kind === 'preview' ||
+    kind === 'markdown-preview' ||
+    kind === 'recipe-view'
+  ) {
+    return undefined;
+  }
   if (kind === 'markdown') return 'markdown';
   if (kind === 'recipe') return 'recipe';
   return isAppFile(kind) ? 'json' : 'plain';

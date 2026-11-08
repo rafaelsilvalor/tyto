@@ -65,6 +65,8 @@ export interface CellViewActions {
   readonly facets: (request: FacetsRequest) => Promise<FacetsAnswer>;
   /** One row of a kept cell's table, whole: `recipe:row` for this tab (TYTO-384). */
   readonly row: (request: RowRequest) => Promise<RowAnswer>;
+  /** Open in a tab: this cell's result drawn full size, in its current view (TYTO-379). */
+  readonly openTab: (index: number) => void;
 }
 
 export interface CellViewContext {
@@ -188,6 +190,14 @@ function renderCell(
         }),
       );
     }
+  }
+  // TYTO-379: a table main keeps (`ranAt`) can be drawn full size; its rows are paged from there.
+  if (table !== undefined && cell.ranAt !== undefined) {
+    header.append(
+      button(say('recipe.cell.openTab'), 'open-tab', () => {
+        actions.openTab(status.index);
+      }),
+    );
   }
 
   // TYTO-379: a cell under `show` is drawn by its view (`recipe-views.ts`); one under none

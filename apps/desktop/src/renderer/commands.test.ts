@@ -52,6 +52,7 @@ import {
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
   RECIPE_RUN,
+  RECIPE_OPEN_CELL_VIEW,
   RECIPE_RUN_FRESH,
   RECIPE_RUN_FROM_CELL,
   TEMPLATES_CHOOSE_FOLDER,
@@ -141,6 +142,7 @@ const actions = () =>
     openDocumentation: vi.fn<() => void>(),
     runRecipe: vi.fn<() => void>(),
     runRecipeFromCell: vi.fn<() => void>(),
+    openRecipeCellView: vi.fn<() => void>(),
     runRecipeFresh: vi.fn<() => void>(),
     focusCommandPanel: vi.fn<() => void>(),
     newTerminal: vi.fn<() => void>(),
@@ -322,6 +324,17 @@ describe('the ids the window registers', () => {
     for (const id of [RECIPE_RUN, RECIPE_RUN_FROM_CELL, RECIPE_RUN_FRESH]) {
       expect(bound[id], id).toBeUndefined();
     }
+  });
+
+  it('opens the cursor cell in a tab through its own action, with no keystroke (TYTO-379)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(RECIPE_OPEN_CELL_VIEW, NO_VIEW)).toBe(true);
+    expect(spies.openRecipeCellView).toHaveBeenCalledOnce();
+    expect(spies.runRecipeFromCell).not.toHaveBeenCalled();
+    expect(COMMAND_LABELS[RECIPE_OPEN_CELL_VIEW]).toBe('command.recipe.openCellView');
+    expect(bindingsOf(keymapSetFor(false), 'linux')[RECIPE_OPEN_CELL_VIEW]).toBeUndefined();
   });
 
   it('runs the two template mode commands, each to its own action (TYTO-44)', () => {

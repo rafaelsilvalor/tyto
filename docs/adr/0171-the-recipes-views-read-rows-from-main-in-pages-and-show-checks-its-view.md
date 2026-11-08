@@ -77,3 +77,15 @@ offset, limit ≤ 500, sort?, filter?, columns?}` answers `{columns, rows, total
   the columns written, apart from `columns`, which the quick filter matches over. Filtering over
   the copied columns, as the first pull request did, could copy different rows than the view
   showed when the selection spanned only some of the shown columns (decision 6).
+- 2026-11-08 (TYTO-379, third pull request): a cell's result opens full size in a tab of its
+  own, an `EditorTab` with `view: 'recipe-view'` and the cell's index, beside the preview tab of
+  ADR 0084. **It draws the cell's current view, not only the Table**: Board (TYTO-381), Calendar
+  (TYTO-383) and Cards (TYTO-384) merged before it, so the tab draws through the same view map
+  in `renderer/recipe-views.ts` as the cell does (`fullSizeBody`), and a cell under no `show`
+  opens in the Table, since a tab has room for every row. Only the Table and Summary needed a
+  change to draw full size (their viewport takes the tab's height); the others keep their
+  renderers and the stylesheet lifts their in-cell height caps inside the tab. The tab pages by
+  the cell's index and `ranAt` like the cell (decision 4), redraws from the recipe's newest
+  answer, closes with its recipe, and is left out of the session: its rows live in main only
+  while the run does. The cells under a `run` step (TYTO-449) draw a plain preview and get no
+  tab.

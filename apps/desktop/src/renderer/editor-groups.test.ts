@@ -18,12 +18,14 @@ import {
   groupList,
   groupsFromLayout,
   groupsOf,
+  isRecipeView,
   layoutOf,
   moveTab,
   moveTabToNextGroup,
   openDocument,
   openPreviewHere,
   openPreviewToSide,
+  openRecipeView,
   placeTab,
   previewSubjectOf,
   previewTabs,
@@ -678,5 +680,56 @@ describe('a preview of a Markdown file (TYTO-247, ADR 0132)', () => {
     });
     const image = { kind: 'image', entryId: 'e-1' } as const;
     expect(previewSubjectOf({ ...tab, subject: image }, () => 'markdown')).toEqual(image);
+  });
+});
+
+describe('a recipe cell drawn full size (TYTO-379)', () => {
+  const recipeTabs = (groups: EditorGroups): EditorTab[] =>
+    groupList(groups).flatMap((group) => group.tabs.filter(isRecipeView));
+
+  it('opens in front of the focused group, naming its recipe and its cell', () => {
+    const groups = openRecipeView(twoDocuments(), 'a', 2);
+    const front = activeTabOf(focusedGroup(groups));
+
+    expect(front).toMatchObject({ documentId: 'a', view: 'recipe-view', cell: 2 });
+    expect(picture(groups)).toEqual(['a b *a']);
+    // No text tab of its recipe: opening the file goes to its text, not here.
+    expect([...shownDocumentIds(groups)]).toEqual(['a', 'b']);
+  });
+
+  it('is one tab per cell: asked again it comes to the front, another cell is another tab', () => {
+    const once = openRecipeView(twoDocuments(), 'a', 2);
+    const elsewhere = activateTab(once, focusedGroup(once).tabs[0]?.id ?? '');
+    const again = openRecipeView(elsewhere, 'a', 2);
+
+    expect(recipeTabs(again)).toHaveLength(1);
+    expect(activeTabOf(focusedGroup(again))).toMatchObject({ cell: 2 });
+    expect(recipeTabs(openRecipeView(again, 'a', 0)).map((tab) => tab.cell)).toEqual([2, 0]);
+    expect(recipeTabs(openRecipeView(again, 'b', 2))).toHaveLength(2);
+  });
+
+  it('closes with its recipe, and stays when another document closes', () => {
+    const groups = openRecipeView(openRecipeView(twoDocuments(), 'a', 0), 'a', 1);
+
+    expect(recipeTabs(closeDocumentTabs(groups, 'a'))).toEqual([]);
+    expect(recipeTabs(closeDocumentTabs(groups, 'b'))).toHaveLength(2);
+  });
+
+  it('is left out of the session, its group keeping the tab before it in front', () => {
+    const groups = openRecipeView(twoDocuments(), 'a', 2);
+    const layout = layoutOf(groups, (tab) => tab.documentId);
+
+    expect(layout.root).toEqual({ tabs: ['a', 'b'], active: 1 });
+  });
+
+  it('leaves a group of nothing else empty in the session, which a restore drops', () => {
+    const split = splitGroup(twoDocuments(), 'row');
+    const groups = openRecipeView(split, 'a', 0);
+    const onlyRecipe = closeTab(groups, focusedGroup(groups).tabs[0]?.id ?? '');
+    const layout = layoutOf(onlyRecipe, (tab) => tab.documentId);
+
+    expect(layout.root).toMatchObject({ children: [{ tabs: ['a', 'b'] }, { tabs: [] }] });
+    const restored = groupsFromLayout(twoDocuments(), layout, (item) => item);
+    expect(restored === undefined ? [] : picture(restored.groups)).toEqual(['a *b']);
   });
 });

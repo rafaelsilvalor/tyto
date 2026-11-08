@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Locale } from '../../shared/i18n/index.js';
-import { PAGE_SIZE, ROW_HEIGHT } from './recipe-table-model.js';
+import { OVERSCAN, PAGE_SIZE, ROW_HEIGHT } from './recipe-table-model.js';
 import {
   type CopyAnswer,
   type CopyRequest,
@@ -10,6 +10,7 @@ import {
   type RowsRequest,
   tableView,
 } from './recipe-table-view.js';
+import { type ViewContext, fullSizeBody } from './recipe-views.js';
 
 /**
  * The Table view in jsdom (TYTO-379, ADR 0171), against a stand-in for main that answers pages of
@@ -349,5 +350,52 @@ describe('the Table view (TYTO-379)', () => {
   it('draws no totals under a plain Table', async () => {
     const { element } = await render({ totals: { n: 1 } });
     expect(element.querySelector<HTMLElement>('.recipe-table__totals')?.hidden).toBe(true);
+  });
+});
+
+describe('a cell drawn full size in a tab (TYTO-379)', () => {
+  type FullCell = Parameters<typeof fullSizeBody>[0];
+  const table = { columns: COLUMNS, rows: [], total: TOTAL };
+  const cellOf = (more: Partial<FullCell> = {}): FullCell => ({
+    index: 2,
+    line: 2,
+    status: 'ok',
+    diagnostics: [],
+    table,
+    ranAt: RAN_AT,
+    ...more,
+  });
+  const contextOf = (): ViewContext => {
+    const main = fakeMain();
+    const stale = () => Promise.resolve({ stale: true as const });
+    return { locale: 'en', rows: main.rows, copy: main.copy, facets: stale, row: stale };
+  };
+
+  it('stretches the viewport to the tab and draws every row the tab has room for', async () => {
+    const element = fullSizeBody(cellOf(), contextOf());
+    if (element === undefined) throw new Error('nothing drawn');
+    document.body.replaceChildren(element);
+    await settle();
+    const viewport = element.querySelector<HTMLElement>('.recipe-table__viewport');
+    if (viewport === null) throw new Error('no viewport');
+
+    // No fixed height: the stylesheet gives the viewport the tab's.
+    expect(element.classList.contains('recipe-table--full')).toBe(true);
+    expect(viewport.style.height).toBe('');
+    // jsdom lays nothing out: a tab with room for 40 rows under the header, stated.
+    Object.defineProperty(viewport, 'clientHeight', { value: 41 * ROW_HEIGHT });
+    viewport.dispatchEvent(new Event('scroll'));
+    expect(firstColumn(element)).toHaveLength(40 + OVERSCAN);
+  });
+
+  it("draws the view the cell's `show` chose, the Table under none, nothing with no kept run", () => {
+    const summary = fullSizeBody(cellOf({ view: { name: 'summary', options: {} } }), contextOf());
+    expect(summary?.dataset['view']).toBe('summary');
+    // Under no `show` the cell keeps a preview; the tab has room for the whole table.
+    expect(fullSizeBody(cellOf(), contextOf())?.dataset['view']).toBe('table');
+    expect(fullSizeBody(cellOf({ ranAt: undefined }), contextOf())).toBeUndefined();
+    expect(
+      fullSizeBody(cellOf({ status: 'failed', table: undefined }), contextOf()),
+    ).toBeUndefined();
   });
 });

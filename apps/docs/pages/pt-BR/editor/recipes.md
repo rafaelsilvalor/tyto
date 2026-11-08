@@ -1,7 +1,7 @@
 # Receitas
 
 ::: info Como esta página foi conferida
-Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Os menus e rótulos abaixo são os da janela em português.
+Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo numa aba foi conferido em 2026-11-08 pela mesma suíte, desenhando as 5.000 linhas em tamanho cheio e fechando a receita. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Os menus e rótulos abaixo são os da janela em português.
 :::
 
 Uma receita (`.recipe`) é uma lista de passos, um por linha, que buscam linhas de uma fonte, filtram e reorganizam essas linhas e planejam o que gravar. O Tyto abre uma receita numa aba como um caderno: **embaixo de cada passo, o resultado dele**, uma tabela que você lê enquanto escreve a próxima linha.
@@ -74,6 +74,12 @@ O calendário abre na semana ou no mês que contém hoje; **Anterior** e **Próx
 `show cards fields=title,owner,due` desenha cada passo dali para baixo como **cartões soltos**: uma grade de cartões do mesmo tamanho, cada um com as colunas de `fields=`, a primeira como título. Sem `fields=`, um cartão mostra as quatro primeiras colunas.
 
 A grade desenha 48 cartões; **mais 252** desenha os próximos. _Filtrar linhas_ funciona como na visão de Tabela. Clique num cartão (ou Enter, com ele em foco) para abri-lo: ele mostra **todas as colunas da linha**, também as que o cartão não mostra, e de onde a linha veio: a origem, o id da linha na origem, quando ela foi buscada e o link dela, a primeira coluna `link` com um endereço web. Um valor longo aparece inteiro até 10.000 caracteres. Uma linha feita por `group` diz `group` como origem e a chave do grupo como id. Esc ou **Fechar** fecha o cartão. Os cartões são para leitura: nada neles escreve.
+
+## Abrir um passo numa aba
+
+**Abrir numa aba**, na linha de um passo cuja tabela a última execução guardou, desenha o resultado desse passo em tamanho cheio numa aba própria, ao lado da receita: a mesma visão que o passo tem, Tabela, Resumo, Quadro, Calendário ou cartões soltos, com toda a altura da janela. Um passo sem `show` acima abre na visão de Tabela, já que a aba tem espaço para todas as linhas. O comando **Abrir o resultado da célula numa aba** faz o mesmo com o passo em que está o cursor, ou o de cima. A aba leva o nome da receita e o número do passo, contado de cima (_semanal.recipe · célula 2_).
+
+A aba acompanha a receita: uma nova execução a desenha de novo com as linhas novas, e ela fecha quando a aba da receita fecha. A ordenação, o filtro e as colunas dela são só dela, separados dos do passo. Ela não volta quando o Tyto abre de novo: abra de novo pelo passo. Um passo de uma receita aberta por `run` não tem o botão; abra essa receita para desenhar os passos dela numa aba.
 
 ## Recolher uma tabela
 
