@@ -1,17 +1,21 @@
 import { exec, execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readdir, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import { type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
+import { PLUGIN_MANIFEST_FILE } from '@tyto/io';
 
 /**
- * `tyto plugin install <folder|git-url|npm-name>` — getting the files onto this disk.
+ * `tyto plugin install <folder|archive|git-url|npm-name>` — getting the files onto this disk.
  *
- * Three sources and one answer: a folder whose root holds a `tyto-plugin.json`. What
+ * Four sources and one answer: a folder whose root holds a `tyto-plugin.json`. What
  * happens next — validating, asking, copying into `~/.tyto/plugins/` — is the same for all
- * three, so this module ends where they converge.
+ * four, so this module ends where they converge.
+ *
+ * An archive is a `.tgz` or `.tar.gz` file on this disk, unpacked with `tar` and nothing else
+ * (TYTO-373): a person who was handed a plugin as one file needs neither npm nor a network.
  *
  * **The network is `git`'s and `npm`'s, never Tyto's.** Both are run as the programs the
  * person already has, with their configuration, their credentials and their proxy; Tyto
@@ -20,7 +24,7 @@ import { type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
  * packed tarball go through exactly the commands a real URL and a real name do.
  */
 
-export type PluginSourceKind = 'folder' | 'git' | 'npm';
+export type PluginSourceKind = 'folder' | 'archive' | 'git' | 'npm';
 
 export interface FetchedPlugin {
   readonly kind: PluginSourceKind;
@@ -121,6 +125,54 @@ async function fetchNpm(
   return join(extracted, 'package');
 }
 
+/** A local file this module unpacks itself instead of handing it to npm. */
+function isArchiveName(path: string): boolean {
+  return /\.(tgz|tar\.gz)$/iu.test(path);
+}
+
+/** How deep under an archive's root the folder holding the manifest may sit. */
+const ARCHIVE_MANIFEST_DEPTH = 2;
+
+/**
+ * The shallowest folder under `root` holding a `tyto-plugin.json`: the root itself for an
+ * archive packed from inside the plugin, `package/` for one `npm pack` made, `<repo>-<sha>/`
+ * for one a git host serves. Two at the same depth is a guess this refuses to make.
+ */
+async function manifestFolderIn(root: string): Promise<string> {
+  let level = [root];
+  for (let depth = 0; depth <= ARCHIVE_MANIFEST_DEPTH && level.length > 0; depth += 1) {
+    const found: string[] = [];
+    for (const folder of level) {
+      if (await isFile(join(folder, PLUGIN_MANIFEST_FILE))) found.push(folder);
+    }
+    if (found.length === 1 && found[0] !== undefined) return found[0];
+    if (found.length > 1) {
+      throw new Error(
+        `it holds more than one ${PLUGIN_MANIFEST_FILE}, so which plugin it is is unclear`,
+      );
+    }
+    const next: string[] = [];
+    for (const folder of level) {
+      const entries = await readdir(folder, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) next.push(join(folder, entry.name));
+      }
+    }
+    level = next;
+  }
+  throw new Error(`it has no ${PLUGIN_MANIFEST_FILE}`);
+}
+
+async function fetchArchive(file: string, scratch: string): Promise<string> {
+  // Copied in first so `tar` gets a relative path, for the reason `fetchNpm` gives: GNU tar
+  // reads `C:\…` as a host named `C`.
+  await copyFile(file, join(scratch, 'archive.tgz'));
+  const extracted = join(scratch, 'extracted');
+  await mkdir(extracted);
+  await run('tar', ['-xzf', 'archive.tgz', '-C', 'extracted'], { cwd: scratch });
+  return manifestFolderIn(extracted);
+}
+
 export interface FetchOptions {
   /** `environment.shellRefusal`: set, a step that would start a shell fails with it. */
   readonly shellRefusal?: string;
@@ -149,6 +201,9 @@ export async function fetchPlugin(
   const gitUrl = gitUrlOf(spec);
 
   try {
+    if (isArchiveName(local) && (await isFile(local))) {
+      return ok({ kind: 'archive', directory: await fetchArchive(local, scratch), cleanup });
+    }
     // A file on this disk is handed to npm as `file:<absolute path>`, never as typed: npm reads
     // a bare `packed/x.tgz` as GitHub shorthand for the repository `packed` of user
     // `x.tgz` and tries to clone it — measured, on Linux in CI and on Windows alike.

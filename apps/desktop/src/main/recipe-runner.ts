@@ -188,6 +188,11 @@ export interface KeptTable {
   readonly table: Table;
   readonly ranAt: string | undefined;
   readonly view?: CellView;
+  /**
+   * TYTO-383: the clock of the run that kept it, so a Calendar reads its days in the zone the
+   * run read written times in (ADR 0148 decision 7). Absent, the machine's.
+   */
+  readonly clock?: RunClock;
 }
 
 /** A kept cell: the step it answered for, by signature, and the answer. */
@@ -205,6 +210,8 @@ type KeptCell = Omit<RunnerCell, 'index' | 'applicable'> & {
 interface Kept {
   readonly header: string;
   readonly cells: readonly KeptCell[];
+  /** The last run's clock, whose zone a Calendar's days are read in (TYTO-383). */
+  readonly clock: RunClock;
 }
 
 /** A recipe `run` names, read beside the including one: a plain word, as a store's name is. */
@@ -329,7 +336,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
 
       const current = latest.get(request.documentId) === run;
       if (current) {
-        kept.set(request.documentId, { header, cells: next });
+        kept.set(request.documentId, { header, cells: next, clock });
       }
 
       // TYTO-378, ADR 0170 decision 6: `apply auto` applies the plans this run made, in cell
@@ -376,12 +383,14 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
 
     // TYTO-379, ADR 0171: a view's pages read the table main kept, never a copy the window holds.
     table(documentId, index) {
-      const cell = kept.get(documentId)?.cells[index];
-      if (cell?.table === undefined) return undefined;
+      const holding = kept.get(documentId);
+      const cell = holding?.cells[index];
+      if (holding === undefined || cell?.table === undefined) return undefined;
       return {
         table: cell.table,
         ranAt: cell.ranAt,
         ...(cell.view === undefined ? {} : { view: cell.view }),
+        clock: holding.clock,
       };
     },
 

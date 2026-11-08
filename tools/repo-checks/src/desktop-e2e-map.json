@@ -634,6 +634,14 @@
       "why": "reviewed: the Board view (TYTO-381); the arithmetic is in recipe-board-model.test.ts and the drawing in recipe-board-view.test.ts, and the views suite draws 300 rows of an installed source in the real window"
     },
     {
+      "paths": [
+        "apps/desktop/src/renderer/recipe-calendar-model.ts",
+        "apps/desktop/src/renderer/recipe-calendar-view.ts"
+      ],
+      "e2e": ["recipe-views.desktop.test.ts"],
+      "why": "reviewed: the Calendar view (TYTO-383); the grid's arithmetic and first weekday are in recipe-calendar-model.test.ts and the drawing in recipe-calendar-view.test.ts, and the views suite places the same 300 rows on today's week in the real window"
+    },
+    {
       "paths": ["apps/desktop/shared/external-url.ts"],
       "e2e": ["recipe-table.desktop.test.ts", "window.desktop.test.ts"],
       "why": "reviewed: which links leave the app for the system browser (TYTO-379), read by window.ts and the Table view's anchors; the rule is in external-url.test.ts, and no suite opens the system browser"
