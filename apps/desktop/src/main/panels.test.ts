@@ -1,4 +1,5 @@
-import type { HostCapabilities } from '@tyto/plugin-api';
+import { ok } from '@tyto/core';
+import type { HostCapabilities, PanelCallRequest, PanelContribution } from '@tyto/plugin-api';
 import { describe, expect, it } from 'vitest';
 
 import { createPanelService } from './panels.js';
@@ -154,5 +155,59 @@ describe('the panel service', () => {
       ok: false,
       code: 'E_PLUGIN_CALL',
     });
+  });
+});
+
+describe("a panel's call (ADR 0173)", () => {
+  /** Two plugins whose panels share an id, each answering with its own name, and one mute. */
+  function twoPlugins(): WindowPlugins {
+    const answering = (plugin: string): PanelContribution => ({
+      id: 'settings',
+      title: plugin,
+      entry: 'panel/index.html',
+      call: (request: PanelCallRequest) =>
+        Promise.resolve(ok({ plugin, method: request.method, params: request.params ?? null })),
+    });
+    return {
+      ...contributed([]),
+      panels: () => [
+        { plugin: 'alfa', panel: answering('alfa') },
+        { plugin: 'beta', panel: answering('beta') },
+        { plugin: 'mudo', panel: { id: 'settings', title: 'mudo', entry: 'panel/index.html' } },
+      ],
+      permissionsOf: () => [],
+    };
+  }
+
+  it("reaches the frame's own plugin, even when another plugin's panel has the same id", async () => {
+    const service = createPanelService(twoPlugins(), network);
+    expect(
+      await service.request('plugin:beta/settings', 'call', ['folder.list', { folder: 'raiz' }]),
+    ).toEqual({
+      ok: true,
+      value: { plugin: 'beta', method: 'folder.list', params: { folder: 'raiz' } },
+    });
+    expect(await service.request('plugin:alfa/settings', 'call', ['token.test'])).toEqual({
+      ok: true,
+      value: { plugin: 'alfa', method: 'token.test', params: null },
+    });
+  });
+
+  it('refuses a panel id no plugin offers, a plugin with no call, and a bad method', async () => {
+    const service = createPanelService(twoPlugins(), network);
+    expect(await service.request('plugin:gama/settings', 'call', ['token.test'])).toMatchObject({
+      ok: false,
+      code: 'E_PERMISSION',
+    });
+    expect(await service.request('plugin:mudo/settings', 'call', ['token.test'])).toMatchObject({
+      ok: false,
+      code: 'E_PANEL_CALL',
+    });
+    for (const args of [[], [42], ['Token test']]) {
+      expect(await service.request('plugin:alfa/settings', 'call', args)).toMatchObject({
+        ok: false,
+        code: 'E_PANEL_CALL',
+      });
+    }
   });
 });

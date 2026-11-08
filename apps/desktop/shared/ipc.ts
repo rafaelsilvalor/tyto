@@ -78,12 +78,16 @@ const channel = <Request extends z.ZodType, Response extends z.ZodType>(
  * makes the renderer's reach exactly what the plugins screen shows. Matched exactly, with
  * no trimming: `'meu-pdf '` is not `'meu-pdf'`, and a refusal says so.
  */
-/** What a plugin's panel may ask of the host through its bridge (ADR 0045, ADR 0134). */
+/**
+ * What a plugin's panel may ask of the host through its bridge (ADR 0045, ADR 0134), and
+ * `call`, which asks its own plugin's process (ADR 0173): `[method, params]`.
+ */
 export const PANEL_CAPABILITIES = [
   'fetch',
   'credentials',
   'storeCredential',
   'deleteCredential',
+  'call',
 ] as const;
 export type PanelCapability = (typeof PANEL_CAPABILITIES)[number];
 
@@ -2103,7 +2107,8 @@ export const IPC_CHANNELS = {
    *
    * Checked in main against that plugin's permissions — `net:<host>` for `fetch`,
    * `credentials:<key>` for `credentials` and for storing and forgetting that key
-   * (ADR 0042, ADR 0134) — and answered as data: a refusal is
+   * (ADR 0042, ADR 0134); `call` reaches the panel's own plugin, found from `panelId` and
+   * never from anything the page wrote (ADR 0173) — and answered as data: a refusal is
    * `{ ok: false, code: 'E_PERMISSION' }`, never a rejection, so the renderer relays one
    * shape back to the page.
    */

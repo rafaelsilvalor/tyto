@@ -83,3 +83,14 @@ isolation protocol and its tests; then the desktop's bridge (`PANEL_CAPABILITIES
   second pull request of TYTO-372. Until then a plugin may register `call` and nothing calls it.
 - Every isolated plugin and host pair must speak protocol 17; both ship inside the same app, so
   only a worker bundle left behind by an upgrade notices.
+
+## Note, 2026-11-08 — the desktop's bridge offers `call` (TYTO-372, second pull request)
+
+`PANEL_CAPABILITIES` gains `call`, with `args: [method, params?]`, on the existing
+`panel:request` channel. Main finds the `WindowPanel` from the layout id the renderer read off
+the iframe's element, matching plugin and panel id together, because two plugins may each name a
+panel `settings` and `panelCallerOf`'s bare-id lookup would answer with the first; it then calls
+`callPanel` with that contribution, fetched plugins' included. The renderer's bridge answers a
+request with a key its strict shape does not have — a `plugin`, a `panelId` — with `E_PANEL_CALL`
+(`E_PLUGIN_CALL` for the other capabilities) instead of dropping it in silence, so a page that
+tries to name another plugin hears no rather than waiting for an answer.

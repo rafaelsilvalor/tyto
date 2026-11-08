@@ -141,6 +141,49 @@ describe('the bridge', () => {
     );
   });
 
+  it('relays a call to the element’s plugin, and refuses one that names another plugin (ADR 0173)', async () => {
+    const panel = await mounted();
+    const source = panel.frameWindow()!;
+    const posted = vi.spyOn(source, 'postMessage').mockImplementation(() => undefined);
+    const bridge: PanelBridge = {
+      request: vi.fn(() => Promise.resolve({ ok: true as const, value: { valid: true } })),
+    };
+    const window_ = target();
+    servePanelBridge(window_.listen, document, bridge);
+    const call = {
+      tyto: 'panel',
+      type: 'request',
+      id: 8,
+      capability: 'call',
+      args: ['token.test', { token: 'x' }],
+    };
+
+    window_.deliver(
+      new MessageEvent('message', { data: { ...call, id: 9, plugin: 'outro' }, source }),
+    );
+    await Promise.resolve();
+    // Refused here, out loud, and never relayed: the page hears no instead of waiting.
+    expect(bridge.request).not.toHaveBeenCalled();
+    expect(posted).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'response', id: 9, ok: false, code: 'E_PANEL_CALL' }),
+      '*',
+    );
+    expect((posted.mock.calls[0]?.[0] as { message: string }).message).toContain('plugin');
+
+    window_.deliver(new MessageEvent('message', { data: call, source }));
+    await vi.waitFor(() => {
+      expect(posted).toHaveBeenCalledTimes(2);
+    });
+    expect(bridge.request).toHaveBeenCalledWith('plugin:demo/contagem', 'call', [
+      'token.test',
+      { token: 'x' },
+    ]);
+    expect(posted).toHaveBeenLastCalledWith(
+      { tyto: 'panel', type: 'response', id: 8, ok: true, value: { valid: true } },
+      '*',
+    );
+  });
+
   it('ignores a message from anything that is not a panel’s frame', async () => {
     await mounted();
     const bridge: PanelBridge = { request: vi.fn() };
