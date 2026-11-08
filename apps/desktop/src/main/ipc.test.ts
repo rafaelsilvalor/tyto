@@ -913,6 +913,21 @@ const dependencies = () => {
     },
     menu: menuRebuilds(),
     plugins: pluginList(keychain),
+    // What each sign-in request reached main as; the service is `signin.test.ts`'s.
+    signin: {
+      list: () =>
+        Promise.resolve({
+          signins: [{ plugin: 'drive-plugin', id: 'drive', signedIn: true, label: 'a@b.test' }],
+        }),
+      start: (plugin: string, id: string) =>
+        Promise.resolve({
+          ok: false as const,
+          reason: 'timeout' as const,
+          message: `start ${plugin} ${id}`,
+        }),
+      out: (plugin: string, id: string) =>
+        Promise.resolve({ signedOut: plugin === 'drive-plugin' && id === 'drive' }),
+    },
     info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
     panels: {
       list: () =>
@@ -1687,6 +1702,33 @@ describe('plugins:list', () => {
     ]);
     // What main sends must satisfy the contract the preload validates it against.
     expect(IPC_CHANNELS['plugins:list'].response.safeParse(answer).success).toBe(true);
+  });
+});
+
+describe('signin:list, signin:start and signin:out (TYTO-374)', () => {
+  it('hands each request to the sign-in window and answers in the validated shape', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const listed = await handlers['signin:list']({});
+    expect(IPC_CHANNELS['signin:list'].response.safeParse(listed).success).toBe(true);
+    const started = await handlers['signin:start']({ plugin: 'drive-plugin', id: 'drive' });
+    expect(started).toEqual({ ok: false, reason: 'timeout', message: 'start drive-plugin drive' });
+    expect(IPC_CHANNELS['signin:start'].response.safeParse(started).success).toBe(true);
+    expect(await handlers['signin:out']({ plugin: 'drive-plugin', id: 'drive' })).toEqual({
+      signedOut: true,
+    });
+  });
+
+  it('has no field for a token, in either direction', () => {
+    const listed = IPC_CHANNELS['signin:list'].response;
+    // A strict reading: an answer that carried a token would lose it, never pass it on.
+    const parsed = listed.parse({
+      signins: [{ plugin: 'p', id: 'd', signedIn: true, refresh: 'r', accessToken: 'a' }],
+    });
+    expect(JSON.stringify(parsed)).not.toMatch(/"r"|"a"/u);
+    expect(
+      IPC_CHANNELS['signin:start'].request.safeParse({ plugin: 'p', id: 'd', token: 'x' }).success,
+    ).toBe(false);
   });
 });
 

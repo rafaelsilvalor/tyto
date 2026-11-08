@@ -156,14 +156,17 @@
       "paths": [
         "apps/desktop/src/main/loopback.ts",
         "apps/desktop/src/main/oauth.ts",
-        "apps/desktop/src/main/signin.ts"
+        "apps/desktop/src/main/signin.ts",
+        "apps/desktop/e2e/signin.desktop.test.ts",
+        "apps/desktop/e2e/fake-authorization-server.ts"
       ],
       "e2e": [
         "installed-plugins.desktop.test.ts",
         "plugins.desktop.test.ts",
+        "signin.desktop.test.ts",
         "window.desktop.test.ts"
       ],
-      "why": "reviewed: browser sign-in reaches plugins through the capabilities main composes"
+      "why": "reviewed: browser sign-in reaches plugins through the capabilities main composes, and the plugins screen signs in and out against a fake provider (TYTO-374)"
     },
     {
       "paths": ["apps/desktop/src/main/desktop.tyto-plugin.json"],
@@ -1498,6 +1501,7 @@
       "e2e": [
         "installed-plugins.desktop.test.ts",
         "plugins.desktop.test.ts",
+        "signin.desktop.test.ts",
         "status-bar.desktop.test.ts",
         "window.desktop.test.ts"
       ],

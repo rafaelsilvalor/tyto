@@ -25,6 +25,12 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  * — whoever opened the screen owns the bridge and asks the list again afterwards. The value
  * leaves through that call once and never comes back: the row knows only whether a key is set.
  *
+ * **Browser sign-in (TYTO-374, ADR 0174).** Beside each `signin.<id>` a plugin declares, who
+ * is signed in — "Signed in as <label>" or "Not signed in" — and Sign in or Sign out, handed to
+ * `onSigninStart` and `onSigninOut`. **Only a click here starts a sign-in**; a plugin's call
+ * never does. The screen is handed `signins` and never a token: main keeps the refresh token in
+ * the keychain and the access token in its memory.
+ *
  * **The notice is not decoration.** A permission a person approved at install is recorded
  * and shown, and until TYTO-48 isolates plugins it is not enforced; a screen listing
  * permissions without that sentence would read as a sandbox that does not exist.
@@ -52,6 +58,24 @@ export type PluginChange = (
   name: string,
   change: IpcRequest<'plugins:change'>['change'],
 ) => Promise<IpcResponse<'plugins:change'>>;
+
+/** Who is signed in to each declared sign-in, from `signin:list`. */
+export type SigninRows = IpcResponse<'signin:list'>['signins'];
+type SigninRow = SigninRows[number];
+
+/** Signs in to one declared sign-in; resolves once the browser came back or gave up. */
+export type SigninStart = (plugin: string, id: string) => Promise<IpcResponse<'signin:start'>>;
+
+/** Signs out of one declared sign-in. Rejects when main refused the request. */
+export type SigninOut = (plugin: string, id: string) => Promise<void>;
+
+/** A sign-in that did not finish: which one, and main's sentence. */
+interface SigninFailure {
+  readonly key: string;
+  readonly message: string;
+}
+
+const signinKey = (plugin: string, id: string): string => `${plugin}:${id}`;
 
 /** What the last install or change said, on the line above the buttons. */
 interface Outcome {
@@ -104,6 +128,11 @@ export class PluginsDialog extends LitElement {
     onInstall: { attribute: false },
     onChange: { attribute: false },
     onSettings: { attribute: false },
+    signins: { attribute: false },
+    onSigninStart: { attribute: false },
+    onSigninOut: { attribute: false },
+    signingIn: { state: true },
+    signinFailure: { state: true },
     failedCredential: { state: true },
     outcome: { state: true },
     busy: { state: true },
@@ -126,6 +155,15 @@ export class PluginsDialog extends LitElement {
   declare outcome: Outcome | undefined;
   /** While an install or a change is out, so a second click does not start another. */
   declare busy: boolean;
+  /** Who is signed in to what, or nothing while it is asked or when it could not be read. */
+  declare signins: SigninRows | undefined;
+  /** Where Sign in goes. No sign-in buttons while it is absent. */
+  declare onSigninStart: SigninStart | undefined;
+  /** Where Sign out goes. */
+  declare onSigninOut: SigninOut | undefined;
+  /** `plugin:id` of the sign-in waiting on the browser, so no second one starts beside it. */
+  declare signingIn: string | undefined;
+  declare signinFailure: SigninFailure | undefined;
 
   constructor() {
     super();
@@ -139,6 +177,11 @@ export class PluginsDialog extends LitElement {
     this.failedCredential = undefined;
     this.outcome = undefined;
     this.busy = false;
+    this.signins = undefined;
+    this.onSigninStart = undefined;
+    this.onSigninOut = undefined;
+    this.signingIn = undefined;
+    this.signinFailure = undefined;
   }
 
   private async act(step: () => Promise<Outcome | undefined>): Promise<void> {
@@ -187,6 +230,102 @@ export class PluginsDialog extends LitElement {
     });
   }
 
+  private async signIn(plugin: string, id: string): Promise<void> {
+    const start = this.onSigninStart;
+    if (start === undefined || this.signingIn !== undefined) return;
+    const key = signinKey(plugin, id);
+    this.signingIn = key;
+    this.signinFailure = undefined;
+    try {
+      const answer = await start(plugin, id);
+      if (!answer.ok) this.signinFailure = { key, message: answer.message };
+    } catch (cause) {
+      this.signinFailure = { key, message: cause instanceof Error ? cause.message : String(cause) };
+    } finally {
+      this.signingIn = undefined;
+    }
+  }
+
+  private async signOut(plugin: string, id: string): Promise<void> {
+    const out = this.onSigninOut;
+    if (out === undefined) return;
+    const key = signinKey(plugin, id);
+    this.signinFailure = undefined;
+    try {
+      await out(plugin, id);
+    } catch (cause) {
+      this.signinFailure = { key, message: cause instanceof Error ? cause.message : String(cause) };
+    }
+  }
+
+  /**
+   * One line per declared sign-in: its id, who is signed in, and Sign in or Sign out. While a
+   * sign-in waits on the browser, every Sign in is disabled and the line says to finish there.
+   */
+  private signinLines(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
+    if (plugin.origin !== 'external') return nothing;
+    const rows = (this.signins ?? []).filter((row) => row.plugin === plugin.name);
+    if (rows.length === 0) return nothing;
+    const line = (row: SigninRow): TemplateResult => {
+      const key = signinKey(row.plugin, row.id);
+      const waiting = this.signingIn === key;
+      const state = row.signedIn
+        ? row.label === undefined
+          ? say('plugins.signin.signedIn')
+          : say('plugins.signin.as').replaceAll('{label}', row.label)
+        : say('plugins.signin.notSignedIn');
+      const button = row.signedIn
+        ? html`<button
+            class="plugins__signin-out"
+            type="button"
+            ?hidden=${this.onSigninOut === undefined}
+            @click=${() => {
+              void this.signOut(row.plugin, row.id);
+            }}
+          >
+            ${say('plugins.signin.out')}
+          </button>`
+        : html`<button
+            class="plugins__signin-start"
+            type="button"
+            ?hidden=${this.onSigninStart === undefined}
+            ?disabled=${this.signingIn !== undefined}
+            @click=${() => {
+              void this.signIn(row.plugin, row.id);
+            }}
+          >
+            ${say('plugins.signin.start')}
+          </button>`;
+      return html`<div
+        class="plugins__signin"
+        data-signin=${row.id}
+        data-signed-in=${row.signedIn ? 'true' : 'false'}
+      >
+        <span class="plugins__signin-id"
+          >${say('plugins.signin.label')} <code>${row.id}</code></span
+        >
+        <span class="plugins__signin-state">${state}</span>
+        ${button}
+        ${waiting ? html`<p class="plugins__signin-waiting" role="status">${say('plugins.signin.waiting')}</p>` : nothing}
+        ${
+          this.signinFailure?.key === key
+            ? html`<p class="plugins__signin-failed" role="alert">
+                ${say('plugins.signin.failed')} ${this.signinFailure.message}
+              </p>`
+            : nothing
+        }
+      </div>`;
+    };
+    return html`<div class="plugins__signins">
+      ${rows.map(line)}
+      ${
+        rows.some((row) => row.signedIn)
+          ? html`<p class="plugins__disclosure">${say('plugins.signin.kept')}</p>`
+          : nothing
+      }
+    </div>`;
+  }
+
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
   protected override createRenderRoot(): HTMLElement {
     return this;
@@ -215,6 +354,7 @@ export class PluginsDialog extends LitElement {
             : nothing
         }
         ${this.fonts(say, plugin)} ${this.workspace(say, plugin)} ${this.credentials(say, plugin)}
+        ${this.signinLines(say, plugin)}
         ${
           plugin.problems.length === 0
             ? nothing

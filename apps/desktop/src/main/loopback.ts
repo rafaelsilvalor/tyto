@@ -44,29 +44,71 @@ export interface CallbackListener {
   close(): void;
 }
 
+/**
+ * The words of the page the browser lands on, in the window's language (ADR 0174, note of
+ * 2026-11-08). Fixed text only: nothing from the query ever reaches it.
+ */
+export interface CallbackPage {
+  /** The `lang` of the page, a BCP 47 tag. */
+  readonly lang: string;
+  /** One line per outcome, and `notFound` for anything on the port that is not the callback. */
+  readonly messages: Readonly<Record<CallbackOutcome['kind'] | 'notFound', string>>;
+  /** The line under it, saying the tab can be closed. */
+  readonly close: string;
+}
+
 export interface ListenOptions {
   /** The `state` this attempt sent; a callback carrying another is refused. */
   readonly state: string;
   readonly timeoutMs?: number;
+  /** The page's words; English when absent. */
+  readonly page?: CallbackPage;
 }
 
-const PAGE = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Tyto</title></head>
-<body style="font-family: system-ui, sans-serif; margin: 3rem;">
-<p>STATUS</p>
-<p>You can close this tab and go back to Tyto.</p>
-</body>
-</html>
-`;
+/** The English page, which a caller with no language at hand gets. */
+export const ENGLISH_CALLBACK_PAGE: CallbackPage = {
+  lang: 'en',
+  messages: {
+    code: 'Signed in.',
+    error: 'The sign-in did not finish.',
+    'state-mismatch': 'This sign-in was refused: it did not come from the attempt Tyto started.',
+    timeout: 'The sign-in timed out.',
+    closed: 'The sign-in was cancelled.',
+    notFound: 'Nothing here.',
+  },
+  close: 'You can close this tab and go back to Tyto.',
+};
 
-function page(response: ServerResponse, status: number, message: string): void {
+/** Escapes the five characters HTML gives meaning to; the words come from a catalogue. */
+function escaped(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function page(
+  response: ServerResponse,
+  status: number,
+  words: CallbackPage,
+  message: string,
+): void {
   response.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-store',
     connection: 'close',
   });
-  response.end(PAGE.replace('STATUS', message));
+  response.end(`<!doctype html>
+<html lang="${escaped(words.lang)}">
+<head><meta charset="utf-8"><title>Tyto</title></head>
+<body style="font-family: system-ui, sans-serif; margin: 3rem;">
+<p>${escaped(message)}</p>
+<p>${escaped(words.close)}</p>
+</body>
+</html>
+`);
 }
 
 function outcomeOf(request: IncomingMessage, state: string): CallbackOutcome {
@@ -81,17 +123,10 @@ function outcomeOf(request: IncomingMessage, state: string): CallbackOutcome {
   return { kind: 'code', code };
 }
 
-const MESSAGES: Record<CallbackOutcome['kind'], string> = {
-  code: 'Signed in.',
-  error: 'The sign-in did not finish.',
-  'state-mismatch': 'This sign-in was refused: it did not come from the attempt Tyto started.',
-  timeout: 'The sign-in timed out.',
-  closed: 'The sign-in was cancelled.',
-};
-
 /** Starts listening and answers once the port is bound. */
 export function listenForCallback(options: ListenOptions): Promise<CallbackListener> {
   const timeoutMs = options.timeoutMs ?? CALLBACK_TIMEOUT_MS;
+  const words = options.page ?? ENGLISH_CALLBACK_PAGE;
   let settle: (outcome: CallbackOutcome) => void = () => undefined;
   let settled = false;
   const outcome = new Promise<CallbackOutcome>((resolve) => {
@@ -102,11 +137,11 @@ export function listenForCallback(options: ListenOptions): Promise<CallbackListe
     const path = new URL(request.url ?? '/', `http://${LOOPBACK_HOST}`).pathname;
     if (settled || path !== CALLBACK_PATH || request.method !== 'GET') {
       // A favicon, a second callback or a stray probe: not this attempt's callback.
-      page(response, 404, 'Nothing here.');
+      page(response, 404, words, words.messages.notFound);
       return;
     }
     const answered = outcomeOf(request, options.state);
-    page(response, answered.kind === 'code' ? 200 : 400, MESSAGES[answered.kind]);
+    page(response, answered.kind === 'code' ? 200 : 400, words, words.messages[answered.kind]);
     finish(answered);
   });
 

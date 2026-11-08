@@ -1969,6 +1969,67 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Who is signed in to each browser sign-in an installed plugin declares (TYTO-374, ADR 0174).
+   * **Never a token**: `label` is the provider's email or name claim, shown only to say who,
+   * and absent when the provider sent none, so the window says "Signed in" in its own words.
+   * `plugin` is the plugin's folder, which is its name.
+   */
+  'signin:list': channel(
+    z.object({}),
+    z.object({
+      signins: z
+        .array(
+          z.object({
+            plugin: z.string().min(1),
+            id: z.string().min(1),
+            signedIn: z.boolean(),
+            label: z.string().min(1).optional(),
+            since: z.string().min(1).optional(),
+          }),
+        )
+        .max(500),
+    }),
+  ),
+
+  /**
+   * Signs in to one declared sign-in in the system browser, when the person clicks Sign in
+   * (ADR 0174, decision 6: a plugin's call never reaches this). Answers once the browser came
+   * back, the five minutes ran out, or the attempt failed; `message` is main's sentence, in
+   * English, as `plugins:install`'s problems are. **Rejected** for a plugin or id nobody
+   * declares.
+   */
+  'signin:start': channel(
+    z.strictObject({ plugin: z.string().min(1).max(214), id: z.string().min(1).max(64) }),
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true) }),
+      z.object({
+        ok: z.literal(false),
+        reason: z.enum([
+          'denied',
+          'state-mismatch',
+          'timeout',
+          'cancelled',
+          'token',
+          'no-refresh-token',
+          'too-large',
+          'failed',
+        ]),
+        message: z.string().max(4000),
+      }),
+    ]),
+  ),
+
+  /**
+   * Deletes a sign-in's keychain entry and forgets its access token (ADR 0174, decision 8).
+   * `signedOut` is false when there was nothing to delete. **Rejected** for a plugin or id
+   * nobody declares, so the window cannot name another account under `signin:`.
+   */
+  'signin:out': channel(
+    z.strictObject({ plugin: z.string().min(1).max(214), id: z.string().min(1).max(64) }),
+    z.object({ signedOut: z.boolean() }),
+  ),
+
+  /**
    * Syncs the plugin files now (TYTO-433, ADR 0151 decision 3), from Plugins: Sync Plugin Files
    * (`update: false`) or Plugins: Update Plugin Files (`update: true`, which moves every ref).
    * **Strict, and it names no folder**: main syncs the machine's files and those of the folder
@@ -3011,6 +3072,13 @@ export const IPC_EVENTS = {
    * asks `plugins:panels`, `plugins:keymaps`, `plugins:vim` and `theme:current` again.
    */
   'plugins:changed': z.object({}),
+
+  /**
+   * A sign-in was stored or deleted (TYTO-374): a sign-in finished, somebody signed out, or a
+   * refresh the provider refused deleted the entry. Empty, for `queue:changed`'s reason: an
+   * open plugins screen asks `signin:list` again.
+   */
+  'signin:changed': z.object({}),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

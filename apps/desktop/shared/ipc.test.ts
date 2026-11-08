@@ -100,6 +100,10 @@ describe('the IPC contract', () => {
       'settings:open',
       'settings:outline',
       'settings:validate',
+      // TYTO-374, ADR 0174: who is signed in, and signing in and out from the plugins screen.
+      'signin:list',
+      'signin:out',
+      'signin:start',
       'snippets:open',
       'snippets:read',
       'template:new',
@@ -209,6 +213,8 @@ describe('the event table', () => {
       'queue:changed',
       // TYTO-206. settings.json changed, or a screen's change to it was refused.
       'settings:changed',
+      // TYTO-374. A sign-in was stored or deleted; an open plugins screen lists them again.
+      'signin:changed',
       // TYTO-277. snippets.json changed on disk; the push carries its text.
       'snippets:changed',
       // TYTO-433. A plugin files' sync changed the templates; the window lists them again.
@@ -506,6 +512,8 @@ describe('what the contract does not promise', () => {
       'app:exit-listening',
       // TYTO-47. "Which plugins are there" has no subject: there is one plugins folder.
       'plugins:list',
+      // TYTO-374. Nor "who is signed in": every installed plugin's sign-ins, which main reads.
+      'signin:list',
       // TYTO-504. Nor "what does the gallery list": the index is the setting's, read in main.
       'gallery:list',
       // TYTO-49. "Which panels do the plugins offer" has none either, for the same reason.

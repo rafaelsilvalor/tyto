@@ -44,6 +44,22 @@ As mesmas mudanças se fazem pelo terminal, com os comandos de [Plugins](../comm
 | religá-lo                                                              | `tyto plugin enable <nome>`    |
 | remover um                                                             | `tyto plugin remove <nome>`    |
 
+## Entrar numa conta para um plugin
+
+::: info Conferida de outro jeito
+Esta seção entrou em 2026-11-08 e foi conferida pelo teste de ponta a ponta do app, com um serviço de login de teste neste computador e a parte do navegador respondida pelo teste. Ninguém a seguiu à mão com um provedor de verdade ainda.
+:::
+
+Alguns plugins trabalham com a sua própria conta em outro lugar — um conector que cria arquivos no seu armazenamento, por exemplo. Um plugin assim pede uma permissão `signin:`, e a linha dele na caixa de plugins mostra uma linha por login que ele declara:
+
+1. A linha diz **Não conectado**. Clique em **Entrar**.
+2. O navegador abre na página do provedor. Entre lá e aprove. Depois o navegador mostra uma página do Tyto dizendo que o login foi feito; pode fechar essa aba.
+3. De volta à caixa, a linha diz **Conectado como** e a conta, ou só **Conectado** quando o provedor não diz quem é.
+
+Clique em **Sair** para encerrar. Nada mais começa um login: um plugin que precisa de um quando você está desconectado para e pede que você entre por esta caixa, e ele nunca abre o navegador sozinho.
+
+O Tyto guarda o login no chaveiro do sistema, e o plugin recebe do Tyto só um token de acesso de curta duração, nunca o que mantém você conectado. Num computador sem chaveiro para criptografar, o login não termina e a linha diz por quê. A linha de comando não faz login pelo navegador: uma receita que precisa de login só funciona na janela.
+
 ## Um plugin é seguro?
 
 Cada plugin instalado roda separado da janela, então um plugin que trava para a si mesmo e não o Tyto, e ele só alcança o que as permissões deixam. A caixa mostra essas permissões, e tanto a caixa de instalação quanto o `tyto plugin install` as mostram antes de você aprovar. Escrever um plugin está no [guia de autoria de plugins](../extend/), em inglês.
