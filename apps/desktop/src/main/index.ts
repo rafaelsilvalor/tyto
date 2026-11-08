@@ -73,6 +73,7 @@ import { createDesktopGallery } from './gallery.js';
 import { fileLayoutStore } from './layout-store.js';
 import { createSessionService, createTemplateFolder } from './session.js';
 import { fileSessionStore } from './session-store.js';
+import { createSigninService, installedSigninDeclarations, signinCapabilities } from './signin.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
@@ -790,10 +791,23 @@ async function start(): Promise<void> {
   // two can never be granted different things (ADR 0042, ADR 0045).
   // A plugin's cache beside the sources' in `TYTO_HOME`, and the files of the folder open in the
   // window, asked of `workspace` at every call because a plugin outlives an Open Folder (ADR 0138).
-  const capabilities = desktopCapabilities(credentials, (url, init) => net.fetch(url, init), {
-    home: pluginsHome,
-    workspace: () => workspace.state(),
+  // Browser sign-in, run here and only here (ADR 0174): the refresh token stays in the keychain
+  // through the same `credentials`, and a plugin reaches only `signinAccessToken`. Nothing a
+  // plugin calls opens the browser; `start` waits for the window to ask (TYTO-374).
+  const signin = createSigninService({
+    credentials,
+    declarationOf: installedSigninDeclarations(pluginStore),
+    fetch: (url, init) => net.fetch(url, init),
+    now: () => Date.now(),
+    openBrowser: (url) => shell.openExternal(url),
   });
+  const capabilities = {
+    ...desktopCapabilities(credentials, (url, init) => net.fetch(url, init), {
+      home: pluginsHome,
+      workspace: () => workspace.state(),
+    }),
+    ...signinCapabilities(signin),
+  };
 
   // The export, composed here for the reason everything else is (ADR 0010): it needs a
   // `Rasterizer`, and the only place allowed to know which adapter exists is this file. It

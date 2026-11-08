@@ -289,7 +289,7 @@ describe('a plugin panel in the window', () => {
         { timeout: 10_000, polling: 25 },
       );
 
-    // The answer comes from the plugin's isolated process, through protocol 17.
+    // The answer comes from the plugin's isolated process, through the plugin protocol.
     await ask({}, 100);
     await answered('{"plugin":"painel","method":"folder.list","params":{"folder":"raiz"}}');
 
