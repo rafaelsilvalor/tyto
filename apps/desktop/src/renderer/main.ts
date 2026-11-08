@@ -113,6 +113,7 @@ import {
   createRecipeNotebook,
 } from './recipe-notebook.js';
 import { AGE_TICK, type CellViewContext, cellOutputOf, tickAges } from './recipe-cell-view.js';
+import { type ViewContext, fullSizeBody } from './recipe-views.js';
 import {
   type Diagnostic,
   type SourceRange,
@@ -269,7 +270,10 @@ import {
   groupsFromLayout,
   groupsOf,
   isPreview,
+  isRecipeView,
+  isTextTab,
   layoutOf,
+  openRecipeView,
   moveTabToNextGroup,
   placeTab,
   stepTabInGroup,
@@ -487,9 +491,15 @@ function focusedPreview(): EditorTab | undefined {
  * of a Markdown file is a kind of its own (TYTO-247): a brief's commands have nothing there.
  */
 const activeKind = (): TabKind => {
+  // A recipe cell drawn full size (TYTO-379): no text in front, and none of the recipe's commands.
+  const front = activeTabOf(focusedGroup(groups));
+  if (front !== undefined && isRecipeView(front)) return 'recipe-view';
   if (focusedPreview() === undefined) return active().kind;
   return active().kind === 'markdown' ? 'markdown-preview' : 'preview';
 };
+
+/** The kind the status bar names: a recipe cell drawn full size is its recipe's (TYTO-379). */
+const statusKindOf = (kind: TabKind) => (kind === 'recipe-view' ? 'recipe' : kind) ?? 'brief';
 
 /**
  * The brief the following preview shows: the last brief whose own tab was in front of the
@@ -807,6 +817,81 @@ setInterval(() => {
   tickAges(document, state.locale, Date.now());
 }, AGE_TICK);
 
+/**
+ * What a recipe's views ask main, for one recipe (TYTO-379, ADR 0171): a page of a kept table
+ * and a copy of its rows, a Board's columns and counts (TYTO-381, ADR 0177), and one row whole
+ * for a card opened (TYTO-384). The cells under the text and a cell drawn full size share it.
+ */
+function recipeViewContext(documentId: string): ViewContext {
+  const stale = { stale: true } as const;
+  return {
+    locale: state.locale,
+    rows: (request) =>
+      window.tyto?.['recipe:rows']({ documentId, ...request }) ?? Promise.resolve(stale),
+    copy: (request) =>
+      window.tyto?.['recipe:copy']({ documentId, ...request }) ?? Promise.resolve(stale),
+    facets: (request) =>
+      window.tyto?.['recipe:facets']({ documentId, ...request }) ?? Promise.resolve(stale),
+    row: (request) =>
+      window.tyto?.['recipe:row']({ documentId, ...request }) ?? Promise.resolve(stale),
+  };
+}
+
+/**
+ * "Open in a tab" on a cell and "Open cell result in a tab" (TYTO-379): the cell's result drawn
+ * full size in a tab of the focused group, or the tab already drawing it, brought forward.
+ * Refused until the last session is read, as a preview is: the groups it brings back replace
+ * these.
+ */
+function openRecipeCell(documentId: string, index: number): void {
+  if (editor === undefined || !sessionRead) return;
+  groups = openRecipeView(groups, documentId, index);
+  showGroups();
+}
+
+/** What each group's full-size cell was last drawn from: a repaint that changed none keeps it. */
+const paintedRecipeViews = new Map<string, string>();
+
+/**
+ * Draws each recipe cell in front of its group full size (TYTO-379, ADR 0171's dated note), from
+ * the recipe's newest answer: the cell's current view through `recipe-views.ts`. The element is
+ * built again only when what it draws from changed (the tab, the run, the view, its options, the
+ * language), so a sort, a filter or a scroll in it survives every other repaint, as a cell's does.
+ */
+function paintRecipeViews(): void {
+  for (const group of groupList(groups)) {
+    const tab = activeTabOf(group);
+    const element = groupElements.get(group.id);
+    if (tab === undefined || !isRecipeView(tab) || element === undefined) {
+      paintedRecipeViews.delete(group.id);
+      continue;
+    }
+    const cell = recipeNotebook
+      .lastOf(tab.documentId)
+      ?.answer.cells.find((each) => each.index === tab.cell);
+    const key = [
+      tab.id,
+      cell?.status ?? '',
+      cell?.ranAt ?? '',
+      cell?.view?.name ?? '',
+      JSON.stringify(cell?.view?.options ?? {}),
+      state.locale,
+    ].join('\u0000');
+    if (paintedRecipeViews.get(group.id) === key) continue;
+    paintedRecipeViews.set(group.id, key);
+    const body =
+      cell === undefined ? undefined : fullSizeBody(cell, recipeViewContext(tab.documentId));
+    if (body !== undefined) {
+      element.recipeView.replaceChildren(body);
+      continue;
+    }
+    const empty = document.createElement('p');
+    empty.className = 'recipe-view-pane__empty';
+    empty.textContent = translate(state.locale, 'recipe.view.empty');
+    element.recipeView.replaceChildren(empty);
+  }
+}
+
 /** A recipe came into a tab, opened or restored: its verbs are read again, and it runs once. */
 function openedRecipe(documentId: string): void {
   refreshRecipeVerbs();
@@ -821,8 +906,11 @@ function openedRecipe(documentId: string): void {
  */
 function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAnswer): void {
   setFileDiagnostics(documentId, text, answerDiagnostics(answer));
+  // A cell drawn full size follows the newest answer too, typed past or not (TYTO-379).
+  paintRecipeViews();
   const target = documentOf(workspace, documentId);
   if (target?.state === undefined || contentOf(target) !== text) return;
+  const views = recipeViewContext(documentId);
   const context: CellViewContext = {
     locale: state.locale,
     collapsed: recipeNotebook.collapsedOf(documentId),
@@ -841,28 +929,13 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
       expandedIncluded: (at, open) => {
         recipeNotebook.setExpanded(documentId, at, open);
       },
-      // TYTO-379, ADR 0171: a view's pages and copies, for this tab's kept tables.
-      rows: (request) => {
-        const bridge = window.tyto;
-        if (bridge === undefined) return Promise.resolve({ stale: true });
-        return bridge['recipe:rows']({ documentId, ...request });
-      },
-      copy: (request) => {
-        const bridge = window.tyto;
-        if (bridge === undefined) return Promise.resolve({ stale: true });
-        return bridge['recipe:copy']({ documentId, ...request });
-      },
-      // TYTO-381, ADR 0177: a Board's columns and counts, counted in main.
-      facets: (request) => {
-        const bridge = window.tyto;
-        if (bridge === undefined) return Promise.resolve({ stale: true });
-        return bridge['recipe:facets']({ documentId, ...request });
-      },
-      // TYTO-384: a card opened, its whole row read from main.
-      row: (request) => {
-        const bridge = window.tyto;
-        if (bridge === undefined) return Promise.resolve({ stale: true });
-        return bridge['recipe:row']({ documentId, ...request });
+      rows: views.rows,
+      copy: views.copy,
+      facets: views.facets,
+      row: views.row,
+      // TYTO-379: this cell's result drawn full size, in a tab of its own.
+      openTab: (index) => {
+        openRecipeCell(documentId, index);
       },
     },
   };
@@ -1107,7 +1180,7 @@ const whereOf = (document_: DocumentState): { where?: string } =>
  */
 function showFontArea(mount: HTMLElement, front: EditorTab | undefined): void {
   const kind =
-    front === undefined || isPreview(front)
+    front === undefined || !isTextTab(front)
       ? undefined
       : documentOf(workspace, front.documentId)?.kind;
   // A text tab is in the editor's font, as a brief is (TYTO-247): only the app's JSON is not.
@@ -1125,12 +1198,15 @@ function paintTabs(): void {
     element.focused = group.id === groups.focusedGroupId;
     element.activeTabId = group.activeTabId ?? '';
     const front = activeTabOf(group);
-    element.showing = front !== undefined && isPreview(front) ? 'preview' : 'editor';
+    element.showing =
+      front === undefined || isTextTab(front) ? 'editor' : isPreview(front) ? 'preview' : 'recipe';
     showFontArea(element.mount, front);
     // "Open preview to the side" at the end of the strip while a brief's own tab is in front, or
     // a Markdown file's (TYTO-247).
     const frontDocument =
-      front === undefined || isPreview(front) ? undefined : documentOf(workspace, front.documentId);
+      front === undefined || !isTextTab(front)
+        ? undefined
+        : documentOf(workspace, front.documentId);
     element.offerPreview = frontDocument !== undefined && hasPreview(frontDocument.kind);
     element.openPreview = () => {
       runCommand(PREVIEW_OPEN_TO_SIDE);
@@ -1148,6 +1224,9 @@ function paintTabs(): void {
     element.tabs = group.tabs.flatMap((tab) => {
       if (isPreview(tab)) return [previewEntry(tab)];
       const document_ = documentOf(workspace, tab.documentId);
+      if (isRecipeView(tab)) {
+        return document_ === undefined ? [] : [recipeViewEntry(tab, document_)];
+      }
       // Compared, never looked up: there is no field on a document that says it has been
       // typed in, and this is the only place a strip learns of one that has (TYTO-112).
       return document_ === undefined
@@ -1189,6 +1268,14 @@ const TAB_ICONS: Readonly<Record<DocumentKind, IconName>> = {
 
 const tabIconOf = (document_: DocumentState): IconName =>
   document_.kind === undefined ? 'brief' : TAB_ICONS[document_.kind];
+
+/** A recipe cell's tab (TYTO-379): "<recipe> · cell <n>", counted from one, and its path. */
+function recipeViewEntry(tab: EditorTab, recipe: DocumentState): TabEntry {
+  const label = translate(state.locale, 'recipe.view.tab')
+    .replace('{name}', labelOf(recipe))
+    .replace('{cell}', String((tab.cell ?? 0) + 1));
+  return { id: tab.id, label, ...whereOf(recipe), dirty: false, icon: 'file' };
+}
 
 /**
  * A preview's tab: "Preview <name>" for the brief it shows now (TYTO-287) — for a following one,
@@ -1829,6 +1916,15 @@ const registry: CommandRegistry = withCommandGate(
       const front = active();
       if (isRecipe(front.kind)) void recipeNotebook.fetchAgain(front.id);
     },
+    openRecipeCellView: () => {
+      // TYTO-379: the cell at or above the cursor, as Run from here finds it.
+      const front = active();
+      const shown = isRecipe(front.kind) ? recipeNotebook.lastOf(front.id) : undefined;
+      const pane = focusedPane() ?? primaryPaneOf(front.id);
+      if (shown === undefined || pane === undefined) return;
+      const cell = cellAtOrAbove(shown.answer, cursorOf(pane.state()).line);
+      if (cell !== undefined) openRecipeCell(front.id, cell);
+    },
     openDocumentation: () => {
       // TYTO-318. Names nothing: main opens one of its two literals, by the menu's language.
       void withBridge(async (bridge) => {
@@ -2290,7 +2386,8 @@ function present(): void {
     const wanted = activeTabOf(group);
     // A preview in front shows no text: the pane lets go of its document, so the record passes
     // to another pane that shows it, and stays hidden until a text tab comes back (TYTO-287).
-    if (wanted !== undefined && isPreview(wanted)) {
+    // A recipe cell drawn full size shows no text either (TYTO-379).
+    if (wanted !== undefined && !isTextTab(wanted)) {
       leave(group.id);
       continue;
     }
@@ -2325,7 +2422,7 @@ function followActiveBrief(): void {
   };
   const textInFront = (group: EditorGroup): string | undefined => {
     const tab = activeTabOf(group);
-    return tab === undefined || isPreview(tab) ? undefined : tab.documentId;
+    return tab === undefined || !isTextTab(tab) ? undefined : tab.documentId;
   };
   const focused = textInFront(focusedGroup(groups));
   const broughtForward = isBriefId(focused) && focused !== frontBrief;
@@ -2355,8 +2452,12 @@ function showGroups(): void {
   present();
   // A preview in front takes the focus itself: its group's pane is hidden (TYTO-287).
   const focusFront = (): void => {
-    if (focusedPreview() === undefined) focusedPane()?.view.focus();
-    else groupElements.get(groups.focusedGroupId)?.preview.focus();
+    const front = activeTabOf(focusedGroup(groups));
+    const element = groupElements.get(groups.focusedGroupId);
+    // A recipe cell drawn full size takes it as a preview does (TYTO-379).
+    if (front !== undefined && isRecipeView(front)) element?.recipeView.focus();
+    else if (focusedPreview() === undefined) focusedPane()?.view.focus();
+    else element?.preview.focus();
   };
   focusFront();
   repaint();
@@ -2408,7 +2509,7 @@ function followWorkspace(): void {
 function revealDocument(current: EditorGroups, documentId: string): EditorGroups {
   // A document's own tabs only: opening a file goes to its text, never to its preview.
   const tabs = [focusedGroup(current), ...groupList(current)].flatMap((group: EditorGroup) =>
-    group.tabs.filter((tab) => !isPreview(tab)),
+    group.tabs.filter(isTextTab),
   );
   const existing = tabs.find((tab) => tab.documentId === documentId);
   return existing === undefined
@@ -3298,7 +3399,7 @@ const BREADCRUMB_SEPARATOR = ' › ';
 function breadcrumbText(groupId: string): string {
   const group = groupById(groups, groupId);
   const front = group === undefined ? undefined : activeTabOf(group);
-  if (front === undefined || isPreview(front)) return '';
+  if (front === undefined || !isTextTab(front)) return '';
   if (!isBrief(documentOf(workspace, front.documentId)?.kind)) return '';
   const pane_ = panes.get(groupId);
   // A pane that has not taken the tab in front yet still holds the last one's state.
@@ -3330,7 +3431,7 @@ function paintBreadcrumb(groupId: string): void {
 function breadcrumbWhere(groupId: string): string | undefined {
   const group = groupById(groups, groupId);
   const front = group === undefined ? undefined : activeTabOf(group);
-  if (front === undefined || isPreview(front)) return undefined;
+  if (front === undefined || !isTextTab(front)) return undefined;
   return documentOf(workspace, front.documentId)?.pathLabel;
 }
 
@@ -4435,11 +4536,12 @@ async function requestCloseTab(tabId: string): Promise<void> {
   if (tab === undefined) return;
   // A preview holds nothing to lose, and its brief stays open whatever it shows (TYTO-287); a
   // preview of a document is not another tab of it, so it never spares the question below.
+  // A recipe cell drawn full size (TYTO-379) holds nothing to lose either.
   const elsewhere =
-    isPreview(tab) ||
+    !isTextTab(tab) ||
     groupList(groups).some((group) =>
       group.tabs.some(
-        (each) => each.id !== tabId && !isPreview(each) && each.documentId === tab.documentId,
+        (each) => each.id !== tabId && isTextTab(each) && each.documentId === tab.documentId,
       ),
     );
   if (!elsewhere) {
@@ -4875,7 +4977,7 @@ function paintStatusBar(): void {
     vim,
     // The focused pane's caret (TYTO-286): a follower's selection is its own, not the record's.
     cursor: shownState === undefined ? { line: 1, column: 1, selected: 0 } : cursorOf(shownState),
-    kind: activeKind() ?? 'brief',
+    kind: statusKindOf(activeKind()),
     template: isBrief(current.kind) ? templateOf(activeText()) : undefined,
     // A command's rows count too (TYTO-496): the bar is the window's one count, and a person
     // reading it after a failed `tyto render` should not see "no problems".
@@ -5016,6 +5118,7 @@ function repaint(): void {
   // the chrome names (TYTO-256).
   paintTabs();
   paintPreviews();
+  paintRecipeViews();
   paint(document, shellState());
   paintPanel();
   paintCommandBar();

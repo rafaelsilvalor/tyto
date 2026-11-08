@@ -75,6 +75,7 @@ function render(
     copy: vi.fn(() => Promise.resolve({ stale: true as const })),
     facets: vi.fn(() => Promise.resolve({ stale: true as const })),
     row: vi.fn(() => Promise.resolve({ stale: true as const })),
+    openTab: vi.fn<(index: number) => void>(),
   } satisfies CellViewActions;
   const context: CellViewContext = {
     locale,

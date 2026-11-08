@@ -57,8 +57,11 @@ export class EditorGroupElement extends LitElement {
   declare locale: Locale;
   declare select: (tabId: string) => void;
   declare close: (tabId: string) => void;
-  /** What the tab in front is (TYTO-287): text in the CodeMirror pane, or a brief's art. */
-  declare showing: 'editor' | 'preview';
+  /**
+   * What the tab in front is (TYTO-287): text in the CodeMirror pane, a brief's art, or one
+   * recipe cell's result drawn full size (TYTO-379).
+   */
+  declare showing: 'editor' | 'preview' | 'recipe';
   /** Whether the strip offers "Open preview to the side": a brief is in front. */
   declare offerPreview: boolean;
   declare openPreview: () => void;
@@ -103,6 +106,25 @@ export class EditorGroupElement extends LitElement {
 
   private ownMount: HTMLElement | undefined;
   private ownPreview: PreviewPane | undefined;
+  private ownRecipe: HTMLElement | undefined;
+
+  /**
+   * The node a recipe cell's result is drawn in full size (TYTO-379, ADR 0171), made the first
+   * time this group shows one, as {@link preview} is. The window fills it (`main.ts`); this
+   * element only shows or hides it.
+   */
+  get recipeView(): HTMLElement {
+    if (this.ownRecipe === undefined) {
+      this.ownRecipe = document.createElement('div');
+      this.ownRecipe.className = 'recipe-view-pane';
+      // Focusable, so the focus has somewhere to go while the CodeMirror pane is hidden.
+      this.ownRecipe.tabIndex = -1;
+      this.ownRecipe.hidden = this.showing !== 'recipe';
+      if (this.mount.parentNode === null) this.append(this.ownRecipe);
+      else this.mount.after(this.ownRecipe);
+    }
+    return this.ownRecipe;
+  }
 
   /**
    * The preview pane a preview tab in front is drawn in (TYTO-287), made the first time this
@@ -151,9 +173,11 @@ export class EditorGroupElement extends LitElement {
   protected override render(): unknown {
     this.dataset['editorGroup'] = this.groupId;
     this.classList.toggle('editor-group--focused', this.focused);
-    this.mount.hidden = this.showing === 'preview';
+    this.mount.hidden = this.showing !== 'editor';
     const pane = this.showing === 'preview' ? this.preview : this.ownPreview;
     if (pane !== undefined) pane.hidden = this.showing !== 'preview';
+    const recipe = this.showing === 'recipe' ? this.recipeView : this.ownRecipe;
+    if (recipe !== undefined) recipe.hidden = this.showing !== 'recipe';
     const open = translate(this.locale, 'command.preview.openToSide');
     // The pane shape (ADR 0085): the strip — the tabs, then the group's actions at its right
     // end — and the header row, which holds the breadcrumb alone. With a preview in front
@@ -191,7 +215,7 @@ export class EditorGroupElement extends LitElement {
         class="pane__header"
         data-font-area="paneHeaders"
         title=${ifDefined(this.breadcrumbTitle)}
-        ?hidden=${this.showing === 'preview'}
+        ?hidden=${this.showing !== 'editor'}
       >
         <div class="pane__breadcrumb" data-breadcrumb>${this.breadcrumb}</div>
       </div>`;

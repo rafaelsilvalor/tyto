@@ -40,7 +40,12 @@ export type PreviewSubject =
 export interface EditorTab {
   readonly id: string;
   readonly documentId: string;
-  readonly view?: 'preview';
+  readonly view?: 'preview' | 'recipe-view';
+  /**
+   * The cell a `recipe-view` tab draws full size (TYTO-379, ADR 0171), by its index in the
+   * recipe `documentId` names: the index `recipe:rows` pages by. Absent on every other tab.
+   */
+  readonly cell?: number;
   readonly locked?: boolean;
   /** A preview showing a file instead of a brief (TYTO-366, ADR 0124); absent is its brief. */
   readonly subject?: PreviewFileSubject;
@@ -51,6 +56,13 @@ export interface EditorTab {
 }
 
 export const isPreview = (tab: EditorTab): boolean => tab.view === 'preview';
+
+/**
+ * A tab drawing one recipe cell's result full size (TYTO-379, ADR 0171's dated note): the cell's
+ * current view, in a tab of its own. Like a preview it shows no text, so it is no tab of its
+ * recipe; unlike one it closes with its recipe and no session keeps it.
+ */
+export const isRecipeView = (tab: EditorTab): boolean => tab.view === 'recipe-view';
 
 /**
  * What a preview tab shows (TYTO-366): the file it names, else its document — a Markdown file
@@ -73,7 +85,8 @@ const sameSubject = (a: EditorTab, b: EditorTab): boolean => {
 };
 
 /** A tab that shows a document's text: what every lookup by document means (TYTO-287). */
-const isEditorTab = (tab: EditorTab): boolean => tab.view === undefined;
+export const isTextTab = (tab: EditorTab): boolean => tab.view === undefined;
+const isEditorTab = isTextTab;
 
 /** A leaf of the tree: a group with its tabs and the one in front. */
 export interface EditorGroup {
@@ -353,12 +366,15 @@ export function closeTab(groups: EditorGroups, tabId: string): EditorGroups {
 
 /**
  * Every tab of a document closed, wherever it is: the document itself went away. Its locked
- * previews go with it; a following preview stays, for the window to point at the next brief.
+ * previews go with it, and so do the cells of a recipe drawn full size (TYTO-379); a following
+ * preview stays, for the window to point at the next brief.
  */
 export function closeDocumentTabs(groups: EditorGroups, documentId: string): EditorGroups {
   const tabs = groupList(groups).flatMap((group) =>
     group.tabs.filter(
-      (tab) => tab.documentId === documentId && (isEditorTab(tab) || tab.locked === true),
+      (tab) =>
+        tab.documentId === documentId &&
+        (isEditorTab(tab) || tab.locked === true || isRecipeView(tab)),
     ),
   );
   return tabs.reduce((next, tab) => closeTab(next, tab.id), groups);
@@ -495,21 +511,25 @@ export function moveTabToNextGroup(groups: EditorGroups): EditorGroups {
  * tabs in order and the index of the one in front, and the focused group as its index among
  * the leaves in tree order (`shared/session-groups.ts`). `item` turns a tab into what the record
  * holds for it.
+ *
+ * A recipe cell drawn full size is left out (TYTO-379): its rows live in main only while the
+ * recipe's run does, so a restart would bring back a tab with nothing to draw. A group in front
+ * of one keeps the tab before it in front instead; a group of nothing else is written empty,
+ * and `shared/session-groups.ts` drops an empty leaf on the way out.
  */
 export function layoutOf<T>(
   groups: EditorGroups,
   item: (tab: EditorTab, group: EditorGroup) => T,
 ): { readonly root: SessionGroupNode<T>; readonly focused: number } {
-  const walk = (node: GroupNode): SessionGroupNode<T> =>
-    node.kind === 'group'
-      ? {
-          tabs: node.tabs.map((tab) => item(tab, node)),
-          active: Math.max(
-            node.tabs.findIndex((tab) => tab.id === node.activeTabId),
-            0,
-          ),
-        }
-      : { split: node.direction, sizes: [...node.sizes], children: node.children.map(walk) };
+  const walk = (node: GroupNode): SessionGroupNode<T> => {
+    if (node.kind === 'split') {
+      return { split: node.direction, sizes: [...node.sizes], children: node.children.map(walk) };
+    }
+    const front = node.tabs.findIndex((tab) => tab.id === node.activeTabId);
+    const kept = node.tabs.filter((tab) => !isRecipeView(tab));
+    const before = node.tabs.slice(0, front + 1).filter((tab) => !isRecipeView(tab)).length;
+    return { tabs: kept.map((tab) => item(tab, node)), active: Math.max(before - 1, 0) };
+  };
   const focused = groupList(groups).findIndex((group) => group.id === groups.focusedGroupId);
   return { root: walk(groups.root), focused: Math.max(focused, 0) };
 }
@@ -803,4 +823,28 @@ export function setPreviewMode(
     const { mode: _mode, ...one } = each;
     return one;
   });
+}
+
+/**
+ * "Open cell result in a tab" (TYTO-379, ADR 0171's dated note): the tab already drawing that
+ * cell of that recipe, brought to the front of its group and focused, or a new one in the focused
+ * group, in front. One tab per cell: a second ask is the first tab again, never a twin.
+ */
+export function openRecipeView(
+  groups: EditorGroups,
+  documentId: string,
+  cell: number,
+): EditorGroups {
+  const existing = groupList(groups)
+    .flatMap((group) => group.tabs)
+    .find((tab) => isRecipeView(tab) && tab.documentId === documentId && tab.cell === cell);
+  if (existing !== undefined) return activateTab(groups, existing.id);
+  const group = focusedGroup(groups);
+  const [tabId, minted] = mint(groups, 'tab');
+  const tab: EditorTab = { id: tabId, documentId, view: 'recipe-view', cell };
+  return withGroup(minted, group.id, (found) => ({
+    ...found,
+    tabs: [...found.tabs, tab],
+    activeTabId: tabId,
+  }));
 }

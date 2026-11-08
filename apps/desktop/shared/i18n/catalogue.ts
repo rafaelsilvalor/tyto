@@ -521,6 +521,15 @@ export interface Catalogue {
   readonly 'recipe.cell.included.show': string;
   readonly 'recipe.cell.included.hide': string;
   /**
+   * TYTO-379, a cell drawn full size in a tab of its own: the command, the cell's button, the
+   * tab's label (`{name}` is the recipe's tab label, `{cell}` the cell's number from one) and
+   * what the tab says while its cell has no result to draw.
+   */
+  readonly 'command.recipe.openCellView': string;
+  readonly 'recipe.cell.openTab': string;
+  readonly 'recipe.view.tab': string;
+  readonly 'recipe.view.empty': string;
+  /**
    * TYTO-378, a plan cell (`recipe-plan-view.ts`): Apply, what the lines leave out, each
    * line's mark, the summary's counts, `apply auto` held outside a trusted folder, and the
    * words for a refusal that came with no reason.
@@ -1197,6 +1206,10 @@ export const CATALOGUE_KEYS = [
   'recipe.cell.expand',
   'recipe.cell.included.show',
   'recipe.cell.included.hide',
+  'command.recipe.openCellView',
+  'recipe.cell.openTab',
+  'recipe.view.tab',
+  'recipe.view.empty',
   'recipe.plan.apply',
   'recipe.plan.more',
   'recipe.plan.more.one',

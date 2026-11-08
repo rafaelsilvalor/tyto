@@ -133,6 +133,12 @@ export const RECIPE_RUN = 'recipe.run';
 export const RECIPE_RUN_FROM_CELL = 'recipe.runFromCell';
 export const RECIPE_RUN_FRESH = 'recipe.runFresh';
 /**
+ * TYTO-379 (ADR 0171's dated note). Draws the cell at or above the cursor full size, in a tab of
+ * its own, in the cell's current view. Offered only with a recipe in front; the cell's own
+ * "Open in a tab" button does the same for its cell.
+ */
+export const RECIPE_OPEN_CELL_VIEW = 'recipe.openCellView';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -363,6 +369,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [RECIPE_RUN]: 'command.recipe.run',
   [RECIPE_RUN_FROM_CELL]: 'command.recipe.runFromCell',
   [RECIPE_RUN_FRESH]: 'command.recipe.runFresh',
+  [RECIPE_OPEN_CELL_VIEW]: 'command.recipe.openCellView',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -492,6 +499,8 @@ export interface DesktopActions {
   runRecipeFromCell(): void;
   /** TYTO-377. Runs the recipe in front with `fresh` and `explicit`: every source fetches. */
   runRecipeFresh(): void;
+  /** TYTO-379. Opens the recipe in front's cursor cell full size, in a tab of its own. */
+  openRecipeCellView(): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -673,6 +682,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(RECIPE_RUN_FRESH, () => {
     actions.runRecipeFresh();
+  });
+  add(RECIPE_OPEN_CELL_VIEW, () => {
+    actions.openRecipeCellView();
   });
   add(THEME_PICK, () => {
     actions.pickTheme();

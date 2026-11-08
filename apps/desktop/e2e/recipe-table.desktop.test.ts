@@ -16,7 +16,8 @@ import { firstWindow } from './first-window.js';
 /**
  * The Table view over 5,000 rows, in the real window (TYTO-379, ADR 0171): the rows come from main
  * a page at a time through `recipe:rows`, the wheel scrolls to the last row while only the rows in
- * sight exist, a header sorts in main, and the quick filter counts what it kept.
+ * sight exist, a header sorts in main, and the quick filter counts what it kept. The cell then
+ * opens full size in a tab of its own, which closes with the recipe.
  *
  * A plugin installed by the real `tyto plugin install` registers the source verb `fixture.rows`,
  * which fetches the table from this file's own server, as `recipe-notebook.desktop.test.ts` does.
@@ -298,5 +299,58 @@ describe('the Table view over 5,000 rows (TYTO-379)', () => {
       .locator(`${TABLE} .recipe-table__row[data-row="0"] a.recipe-table__link`)
       .getAttribute('href');
     expect(link).toBe('https://example.com/4999');
+  }, 20_000);
+
+  it('opens the cell full size in a tab, which closes with its recipe (TYTO-379)', async () => {
+    const PANE = '.recipe-view-pane:not([hidden])';
+    await page
+      .locator('#editor .recipe-cell', { has: page.locator('.recipe-table') })
+      .locator('[data-action="open-tab"]')
+      .click();
+    // A fresh view, in the recipe's order: the cell's sort and filter stay under the cell.
+    await page.waitForFunction(
+      (pane) =>
+        document.querySelector(`${pane} .recipe-table__row .recipe-table__cell`)?.textContent ===
+        '1',
+      PANE,
+      { timeout: 10_000 },
+    );
+    const full = await page.evaluate((pane) => {
+      const viewport = document.querySelector(`${pane} .recipe-table__viewport`);
+      return {
+        tab: document
+          .querySelector('#editor')
+          ?.closest('tyto-editor-group')
+          ?.querySelector('.tabs__tab--on .tabs__label')?.textContent,
+        count: document.querySelector(`${pane} .recipe-table__count`)?.textContent,
+        viewportHeight: viewport?.getBoundingClientRect().height ?? 0,
+        rows: document.querySelectorAll(`${pane} .recipe-table__row`).length,
+        editorHidden: (document.querySelector('#editor') as HTMLElement | null)?.hidden,
+      };
+    }, PANE);
+    expect(full.tab).toBe('big.recipe · cell 2');
+    expect(full.count).toBe('Rows: 5,000');
+    expect(full.editorHidden).toBe(true);
+    // Taller than the cell's 12 rows and its header, so more rows exist than the cell's 20.
+    expect(full.viewportHeight).toBeGreaterThan(13 * 24);
+    expect(full.rows).toBeGreaterThan(20);
+
+    const shots = process.env['TYTO_RECIPE_TABLE_SHOTS'];
+    if (shots !== undefined) await page.screenshot({ path: join(shots, 'recipe-view-tab.png') });
+
+    // The recipe's own tab closed: its document goes, and the cell's tab with it.
+    await page
+      .locator('.tabs__tab')
+      .filter({ has: page.locator('.tabs__label', { hasText: /^big\.recipe$/ }) })
+      .locator('.tabs__close')
+      .click();
+    await page.waitForFunction(
+      () =>
+        ![...document.querySelectorAll('.tabs__label')].some((label) =>
+          label.textContent?.startsWith('big.recipe'),
+        ),
+      undefined,
+      { timeout: 10_000 },
+    );
   }, 20_000);
 });

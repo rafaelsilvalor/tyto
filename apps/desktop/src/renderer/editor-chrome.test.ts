@@ -13,6 +13,7 @@ import {
   PREVIEW_TOGGLE_LOCK,
   RECIPE_RUN,
   RECIPE_RUN_FRESH,
+  RECIPE_OPEN_CELL_VIEW,
   RECIPE_RUN_FROM_CELL,
   SETTINGS_OPEN,
   TEMPLATE_EDIT,
@@ -88,12 +89,28 @@ describe('a recipe tab (TYTO-377)', () => {
       textCommands: true,
     });
     for (const id of BRIEF_ONLY_COMMANDS) expect(commandOffered('recipe', id), id).toBe(false);
-    for (const id of [RECIPE_RUN, RECIPE_RUN_FROM_CELL, RECIPE_RUN_FRESH]) {
+    for (const id of [RECIPE_RUN, RECIPE_RUN_FROM_CELL, RECIPE_RUN_FRESH, RECIPE_OPEN_CELL_VIEW]) {
       expect(commandOffered('recipe', id), id).toBe(true);
-      for (const kind of [undefined, 'text', 'markdown', 'settings', 'preview'] as const) {
+      for (const kind of [
+        undefined,
+        'text',
+        'markdown',
+        'settings',
+        'preview',
+        'recipe-view',
+      ] as const) {
         expect(commandOffered(kind, id), `${id} ${String(kind)}`).toBe(false);
       }
     }
+  });
+
+  it('drawn full size in a tab, is no text and no brief (TYTO-379)', () => {
+    expect(editorChromeFor('recipe-view')).toEqual({
+      templateEdits: false,
+      briefCommands: false,
+      textCommands: false,
+    });
+    expect(languageOf('recipe-view')).toBeUndefined();
   });
 
   it('opens in the recipe language with its own help', () => {

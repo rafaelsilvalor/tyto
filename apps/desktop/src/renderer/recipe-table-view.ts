@@ -56,6 +56,11 @@ export interface TableViewOptions {
   readonly summary: boolean;
   readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
   readonly copy: (request: CopyRequest) => Promise<CopyAnswer>;
+  /**
+   * Drawn in a tab of its own (TYTO-379): the viewport takes the height the tab gives it, read
+   * on every draw and drawn again when it changes, instead of a fixed number of rows.
+   */
+  readonly fullSize?: boolean;
 }
 
 export function tableView(options: TableViewOptions): HTMLElement {
@@ -116,9 +121,14 @@ export function tableView(options: TableViewOptions): HTMLElement {
   const viewport = element('div', 'recipe-table__viewport');
   viewport.tabIndex = 0;
   viewport.setAttribute('role', 'grid');
-  const viewportHeight = Math.min(VIEWPORT_ROWS, Math.max(1, total)) * ROW_HEIGHT;
-  // The header row is sticky inside the viewport, so the rows get the height under it.
-  viewport.style.height = `${String(viewportHeight + ROW_HEIGHT)}px`;
+  const fixedHeight = Math.min(VIEWPORT_ROWS, Math.max(1, total)) * ROW_HEIGHT;
+  const fullSize = options.fullSize === true;
+  // The header row is sticky inside the viewport, so the rows get the height under it. Full
+  // size, the stylesheet stretches the viewport and the rows get what is under its header.
+  if (fullSize) root.classList.add('recipe-table--full');
+  else viewport.style.height = `${String(fixedHeight + ROW_HEIGHT)}px`;
+  const viewportHeight = (): number =>
+    fullSize ? Math.max(viewport.clientHeight - ROW_HEIGHT, ROW_HEIGHT) : fixedHeight;
   const head = element('div', 'recipe-table__head');
   head.setAttribute('role', 'row');
   const canvas = element('div', 'recipe-table__canvas');
@@ -173,7 +183,7 @@ export function tableView(options: TableViewOptions): HTMLElement {
     drawHead(template, width);
     canvas.style.height = `${String(matched * ROW_HEIGHT)}px`;
     canvas.style.width = width;
-    const range = visibleRange(viewport.scrollTop, viewportHeight, matched);
+    const range = visibleRange(viewport.scrollTop, viewportHeight(), matched);
     const lines: HTMLElement[] = [];
     for (let row = range.start; row < range.end; row += 1) {
       const page = Math.floor(row / PAGE_SIZE);
@@ -349,6 +359,16 @@ export function tableView(options: TableViewOptions): HTMLElement {
     event.preventDefault();
     event.stopPropagation();
   });
+
+  // A tab resized, or shown after it was hidden, has another number of rows in sight.
+  if (fullSize && typeof ResizeObserver !== 'undefined') {
+    let drawnHeight = -1;
+    new ResizeObserver(() => {
+      if (viewport.clientHeight === drawnHeight) return;
+      drawnHeight = viewport.clientHeight;
+      draw();
+    }).observe(viewport);
+  }
 
   draw();
   return root;

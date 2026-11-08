@@ -899,6 +899,55 @@ tyto-preview-pane[hidden] {
   display: none;
 }
 
+/*
+ * A recipe cell's result as a tab's content (TYTO-379, ADR 0171's dated note), in place of the
+ * CodeMirror pane while that tab is in front. The cell's view is drawn here as it is under the
+ * cell, with the in-cell height caps lifted: the Table's viewport stretches to the tab
+ * (`.recipe-table--full`), and a Board's columns, the Cards grid and the Calendar's list of
+ * undated rows grow, the pane scrolling.
+ */
+.recipe-view-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--tyto-space-3) var(--tyto-space-4);
+  background: var(--tyto-surface);
+  color: var(--tyto-text);
+  outline: none;
+}
+
+.recipe-view-pane[hidden] {
+  display: none;
+}
+
+.recipe-view-pane > .recipe-cell__body {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+}
+
+.recipe-view-pane__empty {
+  color: var(--tyto-text-muted);
+}
+
+.recipe-table--full {
+  display: flex;
+  flex-direction: column;
+}
+
+.recipe-table--full > .recipe-table__viewport {
+  flex: 1;
+  min-height: calc(3 * var(--recipe-table-row));
+}
+
+.recipe-view-pane .recipe-board__cards,
+.recipe-view-pane .recipe-cards__grid,
+.recipe-view-pane .recipe-calendar__rows {
+  max-height: none;
+}
+
 .preview__lock {
   border: var(--tyto-hairline-width) solid var(--tyto-border);
   border-radius: var(--tyto-radius-sm);

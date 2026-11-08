@@ -1,7 +1,7 @@
 # Recipes
 
 ::: info How this page was checked
-Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Menus and labels below are the English window's.
+Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a step in a tab was checked on 2026-11-08 by the same suite, drawing the 5,000 rows full size and closing the recipe. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Menus and labels below are the English window's.
 :::
 
 A recipe (`.recipe`) is a list of steps, one per line, that fetch rows from a source, filter and reshape them, and plan what to write. Tyto opens a recipe in a tab as a notebook: **under each step, its result**, a table you can read while you write the next line.
@@ -74,6 +74,12 @@ The calendar opens on the week or month that holds today; **Previous** and **Nex
 `show cards fields=title,owner,due` draws every step from it down as **loose cards**: a grid of cards of one size, each showing the columns `fields=` names, the first as its title. Without `fields=`, a card shows the first four columns.
 
 The grid draws 48 cards; **252 more** draws the next ones. _Filter rows_ works as in the Table view. Click a card (or press Enter on it) to open it: it shows **every column of the row**, those the card leaves out included, and where the row came from: its source, the row's id at the source, when it was fetched, and its link, the first `link` column holding a web address. A long value is shown whole up to 10,000 characters. A row made by `group` names `group` as its source and the group's key as its id. Escape or **Close** closes it. The cards are for reading: nothing on them writes.
+
+## Open a step in a tab
+
+**Open in a tab**, on the line of a step whose table the last run kept, draws that step's result full size in a tab of its own, beside the recipe's: the same view the step has, a Table, Summary, Board, Calendar or loose cards, with the whole height of the window to use. A step under no `show` opens in the Table view, since the tab has room for every row. The command **Open cell result in a tab** does the same for the step at or above the cursor. The tab is named after the recipe and the step's number, counted from the top (_weekly.recipe · cell 2_).
+
+The tab follows the recipe: a new run draws it again with the new rows, and it closes when the recipe's tab closes. Its sort, filter and columns are its own, apart from the step's. It is not brought back when Tyto opens again: open it again from the step. A step from a recipe opened by `run` has no button; open that recipe to draw its steps in a tab.
 
 ## Fold a table
 

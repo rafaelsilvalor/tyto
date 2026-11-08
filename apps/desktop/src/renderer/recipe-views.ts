@@ -33,6 +33,12 @@ export interface ViewContext {
   readonly facets: (request: FacetsRequest) => Promise<FacetsAnswer>;
   /** One row whole, every column and its provenance, for a card opened (TYTO-384). */
   readonly row: (request: RowRequest) => Promise<RowAnswer>;
+  /**
+   * Drawn in a tab of its own rather than under the cell (TYTO-379, ADR 0171's dated note): the
+   * Table and Summary stretch their viewport to the tab; Board, Calendar and Cards need no word
+   * of it, since the stylesheet lifts their in-cell height caps inside the tab.
+   */
+  readonly fullSize?: boolean;
 }
 
 /** What a view draws from: a cell that ran, with its table and the run main keeps. */
@@ -58,6 +64,7 @@ const tableOf =
       summary,
       rows: context.rows,
       copy: context.copy,
+      fullSize: context.fullSize === true,
     });
 
 /** TYTO-381: a board `show` did not give `by=` (no notebook checked it) keeps the table. */
@@ -123,6 +130,22 @@ export const VIEW_RENDERERS: Readonly<Record<RecipeViewName, ViewRenderer>> = {
 };
 
 const isViewName = (name: string): name is RecipeViewName => Object.hasOwn(RECIPE_VIEWS, name);
+
+/**
+ * What a cell drawn full size shows (TYTO-379): the view its `show` chose, the Table under no
+ * `show` — a tab is room enough for every row, where the cell keeps a preview — and `undefined`
+ * for a cell with no table main holds, which has no rows to page through.
+ */
+export function fullSizeBody(cell: WireCell, context: ViewContext): HTMLElement | undefined {
+  const table = cell.status === 'ok' || cell.status === 'stale' ? cell.table : undefined;
+  if (table === undefined || cell.ranAt === undefined) return undefined;
+  const name = cell.view?.name;
+  const view = name !== undefined && isViewName(name) ? name : 'table';
+  return VIEW_RENDERERS[view](
+    { index: cell.index, ranAt: cell.ranAt, table, options: cell.view?.options ?? {} },
+    { ...context, fullSize: true },
+  );
+}
 
 /**
  * The body a cell's view draws, or `undefined` for the preview a cell under no `show` keeps

@@ -69,6 +69,7 @@ function contextOf(more: Partial<CellViewContext> = {}) {
     copy: vi.fn(() => Promise.resolve({ stale: true as const })),
     facets: vi.fn(() => Promise.resolve({ stale: true as const })),
     row: vi.fn(() => Promise.resolve({ stale: true as const })),
+    openTab: vi.fn<(index: number) => void>(),
   } satisfies CellViewActions;
   const context: CellViewContext = {
     locale: 'en',
@@ -247,9 +248,24 @@ describe("a cell's age", () => {
 });
 
 describe("a cell's buttons", () => {
+  it('opens its own cell in a tab, and only a cell whose table main keeps (TYTO-379)', () => {
+    const kept = render(cellOf({ index: 4 }));
+    (kept.element.querySelector('[data-action="open-tab"]') as HTMLButtonElement).click();
+    expect(kept.actions.openTab).toHaveBeenCalledWith(4);
+
+    // A table with no run main holds pages nothing: there are no rows to draw full size.
+    const unkept = render(cellOf({ ranAt: undefined }));
+    expect(unkept.element.querySelector('[data-action="open-tab"]')).toBeNull();
+    const failed = render(cellOf({ status: 'failed', table: undefined }));
+    expect(failed.element.querySelector('[data-action="open-tab"]')).toBeNull();
+  });
+
   it('runs from this cell, and fetches again only on a cell that fetches', () => {
     const plain = render(cellOf({ index: 3 }));
-    expect(texts(plain.element, '.recipe-cell__action')).toEqual(['Run from here']);
+    expect(texts(plain.element, '.recipe-cell__action')).toEqual([
+      'Run from here',
+      'Open in a tab',
+    ]);
     (plain.element.querySelector('[data-action="run-from"]') as HTMLButtonElement).click();
     expect(plain.actions.runFrom).toHaveBeenCalledWith(3);
 
@@ -257,6 +273,7 @@ describe("a cell's buttons", () => {
     expect(texts(source.element, '.recipe-cell__action')).toEqual([
       'Executar daqui',
       'Buscar de novo',
+      'Abrir numa aba',
     ]);
     (source.element.querySelector('[data-action="fetch-again"]') as HTMLButtonElement).click();
     expect(source.actions.fetchAgain).toHaveBeenCalledOnce();
