@@ -74,3 +74,22 @@ channels, so **day bucketing also happens in main**; the renderer never reads a 
   more" asks for one day's rest.
 - The first weekday is the window language's (`Intl.Locale#getWeekInfo`), Monday when the
   engine says nothing. The Calendar is view only, as the Board is (decision 6).
+
+## Note, 2026-11-08 (TYTO-384): a card opened reads its row from main
+
+The Cards view (`show cards [fields=…]`, the first four columns when absent) pages its grid
+through `recipe:rows` with `columns` set to `fields=`, as a Board column does, and adds one
+channel: **`recipe:row {documentId, index, ranAt, key}`** answers one row whole, every column the
+table has (up to `RECIPE_WIRE_LIMITS.columns`) whatever `fields=` a card shows, and the row's
+provenance `{source, id, fetchedAt}`; or `stale` when the cell ran again or no longer holds the
+key.
+
+- An opened card is read whole, so its values are cut at `RECIPE_WIRE_LIMITS.opened` = 10,000
+  characters instead of the preview's 1,000; names and provenance stay at 1,000.
+- `Provenance` carries no address, and changing that contract is out of scope. The card's link
+  is the first `link` column whose value `externalUrlAllowed` accepts; a `file:` or custom-scheme
+  value is drawn as text, never an anchor.
+- A row made by `group` shows `group` as its source and the group's key as its id, as
+  `Provenance` already says.
+- The opened card is drawn in the window's dialog frame (a scrim, `role="dialog"`,
+  `aria-modal`), and Escape closes it. View only (decision 6).

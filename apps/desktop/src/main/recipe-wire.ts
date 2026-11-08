@@ -102,16 +102,21 @@ function tableToWire(table: Table): NonNullable<WireCell['table']> {
   };
 }
 
-/** A list joined the way a person writes it, a long text cut; numbers and booleans as they are. */
-export function valueToWire(value: CellValue | undefined): WireValue {
+/**
+ * A list joined the way a person writes it, a long text cut; numbers and booleans as they are.
+ * `limit` is a cell's preview length unless a card opened asks for more (TYTO-384).
+ */
+export function valueToWire(
+  value: CellValue | undefined,
+  limit: number = RECIPE_WIRE_LIMITS.text,
+): WireValue {
   if (value === undefined || value === null) return null;
   if (typeof value === 'number' || typeof value === 'boolean') return value;
-  return cut(typeof value === 'string' ? value : cellText(value));
+  return cut(typeof value === 'string' ? value : cellText(value), limit);
 }
 
-/** At most `RECIPE_WIRE_LIMITS.text` characters, the last an ellipsis when it was cut. */
-export function cut(text: string): string {
-  const limit = RECIPE_WIRE_LIMITS.text;
+/** At most `limit` characters, `RECIPE_WIRE_LIMITS.text` by default, the last an ellipsis when cut. */
+export function cut(text: string, limit: number = RECIPE_WIRE_LIMITS.text): string {
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
 }
 

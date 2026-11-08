@@ -747,6 +747,37 @@ const DATED_TABLE: Table = {
   })),
 };
 
+// TYTO-384: the table the document `cards` keeps: a note longer than an opened card shows, a
+// link, and a row grouped (`source: 'group'`) beside one fetched.
+const LONG_NOTE = 'x'.repeat(12_000);
+const CARD_TABLE: Table = {
+  columns: [
+    { name: 'key', type: 'text', origin: 'test' },
+    { name: 'title', type: 'text', origin: 'test' },
+    { name: 'note', type: 'text', origin: 'test' },
+    { name: 'labels', type: 'list', origin: 'test' },
+    { name: 'site', type: 'link', origin: 'test' },
+  ],
+  rows: [
+    {
+      key: 'C-1',
+      values: {
+        key: 'C-1',
+        title: 'First',
+        note: LONG_NOTE,
+        labels: ['a', 'b'],
+        site: 'https://example.com/C-1',
+      },
+      provenance: { source: 'acme.pull', id: '10001', fetchedAt: '2026-11-07T09:00:00.000Z' },
+    },
+    {
+      key: 'Done',
+      values: { key: 'Done', title: null, note: null, labels: null, site: null },
+      provenance: { source: 'group', id: 'Done', fetchedAt: '2026-11-07T08:00:00.000Z' },
+    },
+  ],
+};
+
 const recipeRunner = () => {
   const asked: RecipeRunInput[] = [];
   const closed: string[] = [];
@@ -791,15 +822,17 @@ const recipeRunner = () => {
       });
     },
     table: (documentId, index) =>
-      documentId === 'calendar' && index === 0
-        ? { table: DATED_TABLE, ranAt: KEPT_RAN_AT, clock: SAO_PAULO }
-        : documentId === 'document-1' && index <= 1
-          ? {
-              table: KEPT_TABLE,
-              ranAt: KEPT_RAN_AT,
-              view: { name: index === 0 ? 'summary' : 'table', options: {} },
-            }
-          : undefined,
+      documentId === 'cards' && index === 0
+        ? { table: CARD_TABLE, ranAt: KEPT_RAN_AT, view: { name: 'cards', options: {} } }
+        : documentId === 'calendar' && index === 0
+          ? { table: DATED_TABLE, ranAt: KEPT_RAN_AT, clock: SAO_PAULO }
+          : documentId === 'document-1' && index <= 1
+            ? {
+                table: KEPT_TABLE,
+                ranAt: KEPT_RAN_AT,
+                view: { name: index === 0 ? 'summary' : 'table', options: {} },
+              }
+            : undefined,
     verbs: () => ['acme.pull', 'where'],
     close: (documentId) => {
       closed.push(documentId);
@@ -1346,6 +1379,46 @@ describe('the tab a message is about (E9.11)', () => {
     expect(
       await handlers['recipe:facets']({ ...asked, ranAt: 'another run', column: 'due' }),
     ).toEqual({ stale: true });
+  });
+
+  // TYTO-384: a card opened reads every column of its row, whatever `fields=` the card shows.
+  it('opens one row whole: every column, values cut at the opened limit, and provenance', async () => {
+    const handlers = createHandlers(dependencies());
+    const asked = { documentId: 'cards', index: 0, ranAt: KEPT_RAN_AT };
+
+    const opened = await handlers['recipe:row']({ ...asked, key: 'C-1' });
+    const grouped = await handlers['recipe:row']({ ...asked, key: 'Done' });
+
+    expect(opened).toEqual({
+      columns: [
+        { name: 'key', type: 'text' },
+        { name: 'title', type: 'text' },
+        { name: 'note', type: 'text' },
+        { name: 'labels', type: 'list' },
+        { name: 'site', type: 'link' },
+      ],
+      values: ['C-1', 'First', `${'x'.repeat(9_999)}…`, 'a, b', 'https://example.com/C-1'],
+      provenance: { source: 'acme.pull', id: '10001', fetchedAt: '2026-11-07T09:00:00.000Z' },
+    });
+    expect('values' in opened && String(opened.values[2]).length).toBe(10_000);
+    // A grouped row says it is one, and which group.
+    expect(grouped).toMatchObject({
+      provenance: { source: 'group', id: 'Done' },
+      values: ['Done', null, null, null, null],
+    });
+  });
+
+  it('answers stale for a card of another run, of a cell it does not keep, or a key it lacks', async () => {
+    const handlers = createHandlers(dependencies());
+    const asked = { documentId: 'cards', index: 0, ranAt: KEPT_RAN_AT };
+
+    expect(await handlers['recipe:row']({ ...asked, ranAt: 'another run', key: 'C-1' })).toEqual({
+      stale: true,
+    });
+    expect(await handlers['recipe:row']({ ...asked, index: 4, key: 'C-1' })).toEqual({
+      stale: true,
+    });
+    expect(await handlers['recipe:row']({ ...asked, key: 'C-404' })).toEqual({ stale: true });
   });
 
   it('passes a confirmation straight through, strings and all', async () => {

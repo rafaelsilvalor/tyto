@@ -1175,6 +1175,120 @@ tyto-preview-pane[hidden] {
   font-size: var(--tyto-text-sm);
 }
 
+/* The Cards view (TYTO-384, recipe-cards-view.ts): the Table's bar, then a grid of cards of one
+   height that scrolls inside the cell, so hundreds of cards keep the cell's height. A long value
+   is cut on the card; the opened card shows it whole. */
+.recipe-cards__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  grid-auto-rows: 5.5rem;
+  gap: var(--tyto-space-2);
+  max-height: 24rem;
+  overflow-y: auto;
+  padding: var(--tyto-space-1) 0;
+}
+
+.recipe-cards__card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--tyto-space-1) var(--tyto-space-2);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  background: var(--tyto-surface);
+  cursor: pointer;
+}
+
+.recipe-cards__card:hover,
+.recipe-cards__card:focus-visible {
+  border-color: var(--tyto-accent);
+}
+
+.recipe-cards__title,
+.recipe-cards__field {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-cards__title {
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-cards__field,
+.recipe-cards__label {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-cards__more {
+  align-self: flex-start;
+}
+
+/* A card opened (TYTO-384): the frame of the window's other dialogs, over a scrim; a long value
+   wraps and the panel scrolls. */
+.recipe-card-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tyto-scrim);
+}
+
+.recipe-card-dialog__panel {
+  display: flex;
+  width: min(var(--tyto-dialog-width-md), calc(100vw - 2 * var(--tyto-space-6)));
+  max-height: 80vh;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  gap: var(--tyto-space-4);
+}
+
+.recipe-card-dialog__title {
+  margin: 0;
+  font-size: var(--tyto-text-lg);
+  overflow-wrap: anywhere;
+}
+
+.recipe-card-dialog__fields,
+.recipe-card-dialog__provenance {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) 1fr;
+  margin: 0;
+  gap: var(--tyto-space-1) var(--tyto-space-3);
+}
+
+.recipe-card-dialog__provenance {
+  padding-top: var(--tyto-space-3);
+  border-top: var(--tyto-hairline-width) solid var(--tyto-border);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-card-dialog__name {
+  color: var(--tyto-text-muted);
+}
+
+.recipe-card-dialog__value {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.recipe-card-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* The Calendar view (TYTO-383, recipe-calendar-view.ts): the Table's bar, the span's buttons,
    then seven columns of days; a day cell draws three rows and "+k more", so a month keeps the
    cell's height. The days around a month are muted, today is outlined. */

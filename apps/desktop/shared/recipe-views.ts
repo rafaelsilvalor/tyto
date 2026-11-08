@@ -32,6 +32,11 @@ export const RECIPE_VIEWS = {
     { name: 'time', kind: 'column', types: ['text', 'datetime'] },
     { name: 'span', kind: 'choice', values: ['week', 'month'] },
   ],
+  /**
+   * TYTO-384: a grid of loose cards, each showing `fields=` (the first four columns when
+   * absent); opening one shows every column of its row and where the row came from.
+   */
+  cards: [{ name: 'fields', kind: 'columns' }],
 } as const satisfies ViewSpecs;
 
 export type RecipeViewName = keyof typeof RECIPE_VIEWS;

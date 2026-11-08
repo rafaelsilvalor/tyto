@@ -64,6 +64,12 @@ Uma coluna desenha cinquenta cartões; **mais 50** desenha os próximos. _Filtra
 
 O calendário abre na semana ou no mês que contém hoje; **Anterior** e **Próximo** andam um período de cada vez, e _3 antes · 12 depois_ diz quantas linhas com data ficaram fora dele. Um dia mostra as três primeiras linhas e **+ mais 2** para o resto. Linhas sem data, ou com uma data que não diz dia nenhum (como `soon`), nunca somem: ficam listadas embaixo do calendário como _Sem data (14)_, com a data errada escrita ao lado da linha. A semana começa no dia em que o seu idioma a começa. _Filtrar linhas_ funciona como na visão de Tabela. O calendário é para leitura: arrastar uma linha não a muda de dia.
 
+## Mostrar as linhas como cartões soltos
+
+`show cards fields=title,owner,due` desenha cada passo dali para baixo como **cartões soltos**: uma grade de cartões do mesmo tamanho, cada um com as colunas de `fields=`, a primeira como título. Sem `fields=`, um cartão mostra as quatro primeiras colunas.
+
+A grade desenha 48 cartões; **mais 252** desenha os próximos. _Filtrar linhas_ funciona como na visão de Tabela. Clique num cartão (ou Enter, com ele em foco) para abri-lo: ele mostra **todas as colunas da linha**, também as que o cartão não mostra, e de onde a linha veio: a origem, o id da linha na origem, quando ela foi buscada e o link dela, a primeira coluna `link` com um endereço web. Um valor longo aparece inteiro até 10.000 caracteres. Uma linha feita por `group` diz `group` como origem e a chave do grupo como id. Esc ou **Fechar** fecha o cartão. Os cartões são para leitura: nada neles escreve.
+
 ## Recolher uma tabela
 
 A seta no começo da linha recolhe a tabela do passo e a traz de volta. Toda tabela começa aberta. Uma tabela recolhida fica recolhida enquanto a aba está aberta, em novas execuções e quando sai da tela pela rolagem; fechar a aba ou sair do Tyto abre todas de novo.

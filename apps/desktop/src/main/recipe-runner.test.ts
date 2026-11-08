@@ -315,7 +315,7 @@ describe('the views a cell is drawn in', () => {
     const problem = answer.cells[1]?.diagnostics[0];
     expect(problem?.code).toBe('E_RECIPE_VIEW');
     expect(problem?.message).toBe(
-      "No view named 'tables' is drawn here. Available: table, summary, board, calendar.",
+      "No view named 'tables' is drawn here. Available: table, summary, board, calendar, cards.",
     );
     expect(text.slice(problem?.range?.start, problem?.range?.end)).toBe('tables');
   });

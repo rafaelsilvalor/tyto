@@ -64,6 +64,12 @@ A column draws fifty cards; **50 more** draws the next ones. _Filter rows_ works
 
 The calendar opens on the week or month that holds today; **Previous** and **Next** move a span at a time, and _3 earlier · 12 later_ says how many dated rows lie outside it. A day shows its first three rows and **+2 more** for the rest. Rows with no date, or a date that names no day (such as `soon`), are never dropped: they are listed under the calendar as _No date (14)_, a wrong date written beside its row. The week starts on the day your language starts it. _Filter rows_ works as in the Table view. The calendar is for reading: a row is not moved by dragging it.
 
+## Show rows as loose cards
+
+`show cards fields=title,owner,due` draws every step from it down as **loose cards**: a grid of cards of one size, each showing the columns `fields=` names, the first as its title. Without `fields=`, a card shows the first four columns.
+
+The grid draws 48 cards; **252 more** draws the next ones. _Filter rows_ works as in the Table view. Click a card (or press Enter on it) to open it: it shows **every column of the row**, those the card leaves out included, and where the row came from: its source, the row's id at the source, when it was fetched, and its link, the first `link` column holding a web address. A long value is shown whole up to 10,000 characters. A row made by `group` names `group` as its source and the group's key as its id. Escape or **Close** closes it. The cards are for reading: nothing on them writes.
+
 ## Fold a table
 
 The arrow at the start of the line folds the step's table away and brings it back. Every table starts open. A folded table stays folded while the tab is open, through new runs and when it scrolls out of view; closing the tab or quitting Tyto opens them all again.
