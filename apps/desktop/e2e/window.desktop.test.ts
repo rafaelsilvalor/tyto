@@ -365,6 +365,8 @@ describe('the bridge', () => {
       // `recipe-table.desktop.test.ts` scrolls, sorts and filters through `recipe:rows`; copy
       // writes the real clipboard, which no suite should, so `ipc.test.ts` holds it.
       'recipe:copy',
+      // TYTO-381, ADR 0177: a Board's columns, which `recipe-views.desktop.test.ts` draws.
+      'recipe:facets',
       'recipe:rows',
       'recipe:run',
       'recipe:verbs',
@@ -976,6 +978,11 @@ describe('switching the language', () => {
     'recipe.table.copied',
     'recipe.table.total',
     'recipe.table.stale',
+    // TYTO-381: drawn only under a cell in a Board view; `recipe-board-view.test.ts` paints them,
+    // and `recipe-views.desktop.test.ts` reads the columns in the real window.
+    'recipe.board.none',
+    'recipe.board.more',
+    'recipe.board.groups',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and

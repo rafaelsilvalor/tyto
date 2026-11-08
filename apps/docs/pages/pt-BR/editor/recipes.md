@@ -44,6 +44,16 @@ Uma linha `show table` desenha cada passo dali para baixo na **visão de Tabela*
 
 Números ficam alinhados à direita e agrupados, datas são escritas no idioma da janela, e os endereços web (`http` e `https`) de uma coluna `link` abrem no seu navegador. Um endereço de qualquer outro tipo fica como texto: o Tyto nunca o entrega ao sistema.
 
+## Mostrar as linhas como um quadro
+
+`show board by=status` desenha cada passo dali para baixo como um **Quadro**: uma coluna para cada valor da coluna `status`, com quantas linhas o têm, e um cartão para cada linha. Uma linha inteira fica `show board by=status order="To Do,In Progress,Done" fields=title,assignee`.
+
+- **`by=`** dá a coluna cujos valores formam as colunas. Os valores se agrupam sem ligar para maiúsculas ou acentos, então `Done` e `done` são uma coluna só, com o nome como a primeira linha o escreveu. As linhas sem valor vão para uma coluna **(sem valor)** no fim.
+- **`order=`** lista os valores que vêm primeiro, nessa ordem; os outros seguem na ordem em que aparecem. A lista pode ficar num arquivo de dados ao lado da receita, como `order=@./board.json#/order`, uma lista JSON de palavras.
+- **`fields=`** dá as colunas que um cartão mostra, a primeira como título. Sem ele, o cartão mostra as três primeiras colunas além de `by=`.
+
+Uma coluna desenha cinquenta cartões; **mais 50** desenha os próximos. _Filtrar linhas_ funciona como na visão de Tabela, e as colunas contam só as linhas que ele mantém. O quadro é para leitura: arrastar um cartão não muda nada. Para mudar um status, escreva o passo que faz isso, que mostra o plano antes de escrever qualquer coisa.
+
 ## Recolher uma tabela
 
 A seta no começo da linha recolhe a tabela do passo e a traz de volta. Toda tabela começa aberta. Uma tabela recolhida fica recolhida enquanto a aba está aberta, em novas execuções e quando sai da tela pela rolagem; fechar a aba ou sair do Tyto abre todas de novo.

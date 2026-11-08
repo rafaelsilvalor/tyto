@@ -197,6 +197,10 @@ export const RECIPE_WIRE_LIMITS = {
   page: 500,
   /** Rows one `recipe:copy` puts on the clipboard, a table's most (`PAGE_LIMITS`). */
   copy: 50_000,
+  /** Groups one `recipe:facets` answers, the Board's columns (TYTO-381, ADR 0177). */
+  facets: 200,
+  /** Groups one `recipe:rows` page may be kept to (`facet.keys`). */
+  facetKeys: 64,
 } as const;
 
 /** A value as the notebook shows it: a list is already joined, a long text already cut. */
@@ -459,6 +463,13 @@ const recipeRowsQuery = {
     .max(RECIPE_WIRE_LIMITS.columns)
     .optional(),
 };
+
+/**
+ * TYTO-381, ADR 0177: a group of a column's values, as `recipe:facets` names it. `key` is the
+ * JSON of the value compared as `where` compares (no case, no accents), so `Done` and `done`
+ * are one group; the window hands it back in `recipe:rows`' `facet.keys` and never reads it.
+ */
+const recipeFacetKey = z.string().max(RECIPE_WIRE_LIMITS.text + 2);
 
 /** The cell ran again, or closed, since the window was shown the `ranAt` it named. */
 const recipeStale = z.object({ stale: z.literal(true) });
@@ -2486,6 +2497,16 @@ export const IPC_CHANNELS = {
     z.object({
       ...recipeRowsQuery,
       limit: z.number().int().positive().max(RECIPE_WIRE_LIMITS.page),
+      /**
+       * TYTO-381, ADR 0177: only the rows whose `column` falls in one of `keys`, groups
+       * `recipe:facets` named; `matched` then counts those. A Board column asks for its own.
+       */
+      facet: z
+        .object({
+          column: z.string().max(RECIPE_WIRE_LIMITS.text),
+          keys: z.array(recipeFacetKey).min(1).max(RECIPE_WIRE_LIMITS.facetKeys),
+        })
+        .optional(),
     }),
     z.union([
       recipeStale,
@@ -2498,6 +2519,46 @@ export const IPC_CHANNELS = {
         total: z.number().int().nonnegative(),
         matched: z.number().int().nonnegative(),
         totals: z.record(z.string().max(RECIPE_WIRE_LIMITS.text), z.number()).optional(),
+      }),
+    ]),
+  ),
+
+  /**
+   * The groups of one column of a kept cell's table and how many rows each holds, counted in
+   * main over the rows the quick filter keeps (TYTO-381, ADR 0177): the Board's columns. Values
+   * group as `where` compares them; the groups `order` names come first in its order, the rest
+   * by first appearance, an empty value last. At most `RECIPE_WIRE_LIMITS.facets`; `more` is
+   * how many groups that left out. `matched` is every row the filter keeps.
+   */
+  'recipe:facets': channel(
+    z.object({
+      documentId,
+      index: recipeRowsQuery.index,
+      ranAt: recipeRowsQuery.ranAt,
+      filter: recipeRowsQuery.filter,
+      columns: recipeRowsQuery.columns,
+      /** The column grouped by, as the cell's view names it. */
+      column: z.string().max(RECIPE_WIRE_LIMITS.text),
+      order: z
+        .array(z.string().max(RECIPE_WIRE_LIMITS.text))
+        .max(RECIPE_WIRE_LIMITS.facets)
+        .optional(),
+    }),
+    z.union([
+      recipeStale,
+      z.object({
+        facets: z
+          .array(
+            z.object({
+              key: recipeFacetKey,
+              label: z.string().max(RECIPE_WIRE_LIMITS.text),
+              count: z.number().int().positive(),
+            }),
+          )
+          .max(RECIPE_WIRE_LIMITS.facets),
+        total: z.number().int().nonnegative(),
+        matched: z.number().int().nonnegative(),
+        more: z.number().int().nonnegative(),
       }),
     ]),
   ),

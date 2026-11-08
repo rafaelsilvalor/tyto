@@ -1,5 +1,7 @@
 import type { Locale } from '../../shared/i18n/index.js';
 import { RECIPE_VIEWS, type RecipeViewName } from '../../shared/recipe-views.js';
+import { boardOptions } from './recipe-board-model.js';
+import { type FacetsAnswer, type FacetsRequest, boardView } from './recipe-board-view.js';
 import type { RecipeRunAnswer } from './recipe-notebook.js';
 import {
   type CopyAnswer,
@@ -23,6 +25,8 @@ export interface ViewContext {
   readonly locale: Locale;
   readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
   readonly copy: (request: CopyRequest) => Promise<CopyAnswer>;
+  /** A column's groups and their counts, from main (TYTO-381, ADR 0177). */
+  readonly facets: (request: FacetsRequest) => Promise<FacetsAnswer>;
 }
 
 /** What a view draws from: a cell that ran, with its table and the run main keeps. */
@@ -30,6 +34,8 @@ export interface ViewCell {
   readonly index: number;
   readonly ranAt: string;
   readonly table: WireTable;
+  /** The view's arguments as `show` read them (TYTO-381). */
+  readonly options: NonNullable<WireCell['view']>['options'];
 }
 
 export type ViewRenderer = (cell: ViewCell, context: ViewContext) => HTMLElement;
@@ -48,9 +54,29 @@ const tableOf =
       copy: context.copy,
     });
 
+/** TYTO-381: a board `show` did not give `by=` (no notebook checked it) keeps the table. */
+const board: ViewRenderer = (cell, context) => {
+  const options = boardOptions(
+    cell.options,
+    cell.table.columns.map((column) => column.name),
+  );
+  if (options === undefined) return tableOf(false)(cell, context);
+  return boardView({
+    index: cell.index,
+    ranAt: cell.ranAt,
+    columns: cell.table.columns,
+    total: cell.table.total,
+    locale: context.locale,
+    board: options,
+    facets: context.facets,
+    rows: context.rows,
+  });
+};
+
 export const VIEW_RENDERERS: Readonly<Record<RecipeViewName, ViewRenderer>> = {
   table: tableOf(false),
   summary: tableOf(true),
+  board,
 };
 
 const isViewName = (name: string): name is RecipeViewName => Object.hasOwn(RECIPE_VIEWS, name);
@@ -66,5 +92,8 @@ export function viewBody(
 ): HTMLElement | undefined {
   const name = cell.view?.name;
   if (name === undefined || !isViewName(name) || cell.ranAt === undefined) return undefined;
-  return VIEW_RENDERERS[name]({ index: cell.index, ranAt: cell.ranAt, table }, context);
+  return VIEW_RENDERERS[name](
+    { index: cell.index, ranAt: cell.ranAt, table, options: cell.view?.options ?? {} },
+    context,
+  );
 }

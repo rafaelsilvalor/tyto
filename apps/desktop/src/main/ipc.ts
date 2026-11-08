@@ -42,6 +42,7 @@ import { type SessionService, type TemplateFolder } from './session.js';
 import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
+import { facetsOf, rowsInFacets } from './recipe-facets.js';
 import { type RowsQuery, createRowViews, rowsAsTsv, visibleColumns } from './recipe-rows.js';
 import { type RecipeRunner } from './recipe-runner.js';
 import { cellToWire, cut, recipeAnswerToWire, valueToWire } from './recipe-wire.js';
@@ -564,15 +565,25 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     // TYTO-379, ADR 0171: a view's pages and copies read the table main kept for the cell, and
     // only while the cell still holds the run the window was shown.
-    'recipe:rows': ({ documentId, index, ranAt, offset, limit, sort, filter, columns }) => {
+    'recipe:rows': (request) => {
+      const { documentId, index, ranAt, offset, limit, sort, filter, columns, facet } = request;
       const kept = recipes.table(documentId, index);
       if (kept === undefined || kept.ranAt !== ranAt) return Promise.resolve({ stale: true });
       const query: RowsQuery = { sort, filter, columns };
       const view = rowViews.view(documentId, index, ranAt, kept.table, query);
       const shown = visibleColumns(kept.table, columns).slice(0, RECIPE_WIRE_LIMITS.columns);
+      // TYTO-381, ADR 0177: a Board column's page holds only its group's rows, in the view's order.
+      const grouped =
+        facet === undefined ? undefined : visibleColumns(kept.table, [facet.column])[0];
+      const permutation =
+        facet === undefined
+          ? view.permutation
+          : grouped === undefined
+            ? []
+            : rowsInFacets(kept.table, view.permutation, grouped.name, facet.keys);
       return Promise.resolve({
         columns: shown.map((column) => cut(column.name)),
-        rows: view.permutation.slice(offset, offset + limit).map((at) => {
+        rows: permutation.slice(offset, offset + limit).map((at) => {
           const row = kept.table.rows[at];
           return {
             key: cut(row?.key ?? ''),
@@ -580,8 +591,26 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
           };
         }),
         total: kept.table.rows.length,
-        matched: view.permutation.length,
+        matched: permutation.length,
         ...(kept.view?.name === 'summary' ? { totals: { ...view.totals } } : {}),
+      });
+    },
+
+    // TYTO-381, ADR 0177: a Board's columns and their counts, over the same filtered view.
+    'recipe:facets': ({ documentId, index, ranAt, filter, columns, column, order }) => {
+      const kept = recipes.table(documentId, index);
+      if (kept === undefined || kept.ranAt !== ranAt) return Promise.resolve({ stale: true });
+      const view = rowViews.view(documentId, index, ranAt, kept.table, { filter, columns });
+      const grouped = visibleColumns(kept.table, [column])[0];
+      const counted =
+        grouped === undefined
+          ? { facets: [], more: 0 }
+          : facetsOf(kept.table, view.permutation, grouped.name, order);
+      return Promise.resolve({
+        facets: counted.facets.map((facet) => ({ ...facet, label: cut(facet.label) })),
+        total: kept.table.rows.length,
+        matched: view.permutation.length,
+        more: counted.more,
       });
     },
 

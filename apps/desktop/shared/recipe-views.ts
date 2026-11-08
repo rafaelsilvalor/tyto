@@ -12,6 +12,16 @@ export const RECIPE_VIEWS = {
   table: [],
   /** The table, with a grand total for each number column over the rows the filter keeps. */
   summary: [],
+  /**
+   * TYTO-381, ADR 0177: one column per value of `by=`, counted in main; `order=` the values
+   * placed first (inline or `@./file.json#/pointer`), the rest by first appearance and an empty
+   * value last; `fields=` the columns a card shows, the first three besides `by=` when absent.
+   */
+  board: [
+    { name: 'by', kind: 'column', required: true },
+    { name: 'order', kind: 'values' },
+    { name: 'fields', kind: 'columns' },
+  ],
 } as const satisfies ViewSpecs;
 
 export type RecipeViewName = keyof typeof RECIPE_VIEWS;

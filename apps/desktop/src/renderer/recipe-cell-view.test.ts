@@ -66,6 +66,7 @@ function contextOf(more: Partial<CellViewContext> = {}) {
     // TYTO-379: no cell here is under `show`, so no view asks main for rows.
     rows: vi.fn(() => Promise.resolve({ stale: true as const })),
     copy: vi.fn(() => Promise.resolve({ stale: true as const })),
+    facets: vi.fn(() => Promise.resolve({ stale: true as const })),
   } satisfies CellViewActions;
   const context: CellViewContext = {
     locale: 'en',
@@ -185,6 +186,21 @@ describe("a cell's view (TYTO-379)", () => {
       ).key;
 
     expect(new Set([keyOf(), keyOf('table'), keyOf('summary')]).size).toBe(3);
+  });
+
+  // TYTO-381: the Board reads its arguments, so another `by=` is another element.
+  it('draws a board by its arguments, and builds a new element when they change', () => {
+    const board = (by: string) => cellOf({ view: { name: 'board', options: { by } } });
+    const { element, actions } = render(board('title'));
+    const { context } = contextOf();
+
+    expect(element.querySelector<HTMLElement>('.recipe-board')?.dataset['view']).toBe('board');
+    expect(actions.facets.mock.calls).toEqual([
+      [{ index: 0, ranAt: '2026-10-28T11:58:00.000Z', column: 'title', columns: ['title', 'key'] }],
+    ]);
+    expect(cellOutputOf(statusOf(board('title')), context).key).not.toBe(
+      cellOutputOf(statusOf(board('key')), context).key,
+    );
   });
 });
 

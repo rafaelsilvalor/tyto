@@ -548,6 +548,13 @@ export interface Catalogue {
   readonly 'recipe.table.copied': string;
   readonly 'recipe.table.total': string;
   readonly 'recipe.table.stale': string;
+  /**
+   * TYTO-381, the Board view (`recipe-board-view.ts`): the column of rows with an empty value,
+   * the button that draws a column's next cards, and the groups past the most main sends.
+   */
+  readonly 'recipe.board.none': string;
+  readonly 'recipe.board.more': string;
+  readonly 'recipe.board.groups': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -1183,6 +1190,9 @@ export const CATALOGUE_KEYS = [
   'recipe.table.copied',
   'recipe.table.total',
   'recipe.table.stale',
+  'recipe.board.none',
+  'recipe.board.more',
+  'recipe.board.groups',
   'status.problems.new',
   'menu.about',
   'shell.about.version',

@@ -586,6 +586,7 @@
       "paths": [
         "apps/desktop/src/main/recipe-apply.ts",
         "apps/desktop/src/main/recipe-clock.ts",
+        "apps/desktop/src/main/recipe-facets.ts",
         "apps/desktop/src/main/recipe-rows.ts",
         "apps/desktop/src/main/recipe-runner.ts",
         "apps/desktop/src/main/recipe-wire.ts",
@@ -595,9 +596,10 @@
         "recipe-notebook.desktop.test.ts",
         "recipe-tab.desktop.test.ts",
         "recipe-table.desktop.test.ts",
+        "recipe-views.desktop.test.ts",
         "window.desktop.test.ts"
       ],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts"
+      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts. The Board's groups (TYTO-381) are counted in recipe-facets.ts, tested in recipe-facets.test.ts and ipc.test.ts, and drawn by the views suite"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
@@ -609,7 +611,8 @@
       "e2e": [
         "recipe-notebook.desktop.test.ts",
         "recipe-tab.desktop.test.ts",
-        "recipe-table.desktop.test.ts"
+        "recipe-table.desktop.test.ts",
+        "recipe-views.desktop.test.ts"
       ],
       "why": "reviewed: the header and table under a recipe's cell (TYTO-377), and the seam that hands a cell under show to its view (TYTO-379); the logic is in recipe-cell-view.test.ts, and only the real window lays the table out and scrolls it"
     },
@@ -619,8 +622,16 @@
         "apps/desktop/src/renderer/recipe-table-view.ts",
         "apps/desktop/src/renderer/recipe-views.ts"
       ],
-      "e2e": ["recipe-table.desktop.test.ts"],
+      "e2e": ["recipe-table.desktop.test.ts", "recipe-views.desktop.test.ts"],
       "why": "reviewed: the Table and Summary views (TYTO-379); the arithmetic is in recipe-table-model.test.ts and the drawing in recipe-table-view.test.ts, and only the real window scrolls 5,000 rows with the wheel"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/renderer/recipe-board-model.ts",
+        "apps/desktop/src/renderer/recipe-board-view.ts"
+      ],
+      "e2e": ["recipe-views.desktop.test.ts"],
+      "why": "reviewed: the Board view (TYTO-381); the arithmetic is in recipe-board-model.test.ts and the drawing in recipe-board-view.test.ts, and the views suite draws 300 rows of an installed source in the real window"
     },
     {
       "paths": ["apps/desktop/shared/external-url.ts"],

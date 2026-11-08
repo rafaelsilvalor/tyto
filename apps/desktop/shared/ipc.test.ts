@@ -87,6 +87,7 @@ describe('the IPC contract', () => {
       'queue:set-kinds',
       'recipe:apply',
       'recipe:copy',
+      'recipe:facets',
       'recipe:rows',
       'recipe:run',
       'recipe:verbs',

@@ -1109,6 +1109,72 @@ tyto-preview-pane[hidden] {
   font-weight: var(--tyto-weight-strong);
 }
 
+/* The Board view (TYTO-381, recipe-board-view.ts): the Table's bar, then columns of one width
+   side by side that scroll sideways together; each column's cards scroll inside it, so a column
+   of hundreds keeps the cell's height. */
+.recipe-board__columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tyto-space-2);
+  overflow-x: auto;
+  padding-bottom: var(--tyto-space-2);
+}
+
+.recipe-board__column {
+  display: flex;
+  flex: 0 0 16rem;
+  flex-direction: column;
+  gap: var(--tyto-space-1);
+  padding: var(--tyto-space-2);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  background: var(--tyto-surface);
+}
+
+.recipe-board__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tyto-space-2);
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-board__tally {
+  color: var(--tyto-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe-board__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tyto-space-1);
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.recipe-board__card {
+  padding: var(--tyto-space-1) var(--tyto-space-2);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  user-select: text;
+}
+
+.recipe-board__title,
+.recipe-board__field {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-board__title {
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-board__field,
+.recipe-board__label {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+}
+
 /* Apply while its answer is on its way (TYTO-378): still there, plainly not clickable. */
 .recipe-cell__action[aria-disabled='true'] {
   opacity: 0.5;
