@@ -28,6 +28,7 @@ import type {
   TemplatePack,
 } from '../contributions.js';
 import { directiveResolverOf } from '../directives.js';
+import { PANEL_CALL_MAX_BYTES, panelCallerOf } from '../panels.js';
 import { resolveSettings } from '../configuration.js';
 import { type RecipeRegistryOptions, recipeRegistriesOf } from '../recipes.js';
 import {
@@ -174,15 +175,18 @@ async function isolate(
     readonly contributes?: readonly string[];
     readonly namespace?: string;
     readonly writes?: readonly string[];
+    /** `texto` unless a test holds two plugins in one host. */
+    readonly name?: string;
   } = {},
 ): Promise<{ readonly pair: Pair; readonly connected: Result<IsolatedPlugin, Diagnostics> }> {
   const pair = channelPair((guest) => runConfined(guest, () => Promise.resolve({ activate })));
   const lines = options.log;
   const connected = await connectIsolatedPlugin({
     requireSandbox: true,
-    name: 'texto',
+    name: options.name ?? 'texto',
     manifest: {
       ...MANIFEST,
+      ...(options.name === undefined ? {} : { name: options.name }),
       permissions: options.permissions ?? [],
       contributes: options.contributes ?? MANIFEST.contributes,
       ...(options.namespace === undefined ? {} : { namespace: options.namespace }),
@@ -419,7 +423,7 @@ describe('what an isolated plugin cannot do', () => {
     pair.inject({ type: 'hello', protocol: RPC_PROTOCOL_VERSION - 1, sandbox: CONFINED });
     const connected = await connecting;
     expect(connected.ok ? '' : connected.error[0]?.message).toBe(
-      "Plugin 'texto' failed to activate: its process speaks protocol 15 and this host speaks 16.",
+      "Plugin 'texto' failed to activate: its process speaks protocol 16 and this host speaks 17.",
     );
   });
 
@@ -1118,6 +1122,119 @@ describe('an isolated panel (TYTO-49)', () => {
     expect(connected.ok ? '' : connected.error[0]?.message).toContain(
       "its 'panel' contribution does not match",
     );
+  });
+});
+
+describe('an isolated panel’s call (TYTO-372, ADR 0173)', () => {
+  const PANEL = { title: 'Contagem', entry: 'panel/index.html' } as const;
+
+  /** An isolated plugin named `name` whose panel, also `name`, answers through `call`. */
+  async function panelPlugin(
+    name: string,
+    call: ((request: { method: string; params?: unknown }) => unknown) | undefined,
+    deadlineMs?: number,
+  ) {
+    const { connected } = await isolate(
+      (host) =>
+        host.registerPanel({
+          ...PANEL,
+          id: name,
+          ...(call === undefined ? {} : { call: call as never }),
+        }),
+      { contributes: ['panel'], name, ...(deadlineMs === undefined ? {} : { deadlineMs }) },
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    return connected.value;
+  }
+
+  function hostOf(...plugins: IsolatedPlugin[]) {
+    const host = createPluginHost();
+    for (const isolated of plugins) {
+      const activated = host.tryActivate(isolated.plugin);
+      if (!activated.ok) throw new Error(activated.error[0]?.message);
+    }
+    return { registry: host.registry, call: panelCallerOf(host.registry) };
+  }
+
+  it('crosses to the plugin’s process and back as JSON', async () => {
+    const isolated = await panelPlugin('contagem', ({ method, params }) =>
+      ok({ method, words: String((params as { text: string }).text).split(' ').length }),
+    );
+    const { call } = hostOf(isolated);
+
+    const answer = await call('contagem', { method: 'words.count', params: { text: 'um dois' } });
+
+    expect(answer).toEqual(ok({ method: 'words.count', words: 2 }));
+  });
+
+  it('is E_PANEL_CALL when the panel registered no call, and the data still crosses alone', async () => {
+    const isolated = await panelPlugin('contagem', undefined);
+    const { registry, call } = hostOf(isolated);
+
+    const answer = await call('contagem', { method: 'words.count' });
+
+    expect(answer.ok ? '' : answer.error[0]?.message).toBe(
+      "Panel 'contagem' could not call its plugin: its plugin registered no 'call'.",
+    );
+    expect(registry.panels()).toEqual([{ id: 'contagem', ...PANEL }]);
+  });
+
+  it('is E_PLUGIN_TIMEOUT past the deadline of every call, and the process is ended', async () => {
+    const isolated = await panelPlugin('contagem', () => new Promise(() => {}), 100);
+    const { call } = hostOf(isolated);
+
+    const answer = await call('contagem', { method: 'words.count' });
+
+    expect(answer.ok ? '' : answer.error[0]?.message).toBe(
+      "Plugin 'contagem' did not answer within 0.1 s, so its process was ended.",
+    );
+    expect(isolated.crashed()).toBe('it did not answer within 0.1 s');
+  });
+
+  it('reaches only its own plugin’s process, whatever the request names', async () => {
+    const heard: string[] = [];
+    const answering = (name: string) => () => {
+      heard.push(name);
+      return ok(name);
+    };
+    const first = await panelPlugin('primeiro', answering('primeiro'));
+    const second = await panelPlugin('segundo', answering('segundo'));
+    const { call } = hostOf(first, second);
+
+    const own = await call('primeiro', { method: 'whoami' });
+    const smuggled = await call('primeiro', { method: 'whoami', plugin: 'segundo' });
+    const byPanel = await call('primeiro', { method: 'whoami', panel: 'segundo' });
+
+    expect(own).toEqual(ok('primeiro'));
+    expect(smuggled.ok ? '' : smuggled.error[0]?.code).toBe('E_PANEL_CALL');
+    expect(byPanel.ok ? '' : byPanel.error[0]?.code).toBe('E_PANEL_CALL');
+    expect(heard).toEqual(['primeiro']);
+  });
+
+  it('is checked in the plugin’s process too, for a host that skipped its own check', async () => {
+    const heard: unknown[] = [];
+    const isolated = await panelPlugin('contagem', (request) => {
+      heard.push(request);
+      return ok(null);
+    });
+    const { registry } = hostOf(isolated);
+    const panel = registry.panels()[0];
+
+    const answer = await panel?.call?.({ method: 'Words', params: null });
+
+    expect(answer?.ok ? '' : answer?.error[0]?.message).toContain(
+      'the host called call with arguments its schema refuses',
+    );
+    expect(heard).toEqual([]);
+  });
+
+  it('refuses an answer over 1 MiB of JSON from the plugin’s process', async () => {
+    const isolated = await panelPlugin('contagem', () => ok('x'.repeat(PANEL_CALL_MAX_BYTES)));
+    const { call } = hostOf(isolated);
+
+    const answer = await call('contagem', { method: 'words.count' });
+
+    expect(answer.ok ? '' : answer.error[0]?.code).toBe('E_PLUGIN_PROTOCOL');
   });
 });
 

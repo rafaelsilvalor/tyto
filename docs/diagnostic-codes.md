@@ -58,6 +58,7 @@ non-zero.
 | `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
 | `E_PLUGIN_TIMEOUT` | error | no | An isolated plugin did not answer within its deadline, and its process was ended. |
+| `E_PANEL_CALL` | error | no | A panel's page asked its plugin something the host refused: no 'call', a bad method, over 1 MiB of JSON, or an answer that is not JSON. |
 | `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
 | `E_CREDENTIAL_TOO_LARGE` | error | no | A credential to store is larger than the ceiling every host keeps (ADR 0134). |
 | `E_CREDENTIAL_READ_ONLY` | error | no | A plugin tried to store or forget a credential on a host that only reads them. |
@@ -274,6 +275,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_PROTOCOL` | no | It costs the one frame whose answer it was; the others are drawn (ADR 0025). |
 | `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
 | `E_PLUGIN_TIMEOUT` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
+| `E_PANEL_CALL` | no | Only that call is refused; the panel stays open and its plugin keeps running. |
 | `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_TOO_LARGE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_READ_ONLY` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
@@ -937,6 +939,20 @@ Plugin '{plugin}' did not answer within {seconds} s, so its process was ended.
 ```
 
 Parameters: `plugin`, `seconds`
+
+### `E_PANEL_CALL`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0173-a-panel-calls-its-own-plugin-process.md`
+
+A panel's page asked its plugin something the host refused: no 'call', a bad method, over 1 MiB of JSON, or an answer that is not JSON.
+
+Only that call is refused; the panel stays open and its plugin keeps running.
+
+```
+Panel '{panel}' could not call its plugin: {problem}.
+```
+
+Parameters: `panel`, `problem`
 
 ### `E_CREDENTIAL_MISSING`
 

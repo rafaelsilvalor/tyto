@@ -430,6 +430,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'It costs the one frame the call was for; the others are drawn (ADR 0025).',
   },
+  // A panel's page is anybody's JavaScript, so what it asks its own plugin is checked on the
+  // host, and a panel whose plugin registered no `call` is refused rather than ignored (ADR 0173).
+  E_PANEL_CALL: {
+    severity: 'error',
+    summary:
+      "A panel's page asked its plugin something the host refused: no 'call', a bad method, over 1 MiB of JSON, or an answer that is not JSON.",
+    template: "Panel '{panel}' could not call its plugin: {problem}.",
+    spec: 'docs/adr/0173-a-panel-calls-its-own-plugin-process.md',
+    fatal: false,
+    fatality: 'Only that call is refused; the panel stays open and its plugin keeps running.',
+  },
   E_CREDENTIAL_MISSING: {
     severity: 'error',
     summary: 'A plugin asked for a credential it declared, and this host has no value for it.',
