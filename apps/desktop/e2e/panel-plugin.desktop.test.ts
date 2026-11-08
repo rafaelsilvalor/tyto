@@ -18,7 +18,8 @@ import { firstWindow } from './first-window.js';
  * `window.tyto` exists because Electron runs no preload in a subframe; the frame cannot be
  * sent to `https://example.com`, and can move within its own plugin, which is the control;
  * a bridge request its plugin has no permission for is `E_PERMISSION`; the page hears the
- * open brief.
+ * open brief; the page calls its own plugin's process and renders the answer, and a call that
+ * names another plugin is refused (ADR 0173).
  *
  * `TYTO_HOME` and `--user-data-dir` are this suite's own (TYTO-150).
  */
@@ -42,6 +43,12 @@ const PANEL_SCRIPT = `window.addEventListener('message', (event) => {
       String((data.text.match(/^::/gmu) || []).length) + ' diretivas';
     window.__lastDocument = data.text;
   }
+  // A call's answer, rendered: what the plugin's process said, or the host's refusal.
+  if (data && data.tyto === 'panel' && data.type === 'response' && data.id >= 100) {
+    document.getElementById('answer').textContent = data.ok
+      ? JSON.stringify(data.value)
+      : data.code;
+  }
 });
 `;
 
@@ -63,13 +70,23 @@ function writeHome(home: string): void {
   writeFileSync(
     join(folder, 'dist', 'index.js'),
     `export function activate(host) {
-  host.registerPanel({ id: 'contagem', title: 'Contagem', location: 'bottom', entry: 'panel/index.html' });
+  host.registerPanel({
+    id: 'contagem',
+    title: 'Contagem',
+    location: 'bottom',
+    entry: 'panel/index.html',
+    call(request) {
+      // A Result as @tyto/core's ok() builds it: an isolated answer without diagnostics is refused.
+      const value = { plugin: 'painel', method: request.method, params: request.params };
+      return { ok: true, value, diagnostics: [] };
+    },
+  });
 }
 `,
   );
   writeFileSync(
     join(folder, 'panel', 'index.html'),
-    '<!doctype html><meta charset="utf-8"><h1>Contagem</h1><p id="count">—</p><script src="panel.js"></script>',
+    '<!doctype html><meta charset="utf-8"><h1>Contagem</h1><p id="count">—</p><p id="answer">—</p><script src="panel.js"></script>',
   );
   writeFileSync(join(folder, 'panel', 'panel.js'), PANEL_SCRIPT);
   writeFileSync(join(folder, 'panel', 'other.html'), '<!doctype html><p id="other">outra</p>');
@@ -245,6 +262,41 @@ describe('a plugin panel in the window', () => {
       code: 'E_PERMISSION',
     });
   });
+
+  it('calls its own plugin’s process and renders the answer; naming another plugin is refused', async () => {
+    const frame = await panelFrame();
+    const ask = (extra: Record<string, unknown>, id: number): Promise<void> =>
+      frame.evaluate(
+        ([more, requestId]) => {
+          window.parent.postMessage(
+            {
+              tyto: 'panel',
+              type: 'request',
+              id: requestId,
+              capability: 'call',
+              args: ['folder.list', { folder: 'raiz' }],
+              ...more,
+            },
+            '*',
+          );
+        },
+        [extra, id] as const,
+      );
+    const answered = (text: string) =>
+      frame.waitForFunction(
+        (expected) => document.getElementById('answer')?.textContent === expected,
+        text,
+        { timeout: 10_000, polling: 25 },
+      );
+
+    // The answer comes from the plugin's isolated process, through protocol 17.
+    await ask({}, 100);
+    await answered('{"plugin":"painel","method":"folder.list","params":{"folder":"raiz"}}');
+
+    // The same call naming a plugin is refused by the bridge before main hears it.
+    await ask({ plugin: 'outro' }, 101);
+    await answered('E_PANEL_CALL');
+  }, 30_000);
 
   it('is kept inside its plugin by main’s guard, and may move within it', async () => {
     // Another plugin's page is a URL the window's CSP allows (`frame-src tyto-plugin:`), so

@@ -20,8 +20,11 @@ import { DockedPanel } from './panels.js';
  * **The bridge is `postMessage`, validated here and checked in main.** A page asks
  * `{ tyto: 'panel', type: 'request', id, capability, args }`; this file checks the shape,
  * relays it on `panel:request` with the panel's id — never one the page names — and posts
- * back `{ tyto: 'panel', type: 'response', id, ok, … }`. A message from anything that is not
- * one of these iframes is ignored. The page hears `{ type: 'event', event: 'document', text }`
+ * back `{ tyto: 'panel', type: 'response', id, ok, … }`. A request with a key the shape does
+ * not have — a `plugin`, a `panelId` — is refused with that answer rather than relayed, so a
+ * page that tries to name another plugin hears no and never waits (ADR 0173). `call`, with
+ * `args: [method, params]`, asks the panel's own plugin's process. A message from anything
+ * that is not one of these iframes is ignored. The page hears `{ type: 'event', event: 'document', text }`
  * whenever the open brief changes: **the document's text leaves the editor for the plugin's
  * code**, which is stated in ADR 0045 and on the plugins screen.
  */
@@ -37,6 +40,14 @@ const requestSchema = z.strictObject({
   id: z.number().int().nonnegative(),
   capability: z.enum(PANEL_CAPABILITIES),
   args: z.array(z.unknown()).max(2),
+});
+
+/** Enough of a request to answer it: what a refusal is addressed to. */
+const addressSchema = z.object({
+  tyto: z.literal('panel'),
+  type: z.literal('request'),
+  id: z.number().int().nonnegative(),
+  capability: z.unknown(),
 });
 
 export interface PanelBridge {
@@ -116,14 +127,29 @@ export function servePanelBridge(
       (candidate) => candidate.frameWindow() !== null && candidate.frameWindow() === event.source,
     );
     if (panel === undefined) return;
-    const parsed = requestSchema.safeParse(event.data);
-    if (!parsed.success) return;
     const source = event.source as Window;
+    // `*` because the page's origin is opaque and has no name to target; the message goes to
+    // that one window object, which is what makes it private.
+    const answer = (id: number, value: IpcResponse<'panel:request'>): void => {
+      source.postMessage({ tyto: 'panel', type: 'response', id, ...value }, '*');
+    };
+    const parsed = requestSchema.safeParse(event.data);
+    if (!parsed.success) {
+      const address = addressSchema.safeParse(event.data);
+      if (address.success) {
+        answer(address.data.id, {
+          ok: false,
+          code: address.data.capability === 'call' ? 'E_PANEL_CALL' : 'E_PLUGIN_CALL',
+          message: `The panel's request is refused: ${parsed.error.issues
+            .map((issue) => issue.message)
+            .join('; ')}.`,
+        });
+      }
+      return;
+    }
     const { id, capability, args } = parsed.data;
-    void bridge.request(panel.panelId, capability, args).then((answer) => {
-      // `*` because the page's origin is opaque and has no name to target; the message goes
-      // to that one window object, which is what makes it private.
-      source.postMessage({ tyto: 'panel', type: 'response', id, ...answer }, '*');
+    void bridge.request(panel.panelId, capability, args).then((value) => {
+      answer(id, value);
     });
   });
 }

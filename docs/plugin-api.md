@@ -247,6 +247,11 @@ parent.postMessage(
   { tyto: 'panel', type: 'request', id: 1, capability: 'fetch', args: [url] },
   '*',
 );
+// or ask the plugin's own process (ADR 0173): args are [method, params?]
+parent.postMessage(
+  { tyto: 'panel', type: 'request', id: 2, capability: 'call', args: ['token.test', {}] },
+  '*',
+);
 // answer: { tyto: 'panel', type: 'response', id: 1, ok: true, value } | { ok: false, code, message }
 // hear: { tyto: 'panel', type: 'event', event: 'document', text } on every pause in typing
 ```
@@ -262,10 +267,15 @@ matches `^[a-z][\w.-]{0,99}$`, `params` and the answer are JSON of at most 1 MiB
 isolated plugin's call has the 30 s deadline of every call. The host finds the panel from the
 frame the page runs in, never from the request, which is strict: a `plugin` or `panel` key is
 refused. A panel without `call` is refused with `E_PANEL_CALL`, as is a bad method or an answer
-over the ceiling; the plugin's own refusal reaches the page as it is. `callPanel` and
+over the ceiling; the plugin's own refusal reaches the page as it is. Answer with `ok(value)`
+from `@tyto/core`, or write its `diagnostics: []` yourself: an isolated plugin's
+`{ ok: true, value }` without it is refused as `E_PLUGIN_PROTOCOL`. `callPanel` and
 `panelCallerOf` are the host's half. `call` is the way forward for a panel that needs a secret's
-effect rather than its value; the `credentials` read stays for the panels that use it today. The
-desktop's bridge does not offer `call` yet (TYTO-372's second pull request). A plugin that
+effect rather than its value, and the documented way for a new panel to reach its plugin; the
+`credentials` read stays for the panels that use it today. The desktop finds the panel from the
+iframe element the message came from, plugin and panel id together, and a request with a key the
+shape does not have — a `plugin`, a `panelId` — is answered `E_PANEL_CALL` by the bridge and never
+reaches main, so the page hears no instead of waiting. A plugin that
 registers `call` needs protocol 17, which `@tyto/plugin-api` 0.16 carries: write
 `"engine": ">=0.16"`, so an older Tyto refuses it rather than meeting a callable it cannot read.
 

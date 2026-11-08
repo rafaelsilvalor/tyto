@@ -419,6 +419,36 @@ describe('the theme the window applies (TYTO-208)', () => {
   });
 });
 
+describe('a panel’s request (ADR 0045, ADR 0173)', () => {
+  const asked = (capability: string, args: readonly unknown[]) => ({
+    panelId: 'plugin:demo/contagem',
+    capability,
+    args,
+  });
+
+  it.each([
+    ['fetch', ['https://api.example.com/']],
+    ['credentials', ['token']],
+    ['storeCredential', ['token', 'novo']],
+    ['deleteCredential', ['token']],
+    ['call', ['token.test']],
+    ['call', ['folder.list', { folder: 'raiz' }]],
+  ])('relays %s with its arguments', (capability, args) => {
+    expect(parseIpc('panel:request', 'request', asked(capability, args))).toEqual(
+      asked(capability, args),
+    );
+  });
+
+  it('refuses a capability the bridge does not offer, and a third argument', () => {
+    expect(() => parseIpc('panel:request', 'request', asked('exec', ['ls']))).toThrow(
+      IpcContractError,
+    );
+    expect(() =>
+      parseIpc('panel:request', 'request', asked('call', ['token.test', {}, 'outro'])),
+    ).toThrow(IpcContractError);
+  });
+});
+
 describe('what the contract does not promise', () => {
   it('lets an unknown key through rather than refusing the message', () => {
     // Zod objects strip by default, and that is the right default across a version skew: a

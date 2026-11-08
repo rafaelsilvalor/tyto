@@ -2,13 +2,14 @@ import {
   type HostCapabilities,
   type HostFetchInit,
   PluginCapabilityError,
+  callPanel,
   checkedCapabilities,
 } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 import type { PanelCapability } from '../../shared/ipc.js';
 import { panelUrl } from './plugin-protocol.js';
-import type { WindowPlugins } from './window-plugins.js';
+import type { WindowPanel, WindowPlugins } from './window-plugins.js';
 
 /**
  * The installed plugins' panels, as the window lists them, and what a panel may ask of the
@@ -19,6 +20,12 @@ import type { WindowPlugins } from './window-plugins.js';
  * never in the renderer, which relays, and never in the page, which is somebody else's code.
  * A panel is its plugin: it gets no permission its plugin was not granted, and none of
  * another plugin's.
+ *
+ * **`call` reaches the panel's own plugin and no other** (ADR 0173). The panel is found from
+ * the layout id the renderer read off the iframe's element — plugin and panel both, since two
+ * plugins may each name a panel `settings` — and never from anything the page wrote; the
+ * request itself is checked by `callPanel`, whose strict schema refuses a `plugin` or `panel`
+ * key the page adds.
  */
 
 /** The layout id of a plugin's panel — prefixed, so it can never collide with a built-in. */
@@ -78,6 +85,13 @@ export function createPanelService(
       src: panelUrl(plugin, panel.entry),
     }));
 
+  /**
+   * The panel behind a layout id, matched on plugin and panel id together: two plugins may
+   * each name a panel `settings`, and a bare panel id would answer with the first one's.
+   */
+  const contributed = (panelId: string): WindowPanel | undefined =>
+    plugins.panels().find(({ plugin, panel }) => pluginPanelId(plugin, panel.id) === panelId);
+
   return {
     async list() {
       await plugins.ready;
@@ -85,13 +99,19 @@ export function createPanelService(
     },
 
     async request(panelId, capability, args) {
-      const panel = offered().find((candidate) => candidate.id === panelId);
+      const panel = contributed(panelId);
       const permissions = panel === undefined ? undefined : plugins.permissionsOf(panel.plugin);
       if (panel === undefined || permissions === undefined) {
         return { ok: false, code: 'E_PERMISSION', message: `No panel '${panelId}' is open.` };
       }
       const checked = checkedCapabilities(panel.plugin, permissions, capabilities);
       try {
+        // `[method, params?]`: the method's pattern, the sizes and the shape are callPanel's
+        // to refuse, as E_PANEL_CALL, before the plugin sees anything.
+        if (capability === 'call') {
+          const [method, params] = args;
+          return answerOf(await callPanel(panel.panel, { method, params }));
+        }
         if (capability === 'credentials') {
           const parsed = credentialArgs.safeParse(args);
           if (!parsed.success) throw new TypeError('host.credentials takes one key.');
@@ -136,5 +156,16 @@ export function createPanelService(
         };
       }
     },
+  };
+}
+
+/** A call's result as the bridge answers it: every diagnostic's message, the first's code. */
+function answerOf(result: Awaited<ReturnType<typeof callPanel>>): PanelAnswer {
+  if (result.ok) return { ok: true, value: result.value };
+  const [first] = result.error;
+  return {
+    ok: false,
+    code: first?.code ?? 'E_PANEL_CALL',
+    message: result.error.map((problem) => problem.message).join(' '),
   };
 }
