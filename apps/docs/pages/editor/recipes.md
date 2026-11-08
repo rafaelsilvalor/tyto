@@ -25,6 +25,11 @@ Only the steps that changed run again: a step whose line did not change keeps it
 
 ## What a step shows
 
+<Screenshot
+  scene="recipe-notebook"
+  alt="A recipe after Run recipe: under its source step, the line 30 rows · 5 columns with its age and the Run from here and Fetch again buttons, a table of the first 20 rows and 10 more rows below it; the where step under it shows its own line and table."
+/>
+
 Under each step is one line, then its table:
 
 - **The line** says what the step answered: _12 rows · 4 columns_, a plan (_Plan: 3 to write to Pauta_), _Failed: see Problems_, or why it did not run.

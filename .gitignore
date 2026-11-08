@@ -17,6 +17,8 @@ lerna-debug.log*
 dist/
 # An example plugin's dist/index.js is its source: an installed plugin is not built (TYTO-50).
 !examples/plugins/*/dist/
+# So is a docs-shots fixture plugin's, which the manual's recipe scene installs (TYTO-450).
+!apps/desktop/e2e/docs-shots/__fixtures__/plugins/*/dist/
 build/
 out/
 *.tsbuildinfo

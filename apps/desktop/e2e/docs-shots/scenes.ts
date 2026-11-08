@@ -53,6 +53,8 @@ export interface SceneWindow {
   run(commandId: string): Promise<void>;
   /** Opens one of the briefs in `docs-shots/__fixtures__/briefs` through the window's own Open. */
   openBrief(file: string): Promise<void>;
+  /** Opens one of the recipes in `docs-shots/__fixtures__/recipes` through the window's own Open. */
+  openRecipe(file: string): Promise<void>;
 }
 
 export interface Scene {
@@ -66,6 +68,12 @@ export interface Scene {
    * the file it shows holds the theme and nothing of that machine.
    */
   readonly brief?: string;
+  /**
+   * Plugin folders in `docs-shots/__fixtures__/plugins` that the real `tyto plugin install`
+   * puts in the shot's own Tyto home before the window opens (TYTO-450): a recipe step only
+   * draws a table when a source plugin answers it.
+   */
+  readonly plugins?: readonly string[];
   readonly size: WindowSize;
   /**
    * A string the scene shows in the window's language, and where: the proof that the
@@ -115,6 +123,31 @@ async function thumbnailsDrawn(page: Page, count: number): Promise<void> {
   );
   // A `srcdoc` is in; its paint is a frame or two later.
   await page.waitForTimeout(500);
+}
+
+/**
+ * Waits until main lists every recipe verb in `verbs`: plugins start after the window opens
+ * (ADR 0044), and a recipe run before its source is registered fails on an unknown verb.
+ */
+async function verbsListed(page: Page, verbs: readonly string[]): Promise<void> {
+  // A loop of evaluations, as `recipe-notebook.desktop.test.ts` does: an async predicate in
+  // `waitForFunction` passed here while the run that followed still found no such verb.
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const listed = await page.evaluate(async () => {
+      const bridge = (
+        window as unknown as {
+          tyto?: Record<string, (request: object) => Promise<{ verbs: string[] }>>;
+        }
+      ).tyto;
+      return (await bridge?.['recipe:verbs']?.({}))?.verbs ?? [];
+    });
+    if (verbs.every((verb) => listed.includes(verb))) return;
+    if (Date.now() > deadline) {
+      throw new Error(`main never listed ${verbs.join(', ')}; it lists ${listed.join(', ')}`);
+    }
+    await page.waitForTimeout(250);
+  }
 }
 
 export const SCENES: readonly Scene[] = [
@@ -205,6 +238,45 @@ export const SCENES: readonly Scene[] = [
       await run('preview.showAllSlides');
       await page.waitForSelector('tyto-preview-pane:not([hidden]) .thumbnails--grid');
       await thumbnailsDrawn(page, 6);
+    },
+  },
+  // TYTO-450: a recipe after Run recipe — each step's line, its buttons, its table and what
+  // the table leaves out — over the fixture source `reading.list`.
+  {
+    name: 'recipe-notebook',
+    plugins: ['reading-list'],
+    // The tallest window allowed: at a laptop's height the table hides its "10 more rows".
+    size: LARGEST_WINDOW,
+    proof: {
+      selector: '#editor .recipe-cell [data-action="run-from"]',
+      key: 'recipe.cell.runFrom',
+    },
+    arrange: async ({ page, run, openRecipe }) => {
+      await verbsListed(page, ['reading.list']);
+      await openRecipe('reading.recipe');
+      // Run recipe is refused, or runs nothing, until the notebook has drawn its cells.
+      await page.waitForSelector('#editor .recipe-cell', { timeout: 30_000 });
+      await run('recipe.run');
+      // The source's 30 rows: its first 20 drawn, then the line that counts the other 10.
+      try {
+        await page.waitForFunction(
+          () => {
+            const first = document.querySelector('#editor .recipe-cell');
+            return (
+              first !== null &&
+              first.querySelectorAll('table tbody tr').length === 20 &&
+              first.querySelector('.recipe-cell__more') !== null
+            );
+          },
+          undefined,
+          { polling: 50, timeout: 30_000 },
+        );
+      } catch (cause) {
+        const said = await page.evaluate(
+          () => document.querySelector('#editor .recipe-cell-summary')?.textContent ?? 'no cell',
+        );
+        throw new Error(`the source's table never came; its cell says '${said}'`, { cause });
+      }
     },
   },
 ];

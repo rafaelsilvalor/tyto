@@ -1,0 +1,6 @@
+# An invented reading list, for the manual's picture: no real book, author or person.
+recipe reading
+  | The books not finished yet, the nearest due date first.
+reading.list
+where status != done
+sort due
