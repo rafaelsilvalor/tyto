@@ -44,6 +44,16 @@ A `show table` line draws every step from it down in the **Table view** instead 
 
 Numbers are aligned to the right and grouped, dates are written in the window's language, and a `link` column's web addresses (`http` and `https`) open in your browser. An address of any other kind stays plain text: Tyto never hands it to the system.
 
+## Show rows as a board
+
+`show board by=status` draws every step from it down as a **Board**: one column for each value of the `status` column, with how many rows hold it, and a card for each row. A whole line reads `show board by=status order="To Do,In Progress,Done" fields=title,assignee`.
+
+- **`by=`** names the column whose values make the columns. Values are grouped without minding case or accents, so `Done` and `done` are one column, named as the first row wrote it. Rows with no value go in a **(none)** column at the end.
+- **`order=`** lists the values that come first, in that order; the others follow in the order they first appear. The list can be kept in a data file beside the recipe, as `order=@./board.json#/order`, a JSON list of words.
+- **`fields=`** names the columns a card shows, the first as its title. Without it, a card shows the first three columns besides `by=`.
+
+A column draws fifty cards; **50 more** draws the next ones. _Filter rows_ works as in the Table view, and the columns count only the rows it keeps. The board is for reading: dragging a card changes nothing. To change a status, write the step that does it, which shows its plan before anything is written.
+
 ## Fold a table
 
 The arrow at the start of the line folds the step's table away and brings it back. Every table starts open. A folded table stays folded while the tab is open, through new runs and when it scrolls out of view; closing the tab or quitting Tyto opens them all again.

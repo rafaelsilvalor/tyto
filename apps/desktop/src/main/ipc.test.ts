@@ -1209,6 +1209,50 @@ describe('the tab a message is about (E9.11)', () => {
     expect(injected.clipboard).toEqual(['K-1\r\nK-4']);
   });
 
+  // TYTO-381, ADR 0177: a Board's columns are counted in main, and each column pages its group.
+  it('counts a column of a kept table in groups, after the filter, and pages one group', async () => {
+    const handlers = createHandlers(dependencies());
+    const asked = { documentId: 'document-1', index: 1, ranAt: KEPT_RAN_AT };
+
+    const all = await handlers['recipe:facets']({ ...asked, column: 'note', order: ['PLAIN'] });
+    const filtered = await handlers['recipe:facets']({
+      ...asked,
+      column: 'note',
+      filter: 'PLAIN',
+      columns: ['note'],
+    });
+    const group = await handlers['recipe:rows']({
+      ...asked,
+      offset: 1,
+      limit: 5,
+      columns: ['key', 'points'],
+      facet: { column: 'note', keys: ['"plain"'] },
+    });
+
+    expect(all).toMatchObject({ total: 5, matched: 5, more: 0 });
+    expect('facets' in all && all.facets.map((facet) => [facet.label, facet.count])).toEqual([
+      ['plain', 2],
+      ['with\ttab', 1],
+      ['say "yes" now', 1],
+      ['line\nbreak', 1],
+    ]);
+    expect(filtered).toEqual({
+      facets: [{ key: '"plain"', label: 'plain', count: 2 }],
+      total: 5,
+      matched: 2,
+      more: 0,
+    });
+    expect(group).toEqual({
+      columns: ['key', 'points'],
+      rows: [{ key: 'K-4', values: ['K-4', 3] }],
+      total: 5,
+      matched: 2,
+    });
+    expect(
+      await handlers['recipe:facets']({ ...asked, ranAt: 'another run', column: 'note' }),
+    ).toEqual({ stale: true });
+  });
+
   it('passes a confirmation straight through, strings and all', async () => {
     const asked: unknown[] = [];
     const handlers = createHandlers({

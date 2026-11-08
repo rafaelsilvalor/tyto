@@ -3,6 +3,7 @@ import { type CellOutput, cellOutputLineStart, remeasureCellOutput } from '@tyto
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { CellStatus } from './recipe-notebook.js';
 import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js';
+import type { FacetsAnswer, FacetsRequest } from './recipe-board-view.js';
 import type { CopyAnswer, CopyRequest, RowsAnswer, RowsRequest } from './recipe-table-view.js';
 import { viewBody } from './recipe-views.js';
 
@@ -51,6 +52,8 @@ export interface CellViewActions {
   readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
   /** Copy rows of a kept cell's table: `recipe:copy` for this tab (TYTO-379). */
   readonly copy: (request: CopyRequest) => Promise<CopyAnswer>;
+  /** A column's groups of a kept cell's table: `recipe:facets` for this tab (TYTO-381). */
+  readonly facets: (request: FacetsRequest) => Promise<FacetsAnswer>;
 }
 
 export interface CellViewContext {
@@ -92,6 +95,8 @@ export function cellOutputOf(status: CellStatus, context: CellViewContext): Cell
       context.applying.has(status.index) ? 'applying' : '',
       context.refusals.get(status.index) ?? '',
       cell.view?.name ?? '',
+      // TYTO-381: `show board by=status` and `by=owner` draw different boards.
+      JSON.stringify(cell.view?.options ?? {}),
     ].join('\u0000'),
     render: () => renderCell(status, context, collapsed),
   };
@@ -162,7 +167,12 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
   // TYTO-379: a cell under `show` is drawn by its view (`recipe-views.ts`); one under none
   // keeps the preview. Only the body changes: the header and a plan's lines stay as they are.
   if (table !== undefined) {
-    const view = viewBody(cell, table, { locale, rows: actions.rows, copy: actions.copy });
+    const view = viewBody(cell, table, {
+      locale,
+      rows: actions.rows,
+      copy: actions.copy,
+      facets: actions.facets,
+    });
     root.append(view ?? tableBody(table, locale));
   }
   const planned = planBody(cell, status.held, plan);

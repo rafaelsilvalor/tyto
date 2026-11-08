@@ -72,6 +72,7 @@ function render(
     // TYTO-379: no cell here is under `show`, so no view asks main for rows.
     rows: vi.fn(() => Promise.resolve({ stale: true as const })),
     copy: vi.fn(() => Promise.resolve({ stale: true as const })),
+    facets: vi.fn(() => Promise.resolve({ stale: true as const })),
   } satisfies CellViewActions;
   const context: CellViewContext = {
     locale,

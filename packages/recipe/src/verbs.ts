@@ -178,11 +178,11 @@ export function compareCells(
  * has (ADR 0128). The views are the notebook's: when the host passes its list, the name and
  * the arguments are checked against it (ADR 0171); without one, any single name passes.
  */
-function show(context: VerbContext): VerbResult {
+async function show(context: VerbContext): Promise<VerbResult> {
   const table = requireTable(context);
   if (context.views !== undefined) {
     if (!table.ok) return table;
-    const view = readView(context, table.value, context.views);
+    const view = await readView(context, table.value, context.views);
     if (!view.ok) return view;
     return ok({ table: table.value, view: view.value.name, viewOptions: view.value.options });
   }

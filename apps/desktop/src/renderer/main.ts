@@ -849,6 +849,12 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
         if (bridge === undefined) return Promise.resolve({ stale: true });
         return bridge['recipe:copy']({ documentId, ...request });
       },
+      // TYTO-381, ADR 0177: a Board's columns and counts, counted in main.
+      facets: (request) => {
+        const bridge = window.tyto;
+        if (bridge === undefined) return Promise.resolve({ stale: true });
+        return bridge['recipe:facets']({ documentId, ...request });
+      },
     },
   };
   const statuses = cellStatuses(text, answer, state.locale);

@@ -1,4 +1,4 @@
-import { err } from '@tyto/core';
+import { err, ok } from '@tyto/core';
 import { describe, expect, it } from 'vitest';
 
 import tasksJson from './__fixtures__/tasks.json';
@@ -114,6 +114,28 @@ describe('show against the host views (ADR 0171)', () => {
     expect(result.cells[1]?.view?.options).toEqual({ by: 'status', order: ['To Do', 'Done'] });
     expect(result.cells[1]?.table).toBe(result.cells[0]?.table);
     expect(result.view).toBe('calendar');
+  });
+
+  // TYTO-381: a status order kept in the workspace, read as every verb reads a data file.
+  it('reads a values argument from a data file, and refuses one that is not a list of words', async () => {
+    const files: Record<string, unknown> = {
+      './board.json': { order: ['To Do', 'Done'], wrong: [1, 2] },
+    };
+    const resolveData = (path: string) =>
+      Promise.resolve(path in files ? ok(files[path]) : err([]));
+    const read = await run(['show board by=status order=@./board.json#/order'], { resolveData });
+    expect(read.problem).toBeUndefined();
+    expect(read.run.cells[0]?.view?.options).toEqual({ by: 'status', order: ['To Do', 'Done'] });
+
+    const misshapen = await run(['show board by=status order=@./board.json#/wrong'], {
+      resolveData,
+    });
+    expect(misshapen.problem?.code).toBe('E_RECIPE_DATA_SHAPE');
+    expect(misshapen.at).toBe('order=@./board.json#/wrong');
+    const missing = await run(['show board by=status order=@./none.json#/order'], {
+      resolveData,
+    });
+    expect(missing.problem?.code).toBe('E_RECIPE_DATA');
   });
 
   it('behaves as before when the host passes no list', async () => {

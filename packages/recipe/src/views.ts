@@ -1,7 +1,9 @@
 import { type Diagnostic, type Result, diagnostic, didYouMean, err, ok } from '@tyto/core';
+import { z } from 'zod';
 
 import type { Argument, NamedArgument } from './ast.js';
 import { resolveColumn } from './columns.js';
+import { isDataReference, readDataArgument } from './data.js';
 import type { VerbContext } from './registry.js';
 import { type Problems, columnNames, locate } from './support.js';
 import type { ColumnType, Table } from './table.js';
@@ -21,8 +23,8 @@ export interface ViewArgumentSpec {
   readonly name: string;
   /**
    * `column` is one column of the table and `columns` a comma list of them, both resolved
-   * through the aliases to the canonical name; `values` is a comma list of words; `choice` is
-   * one of `values`.
+   * through the aliases to the canonical name; `values` is a comma list of words, or a data
+   * file's list of strings (`order=@./board.json#/order`, TYTO-381); `choice` is one of `values`.
    */
   readonly kind: ViewArgumentKind;
   readonly required?: boolean;
@@ -49,11 +51,11 @@ export interface CellView {
  * word; a second word is a stray one; each named argument is checked against the view's specs,
  * its columns resolved against `table`.
  */
-export function readView(
+export async function readView(
   context: VerbContext,
   table: Table,
   views: ViewSpecs,
-): Result<CellView, Problems> {
+): Promise<Result<CellView, Problems>> {
   const at = locate(context);
   const [written, extra] = context.step.positional;
   if (written === undefined) {
@@ -94,19 +96,22 @@ export function readView(
       }
       continue;
     }
-    const value = optionValue(context, table, spec, argument);
+    const value = await optionValue(context, table, spec, argument);
     if (!value.ok) return value;
     options[spec.name] = value.value;
   }
   return ok({ name: written.value, options });
 }
 
-function optionValue(
+/** A `values` argument read from a data file: a list of strings, as `decide values=` reads. */
+const DATA_VALUES = z.array(z.string()).min(1);
+
+async function optionValue(
   context: VerbContext,
   table: Table,
   spec: ViewArgumentSpec,
   argument: NamedArgument,
-): Result<ViewOptionValue, Problems> {
+): Promise<Result<ViewOptionValue, Problems>> {
   const at = locate(context);
   const range = at(argument.range);
   switch (spec.kind) {
@@ -134,6 +139,9 @@ function optionValue(
       return ok(spec.kind === 'column' ? (resolved[0] as string) : resolved);
     }
     case 'values': {
+      // TYTO-381: a list kept in the workspace, such as a status order, is read through the
+      // host's data files, as every other verb's `@./file.json#/pointer` argument is.
+      if (isDataReference(argument.value)) return readDataArgument(context, argument, DATA_VALUES);
       const words = columnNames([argument]).map((word) => word.value);
       return words.length === 0
         ? refuse(context, `${spec.name}= takes a comma list of values`, range)
