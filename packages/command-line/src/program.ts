@@ -326,8 +326,13 @@ export function createProgram(
 
   const pluginInstall = plugin
     .command('install')
-    .description('install a plugin from a folder, a git URL or an npm package name')
-    .argument('<source>', 'a folder, a git URL (git+https://…, …/repo.git) or an npm spec')
+    .description(
+      'install a plugin from a folder, a local .tgz archive, a git URL or an npm package name',
+    )
+    .argument(
+      '<source>',
+      'a folder, a .tgz or .tar.gz file, a git URL (git+https://…, …/repo.git) or an npm spec',
+    )
     .option('-y, --yes', 'approve its permissions without asking', false)
     .action(async (source: string) => {
       captured.code = await pluginInstallCommand(source, pluginInstall.opts(), environment);

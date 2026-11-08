@@ -75,11 +75,18 @@ export function declaredCredentialKeys(permissions: readonly string[]): readonly
  */
 export type IsStored = (account: string) => Promise<boolean>;
 
+/**
+ * `running` is the ids this window started (`WindowPlugins.running`): installed plugins start
+ * once, when the window opens, so an installed row the window did not start — or a disabled
+ * one it did — is a change waiting for the next start (TYTO-373). Built-ins always run.
+ */
 export async function listPlugins(
   builtIns: readonly InstalledPlugin[],
   store: PluginStore,
   isStored: IsStored,
+  running: () => readonly string[] = () => [],
 ): Promise<readonly PluginRow[]> {
+  const started = new Set(running());
   const rows: Omit<PluginRow, 'credentials'>[] = builtIns.map(({ manifest }) => ({
     name: manifest.name,
     version: manifest.version,
@@ -88,6 +95,8 @@ export async function listPlugins(
     contributes: [...manifest.contributes],
     permissions: [...manifest.permissions],
     problems: [],
+    configurable: false,
+    running: true,
   }));
 
   // The same reader the CLI's `plugin list` and both apps' loaders use, so the screen and
@@ -109,6 +118,8 @@ export async function listPlugins(
         contributes: [],
         permissions: [],
         problems: entry.problems.map((problem) => problem.message),
+        configurable: false,
+        running: false,
       });
       continue;
     }
@@ -127,6 +138,8 @@ export async function listPlugins(
       problems: crashed
         ? [diagnostic('W_PLUGIN_CRASHED', { plugin: entry.folder, ...crash }).message]
         : [],
+      configurable: manifest.contributes.includes('configuration'),
+      running: started.has(manifest.name),
     });
   }
 

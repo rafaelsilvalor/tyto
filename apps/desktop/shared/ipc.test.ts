@@ -74,6 +74,9 @@ describe('the IPC contract', () => {
       'panel:request',
       // TYTO-433: Plugins: Sync / Update Plugin Files.
       'plugin-files:sync',
+      // TYTO-373: install, remove, disable and enable from the plugins screen.
+      'plugins:change',
+      'plugins:install',
       'plugins:keymaps',
       'plugins:list',
       'plugins:panels',

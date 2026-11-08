@@ -155,7 +155,7 @@ tyto plugin list [options] [folder]
 
 ## tyto plugin install
 
-install a plugin from a folder, a git URL or an npm package name
+install a plugin from a folder, a local .tgz archive, a git URL or an npm package name
 
 ```sh
 tyto plugin install [options] <source>
@@ -165,7 +165,7 @@ tyto plugin install [options] <source>
 
 | Argument | What it does |
 | --- | --- |
-| `<source>` | a folder, a git URL (git+https://…, …/repo.git) or an npm spec |
+| `<source>` | a folder, a .tgz or .tar.gz file, a git URL (git+https://…, …/repo.git) or an npm spec |
 
 **Options**
 

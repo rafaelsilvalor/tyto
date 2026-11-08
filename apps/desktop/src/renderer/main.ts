@@ -128,7 +128,7 @@ import {
   type FormatOption,
   EXPORT_DIALOG_TAG,
 } from './export-dialog.js';
-import { type PluginsDialog, PLUGINS_DIALOG_TAG } from './plugins-dialog.js';
+import { type PluginsDialog, PLUGINS_DIALOG_TAG, settingKeyOffset } from './plugins-dialog.js';
 import { type GalleryDialog, GALLERY_DIALOG_TAG } from './gallery-dialog.js';
 import { previewAnalysis } from './brief-analysis.js';
 import {
@@ -1510,6 +1510,32 @@ function openPluginsDialog(): void {
     else await bridge['credentials:set']({ plugin, key, secret });
     dialog.view = await bridge['plugins:list']({});
   };
+  // TYTO-373: main opens the picker and the native boxes and runs the CLI's steps; the list is
+  // asked again after any answer, since a declined install can still have changed nothing
+  // and a refused one may have left a folder behind for the list to name.
+  const relist = async (bridge: TytoBridge): Promise<void> => {
+    dialog.view = await bridge['plugins:list']({});
+  };
+  dialog.onInstall = async (from) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    const answer = await bridge['plugins:install']({ from });
+    await relist(bridge);
+    return answer;
+  };
+  dialog.onChange = async (name, change) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    const answer = await bridge['plugins:change']({ name, change });
+    await relist(bridge);
+    return answer;
+  };
+  dialog.onSettings = (plugin) => {
+    dialog.close();
+    openAppFile('settings', () => {
+      revealSettingKey(plugin);
+    });
+  };
   void withBridge(async (bridge) => {
     try {
       dialog.view = await bridge['plugins:list']({});
@@ -2652,19 +2678,33 @@ const isSettings = (document_: DocumentState): boolean => document_.kind === 'se
 
 /**
  * Opens `settings.json`, `keybindings.json` or `snippets.json` in a tab. One tab each: asking
- * again brings it forward rather than opening a second buffer over the same file.
+ * again brings it forward rather than opening a second buffer over the same file. `opened`
+ * runs once the tab is in front, whichever of the two happened.
  */
-function openAppFile(kind: AppFile): void {
+function openAppFile(kind: AppFile, opened?: () => void): void {
   void withBridge(async (bridge) => {
     const open = workspace.documents.find((document_) => document_.kind === kind);
     if (open !== undefined) {
       activate(open.id);
+      opened?.();
       return;
     }
     const wanted = nextDocumentId();
     const answer = await openAppFileIn(bridge, kind, wanted);
     adopt(answer.document, answer.documentId, wanted, kind);
+    opened?.();
   });
+}
+
+/**
+ * Puts the caret on the first `"<plugin>.` key of the settings tab in front (TYTO-373), the
+ * plugins screen's Settings button. A file with no key of the plugin's yet stays where it was.
+ */
+function revealSettingKey(plugin: string): void {
+  const target = commandPane();
+  if (target === undefined) return;
+  const at = settingKeyOffset(target.view.state.doc.toString(), plugin);
+  if (at !== undefined) revealRange(target.view, { start: at, end: at });
 }
 
 /** Checks an app file's tab: settings by main, keybindings and snippets here. */
