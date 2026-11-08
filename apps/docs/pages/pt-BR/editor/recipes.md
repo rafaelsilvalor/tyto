@@ -54,6 +54,16 @@ Números ficam alinhados à direita e agrupados, datas são escritas no idioma d
 
 Uma coluna desenha cinquenta cartões; **mais 50** desenha os próximos. _Filtrar linhas_ funciona como na visão de Tabela, e as colunas contam só as linhas que ele mantém. O quadro é para leitura: arrastar um cartão não muda nada. Para mudar um status, escreva o passo que faz isso, que mostra o plano antes de escrever qualquer coisa.
 
+## Mostrar as linhas num calendário
+
+`show calendar date=due` desenha cada passo dali para baixo como um **Calendário**: cada linha no dia da sua coluna `due`. Uma linha inteira fica `show calendar date=due time=hour span=week`.
+
+- **`date=`** dá a coluna que posiciona a linha: uma data, ou data e hora. Uma data e hora com fuso (`2026-11-09T01:30Z`) cai no dia em que ela está no fuso das receitas (a configuração `recipeTimeZone`, o do seu computador quando vazia), então uma entrega às 22:30 em São Paulo fica naquela noite, não no dia seguinte.
+- **`time=`** dá uma coluna com a hora, como `14:30` ou uma data e hora. Um dia lista as linhas por ela; sem ela, pela hora de `date=` quando houver.
+- **`span=`** é `week` (semana) ou `month` (mês), um mês quando ausente. Os botões **Semana** e **Mês** alternam entre eles.
+
+O calendário abre na semana ou no mês que contém hoje; **Anterior** e **Próximo** andam um período de cada vez, e _3 antes · 12 depois_ diz quantas linhas com data ficaram fora dele. Um dia mostra as três primeiras linhas e **+ mais 2** para o resto. Linhas sem data, ou com uma data que não diz dia nenhum (como `soon`), nunca somem: ficam listadas embaixo do calendário como _Sem data (14)_, com a data errada escrita ao lado da linha. A semana começa no dia em que o seu idioma a começa. _Filtrar linhas_ funciona como na visão de Tabela. O calendário é para leitura: arrastar uma linha não a muda de dia.
+
 ## Recolher uma tabela
 
 A seta no começo da linha recolhe a tabela do passo e a traz de volta. Toda tabela começa aberta. Uma tabela recolhida fica recolhida enquanto a aba está aberta, em novas execuções e quando sai da tela pela rolagem; fechar a aba ou sair do Tyto abre todas de novo.

@@ -53,3 +53,24 @@ columns?, order?}` answers `{facets: [{key, label, count}], total, matched, more
   own; its zone and its undated rows are its own dated note here.
 - Two values that share their first 1,000 compared characters share a group: a group's key is
   cut as a value on the wire is cut.
+
+## Note, 2026-11-08 (TYTO-383): main buckets days too
+
+The Calendar (`show calendar date=… [time=…] [span=week|month]`) groups by day through the same
+channels, so **day bucketing also happens in main**; the renderer never reads a date.
+
+- `recipe:facets` takes `bucket: 'day'` and `days: {from, to}`. A row's day is read in pure
+  `src/main/recipe-facets.ts`: an ISO date is its own day in every zone; a date and time with an
+  offset is an instant, placed on the wall clock of the zone the cell's run read written times
+  in (`recipeTimeZone`, ADR 0148 decision 7; the runner keeps the run's clock beside its cells);
+  one without an offset is already wall-clock time. Keys are ISO days in date order, then `?`
+  (a value that names no day) and `""` (no value), which are always answered, so an undated row
+  is listed with its count and never dropped. Rows of dated days outside `days` are counted in
+  `earlier` and `later`, and the answer says `today` in the same zone, which the calendar opens
+  on. `order` is not read for days.
+- `recipe:rows`' `facet` takes `bucket: 'day'`, `time` and `perDay`: the rows of the days asked,
+  by day, then by the wall time `time=` names (`HH:MM` or a date and time), else the date's own,
+  each row with its `day` and `time`. One page with `perDay: 3` fills a month's 42 cells; "+k
+  more" asks for one day's rest.
+- The first weekday is the window language's (`Intl.Locale#getWeekInfo`), Monday when the
+  engine says nothing. The Calendar is view only, as the Board is (decision 6).

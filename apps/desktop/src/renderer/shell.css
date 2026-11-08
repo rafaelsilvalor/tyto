@@ -1175,6 +1175,121 @@ tyto-preview-pane[hidden] {
   font-size: var(--tyto-text-sm);
 }
 
+/* The Calendar view (TYTO-383, recipe-calendar-view.ts): the Table's bar, the span's buttons,
+   then seven columns of days; a day cell draws three rows and "+k more", so a month keeps the
+   cell's height. The days around a month are muted, today is outlined. */
+.recipe-calendar__navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tyto-space-2);
+  padding-bottom: var(--tyto-space-2);
+}
+
+.recipe-calendar__title {
+  min-width: 10rem;
+  font-weight: var(--tyto-weight-strong);
+  text-align: center;
+}
+
+.recipe-calendar__span[aria-pressed='true'] {
+  background: var(--tyto-selection);
+}
+
+.recipe-calendar__outside {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--tyto-hairline-width);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  background: var(--tyto-border);
+}
+
+.recipe-calendar__weekday {
+  padding: var(--tyto-space-1);
+  background: var(--tyto-surface);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+  text-align: center;
+}
+
+.recipe-calendar__day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tyto-space-1);
+  min-height: 5.5rem;
+  min-width: 0;
+  padding: var(--tyto-space-1);
+  background: var(--tyto-surface);
+}
+
+.recipe-calendar__grid[data-span='week'] .recipe-calendar__day {
+  min-height: 8rem;
+}
+
+.recipe-calendar__day--out {
+  opacity: 0.55;
+}
+
+.recipe-calendar__day--today {
+  outline: var(--tyto-focus-width) solid var(--tyto-accent);
+  outline-offset: calc(var(--tyto-focus-width) * -1);
+}
+
+.recipe-calendar__date {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `flex: none`: in the scrolling "No date" list a row keeps its line instead of shrinking. */
+.recipe-calendar__row {
+  flex: none;
+  overflow: hidden;
+  font-size: var(--tyto-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
+.recipe-calendar__time,
+.recipe-calendar__written {
+  margin-right: var(--tyto-space-1);
+  color: var(--tyto-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.recipe-calendar__written {
+  margin-left: var(--tyto-space-1);
+}
+
+.recipe-calendar__more {
+  align-self: flex-start;
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-calendar__undated {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tyto-space-1);
+  padding-top: var(--tyto-space-2);
+}
+
+.recipe-calendar__heading {
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-calendar__rows {
+  display: flex;
+  flex-direction: column;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
 /* Apply while its answer is on its way (TYTO-378): still there, plainly not clickable. */
 .recipe-cell__action[aria-disabled='true'] {
   opacity: 0.5;

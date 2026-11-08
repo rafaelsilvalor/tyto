@@ -555,6 +555,18 @@ export interface Catalogue {
   readonly 'recipe.board.none': string;
   readonly 'recipe.board.more': string;
   readonly 'recipe.board.groups': string;
+  /**
+   * TYTO-383, the Calendar view (`recipe-calendar-view.ts`): the span's buttons, the dated rows
+   * outside the span, a day's rows past the three it draws, and the list of rows with no day.
+   */
+  readonly 'recipe.calendar.previous': string;
+  readonly 'recipe.calendar.next': string;
+  readonly 'recipe.calendar.week': string;
+  readonly 'recipe.calendar.month': string;
+  readonly 'recipe.calendar.earlier': string;
+  readonly 'recipe.calendar.later': string;
+  readonly 'recipe.calendar.more': string;
+  readonly 'recipe.calendar.undated': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -1193,6 +1205,14 @@ export const CATALOGUE_KEYS = [
   'recipe.board.none',
   'recipe.board.more',
   'recipe.board.groups',
+  'recipe.calendar.previous',
+  'recipe.calendar.next',
+  'recipe.calendar.week',
+  'recipe.calendar.month',
+  'recipe.calendar.earlier',
+  'recipe.calendar.later',
+  'recipe.calendar.more',
+  'recipe.calendar.undated',
   'status.problems.new',
   'menu.about',
   'shell.about.version',

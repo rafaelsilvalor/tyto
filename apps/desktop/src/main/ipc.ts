@@ -6,6 +6,7 @@ import { basename } from 'node:path';
 import type { IpcMain } from 'electron';
 import type { Diagnostics } from '@tyto/core';
 import type { SettingOption, SettingOutline } from '@tyto/plugin-api';
+import { type RunClock, systemClock } from '@tyto/recipe';
 
 import {
   type IpcChannelName,
@@ -42,9 +43,16 @@ import { type SessionService, type TemplateFolder } from './session.js';
 import { type PanelService } from './panels.js';
 import { type PreviewService } from './preview.js';
 import { type QueueService, type QueueView } from './queue.js';
-import { facetsOf, rowsInFacets } from './recipe-facets.js';
+import {
+  clockText,
+  dayFacetsOf,
+  facetsOf,
+  rowsInDays,
+  rowsInFacets,
+  todayIn,
+} from './recipe-facets.js';
 import { type RowsQuery, createRowViews, rowsAsTsv, visibleColumns } from './recipe-rows.js';
-import { type RecipeRunner } from './recipe-runner.js';
+import { type KeptTable, type RecipeRunner } from './recipe-runner.js';
 import { cellToWire, cut, recipeAnswerToWire, valueToWire } from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
@@ -86,6 +94,11 @@ export interface WindowThemes extends Pick<ThemeService, 'list' | 'current' | 'p
   commandsFoldOlderRuns(): boolean;
   /** The faces and sizes in force (TYTO-272), on the same answer. */
   typography(): Typography;
+}
+
+/** TYTO-383: the zone a kept cell's days are read in, its run's, or the machine's without one. */
+function clockOf(kept: KeptTable): RunClock {
+  return kept.clock ?? systemClock;
 }
 
 /**
@@ -575,19 +588,34 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       // TYTO-381, ADR 0177: a Board column's page holds only its group's rows, in the view's order.
       const grouped =
         facet === undefined ? undefined : visibleColumns(kept.table, [facet.column])[0];
+      // TYTO-383: a Calendar's page holds the rows of its days, by day and time.
+      const days =
+        facet?.bucket !== 'day' || grouped === undefined
+          ? undefined
+          : rowsInDays(kept.table, view.permutation, grouped.name, facet.keys, clockOf(kept), {
+              time:
+                facet.time === undefined
+                  ? undefined
+                  : visibleColumns(kept.table, [facet.time])[0]?.name,
+              perDay: facet.perDay,
+            });
       const permutation =
         facet === undefined
           ? view.permutation
           : grouped === undefined
             ? []
-            : rowsInFacets(kept.table, view.permutation, grouped.name, facet.keys);
+            : (days?.map((row) => row.index) ??
+              rowsInFacets(kept.table, view.permutation, grouped.name, facet.keys));
       return Promise.resolve({
         columns: shown.map((column) => cut(column.name)),
-        rows: permutation.slice(offset, offset + limit).map((at) => {
+        rows: permutation.slice(offset, offset + limit).map((at, place) => {
           const row = kept.table.rows[at];
+          const day = days?.[offset + place];
           return {
             key: cut(row?.key ?? ''),
             values: shown.map((column) => valueToWire(row?.values[column.name])),
+            ...(day === undefined ? {} : { day: day.day }),
+            ...(day?.minutes === undefined ? {} : { time: clockText(day.minutes) }),
           };
         }),
         total: kept.table.rows.length,
@@ -597,11 +625,27 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     // TYTO-381, ADR 0177: a Board's columns and their counts, over the same filtered view.
-    'recipe:facets': ({ documentId, index, ranAt, filter, columns, column, order }) => {
+    'recipe:facets': (request) => {
+      const { documentId, index, ranAt, filter, columns, column, order } = request;
       const kept = recipes.table(documentId, index);
       if (kept === undefined || kept.ranAt !== ranAt) return Promise.resolve({ stale: true });
       const view = rowViews.view(documentId, index, ranAt, kept.table, { filter, columns });
       const grouped = visibleColumns(kept.table, [column])[0];
+      // TYTO-383, ADR 0177 (2026-11-08 note): a Calendar's days, counted in the run's zone.
+      if (request.bucket === 'day') {
+        const clock = clockOf(kept);
+        const counted =
+          grouped === undefined
+            ? { facets: [], more: 0, earlier: 0, later: 0 }
+            : dayFacetsOf(kept.table, view.permutation, grouped.name, clock, request.days);
+        return Promise.resolve({
+          ...counted,
+          facets: [...counted.facets],
+          total: kept.table.rows.length,
+          matched: view.permutation.length,
+          today: todayIn(clock),
+        });
+      }
       const counted =
         grouped === undefined
           ? { facets: [], more: 0 }
