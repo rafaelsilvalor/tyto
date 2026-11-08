@@ -623,6 +623,11 @@
       "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts. The Board's groups (TYTO-381) are counted in recipe-facets.ts, tested in recipe-facets.test.ts and ipc.test.ts, and drawn by the views suite"
     },
     {
+      "paths": ["apps/desktop/src/main/recipe-schedule.ts"],
+      "e2e": ["window.desktop.test.ts"],
+      "why": "reviewed: the recipe scheduler in main (TYTO-385, ADR 0175); window.desktop's channel list reaches its schedule:list, schedule:run-now and schedule:open. Its cadence, skipped ticks, trust, needed parameters, notification dedupe and stop are in recipe-schedule.test.ts with fake timers; the Schedules panel and its suite are the card's third pull request"
+    },
+    {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
       "e2e": ["recipe-notebook.desktop.test.ts", "recipe-tab.desktop.test.ts"],
       "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables"

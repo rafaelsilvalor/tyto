@@ -148,6 +148,8 @@ export const en: Catalogue = {
   'crash.noLog':
     'This one could not even be written down: Tyto is not allowed to write to its own settings folder.',
   'crash.close': 'Close',
+  'schedule.notification.operations': '{count} operations of the plan failed to apply',
+  'schedule.notification.failed': 'A step failed',
   'import.message': 'Bring your settings from version {version}?',
   'import.detail':
     'The templates folder, where the panels were, the recent files, your keyboard shortcuts and the tabs you had open. Version {version} keeps its own copy either way, and this question will not come back.',

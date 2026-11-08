@@ -40,6 +40,13 @@ interface Plugin {
   readonly marks: Map<string, string>;
   /** How many operations `apply` was handed, over every call. */
   applied: number;
+  /** TYTO-385: how many sources were fetched and plans made, over every call. */
+  pulls: number;
+  plans: number;
+  /** TYTO-385: when set, every `apply` waits for it; and the most applies seen at once. */
+  gate?: Promise<void> | undefined;
+  applying: number;
+  mostApplying: number;
 }
 
 function plugin(state: Plugin): RecipeContributions {
@@ -47,7 +54,10 @@ function plugin(state: Plugin): RecipeContributions {
     id: 'acme.pull',
     kind: 'source',
     arguments: [],
-    page: () => Promise.resolve(ok({ table: ITEMS })),
+    page: () => {
+      state.pulls += 1;
+      return Promise.resolve(ok({ table: ITEMS }));
+    },
   };
   const mark: RecipeVerbContribution = {
     id: 'example.mark',
@@ -55,6 +65,7 @@ function plugin(state: Plugin): RecipeContributions {
     arguments: [{ name: 'label', type: 'text', positional: true, required: true }],
     writes: ['mark'],
     plan: ({ arguments: values, table }) => {
+      state.plans += 1;
       const label = String(values.label);
       const operations = table.rows.map((each) => ({
         write: 'mark',
@@ -68,7 +79,11 @@ function plugin(state: Plugin): RecipeContributions {
       }));
       return Promise.resolve(ok({ target: 'example items', operations, count: operations.length }));
     },
-    apply: ({ operations }) => {
+    apply: async ({ operations }) => {
+      state.applying += 1;
+      state.mostApplying = Math.max(state.mostApplying, state.applying);
+      if (state.gate !== undefined) await state.gate;
+      state.applying -= 1;
       state.applied += operations.length;
       const answers = operations.map((operation) => {
         const payload = operation.payload as { [key: string]: JsonValue };
@@ -80,7 +95,7 @@ function plugin(state: Plugin): RecipeContributions {
         state.marks.set(id, String(payload.mark));
         return { status: 'applied' as const };
       });
-      return Promise.resolve(ok({ operations: answers }));
+      return ok({ operations: answers });
     },
   };
   return {
@@ -119,7 +134,14 @@ afterEach(async () => {
 });
 
 function harness(trust: RecipePlace['trust'] = 'trusted') {
-  const state: Plugin = { marks: new Map(), applied: 0 };
+  const state: Plugin = {
+    marks: new Map(),
+    applied: 0,
+    pulls: 0,
+    plans: 0,
+    applying: 0,
+    mostApplying: 0,
+  };
   const runner = createRecipeRunner({
     contributions: plugin(state),
     placeOf: () => Promise.resolve(trust === 'none' ? { trust } : { trust, folder: workspace }),
@@ -300,5 +322,59 @@ describe('apply auto', () => {
     expect(typed.cells[2]?.plan?.count).toBe(3);
     expect(typed.cells[2]?.status).toBe('ok');
     expect(state.applied).toBe(0);
+  });
+});
+
+describe('a scheduled run (TYTO-385, ADR 0175)', () => {
+  const AUTO = SYNC.replace('recipe sync\n', 'recipe sync\nevery 5m\napply auto\n');
+  const scheduled = { documentId: 'schedule:sync', scheduled: true, from: 0 } as const;
+
+  it('counts as Run in a trusted folder: fetches from the first cell and applies auto', async () => {
+    const { state, run, stored } = harness();
+
+    const first = await run(AUTO, scheduled);
+    const second = await run(AUTO, scheduled);
+
+    expect(first.held).toBeUndefined();
+    expect(state.pulls).toBe(2);
+    expect(state.applied).toBe(6);
+    expect(second.cells[2]?.applied?.operations).toHaveLength(3);
+    expect(Object.keys(await stored())).toEqual(['EX-1', 'EX-2', 'EX-3']);
+  });
+
+  it('runs nothing in a restricted folder or outside any workspace, held as restricted', async () => {
+    for (const trust of ['restricted', 'none'] as const) {
+      const { state, run } = harness(trust);
+
+      const answer = await run(AUTO, scheduled);
+      // Not even a syntax error is reported: nothing is parsed.
+      const broken = await run(`${AUTO}every 1h\n`, scheduled);
+
+      expect(answer).toEqual({ cells: [], diagnostics: [], held: 'restricted', ranAt: NOW });
+      expect(broken.diagnostics).toEqual([]);
+      expect(state.pulls).toBe(0);
+      expect(state.applied).toBe(0);
+    }
+  });
+
+  it("never applies at the same time as a tab's Apply of the same file", async () => {
+    const { state, runner, run, apply } = harness();
+    const tab = await run(SYNC, { explicit: true });
+    let release = (): void => {};
+    state.gate = new Promise((resolve) => {
+      release = resolve;
+    });
+
+    const clicked = apply(2, tab.cells[2]?.planId ?? -1);
+    const timed = runner.run({ text: AUTO, path: recipePath, ...scheduled });
+    // The scheduled run has planned; give its Apply every chance to start beside the click's.
+    while (state.plans < 2) await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(state.applying).toBe(1);
+    release();
+    await Promise.all([clicked, timed]);
+
+    expect(state.mostApplying).toBe(1);
+    expect(state.applied).toBe(6);
   });
 });

@@ -9,12 +9,14 @@ import {
   type BrowserWindow,
   type OpenDialogOptions,
   Menu,
+  Notification,
   app,
   clipboard,
   dialog,
   ipcMain,
   nativeTheme,
   net,
+  powerMonitor,
   safeStorage,
   protocol,
   shell,
@@ -118,6 +120,11 @@ import { googleFontsOptionsFor, windowGoogleFonts } from './google-fonts.js';
 import { createPreviewService } from './preview.js';
 import { recipeClock } from './recipe-clock.js';
 import { createRecipeRunner, templateManifestsOf } from './recipe-runner.js';
+import {
+  type RecipeSchedule,
+  type ScheduleNotice,
+  createRecipeSchedule,
+} from './recipe-schedule.js';
 import { createProjectSources } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
@@ -691,9 +698,14 @@ async function start(): Promise<void> {
   // plugins live in, and its template folders handed to the same `sources` the folder above is.
   // **The explorer** (TYTO-279, ADR 0115): the open folder's files by id, watched while it is
   // open. A notice and not a question, as the queue's: the panel lists again when it hears it.
+  // The recipe scheduler (TYTO-385, ADR 0175), bound once the recipe runner exists below; it
+  // schedules the folder the workspace opens, and walks again when the explorer hears a recipe.
+  let recipeSchedule: RecipeSchedule | undefined = undefined;
   const explorer = createExplorerService({
-    onChange: () => {
+    onChange: (names) => {
       toWindow('explorer:changed', {});
+      // TYTO-385: a `.recipe` changed, so the scheduler walks the folder again.
+      recipeSchedule?.filesChanged(names);
     },
     onError: (message, cause) => {
       log.error(message, cause);
@@ -737,6 +749,8 @@ async function start(): Promise<void> {
     onFolder: async (folder, places) => {
       stopCommands();
       await explorer.setRoot(folder, places);
+      // Not awaited: the walk reads every recipe in the folder, which opens meanwhile.
+      void recipeSchedule?.setFolder(folder);
       if (folder !== undefined) await recentFolders.remember(folder);
       // Not awaited: a fetch may take a while, and the folder is open meanwhile. The templates
       // it brings arrive with `templates:changed` (ADR 0151 decision 3).
@@ -1014,6 +1028,52 @@ async function start(): Promise<void> {
     clock: () => recipeClock(recipeTimeZone),
     // `to-brief`'s templates (TYTO-380, ADR 0172), as the preview finds a brief's.
     templates: templateManifestsOf(sources),
+  });
+  // **Recipes on an interval while the app is open** (TYTO-385, ADR 0175): every recipe in the
+  // open folder whose header says `every`, run through the same runner as `scheduled`. A
+  // problem raises one OS notification, worded here: the recipe's name and a diagnostic code,
+  // never a row's values. Kept until clicked or closed, or the click handler goes with it.
+  const notices = new Set<Notification>();
+  const noticeBody = ({ problem }: ScheduleNotice): string =>
+    problem.kind === 'diagnostic'
+      ? problem.code
+      : problem.kind === 'operations'
+        ? translate(uiLocale, 'schedule.notification.operations').replaceAll(
+            '{count}',
+            String(problem.failed),
+          )
+        : translate(uiLocale, 'schedule.notification.failed');
+  const schedule = createRecipeSchedule({
+    run: (input) => recipes.run(input),
+    notify: (notice) => {
+      if (!Notification.isSupported()) return;
+      const shown = new Notification({ title: notice.recipe, body: noticeBody(notice) });
+      notices.add(shown);
+      shown.on('close', () => notices.delete(shown));
+      shown.on('click', () => {
+        notices.delete(shown);
+        if (mainWindow !== undefined && !mainWindow.isDestroyed()) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+        // The window opens it by the id, with `schedule:open`.
+        toWindow('schedule:changed', { open: notice.scheduleId });
+      });
+      shown.show();
+    },
+    changed: () => {
+      toWindow('schedule:changed', {});
+    },
+    onError: (message, cause) => {
+      log.error(message, cause);
+    },
+  });
+  recipeSchedule = schedule;
+  // A folder opened before the scheduler existed, as a session brought back at launch.
+  void schedule.setFolder(workspace.state().folder ?? undefined);
+  // After sleep a recipe whose time passed runs once, never once per missed tick.
+  powerMonitor.on('resume', () => {
+    schedule.resumed();
   });
   // The images and faces installed plugins supply, in one cache for the process, which the
   // preview and the export share (ADR 0117, ADR 0119).
@@ -1881,6 +1941,8 @@ async function start(): Promise<void> {
     },
     preview,
     recipes,
+    // TYTO-385, ADR 0175: the Schedules panel's list, Run now and Open, by main's ids.
+    schedule,
     // TYTO-379, ADR 0171: `recipe:copy` writes the text it built in main.
     writeClipboard: (text) => clipboard.writeText(text),
     templates,
@@ -2006,6 +2068,8 @@ async function start(): Promise<void> {
 
   mainWindow.on('closed', () => {
     exit.windowGone();
+    // ADR 0175 decision 3: nothing runs on a schedule once the window is gone.
+    recipeSchedule?.stop();
   });
 
   // **Measured, against the built app, and it is why this third hook exists.** A reload keeps the

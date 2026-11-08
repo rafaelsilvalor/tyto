@@ -41,6 +41,9 @@ export const EXPLORER_ENTRY_CAP = 2000;
 /** How long a burst of watcher events has to go quiet before the window is told. */
 export const EXPLORER_SETTLE_MS = 150;
 
+/** How many of a burst's names are handed on; a checkout's thousands are not. */
+export const EXPLORER_BURST_NAMES = 256;
+
 /**
  * Not listed: Git's own folder, which nobody edits and which churns on every commit.
  * `node_modules` is listed — VS Code shows it too, and a person may want to look — but see
@@ -145,8 +148,14 @@ export type WatchFolder = (
 ) => { close(): void };
 
 export interface ExplorerServiceOptions {
-  /** Something in the listed folder changed. The composition root pushes `explorer:changed`. */
-  readonly onChange: () => void;
+  /**
+   * Something in the listed folder changed. The composition root pushes `explorer:changed`.
+   * `names` are the burst's paths relative to the folder, as the watcher gave them, with `null`
+   * for an event that named nothing; past {@link EXPLORER_BURST_NAMES} a single `null` stands
+   * for the rest. The recipe scheduler reads them to walk again only for a `.recipe` change
+   * (TYTO-385, ADR 0175).
+   */
+  readonly onChange: (names: readonly (string | null)[]) => void;
   readonly onError?: (message: string, cause: unknown) => void;
   readonly watch?: WatchFolder;
   readonly settleMs?: number;
@@ -331,12 +340,17 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
 
   const startWatching = (folder: string): void => {
     const mine = generation;
+    let burst: (string | null)[] = [];
     const changed = (name: string | null): void => {
       if (mine !== generation || ignoredByTheWatcher(name)) return;
+      if (burst.length < EXPLORER_BURST_NAMES) burst.push(name);
+      else if (burst.at(-1) !== null) burst.push(null);
       if (settle !== undefined) clearTimeout(settle);
       settle = setTimeout(() => {
         settle = undefined;
-        options.onChange();
+        const names = burst;
+        burst = [];
+        options.onChange(names);
       }, settleMs);
     };
     try {
@@ -506,7 +520,8 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
         // The same folder read again — a trust change can accept a key it refused before.
         const changed = !samePlaces(places, next);
         places = next;
-        if (changed) options.onChange();
+        // No file changed, so no names: only the flags did.
+        if (changed) options.onChange([]);
         return;
       }
       stopWatching();

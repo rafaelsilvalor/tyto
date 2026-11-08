@@ -76,3 +76,19 @@ channels; then the Schedules panel, its strings, the manual and an end-to-end te
 - Two windows on one workspace would each schedule its recipes; that is out of this record and
   waits for a window that can tell another one is running them.
 - Until the second pull request lands, `every` parses and nothing runs it.
+
+## Note, 2026-11-08: the scheduler in main
+
+The second pull request settles what the record left to the code:
+
+- A recipe's first run is one interval after main finds it, not at once: opening a folder does
+  not fire every recipe in it, and an `every 5m` recipe runs twice in its first ten minutes.
+- A scheduled run starts from the first cell, so every source is called again; it does not ask
+  sources to skip their own caches, as Fetch again does. A plugin whose cache outlives the
+  interval answers from it.
+- Main walks the folder again when a burst of changes names a `.recipe` file. A folder renamed
+  or moved with recipes inside is reported by the watcher under the folder's name alone, so its
+  recipes are found again only at the next `.recipe` change or when the folder is reopened.
+- A notification's click focuses the window and pushes `schedule:changed` with the schedule's
+  id in `open`; the window opens it through `schedule:open`, by that id, as `queue:open-brief`
+  opens a task's brief.
