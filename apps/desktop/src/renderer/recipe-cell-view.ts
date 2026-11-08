@@ -4,6 +4,7 @@ import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/ind
 import type { CellStatus } from './recipe-notebook.js';
 import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js';
 import type { FacetsAnswer, FacetsRequest } from './recipe-board-view.js';
+import type { RowAnswer, RowRequest } from './recipe-cards-view.js';
 import type { CopyAnswer, CopyRequest, RowsAnswer, RowsRequest } from './recipe-table-view.js';
 import { viewBody } from './recipe-views.js';
 
@@ -54,6 +55,8 @@ export interface CellViewActions {
   readonly copy: (request: CopyRequest) => Promise<CopyAnswer>;
   /** A column's groups of a kept cell's table: `recipe:facets` for this tab (TYTO-381). */
   readonly facets: (request: FacetsRequest) => Promise<FacetsAnswer>;
+  /** One row of a kept cell's table, whole: `recipe:row` for this tab (TYTO-384). */
+  readonly row: (request: RowRequest) => Promise<RowAnswer>;
 }
 
 export interface CellViewContext {
@@ -172,6 +175,7 @@ function renderCell(status: CellStatus, context: CellViewContext, collapsed: boo
       rows: actions.rows,
       copy: actions.copy,
       facets: actions.facets,
+      row: actions.row,
     });
     root.append(view ?? tableBody(table, locale));
   }

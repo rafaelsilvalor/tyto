@@ -855,6 +855,12 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
         if (bridge === undefined) return Promise.resolve({ stale: true });
         return bridge['recipe:facets']({ documentId, ...request });
       },
+      // TYTO-384: a card opened, its whole row read from main.
+      row: (request) => {
+        const bridge = window.tyto;
+        if (bridge === undefined) return Promise.resolve({ stale: true });
+        return bridge['recipe:row']({ documentId, ...request });
+      },
     },
   };
   const statuses = cellStatuses(text, answer, state.locale);

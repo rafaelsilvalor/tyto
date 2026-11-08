@@ -8,7 +8,20 @@ import {
   sourceRange,
 } from '@tyto/core';
 
-import type { Argument, NamedArgument, RecipeAst, RecipeParam, Step } from './ast.js';
+import type {
+  Argument,
+  NamedArgument,
+  RecipeAst,
+  RecipeInterval,
+  RecipeParam,
+  Step,
+} from './ast.js';
+
+/**
+ * The shortest interval `every` accepts. A scheduled run reads its sources again, so a
+ * shorter cadence mostly spends the source's rate limit (ADR 0175).
+ */
+export const MINIMUM_INTERVAL_MINUTES = 5;
 
 /**
  * Parses a `*.recipe` file (ADR 0128).
@@ -24,8 +37,9 @@ import type { Argument, NamedArgument, RecipeAst, RecipeParam, Step } from './as
  * ```
  *
  * A header names the recipe and `|` lines describe it; `apply auto` in the header lets an
- * explicit Run in a trusted folder apply its plans without a click (ADR 0170); `param` lines
- * declare what varies;
+ * explicit Run in a trusted folder apply its plans without a click (ADR 0170); `every 30m`
+ * or `every 2h` in the header asks the host to run it on that interval while the app is open
+ * (ADR 0175); `param` lines declare what varies;
  * every other line is one verb and its arguments, and so one cell. `#` starts a comment line.
  * It is a line format and not a grammar on purpose: a one-step change is a one-line diff,
  * and the chain of verbs is what the person reads.
@@ -37,6 +51,7 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
   const description: string[] = [];
   let name: string | undefined;
   let apply: 'auto' | undefined;
+  let every: RecipeInterval | undefined;
 
   for (const line of linesOf(text)) {
     const content = line.text.trim();
@@ -58,7 +73,7 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
     }
 
     if (content.startsWith('|')) {
-      if (steps.length > 0 || params.length > 0 || apply !== undefined) {
+      if (steps.length > 0 || params.length > 0 || apply !== undefined || every !== undefined) {
         syntax("a '|' description line belongs right under the 'recipe' line");
       } else {
         description.push(content.slice(1).trim());
@@ -80,6 +95,19 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
         syntax("'apply auto' is written once");
       } else {
         apply = 'auto';
+      }
+      continue;
+    }
+    if (verb === 'every') {
+      const interval = parseInterval(content);
+      if (typeof interval === 'string') {
+        syntax(interval);
+      } else if (steps.length > 0) {
+        syntax("'every' belongs in the header, before the first step");
+      } else if (every !== undefined) {
+        syntax("'every' is written once");
+      } else {
+        every = interval;
       }
       continue;
     }
@@ -130,8 +158,22 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
     description: description.join('\n'),
     params,
     ...(apply === undefined ? {} : { apply }),
+    ...(every === undefined ? {} : { every }),
     steps,
   });
+}
+
+/** Reads `every <n>m` or `every <n>h`; a string is the problem to report. */
+function parseInterval(content: string): RecipeInterval | string {
+  const match = /^every\s+(\d+)(m|h)$/u.exec(content);
+  if (match?.[1] === undefined) {
+    return "the header line 'every' takes minutes or hours, as in 'every 30m' or 'every 2h'";
+  }
+  const minutes = Number(match[1]) * (match[2] === 'h' ? 60 : 1);
+  if (minutes < MINIMUM_INTERVAL_MINUTES) {
+    return `'every' runs at most every ${MINIMUM_INTERVAL_MINUTES} minutes; write 'every ${MINIMUM_INTERVAL_MINUTES}m' or more`;
+  }
+  return { minutes };
 }
 
 interface Line {

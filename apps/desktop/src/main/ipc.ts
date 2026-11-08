@@ -658,6 +658,23 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       });
     },
 
+    // TYTO-384: a card opened reads its whole row, every column, from the table main kept.
+    'recipe:row': ({ documentId, index, ranAt, key }) => {
+      const kept = recipes.table(documentId, index);
+      if (kept === undefined || kept.ranAt !== ranAt) return Promise.resolve({ stale: true });
+      const row = kept.table.rows.find((each) => cut(each.key) === key);
+      if (row === undefined) return Promise.resolve({ stale: true });
+      const columns = kept.table.columns.slice(0, RECIPE_WIRE_LIMITS.columns);
+      const { source, id, fetchedAt } = row.provenance;
+      return Promise.resolve({
+        columns: columns.map((column) => ({ name: cut(column.name), type: column.type })),
+        values: columns.map((column) =>
+          valueToWire(row.values[column.name], RECIPE_WIRE_LIMITS.opened),
+        ),
+        provenance: { source: cut(source), id: cut(id), fetchedAt: cut(fetchedAt) },
+      });
+    },
+
     'recipe:copy': (request) => {
       const { documentId, index, ranAt, offset, limit, sort, filter, columns } = request;
       const kept = recipes.table(documentId, index);

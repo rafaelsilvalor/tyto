@@ -567,6 +567,17 @@ export interface Catalogue {
   readonly 'recipe.calendar.later': string;
   readonly 'recipe.calendar.more': string;
   readonly 'recipe.calendar.undated': string;
+  /**
+   * TYTO-384, the Cards view (`recipe-cards-view.ts`): the cards past those drawn, a card's name
+   * for a screen reader, and the opened card's close button and provenance lines.
+   */
+  readonly 'recipe.cards.more': string;
+  readonly 'recipe.cards.open': string;
+  readonly 'recipe.cards.close': string;
+  readonly 'recipe.cards.source': string;
+  readonly 'recipe.cards.id': string;
+  readonly 'recipe.cards.fetchedAt': string;
+  readonly 'recipe.cards.link': string;
   readonly 'status.problems.new': string;
   /**
    * Help > About, where the version, the platform, the template count and the template
@@ -1213,6 +1224,13 @@ export const CATALOGUE_KEYS = [
   'recipe.calendar.later',
   'recipe.calendar.more',
   'recipe.calendar.undated',
+  'recipe.cards.more',
+  'recipe.cards.open',
+  'recipe.cards.close',
+  'recipe.cards.source',
+  'recipe.cards.id',
+  'recipe.cards.fetchedAt',
+  'recipe.cards.link',
   'status.problems.new',
   'menu.about',
   'shell.about.version',
