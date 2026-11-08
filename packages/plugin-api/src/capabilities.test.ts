@@ -216,6 +216,101 @@ describe('host.credentials.set and .delete (ADR 0134)', () => {
   });
 });
 
+/** A host that ran a sign-in, counting every token it was asked for (ADR 0174). */
+function signedIn(tokens: Readonly<Record<string, string>> = {}) {
+  const asked: string[] = [];
+  const capabilities: HostCapabilities = {
+    ...writable({ 'texto/signin:provider': 'refresh-token' }).capabilities,
+    hostName: 'the desktop',
+    signinAccessToken: (plugin, id) => {
+      asked.push(`${plugin}/${id}`);
+      return Promise.resolve(tokens[`${plugin}/${id}`]);
+    },
+  };
+  return { asked, capabilities };
+}
+
+describe('host.signin.accessToken (ADR 0174)', () => {
+  it('answers the access token of a declared sign-in', async () => {
+    const { asked, capabilities } = signedIn({ 'texto/provider': 'access-token' });
+    const checked = checkedCapabilities('texto', ['signin:provider'], capabilities);
+
+    expect(await checked.signinAccessToken('provider')).toBe('access-token');
+    expect(asked).toEqual(['texto/provider']);
+  });
+
+  it('refuses an undeclared id with E_PERMISSION, and never asks the host', async () => {
+    const { asked, capabilities } = signedIn({ 'texto/other': 'access-token' });
+    const checked = checkedCapabilities('texto', ['signin:provider'], capabilities);
+
+    await expect(checked.signinAccessToken('other')).rejects.toThrow(
+      "Plugin 'texto' called 'host.signin.accessToken('other') (signin:other)' without that " +
+        'permission being granted at install time.',
+    );
+    expect(asked).toEqual([]);
+  });
+
+  it('answers E_SIGNIN_REQUIRED when nobody signed in, naming the host', async () => {
+    const { capabilities } = signedIn();
+    const checked = checkedCapabilities('texto', ['signin:provider'], capabilities);
+
+    await expect(checked.signinAccessToken('provider')).rejects.toThrow(
+      "Plugin 'texto' needs sign-in 'provider', and nobody has signed in to it on the desktop; " +
+        'sign in from the plugins screen.',
+    );
+    expect(await codeOf(checked.signinAccessToken('provider'))).toBe('E_SIGNIN_REQUIRED');
+  });
+
+  it('answers E_SIGNIN_UNAVAILABLE on a host that cannot sign in, as the CLI', async () => {
+    const { capabilities } = recording();
+    const checked = checkedCapabilities('texto', ['signin:provider'], {
+      ...capabilities,
+      hostName: 'tyto',
+    });
+
+    await expect(checked.signinAccessToken('provider')).rejects.toThrow(
+      "Plugin 'texto' asked for sign-in 'provider', and tyto cannot sign in through a browser.",
+    );
+    expect(
+      await codeOf(
+        checkedCapabilities('texto', ['signin:provider'], undefined).signinAccessToken('provider'),
+      ),
+    ).toBe('E_SIGNIN_UNAVAILABLE');
+  });
+
+  it('refuses an adapter answer that is not a token, so a token record never reaches the plugin', async () => {
+    const { capabilities } = signedIn();
+    const leaky: HostCapabilities = {
+      ...capabilities,
+      signinAccessToken: () =>
+        Promise.resolve({ access: 'a', refresh: 'refresh-token' } as unknown as string),
+    };
+    const checked = checkedCapabilities('texto', ['signin:provider'], leaky);
+
+    await expect(checked.signinAccessToken('provider')).rejects.toThrow(
+      "the desktop answered sign-in 'provider' with something other than a token.",
+    );
+  });
+
+  it("keeps the plugin's own host.credentials out of every signin: key, whatever it declares", async () => {
+    const { capabilities } = signedIn();
+    // A manifest refuses this permission; the check holds even for a host that skipped it.
+    const checked = checkedCapabilities(
+      'texto',
+      ['signin:provider', 'credentials:signin:provider'],
+      capabilities,
+    );
+
+    expect(
+      await Promise.all([
+        codeOf(checked.credentials('signin:provider')),
+        codeOf(checked.storeCredential('signin:provider', 'x')),
+        codeOf(checked.deleteCredential('signin:provider')),
+      ]),
+    ).toEqual(['E_PERMISSION', 'E_PERMISSION', 'E_PERMISSION']);
+  });
+});
+
 describe('the in-process host', () => {
   it('checks a built-in against its own manifest too', async () => {
     const { fetched, capabilities } = recording();
@@ -548,5 +643,39 @@ describe('host.cache and host.workspace in process', () => {
 
     expect(await seen).toBe('2026-10-25T12:00:00.000Z 4 k:4 null E_PERMISSION');
     expect(files.get('saida.txt')).toEqual(new Uint8Array([111, 105]));
+  });
+});
+
+describe('host.signin in process', () => {
+  it('hands a plugin the access token of the sign-in its manifest declares', async () => {
+    const { capabilities } = signedIn({ 'svg/provider': 'access-token' });
+    const host = createPluginHost({ capabilities });
+    let seen: Promise<string> | undefined;
+    host.activate({
+      id: 'svg',
+      manifest: {
+        name: 'svg',
+        version: '1.0.0',
+        engine: '>=0.1',
+        contributes: ['exporter'],
+        permissions: ['signin:provider'],
+        signin: {
+          provider: {
+            authorize: 'https://accounts.example.com/auth',
+            token: 'https://accounts.example.com/token',
+            clientId: 'client',
+            scopes: [],
+          },
+        },
+      },
+      activate: (inner) => {
+        seen = (async () => {
+          const token = await inner.signin.accessToken('provider');
+          return `${token} ${await codeOf(inner.signin.accessToken('other'))}`;
+        })();
+      },
+    });
+
+    expect(await seen).toBe('access-token E_PERMISSION');
   });
 });

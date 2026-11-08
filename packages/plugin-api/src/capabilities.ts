@@ -149,6 +149,15 @@ export interface HostCapabilities {
   workspaceRead?(plugin: string, path: string): Promise<Uint8Array>;
   /** Writes the file whole, creating its folders, replacing one that is there. */
   workspaceWrite?(plugin: string, path: string, bytes: Uint8Array): Promise<void>;
+
+  /**
+   * A current access token for the plugin's sign-in `id`, already allowed (ADR 0174), or
+   * `undefined` when nobody has signed in to it. **The adapter never opens a browser here**:
+   * only a person starts a sign-in, from the host's own screen. It refreshes an expired token
+   * itself, and the refresh token never leaves it. Absent on a host that cannot sign in
+   * through a browser — the CLI — which answers `E_SIGNIN_UNAVAILABLE`.
+   */
+  signinAccessToken?(plugin: string, id: string): Promise<string | undefined>;
 }
 
 /**
@@ -186,8 +195,21 @@ export function allowsHost(permissions: readonly string[], hostname: string): bo
   });
 }
 
+/**
+ * A credential key under `signin:` is never a plugin's, whatever it declares: the host keeps a
+ * sign-in's refresh token there (ADR 0174), and a plugin reaches a sign-in only through
+ * `host.signin.accessToken`.
+ */
+const SIGNIN_KEY_PREFIX = 'signin:';
+
 export function allowsCredential(permissions: readonly string[], key: string): boolean {
+  if (key.startsWith(SIGNIN_KEY_PREFIX)) return false;
   return permissions.includes(`credentials:${key}`);
+}
+
+/** `signin:<id>`, which the manifest grants only beside a `signin.<id>` entry (ADR 0174). */
+export function allowsSignin(permissions: readonly string[], id: string): boolean {
+  return permissions.includes(`signin:${id}`);
 }
 
 /** `workspace:read` and `workspace:write` (ADR 0138). Neither implies the other. */
@@ -209,6 +231,25 @@ export interface PluginCapabilities {
   cacheList(prefix: string): Promise<readonly PluginCacheListing[]>;
   workspaceRead(path: string): Promise<Uint8Array>;
   workspaceWrite(path: string, bytes: Uint8Array): Promise<void>;
+  signinAccessToken(id: string): Promise<string>;
+}
+
+/**
+ * `host.signin`: a browser sign-in the host ran for this plugin (ADR 0174). The plugin gets an
+ * access token and nothing else; it never opens a browser and never sees the refresh token.
+ */
+export interface HostSignin {
+  /**
+   * A current access token for the sign-in the manifest declares as `signin.<id>`. Undeclared
+   * is `E_PERMISSION`, nobody signed in is `E_SIGNIN_REQUIRED`, and a host that cannot sign in
+   * through a browser (the CLI) is `E_SIGNIN_UNAVAILABLE`.
+   */
+  accessToken(id: string): Promise<string>;
+}
+
+/** The `host.signin` both sides of the isolation boundary hand a plugin. */
+export function hostSignin(checked: Pick<PluginCapabilities, 'signinAccessToken'>): HostSignin {
+  return { accessToken: (id) => checked.signinAccessToken(id) };
 }
 
 /**
@@ -496,6 +537,31 @@ export function checkedCapabilities(
         return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
       }
       await capabilities.workspaceWrite(plugin, relative, bytes);
+    },
+
+    async signinAccessToken(id) {
+      if (typeof id !== 'string') throw new TypeError('a sign-in id must be a string.');
+      if (!allowsSignin(permissions, id)) {
+        return refuse(
+          diagnostic('E_PERMISSION', {
+            plugin,
+            capability: `host.signin.accessToken('${id}') (signin:${id})`,
+          }),
+        );
+      }
+      const host = capabilities?.hostName ?? 'this host';
+      if (capabilities?.signinAccessToken === undefined) {
+        return refuse(diagnostic('E_SIGNIN_UNAVAILABLE', { plugin, id, host }));
+      }
+      // Read as `unknown`: the adapter is typed, but this is the check that does not trust it.
+      const token: unknown = await capabilities.signinAccessToken(plugin, id);
+      if (token === undefined) return refuse(diagnostic('E_SIGNIN_REQUIRED', { plugin, id, host }));
+      // An adapter that answered its whole token record would hand the plugin the refresh
+      // token; only a non-empty string crosses, and anything else is the adapter's bug.
+      if (typeof token !== 'string' || token === '') {
+        throw new TypeError(`${host} answered sign-in '${id}' with something other than a token.`);
+      }
+      return token;
     },
   };
 }

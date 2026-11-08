@@ -28,10 +28,12 @@ import {
   type HostCredentials,
   type HostFetchInit,
   type HostFetchResponse,
+  type HostSignin,
   type HostWorkspace,
   checkedCapabilities,
   hostCache,
   hostCredentials,
+  hostSignin,
   hostWorkspace,
   responseOf,
 } from './capabilities.js';
@@ -183,6 +185,13 @@ export interface PluginHost {
    * `E_WORKSPACE_FILE_RESTRICTED`.
    */
   readonly workspace: HostWorkspace;
+  /**
+   * A browser sign-in the host ran for this plugin (ADR 0174), behind `signin:<id>` and the
+   * manifest's `signin.<id>` entry. `accessToken(id)` answers a current token, never opens a
+   * browser, and never hands over the refresh token; nobody signed in is `E_SIGNIN_REQUIRED`
+   * and a host that cannot sign in (the CLI) is `E_SIGNIN_UNAVAILABLE`.
+   */
+  readonly signin: HostSignin;
 
   readonly log: Logger;
   readonly events: TypedEmitter;
@@ -638,6 +647,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       ),
       cache: hostCache(checked),
       workspace: hostWorkspace(checked),
+      signin: hostSignin(checked),
 
       log,
       events: emitter,

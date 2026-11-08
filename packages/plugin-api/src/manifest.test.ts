@@ -126,3 +126,92 @@ describe('parsing the bytes of a file', () => {
     ).toBe(true);
   });
 });
+
+describe('a browser sign-in (ADR 0174)', () => {
+  const PROVIDER = {
+    authorize: 'https://accounts.example.com/o/oauth2/v2/auth',
+    token: 'https://oauth2.example.com/token',
+    clientId: 'client-id.apps.example.com',
+    scopes: ['openid', 'email'],
+  };
+  const SIGNING = {
+    ...VALID,
+    permissions: ['signin:provider'],
+    signin: { provider: PROVIDER },
+  };
+
+  it('is accepted with its signin:<id> permission, with or without a client secret', () => {
+    expect(pathsOf(SIGNING)).toEqual([]);
+    expect(
+      pathsOf({ ...SIGNING, signin: { provider: { ...PROVIDER, clientSecret: 'x' } } }),
+    ).toEqual([]);
+  });
+
+  it('accepts plain http only on this machine, for a test provider', () => {
+    for (const host of ['127.0.0.1:43210', 'localhost:8080']) {
+      const local = {
+        ...PROVIDER,
+        authorize: `http://${host}/auth`,
+        token: `http://${host}/token`,
+      };
+      expect(pathsOf({ ...SIGNING, signin: { provider: local } })).toEqual([]);
+    }
+  });
+
+  it('refuses http to any other host, and every other scheme, naming the field', () => {
+    const refused = validatePluginManifest({
+      ...SIGNING,
+      signin: {
+        provider: {
+          ...PROVIDER,
+          authorize: 'http://accounts.example.com/auth',
+          token: 'ftp://oauth2.example.com/token',
+        },
+      },
+    });
+    expect(isErr(refused) && refused.error.map((issue) => issue.message)).toEqual([
+      "Plugin manifest is invalid at 'signin.provider.authorize': must be an https URL, or http on 127.0.0.1 or localhost.",
+      "Plugin manifest is invalid at 'signin.provider.token': must be an https URL, or http on 127.0.0.1 or localhost.",
+    ]);
+  });
+
+  it('refuses a loopback lookalike, a relative URL, a user in the URL and a fragment', () => {
+    const urls = [
+      'http://127.0.0.1.example.com/auth',
+      '/auth',
+      'https://user:pass@accounts.example.com/auth',
+      'https://accounts.example.com/auth#x',
+    ];
+    for (const authorize of urls) {
+      expect(pathsOf({ ...SIGNING, signin: { provider: { ...PROVIDER, authorize } } })).toEqual([
+        'signin.provider.authorize',
+      ]);
+    }
+  });
+
+  it('refuses an entry without its permission, and a permission without its entry', () => {
+    expect(pathsOf({ ...SIGNING, permissions: [] })).toEqual(['signin.provider']);
+    expect(pathsOf({ ...VALID, permissions: ['signin:provider'] })).toEqual(['permissions.0']);
+  });
+
+  it('refuses a credentials: permission that names a sign-in, which only the host holds', () => {
+    expect(
+      pathsOf({ ...SIGNING, permissions: ['signin:provider', 'credentials:signin:provider'] }),
+    ).toEqual(['permissions.1']);
+  });
+
+  it('refuses unknown keys, an empty client id and a repeated scope', () => {
+    const wrong = { ...PROVIDER, refreshToken: 'r', clientId: '', scopes: ['a', 'a'] };
+    expect(pathsOf({ ...SIGNING, signin: { provider: wrong } }).sort()).toEqual([
+      'signin.provider.clientId',
+      'signin.provider.refreshToken',
+      'signin.provider.scopes',
+    ]);
+  });
+
+  it('refuses an id that is not lowercase letters, digits and hyphens', () => {
+    expect(
+      pathsOf({ ...SIGNING, permissions: ['signin:Provider'], signin: { Provider: PROVIDER } }),
+    ).toContain('signin.Provider');
+  });
+});

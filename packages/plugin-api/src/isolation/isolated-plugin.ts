@@ -26,6 +26,7 @@ import {
   describeIssues,
   fetchArgsSchema,
   guestMessageSchema,
+  signinArgsSchema,
   workspaceReadArgsSchema,
   workspaceWriteArgsSchema,
   helloMessageSchema,
@@ -307,6 +308,12 @@ export function connectIsolatedPlugin(
           if (!args.success)
             throw new TypeError(`host.credentials.delete was given ${describeIssues(args.error)}`);
           reply({ ok: true, value: await capabilities.deleteCredential(args.data[0]) });
+        } else if (message.capability === 'signinAccessToken') {
+          const args = signinArgsSchema.safeParse(message.args);
+          if (!args.success)
+            throw new TypeError(`host.signin.accessToken was given ${describeIssues(args.error)}`);
+          // A string, checked by `checkedCapabilities`: never the adapter's token record.
+          reply({ ok: true, value: await capabilities.signinAccessToken(args.data[0]) });
         } else {
           reply({ ok: true, value: await storage(message.capability, message.args) });
         }
@@ -327,7 +334,7 @@ export function connectIsolatedPlugin(
     async function storage(
       capability: Exclude<
         RequestedCapability,
-        'fetch' | 'credentials' | 'storeCredential' | 'deleteCredential'
+        'fetch' | 'credentials' | 'storeCredential' | 'deleteCredential' | 'signinAccessToken'
       >,
       raw: readonly unknown[],
     ): Promise<unknown> {
