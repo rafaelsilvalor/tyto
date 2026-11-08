@@ -83,6 +83,16 @@ Three things have to be settled before a renderer can show anything:
 9. **The wire is bounded** (`RECIPE_WIRE_LIMITS`): the first 50 rows of each table and its
    total, a value cut at 1,000 characters, a list joined as a person writes it. Main keeps whole
    tables; the window is shown a preview.
+   _Amended 2026-11-08 (TYTO-449):_ a `run` cell also carries its included recipe's cells,
+   flat and in the order they ran, a recipe included inside an included one following its `run`
+   cell one `depth` further in: at most `RECIPE_WIRE_LIMITS.included` (200) per `run` cell and
+   `depth` 8, each table cut at the same 50 rows. They are sent only when the `run` succeeded,
+   kept with the cell as its table is, and shown read-only when the person opens the cell
+   (closed by default, kept open by line as a fold is). Their lines live in another file, so an
+   included cell carries its step's text and no line, its diagnostics no range, and its plan no
+   id: they never reach the editor's markers or Problems, and no Apply is offered on them. Each
+   draws the preview of its table, never a view, since a view pages its rows from main by the
+   outer cell's index.
 10. **`refresh` has a seam and no meaning yet.** The runner hands its registries factory a
     `refresh` flag (from `fresh`); TYTO-377's last pull request gives sources a way to skip their
     cache with it, in `@tyto/plugin-api`.

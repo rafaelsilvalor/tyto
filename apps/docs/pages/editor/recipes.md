@@ -1,7 +1,7 @@
 # Recipes
 
 ::: info How this page was checked
-Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Menus and labels below are the English window's.
+Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Menus and labels below are the English window's.
 :::
 
 A recipe (`.recipe`) is a list of steps, one per line, that fetch rows from a source, filter and reshape them, and plan what to write. Tyto opens a recipe in a tab as a notebook: **under each step, its result**, a table you can read while you write the next line.
@@ -78,6 +78,10 @@ The grid draws 48 cards; **252 more** draws the next ones. _Filter rows_ works a
 ## Fold a table
 
 The arrow at the start of the line folds the step's table away and brings it back. Every table starts open. A folded table stays folded while the tab is open, through new runs and when it scrolls out of view; closing the tab or quitting Tyto opens them all again.
+
+## Open a run step
+
+A `run other` step shows one table, the one the recipe `other` ends with. **Show the included recipe's cells**, on its line, opens it onto the steps of `other`, each with its own line and its first rows, and a recipe `other` runs in turn one step further in. They are for reading: no button on them runs, applies or fetches, and opening them asks for nothing, since the last run already brought them. Each draws the preview of its table even under a `show`, and only a `run` that worked has them; one that failed says why on its own line. A step opened stays open while the tab is open, as a folded table stays folded.
 
 ## Run from here
 

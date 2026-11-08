@@ -970,7 +970,7 @@ tyto-preview-pane[hidden] {
   font-size: var(--tyto-text-sm);
 }
 
-.recipe-cell--collapsed .recipe-cell__body {
+.recipe-cell--collapsed > .recipe-cell__body {
   display: none;
 }
 
@@ -1001,6 +1001,28 @@ tyto-preview-pane[hidden] {
 .recipe-cell__more {
   padding-top: var(--tyto-space-1);
   color: var(--tyto-text-muted);
+}
+
+/* A `run` cell opened onto its included recipe's cells (TYTO-449): read-only, each one step
+   further in per recipe it sits inside, under a rule that says they belong to the `run`. Their
+   tables fold with nothing: the outer fold hides only the `run` cell's own body. */
+.recipe-included {
+  margin: 0 0 var(--tyto-space-2) var(--tyto-space-2);
+  border-left: var(--tyto-hairline-width) solid var(--tyto-border);
+}
+
+.recipe-included__cell {
+  padding-left: calc(var(--tyto-space-4) * (1 + var(--recipe-included-depth, 0)));
+}
+
+.recipe-included__recipe {
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-included__problem {
+  padding: 0 0 var(--tyto-space-1) var(--tyto-space-2);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
 }
 
 /* The Table view (TYTO-379, recipe-table-view.ts): a bar, then a viewport of fixed height in

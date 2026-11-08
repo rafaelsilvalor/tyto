@@ -62,6 +62,7 @@ function contextOf(more: Partial<CellViewContext> = {}) {
     runFrom: vi.fn<(index: number) => void>(),
     fetchAgain: vi.fn<() => void>(),
     toggled: vi.fn<(at: number, collapsed: boolean) => void>(),
+    expandedIncluded: vi.fn<(at: number, expanded: boolean) => void>(),
     apply: vi.fn<(index: number, planId: number) => void>(),
     // TYTO-379: no cell here is under `show`, so no view asks main for rows.
     rows: vi.fn(() => Promise.resolve({ stale: true as const })),
@@ -72,6 +73,7 @@ function contextOf(more: Partial<CellViewContext> = {}) {
   const context: CellViewContext = {
     locale: 'en',
     collapsed: new Set(),
+    expanded: new Set(),
     applying: new Set(),
     refusals: new Map(),
     now: () => NOW,
@@ -318,6 +320,103 @@ describe('folding a table', () => {
       }),
     );
     expect(element.querySelector('.recipe-cell__toggle')).toBeNull();
+  });
+});
+
+// TYTO-449: a `run` cell opened onto its included recipe's cells, from the answer alone.
+describe("a run cell's included cells", () => {
+  const included: NonNullable<Cell['included']> = [
+    {
+      depth: 1,
+      recipe: 'tasks',
+      index: 0,
+      step: 'acme.pull',
+      status: 'ok',
+      table: tableOf(30),
+      diagnostics: [],
+    },
+    {
+      depth: 2,
+      recipe: 'marks',
+      index: 0,
+      step: 'example.mark done',
+      status: 'ok',
+      plan: {
+        target: 'example items',
+        count: 1,
+        operations: [{ write: 'mark', rowKey: 'EX-1', description: 'Mark EX-1' }],
+      },
+      diagnostics: [{ severity: 'warning', code: 'W_X', message: 'careful' }],
+    },
+  ];
+  const runCell = (more: Partial<Cell> = {}) => cellOf({ included, ...more });
+  const opener = (element: HTMLElement) =>
+    element.querySelector('[data-action="included"]') as HTMLButtonElement;
+  const nested = (element: HTMLElement) =>
+    [...element.querySelectorAll('.recipe-included__cell')].map((cell) => ({
+      depth: (cell as HTMLElement).dataset['depth'],
+      header: cell.querySelector('.recipe-cell-status')?.textContent,
+      rows: cell.querySelectorAll('tbody tr').length,
+      plan: cell.querySelectorAll('.recipe-plan__operation').length,
+      buttons: cell.querySelectorAll('button').length,
+      problem: cell.querySelector('.recipe-included__problem')?.textContent,
+    }));
+
+  it('starts closed, opens in place from the answer, and asks main for nothing', () => {
+    const { element, actions } = render(runCell({ index: 2, line: 3 }));
+    expect(opener(element).textContent).toBe("Show the included recipe's cells");
+    expect(opener(element).getAttribute('aria-expanded')).toBe('false');
+    expect(nested(element)).toEqual([]);
+
+    opener(element).click();
+    expect(opener(element).textContent).toBe("Hide the included recipe's cells");
+    expect(nested(element)).toEqual([
+      {
+        depth: '1',
+        header: 'tasksacme.pull30 rows · 2 columns',
+        rows: 20,
+        plan: 0,
+        buttons: 0,
+        problem: undefined,
+      },
+      {
+        depth: '2',
+        header: 'marksexample.mark donePlan: 1 to write to example items',
+        rows: 0,
+        plan: 1,
+        buttons: 0,
+        problem: 'careful',
+      },
+    ]);
+    opener(element).click();
+    expect(nested(element)).toEqual([]);
+    // The line, as a fold says it; and not one bridge call, nor a run.
+    expect(actions.expandedIncluded.mock.calls).toEqual([
+      [24, true],
+      [24, false],
+    ]);
+    for (const call of [actions.runFrom, actions.fetchAgain, actions.apply, actions.rows]) {
+      expect(call).not.toHaveBeenCalled();
+    }
+    expect(
+      [actions.copy, actions.facets, actions.row].every((call) => call.mock.calls.length === 0),
+    ).toBe(true);
+  });
+
+  it('is built open with its own key when the notebook kept it open, in both languages', () => {
+    const at = statusOf(runCell()).at;
+    const closed = cellOutputOf(statusOf(runCell()), contextOf().context);
+    const open = cellOutputOf(statusOf(runCell()), contextOf({ expanded: new Set([at]) }).context);
+    expect(open.key).not.toBe(closed.key);
+    expect(nested(open.render())).toHaveLength(2);
+
+    const { element } = render(runCell(), { expanded: new Set([at]) }, 'pt-BR');
+    expect(opener(element).textContent).toBe('Ocultar as células da receita incluída');
+  });
+
+  it('offers no opener on a cell without included cells, or on a failed one', () => {
+    expect(opener(render(cellOf()).element)).toBeNull();
+    expect(opener(render(runCell({ status: 'failed', table: undefined })).element)).toBeNull();
   });
 });
 

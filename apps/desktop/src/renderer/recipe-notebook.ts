@@ -91,8 +91,15 @@ export interface RecipeNotebook {
   collapsedOf(documentId: string): ReadonlySet<number>;
   setCollapsed(documentId: string, at: number, collapsed: boolean): void;
   /**
-   * The person edited the text: each fold follows its line through `map`, which answers where a
-   * line start went, or `undefined` when its line is gone, and then the fold is too (TYTO-451).
+   * The `run` cells the person opened onto their included recipe's cells (TYTO-449), keyed
+   * as folds are: every `run` cell starts closed.
+   */
+  expandedOf(documentId: string): ReadonlySet<number>;
+  setExpanded(documentId: string, at: number, expanded: boolean): void;
+  /**
+   * The person edited the text: each fold, and each opened `run` cell, follows its line through
+   * `map`, which answers where a line start went, or `undefined` when its line is gone, and
+   * then it is gone too (TYTO-451).
    */
   edited(documentId: string, map: (at: number) => number | undefined): void;
   /** The tab closed: nothing waits for it, an answer on its way is dropped, and all is forgotten. */
@@ -111,6 +118,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const newest = new Map<string, number>();
   const last = new Map<string, { readonly text: string; readonly answer: RecipeRunAnswer }>();
   const collapsed = new Map<string, Set<number>>();
+  const expanded = new Map<string, Set<number>>();
   const applying = new Map<string, Set<number>>();
   const refusals = new Map<string, Map<number, string>>();
   let requests = 0;
@@ -213,31 +221,54 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     },
     lastOf: (documentId) => last.get(documentId),
     collapsedOf: (documentId) => collapsed.get(documentId) ?? new Set(),
-    setCollapsed(documentId, at, folded) {
-      const cells = collapsed.get(documentId) ?? new Set<number>();
-      if (folded) cells.add(at);
-      else cells.delete(at);
-      collapsed.set(documentId, cells);
+    setCollapsed: (documentId, at, folded) => {
+      mark(collapsed, documentId, at, folded);
+    },
+    expandedOf: (documentId) => expanded.get(documentId) ?? new Set(),
+    setExpanded: (documentId, at, open) => {
+      mark(expanded, documentId, at, open);
     },
     edited(documentId, map) {
-      const cells = collapsed.get(documentId);
-      if (cells === undefined || cells.size === 0) return;
-      const moved = new Set<number>();
-      for (const at of cells) {
-        const now = map(at);
-        if (now !== undefined) moved.add(now);
+      for (const marks of [collapsed, expanded]) {
+        const cells = marks.get(documentId);
+        if (cells === undefined || cells.size === 0) continue;
+        const moved = new Set<number>();
+        for (const at of cells) {
+          const now = map(at);
+          if (now !== undefined) moved.add(now);
+        }
+        marks.set(documentId, moved);
       }
-      collapsed.set(documentId, moved);
     },
     close(documentId) {
       cancel(documentId);
       newest.delete(documentId);
       last.delete(documentId);
       collapsed.delete(documentId);
+      expanded.delete(documentId);
       applying.delete(documentId);
       refusals.delete(documentId);
     },
   };
+}
+
+/** Adds or drops one line start in a document's set of them. */
+function mark(marks: Map<string, Set<number>>, documentId: string, at: number, on: boolean): void {
+  const cells = marks.get(documentId) ?? new Set<number>();
+  if (on) cells.add(at);
+  else cells.delete(at);
+  marks.set(documentId, cells);
+}
+
+/**
+ * The diagnostics an answer marks in the editor and lists in Problems: the file's and each
+ * cell's. An included recipe's cells are left out (TYTO-449): their lines are in another file,
+ * and what failed in them already reached the `run` line's own diagnostics.
+ */
+export function answerDiagnostics(
+  answer: Pick<RecipeRunAnswer, 'cells' | 'diagnostics'>,
+): RecipeRunAnswer['diagnostics'] {
+  return [...answer.diagnostics, ...answer.cells.flatMap((cell) => cell.diagnostics)];
 }
 
 /** Whether an answer is for the newest request this document made. */
@@ -299,8 +330,13 @@ export function cellStatuses(
   return statuses;
 }
 
-function statusText(
-  cell: WireCell,
+/** What a cell's status line says; also a `run` cell's included cells' (TYTO-449). */
+export function statusText(
+  cell: {
+    readonly status: WireCell['status'];
+    readonly table?: WireCell['table'];
+    readonly plan?: { readonly target: string; readonly count: number } | undefined;
+  },
   held: RecipeRunAnswer['held'],
   locale: Locale,
 ): string | undefined {

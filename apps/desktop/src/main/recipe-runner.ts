@@ -19,6 +19,7 @@ import {
 import {
   type Cell,
   type CellView,
+  type IncludedRecipe,
   type Plan,
   type RecipeAst,
   type RunClock,
@@ -132,6 +133,8 @@ export interface RunnerCell {
   // TYTO-379, ADR 0171: views.
   /** The view the cell is drawn in: the last `show` at or above it, with its arguments. */
   readonly view?: CellView;
+  /** TYTO-449: a `run` cell's included recipe and its cells, kept with the cell. */
+  readonly included?: IncludedRecipe;
   // TYTO-378, ADR 0170: Apply.
   /** Main's id for the cell's plan, which `apply` names; stamped when the cell planned it. */
   readonly planId?: number;
@@ -621,6 +624,7 @@ function keptOf(
     ...(planId === undefined ? {} : { planId }),
     ...(cell.remembers === undefined ? {} : { remembers: cell.remembers }),
     ...(cell.view === undefined ? {} : { view: cell.view }),
+    ...(cell.included === undefined ? {} : { included: cell.included }),
     diagnostics: cell.diagnostics,
     // A skipped cell did not run, so it has no time of its own.
     ...(cell.status === 'skipped' ? {} : { ranAt }),

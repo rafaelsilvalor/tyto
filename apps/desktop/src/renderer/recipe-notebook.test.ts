@@ -8,6 +8,7 @@ import {
   type RecipeNotebook,
   type RecipeRunAnswer,
   type RecipeRunRequest,
+  answerDiagnostics,
   cellAtOrAbove,
   cellStatuses,
   createRecipeNotebook,
@@ -228,6 +229,28 @@ describe('when a recipe runs', () => {
       expect(notebook.collapsedOf('tab-1').size).toBe(1);
     });
 
+    // TYTO-449: an opened `run` cell is kept the same way, and follows its line too.
+    it('moves an opened run cell with its line, apart from the folds', () => {
+      const { notebook } = harness();
+      const on = typedInto(notebook);
+      const shown = cellStatuses(TEXT, answer(1, [cell(0, 3), cell(1, 4)]), 'en');
+      notebook.setExpanded('tab-1', shown[1]?.at ?? -1, true);
+      expect([...notebook.collapsedOf('tab-1')]).toEqual([]);
+
+      on.view.dispatch({ changes: { from: on.view.state.doc.line(3).from, insert: 'acme.x\n' } });
+
+      const opened = cellStatuses(
+        on.getValue(),
+        answer(1, [cell(0, 3), cell(1, 4), cell(2, 5)]),
+        'en',
+      )
+        .filter((status) => notebook.expandedOf('tab-1').has(status.at))
+        .map((status) => status.index);
+      expect(opened).toEqual([2]);
+      notebook.setExpanded('tab-1', [...notebook.expandedOf('tab-1')][0] ?? -1, false);
+      expect(notebook.expandedOf('tab-1').size).toBe(0);
+    });
+
     it('maps nothing for a write by the host, which reports no edit', () => {
       const { notebook } = harness();
       const on = typedInto(notebook);
@@ -248,6 +271,35 @@ describe('when a recipe runs', () => {
 
     expect(shown).toEqual([]);
     expect(asked).toHaveLength(1);
+  });
+});
+
+// TYTO-449: an included cell's lines are in another file; the `run` line already says its error.
+describe('the diagnostics an answer marks in the editor', () => {
+  it("are the file's and each cell's, never an included cell's", () => {
+    const problem = (message: string) => ({ severity: 'error' as const, code: 'E_X', message });
+    const marked = answerDiagnostics({
+      diagnostics: [problem('file')],
+      cells: [
+        {
+          index: 0,
+          line: 2,
+          status: 'ok',
+          diagnostics: [problem('run line')],
+          included: [
+            {
+              depth: 1,
+              recipe: 'inner',
+              index: 0,
+              step: 'where x = 1',
+              status: 'failed',
+              diagnostics: [problem('inside')],
+            },
+          ],
+        },
+      ],
+    });
+    expect(marked.map((found) => found.message)).toEqual(['file', 'run line']);
   });
 });
 

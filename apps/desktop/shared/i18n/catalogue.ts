@@ -518,6 +518,8 @@ export interface Catalogue {
   readonly 'recipe.cell.fetchAgain': string;
   readonly 'recipe.cell.collapse': string;
   readonly 'recipe.cell.expand': string;
+  readonly 'recipe.cell.included.show': string;
+  readonly 'recipe.cell.included.hide': string;
   /**
    * TYTO-378, a plan cell (`recipe-plan-view.ts`): Apply, what the lines leave out, each
    * line's mark, the summary's counts, `apply auto` held outside a trusted folder, and the
@@ -1193,6 +1195,8 @@ export const CATALOGUE_KEYS = [
   'recipe.cell.fetchAgain',
   'recipe.cell.collapse',
   'recipe.cell.expand',
+  'recipe.cell.included.show',
+  'recipe.cell.included.hide',
   'recipe.plan.apply',
   'recipe.plan.more',
   'recipe.plan.more.one',

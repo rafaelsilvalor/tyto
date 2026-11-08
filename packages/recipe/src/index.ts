@@ -32,6 +32,7 @@ export { PLAN_LIMITS, checkPlan } from './plan.js';
 export type {
   Derivation,
   DerivationRegistry,
+  IncludedRecipe,
   KeepRequest,
   RecipeResolver,
   Verb,

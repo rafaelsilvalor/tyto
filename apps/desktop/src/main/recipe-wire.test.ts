@@ -1,4 +1,4 @@
-import type { Table } from '@tyto/recipe';
+import type { Cell, IncludedRecipe, Step, Table } from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 
 import { RECIPE_WIRE_LIMITS, parseIpc } from '../../shared/ipc.js';
@@ -107,6 +107,92 @@ describe('a recipe run on the wire', () => {
     expect(applied?.operations[1]?.reason).toHaveLength(RECIPE_WIRE_LIMITS.text);
     expect(() => parseIpc('recipe:run', 'response', { requestId: 1, ...wire })).not.toThrow();
     expect(() => parseIpc('recipe:apply', 'response', { cell: wire.cells[0] })).not.toThrow();
+  });
+
+  // TYTO-449: a `run` cell's included cells, flat, in the order they ran, every one bounded.
+  describe("a run cell's included cells", () => {
+    const step = (verb: string, text = ''): Step => {
+      const range = { start: 0, end: 1 };
+      return { verb, verbRange: range, positional: [], named: [], text, textRange: range, range };
+    };
+    const table: Table = {
+      columns: [{ name: 'key', type: 'text', origin: 'acme' }],
+      rows: rows(80),
+    };
+    const ok = (verb: string, more: Partial<Cell> = {}): Cell => ({
+      step: step(verb, 'x'),
+      status: 'ok',
+      table,
+      diagnostics: [],
+      ...more,
+    });
+    const wireOf = (included: IncludedRecipe) =>
+      recipeAnswerToWire({
+        cells: [{ index: 0, line: 2, status: 'ok', table, diagnostics: [], included }],
+        diagnostics: [],
+        ranAt: '2026-11-08T12:00:00.000Z',
+      });
+
+    it('lists a nested recipe after its run cell, one depth in, each table cut', () => {
+      const inner: IncludedRecipe = { recipe: 'inner', cells: [ok('acme.pull')] };
+      const problem = {
+        severity: 'warning' as const,
+        code: 'E_RECIPE_RUN' as const,
+        message: 'careful',
+        range: { start: 3, end: 9 },
+      };
+      const wire = wireOf({
+        recipe: 'middle',
+        cells: [
+          ok('run', { step: step('run', 'inner'), included: inner }),
+          ok('sort', {
+            plan: { target: 'sheet', count: 1, operations: [] },
+            diagnostics: [problem],
+          }),
+          { step: step('where'), status: 'skipped', diagnostics: [] },
+        ],
+      });
+      const included = wire.cells[0]?.included ?? [];
+      expect(included.map((cell) => [cell.depth, cell.recipe, cell.index, cell.step])).toEqual([
+        [1, 'middle', 0, 'run inner'],
+        [2, 'inner', 0, 'acme.pull x'],
+        [1, 'middle', 1, 'sort x'],
+        [1, 'middle', 2, 'where'],
+      ]);
+      expect(included[1]?.table?.rows).toHaveLength(RECIPE_WIRE_LIMITS.rows);
+      expect(included[1]?.table?.total).toBe(80);
+      expect(included[2]?.plan).toEqual({ target: 'sheet', count: 1, operations: [] });
+      // Its range points into another file: the window is told the words only.
+      expect(included[2]?.diagnostics).toEqual([
+        { severity: 'warning', code: 'E_RECIPE_RUN', message: 'careful' },
+      ]);
+      expect(included[3]).not.toHaveProperty('table');
+      expect(() => parseIpc('recipe:run', 'response', { requestId: 1, ...wire })).not.toThrow();
+    });
+
+    it('stops at the cap on cells and on depth, and the schema refuses one past either', () => {
+      const many = Array.from({ length: RECIPE_WIRE_LIMITS.included + 30 }, () => ok('sort'));
+      const wide = wireOf({ recipe: 'wide', cells: many });
+      expect(wide.cells[0]?.included).toHaveLength(RECIPE_WIRE_LIMITS.included);
+
+      let deep: IncludedRecipe = { recipe: 'r12', cells: [ok('sort')] };
+      for (let level = 11; level >= 1; level -= 1) {
+        deep = { recipe: `r${String(level)}`, cells: [ok('run', { included: deep })] };
+      }
+      const nested = wireOf(deep).cells[0]?.included ?? [];
+      expect(Math.max(...nested.map((cell) => cell.depth))).toBe(RECIPE_WIRE_LIMITS.depth);
+      expect(nested).toHaveLength(RECIPE_WIRE_LIMITS.depth);
+
+      const cell = wide.cells[0];
+      const tooMany = { ...cell, included: [...(cell?.included ?? []), cell?.included?.[0]] };
+      expect(() =>
+        parseIpc('recipe:run', 'response', {
+          requestId: 1,
+          ...wide,
+          cells: [tooMany],
+        }),
+      ).toThrow();
+    });
   });
 
   it('cuts a long text with an ellipsis, and leaves a short one and a scalar alone', () => {

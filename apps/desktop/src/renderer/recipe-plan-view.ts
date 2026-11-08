@@ -27,7 +27,10 @@ import type { CellStatus } from './recipe-notebook.js';
 export const SHOWN_OPERATIONS = 20;
 
 type WireCell = CellStatus['cell'];
-type WirePlan = NonNullable<WireCell['plan']>;
+/** A plan's lines: a `run` cell's included plan carries these alone, with no Apply (TYTO-449). */
+type WirePlan = Pick<NonNullable<WireCell['plan']>, 'target' | 'count' | 'operations'>;
+/** What the plan's body reads of a cell, which an included cell has too. */
+type PlannedCell = Pick<WireCell, 'table' | 'applied'> & { readonly plan?: WirePlan | undefined };
 
 /** What the plan view needs of the window, besides the cell: its Apply and how it is going. */
 export interface PlanViewState {
@@ -65,7 +68,7 @@ export function applyButton(
 
 /** The plan's lines, their marks and the notes under them; `undefined` for a cell with no plan. */
 export function planBody(
-  cell: WireCell,
+  cell: PlannedCell,
   held: CellStatus['held'],
   state: PlanViewState,
 ): HTMLElement | undefined {

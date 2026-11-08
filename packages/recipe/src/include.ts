@@ -12,7 +12,8 @@ import { argumentsProblem } from './support.js';
  *
  * It is one cell and not its recipe's lines copied in, because a cell's diagnostics point into
  * the file being edited and the included lines live in another file. What goes wrong inside
- * is reported at the `run` line, naming the recipe it happened in.
+ * is reported at the `run` line, naming the recipe it happened in. The included recipe's own
+ * cells ride along on the answer (`included`, TYTO-449), for a notebook to show read-only.
  *
  * The recipe is found through the `resolveRecipe` port, so this stays pure: the host reads the
  * file. A recipe that would include one already running is refused before it is read twice.
@@ -118,6 +119,9 @@ export async function include(context: VerbContext): Promise<VerbResult> {
       table,
       keeps,
       remembers,
+      // TYTO-449: its own cells too, which a notebook opens the `run` cell onto. Carried only
+      // here, on success: a failed include is one cell whose diagnostics say what went wrong.
+      included: { recipe: name, cells: included.value.cells },
       ...(view === undefined ? {} : { view }),
       ...(shown === undefined ? {} : { viewOptions: shown.options }),
     },

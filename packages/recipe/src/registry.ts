@@ -4,6 +4,7 @@ import type { RecipeAst, Step } from './ast.js';
 import type { RunClock } from './clock.js';
 import type { DataResolver } from './data.js';
 import type { Plan } from './plan.js';
+import type { Cell } from './run.js';
 import type { ApplyOutcome, RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
 import { type ToBriefPorts, toBriefVerb } from './to-brief.js';
@@ -73,6 +74,17 @@ export interface VerbOutput {
    * is the one it read, so a cell after it reads the same rows.
    */
   readonly plan?: Plan;
+  /**
+   * A `run`'s: the included recipe's own cells, so a notebook can open the `run` cell onto
+   * them (TYTO-449). Present only when the included recipe ran to a table.
+   */
+  readonly included?: IncludedRecipe;
+}
+
+/** The cells of a recipe a `run` included, under the name the `run` line gave it. */
+export interface IncludedRecipe {
+  readonly recipe: string;
+  readonly cells: readonly Cell[];
 }
 
 export type VerbResult = Result<VerbOutput, readonly Diagnostic[]>;

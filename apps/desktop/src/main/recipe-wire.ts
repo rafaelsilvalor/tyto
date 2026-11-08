@@ -1,5 +1,5 @@
 import type { Diagnostic } from '@tyto/core';
-import { type CellValue, type Table, cellText } from '@tyto/recipe';
+import { type CellValue, type IncludedRecipe, type Plan, type Table, cellText } from '@tyto/recipe';
 
 import { type IpcResponse, RECIPE_WIRE_LIMITS } from '../../shared/ipc.js';
 import type { AppliedRecord } from './recipe-apply.js';
@@ -15,6 +15,7 @@ import type { RunnerAnswer, RunnerCell } from './recipe-runner.js';
 type WireAnswer = Omit<IpcResponse<'recipe:run'>, 'requestId'>;
 type WireCell = WireAnswer['cells'][number];
 type WireDiagnostic = WireAnswer['diagnostics'][number];
+type WireIncluded = NonNullable<WireCell['included']>[number];
 type WireValue = string | number | boolean | null;
 
 export function recipeAnswerToWire(answer: RunnerAnswer): WireAnswer {
@@ -39,7 +40,37 @@ export function cellToWire(cell: RunnerCell): WireCell {
     ...(cell.oldestFetchedAt === undefined ? {} : { oldestFetchedAt: cell.oldestFetchedAt }),
     ...(cell.source === true ? { source: true } : {}),
     ...(cell.view === undefined ? {} : { view: viewToWire(cell.view) }),
+    ...(cell.included === undefined ? {} : { included: includedToWire(cell.included) }),
   };
+}
+
+// TYTO-449: a `run` cell's included cells, flat and in the order they ran, the whole list
+// capped at `RECIPE_WIRE_LIMITS.included` and each table cut as any cell's is.
+
+export function includedToWire(included: IncludedRecipe): WireIncluded[] {
+  const flat: WireIncluded[] = [];
+  const visit = (recipe: IncludedRecipe, depth: number): void => {
+    for (const [index, cell] of recipe.cells.entries()) {
+      if (flat.length >= RECIPE_WIRE_LIMITS.included) return;
+      const step = cell.step.text === '' ? cell.step.verb : `${cell.step.verb} ${cell.step.text}`;
+      flat.push({
+        depth,
+        recipe: cut(recipe.recipe),
+        index,
+        step: cut(step),
+        status: cell.status,
+        ...(cell.table === undefined ? {} : { table: tableToWire(cell.table) }),
+        ...(cell.plan === undefined ? {} : { plan: planLinesToWire(cell.plan) }),
+        // Their ranges point into the included file, which no editor here shows.
+        diagnostics: diagnosticsToWire(cell.diagnostics).map(({ range: _range, ...rest }) => rest),
+      });
+      if (cell.included !== undefined && depth < RECIPE_WIRE_LIMITS.depth) {
+        visit(cell.included, depth + 1);
+      }
+    }
+  };
+  visit(included, 1);
+  return flat;
 }
 
 // TYTO-379, ADR 0171: the cell's view and its arguments, every word cut as a value is.
@@ -61,7 +92,15 @@ function viewToWire(view: NonNullable<RunnerCell['view']>): NonNullable<WireCell
 // TYTO-378, ADR 0170: a plan's first lines and the id Apply names; an Apply's outcome, counted.
 
 function planToWire(cell: RunnerCell): NonNullable<WireCell['plan']> {
-  const plan = cell.plan as NonNullable<RunnerCell['plan']>;
+  return {
+    ...planLinesToWire(cell.plan as Plan),
+    ...(cell.planId === undefined ? {} : { planId: cell.planId }),
+    applicable: cell.applicable === true,
+  };
+}
+
+/** A plan's target, size and first lines, which a plan included by a `run` carries alone. */
+function planLinesToWire(plan: Plan): NonNullable<WireIncluded['plan']> {
   return {
     target: cut(plan.target),
     count: plan.count,
@@ -70,8 +109,6 @@ function planToWire(cell: RunnerCell): NonNullable<WireCell['plan']> {
       ...(operation.rowKey === undefined ? {} : { rowKey: cut(operation.rowKey) }),
       description: cut(operation.description),
     })),
-    ...(cell.planId === undefined ? {} : { planId: cell.planId }),
-    applicable: cell.applicable === true,
   };
 }
 
