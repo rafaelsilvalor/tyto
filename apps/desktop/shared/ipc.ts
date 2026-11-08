@@ -203,6 +203,11 @@ export const RECIPE_WIRE_LIMITS = {
   facetKeys: 64,
   /** Rows a day cell of the Calendar asks for at most (`facet.perDay`, TYTO-383). */
   perDay: 50,
+  /**
+   * Characters of one value of an opened card (`recipe:row`, TYTO-384): a card opened is read
+   * whole, so it is cut much later than a cell's preview.
+   */
+  opened: 10_000,
 } as const;
 
 /** A value as the notebook shows it: a list is already joined, a long text already cut. */
@@ -2597,6 +2602,39 @@ export const IPC_CHANNELS = {
         earlier: z.number().int().nonnegative().optional(),
         later: z.number().int().nonnegative().optional(),
         today: recipeDayKey.optional(),
+      }),
+    ]),
+  ),
+
+  /**
+   * One row of a kept cell's table, opened (TYTO-384, ADR 0177 note of 2026-11-08): every column
+   * the table has, whatever `fields=` a card shows, each value cut at `RECIPE_WIRE_LIMITS.opened`,
+   * and where the row came from. `key` is a row's key as `recipe:rows` sent it. A cell that ran
+   * again, or a key the table no longer holds, answers `stale`.
+   */
+  'recipe:row': channel(
+    z.object({
+      documentId,
+      index: recipeRowsQuery.index,
+      ranAt: recipeRowsQuery.ranAt,
+      key: z.string().max(RECIPE_WIRE_LIMITS.text),
+    }),
+    z.union([
+      recipeStale,
+      z.object({
+        columns: z
+          .array(z.object({ name: z.string().max(RECIPE_WIRE_LIMITS.text), type: z.string() }))
+          .max(RECIPE_WIRE_LIMITS.columns),
+        values: z
+          .array(
+            z.union([z.string().max(RECIPE_WIRE_LIMITS.opened), z.number(), z.boolean(), z.null()]),
+          )
+          .max(RECIPE_WIRE_LIMITS.columns),
+        provenance: z.object({
+          source: z.string().max(RECIPE_WIRE_LIMITS.text),
+          id: z.string().max(RECIPE_WIRE_LIMITS.text),
+          fetchedAt: z.string().max(RECIPE_WIRE_LIMITS.text),
+        }),
       }),
     ]),
   ),

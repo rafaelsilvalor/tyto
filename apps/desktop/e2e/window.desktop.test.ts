@@ -367,6 +367,8 @@ describe('the bridge', () => {
       'recipe:copy',
       // TYTO-381, ADR 0177: a Board's columns, which `recipe-views.desktop.test.ts` draws.
       'recipe:facets',
+      // TYTO-384: a card opened, which `recipe-views.desktop.test.ts` opens in the Cards view.
+      'recipe:row',
       'recipe:rows',
       'recipe:run',
       'recipe:verbs',
@@ -993,6 +995,15 @@ describe('switching the language', () => {
     'recipe.calendar.later',
     'recipe.calendar.more',
     'recipe.calendar.undated',
+    // TYTO-384: drawn only under a cell in a Cards view and in the card it opens;
+    // `recipe-cards-view.test.ts` paints them, and `recipe-views.desktop.test.ts` opens a card.
+    'recipe.cards.more',
+    'recipe.cards.open',
+    'recipe.cards.close',
+    'recipe.cards.source',
+    'recipe.cards.id',
+    'recipe.cards.fetchedAt',
+    'recipe.cards.link',
     'status.problems.new',
     // TYTO-248: what the footer used to say is Help > About now, a box main shows — menu
     // chrome, like `menu.revealLogs`. `src/main/menu.test.ts` holds the five to `aboutText`, and

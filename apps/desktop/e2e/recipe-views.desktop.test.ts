@@ -16,7 +16,8 @@ import { firstWindow } from './first-window.js';
 /**
  * The recipe's grouping views in the real window (TYTO-381, ADR 0177): `show board by=status`
  * draws one column per status of 300 rows, with the counts main made, and a column draws fifty
- * cards before "N more" asks for the next ones.
+ * cards before "N more" asks for the next ones. The Calendar (TYTO-383) places the same rows on
+ * their days, and the Cards view (TYTO-384) opens a card onto every column of its row.
  *
  * A plugin installed by the real `tyto plugin install` registers the source verb `fixture.rows`,
  * which fetches the table from this file's own server, as `recipe-table.desktop.test.ts` does.
@@ -99,6 +100,7 @@ function rowsTable(): string {
       { name: 'owner', type: 'text', origin: 'fixture' },
       { name: 'due', type: 'date', origin: 'fixture' },
       { name: 'at', type: 'text', origin: 'fixture' },
+      { name: 'link', type: 'link', origin: 'fixture' },
     ],
     rows: statuses.map((status, index) => ({
       key: `C-${String(index + 1)}`,
@@ -108,6 +110,7 @@ function rowsTable(): string {
         status,
         owner: index % 2 === 0 ? 'Ana' : 'Rui',
         ...dueOf(index),
+        link: `https://example.com/C-${String(index + 1)}`,
       },
       provenance: { source: 'fixture', id: String(index + 1), fetchedAt },
     })),
@@ -128,10 +131,13 @@ const CALENDAR_RECIPE = [
   '',
 ].join('\n');
 
+const CARDS_RECIPE = ['recipe cards', VERB, 'show cards fields=title,owner', ''].join('\n');
+
 let scratch: string;
 let home: string;
 let recipePath: string;
 let calendarPath: string;
+let cardsPath: string;
 let app: ElectronApplication | undefined;
 let page: Page;
 let server: Server;
@@ -199,6 +205,8 @@ beforeAll(async () => {
   writeFileSync(recipePath, RECIPE);
   calendarPath = join(scratch, 'recipes', 'calendar.recipe');
   writeFileSync(calendarPath, CALENDAR_RECIPE);
+  cardsPath = join(scratch, 'recipes', 'cards.recipe');
+  writeFileSync(cardsPath, CARDS_RECIPE);
 
   app = await _electron.launch({
     args: ['.', `--user-data-dir=${join(scratch, 'userData')}`, '--lang=en'],
@@ -388,5 +396,84 @@ describe('the Calendar view over the same 300 rows (TYTO-383)', () => {
       CALENDAR,
       { timeout: 10_000 },
     );
+  }, 30_000);
+});
+
+const CARDS = '#editor .recipe-cards';
+
+describe('the Cards view over the same 300 rows (TYTO-384)', () => {
+  it('draws cards with fields=, and opens one onto every column and its provenance', async () => {
+    await app?.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, cardsPath);
+    await run('editor.open');
+    await page.waitForSelector(`${CARDS}, #editor .recipe-cell`);
+    await run('recipe.run');
+    await page.waitForFunction(
+      (selector) => document.querySelectorAll(`${selector} .recipe-cards__card`).length === 48,
+      CARDS,
+      { timeout: 20_000 },
+    );
+    const first = await page.evaluate(
+      (selector) =>
+        [...(document.querySelector(`${selector} .recipe-cards__card`)?.children ?? [])].map(
+          (line) => line.textContent,
+        ),
+      CARDS,
+    );
+    expect(first).toEqual(['Card 1', 'owner: Ana']);
+    expect(await page.locator(`${CARDS} .recipe-cards__more`).textContent()).toBe('252 more');
+
+    await page.locator('#editor .recipe-cell').first().locator('.recipe-cell__toggle').click();
+    await page.locator(`${CARDS} .recipe-cards__card`).nth(2).click();
+    await page.waitForSelector('.recipe-card-dialog [role="dialog"]');
+    const shots = process.env['TYTO_RECIPE_VIEWS_SHOTS'];
+    if (shots !== undefined) {
+      await page.screenshot({ path: join(shots, 'recipe-cards.png') });
+    }
+    const opened = await page.evaluate(() => ({
+      title: document.querySelector('.recipe-card-dialog__title')?.textContent,
+      values: Object.fromEntries(
+        [...document.querySelectorAll<HTMLElement>('.recipe-card-dialog__value')].map((value) => [
+          value.dataset['field'] ?? `provenance.${value.dataset['provenance'] ?? ''}`,
+          value.textContent,
+        ]),
+      ),
+      anchors: [...document.querySelectorAll('.recipe-card-dialog a')].map(
+        (anchor) => (anchor as HTMLAnchorElement).href,
+      ),
+    }));
+    // Every column of row 3, those no card shows included, and where the row came from.
+    expect(opened.title).toBe('Card 3');
+    expect(opened.values).toMatchObject({
+      key: 'C-3',
+      title: 'Card 3',
+      status: 'Blocked',
+      owner: 'Ana',
+      at: '11:00',
+      link: 'https://example.com/C-3',
+      'provenance.source': 'fixture',
+      'provenance.id': '3',
+      'provenance.link': 'https://example.com/C-3',
+    });
+    expect(Object.keys(opened.values)).toEqual([
+      'key',
+      'title',
+      'status',
+      'owner',
+      'due',
+      'at',
+      'link',
+      'provenance.source',
+      'provenance.id',
+      'provenance.fetchedAt',
+      'provenance.link',
+    ]);
+    expect(opened.anchors).toEqual(['https://example.com/C-3', 'https://example.com/C-3']);
+
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('.recipe-card-dialog') === null, null, {
+      timeout: 5_000,
+    });
   }, 30_000);
 });

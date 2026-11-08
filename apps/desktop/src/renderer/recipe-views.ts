@@ -4,6 +4,8 @@ import { boardOptions } from './recipe-board-model.js';
 import { type FacetsAnswer, type FacetsRequest, boardView } from './recipe-board-view.js';
 import { calendarOptions } from './recipe-calendar-model.js';
 import { calendarView } from './recipe-calendar-view.js';
+import { cardFields } from './recipe-cards-model.js';
+import { type RowAnswer, type RowRequest, cardsView } from './recipe-cards-view.js';
 import type { RecipeRunAnswer } from './recipe-notebook.js';
 import {
   type CopyAnswer,
@@ -29,6 +31,8 @@ export interface ViewContext {
   readonly copy: (request: CopyRequest) => Promise<CopyAnswer>;
   /** A column's groups and their counts, from main (TYTO-381, ADR 0177). */
   readonly facets: (request: FacetsRequest) => Promise<FacetsAnswer>;
+  /** One row whole, every column and its provenance, for a card opened (TYTO-384). */
+  readonly row: (request: RowRequest) => Promise<RowAnswer>;
 }
 
 /** What a view draws from: a cell that ran, with its table and the run main keeps. */
@@ -94,11 +98,28 @@ const calendar: ViewRenderer = (cell, context) => {
   });
 };
 
+/** TYTO-384: loose cards showing `fields=`, each opening onto its whole row. */
+const cards: ViewRenderer = (cell, context) =>
+  cardsView({
+    index: cell.index,
+    ranAt: cell.ranAt,
+    columns: cell.table.columns,
+    total: cell.table.total,
+    locale: context.locale,
+    fields: cardFields(
+      cell.options,
+      cell.table.columns.map((column) => column.name),
+    ),
+    rows: context.rows,
+    row: context.row,
+  });
+
 export const VIEW_RENDERERS: Readonly<Record<RecipeViewName, ViewRenderer>> = {
   table: tableOf(false),
   summary: tableOf(true),
   board,
   calendar,
+  cards,
 };
 
 const isViewName = (name: string): name is RecipeViewName => Object.hasOwn(RECIPE_VIEWS, name);

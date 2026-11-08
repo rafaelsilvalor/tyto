@@ -67,6 +67,7 @@ function contextOf(more: Partial<CellViewContext> = {}) {
     rows: vi.fn(() => Promise.resolve({ stale: true as const })),
     copy: vi.fn(() => Promise.resolve({ stale: true as const })),
     facets: vi.fn(() => Promise.resolve({ stale: true as const })),
+    row: vi.fn(() => Promise.resolve({ stale: true as const })),
   } satisfies CellViewActions;
   const context: CellViewContext = {
     locale: 'en',
