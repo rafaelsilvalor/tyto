@@ -4,6 +4,16 @@ Status: accepted · 2026-09-27 · TYTO-48 · extends ADR 0041 and ADR 0042 · am
 which measured that a `utilityProcess` does not enforce Node's permission model · amended by
 ADR 0061, which lets each queue folder choose its file types
 
+## Note, 2026-11-08 (TYTO-373)
+
+The rule above, one loader and two compositions, now covers the write half too. Installing a
+plugin and removing, disabling or enabling one are `installPlugin` and `changePluginState` in
+`@tyto/command-line`, steps that answer a `Result` and print nothing. `tyto plugin install`,
+`remove`, `disable` and `enable` wrap them with the terminal's prompt; the window's plugins
+screen is to wrap the same steps with a native box. The validation, the built-in-name refusal
+and what `plugins.json` records are therefore one implementation behind both apps. As this ADR
+already says for installs, a change takes effect the next time the window starts plugins.
+
 ## Amended by ADR 0061
 
 The queue is no longer PNG-only: a person chooses, per queue folder, which kinds its tasks
