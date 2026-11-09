@@ -352,19 +352,27 @@ describe('the permission prompt', () => {
     expect(prompt).toContain(
       'It may ask Tyto to start `claude`, found on your PATH, in the folder open in Tyto,\n' +
         'and never while that folder is restricted. Tyto starts no other program for it.\n' +
-        'That program runs with your rights and is not confined to the folder.\n',
+        'That program runs with your rights and is not confined to the folder.\n' +
+        'That program can also reach the Tyto window as an agent while Tyto lets agents connect\n' +
+        '(setting `agentsListen`): it reads what is open there, and its edits arrive as proposals\n' +
+        'you approve or reject.\n',
     );
     expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain('process:');
     expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain(
       'It may ask Tyto to start',
     );
+    // The window sentence comes with a program, never alone (ADR 0183).
+    expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain('Tyto window');
   });
 
   it('names every program, joined by "or", when a plugin declares several', () => {
     expect(permissionPrompt(manifest(['process:claude', 'process:codex']), 'x')).toContain(
       'It may ask Tyto to start `claude` or `codex`, found on your PATH, in the folder open in Tyto,\n' +
         'and never while that folder is restricted. Tyto starts no other program for it.\n' +
-        'Those programs run with your rights and are not confined to the folder.\n',
+        'Those programs run with your rights and are not confined to the folder.\n' +
+        'Those programs can also reach the Tyto window as agents while Tyto lets agents connect\n' +
+        '(setting `agentsListen`): they read what is open there, and their edits arrive as proposals\n' +
+        'you approve or reject.\n',
     );
   });
 });

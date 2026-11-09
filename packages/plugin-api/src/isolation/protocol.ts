@@ -1,6 +1,8 @@
 import { type Diagnostic, diagnosticCodeList } from '@tyto/core';
 import { z } from 'zod';
 
+import { agentServerSchema } from '../window.js';
+
 /**
  * The messages between the host and an isolated plugin (E11.2, ADR 0041).
  *
@@ -45,9 +47,11 @@ import { z } from 'zod';
  * 18 since a plugin may ask for a sign-in's access token, a request a host on 17 would refuse
  * as an unknown capability (ADR 0174, TYTO-374); 19 since a plugin may start a program it names
  * and the host sends that program's output back on its own, four requests a host on 18 would
- * refuse and a `process` message a guest on 18 would not read (ADR 0182, TYTO-568).
+ * refuse and a `process` message a guest on 18 would not read (ADR 0182, TYTO-568); 20 since a
+ * plugin may ask for the window's agent server, a request a host on 19 would refuse as an
+ * unknown capability (ADR 0183, TYTO-569).
  */
-export const RPC_PROTOCOL_VERSION = 19;
+export const RPC_PROTOCOL_VERSION = 20;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -228,6 +232,7 @@ const requestedCapabilitySchema = z.enum([
   'processWrite',
   'processEnd',
   'processKill',
+  'windowAgentServer',
 ]);
 export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
 
@@ -259,8 +264,8 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
   }),
   /**
    * The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`
-   * and its `.set` and `.delete`, `host.cache`, `host.workspace`, `host.signin` and
-   * `host.process` with what a started program's handle does.
+   * and its `.set` and `.delete`, `host.cache`, `host.workspace`, `host.signin`,
+   * `host.process` with what a started program's handle does, and `host.window`.
    */
   z.strictObject({
     protocol,
@@ -354,3 +359,10 @@ export function describeIssues(error: z.ZodError): string {
     .map((issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`)
     .join('; ');
 }
+
+/**
+ * `host.window.agentServer` (ADR 0183): nothing goes out, the server comes back, checked by the
+ * same schema the host's check used, so a guest never hands its plugin an extra field.
+ */
+export const windowAgentServerArgsSchema = z.tuple([]);
+export const windowAgentServerSchema = agentServerSchema;

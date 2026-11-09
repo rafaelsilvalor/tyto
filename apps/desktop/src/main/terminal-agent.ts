@@ -1,9 +1,16 @@
 import { posix, win32 } from 'node:path';
 
 import { WINDOW_PID_VARIABLE } from '@tyto/command-line/relay';
+import { diagnostic } from '@tyto/core';
+import {
+  type AgentServer,
+  PluginCapabilityError,
+  WINDOW_AGENT_SERVER_NAME,
+} from '@tyto/plugin-api';
 
 import { programName } from './terminal.js';
 import type { ShellChoice } from './terminal-shell.js';
+import type { WorkspaceState } from './workspace.js';
 
 /**
  * What **Open an Agent Here** starts (TYTO-567, ADR 0181): the agent program the person set in
@@ -112,6 +119,59 @@ export function claudeConfig(options: Pick<AgentLaunchOptions, 'relay' | 'pid' |
     env: { [WINDOW_PID_VARIABLE]: String(options.pid), TYTO_HOME: options.home },
   };
   return `${JSON.stringify({ mcpServers: { tyto: server } }, null, 2)}\n`;
+}
+
+/**
+ * The same server in the shape ACP's `session/new` takes in `mcpServers` (ADR 0183), for the
+ * agent a plugin starts. The plugin sends it on the agent's stdin, inside JSON, so no command
+ * line carries it and no quote rule applies. `TYTO_WINDOW` and `TYTO_HOME` only: the relay's two.
+ */
+export function windowAgentServer(
+  options: Pick<AgentLaunchOptions, 'relay' | 'pid' | 'home'>,
+): AgentServer {
+  return {
+    name: WINDOW_AGENT_SERVER_NAME,
+    command: options.relay.node,
+    args: [options.relay.script],
+    env: [
+      { name: WINDOW_PID_VARIABLE, value: String(options.pid) },
+      { name: 'TYTO_HOME', value: options.home },
+    ],
+  };
+}
+
+export interface WindowAgentServerPortOptions extends Pick<
+  AgentLaunchOptions,
+  'relay' | 'pid' | 'home'
+> {
+  /** Whether the window's endpoint listens now (`agentsListen`). */
+  readonly listening: () => boolean;
+  readonly workspace: () => Pick<WorkspaceState, 'folder' | 'trust'>;
+}
+
+/**
+ * The desktop's `windowAgentServer` port (ADR 0183). The folder's trust and `agentsListen` are
+ * read on every call, because either can change between a plugin's two conversations; the
+ * permission is plugin-api's to check, in front of this.
+ */
+export function windowAgentServerPort(
+  options: WindowAgentServerPortOptions,
+): (plugin: string) => Promise<AgentServer> {
+  return (plugin) => {
+    const { folder, trust } = options.workspace();
+    // As the terminal and a plugin's program are refused (ADR 0164 decision 5, ADR 0182).
+    if (folder !== null && trust === 'restricted') {
+      return Promise.reject(
+        new PluginCapabilityError(diagnostic('E_WINDOW_RESTRICTED', { plugin })),
+      );
+    }
+    if (!options.listening()) {
+      return Promise.reject(
+        new PluginCapabilityError(diagnostic('E_WINDOW_AGENTS_OFF', { plugin })),
+      );
+    }
+    return Promise.resolve(windowAgentServer(options));
+  };
 }
 
 /** A TOML literal string: no escapes inside, so a Windows path reads as it is written. */

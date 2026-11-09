@@ -14,15 +14,57 @@ import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
  * - `echo …`: prints `ARGS`, `SECRET`, `TOKEN`, `WINDOW` and `CWD` lines, then echoes stdin
  *   upper-cased until stdin closes.
  * - `hold <file>`: writes its process id into `<file>` and runs until it is ended.
+ * - `mcp`: reads one line of JSON from stdin, the window's agent server a plugin got from
+ *   `host.window.agentServer()` (ADR 0183), starts it as an ACP agent would, lists the tools and
+ *   prints `SERVER`, `RELAY` and `TOOLS` lines.
  */
 
 export const STAND_IN = 'tyto-echo';
 
 const SCRIPT = `
+import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 
+/** What an ACP agent does with an mcpServers entry: start it, initialise, list the tools. */
+function reachWindow(server) {
+  process.stdout.write('SERVER ' + server.name + ' ' + server.env.map((v) => v.name).join(',') + '\\n');
+  const env = { ...process.env };
+  for (const variable of server.env) env[variable.name] = variable.value;
+  const child = spawn(server.command, server.args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+  child.stderr.on('data', (chunk) => process.stdout.write('RELAY ' + chunk.toString()));
+  let buffered = '';
+  child.stdout.on('data', (chunk) => {
+    buffered += chunk.toString();
+    for (let end; (end = buffered.indexOf('\\n')) >= 0; ) {
+      const message = JSON.parse(buffered.slice(0, end));
+      buffered = buffered.slice(end + 1);
+      if (message.id === 1) {
+        child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\\n');
+        child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) + '\\n');
+      } else if (message.id === 2) {
+        const names = message.result.tools.map((tool) => tool.name).sort();
+        process.stdout.write('TOOLS ' + names.join(',') + '\\n');
+        child.stdin.end();
+        child.on('exit', () => process.exit(0));
+      }
+    }
+  });
+  child.stdin.write(JSON.stringify({
+    jsonrpc: '2.0', id: 1, method: 'initialize',
+    params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'stand-in', version: '0' } },
+  }) + '\\n');
+}
+
 const [mode, ...rest] = process.argv.slice(2);
-if (mode === 'hold') {
+if (mode === 'mcp') {
+  // The plugin sends the server on stdin, inside JSON, as ACP's session/new carries it.
+  let line = '';
+  process.stdin.on('data', (chunk) => {
+    line += chunk.toString();
+    const end = line.indexOf('\\n');
+    if (end >= 0) reachWindow(JSON.parse(line.slice(0, end)));
+  });
+} else if (mode === 'hold') {
   writeFileSync(rest[0], String(process.pid));
   setInterval(() => undefined, 1000);
 } else {
@@ -52,8 +94,9 @@ export function writeStandInProgram(folder: string): string {
 
 /**
  * `programa`, installed in `home`: an `echo` exporter that starts `tyto-echo echo`, writes a
- * line, closes stdin and answers everything it heard; a `hold` exporter that starts
- * `tyto-echo hold <pidFile>` and leaves it running. A refusal is answered as `REFUSED <code>`.
+ * line, closes stdin and answers everything it heard; an `agent` exporter that hands
+ * `tyto-echo mcp` the window's agent server and answers what it heard; a `hold` exporter that
+ * starts `tyto-echo hold <pidFile>` and leaves it running. A refusal is answered as `REFUSED <code>`.
  */
 export function writeProgramPlugin(home: string, pidFile: string): void {
   const folder = join(home, 'plugins', 'programa');
@@ -83,6 +126,22 @@ export function activate(host) {
         program.onStdout((bytes) => { heard += new TextDecoder().decode(bytes); });
         await program.write('hello from the plugin\\n');
         await program.end();
+        const exit = await program.exited;
+        return answer(heard + 'EXIT ' + String(exit.code));
+      } catch (cause) {
+        return answer(refused(cause));
+      }
+    },
+  });
+  host.registerExporter({
+    id: 'janela', mime: 'text/plain', extension: 'agent', kinds: ['agent'], rasterized: false,
+    exportFrame: async () => {
+      try {
+        const server = await host.window.agentServer();
+        const program = await host.process.start(${JSON.stringify(STAND_IN)}, ['mcp']);
+        let heard = '';
+        program.onStdout((bytes) => { heard += new TextDecoder().decode(bytes); });
+        await program.write(JSON.stringify(server) + '\\n');
         const exit = await program.exited;
         return answer(heard + 'EXIT ' + String(exit.code));
       } catch (cause) {

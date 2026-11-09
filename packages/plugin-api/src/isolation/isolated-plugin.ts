@@ -10,6 +10,7 @@ import {
 import type { Disposable, Logger, Plugin, PluginHost } from '../host.js';
 import { validatePluginManifest } from '../manifest.js';
 import { type CheckedProcess, checkedProcesses } from '../process.js';
+import { checkedWindowAgentServer } from '../window.js';
 import type { PluginChannel } from './channel.js';
 import { type CallableSpec, type PointSpec, pointSpecOf } from './points.js';
 import {
@@ -34,6 +35,7 @@ import {
   processIdArgsSchema,
   processStartArgsSchema,
   processWriteArgsSchema,
+  windowAgentServerArgsSchema,
 } from './protocol.js';
 
 /**
@@ -183,6 +185,7 @@ export function connectIsolatedPlugin(
    * conversation starts a handful, not thousands. All of them end when the process does.
    */
   const processes = checkedProcesses(name, permissions, options.capabilities);
+  const windowAgentServer = checkedWindowAgentServer(name, permissions, options.capabilities);
   const programs = new Map<number, CheckedProcess>();
   let nextProgram = 0;
 
@@ -349,6 +352,13 @@ export function connectIsolatedPlugin(
           });
           programs.set(id, program);
           reply({ ok: true, value: { id } });
+        } else if (message.capability === 'windowAgentServer') {
+          const args = windowAgentServerArgsSchema.safeParse(message.args);
+          if (!args.success) {
+            throw new TypeError(`host.window.agentServer was given ${describeIssues(args.error)}`);
+          }
+          // Checked by `checkedWindowAgentServer`: the schema's fields and the two variables only.
+          reply({ ok: true, value: await windowAgentServer() });
         } else if (
           message.capability === 'processWrite' ||
           message.capability === 'processEnd' ||
@@ -407,6 +417,7 @@ export function connectIsolatedPlugin(
         | 'processWrite'
         | 'processEnd'
         | 'processKill'
+        | 'windowAgentServer'
       >,
       raw: readonly unknown[],
     ): Promise<unknown> {

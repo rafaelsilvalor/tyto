@@ -23,7 +23,8 @@ import { STAND_IN, writeProgramPlugin, writeStandInProgram } from './stand-in-pr
  * A program an installed plugin starts through `process:<name>`, in the running app (TYTO-568,
  * ADR 0182): found on `PATH` as a `.cmd` under a folder with a space on Windows, given an
  * environment with no secret, run in the open folder, refused in a restricted one, and ended
- * when the trust is taken back, when another folder opens and when the window closes.
+ * when the trust is taken back, when another folder opens and when the window closes. The same
+ * plugin hands it the window's agent server (TYTO-569, ADR 0183), and the window answers.
  *
  * What each rule decides is `plugin-programs.test.ts`'s and `process.test.ts`'s; this file proves
  * main composes them: the port reaches the plugin's process, and the workspace and the window
@@ -53,7 +54,7 @@ const call = <T>(channel: string, request: unknown): Promise<T> =>
   ) as Promise<T>;
 
 /** One export of the one-frame brief to `kind`, answered with the file's text. */
-async function exported(kind: 'echo' | 'hold'): Promise<string> {
+async function exported(kind: 'echo' | 'hold' | 'agent'): Promise<string> {
   const out = mkdtempSync(join(scratch, 'out-'));
   const { exportId } = await call<{ exportId: string }>('export:start', {
     documentId: 'programa',
@@ -175,6 +176,19 @@ describe('a program a plugin starts (ADR 0182)', () => {
     expect(heard).toMatch(/EXIT 0$/u);
   }, 30_000);
 
+  it("hands it the window's agent server, through which it lists the window's tools (ADR 0183)", async () => {
+    const heard = await exported('agent');
+    const pid = await app!.evaluate(() => process.pid);
+    process.stdout.write(`[TYTO-569] the plugin's agent heard: ${JSON.stringify(heard)}\n`);
+
+    // The server as the plugin got it: named `tyto`, with the relay's two variables only.
+    expect(heard).toContain('SERVER tyto TYTO_WINDOW,TYTO_HOME\n');
+    // A window tool: the window answered through the bundled relay (ADR 0180, ADR 0181).
+    expect(heard).toMatch(/TOOLS [a-z_,]*brief_in_front/u);
+    expect(heard).toContain(`(pid ${String(pid)})`);
+    expect(heard).toMatch(/EXIT 0$/u);
+  }, 30_000);
+
   it('ends it when the folder trust is taken back, and when another folder opens', async () => {
     const first = await holding();
     await call('workspace:trust', { trusted: false, source: 'folder' });
@@ -188,6 +202,7 @@ describe('a program a plugin starts (ADR 0182)', () => {
     await expect.poll(() => alive(second), { timeout: 10_000 }).toBe(false);
 
     expect(await exported('echo')).toBe('REFUSED E_PROCESS_RESTRICTED');
+    expect(await exported('agent')).toBe('REFUSED E_WINDOW_RESTRICTED');
   }, 45_000);
 
   // Last: it closes the app, and `afterAll`'s `closeApp` then finds it already down.
