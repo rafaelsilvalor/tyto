@@ -223,3 +223,14 @@ Decision 4 gains a first rule (ADR 0181): the window `TYTO_WINDOW` names, when i
 before the folder rule. A terminal Tyto starts sets it. When that window is gone the relay says so
 on stderr and falls back to the folder rule. The relay also ships alone, as
 `@tyto/command-line/relay`, which the desktop builds into a file the bundled Node runs.
+
+## Amendment — 2026-11-10, TYTO-656
+
+**A record with nobody listening at its endpoint is skipped.** The relay already skips a record
+whose pid is gone. One whose pid is alive but whose window is not — a window killed before it
+quit, its pid since given to another process — failed the connection with `ENOENT` or
+`ECONNREFUSED`. The relay now says so on stderr and tries the next window in the pick's order.
+It never waits and retries: a window writes its record only once it listens, so a live window's
+record never comes before its pipe. Measured on the `desktop-v0.17.0` tag: the failure there was
+the packaged suite reading an orphan record left by a launch the suite itself killed, in the
+same `TYTO_HOME`.

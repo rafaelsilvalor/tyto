@@ -36,6 +36,7 @@ import {
 } from './cdp-app.js';
 import { FIRST_WINDOW_TIMEOUT_MS } from './first-window.js';
 import { probeLaunch } from './launch-probe.js';
+import { seenLine, windowRecordFor } from './window-record.js';
 import { killTree, probeRunAsNode } from './run-as-node-probe.js';
 
 /**
@@ -807,10 +808,12 @@ describe('the packaged app', () => {
     //
     // A booted app never exits on its own, so the probe ends it once the editor is up over CDP
     // (TYTO-308). The deadline is only the upper bound for one that never gets there.
+    // Its own `TYTO_HOME`: booted as the app and then ended, it never quits, so the record of its
+    // agent endpoint would stay in the suite's folder for the tests after it (TYTO-656).
     const packaged = await probeRunAsNode(packagedExecutable(), {
       userData:
         state(FuseV1Options.RunAsNode) === 'off' ? join(scratch, 'probe-packaged-data') : undefined,
-      home: join(scratch, 'tyto-home'),
+      home: join(scratch, 'probe-tyto-home'),
       deadlineMs: FIRST_WINDOW_TIMEOUT_MS,
     });
     process.stdout.write(
@@ -864,13 +867,19 @@ describe('the packaged app', () => {
   it("serves an agent's tools/list on its endpoint, from the SDK chunk inside the asar (TYTO-566)", async () => {
     // ADR 0180: the packaged app ships no `node_modules` the MCP SDK could be imported from, so
     // only a packaged launch shows the chunk it was bundled into loads. The record is the one the
-    // relay reads, in this suite's own `TYTO_HOME`.
+    // relay reads, in this suite's own `TYTO_HOME`, and it is **this app's**, by its pid: another
+    // launch in the same folder that was killed before it quit leaves its record behind, and the
+    // first `*.json` was once that orphan (TYTO-656, `desktop-v0.17.0`: `connect ENOENT`).
     const windows = join(scratch, 'tyto-home', 'windows');
+    const pid = app!.child.pid!;
     await expect
-      .poll(() => (existsSync(windows) ? readdirSync(windows) : []), { timeout: 15_000 })
-      .toContainEqual(expect.stringMatching(/^\d+\.json$/u));
-    const name = readdirSync(windows).find((entry) => entry.endsWith('.json'));
-    const record = JSON.parse(readFileSync(join(windows, name!), 'utf8')) as WindowRecord;
+      .poll(() => windowRecordFor<WindowRecord>(windows, pid).record, { timeout: 15_000 })
+      .toBeDefined();
+    const { record: found, seen } = windowRecordFor<WindowRecord>(windows, pid);
+    process.stdout.write(
+      `[TYTO-656] app pid ${String(pid)}; records in TYTO_HOME/windows: ${seenLine(seen)}\n`,
+    );
+    const record = found!;
     const frames = [
       {
         jsonrpc: '2.0',
