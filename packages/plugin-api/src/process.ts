@@ -93,6 +93,11 @@ export interface ProcessEvents {
  * {@link ProcessEvents.exit}.
  */
 export interface StartedProcess {
+  /**
+   * The absolute folder the adapter started the program in: the open workspace, or the home
+   * folder with none open. ACP's `session/new` needs it, and only the host knows it.
+   */
+  readonly cwd: string;
   write(bytes: Uint8Array): Promise<void>;
   /** Closes stdin, which is how a program reading it learns there is no more. */
   end(): Promise<void>;
@@ -109,6 +114,11 @@ export type StartProcess = (
 
 /** A program the plugin started, as the plugin holds it. */
 export interface PluginProcess {
+  /**
+   * The absolute folder the host started it in (the open workspace, or the home folder with
+   * none open), as ACP's `session/new` asks for its `cwd`.
+   */
+  readonly cwd: string;
   /** Bytes, or text sent as UTF-8, to its stdin; at most 1 MiB per write. */
   write(data: Uint8Array | string): Promise<void>;
   /** Closes its stdin. */
@@ -149,6 +159,8 @@ export function hostProcess(
 
 /** The operations behind a {@link PluginProcess}, already checked. */
 export interface ProcessOperations {
+  /** Where the program runs, as the adapter reported it. */
+  readonly cwd: string;
   write(bytes: Uint8Array): Promise<void>;
   end(): Promise<void>;
   kill(): Promise<void>;
@@ -209,6 +221,7 @@ export function processChannel(): {
       exit: (exit) => ended?.(exit),
     },
     handle: (operations) => ({
+      cwd: operations.cwd,
       write: (data) => operations.write(bytesOf(data)),
       end: () => operations.end(),
       kill: () => operations.kill(),
@@ -307,12 +320,20 @@ export function checkedProcesses(
       }
       // Stopped while the adapter was starting it: the plugin is gone, so the program goes too.
       if (stopped) started.kill();
+      // Read as `unknown`: the adapter is typed, but this is the check that does not trust it.
+      // A plugin hands this folder to its agent as ACP's absolute `cwd` (ADR 0182, 2026-11-09).
+      const cwd: unknown = started.cwd;
+      if (typeof cwd !== 'string' || cwd === '') {
+        started.kill();
+        throw new TypeError(`${host} started '${name}' without saying the folder it runs in.`);
+      }
 
       const running = started;
       const gone = (): Promise<never> =>
         refuse(diagnostic('E_PROCESS_EXITED', { plugin, program: name }));
       return {
         program: name,
+        cwd,
         write(bytes) {
           if (exited) return gone();
           if (bytes.length > PROCESS_WRITE_LIMIT_BYTES) {

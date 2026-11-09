@@ -300,13 +300,16 @@ export function runGuest(
       },
     }),
     process: hostProcess(async (name, args) => {
-      const { id } = (await request('processStart', [name, [...args]], processStartedSchema)) as {
-        id: number;
-      };
+      const { id, cwd } = (await request(
+        'processStart',
+        [name, [...args]],
+        processStartedSchema,
+      )) as { id: number; cwd: string };
       const program = programChannel(id);
       heldByPlugin.add(id);
       forgetIfDone(id);
       return program.handle({
+        cwd,
         write: async (bytes) => {
           await request('processWrite', [id, bytes], storedSchema);
         },

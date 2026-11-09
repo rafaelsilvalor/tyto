@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -174,6 +175,21 @@ describe('a program a plugin starts (ADR 0182)', () => {
     expect(heard).toContain(`CWD ${work}`);
     expect(heard).toContain('HELLO FROM THE PLUGIN\n');
     expect(heard).toMatch(/EXIT 0$/u);
+  }, 30_000);
+
+  it('tells the plugin the folder the program runs in (ADR 0182, note of 2026-11-09)', async () => {
+    const heard = await exported('echo');
+    const reported = /^REPORTED (.+)$/mu.exec(heard)?.[1];
+    const ran = /^CWD (.+)$/mu.exec(heard)?.[1];
+    process.stdout.write(
+      `[TYTO-569] the plugin was told ${String(reported)}; the program ran in ${String(ran)}\n`,
+    );
+    expect(reported).toBeDefined();
+    expect(ran).toBeDefined();
+    // After realpath on every side: macOS's /private/tmp and Windows' 8.3 short names make equal
+    // folders differ as text.
+    expect(realpathSync.native(reported!)).toBe(realpathSync.native(ran!));
+    expect(realpathSync.native(reported!)).toBe(realpathSync.native(work));
   }, 30_000);
 
   it("hands it the window's agent server, through which it lists the window's tools (ADR 0183)", async () => {

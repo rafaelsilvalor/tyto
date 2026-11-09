@@ -2683,6 +2683,7 @@ describe('host.process across the boundary (ADR 0182)', () => {
           events.exit({ code: 3, signal: null });
         }
         return Promise.resolve({
+          cwd: '/home/ana/work',
           write: (bytes) => {
             events.stdout(new TextEncoder().encode(text(bytes).toUpperCase()));
             return Promise.resolve();
@@ -2730,12 +2731,13 @@ describe('host.process across the boundary (ADR 0182)', () => {
         await program.write(new TextEncoder().encode('olá'));
         await program.end();
         const exit = await program.exited;
-        return `${heard.join('|')} ${String(exit.code)}`;
+        // The folder crosses with the answer to the start (protocol 21).
+        return `${heard.join('|')} ${String(exit.code)} ${program.cwd}`;
       }),
       { permissions: ['process:claude'], capabilities: port.capabilities },
     );
 
-    expect(await answerOf(connected)).toBe('{"JSONRPC":"2.0"}\n|OLÁ 0');
+    expect(await answerOf(connected)).toBe('{"JSONRPC":"2.0"}\n|OLÁ 0 /home/ana/work');
     expect(port.started).toEqual([{ program: 'claude', args: ['--acp'] }]);
   });
 

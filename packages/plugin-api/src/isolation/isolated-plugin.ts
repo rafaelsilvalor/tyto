@@ -351,7 +351,7 @@ export function connectIsolatedPlugin(
             exit: ({ code, signal }) => tell({ event: 'exit', code, signal }),
           });
           programs.set(id, program);
-          reply({ ok: true, value: { id } });
+          reply({ ok: true, value: { id, cwd: program.cwd } });
         } else if (message.capability === 'windowAgentServer') {
           const args = windowAgentServerArgsSchema.safeParse(message.args);
           if (!args.success) {

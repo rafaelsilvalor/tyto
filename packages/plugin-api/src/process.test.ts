@@ -37,7 +37,7 @@ interface Started {
  * A port whose programs echo stdin back upper-cased, end with 0 when stdin closes, and end
  * by signal when killed. `hold` keeps a start unanswered until the test lets it go.
  */
-function programs(options: { readonly hold?: boolean } = {}) {
+function programs(options: { readonly hold?: boolean; readonly cwd?: unknown } = {}) {
   const started: Started[] = [];
   const holding: (() => void)[] = [];
   const capabilities: HostCapabilities = {
@@ -50,6 +50,7 @@ function programs(options: { readonly hold?: boolean } = {}) {
       started.push(record);
       if (options.hold === true) await new Promise<void>((go) => holding.push(go));
       return {
+        cwd: ('cwd' in options ? options.cwd : '/home/ana/work') as string,
         write: (bytes) => {
           record.written.push(text(bytes));
           events.stdout(new TextEncoder().encode(text(bytes).toUpperCase()));
@@ -204,12 +205,42 @@ describe('checkedProcesses', () => {
   });
 });
 
+describe('the folder a program runs in (ADR 0182, note of 2026-11-09)', () => {
+  it('hands the plugin the folder the adapter started it in', async () => {
+    const port = programs({ cwd: '/home/ana/work' });
+    const checked = checkedProcesses('agente', ['process:claude'], port.capabilities);
+    const program = await checked.start('claude', [], silent());
+    const channel = processChannel();
+    expect(program.cwd).toBe('/home/ana/work');
+    expect(channel.handle(program).cwd).toBe('/home/ana/work');
+  });
+
+  it('refuses, and ends, a program whose adapter does not say where it runs', async () => {
+    const answers: string[] = [];
+    const killed: number[] = [];
+    for (const cwd of ['', undefined, 42]) {
+      const port = programs({ cwd });
+      const checked = checkedProcesses('agente', ['process:claude'], port.capabilities);
+      answers.push(await codeOf(checked.start('claude', [], silent())));
+      killed.push(port.started[0]?.killed ?? -1);
+    }
+    expect(answers).toEqual(
+      Array(3).fill(
+        "TypeError: the test host started 'claude' without saying the folder it runs in.",
+      ),
+    );
+    // Ended rather than left running where the plugin can no longer reach it.
+    expect(killed).toEqual([1, 1, 1]);
+  });
+});
+
 describe('processChannel', () => {
   it('hands chunks that came before the first listener to it, up to the ceiling', () => {
     const channel = processChannel();
     channel.events.stdout(new TextEncoder().encode('cedo'));
     channel.events.stderr(new Uint8Array(PROCESS_UNREAD_LIMIT_BYTES + 1));
     const handle = channel.handle({
+      cwd: '/home/ana/work',
       write: () => Promise.resolve(),
       end: () => Promise.resolve(),
       kill: () => Promise.resolve(),
