@@ -86,6 +86,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Every terminal ended first: on macOS and Linux a program still running in one makes the quit
+  // ask in a box no test answers (ADR 0164), and the polls below may have started agents.
+  const { terminals } = await call<{ terminals: { terminalId: string }[] }>('terminal:list', {});
+  for (const { terminalId } of terminals) await call('terminal:kill', { terminalId });
   await closeApp(app);
   rmSync(scratch, { recursive: true, force: true });
 });

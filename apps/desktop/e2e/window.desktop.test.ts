@@ -581,6 +581,8 @@ describe('switching the language', () => {
     // `terminal-panel.test.ts` holds the tab's.
     'panel.terminal',
     'command.terminal.new',
+    // TYTO-567: Open an Agent Here is the bar's text and the Tools menu's, as New Terminal is.
+    'command.terminal.openAgent',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('terminal.')),
     'workspace.banner.text',
     'workspace.banner.trust',

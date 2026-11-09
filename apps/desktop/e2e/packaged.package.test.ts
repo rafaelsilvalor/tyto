@@ -502,6 +502,19 @@ describe('the packaged app', () => {
         [channel, request] as const,
       ) as Promise<T>;
 
+    // What the terminal prints, heard as it comes: the agent exits once it has listed the tools,
+    // and main forgets an exited terminal, so `terminal:list` may no longer have it.
+    await page.evaluate(() => {
+      const scope = globalThis as never as {
+        tyto: { on: (event: string, listen: (payload: never) => void) => () => void };
+        agentHeard: Record<string, string>;
+      };
+      scope.agentHeard = {};
+      scope.tyto.on('terminal:output', (payload: { terminalId: string; data: string }) => {
+        scope.agentHeard[payload.terminalId] =
+          (scope.agentHeard[payload.terminalId] ?? '') + payload.data;
+      });
+    });
     const opened = await call<{ terminalId?: string; message?: string }>('terminal:open', {
       cols: 200,
       rows: 30,
@@ -518,11 +531,11 @@ describe('the packaged app', () => {
         );
       }
       await new Promise((resolve) => setTimeout(resolve, 200));
-      const { terminals } = await call<{ terminals: { terminalId: string; replay: string }[] }>(
-        'terminal:list',
-        {},
+      replay = await page.evaluate(
+        (id) =>
+          (globalThis as never as { agentHeard: Record<string, string> }).agentHeard[id] ?? '',
+        terminalId,
       );
-      replay = terminals.find((terminal) => terminal.terminalId === terminalId)?.replay ?? '';
     }
     const tools = /AGENT_TOOLS ([a-z_,]+)/u.exec(replay)?.[1] ?? '';
     const relayed = /relaying to the window that started this terminal[^\r\n]*/u.exec(replay)?.[0];
