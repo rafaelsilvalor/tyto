@@ -16,10 +16,16 @@ import { openSession } from './session.js';
 export const NO_STDIO =
   'tyto mcp: this program has no standard streams to serve on; run tyto mcp in a terminal, or register it with an agent that starts it (ADR 0179)\n';
 
+export interface McpOptions {
+  /** Relay to a running window instead of serving the files (ADR 0180). */
+  readonly window?: boolean;
+}
+
 export async function mcpCommand(
   folder: string,
   environment: CliEnvironment,
   signal?: AbortSignal,
+  options: McpOptions = {},
 ): Promise<ExitCode> {
   if (environment.stdio === undefined) {
     environment.console.err(NO_STDIO);
@@ -27,6 +33,18 @@ export async function mcpCommand(
   }
   const stdio = environment.stdio();
   const err = environment.console.err;
+  if (options.window === true) {
+    // The window serves the protocol; this process only copies bytes, so it loads no SDK.
+    const { relayToWindow } = await import('./relay.js');
+    return relayToWindow({
+      home: environment.home,
+      folder: resolve(environment.cwd, folder),
+      platform: process.platform,
+      stdio,
+      err,
+      ...(signal === undefined ? {} : { signal }),
+    });
+  }
   // Everything the reused commands print goes to stderr, their answers included: stdout is the
   // protocol's now, and an answer a tool needs comes back as a value, not as printed text.
   // And the folder named on the command line is the session's current folder: relative paths

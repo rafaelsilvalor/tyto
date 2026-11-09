@@ -475,8 +475,18 @@ export function createProgram(
     )
     // An agent's host may start the server anywhere: Claude Desktop names no working folder.
     .argument('[folder]', 'the folder whose templates and briefs are served', '.')
-    .action(async (folder: string) => {
-      captured.code = await mcpCommand(folder, environment, signal);
+    // Hidden until the window listens (TYTO-566 PR 2): until then it can only say no window is
+    // open, and neither `--help` nor the generated reference should offer it.
+    .addOption(
+      new Option(
+        '--window',
+        'relay to the open Tyto window whose workspace holds the folder, or the most recent one (ADR 0180)',
+      ).hideHelp(),
+    )
+    .action(async (folder: string, options: { window?: boolean }) => {
+      captured.code = await mcpCommand(folder, environment, signal, {
+        window: options.window === true,
+      });
     });
   valuesOf(mcp, { '<folder>': FOLDER });
 

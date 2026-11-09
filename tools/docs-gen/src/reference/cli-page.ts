@@ -80,12 +80,14 @@ function section(leaf: LeafCommand, words: (typeof WORDS)[Locale]): string {
             prose(argument.description),
           ]),
         )}`;
+  // What `--help` hides, the reference hides too: an option kept out of help is not offered yet.
+  const shownOptions = command.options.filter((option) => !option.hidden);
   const optionsTable =
-    command.options.length === 0
+    shownOptions.length === 0
       ? ''
       : `**${words.options}**\n\n${table(
           [words.option, words.meaning, words.default],
-          command.options.map((option) => [
+          shownOptions.map((option) => [
             code(option.flags),
             prose(
               option.mandatory ? `${option.description} (${words.required})` : option.description,
