@@ -1,5 +1,199 @@
 # @tyto/desktop
 
+## 0.17.0
+
+### Minor Changes
+
+- 0c7afa6: A plugin's panel calls its own plugin's process from the window (TYTO-372, ADR 0173): the
+  bridge offers `call` with `args: [method, params?]`, and main finds the
+  panel from the layout id read off the iframe's element, plugin and panel id together, and hands
+  the request to `callPanel`, so a page reaches its own plugin and no other, fetched plugins
+  included. A bridge request with a key its shape does not have, such as a `plugin` naming
+  another plugin, is now answered `E_PANEL_CALL` (`E_PLUGIN_CALL` for the other capabilities)
+  instead of being dropped in silence.
+- ae4a916: TYTO-373: the plugins screen installs a plugin from a folder or a `.tgz` archive, after a native
+  box that shows the same permissions `tyto plugin install` prints, and removes, disables and
+  enables an installed one; Settings opens `settings.json` at the plugin's keys. Changes apply the
+  next time Tyto starts, and each row says so. `tyto plugin install --help` names the local archive,
+  and a test proves a hostile archive writes nothing outside the folder it is unpacked into.
+- 15403eb: TYTO-374: the desktop runs a plugin's browser sign-in in its main process: PKCE with a loopback redirect
+  on `127.0.0.1`, the refresh token in the keychain and the access token only in memory, refreshed
+  when it expires. A plugin's `host.signin.accessToken(id)` now answers a token once somebody has
+  signed in. The window that starts a sign-in comes next.
+- 15c2f94: TYTO-374: the plugins screen shows, beside each browser sign-in an installed plugin declares,
+  who is signed in, with Sign in and Sign out. Only a click there opens the system browser; the
+  page it lands on after signing in is in the window's language. The window reaches three new
+  channels and hears one event, none of which carries a token, and signing out deletes the
+  keychain entry.
+- 4a91cef: A recipe's views read rows from main in pages, and `show` checks its view (TYTO-379, ADR 0171).
+  `RunOptions.views` and `VerbContext.views` map a view name to the arguments it reads
+  (`ViewArgumentSpec`: `column`, `columns`, `values` or `choice`); with a list, `show` refuses a
+  view not in it as `E_RECIPE_VIEW` (new in core) at the view's word, and an unknown, missing or
+  stray argument at its range, columns resolved through the aliases. Without a list `show` takes
+  any one name, as before. Every cell carries `Cell.view`, the last `show` at or above it with its
+  arguments, and `run` hands the list and the included recipe's view on. The `sort` verb's order
+  is exported as `compareCells`. In the desktop, main passes the notebook's views (`table`,
+  `summary`) to every run, the cell on the wire carries its view, and two channels read a cell's
+  kept table: `recipe:rows` answers a page of it sorted and filtered in main over indices, never
+  moving the recipe's rows, with the Summary's totals over the rows the filter keeps, and
+  `recipe:copy` writes rows to the clipboard as quoted tab-separated text built from the whole
+  values. A page names the run it reads and a newer one answers `stale`. The Table view follows.
+- 6ac41ae: A recipe cell's result opens full size in a tab of its own (TYTO-379, ADR 0171): **Open in a
+  tab** on a cell whose table main keeps, or the command **Open cell result in a tab** for the
+  cell at or above the cursor. The tab draws the cell's current view (Table, Summary, Board,
+  Calendar or Cards; the Table for a cell under no `show`) from the recipe's newest run, the
+  Table's viewport stretched to the tab. One tab per cell; it closes with its recipe and no
+  session brings it back.
+- 99a64c4: The recipe notebook draws a cell under `show table` or `show summary` in the Table view
+  (TYTO-379, ADR 0171): every row of the kept table, in a twelve-row viewport that draws only the
+  rows in sight and reads them from main a page at a time over `recipe:rows`. A header sorts in
+  main, one quick-filter box filters over the shown columns, a column picker hides columns, and a
+  click, Shift-click or Ctrl+A selects a rectangle that Copy or Ctrl+C writes as tab-separated text
+  through `recipe:copy`, which takes the copied columns apart from the filtered ones
+  (`copyColumns`). Summary adds main's totals over the rows the filter keeps. Numbers are
+  right-aligned, dates follow the window's language, and a `link` value is an anchor only for an
+  `http` or `https` address; the window's open handler now hands only those two schemes to the
+  system browser (`externalUrlAllowed`). A cell under no `show` keeps its preview.
+- 092d29e: The desktop writes briefs with `to-brief` (TYTO-380, ADR 0172). `@tyto/io` adds
+  `workspaceBriefPorts`, the verb's ports over a workspace folder: `stat` answers the SHA-256 of a
+  file's bytes (`briefDigest`), `write` lands the brief whole and creates its folder, and both
+  confine the real path again after following links, refuse `.tyto/` and refuse a folder that is
+  not trusted, asked on every call. `@tyto/plugin-api` names `ToBriefPorts` and `BriefFolder`, so
+  the adapter implements a port from it. The desktop's recipe runner binds the ports per run and
+  per Apply to the recipe's workspace and trust, with templates looked up as the preview looks up
+  a brief's `template:`.
+- 321e1f4: The recipe notebook draws `show board by=<column>` as a Board (TYTO-381, ADR 0177): one column per
+  value of the column, grouped without case or accents, with the count main made over the rows the
+  quick filter keeps, and a card per row showing `fields=` (the first three other columns when
+  absent). `order=` places values first, the rest follow by first appearance and an empty value is
+  a "(none)" column at the end. A column draws fifty cards, then "N more". View only. A new
+  channel, `recipe:facets`, counts a column's groups in main, and `recipe:rows` gains `facet` to
+  page one group's rows. In `@tyto/recipe`, a view's `values` argument reads a data file's list of
+  strings (`order=@./board.json#/order`) through the host's data resolver, so `show` reads its
+  arguments asynchronously.
+- 25e37cc: The recipe notebook draws `show calendar date=<column> [time=<column>] [span=week|month]` as a
+  Calendar (TYTO-383, ADR 0177 note of 2026-11-08): each row on the day its date falls on in the
+  run's time zone (`recipeTimeZone`), a day's rows by time, three to a day and "+k more". It opens
+  on the week or month holding today, with Previous and Next, Week and Month, and how many dated
+  rows lie before and after the span. Rows with no date, or a date that names no day, are listed
+  apart as "No date (N)". The first weekday is the window language's. View only. Main counts the
+  days: `recipe:facets` gains `bucket: 'day'` and `days`, and `recipe:rows`' `facet` gains
+  `bucket`, `time` and `perDay`.
+- 2ae39ec: The recipe notebook draws `show cards [fields=<columns>]` as loose cards (TYTO-384, ADR 0177 note
+  of 2026-11-08): a grid of cards of one size showing `fields=` (the first four columns when
+  absent), 48 at a time under the quick filter. Opening a card, by click or Enter, shows every
+  column of its row, those the card leaves out included, with its provenance (source, id, fetched
+  at) and its link, the first `link` column holding a web address. Escape closes it. View only.
+  Main answers the row on a new channel, `recipe:row`, values cut at 10,000 characters.
+- 432881f: TYTO-385: while the window is open, main runs every recipe in a trusted workspace folder whose
+  header says `every`, from the file on disk, one interval after it is found and then one interval
+  after each run starts. A run still going skips the next tick; after sleep a missed recipe runs
+  once. A restricted folder runs nothing, a recipe needing a parameter is listed and not run, and
+  `apply auto` applies there as on Run. The first run with a problem after a clean one raises one
+  OS notification naming the recipe and the code. Three new channels and one event carry the list,
+  Run now and Open by main's ids; the panel that shows them comes next.
+- a8b91a3: TYTO-449: a recipe's `run` cell opens onto the included recipe's own cells. `@tyto/recipe` adds
+  `VerbOutput.included` and `Cell.included` (the `IncludedRecipe` type), set on a `run` that
+  succeeded; the desktop notebook carries them on the wire and shows them read-only, closed until
+  **Show the included recipe's cells** is clicked.
+- fdc18fe: TYTO-566: an agent's edit arrives as a proposal (ADR 0180 decision 5). `propose_edit` shows an
+  edit of the document in front, struck-through and inserted text under an Accept / Reject bar;
+  accepted, it is one undo step and saves nothing, and typing in it makes it stale.
+  `proposal_status` tells the agent how it ended. `@tyto/editor` gains the `proposals` extension.
+- f3196f6: TYTO-566: the window listens for agents (ADR 0180). It writes its record into
+  `TYTO_HOME/windows/`, checks each connection's token and serves the same tools as `tyto mcp`
+  through the new `serveAgent`. The status bar shows the agents connected, and its click cuts
+  them. `tyto mcp --window` is now offered. The MCP SDK is bundled into a lazy chunk of main.
+- 639317d: TYTO-566: the window's tools for agents (ADR 0180). Served by a window, `tyto mcp` adds
+  `brief_in_front` and `selection` in any folder, and `open_file` and `show_format` in a trusted
+  one, asked first in a box unless `agentsWindowActions` is `allow`. `agentsListen` turns the
+  window's endpoint off and on, live. `serveAgent` takes the window as a `WindowPort`.
+- 661a573: An agent started in Tyto's terminal reaches the open window (TYTO-567, ADR 0181). Terminal: Open
+  an Agent Here starts the program `agentCommand` names (default `claude`, with `agentArgs` after)
+  in a new terminal tab, told through `--mcp-config` (or Codex's `-c`) to start the window relay on
+  the bundled Node; Tyto installs no agent, and a missing program is a line in the tab. Every
+  terminal carries `TYTO_WINDOW`, which `tyto mcp --window` and the relay prefer over the folder
+  rule, falling back to it when that window is gone. `@tyto/command-line` gains the
+  `@tyto/command-line/relay` subpath export.
+- 159b5c1: An installed plugin that declares `process:<name>` can start that program (TYTO-568, ADR
+  0182). Main finds it on `PATH` (`.exe` before an npm `.cmd`, never `.ps1`), starts it with no
+  shell, or through `cmd.exe /d /s /c` for a `.cmd` with every argument `cmd.exe` would read
+  refused, in the open folder, with an allowlisted environment that carries no secret and adds
+  `TYTO_WINDOW`. A restricted folder is refused, a missing program is `E_PROCESS_NOT_FOUND`, and
+  every program ends when the folder or its trust changes and when the window closes. The plugins
+  screen names the programs each plugin may start, in English and Brazilian Portuguese.
+- 046a5b9: A program a plugin starts now says where it runs (TYTO-569, ADR 0182 note of 2026-11-09).
+  `host.process.start` answers a handle with `cwd`, the absolute folder the host started it in:
+  the open workspace, or the home folder with none open, which a plugin hands its agent as ACP's
+  `session/new` `cwd`. The port's `StartedProcess` carries `cwd` too, and `checkedProcesses`
+  refuses and ends a program whose adapter reports none. `RPC_PROTOCOL_VERSION` is 21. The
+  desktop reports the folder it spawned the program in.
+- 64a7b70: A plugin that declares a `process:<name>` can ask for the window's MCP server and hand it to
+  the agent it starts (TYTO-569, ADR 0183). `host.window.agentServer()` answers
+  `{ name: 'tyto', command, args, env }`, the shape ACP's `session/new` takes in `mcpServers`:
+  the bundled Node, the relay Open an Agent Here names, and `TYTO_WINDOW` and `TYTO_HOME` only,
+  which the host's check enforces with a strict schema. A plugin with no program is
+  `E_PERMISSION`, the CLI is `E_WINDOW_UNAVAILABLE`, and the desktop refuses `agentsListen` off
+  (`E_WINDOW_AGENTS_OFF`) and a restricted folder (`E_WINDOW_RESTRICTED`), read at each call.
+  `RPC_PROTOCOL_VERSION` is 20. The install prompt's `process:` paragraph now says that the
+  program can also reach the Tyto window as an agent, with its edits arriving as proposals.
+- 3bb3367: TYTO-651: verification mode. Started with Chromium's `--remote-debugging-port`, the window draws
+  "Verification mode · port N" first on the status bar, outside the `statusBarItems` list, and
+  main logs a warning; the port listens on 127.0.0.1 only. `scripts/verify.ts` connects over CDP
+  and prints the window's screenshot path, text, tabs, plugins with credentials as set or not set,
+  and, only when named, a recipe's Run with each cell's status and plan lines.
+
+### Patch Changes
+
+- 35e3a49: TYTO-450: the manual's pictures of the window gain a recipe after Run recipe. A docs-shots
+  scene can name fixture plugins, installed with `tyto plugin install` in the launch's own Tyto
+  home before the window opens; the recipe scene reads an invented reading list from one.
+- bf255a4: TYTO-565: `tyto mcp [folder]` serves a folder's templates and briefs to an AI agent over the
+  Model Context Protocol on stdio, with four read tools: `list_templates`, `describe_template`,
+  `check_brief` and `render_preview` (a PNG at most 1,024 px on its longest side). A restricted
+  folder is offered no tool that writes (ADR 0179). A plugin's process now prints onto stderr, so
+  its output no longer lands in `tyto render --json`'s document. The window refuses `tyto mcp`.
+- 422b6bc: TYTO-566: `tyto mcp --window [folder]` relays an agent's stdio to a running window's local
+  endpoint, after reading its record in `TYTO_HOME/windows/` and sending its token (ADR 0180).
+  The window does not listen yet, so the option is hidden and answers that no window is open.
+  The desktop only gains a test: its command panel refuses `mcp --window` as it refuses `mcp`.
+- Updated dependencies [edc97c6]
+- Updated dependencies [98322e5]
+- Updated dependencies [cd096ab]
+- Updated dependencies [ae4a916]
+- Updated dependencies [ed7a364]
+- Updated dependencies [4a91cef]
+- Updated dependencies [4db076c]
+- Updated dependencies [092d29e]
+- Updated dependencies [321e1f4]
+- Updated dependencies [3642f9a]
+- Updated dependencies [a8b91a3]
+- Updated dependencies [bf255a4]
+- Updated dependencies [fdc18fe]
+- Updated dependencies [422b6bc]
+- Updated dependencies [f3196f6]
+- Updated dependencies [639317d]
+- Updated dependencies [661a573]
+- Updated dependencies [c0875cc]
+- Updated dependencies [046a5b9]
+- Updated dependencies [64a7b70]
+- Updated dependencies [d836583]
+  - @tyto/command-line@0.3.0
+  - @tyto/recipe@0.3.0
+  - @tyto/core@0.42.0
+  - @tyto/plugin-api@0.16.0
+  - @tyto/brief-lang@0.8.0
+  - @tyto/pipeline@0.12.12
+  - @tyto/io@5.4.0
+  - @tyto/editor@0.16.0
+  - @tyto/export-html@0.7.16
+  - @tyto/export-svg@2.0.16
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.15
+  - @tyto/template-lang@0.8.15
+  - @tyto/templates@1.2.10
+  - @tyto/theme-pack@0.1.15
+
 ## 0.16.0
 
 ### Minor Changes

@@ -1,5 +1,31 @@
 # @tyto/pipeline
 
+## 0.12.12
+
+### Patch Changes
+
+- 4db076c: A recipe gains the generic sink `to-brief template=<name> into=<folder> name=<column>
+slots=<slot>:<column>,…` (TYTO-380, ADR 0172): it plans one brief per row in the chosen template,
+  each marked new or overwriting, and writes them on Apply through `ToBriefPorts` the host lends
+  through `createVerbRegistry({ briefs })` and `recipeRegistriesOf`'s `briefs` option; a file
+  changed since the plan fails that write while the others apply. `@tyto/brief-lang` gains
+  `writeBrief`, which writes a brief from a template name and slot values and parses it back,
+  refusing a value that holds a brace. `@tyto/core` gains `fileSafeName`, which the pipeline's
+  `artifactName` now calls, and the diagnostic code `E_RECIPE_BRIEF`.
+- Updated dependencies [cd096ab]
+- Updated dependencies [ed7a364]
+- Updated dependencies [4a91cef]
+- Updated dependencies [4db076c]
+- Updated dependencies [092d29e]
+- Updated dependencies [c0875cc]
+- Updated dependencies [046a5b9]
+- Updated dependencies [64a7b70]
+  - @tyto/core@0.42.0
+  - @tyto/plugin-api@0.16.0
+  - @tyto/brief-lang@0.8.0
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.15
+
 ## 0.12.11
 
 ### Patch Changes
