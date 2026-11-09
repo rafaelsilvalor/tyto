@@ -80,9 +80,11 @@ provedor, e o Tyto guarda o login no chaveiro do sistema.
 
 ## Para quem escreve plugins
 
-O protocolo entre o Tyto e o processo de um plugin passou da versão 15 para a **versão 21** (`@tyto/plugin-api` 0.16).
-**Um plugin ou um template de repositório próprio construído com a `plugin-api` 0.14 ou anterior é recusado ao
-conectar**, com uma mensagem que diz os dois números: atualize-o para a `plugin-api` nova. O que muda:
+A `@tyto/plugin-api` chega à 0.16. **Um plugin ou um template de repositório próprio construído com uma `plugin-api`
+anterior continua abrindo**, desde que a faixa `engine` do manifesto dele aceite a 0.16, como `>=0.11` aceita. Quem
+decide é essa faixa: uma que esta versão não satisfaz é recusada na instalação com `E_PLUGIN_ENGINE`, que diz as duas
+versões. Para usar o que vem abaixo, construa o plugin com a `plugin-api` 0.16 e declare `"engine": ">=0.16"`. O que
+muda:
 
 - **`apply`**: uma ação ou um destino de receita grava o plano que a pessoa viu, em lotes de até 100 operações, e uma
   operação pode levar o seu próprio `payload`.
@@ -104,9 +106,6 @@ login feito. Quando ele não está, a aba do terminal diz isso, e um plugin fica
 **No Mac, um plugin aberto pelo Dock pode não achar o programa.** Um aplicativo aberto pelo Dock ou pelo Finder recebe uma
 lista curta de pastas onde procurar programas, sem as pastas do Homebrew ou do npm, então um `claude` instalado ali pode
 não ser encontrado por um plugin. O terminal do Tyto não tem esse problema. Isso não foi medido num Mac.
-
-**Os templates de repositório próprio precisam da `plugin-api` nova.** Um template feito para a 0.15.0 do Tyto é recusado
-por esta versão até o repositório dele ser atualizado; o painel de problemas diz qual.
 
 **É preciso ter o Git instalado** para a galeria e para buscar templates por arquivo de plugins. Sem ele, a busca falha e
 o painel de problemas diz qual repositório não veio.
