@@ -184,3 +184,7 @@ restart the app:
 The server's own messages, and anything a plugin prints, go to stderr, which both hosts keep in
 their MCP log; stdout carries the protocol only. The window refuses `tyto mcp` in its command
 panel.
+
+`tyto mcp --window [folder]` relays the same stdio to a running window instead, which will serve
+what is open in it (ADR 0180). The window does not listen yet (TYTO-566 PR 2), so the option is
+hidden from `--help` and answers that no window is open; register it once the window listens.

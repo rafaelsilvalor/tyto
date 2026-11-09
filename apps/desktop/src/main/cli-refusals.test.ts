@@ -52,6 +52,12 @@ describe('mcp', () => {
     expect(MCP_REFUSED).toContain('terminal');
   });
 
+  it('is refused with --window too: the relay needs stdio the panel does not have (ADR 0180)', async () => {
+    expect(await refusals()(invocation(['mcp'], ['.'], { window: true }), 'C:\\w')).toBe(
+      MCP_REFUSED,
+    );
+  });
+
   it('leaves a command named after it alone', async () => {
     expect(await refusals()(invocation(['render'], ['mcp']), 'C:\\w')).toBeUndefined();
   });
