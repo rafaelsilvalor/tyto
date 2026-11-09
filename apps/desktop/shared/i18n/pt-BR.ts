@@ -243,6 +243,10 @@ export const ptBR: Catalogue = {
   'command.layout.toggleDock.right': 'Mostrar ou ocultar a área direita',
   'command.layout.toggleDock.bottom': 'Mostrar ou ocultar a área de baixo',
   'status.commandBar': 'Abrir a barra de comandos',
+  'status.verification.port': 'Modo de verificação · porta {port}',
+  'status.verification.on': 'Modo de verificação · ligado',
+  'status.verification.risk':
+    'O Tyto foi aberto com uma porta de depuração. Qualquer programa deste computador pode ler e comandar esta janela até o Tyto ser reaberto sem ela.',
   'status.position': 'Lin {line}, Col {column}',
   'status.selected': '{count} selecionados',
   'status.kind.settings': 'Configurações',

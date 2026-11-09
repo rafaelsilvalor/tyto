@@ -27,3 +27,7 @@ Com essa lista a barra fica com o botão da barra de comandos, a posição do cu
 Uma cor que deixa o texto da barra difícil de ler em algum dos seus temas vale mesmo assim, e o painel de Problemas avisa com `W_SETTING_LOW_CONTRAST`, citando o tema e o contraste que mediu.
 
 Como o modo do vim aparece — um selo colorido, uma faixa colorida no alto da barra, ou a barra inteira na cor do modo — é a configuração [`vimModeStyle`](../reference/settings.md#vimmodestyle). [Modo vim](../editor/vim-mode.md) diz quando o selo aparece.
+
+## Modo de verificação
+
+Quando o Tyto foi aberto com uma porta de depuração, para que um agente de código possa olhar a janela, o primeiro item da barra diz **Modo de verificação · porta 9333** (ou **Modo de verificação · ligado** quando o número da porta não é conhecido), com contorno vermelho. Nenhuma configuração o esconde. Enquanto ele aparece, qualquer programa deste computador pode ler e comandar a janela; feche o Tyto e abra do jeito de sempre para desligar. Ele nunca liga sozinho: só um atalho que passa a porta o liga.

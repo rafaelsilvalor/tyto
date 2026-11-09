@@ -31,6 +31,7 @@ import { type CliRunner } from './cli-runner.js';
 import { type Terminals } from './terminal.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
+import { type VerificationMode } from './verification-mode.js';
 import { declaredCredentialKeys } from './plugin-list.js';
 import { type PluginManager } from './plugin-manage.js';
 import { type SigninWindow } from './signin.js';
@@ -220,6 +221,8 @@ export interface IpcDependencies {
   readonly exports: ExportService;
   /** A newer version: what the notice says, and what clicking it does (TYTO-131). */
   readonly updates: Pick<UpdateService, 'status' | 'act'>;
+  /** Verification mode, read off the command line (TYTO-651, ADR 0178). */
+  readonly verification: () => VerificationMode;
   /**
    * The native folder picker and the OS file manager, wrapped here for the reason the other
    * dialogs are: `dialog` and `shell` are Electron main-process APIs, and a service that
@@ -868,6 +871,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     },
 
     'update:status': () => Promise.resolve(updates.status()),
+
+    'verification:status': () => Promise.resolve(dependencies.verification()),
 
     'update:act': () => {
       updates.act();

@@ -1919,6 +1919,15 @@
       "paths": ["apps/desktop/e2e/__fixtures__/orphan-run/**"],
       "e2e": ["orphan-guard.desktop.test.ts"],
       "why": "reviewed: the nested run it kills a worker in (TYTO-292); it reaches only the launch harness, and a harness change already runs everything"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/verification-mode.ts",
+        "apps/desktop/e2e/verify-probe.test.ts",
+        "apps/desktop/e2e/verification-mode.desktop.test.ts"
+      ],
+      "e2e": ["verification-mode.desktop.test.ts"],
+      "why": "TYTO-651: the verification probe against a running window"
     }
   ]
 }

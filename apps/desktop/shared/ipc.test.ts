@@ -129,6 +129,7 @@ describe('the IPC contract', () => {
       'theme:preview',
       'update:act',
       'update:status',
+      'verification:status',
       'window:zoom',
       'workspace:folder',
       'workspace:open-recent',
@@ -553,6 +554,8 @@ describe('what the contract does not promise', () => {
       // there is one app, and main holds the version and the release page.
       'update:status',
       'update:act',
+      // TYTO-651. Nor "is verification mode on": it is the app's own command line.
+      'verification:status',
       // TYTO-244. "What is in the menu" names nothing: there is one installed menu.
       'menu:model',
       // TYTO-495. Nor "which commands does tyto have": there is one command tree.

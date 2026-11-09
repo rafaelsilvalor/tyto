@@ -27,3 +27,7 @@ With this list the bar keeps the command bar button, the cursor position, the pr
 A colour that makes the bar's text hard to read in one of your themes still applies, and the Problems panel says so with `W_SETTING_LOW_CONTRAST`, naming the theme and the contrast it measured.
 
 How vim's mode is shown — a coloured badge, a coloured strip along the top of the bar, or the whole bar in the mode's colour — is [`vimModeStyle`](../reference/settings.md#vimmodestyle). [Vim mode](../editor/vim-mode.md) says when the badge shows.
+
+## Verification mode
+
+When Tyto was started with a debugging port, so that a coding agent can look at the window, the bar's first item reads **Verification mode · port 9333** (or **Verification mode · on** when the port number is not known), with a red outline. No setting hides it. While it shows, any program on this computer can read and drive the window; close Tyto and open it the usual way to turn it off. It never turns on by itself: only a launcher that passes the port does.

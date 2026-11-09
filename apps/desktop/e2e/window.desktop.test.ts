@@ -421,6 +421,9 @@ describe('the bridge', () => {
       // TYTO-131, ADR 0069: the update notice. Exercised by `e2e/update.package.test.ts`.
       'update:act',
       'update:status',
+      // TYTO-651, ADR 0178: the status bar's verification badge. Exercised by
+      // `e2e/verification-mode.desktop.test.ts`.
+      'verification:status',
       // TYTO-272: View > Zoom and its keys, which write the `zoom` setting. Exercised by
       // `e2e/typography.desktop.test.ts`.
       'window:zoom',
@@ -481,6 +484,12 @@ describe('switching the language', () => {
     // screen inside the drawn title bar's text, which `shell.ts` builds with the file's name
     // (`titleBarText`). It reads the same in both languages, so it never counted as changed.
     'app.name',
+    // TYTO-651, ADR 0178: the verification badge is drawn only in a window that is shown, and
+    // this suite's is headless; its risk line is a `title`. `status-bar.test.ts` paints all three
+    // in both languages.
+    'status.verification.port',
+    'status.verification.on',
+    'status.verification.risk',
     'preview.zoom.out',
     'preview.zoom.in',
     // TYTO-323: the strip toggle is a glyph, so its words — which change with the state — are its

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, realpathSync, watch } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, watch } from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -83,6 +83,7 @@ import {
   signinWindow,
 } from './signin.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
+import { type VerificationMode, verificationMode } from './verification-mode.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
 import { findTopLevel, projectMenu } from './menu-model.js';
@@ -249,6 +250,33 @@ let reportCrash = (reason: unknown): void => {
 // chosen one has sibling versions to offer an import from (TYTO-151). A folder named with
 // `--user-data-dir` is a suite's scratch folder, and a question on its first run would be a
 // native box nobody is there to answer.
+/**
+ * Verification mode as the window shows it (TYTO-651, ADR 0178): `--remote-debugging-port` on
+ * the command line, and for port 0 the number Chromium wrote into `DevToolsActivePort`. The log
+ * is told the truth; the window is told off only when it is not shown (`showWindow`).
+ */
+/**
+ * Whether the main window is shown (ADR 0036): `TYTO_HEADLESS` is the end-to-end suite's, which
+ * drives the window through Playwright and has no screen to show one on. **One predicate for two
+ * readers**: the window's `show`, and the verification badge, which only a window nobody is shown
+ * may leave out (TYTO-651) — a window nobody sees warns nobody.
+ */
+const showWindow = process.env['TYTO_HEADLESS'] !== '1';
+
+function currentVerificationMode(headless: boolean): VerificationMode {
+  return verificationMode(
+    app.commandLine,
+    () => {
+      try {
+        return readFileSync(join(app.getPath('userData'), 'DevToolsActivePort'), 'utf8');
+      } catch {
+        return undefined;
+      }
+    },
+    headless,
+  );
+}
+
 let chosenUserData: string | undefined;
 try {
   const userData = chooseUserDataPath({
@@ -329,6 +357,14 @@ async function start(): Promise<void> {
   // exists — the version and the platform are already on every line, so what it adds is a
   // timestamp, which dates the session a report is about.
   log.info('app started');
+  // Said once in the log too, so a report read later shows the window could be inspected
+  // (TYTO-651, ADR 0178). Main never opens the port; it only reads that it was asked for.
+  const verification = currentVerificationMode(false);
+  if (verification.on) {
+    log.warn(
+      `verification mode is on: Chromium's debugging port listens on 127.0.0.1:${String(verification.port ?? 'chosen by Chromium')}`,
+    );
+  }
 
   // The window, held rather than discarded, because main now has something to say to it
   // (ADR 0029). A `let` and not a `const`: the handler table is registered before the window
@@ -1949,6 +1985,8 @@ async function start(): Promise<void> {
     templateEditor,
     templateFolder,
     updates,
+    // The badge follows the window's own `show` (below): only a window nobody is shown can skip it.
+    verification: () => currentVerificationMode(!showWindow),
     templateDialogs: {
       // No `createDirectory`: a template to edit is a folder that already has one in it.
       chooseTemplate: async () => {
@@ -1985,7 +2023,7 @@ async function start(): Promise<void> {
     renderer: devServerUrl === undefined ? { file: bundledRenderer(here) } : { url: devServerUrl },
     // `TYTO_HEADLESS` is the end-to-end suite's: it drives the window through Playwright
     // and has no screen to show one on. The only thing a test changes about the shipped app.
-    show: process.env['TYTO_HEADLESS'] !== '1',
+    show: showWindow,
     frame: frameOptions(process.platform, titleBarColours()),
   });
 

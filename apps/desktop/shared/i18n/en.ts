@@ -241,6 +241,10 @@ export const en: Catalogue = {
   'command.layout.toggleDock.right': 'Show or hide the right area',
   'command.layout.toggleDock.bottom': 'Show or hide the bottom area',
   'status.commandBar': 'Open the command bar',
+  'status.verification.port': 'Verification mode · port {port}',
+  'status.verification.on': 'Verification mode · on',
+  'status.verification.risk':
+    'Tyto was started with a debugging port. Any program on this computer can read and drive this window until Tyto is restarted without it.',
   'status.position': 'Ln {line}, Col {column}',
   'status.selected': '{count} selected',
   'status.kind.settings': 'Settings',

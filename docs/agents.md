@@ -93,3 +93,48 @@ A coordinator of either tool records each executor's address in the batch file: 
 agent id (an internal executor, resumed with `SendMessage`) or session id, or
 `codex:<thread id>`. That is how the next coordinator, of either tool, finds them. Executors of
 both tools follow the same rules, `docs/executor-protocol.md`.
+
+## Looking at the running app
+
+An agent can inspect the maintainer's running Tyto instead of asking for screenshots: the window,
+its text, its tabs, its plugins and a recipe's plan (TYTO-651, ADR 0178). It reaches the window
+and its bridge, never main.
+
+**Turn it on** by starting Tyto with Chromium's debugging switch, before the app folder:
+
+```
+electron.exe --remote-debugging-port=9333 .
+```
+
+The status bar then reads "Verification mode · port 9333" in red, and no setting hides it. The
+port listens on `127.0.0.1` only (measured in ADR 0178), but **while it is on, any program on the
+machine can read and drive the window**; restart Tyto without the switch to turn it off. There is
+no environment variable for it, on purpose: plugins and the integrated terminal inherit the
+environment.
+
+The maintainer's launcher (`abrir-tyto.ps1`) lives outside the repository. The change it needs
+is one parameter and one line, so a second shortcut runs `abrir-tyto.ps1 -Verificar`:
+
+```powershell
+param([switch]$Verificar)   # first line of the script
+# in Open-Tyto, instead of -ArgumentList '.':
+Start-Process -FilePath $Electron -ArgumentList (@(if ($Verificar) { '--remote-debugging-port=9333' }) + '.') -WorkingDirectory (Join-Path $App 'apps\desktop')
+```
+
+**Use it** from `apps/desktop`. Each command connects, prints plain text or a PNG path, and
+disconnects; the person's app keeps running.
+
+| Command                                   | What it prints                                                  |
+| ----------------------------------------- | --------------------------------------------------------------- |
+| `node scripts/verify.ts screenshot`       | The path of a PNG of the window                                 |
+| `node scripts/verify.ts text`             | The window's visible text                                       |
+| `node scripts/verify.ts tabs`             | The open tabs, the one in front of each group marked `*`        |
+| `node scripts/verify.ts plugins`          | Each plugin, and its credentials as set / not set, never values |
+| `node scripts/verify.ts recipe [--fresh]` | Runs the recipe in front, then each cell's status and plan      |
+
+`--port <n>` names another port (9333 by default). Every command but `recipe` only reads.
+`recipe` is the person's Run (`recipe.run`, or `recipe.runFresh` with `--fresh`): it fetches its
+sources, it prints the command before running it, and a recipe whose header says `apply auto`
+(ADR 0170) applies its plan, writing to the services it names, as the person's Run does. Ask the
+maintainer before running it on a real workspace. With the mode off, every command fails with
+`connect ECONNREFUSED 127.0.0.1:9333`.
