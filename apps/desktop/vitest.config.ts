@@ -15,7 +15,7 @@ export default defineConfig({
     // And where the global setup finds the Electron binary, which only reads paths (TYTO-327).
     // And the packaging hook in `scripts/`, which is checked through an injected file system
     // (TYTO-510). And the verification probe's readers, run in jsdom against the real cell
-    // views (TYTO-651).
+    // views (TYTO-651). And the pick of the packaged suite's agent-endpoint record (TYTO-656).
     include: [
       'shared/**/*.test.ts',
       'src/**/*.test.ts',
@@ -26,6 +26,8 @@ export default defineConfig({
       'e2e/port-file.test.ts',
       'e2e/verify-probe.test.ts',
       'e2e/electron-binary.test.ts',
+      // Which agent-endpoint record is the launched window's (TYTO-656).
+      'e2e/window-record.test.ts',
       'e2e/docs-shots/**/*.test.ts',
     ],
   },

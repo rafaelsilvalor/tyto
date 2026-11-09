@@ -231,6 +231,42 @@ describe('tyto mcp --window', () => {
     expect(errors.join('')).toContain(WINDOW_UNREACHABLE);
   });
 
+  it('tries the next window when nobody listens where a live record says, and says so (TYTO-656)', async () => {
+    // A record whose pid is alive but whose window is gone — a pid Windows gave to another
+    // process — and that the pick puts first: its workspace holds the folder.
+    const stale = 424_242;
+    await writeFile(
+      join(home, 'windows', `${String(stale)}.json`),
+      JSON.stringify({
+        version: 1,
+        pid: stale,
+        endpoint: uniqueEndpoint(),
+        folder,
+        token: 'a'.repeat(64),
+        startedAt: new Date().toISOString(),
+      } satisfies WindowRecord),
+    );
+    const live = await fakeWindow({ folder: home }, true);
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const exit = relayToWindow({
+      home,
+      folder,
+      platform: process.platform,
+      stdio: { input, output },
+      err: (text) => errors.push(text),
+      alive: () => true,
+    });
+    input.end();
+
+    expect(await exit).toBe(EXIT_OK);
+    expect(live.hellos.map((hello) => hello.accepted)).toEqual([true]);
+    const said = errors.join('');
+    expect(said).toContain(`the window of ${folder} (pid ${String(stale)})`);
+    expect(said).toContain(`nobody listens at the endpoint of pid ${String(stale)}`);
+    expect(said).toContain('relaying to the most recent one');
+  });
+
   it('skips a window whose process is gone, and leaves its record where it is', async () => {
     const gone = await fakeWindow({ pid: 999_999_991, folder }, true);
     const live = await fakeWindow({ folder: home }, true);

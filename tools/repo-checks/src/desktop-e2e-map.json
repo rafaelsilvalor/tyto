@@ -1978,6 +1978,11 @@
       ],
       "e2e": ["plugin-program.desktop.test.ts", "packaged.package.test.ts"],
       "why": "TYTO-568: a program an installed plugin starts through process:<name>, ended with the folder, its trust and the window"
+    },
+    {
+      "paths": ["apps/desktop/e2e/window-record.ts", "apps/desktop/e2e/window-record.test.ts"],
+      "e2e": ["packaged.package.test.ts"],
+      "why": "TYTO-656: the packaged suite's pick of the app's own agent-endpoint record"
     }
   ]
 }

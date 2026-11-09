@@ -70,15 +70,20 @@ export function namedGoneLine(pid: number): string {
 async function open(
   record: WindowRecord,
   connectTo: (endpoint: string) => Socket,
-): Promise<{ socket: Socket } | { failure: string }> {
+): Promise<{ socket: Socket } | { failure: string; readonly nobodyListens?: true }> {
   const socket = connectTo(record.endpoint);
-  const connected = await new Promise<boolean>((resolve) => {
+  const connected = await new Promise<NodeJS.ErrnoException | true>((resolve) => {
     socket.once('connect', () => resolve(true));
-    socket.once('error', () => resolve(false));
+    socket.once('error', (cause: NodeJS.ErrnoException) => resolve(cause));
   });
-  if (!connected) {
+  if (connected !== true) {
     socket.destroy();
-    return { failure: WINDOW_UNREACHABLE };
+    // No pipe or socket at the record's endpoint: a record whose window is gone, and whose pid
+    // another process now has, so the liveness check let it through (TYTO-656).
+    const nobodyListens = connected.code === 'ENOENT' || connected.code === 'ECONNREFUSED';
+    return nobodyListens
+      ? { failure: WINDOW_UNREACHABLE, nobodyListens: true }
+      : { failure: WINDOW_UNREACHABLE };
   }
   socket.write(handshakeLine(record.token));
   const line = await readFirstLine(socket);
@@ -122,19 +127,40 @@ export async function relayToWindow(options: RelayOptions): Promise<ExitCode> {
     err(NO_HOME);
     return EXIT_INTERNAL;
   }
-  const records = await listWindows(options.home, options.platform, options.alive ?? processAlive);
-  const picked = pickWindow(records, options.folder, options.platform, options.named);
-  if (options.named !== undefined && picked?.why !== 'named') err(namedGoneLine(options.named));
-  if (picked === undefined) {
-    err(NO_WINDOW);
-    return EXIT_INTERNAL;
+  let records = await listWindows(options.home, options.platform, options.alive ?? processAlive);
+  const connectTo = options.connectTo ?? ((endpoint: string) => connect(endpoint));
+  let first = true;
+  let unreachable = false;
+  for (;;) {
+    const picked = pickWindow(records, options.folder, options.platform, options.named);
+    if (first && options.named !== undefined && picked?.why !== 'named') {
+      err(namedGoneLine(options.named));
+    }
+    first = false;
+    if (picked === undefined) {
+      // Every window there was had nobody listening: that, rather than "none is open".
+      err(unreachable ? WINDOW_UNREACHABLE : NO_WINDOW);
+      return EXIT_INTERNAL;
+    }
+    err(pickedLine(picked));
+    const opened = await open(picked.record, connectTo);
+    if (!('failure' in opened)) {
+      await pump(opened.socket, options.stdio, options.signal);
+      return EXIT_OK;
+    }
+    // Nobody listens where that record says: the next window in the same order, never a wait,
+    // since a window writes its record only once it listens (ADR 0180, TYTO-656).
+    if (opened.nobodyListens !== true) {
+      err(opened.failure);
+      return EXIT_INTERNAL;
+    }
+    err(nobodyListensLine(picked.record));
+    unreachable = true;
+    records = records.filter((record) => record !== picked.record);
   }
-  err(pickedLine(picked));
-  const opened = await open(picked.record, options.connectTo ?? ((endpoint) => connect(endpoint)));
-  if ('failure' in opened) {
-    err(opened.failure);
-    return EXIT_INTERNAL;
-  }
-  await pump(opened.socket, options.stdio, options.signal);
-  return EXIT_OK;
+}
+
+/** Said when a record's endpoint has nobody listening, before the next window is tried. */
+export function nobodyListensLine(record: WindowRecord): string {
+  return `tyto mcp --window: nobody listens at the endpoint of pid ${String(record.pid)}; its record is stale, trying the next window\n`;
 }
