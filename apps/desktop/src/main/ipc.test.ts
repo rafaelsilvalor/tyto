@@ -1034,6 +1034,7 @@ const dependencies = () => {
     templateFolder: createTemplateFolder(),
     updates: updateNotice(),
     verification: () => ({ on: false }) as const,
+    agents: { count: () => 0, cut: () => {} },
   };
 };
 
@@ -1693,6 +1694,25 @@ describe('verification:status', () => {
     });
 
     expect(await handlers['verification:status']({})).toEqual({ on: true, port: 9333 });
+  });
+});
+
+describe('agents:status and agents:cut', () => {
+  it('answers how many agents are connected, and cuts them (TYTO-566)', async () => {
+    let count = 2;
+    const handlers = createHandlers({
+      ...dependencies(),
+      agents: {
+        count: () => count,
+        cut: () => {
+          count = 0;
+        },
+      },
+    });
+
+    expect(await handlers['agents:status']({})).toEqual({ count: 2 });
+    expect(await handlers['agents:cut']({})).toEqual({});
+    expect(await handlers['agents:status']({})).toEqual({ count: 0 });
   });
 });
 

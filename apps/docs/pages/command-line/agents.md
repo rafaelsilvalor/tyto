@@ -1,7 +1,7 @@
 # Connect an AI agent
 
 ::: info How this page was checked
-Every command was run on 2026-11-09 on a development build of the branch that added it (TYTO-565, CLI 0.10.9) on Windows 11, with a small agent stand-in that speaks the protocol the way Claude Code does. The outputs below are copied from those runs.
+Every command was run on 2026-11-09 on a development build of the branch that added it (TYTO-565, CLI 0.10.9) on Windows 11, with a small agent stand-in that speaks the protocol the way Claude Code does. The outputs below are copied from those runs. The section on the open window was run the same way on the branch that added it (TYTO-566).
 :::
 
 `tyto mcp` lets an AI agent such as Claude Code or Claude Desktop work with a project folder: list its templates, read what a template expects, check a brief for errors and look at a preview of the artwork, before it shows you anything. It speaks the [Model Context Protocol](https://modelcontextprotocol.io), the way those agents reach a program on your computer.
@@ -32,6 +32,24 @@ claude mcp add tyto -- node C:/projects/tyto/tyto/apps/cli/dist/index.js mcp C:/
 ```
 
 Then ask in plain words: "which Tyto templates do I have?", or "write a brief for the banner with this text and show me the preview".
+
+## Work with the window that is open
+
+`tyto mcp --window` connects the agent to the Tyto window you have open instead of reading the folder on its own. The agent gets the same tools; while the window is open it listens for an agent, and only a program that can read the connection's key in your Tyto folder can reach it — normally only the programs running as you.
+
+**Claude Code**:
+
+```
+claude mcp add tyto-window -- node C:/projects/tyto/tyto/apps/cli/dist/index.js mcp --window C:/projects/my-project
+```
+
+With several windows open, it picks the one whose folder holds the folder you named, or else the one opened last, and its log says which:
+
+```
+tyto mcp --window: no open window holds this folder; relaying to the most recent one, no folder (pid 28532)
+```
+
+While an agent is connected, the status bar shows **Agent connected** (with a count when there are more). Click it to cut every connection; the agent's server stops, and the window keeps listening for the next one. With no window open, the command says so and stops.
 
 ## What the agent can do
 
@@ -67,7 +85,7 @@ Four things, and none of them changes a file:
 - **Only the folder and its workspace.** A path outside them is refused, and so is a shortcut inside the folder that leads outside.
 - **No passwords or keys.** No answer carries a credential, the environment the plugins read them from, or the plugin settings in `.tyto/project.json`.
 - **A folder you have not trusted stays restricted.** Its plugin files are not loaded, as on `tyto render`. Tools that write files are planned; a folder you have not [trusted](../editor/workspace-folder.md) will not be offered them.
-- **Not from the window.** The [Commands](../editor/commands.md) tab refuses `tyto mcp`: the agent starts it on its own.
+- **Not from the window.** The [Commands](../editor/commands.md) tab refuses `tyto mcp`, `--window` included: the agent starts it on its own.
 
 ## When something goes wrong
 

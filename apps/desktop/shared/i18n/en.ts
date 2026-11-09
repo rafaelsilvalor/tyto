@@ -245,6 +245,10 @@ export const en: Catalogue = {
   'status.verification.on': 'Verification mode · on',
   'status.verification.risk':
     'Tyto was started with a debugging port. Any program on this computer can read and drive this window until Tyto is restarted without it.',
+  'status.agents.one': 'Agent connected',
+  'status.agents.many': '{count} agents connected',
+  'status.agents.cut':
+    'Disconnect: an agent is reading this window over its local endpoint. Click to cut every connection.',
   'status.position': 'Ln {line}, Col {column}',
   'status.selected': '{count} selected',
   'status.kind.settings': 'Settings',

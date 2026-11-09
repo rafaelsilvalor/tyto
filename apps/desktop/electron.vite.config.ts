@@ -61,15 +61,14 @@ export default defineConfig({
         // `@tyto/templates` already has and for the same underlying reason — a folder of
         // bytes is not code and cannot be bundled into any amount of JavaScript.
         //
-        // `@modelcontextprotocol/server` is external for `playwright`'s reason: only `tyto mcp`
-        // imports it, lazily, and the window refuses that command before it starts (ADR 0179).
-        // Bundled, it was a 694,040-byte chunk main never loads.
+        // `@modelcontextprotocol/server` is bundled, not external (ADR 0180, amending ADR 0179
+        // decision 8): the window serves agents on its endpoint, and the packaged app ships no
+        // `node_modules` to import it from. It stays a lazy chunk, loaded when an agent connects.
         external: [
           'electron',
           '@tyto/fonts',
           /^playwright(?:-core)?(?:\/|$)/,
           /^chromium-bidi(?:\/|$)/,
-          /^@modelcontextprotocol\/server(?:\/|$)/,
         ],
         // Two bundles: main, and the file each installed plugin's `utilityProcess` starts from,
         // which Electron can only be given as a file of its own (ADR 0044).

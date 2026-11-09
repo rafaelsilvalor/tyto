@@ -27,6 +27,18 @@ export {
   installPlugin,
 } from './plugin-actions.js';
 export { permissionPrompt } from './plugin.js';
+export { serveAgent } from './mcp/command.js';
+export {
+  REFUSED_LINE,
+  type WindowRecord,
+  acceptedLine,
+  checkHandshake,
+  endpointFor,
+  handshakeLine,
+  readFirstLine,
+  recordPath,
+  windowsFolder,
+} from './mcp/window-endpoint.js';
 export { type PluginSourceKind } from './plugins/fetch.js';
 export { type CloseableRasterizer } from './plugins/rasterizer.js';
 export {

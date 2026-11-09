@@ -16,6 +16,9 @@ import {
 describe('the IPC contract', () => {
   it('names every channel exactly once, and nothing else', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
+      // TYTO-566, ADR 0180: the status bar's agent badge, and its cut.
+      'agents:cut',
+      'agents:status',
       'app:exit-ack',
       'app:exit-answer',
       'app:exit-listening',
@@ -202,6 +205,8 @@ describe('the terminal channels', () => {
 describe('the event table', () => {
   it('names every event exactly once, and nothing else', () => {
     expect([...IPC_EVENT_NAMES].sort()).toEqual([
+      // TYTO-566. An agent connected to the window's endpoint, or left.
+      'agents:changed',
       'app:exit-requested',
       // TYTO-495, ADR 0159: what a command prints, and where its run stands.
       'cli:diagnostics',
@@ -556,6 +561,9 @@ describe('what the contract does not promise', () => {
       'update:act',
       // TYTO-651. Nor "is verification mode on": it is the app's own command line.
       'verification:status',
+      // TYTO-566. Nor "how many agents", nor "cut them": the connections are main's.
+      'agents:status',
+      'agents:cut',
       // TYTO-244. "What is in the menu" names nothing: there is one installed menu.
       'menu:model',
       // TYTO-495. Nor "which commands does tyto have": there is one command tree.

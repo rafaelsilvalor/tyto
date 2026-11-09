@@ -247,6 +247,10 @@ export const ptBR: Catalogue = {
   'status.verification.on': 'Modo de verificação · ligado',
   'status.verification.risk':
     'O Tyto foi aberto com uma porta de depuração. Qualquer programa deste computador pode ler e comandar esta janela até o Tyto ser reaberto sem ela.',
+  'status.agents.one': 'Agente conectado',
+  'status.agents.many': '{count} agentes conectados',
+  'status.agents.cut':
+    'Desconectar: um agente está lendo esta janela pela conexão local. Clique para cortar todas as conexões.',
   'status.position': 'Lin {line}, Col {column}',
   'status.selected': '{count} selecionados',
   'status.kind.settings': 'Configurações',

@@ -974,6 +974,8 @@ let elements = resolveElements();
 let updateStatus: UpdateStatus = { state: 'none' };
 /** Verification mode (TYTO-651, ADR 0178): asked once, since nothing changes it while running. */
 let verification: { readonly port: number | undefined } | undefined;
+/** Agents connected to the window's endpoint (TYTO-566, ADR 0180); main pushes each change. */
+let agentCount = 0;
 
 function resolveElements() {
   return {
@@ -5072,6 +5074,7 @@ function paintStatusBar(): void {
       bottom: dockHasPanels(layout, 'bottom'),
     },
     ...(verification === undefined ? {} : { verification }),
+    ...(agentCount === 0 ? {} : { agents: agentCount }),
   };
 }
 
@@ -6421,6 +6424,19 @@ async function load(): Promise<void> {
     bannerProject?.addEventListener('click', showProject);
     void refreshUpdate(bridge);
     void refreshVerification(bridge);
+    void bridge['agents:status']({}).then(({ count }) => {
+      agentCount = count;
+      paintStatusBar();
+    });
+    bridge.on('agents:changed', ({ count }) => {
+      agentCount = count;
+      paintStatusBar();
+    });
+    if (elements.statusBar !== null) {
+      elements.statusBar.cutAgents = () => {
+        void bridge['agents:cut']({});
+      };
+    }
   }
 
   if (bridge !== undefined) {

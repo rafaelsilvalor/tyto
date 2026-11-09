@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 
-import type { CliEnvironment } from '../environment.js';
+import type { CliEnvironment, CliStdio } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK, type ExitCode } from '../exit.js';
 import { openSession } from './session.js';
 
@@ -32,7 +32,6 @@ export async function mcpCommand(
     return EXIT_INTERNAL;
   }
   const stdio = environment.stdio();
-  const err = environment.console.err;
   if (options.window === true) {
     // The window serves the protocol; this process only copies bytes, so it loads no SDK.
     const { relayToWindow } = await import('./relay.js');
@@ -41,26 +40,41 @@ export async function mcpCommand(
       folder: resolve(environment.cwd, folder),
       platform: process.platform,
       stdio,
-      err,
+      err: environment.console.err,
       ...(signal === undefined ? {} : { signal }),
     });
   }
-  // Everything the reused commands print goes to stderr, their answers included: stdout is the
-  // protocol's now, and an answer a tool needs comes back as a value, not as printed text.
-  // And the folder named on the command line is the session's current folder: relative paths
-  // an agent gives resolve against it, and its workspace is the one served.
-  const quiet: CliEnvironment = {
-    ...environment,
-    cwd: resolve(environment.cwd, folder),
-    console: { out: err, err },
-  };
+  await serveAgent({ ...environment, cwd: resolve(environment.cwd, folder) }, stdio, signal);
+  return EXIT_OK;
+}
 
-  // Lazy, so the SDK is loaded by this command alone: tsup splits it into a chunk of its own
-  // beside `index.js`, and the window's bundle keeps it out of what main runs at start.
+/**
+ * Serves the MCP tools on two streams until the client closes its end, or `signal` fires: what
+ * `tyto mcp` does on stdio, and what the window does on each connection to its endpoint (ADR
+ * 0180), so the two offer the same tools under the same trust rules. `environment.cwd` is the
+ * folder served.
+ */
+export async function serveAgent(
+  environment: CliEnvironment,
+  stdio: CliStdio,
+  signal?: AbortSignal,
+  /** What the start line says it serves on: `stdio`, or the window's connection. */
+  on = 'stdio',
+): Promise<void> {
+  const err = environment.console.err;
+  // Everything the reused commands print goes to stderr, their answers included: the stream
+  // is the protocol's now, and an answer a tool needs comes back as a value, not as printed
+  // text. Relative paths an agent gives resolve against `cwd`, and its workspace is the one
+  // served.
+  const quiet: CliEnvironment = { ...environment, console: { out: err, err } };
+
+  // Lazy, so the SDK is loaded when an agent connects and not before: tsup splits it into a
+  // chunk of its own beside `index.js`, and the window's bundle does the same (ADR 0180).
   const { serveMcp } = await import('./server.js');
   const session = await openSession(quiet);
   try {
-    err(`tyto mcp: serving on stdio, workspace ${session.trust} (${session.roots.join(', ')})\n`);
+    err(`tyto mcp: serving on ${on}, workspace ${session.trust} (${session.roots.join(', ')})
+`);
     await serveMcp(session, stdio, {
       version: environment.version,
       err,
@@ -69,5 +83,4 @@ export async function mcpCommand(
   } finally {
     await session.close();
   }
-  return EXIT_OK;
 }

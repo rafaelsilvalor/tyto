@@ -10,12 +10,14 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
+import { type WindowRecord, handshakeLine } from '@tyto/command-line';
 import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
 import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -739,6 +741,62 @@ describe('the packaged app', () => {
 
     expect(manifest).not.toHaveProperty('tytoUpdateFeed');
     expect(bundle).toContain(feed);
+  });
+
+  it("serves an agent's tools/list on its endpoint, from the SDK chunk inside the asar (TYTO-566)", async () => {
+    // ADR 0180: the packaged app ships no `node_modules` the MCP SDK could be imported from, so
+    // only a packaged launch shows the chunk it was bundled into loads. The record is the one the
+    // relay reads, in this suite's own `TYTO_HOME`.
+    const windows = join(scratch, 'tyto-home', 'windows');
+    await expect
+      .poll(() => (existsSync(windows) ? readdirSync(windows) : []), { timeout: 15_000 })
+      .toContainEqual(expect.stringMatching(/^\d+\.json$/u));
+    const name = readdirSync(windows).find((entry) => entry.endsWith('.json'));
+    const record = JSON.parse(readFileSync(join(windows, name!), 'utf8')) as WindowRecord;
+    const frames = [
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'packaged', version: '1' },
+        },
+      },
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+    ];
+    const lines = await new Promise<string[]>((resolve, reject) => {
+      const socket = connect(record.endpoint);
+      const received: string[] = [];
+      let buffered = '';
+      socket.once('error', reject);
+      socket.on('data', (chunk: Buffer) => {
+        buffered += chunk.toString('utf8');
+        let end: number;
+        while ((end = buffered.indexOf('\n')) >= 0) {
+          received.push(buffered.slice(0, end));
+          buffered = buffered.slice(end + 1);
+        }
+        if (received.length >= 3) {
+          socket.destroy();
+          resolve(received);
+        }
+      });
+      socket.once('connect', () => {
+        socket.write(
+          handshakeLine(record.token) +
+            frames.map((frame) => `${JSON.stringify(frame)}\n`).join(''),
+        );
+      });
+    });
+    expect(JSON.parse(lines[0]!)).toMatchObject({ tyto: 'window', ok: true });
+    const tools = (JSON.parse(lines[2]!) as { result: { tools: { name: string }[] } }).result.tools;
+    expect(tools.map((tool) => tool.name)).toContain('list_templates');
+    process.stdout.write(
+      `[TYTO-566] packaged app answered tools/list on its endpoint: ${tools.map((tool) => tool.name).join(', ')}\n`,
+    );
   });
 
   it('names both editions of the manual whole in the shipped bundle (TYTO-318)', () => {

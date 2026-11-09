@@ -274,6 +274,37 @@ describe('the verification badge (TYTO-651, ADR 0178)', () => {
   });
 });
 
+describe('the agent badge (TYTO-566, ADR 0180)', () => {
+  const badge = (bar: StatusBar): HTMLButtonElement | null =>
+    bar.querySelector<HTMLButtonElement>('.status-bar__agents');
+
+  it('is drawn only while an agent is connected, and says how many, in both languages', async () => {
+    expect(badge((await mount()).bar)).toBeNull();
+    document.body.replaceChildren();
+    expect(badge((await mount({ ...base, agents: 0 })).bar)).toBeNull();
+    document.body.replaceChildren();
+    expect(badge((await mount({ ...base, agents: 1 })).bar)?.textContent?.trim()).toBe(
+      'Agent connected',
+    );
+    document.body.replaceChildren();
+    const portuguese = await mount({ ...base, locale: 'pt-BR', agents: 2 });
+    expect(badge(portuguese.bar)?.textContent?.trim()).toBe('2 agentes conectados');
+    expect(badge(portuguese.bar)?.title).toMatch(/^Desconectar/u);
+  });
+
+  it('cuts the agents when clicked, and cannot be hidden by the statusBarItems setting', async () => {
+    const { bar } = await mount({ ...base, agents: 1 });
+    let cuts = 0;
+    bar.cutAgents = () => {
+      cuts += 1;
+    };
+    bar.items = [];
+    await bar.updateComplete;
+    badge(bar)?.click();
+    expect(cuts).toBe(1);
+  });
+});
+
 describe('positionText', () => {
   it('says line and column, and the selection only when there is one', () => {
     expect(positionText(base)).toBe('Ln 4, Col 17');

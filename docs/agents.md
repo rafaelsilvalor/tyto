@@ -185,6 +185,7 @@ The server's own messages, and anything a plugin prints, go to stderr, which bot
 their MCP log; stdout carries the protocol only. The window refuses `tyto mcp` in its command
 panel.
 
-`tyto mcp --window [folder]` relays the same stdio to a running window instead, which will serve
-what is open in it (ADR 0180). The window does not listen yet (TYTO-566 PR 2), so the option is
-hidden from `--help` and answers that no window is open; register it once the window listens.
+`tyto mcp --window [folder]` relays the same stdio to a running window instead (ADR 0180): the
+window listens on a named pipe or Unix socket announced in `TYTO_HOME/windows/<pid>.json`,
+checks the record's token on the first line, and serves the same tools through `serveAgent`.
+The status bar shows **Agent connected** while one is, and its click cuts them.
