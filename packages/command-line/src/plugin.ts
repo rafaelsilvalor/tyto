@@ -3,6 +3,7 @@ import {
   type PluginManifest,
   type PluginCrash,
   type PluginOrigin,
+  PROCESS_PERMISSION,
   validatePluginManifest,
 } from '@tyto/plugin-api';
 
@@ -278,18 +279,49 @@ export function permissionPrompt(manifest: PluginManifest, source: string): stri
   const permissions =
     manifest.permissions.length === 0
       ? '  (none)\n'
-      : manifest.permissions.map((permission) => `  - ${permission}\n`).join('');
+      : manifest.permissions.map((permission) => `  - ${permissionLine(permission)}\n`).join('');
   return (
     `${manifest.name} ${manifest.version} from ${source}\n` +
     `contributes: ${manifest.contributes.join(', ')}\n` +
     `permissions:\n${permissions}` +
     'Each plugin runs in a process of its own, so a crash stops the plugin and not Tyto.\n' +
     "Node's permission model confines that process to the plugin's own folder: it cannot\n" +
-    'read your other files, write anywhere, or start programs. It is not confined on the\n' +
+    'read your other files, write anywhere, or start programs itself. It is not confined on the\n' +
     'network: net: permissions filter host.fetch only, and a plugin that opens its own\n' +
     'connection is not stopped. credentials: permissions filter host.credentials.\n' +
     workspaceNotice(manifest.permissions) +
-    fontNotice(manifest.permissions)
+    fontNotice(manifest.permissions) +
+    processNotice(manifest.permissions)
+  );
+}
+
+/** One permission as the list shows it; `process:<name>` says what it does (ADR 0182). */
+function permissionLine(permission: string): string {
+  if (!permission.startsWith(PROCESS_PERMISSION)) return permission;
+  const program = permission.slice(PROCESS_PERMISSION.length);
+  return `${permission}: start the program ${program} on your computer`;
+}
+
+/**
+ * `process:<name>` in words, only for a plugin that asks for one (ADR 0182): Tyto, not the
+ * plugin, starts that one program from the person's PATH, and the program is not confined.
+ */
+function processNotice(permissions: readonly string[]): string {
+  const programs = permissions
+    .filter((permission) => permission.startsWith(PROCESS_PERMISSION))
+    .map((permission) => permission.slice(PROCESS_PERMISSION.length));
+  if (programs.length === 0) return '';
+  const named = programs.map((program) => `\`${program}\``);
+  const last = named.pop() ?? '';
+  const either = named.length === 0 ? last : `${named.join(', ')} or ${last}`;
+  const those =
+    named.length === 0
+      ? 'That program runs with your rights and is'
+      : 'Those programs run with your rights and are';
+  return (
+    `It may ask Tyto to start ${either}, found on your PATH, in the folder open in Tyto,\n` +
+    'and never while that folder is restricted. Tyto starts no other program for it.\n' +
+    `${those} not confined to the folder.\n`
   );
 }
 

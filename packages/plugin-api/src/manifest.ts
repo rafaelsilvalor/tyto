@@ -1,6 +1,8 @@
 import { type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import { z } from 'zod';
 
+import { PROCESS_PERMISSION, programNameProblem } from './process.js';
+
 /**
  * `tyto-plugin.json`, as a schema (`docs/plugin-api.md`, Plugin package).
  *
@@ -184,7 +186,8 @@ export const pluginManifestSchema = z
      * because the vocabulary is still growing — `net:<host>` gates `host.fetch` and
      * `credentials:<key>` gates `host.credentials` (ADR 0042), `font:<family>` sends a code template
      * a face installed on this machine (ADR 0048), `signin:<id>` gates `host.signin` and must
-     * match a `signin` entry (ADR 0174) — and closing an enum now would
+     * match a `signin` entry (ADR 0174), `process:<name>` gates `host.process` and must name one
+     * program by its bare name (ADR 0182) — and closing an enum now would
      * reject the next scope before it is written. E11 closes it; until then a typo in a
      * permission is caught by the grant prompt, which a person reads.
      */
@@ -273,6 +276,17 @@ export const pluginManifestSchema = z
           path: ['permissions', index],
           message: `grants a sign-in the manifest does not declare under signin`,
         });
+      }
+      // One program by name, never a path or a pattern (ADR 0182): the person reads which one.
+      if (permission.startsWith(PROCESS_PERMISSION)) {
+        const problem = programNameProblem(permission.slice(PROCESS_PERMISSION.length));
+        if (problem !== undefined) {
+          context.addIssue({
+            code: 'custom',
+            path: ['permissions', index],
+            message: `names a program that ${problem}`,
+          });
+        }
       }
       // A sign-in's tokens are the host's (ADR 0174): no permission reaches them as a credential.
       if (permission.startsWith(`credentials:${SIGNIN_PERMISSION}`)) {

@@ -742,6 +742,28 @@ The port is `HostCapabilities.signinAccessToken(plugin, id)`, optional: it answe
 
 **The plugins screen is where a person signs in** (TYTO-374). Beside each `signin.<id>` an installed plugin declares, the row says who is signed in — "Signed in as" the `id_token`'s email or name, "Signed in" when the provider sent none, or "Not signed in" — with Sign in or Sign out. Sign in opens the system browser; the page the browser lands on after the callback is in the window's language and never shows the code. The window reaches three channels, `signin:list`, `signin:start` and `signin:out`, and hears `signin:changed` when an entry is stored or deleted, a refused refresh included; **none of them carries a token**, and a plugin or id no installed manifest declares is rejected before anything runs. On a machine with no keychain to encrypt with (a Linux session with no keyring), the sign-in answers `failed` and nothing is stored, as for credentials.
 
+### `host.process` (ADR 0182)
+
+| Permission       | Allows                                                                   |
+| ---------------- | ------------------------------------------------------------------------ |
+| `process:<name>` | `host.process.start('<name>', args)`: the program `<name>` on the `PATH` |
+
+**One program per permission, by its bare name.** `<name>` is 1 to 64 lowercase letters, digits, dots, hyphens and underscores; a path, a wildcard or an extension (`.exe`, `.cmd`, `.ps1`…) is refused at install with its field path, and `process:claude` does not start `claude-code`. The install prompt lists it as "start the program claude on your computer".
+
+```ts
+const agent = await host.process.start('claude', ['--acp']);
+agent.onStdout((bytes) => read(bytes));
+agent.onStderr((bytes) => log(bytes));
+await agent.write('{"jsonrpc":"2.0","id":1,"method":"initialize"}\n');
+// …as long as the conversation lasts…
+await agent.end(); // closes stdin; or agent.kill()
+const { code, signal } = await agent.exited;
+```
+
+**The host starts it, never the plugin's process, and never through a shell**: the arguments are an array. It runs for as long as the plugin keeps it, with bytes both ways — what a JSON-RPC conversation over stdio needs. `write(data)` takes bytes or text (sent as UTF-8), at most **1 MiB** per write (`PROCESS_WRITE_LIMIT_BYTES`; over is a `RangeError`); a write or `end` after the program ended is `E_PROCESS_EXITED`. Output that arrives before a listener is handed to the first one, up to 1 MiB per stream. **At most two of a plugin's programs run at once** (`PLUGIN_PROCESS_LIMIT`); a third is `E_PROCESS_LIMIT` until one ends. Every program a plugin started ends when the plugin stops, crashes or is closed.
+
+An undeclared name is `E_PERMISSION`; **a host that starts no programs — the CLI — answers `E_PROCESS_UNAVAILABLE`**. The adapter, which sees the machine, answers the rest: a program not on the `PATH` is `E_PROCESS_NOT_FOUND` (Tyto installs none), a restricted workspace is `E_PROCESS_RESTRICTED`, and an argument it cannot pass unchanged is `E_PROCESS_ARGUMENT`. The port is `HostCapabilities.startProcess(plugin, program, args, events)`, optional, answering `{ write, end, kill }` and reporting `stdout`, `stderr` and one `exit` through `events`; `checkedProcesses` stands in front of it. Across the isolation boundary the plugin's requests are `processStart`, `processWrite`, `processEnd` and `processKill`, and the host sends `process` messages with the output and the exit on its own (protocol 19). The desktop's adapter — `PATH`, the folder, the environment, `.cmd` files on Windows — is described in ADR 0182.
+
 ## Isolation
 
 - Main: each plugin in a process of its own under Node's permission model: a child of the CLI's Node, or of the Node the desktop carries (ADR 0050). Typed RPC; the host is a proxy.

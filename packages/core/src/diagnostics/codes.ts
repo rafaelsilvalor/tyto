@@ -488,6 +488,59 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
+  // A program the host starts for a plugin, by name (ADR 0182). One code per answer a plugin
+  // shows a person differently: install it, trust the folder, use the desktop, wait.
+  E_PROCESS_UNAVAILABLE: {
+    severity: 'error',
+    summary: 'A plugin asked to start a program on a host that starts no programs.',
+    template: "Plugin '{plugin}' asked to start '{program}', and {host} starts no programs.",
+    spec: 'docs/adr/0182-a-plugin-starts-one-named-program-through-the-host.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_PROCESS_NOT_FOUND: {
+    severity: 'error',
+    summary: 'A plugin asked to start a program it declared, and the program is not on PATH.',
+    template:
+      "Plugin '{plugin}' asked to start '{program}', which was not found on PATH; Tyto installs no program.",
+    spec: 'docs/adr/0182-a-plugin-starts-one-named-program-through-the-host.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_PROCESS_RESTRICTED: {
+    severity: 'error',
+    summary: 'A plugin asked to start a program while the open folder is restricted.',
+    template:
+      "Plugin '{plugin}' asked to start '{program}', and the open folder is restricted; trust it to allow programs.",
+    spec: 'docs/adr/0182-a-plugin-starts-one-named-program-through-the-host.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_PROCESS_LIMIT: {
+    severity: 'error',
+    summary: 'A plugin asked to start a program while as many of its programs as allowed run.',
+    template:
+      "Plugin '{plugin}' asked to start '{program}' while {limit} of its programs are running, the most it may have.",
+    spec: 'docs/adr/0182-a-plugin-starts-one-named-program-through-the-host.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_PROCESS_ARGUMENT: {
+    severity: 'error',
+    summary: 'A plugin passed a program an argument the host cannot pass to it unchanged.',
+    template: "Plugin '{plugin}' passed '{program}' an argument the host refuses: {problem}.",
+    spec: 'docs/adr/0182-a-plugin-starts-one-named-program-through-the-host.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_PROCESS_EXITED: {
+    severity: 'error',
+    summary: 'A plugin wrote to a program it started after that program had ended.',
+    template: "Plugin '{plugin}' wrote to '{program}' after it had ended.",
+    spec: 'docs/adr/0182-a-plugin-starts-one-named-program-through-the-host.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
   // A plugin's private cache and the workspace files it reaches through the host (ADR 0138,
   // completing ADR 0130). Three codes, so a plugin can tell "trust the folder" from the rest.
   E_PLUGIN_CACHE: {

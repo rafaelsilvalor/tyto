@@ -343,4 +343,28 @@ describe('the permission prompt', () => {
       'workspace: permissions',
     );
   });
+
+  it('names each program a process: permission starts, and only when asked (ADR 0182)', () => {
+    const prompt = permissionPrompt(manifest(['net:api.example.com', 'process:claude']), 'x');
+    expect(prompt).toContain(
+      '  - net:api.example.com\n  - process:claude: start the program claude on your computer\n',
+    );
+    expect(prompt).toContain(
+      'It may ask Tyto to start `claude`, found on your PATH, in the folder open in Tyto,\n' +
+        'and never while that folder is restricted. Tyto starts no other program for it.\n' +
+        'That program runs with your rights and is not confined to the folder.\n',
+    );
+    expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain('process:');
+    expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain(
+      'It may ask Tyto to start',
+    );
+  });
+
+  it('names every program, joined by "or", when a plugin declares several', () => {
+    expect(permissionPrompt(manifest(['process:claude', 'process:codex']), 'x')).toContain(
+      'It may ask Tyto to start `claude` or `codex`, found on your PATH, in the folder open in Tyto,\n' +
+        'and never while that folder is restricted. Tyto starts no other program for it.\n' +
+        'Those programs run with your rights and are not confined to the folder.\n',
+    );
+  });
 });

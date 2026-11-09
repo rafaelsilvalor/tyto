@@ -13,6 +13,7 @@ import {
 } from '../capabilities.js';
 
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
+import { hostProcess, processChannel } from '../process.js';
 import type { GuestChannel } from './channel.js';
 import { guestFaces } from './faces.js';
 import {
@@ -35,6 +36,7 @@ import {
   describeIssues,
   fetchedResponseSchema,
   hostMessageSchema,
+  processStartedSchema,
   signinTokenSchema,
   workspaceBytesSchema,
 } from './protocol.js';
@@ -122,6 +124,38 @@ export function runGuest(
       pendingRequest.reject(
         new Error(`the host answered something unexpected: ${describeIssues(checked.error)}`),
       );
+  }
+
+  /**
+   * The programs this plugin started, by the number the host gave each (ADR 0182). A channel is
+   * made by whichever comes first, the answer to `processStart` or the program's first output,
+   * because one read of the host's pipe can hold both, and a program can even end before its
+   * answer is read. A channel is forgotten once the plugin holds its handle and it has ended.
+   */
+  const programs = new Map<number, ReturnType<typeof processChannel>>();
+  const heldByPlugin = new Set<number>();
+  const ended = new Set<number>();
+  function programChannel(id: number): ReturnType<typeof processChannel> {
+    const known = programs.get(id);
+    if (known !== undefined) return known;
+    const made = processChannel();
+    programs.set(id, made);
+    return made;
+  }
+  function forgetIfDone(id: number): void {
+    if (!heldByPlugin.has(id) || !ended.has(id)) return;
+    programs.delete(id);
+    heldByPlugin.delete(id);
+    ended.delete(id);
+  }
+
+  function heard(message: Extract<HostMessage, { type: 'process' }>): void {
+    const { events } = programChannel(message.id);
+    if (message.event === 'exit') {
+      events.exit({ code: message.code, signal: message.signal });
+      ended.add(message.id);
+      forgetIfDone(message.id);
+    } else events[message.event](message.bytes);
   }
 
   function send(message: GuestMessage): void {
@@ -263,6 +297,25 @@ export function runGuest(
         await request('workspaceWrite', [path, bytes], storedSchema);
       },
     }),
+    process: hostProcess(async (name, args) => {
+      const { id } = (await request('processStart', [name, [...args]], processStartedSchema)) as {
+        id: number;
+      };
+      const program = programChannel(id);
+      heldByPlugin.add(id);
+      forgetIfDone(id);
+      return program.handle({
+        write: async (bytes) => {
+          await request('processWrite', [id, bytes], storedSchema);
+        },
+        end: async () => {
+          await request('processEnd', [id], storedSchema);
+        },
+        kill: async () => {
+          await request('processKill', [id], storedSchema);
+        },
+      });
+    }),
     signin: hostSignin({
       signinAccessToken: async (id) =>
         (await request('signinAccessToken', [id], signinTokenSchema)) as string,
@@ -358,6 +411,7 @@ export function runGuest(
       host.events.emit('configured', {});
     } else if (message.type === 'call') void call(message);
     else if (message.type === 'response') answer(message);
+    else if (message.type === 'process') heard(message);
     else host.events.emit(message.event, message.payload);
   });
 

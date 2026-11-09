@@ -9,6 +9,7 @@ import {
   type TemplateCall,
   type TemplateRegistry,
   type TemplateReport,
+  diagnostic,
   ok,
   isTonedMark,
   parseManifest,
@@ -43,6 +44,7 @@ import {
   CREDENTIAL_VALUE_LIMIT_BYTES,
   type HostCapabilities,
   PLUGIN_FILE_LIMIT_BYTES,
+  PluginCapabilityError,
 } from '../capabilities.js';
 import { ASSET_SOURCE_MAX_BYTES } from '../sources.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
@@ -2565,5 +2567,150 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     ]);
     expect(new Set(statuses.slice(100, 200)).size).toBe(1);
     expect(new Set(statuses.slice(200)).size).toBe(1);
+  });
+});
+
+describe('host.process across the boundary (ADR 0182)', () => {
+  const { TextDecoder } = globalThis as unknown as {
+    TextDecoder: new () => { decode(bytes: Uint8Array): string };
+  };
+  const text = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
+
+  /**
+   * A port whose programs echo stdin upper-cased, end with 0 when stdin closes and by signal
+   * when killed. `early` makes a program speak and end inside its own start, before the host
+   * has answered `processStart`.
+   */
+  function programs(options: { readonly early?: boolean } = {}) {
+    const kills: string[] = [];
+    const started: { program: string; args: readonly string[] }[] = [];
+    const capabilities: HostCapabilities = {
+      fetch: () => Promise.reject(new Error('no network here')),
+      credential: () => Promise.resolve(undefined),
+      describeCredential: () => 'nowhere',
+      startProcess: (_plugin, program, args, events) => {
+        if (program === 'missing') {
+          return Promise.reject(
+            new PluginCapabilityError(
+              diagnostic('E_PROCESS_NOT_FOUND', { plugin: 'texto', program }),
+            ),
+          );
+        }
+        started.push({ program, args });
+        if (options.early === true) {
+          events.stdout(new TextEncoder().encode('cedo'));
+          events.exit({ code: 3, signal: null });
+        }
+        return Promise.resolve({
+          write: (bytes) => {
+            events.stdout(new TextEncoder().encode(text(bytes).toUpperCase()));
+            return Promise.resolve();
+          },
+          end: () => {
+            events.exit({ code: 0, signal: null });
+            return Promise.resolve();
+          },
+          kill: () => {
+            kills.push(program);
+            events.exit({ code: null, signal: 'SIGTERM' });
+          },
+        });
+      },
+    };
+    return { capabilities, kills, started };
+  }
+
+  const asking = (ask: (host: PluginHost) => Promise<string>) => (host: PluginHost) =>
+    host.registerExporter({ ...textExporter, exportFrame: async () => ok(await ask(host)) });
+
+  async function codeOf(promise: Promise<unknown>): Promise<string> {
+    try {
+      await promise;
+      return 'resolved';
+    } catch (cause) {
+      return cause instanceof PluginCapabilityError ? cause.code : String(cause);
+    }
+  }
+
+  async function answerOf(connected: Result<IsolatedPlugin, Diagnostics>): Promise<string> {
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    return answer.ok ? answer.value : answer.error.map((item) => item.code).join(',');
+  }
+
+  it('talks to a long-lived program both ways, in bytes, until its stdin closes', async () => {
+    const port = programs();
+    const { connected } = await isolate(
+      asking(async (host) => {
+        const program = await host.process.start('claude', ['--acp']);
+        const heard: string[] = [];
+        program.onStdout((bytes) => heard.push(text(bytes)));
+        await program.write('{"jsonrpc":"2.0"}\n');
+        await program.write(new TextEncoder().encode('olá'));
+        await program.end();
+        const exit = await program.exited;
+        return `${heard.join('|')} ${String(exit.code)}`;
+      }),
+      { permissions: ['process:claude'], capabilities: port.capabilities },
+    );
+
+    expect(await answerOf(connected)).toBe('{"JSONRPC":"2.0"}\n|OLÁ 0');
+    expect(port.started).toEqual([{ program: 'claude', args: ['--acp'] }]);
+  });
+
+  it('hands over what a program said before the host answered its start', async () => {
+    const port = programs({ early: true });
+    const { connected } = await isolate(
+      asking(async (host) => {
+        const program = await host.process.start('claude');
+        const heard: string[] = [];
+        program.onStdout((bytes) => heard.push(text(bytes)));
+        const exit = await program.exited;
+        return `${heard.join('|')} ${String(exit.code)}`;
+      }),
+      { permissions: ['process:claude'], capabilities: port.capabilities },
+    );
+
+    expect(await answerOf(connected)).toBe('cedo 3');
+  });
+
+  it('refuses on the host side with the code it decided, and the adapter keeps its own', async () => {
+    const port = programs();
+    const { connected } = await isolate(
+      asking(async (host) =>
+        [
+          await codeOf(host.process.start('codex')),
+          await codeOf(host.process.start('missing')),
+        ].join(' '),
+      ),
+      { permissions: ['process:claude', 'process:missing'], capabilities: port.capabilities },
+    );
+
+    expect(await answerOf(connected)).toBe('E_PERMISSION E_PROCESS_NOT_FOUND');
+    expect(port.started).toEqual([]);
+  });
+
+  it('ends what the plugin started when the host closes it, and when it crashes', async () => {
+    const start = asking(async (host) => {
+      await host.process.start('claude');
+      return 'started';
+    });
+    const closing = programs();
+    const closed = await isolate(start, {
+      permissions: ['process:claude'],
+      capabilities: closing.capabilities,
+    });
+    expect(await answerOf(closed.connected)).toBe('started');
+    if (closed.connected.ok) await closed.connected.value.close();
+    expect(closing.kills).toEqual(['claude']);
+
+    const crashing = programs();
+    const crashed = await isolate(start, {
+      permissions: ['process:claude'],
+      capabilities: crashing.capabilities,
+    });
+    expect(await answerOf(crashed.connected)).toBe('started');
+    crashed.pair.crash('exit code 1');
+    expect(crashing.kills).toEqual(['claude']);
   });
 });

@@ -246,6 +246,26 @@ export {
   hostWorkspace,
   workspacePath,
 } from './capabilities.js';
+export {
+  type CheckedProcess,
+  type CheckedProcesses,
+  type HostProcess,
+  PLUGIN_PROCESS_LIMIT,
+  PROCESS_PERMISSION,
+  PROCESS_UNREAD_LIMIT_BYTES,
+  PROCESS_WRITE_LIMIT_BYTES,
+  type PluginProcess,
+  type ProcessEvents,
+  type ProcessExit,
+  type ProcessOperations,
+  type StartProcess,
+  type StartedProcess,
+  allowsProcess,
+  checkedProcesses,
+  hostProcess,
+  processChannel,
+  programNameProblem,
+} from './process.js';
 
 export {
   type ActivateOptions,
