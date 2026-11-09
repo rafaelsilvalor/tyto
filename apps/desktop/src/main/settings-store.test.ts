@@ -132,6 +132,8 @@ describe('fileSettingsStore', () => {
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
       agentsListen: DEFAULT_SETTINGS.agentsListen,
       agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
+      agentCommand: DEFAULT_SETTINGS.agentCommand,
+      agentArgs: DEFAULT_SETTINGS.agentArgs,
     });
   });
 
@@ -178,6 +180,8 @@ describe('fileSettingsStore', () => {
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
       agentsListen: DEFAULT_SETTINGS.agentsListen,
       agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
+      agentCommand: DEFAULT_SETTINGS.agentCommand,
+      agentArgs: DEFAULT_SETTINGS.agentArgs,
     });
   });
 
@@ -224,6 +228,8 @@ describe('fileSettingsStore', () => {
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
       agentsListen: DEFAULT_SETTINGS.agentsListen,
       agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
+      agentCommand: DEFAULT_SETTINGS.agentCommand,
+      agentArgs: DEFAULT_SETTINGS.agentArgs,
     });
   });
 
@@ -269,6 +275,8 @@ describe('fileSettingsStore', () => {
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
       agentsListen: DEFAULT_SETTINGS.agentsListen,
       agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
+      agentCommand: DEFAULT_SETTINGS.agentCommand,
+      agentArgs: DEFAULT_SETTINGS.agentArgs,
     });
   });
 

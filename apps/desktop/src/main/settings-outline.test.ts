@@ -53,6 +53,8 @@ describe("the app's settings outline", () => {
       'terminalArgs',
       'agentsListen',
       'agentsWindowActions',
+      'agentCommand',
+      'agentArgs',
     ]);
   });
 

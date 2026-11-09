@@ -122,10 +122,26 @@ export async function listWindows(
   return records;
 }
 
+/**
+ * The variable a terminal tab Tyto started carries: the process id of the window that started
+ * it (ADR 0181). The relay prefers that window over the folder rule, so an agent started in a
+ * window's terminal reaches that window and not the most recent one.
+ */
+export const WINDOW_PID_VARIABLE = 'TYTO_WINDOW';
+
+/** The process id a {@link WINDOW_PID_VARIABLE} value names, or undefined when it names none. */
+export function windowPidOf(value: string | undefined): number | undefined {
+  if (value === undefined || !/^[1-9][0-9]{0,9}$/u.test(value.trim())) return undefined;
+  return Number(value.trim());
+}
+
 export interface PickedWindow {
   readonly record: WindowRecord;
-  /** `folder`: its workspace holds the folder asked for; `most-recent`: none did. */
-  readonly why: 'folder' | 'most-recent';
+  /**
+   * `named`: the window {@link WINDOW_PID_VARIABLE} names; `folder`: its workspace holds the
+   * folder asked for; `most-recent`: none did.
+   */
+  readonly why: 'named' | 'folder' | 'most-recent';
 }
 
 /** Whether `inner` is `outer` or inside it, by the platform's rule (Windows ignores case). */
@@ -141,14 +157,19 @@ const newestFirst = (left: WindowRecord, right: WindowRecord): number =>
   right.startedAt.localeCompare(left.startedAt) || right.pid - left.pid;
 
 /**
- * Which window serves `folder`: the one whose workspace holds it (the deepest, then the most
- * recent), else the most recently started window. Undefined when none is open.
+ * Which window serves `folder`: the open window `named` (a process id), when one is; else the
+ * one whose workspace holds the folder (the deepest, then the most recent), else the most
+ * recently started window. Undefined when none is open. A named window that is not open — its
+ * terminal outlived it — falls back to the folder rule rather than failing.
  */
 export function pickWindow(
   records: readonly WindowRecord[],
   folder: string,
   platform: Platform,
+  named?: number,
 ): PickedWindow | undefined {
+  const chosen = named === undefined ? undefined : records.find((record) => record.pid === named);
+  if (chosen !== undefined) return { record: chosen, why: 'named' };
   const holding = records
     .filter((record) => record.folder !== null && within(platform, record.folder, folder))
     .sort(

@@ -26,6 +26,8 @@ export interface TerminalPorts {
   readonly open: (size: {
     cols: number;
     rows: number;
+    /** The agent program instead of the shell (TYTO-567); main names it, never the window. */
+    agent?: boolean;
   }) => Promise<
     { terminalId: string; title: string } | { refused: 'restricted' | 'failed'; message: string }
   >;
@@ -103,9 +105,15 @@ export class TerminalSessions {
     this.#changed();
   }
 
-  /** Opens a new terminal in front; a refusal is kept for the panel to say and nothing opens. */
-  async create(size: { cols: number; rows: number } = DEFAULT_SIZE): Promise<string | undefined> {
-    const opened = await this.ports.open(size);
+  /**
+   * Opens a new terminal in front; a refusal is kept for the panel to say and nothing opens.
+   * With `agent`, the terminal runs the agent `agentCommand` names (TYTO-567, ADR 0181).
+   */
+  async create(
+    size: { cols: number; rows: number } = DEFAULT_SIZE,
+    agent = false,
+  ): Promise<string | undefined> {
+    const opened = await this.ports.open(agent ? { ...size, agent } : size);
     if ('refused' in opened) {
       this.#refusal = { reason: opened.refused, message: opened.message };
       this.#changed();

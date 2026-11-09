@@ -63,6 +63,7 @@ export const en: Catalogue = {
   'terminal.quit.stay': 'Keep running',
   'panel.terminal': 'Terminal',
   'command.terminal.new': 'Terminal: New Terminal',
+  'command.terminal.openAgent': 'Terminal: Open an Agent Here',
   'command.terminal.show': 'Show Terminal',
   'command.problems.show': 'Show Problems',
   'terminal.new': 'New terminal',

@@ -9,6 +9,7 @@ import {
   listWindows,
   parseAnswer,
   pickWindow,
+  WINDOW_PID_VARIABLE,
   processAlive,
   readFirstLine,
 } from './window-endpoint.js';
@@ -40,6 +41,8 @@ export interface RelayOptions {
   readonly stdio: CliStdio;
   readonly err: CliConsole['err'];
   readonly signal?: AbortSignal;
+  /** The window {@link WINDOW_PID_VARIABLE} names, preferred over the folder rule (ADR 0181). */
+  readonly named?: number;
   /** The tests' seams; the process's own in a terminal. */
   readonly alive?: (pid: number) => boolean;
   readonly connectTo?: (endpoint: string) => Socket;
@@ -48,9 +51,19 @@ export interface RelayOptions {
 function pickedLine(picked: PickedWindow): string {
   const { record, why } = picked;
   const where = record.folder ?? 'no folder';
+  if (why === 'named') {
+    return `tyto mcp --window: relaying to the window that started this terminal, ${where} (pid ${String(record.pid)})
+`;
+  }
   return why === 'folder'
     ? `tyto mcp --window: relaying to the window of ${where} (pid ${String(record.pid)})\n`
     : `tyto mcp --window: no open window holds this folder; relaying to the most recent one, ${where} (pid ${String(record.pid)})\n`;
+}
+
+/** Said when the terminal's window is gone, before the folder rule picks another. */
+export function namedGoneLine(pid: number): string {
+  return `tyto mcp --window: ${WINDOW_PID_VARIABLE} names pid ${String(pid)}, which has no open window; picking by folder instead
+`;
 }
 
 /** Connects and sends the handshake; resolves with the socket once the window accepted it. */
@@ -110,7 +123,8 @@ export async function relayToWindow(options: RelayOptions): Promise<ExitCode> {
     return EXIT_INTERNAL;
   }
   const records = await listWindows(options.home, options.platform, options.alive ?? processAlive);
-  const picked = pickWindow(records, options.folder, options.platform);
+  const picked = pickWindow(records, options.folder, options.platform, options.named);
+  if (options.named !== undefined && picked?.why !== 'named') err(namedGoneLine(options.named));
   if (picked === undefined) {
     err(NO_WINDOW);
     return EXIT_INTERNAL;

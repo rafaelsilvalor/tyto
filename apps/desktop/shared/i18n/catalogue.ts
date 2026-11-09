@@ -124,6 +124,7 @@ export interface Catalogue {
   readonly 'terminal.quit.stay': string;
   readonly 'panel.terminal': string;
   readonly 'command.terminal.new': string;
+  readonly 'command.terminal.openAgent': string;
   readonly 'command.terminal.show': string;
   readonly 'command.problems.show': string;
   readonly 'terminal.new': string;
@@ -1084,6 +1085,7 @@ export const CATALOGUE_KEYS = [
   'terminal.quit.stay',
   'panel.terminal',
   'command.terminal.new',
+  'command.terminal.openAgent',
   'command.terminal.show',
   'command.problems.show',
   'terminal.new',

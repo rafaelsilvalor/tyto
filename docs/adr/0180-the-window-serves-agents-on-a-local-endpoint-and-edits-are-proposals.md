@@ -216,3 +216,10 @@ trusted workspace only, and a text edit is a proposal whatever `agentsWindowActi
   stale or gone (its tab closed). The window keeps the last 50.
 - **No key is bound.** Escape is vim's way out of insert mode, and a proposal rejected by a person
   leaving insert mode would be lost; Accept and Reject are the bar's buttons.
+
+## Amendment — 2026-11-09, TYTO-567
+
+Decision 4 gains a first rule (ADR 0181): the window `TYTO_WINDOW` names, when it is open, comes
+before the folder rule. A terminal Tyto starts sets it. When that window is gone the relay says so
+on stderr and falls back to the folder rule. The relay also ships alone, as
+`@tyto/command-line/relay`, which the desktop builds into a file the bundled Node runs.

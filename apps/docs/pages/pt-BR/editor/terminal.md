@@ -1,7 +1,7 @@
 # Terminal
 
 ::: info Como esta página foi conferida
-Abrir um terminal, digitar nele, as teclas da janela de dentro dele, dois terminais, as duas larguras e os dois esquemas de cor foram seguidos em 31/10/2026 numa build de desenvolvimento do Tyto, a partir da branch que acrescentou esta página, no Windows 11, com a janela em inglês. Os shells, a saída e a pasta restrita também rodaram no Linux e no macOS pelos testes automáticos do projeto, sem uma janela olhada lá. Os nomes em português foram lidos do catálogo da própria janela.
+Abrir um terminal, digitar nele, as teclas da janela de dentro dele, dois terminais, as duas larguras e os dois esquemas de cor foram seguidos em 31/10/2026 numa build de desenvolvimento do Tyto, a partir da branch que acrescentou esta página, no Windows 11, com a janela em inglês. Os shells, a saída e a pasta restrita também rodaram no Linux e no macOS pelos testes automáticos do projeto, sem uma janela olhada lá. Os nomes em português foram lidos do catálogo da própria janela. Abrir um agente aqui rodou em 09/11/2026 pelos testes automáticos do projeto na branch que o acrescentou (TYTO-567), com um substituto de agente que faz o que o Claude Code faz com os mesmos argumentos, no Windows 11; não foi seguido numa janela.
 :::
 
 A aba **Terminal** da área inferior roda o seu próprio shell, o mesmo que o seu sistema abre numa janela de terminal, dentro do Tyto. Diferente de [Comandos](commands.md), que roda só comandos `tyto`, um terminal roda qualquer programa: `git`, `npm`, um editor, um prompt de Python.
@@ -35,6 +35,18 @@ Enquanto a pasta aberta não é confiável, um terminal novo é recusado, e a ab
 ## Mais de um
 
 O **+** abre outro terminal. Com dois ou mais, eles aparecem como abas pequenas à direita da faixa, com o nome do shell, numeradas quando dois têm o mesmo nome. O **×** de uma aba encerra aquele shell e todo programa que ele iniciou.
+
+## Abrir um agente aqui
+
+**Terminal: Abrir um agente aqui**, na barra de comandos e no menu **Ferramentas**, abre um programa de agente de IA num terminal novo, na pasta aberta, já conectado a esta janela: ele lê o brief da frente, confere e propõe mudanças que você aceita ou recusa, como [Conectar um agente de IA](../command-line/agents.md#trabalhar-com-a-janela-aberta) descreve.
+
+- O programa é o `claude` (Claude Code), a menos que `agentCommand` no `settings.json` nomeie outro, como `"codex"`. `agentArgs` acrescenta argumentos seus, como `["--model", "opus"]`. Os dois são lidos só desse arquivo (veja [Configurações](../reference/settings.md#agentcommand)).
+- **O Tyto não instala nenhum agente.** Quando o programa não está instalado, a aba diz isso e nada começa.
+- O Claude Code e o Codex já começam sabendo onde a janela está. Nada é escrito na sua pasta: os dados da conexão ficam na sua pasta do Tyto.
+- Numa pasta em que você não confiou, o agente é recusado como o terminal. Sem pasta aberta, ele começa na sua pasta pessoal e só pode ler.
+- Com `agentsListen` em `false`, o comando diz isso em vez de abrir um agente que não conseguiria se conectar.
+
+Todo terminal que o Tyto abre diz aos programas dentro dele qual janela o abriu. Um agente que você abre ali à mão chega a esta janela se você registrou o Tyto nele ([Conectar um agente de IA](../command-line/agents.md#do-terminal-do-tyto)).
 
 ## Copiar e colar
 

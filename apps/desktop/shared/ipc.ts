@@ -3012,9 +3012,12 @@ export const IPC_CHANNELS = {
    * and nothing else**, and strict, so a `cwd`, a `shell` or an `args` key is refused rather than
    * ignored: main chooses the program, the folder and the environment (decision 3, ADR 0113).
    * A restricted workspace answers `refused` (decision 5).
+   *
+   * `agent: true` asks for the agent program instead of the shell (TYTO-567, ADR 0181): a yes or
+   * no, never a program's name, which main reads from `agentCommand` in `settings.json`.
    */
   'terminal:open': channel(
-    z.strictObject({ cols: terminalColumns, rows: terminalRows }),
+    z.strictObject({ cols: terminalColumns, rows: terminalRows, agent: z.boolean().optional() }),
     z.union([
       z.object({ terminalId, title: z.string().max(200) }),
       z.object({ refused: z.enum(['restricted', 'failed']), message: z.string().max(4000) }),

@@ -194,3 +194,10 @@ in any folder) and `open_file` and `show_format` (window actions, trusted folder
 first unless `agentsWindowActions` is `allow`). `agentsListen: false` stops the listener. `propose_edit` shows an edit of the document in front for the person
 to accept (one undo step, no save) or reject, and answers at once with an id;
 `proposal_status` says whether it was accepted, rejected, became stale or is gone.
+
+An agent started in Tyto's own terminal reaches the window without `tyto` (ADR 0181): the package
+runs `out/relay/agent-relay.js`, the relay alone (`@tyto/command-line/relay`), on its bundled
+Node. Every terminal the window opens carries `TYTO_WINDOW=<pid>`, which the relay prefers over the
+folder rule. **Open an Agent Here** (`terminal.openAgent`) starts `agentCommand` (default `claude`)
+with `--mcp-config <TYTO_HOME>/agents/window-<pid>.json`, or `codex` with `-c mcp_servers.tyto.*`
+overrides. Nothing is written into the workspace, and nothing is installed.

@@ -1,5 +1,7 @@
 import { posix, win32 } from 'node:path';
 
+import { WINDOW_PID_VARIABLE } from '@tyto/command-line/relay';
+
 /**
  * Which shell a terminal tab runs, and with what environment (TYTO-497, ADR 0164 decision 4).
  *
@@ -73,11 +75,14 @@ export function chooseShell(options: ShellChoiceOptions): ShellChoice {
 
 /**
  * Main's environment minus what is Tyto's or Electron's to read, plus what tells programs they
- * are in a colour terminal. Nothing from `safeStorage` is ever in main's environment to begin
- * with, and nothing here adds it.
+ * are in a colour terminal, and `TYTO_WINDOW`, the window that started it (ADR 0181): an agent
+ * started in the terminal, by hand or by Open an Agent Here, relays to this window and not to
+ * the most recent one. Nothing from `safeStorage` is ever in main's environment to begin with,
+ * and nothing here adds it.
  */
 export function terminalEnvironment(
   environment: Readonly<Record<string, string | undefined>>,
+  windowPid: number,
 ): Record<string, string> {
   const kept: Record<string, string> = {};
   for (const [key, value] of Object.entries(environment)) {
@@ -87,5 +92,11 @@ export function terminalEnvironment(
     if (upper === 'NODE_OPTIONS') continue;
     kept[key] = value;
   }
-  return { ...kept, TERM: 'xterm-256color', COLORTERM: 'truecolor', TERM_PROGRAM: 'Tyto' };
+  return {
+    ...kept,
+    TERM: 'xterm-256color',
+    COLORTERM: 'truecolor',
+    TERM_PROGRAM: 'Tyto',
+    [WINDOW_PID_VARIABLE]: String(windowPid),
+  };
 }

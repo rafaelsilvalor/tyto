@@ -1,3 +1,4 @@
+import type { AgentLaunch } from './terminal-agent.js';
 import type { ShellChoice } from './terminal-shell.js';
 
 /**
@@ -36,6 +37,13 @@ export interface TerminalDependencies {
   readonly spawn: (file: string, args: readonly string[], options: SpawnOptions) => PseudoTerminal;
   /** Read at each open, so a save of `terminalShell` applies to the next terminal. */
   readonly shell: () => ShellChoice;
+  /**
+   * What **Open an Agent Here** starts (TYTO-567, ADR 0181), or why nothing does. Read at each
+   * open, as `shell` is; a configuration it names is written before the program starts.
+   */
+  readonly agent: () => AgentLaunch;
+  /** Writes the agent's configuration file, in `TYTO_HOME`, never in the workspace. */
+  readonly writeConfig: (file: string, text: string) => void;
   /** The open workspace folder, or `null` with none open. */
   readonly folder: () => string | null;
   readonly home: () => string;
@@ -74,7 +82,12 @@ export interface TerminalListing {
 }
 
 export interface Terminals {
-  open(size: { readonly cols: number; readonly rows: number }): TerminalOpened;
+  /** A shell, or with `agent` the agent program `agentCommand` names (TYTO-567). */
+  open(size: {
+    readonly cols: number;
+    readonly rows: number;
+    readonly agent?: boolean | undefined;
+  }): TerminalOpened;
   input(terminalId: string, data: string): void;
   resize(terminalId: string, cols: number, rows: number): void;
   kill(terminalId: string): void;
@@ -157,9 +170,28 @@ export function createTerminals(dependencies: TerminalDependencies): Terminals {
   };
 
   return {
-    open: ({ cols, rows }) => {
+    open: ({ cols, rows, agent = false }) => {
+      // Before the agent is looked for: an agent is a program started in the folder, as a
+      // shell is, and the folder's files reach it the same way (ADR 0164 decision 5).
       if (dependencies.restricted()) return { refused: 'restricted', message: TERMINAL_RESTRICTED };
-      const shell = dependencies.shell();
+      let shell: ShellChoice;
+      if (agent) {
+        const launch = dependencies.agent();
+        if ('refused' in launch) return { refused: 'failed', message: launch.refused };
+        shell = launch.choice;
+        try {
+          if (launch.config !== undefined) {
+            dependencies.writeConfig(launch.config.file, launch.config.text);
+          }
+        } catch (error) {
+          return {
+            refused: 'failed',
+            message: `${shell.title} did not start: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+      } else {
+        shell = dependencies.shell();
+      }
       let pty: PseudoTerminal;
       try {
         pty = dependencies.spawn(shell.file, shell.args, {

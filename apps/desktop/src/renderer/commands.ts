@@ -260,6 +260,11 @@ export const COMMAND_PANEL_RENDER_BRIEF = 'commandPanel.renderBrief';
  */
 export const TERMINAL_NEW = 'terminal.new';
 /**
+ * TYTO-567 (ADR 0181). A new terminal running the agent `agentCommand` names, in the workspace
+ * folder, told how to reach this window. Tyto installs no agent.
+ */
+export const TERMINAL_OPEN_AGENT = 'terminal.openAgent';
+/**
  * TYTO-514 (ADR 0166). View's bottom tabs: the Terminal and the Problems tab brought to the front,
  * never hidden, for `queue.show`'s reason. The Terminal's caret goes to the shell in front.
  */
@@ -348,6 +353,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [COMMAND_PANEL_RUN]: 'command.commandPanel.run',
   [COMMAND_PANEL_RENDER_BRIEF]: 'command.commandPanel.renderBrief',
   [TERMINAL_NEW]: 'command.terminal.new',
+  [TERMINAL_OPEN_AGENT]: 'command.terminal.openAgent',
   [TERMINAL_SHOW]: 'command.terminal.show',
   [PROBLEMS_SHOW]: 'command.problems.show',
   [DELIVERY_EXPORT]: 'command.delivery.export',
@@ -420,6 +426,8 @@ export interface DesktopActions {
   focusCommandPanel(): void;
   /** Opens another terminal in front, the Terminal tab with it (TYTO-497). */
   newTerminal(): void;
+  /** TYTO-567. A terminal running the agent, in front in the Terminal tab. */
+  openAgent(): void;
   /** TYTO-514. The Terminal tab in front, its shell focused; a first one if none runs. */
   showTerminal(): void;
   /** TYTO-514. The Problems tab in front, opened when it is not already shown. */
@@ -618,6 +626,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(TERMINAL_NEW, () => {
     actions.newTerminal();
+  });
+  add(TERMINAL_OPEN_AGENT, () => {
+    actions.openAgent();
   });
   add(TERMINAL_SHOW, () => {
     actions.showTerminal();

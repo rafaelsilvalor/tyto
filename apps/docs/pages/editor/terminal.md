@@ -1,7 +1,7 @@
 # Terminal
 
 ::: info How this page was checked
-Opening a terminal, typing into it, the window's keys from inside it, two terminals, the two widths and both colour schemes were followed on 2026-10-31 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The shells, the quit and the restricted folder were also run on Linux and macOS by the project's automated tests, not looked at in a window there. The Portuguese edition's labels were read from the window's own catalogue.
+Opening a terminal, typing into it, the window's keys from inside it, two terminals, the two widths and both colour schemes were followed on 2026-10-31 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. Open an Agent Here was run on 2026-11-09 by the project's automated tests on the branch that added it (TYTO-567), with a stand-in agent that does what Claude Code does with the same arguments, on Windows 11; it was not followed in a window. The shells, the quit and the restricted folder were also run on Linux and macOS by the project's automated tests, not looked at in a window there. The Portuguese edition's labels were read from the window's own catalogue.
 :::
 
 The **Terminal** tab of the bottom area runs your own shell, the one your system opens in a terminal window, inside Tyto. Unlike [Commands](commands.md), which runs only `tyto` commands, a terminal runs any program: `git`, `npm`, an editor, a Python prompt.
@@ -35,6 +35,18 @@ While the open folder is not trusted, a new terminal is refused, and the tab say
 ## More than one
 
 **+** opens another terminal. With two or more, they show as small tabs at the right of the strip, named after the shell and numbered when two share a name. A tab's **×** ends that shell and every program it started.
+
+## Open an agent here
+
+**Terminal: Open an Agent Here**, in the command bar and the **Tools** menu, starts an AI agent program in a new terminal, in the open folder, already connected to this window: it can read the brief in front, check it and propose edits you accept or reject, as [Connect an AI agent](../command-line/agents.md#work-with-the-window-that-is-open) describes.
+
+- The program is `claude` (Claude Code) unless `agentCommand` in `settings.json` names another, such as `"codex"`. `agentArgs` adds arguments of your own, such as `["--model", "opus"]`. Both are read from that file only (see [Settings](../reference/settings.md#agentcommand)).
+- **Tyto installs no agent.** When the program is not installed, the tab says so and nothing starts.
+- Claude Code and Codex are told where the window is when they start. Nothing is written into your folder: the connection's settings go in your Tyto folder.
+- In a folder you have not trusted, the agent is refused as a terminal is. With no folder open it starts in your home folder and can only read.
+- With `agentsListen` set to `false`, the command says so instead of starting an agent that could not connect.
+
+Any terminal Tyto opens tells the programs in it which window opened it. An agent you start there by hand reaches this window if you registered Tyto with it ([Connect an AI agent](../command-line/agents.md#from-tyto-s-terminal)).
 
 ## Copy and paste
 

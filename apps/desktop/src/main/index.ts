@@ -1,5 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, watch } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  watch,
+  writeFileSync,
+} from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -150,6 +158,7 @@ import {
   killTree,
   terminalQuitGuard,
 } from './terminal.js';
+import { agentConfigFile, agentLaunch, agentRelayPaths } from './terminal-agent.js';
 import { chooseShell, terminalEnvironment } from './terminal-shell.js';
 import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
@@ -697,6 +706,8 @@ async function start(): Promise<void> {
   let commandsOrder = saved.commandsOrder;
   let commandsFoldOlderRuns = saved.commandsFoldOlderRuns;
   let terminalShell = { shell: saved.terminalShell, args: saved.terminalArgs };
+  // And the agent Open an Agent Here starts (TYTO-567, ADR 0181), on the same answer.
+  let agentProgram = { command: saved.agentCommand, args: saved.agentArgs };
   // And the faces and sizes (TYTO-272), on the same answer. The zoom is applied here, in main.
   let typography: Typography = {
     uiFontFamily: saved.uiFontFamily,
@@ -1386,7 +1397,38 @@ async function start(): Promise<void> {
       const state = workspace.state();
       return state.folder !== null && state.trust === 'restricted';
     },
-    environment: () => terminalEnvironment(process.env),
+    // An agent reaches this window through the relay on the bundled Node (ADR 0181): `tyto` is
+    // not on the terminal's PATH (ADR 0164 decision 4), and the package ships none (TYTO-335).
+    agent: () => {
+      if (!agentsListening) {
+        return {
+          refused:
+            'agentsListen is off in settings.json, so an agent could not reach this window. Turn it on to open an agent here (ADR 0180).',
+        };
+      }
+      return agentLaunch({
+        platform: process.platform,
+        environment: process.env,
+        command: agentProgram.command,
+        args: agentProgram.args,
+        exists: existsSync,
+        relay: agentRelayPaths({
+          packaged: app.isPackaged,
+          mainDirectory: dirname(fileURLToPath(import.meta.url)),
+          resourcesPath: process.resourcesPath,
+          platform: process.platform,
+          join,
+        }),
+        pid: process.pid,
+        home: pluginsHome,
+        configFile: agentConfigFile(pluginsHome, process.pid, process.platform),
+      });
+    },
+    writeConfig: (file, text) => {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, text, { encoding: 'utf8', mode: 0o600 });
+    },
+    environment: () => terminalEnvironment(process.env, process.pid),
     // A shell outlives the window it printed to, so the window is asked whether it is gone
     // before its `webContents` is read, which throws on a destroyed window.
     output: (terminalId, data) => {
@@ -1405,6 +1447,8 @@ async function start(): Promise<void> {
   });
   app.on('will-quit', () => {
     terminals.killAll();
+    // This window's agent configuration names its process id, which no other window will have.
+    rmSync(agentConfigFile(pluginsHome, process.pid, process.platform), { force: true });
   });
   // Quitting over a program still running in a terminal asks first, in a box main owns.
   const terminalsMayQuit = terminalQuitGuard(terminals.busy, (titles) => {
@@ -1475,6 +1519,9 @@ async function start(): Promise<void> {
       }
       if (keys.includes('terminalShell') || keys.includes('terminalArgs')) {
         terminalShell = { shell: next.terminalShell, args: next.terminalArgs };
+      }
+      if (keys.includes('agentCommand') || keys.includes('agentArgs')) {
+        agentProgram = { command: next.agentCommand, args: next.agentArgs };
       }
       if (keys.includes('zoom')) applyZoom(next.zoom);
       if (keys.includes('agentsWindowActions')) agentsWindowActions = next.agentsWindowActions;

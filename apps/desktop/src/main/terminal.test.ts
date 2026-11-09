@@ -62,6 +62,10 @@ const harness = (overrides: Partial<TerminalDependencies> = {}) => {
       return pty;
     },
     shell: () => ({ file: '/bin/bash', args: [], title: 'bash' }),
+    agent: () => ({ refused: 'no agent in this harness' }),
+    writeConfig: () => {
+      throw new Error('no agent in this harness');
+    },
     folder: () => folder,
     home: () => '/home/person',
     restricted: () => restricted,
@@ -92,6 +96,87 @@ const harness = (overrides: Partial<TerminalDependencies> = {}) => {
     },
   };
 };
+
+describe('opening an agent (TYTO-567, ADR 0181)', () => {
+  const claude = {
+    choice: {
+      file: '/usr/bin/claude',
+      args: ['--mcp-config', '/home/.tyto/agents/w.json'],
+      title: 'claude',
+    },
+    config: { file: '/home/.tyto/agents/w.json', text: '{}\n' },
+  };
+
+  it('writes the configuration, then starts the agent in the open folder with the terminal environment', () => {
+    const written: [string, string][] = [];
+    const { terminals, spawned } = harness({
+      agent: () => claude,
+      writeConfig: (file, text) => written.push([file, text]),
+    });
+
+    const opened = terminals.open({ cols: 100, rows: 30, agent: true });
+
+    expect(opened).toEqual({ terminalId: 'terminal-1', title: 'claude' });
+    expect(written).toEqual([['/home/.tyto/agents/w.json', '{}\n']]);
+    expect(spawned[0]).toMatchObject({
+      file: '/usr/bin/claude',
+      args: ['--mcp-config', '/home/.tyto/agents/w.json'],
+      options: { cwd: '/work/folder', env: { TERM: 'xterm-256color' } },
+    });
+  });
+
+  it('says why when the agent is not there, and starts nothing', () => {
+    const { terminals, spawned } = harness({ agent: () => ({ refused: 'no claude here' }) });
+
+    expect(terminals.open({ cols: 80, rows: 24, agent: true })).toEqual({
+      refused: 'failed',
+      message: 'no claude here',
+    });
+    expect(spawned).toHaveLength(0);
+  });
+
+  it('is refused in a restricted workspace before the agent is looked for', () => {
+    let asked = 0;
+    const { terminals, spawned, restrict } = harness({
+      agent: () => {
+        asked += 1;
+        return claude;
+      },
+      writeConfig: () => {},
+    });
+    restrict(true);
+
+    expect(terminals.open({ cols: 80, rows: 24, agent: true })).toEqual({
+      refused: 'restricted',
+      message: TERMINAL_RESTRICTED,
+    });
+    expect(asked).toBe(0);
+    expect(spawned).toHaveLength(0);
+  });
+
+  it('starts nothing when its configuration cannot be written', () => {
+    const { terminals, spawned } = harness({
+      agent: () => claude,
+      writeConfig: () => {
+        throw new Error('EACCES');
+      },
+    });
+
+    expect(terminals.open({ cols: 80, rows: 24, agent: true })).toEqual({
+      refused: 'failed',
+      message: 'claude did not start: EACCES',
+    });
+    expect(spawned).toHaveLength(0);
+  });
+
+  it('opens the shell, not the agent, when the window does not ask for one', () => {
+    const { terminals, spawned } = harness({ agent: () => claude, writeConfig: () => {} });
+
+    terminals.open({ cols: 80, rows: 24 });
+
+    expect(spawned[0]?.file).toBe('/bin/bash');
+  });
+});
 
 describe('opening a terminal (ADR 0164)', () => {
   it('starts the chosen shell in the open folder, at the size the window measured', () => {
