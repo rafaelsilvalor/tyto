@@ -70,6 +70,9 @@ non-zero.
 | `E_PROCESS_LIMIT` | error | no | A plugin asked to start a program while as many of its programs as allowed run. |
 | `E_PROCESS_ARGUMENT` | error | no | A plugin passed a program an argument the host cannot pass to it unchanged. |
 | `E_PROCESS_EXITED` | error | no | A plugin wrote to a program it started after that program had ended. |
+| `E_WINDOW_UNAVAILABLE` | error | no | A plugin asked for the window's agent server on a host that has no window. |
+| `E_WINDOW_AGENTS_OFF` | error | no | A plugin asked for the window's agent server while agentsListen is off. |
+| `E_WINDOW_RESTRICTED` | error | no | A plugin asked for the window's agent server while the open folder is restricted. |
 | `E_PLUGIN_CACHE` | error | no | A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache. |
 | `E_WORKSPACE_FILE` | error | no | A plugin's workspace file was refused: outside the folder, through a link, missing, too large, inside .tyto/, or no folder is open. |
 | `E_WORKSPACE_FILE_RESTRICTED` | error | no | A plugin asked for a file of a workspace the person has not trusted. |
@@ -295,6 +298,9 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PROCESS_LIMIT` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PROCESS_ARGUMENT` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PROCESS_EXITED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_WINDOW_UNAVAILABLE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_WINDOW_AGENTS_OFF` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_WINDOW_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_CACHE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WORKSPACE_FILE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WORKSPACE_FILE_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
@@ -1123,6 +1129,48 @@ Plugin '{plugin}' wrote to '{program}' after it had ended.
 ```
 
 Parameters: `plugin`, `program`
+
+### `E_WINDOW_UNAVAILABLE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md`
+
+A plugin asked for the window's agent server on a host that has no window.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for the window's agent server, and {host} has no window.
+```
+
+Parameters: `plugin`, `host`
+
+### `E_WINDOW_AGENTS_OFF`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md`
+
+A plugin asked for the window's agent server while agentsListen is off.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for the window's agent server, and agentsListen is off in settings.json; turn it on to let agents reach the window.
+```
+
+Parameters: `plugin`
+
+### `E_WINDOW_RESTRICTED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md`
+
+A plugin asked for the window's agent server while the open folder is restricted.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for the window's agent server, and the open folder is restricted; trust it to let agents reach the window.
+```
+
+Parameters: `plugin`
 
 ### `E_PLUGIN_CACHE`
 

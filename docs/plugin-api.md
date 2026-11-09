@@ -764,6 +764,27 @@ const { code, signal } = await agent.exited;
 
 An undeclared name is `E_PERMISSION`; **a host that starts no programs — the CLI — answers `E_PROCESS_UNAVAILABLE`**. The adapter, which sees the machine, answers the rest: a program not on the `PATH` is `E_PROCESS_NOT_FOUND` (Tyto installs none), a restricted workspace is `E_PROCESS_RESTRICTED`, and an argument it cannot pass unchanged is `E_PROCESS_ARGUMENT`. The port is `HostCapabilities.startProcess(plugin, program, args, events)`, optional, answering `{ write, end, kill }` and reporting `stdout`, `stderr` and one `exit` through `events`; `checkedProcesses` stands in front of it. Across the isolation boundary the plugin's requests are `processStart`, `processWrite`, `processEnd` and `processKill`, and the host sends `process` messages with the output and the exit on its own (protocol 19). The desktop's adapter — `PATH`, the folder, the environment, `.cmd` files on Windows — is described in ADR 0182.
 
+### `host.window` (ADR 0183)
+
+**The window's MCP server, for the agent a plugin starts**, in the shape the Agent Client Protocol's `session/new` takes in `mcpServers`. The agent connects to it and gets the window's tools: what is in front, and edits that arrive as proposals the person approves (ADR 0180).
+
+```ts
+const server = await host.window.agentServer();
+// { name: 'tyto', command: '<bundled node>', args: ['<agent-relay.js>'],
+//   env: [{ name: 'TYTO_WINDOW', value: '…' }, { name: 'TYTO_HOME', value: '…' }] }
+const agent = await host.process.start('claude-agent-acp');
+await agent.write(
+  JSON.stringify({
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'session/new',
+    params: { cwd, mcpServers: [server] },
+  }) + '\n',
+);
+```
+
+**No permission of its own: it answers a plugin that declares at least one `process:<name>`**, and is `E_PERMISSION` for any other. The answer carries no secret, it is of no use without a program to hand it to, and a program the plugin starts could reach the window anyway. The install prompt says so in the `process:` paragraph. Ask again for each conversation: **`agentsListen` off is `E_WINDOW_AGENTS_OFF`** and **a restricted folder is `E_WINDOW_RESTRICTED`**, both read at each call. A host with no window (the CLI) answers `E_WINDOW_UNAVAILABLE`. `env` holds `TYTO_WINDOW` and `TYTO_HOME` and nothing else (`AGENT_SERVER_VARIABLES`), checked on the host's side with a strict schema. The port is `HostCapabilities.windowAgentServer(plugin)`, optional; `checkedWindowAgentServer` stands in front of it. Across the isolation boundary the request is `windowAgentServer` (protocol 20). In `testPlugin`, pass `windowAgentServer` in `capabilities` to stand in for the window.
+
 ## Isolation
 
 - Main: each plugin in a process of its own under Node's permission model: a child of the CLI's Node, or of the Node the desktop carries (ADR 0050). Typed RPC; the host is a proxy.

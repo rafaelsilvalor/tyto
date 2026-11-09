@@ -1,5 +1,6 @@
 import { posix, win32 } from 'node:path';
 
+import { PluginCapabilityError, checkedWindowAgentServer } from '@tyto/plugin-api';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -11,6 +12,8 @@ import {
   findProgram,
   notFound,
   unsafeValue,
+  windowAgentServer,
+  windowAgentServerPort,
 } from './terminal-agent.js';
 
 /**
@@ -191,5 +194,106 @@ describe('where the relay and the configuration are', () => {
     expect(agentConfigFile('C:\\Users\\a\\.tyto', 7, 'win32')).toBe(
       'C:\\Users\\a\\.tyto\\agents\\window-7.json',
     );
+  });
+});
+
+describe('the window’s agent server a plugin hands its agent (TYTO-569, ADR 0183)', () => {
+  const trusted = { folder: '/home/person/work', trust: 'trusted' } as const;
+  const port = (
+    overrides: {
+      listening?: boolean;
+      workspace?: { folder: string | null; trust: 'trusted' | 'restricted' | null };
+      environment?: Readonly<Record<string, string>>;
+    } = {},
+  ) =>
+    windowAgentServerPort({
+      ...linux(overrides.environment === undefined ? {} : { environment: overrides.environment }),
+      listening: () => overrides.listening ?? true,
+      workspace: () =>
+        (overrides.workspace ?? trusted) as ReturnType<
+          Parameters<typeof windowAgentServerPort>[0]['workspace']
+        >,
+    });
+  const codeOf = (attempt: Promise<unknown>): Promise<string> =>
+    attempt.then(
+      () => 'answered',
+      (cause: unknown) => (cause instanceof PluginCapabilityError ? cause.code : 'thrown'),
+    );
+
+  it('names the relay Open an Agent Here names, in ACP’s mcpServers shape', async () => {
+    const claude = JSON.parse(claudeConfig(linux())) as {
+      mcpServers: { tyto: { command: string; args: string[]; env: Record<string, string> } };
+    };
+    const server = await port()('agente');
+    expect(server).toEqual({
+      name: 'tyto',
+      command: '/opt/Tyto/resources/node/node',
+      args: ['/opt/Tyto/relay/agent-relay.js'],
+      env: [
+        { name: 'TYTO_WINDOW', value: '4242' },
+        { name: 'TYTO_HOME', value: '/home/person/.tyto' },
+      ],
+    });
+    // One relay, two doors: the terminal's agent and a plugin's agent reach the same window.
+    expect(server.command).toBe(claude.mcpServers.tyto.command);
+    expect(server.args).toEqual(claude.mcpServers.tyto.args);
+    expect(Object.fromEntries(server.env.map((v) => [v.name, v.value]))).toEqual(
+      claude.mcpServers.tyto.env,
+    );
+  });
+
+  it('carries no variable of main’s, a secret least of all, and passes plugin-api’s check', async () => {
+    const environment = {
+      PATH: '/usr/bin',
+      ANTHROPIC_API_KEY: 'sk-secret',
+      GITHUB_TOKEN: 'ghp-secret',
+      TYTO_PLUGIN_SECRET: 'x',
+    };
+    const server = await port({ environment })('agente');
+    expect(server.env.map((variable) => variable.name)).toEqual(['TYTO_WINDOW', 'TYTO_HOME']);
+    expect(JSON.stringify(server)).not.toMatch(/secret/u);
+    const checked = await checkedWindowAgentServer('agente', ['process:claude-agent-acp'], {
+      fetch: () => Promise.reject(new Error('no network here')),
+      credential: () => Promise.resolve(undefined),
+      describeCredential: () => 'nowhere',
+      windowAgentServer: port({ environment }),
+    })();
+    expect(checked).toEqual(server);
+  });
+
+  it('refuses a restricted folder and agentsListen off, read at each call', async () => {
+    let listening = true;
+    let trust: 'trusted' | 'restricted' = 'trusted';
+    const live = windowAgentServerPort({
+      ...linux(),
+      listening: () => listening,
+      workspace: () => ({ folder: '/home/person/work', trust }),
+    });
+    const answers = [await codeOf(live('agente'))];
+    trust = 'restricted';
+    answers.push(await codeOf(live('agente')));
+    trust = 'trusted';
+    listening = false;
+    answers.push(await codeOf(live('agente')));
+    listening = true;
+    answers.push(await codeOf(live('agente')));
+    expect(answers).toEqual(['answered', 'E_WINDOW_RESTRICTED', 'E_WINDOW_AGENTS_OFF', 'answered']);
+  });
+
+  it('answers with no folder open, where an agent gets the window’s reads only (ADR 0180)', async () => {
+    expect(await codeOf(port({ workspace: { folder: null, trust: null } })('agente'))).toBe(
+      'answered',
+    );
+  });
+
+  it('says which plugin was refused', async () => {
+    const refusal = await port({ listening: false })('agente').then(
+      () => undefined,
+      (cause: PluginCapabilityError) => cause,
+    );
+    expect(refusal?.message).toBe(
+      "Plugin 'agente' asked for the window's agent server, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
+    );
+    expect(windowAgentServer(windows()).command).toBe(windows().relay.node);
   });
 });

@@ -159,7 +159,12 @@ import {
   killTree,
   terminalQuitGuard,
 } from './terminal.js';
-import { agentConfigFile, agentLaunch, agentRelayPaths } from './terminal-agent.js';
+import {
+  agentConfigFile,
+  agentLaunch,
+  agentRelayPaths,
+  windowAgentServerPort,
+} from './terminal-agent.js';
 import { chooseShell, terminalEnvironment } from './terminal-shell.js';
 import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
@@ -800,6 +805,15 @@ async function start(): Promise<void> {
   let stopCommands = (): void => {};
   // Whether the agent endpoint listens now (`agentsListen`), set where it starts, below.
   let agentsListening = false;
+  // The relay an agent registers to reach this window (ADR 0181): Open an Agent Here names it,
+  // and so does the server a plugin hands the agent it starts (ADR 0183).
+  const agentRelay = agentRelayPaths({
+    packaged: app.isPackaged,
+    mainDirectory: dirname(fileURLToPath(import.meta.url)),
+    resourcesPath: process.resourcesPath,
+    platform: process.platform,
+    join,
+  });
   // An agent's window tools (TYTO-566, ADR 0180): asks the renderer what is in front, and acts
   // on it once allowed. Under `agentsWindowActions: propose` the person is asked in a box attached
   // to the window, one at a time. When Tyto is not in front the taskbar flashes and the box waits
@@ -998,6 +1012,15 @@ async function start(): Promise<void> {
     }),
     ...signinCapabilities(signin),
     startProcess: programs.startProcess,
+    // The window's MCP server for the agent a plugin starts (ADR 0183): the relay Open an Agent
+    // Here names (ADR 0181), refused while the folder is restricted or agentsListen is off.
+    windowAgentServer: windowAgentServerPort({
+      relay: agentRelay,
+      pid: process.pid,
+      home: pluginsHome,
+      listening: () => agentsListening,
+      workspace: () => workspace.state(),
+    }),
   };
 
   // The export, composed here for the reason everything else is (ADR 0010): it needs a
@@ -1441,13 +1464,7 @@ async function start(): Promise<void> {
         command: agentProgram.command,
         args: agentProgram.args,
         exists: existsSync,
-        relay: agentRelayPaths({
-          packaged: app.isPackaged,
-          mainDirectory: dirname(fileURLToPath(import.meta.url)),
-          resourcesPath: process.resourcesPath,
-          platform: process.platform,
-          join,
-        }),
+        relay: agentRelay,
         pid: process.pid,
         home: pluginsHome,
         configFile: agentConfigFile(pluginsHome, process.pid, process.platform),

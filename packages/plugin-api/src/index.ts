@@ -266,6 +266,17 @@ export {
   processChannel,
   programNameProblem,
 } from './process.js';
+export {
+  AGENT_SERVER_VARIABLES,
+  type AgentServer,
+  type AgentServerVariable,
+  type HostWindow,
+  WINDOW_AGENT_SERVER_NAME,
+  agentServerSchema,
+  checkedWindowAgentServer,
+  hostWindow,
+  namesAProgram,
+} from './window.js';
 
 export {
   type ActivateOptions,

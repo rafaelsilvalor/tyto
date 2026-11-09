@@ -71,6 +71,7 @@ Some plugins work by talking to another program on your computer — an agent pa
 - **Tyto starts the program, not the plugin**, and only the one named: `process:claude` does not start anything else. The program is the one your `PATH` finds, so it is the same `claude` you run in a terminal, logged in the same way. Tyto installs no program: when it is not there, the plugin is told so and can tell you.
 - **It runs in the folder open in Tyto, and never while that folder is restricted.** Opening another folder, or trusting or distrusting this one, ends the programs a plugin started; so does closing the window.
 - **It runs as you.** The program can read and change what you can. It gets the folder it runs in and a few settings of your system, such as where your home folder is and your proxy, and never Tyto's secrets or a variable whose name looks like a key or a token.
+- **It can reach the Tyto window as an agent**, while `agentsListen` is on in your settings: the plugin can tell it how. It then reads what is open in the window, and a change it wants to make arrives as a proposal you approve or reject, as with an agent you open in a Tyto terminal. The install box says so beside the program's name. Turning `agentsListen` off, or a restricted folder, keeps it out.
 
 A plugin that adds a new program in an update is not started until you approve it again. The command line starts no programs for plugins.
 

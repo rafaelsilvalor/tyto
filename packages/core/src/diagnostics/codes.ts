@@ -541,6 +541,34 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
+  // The window's MCP server, handed to a plugin for the agent it starts (ADR 0183). Three codes,
+  // so a panel can tell "turn agentsListen on" and "trust the folder" from "not on this host".
+  E_WINDOW_UNAVAILABLE: {
+    severity: 'error',
+    summary: "A plugin asked for the window's agent server on a host that has no window.",
+    template: "Plugin '{plugin}' asked for the window's agent server, and {host} has no window.",
+    spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_WINDOW_AGENTS_OFF: {
+    severity: 'error',
+    summary: "A plugin asked for the window's agent server while agentsListen is off.",
+    template:
+      "Plugin '{plugin}' asked for the window's agent server, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
+    spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_WINDOW_RESTRICTED: {
+    severity: 'error',
+    summary: "A plugin asked for the window's agent server while the open folder is restricted.",
+    template:
+      "Plugin '{plugin}' asked for the window's agent server, and the open folder is restricted; trust it to let agents reach the window.",
+    spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
   // A plugin's private cache and the workspace files it reaches through the host (ADR 0138,
   // completing ADR 0130). Three codes, so a plugin can tell "trust the folder" from the rest.
   E_PLUGIN_CACHE: {

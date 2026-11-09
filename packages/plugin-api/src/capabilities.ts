@@ -1,6 +1,7 @@
 import { type Diagnostic, diagnostic } from '@tyto/core';
 
 import type { StartProcess } from './process.js';
+import type { AgentServer } from './window.js';
 
 /**
  * The runtime's own, read off `globalThis`: this package compiles against no platform's
@@ -171,6 +172,16 @@ export interface HostCapabilities {
    * Absent on a host that starts no programs — the CLI — which answers `E_PROCESS_UNAVAILABLE`.
    */
   startProcess?: StartProcess;
+
+  /**
+   * The window's MCP server, for the agent a plugin starts (ADR 0183), already allowed: the
+   * plugin declares a `process:<name>`. **The adapter reads `agentsListen` and the open folder's
+   * trust on every call** and refuses with `E_WINDOW_AGENTS_OFF` or `E_WINDOW_RESTRICTED`, as
+   * `PluginCapabilityError`s. Its `env` carries `TYTO_WINDOW` and `TYTO_HOME` only, which the
+   * check repeats. Absent on a host with no window — the CLI — which answers
+   * `E_WINDOW_UNAVAILABLE`.
+   */
+  windowAgentServer?(plugin: string): Promise<AgentServer>;
 }
 
 /**

@@ -304,7 +304,8 @@ function permissionLine(permission: string): string {
 
 /**
  * `process:<name>` in words, only for a plugin that asks for one (ADR 0182): Tyto, not the
- * plugin, starts that one program from the person's PATH, and the program is not confined.
+ * plugin, starts that one program from the person's PATH, and the program is not confined. It
+ * may reach the window as an agent (ADR 0183), and the last sentence says what that means.
  */
 function processNotice(permissions: readonly string[]): string {
   const programs = permissions
@@ -314,14 +315,24 @@ function processNotice(permissions: readonly string[]): string {
   const named = programs.map((program) => `\`${program}\``);
   const last = named.pop() ?? '';
   const either = named.length === 0 ? last : `${named.join(', ')} or ${last}`;
-  const those =
-    named.length === 0
-      ? 'That program runs with your rights and is'
-      : 'Those programs run with your rights and are';
+  const one = named.length === 0;
+  const those = one
+    ? 'That program runs with your rights and is'
+    : 'Those programs run with your rights and are';
+  // ADR 0183: a plugin that names a program may hand it the window's agent server, so the
+  // person reads here what that program can then do in the window.
+  const reach = one
+    ? 'That program can also reach the Tyto window as an agent while Tyto lets agents connect\n' +
+      '(setting `agentsListen`): it reads what is open there, and its edits arrive as proposals\n' +
+      'you approve or reject.\n'
+    : 'Those programs can also reach the Tyto window as agents while Tyto lets agents connect\n' +
+      '(setting `agentsListen`): they read what is open there, and their edits arrive as proposals\n' +
+      'you approve or reject.\n';
   return (
     `It may ask Tyto to start ${either}, found on your PATH, in the folder open in Tyto,\n` +
     'and never while that folder is restricted. Tyto starts no other program for it.\n' +
-    `${those} not confined to the folder.\n`
+    `${those} not confined to the folder.\n` +
+    reach
   );
 }
 

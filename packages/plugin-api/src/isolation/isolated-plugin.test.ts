@@ -888,6 +888,87 @@ describe('host.signin across the boundary (ADR 0174)', () => {
   });
 });
 
+describe('host.window across the boundary (ADR 0183)', () => {
+  const SERVER = {
+    name: 'tyto',
+    command: '/opt/tyto/node/node',
+    args: ['/opt/tyto/relay/agent-relay.js'],
+    env: [
+      { name: 'TYTO_WINDOW', value: '4242' },
+      { name: 'TYTO_HOME', value: '/home/ana/.tyto' },
+    ],
+  };
+  const WINDOW: HostCapabilities = {
+    fetch: () => Promise.reject(new Error('no network here')),
+    credential: () => Promise.resolve(undefined),
+    describeCredential: () => 'nowhere',
+    windowAgentServer: () => Promise.resolve(SERVER),
+  };
+
+  const asking = (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () =>
+        ok(
+          await host.window.agentServer().then(
+            (server) => JSON.stringify(server),
+            (cause: { code?: string }) => cause.code ?? 'thrown',
+          ),
+        ),
+    });
+
+  const answerOf = async (connected: Result<IsolatedPlugin, Diagnostics>): Promise<string> => {
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    return answer.ok ? answer.value : '';
+  };
+
+  it('hands a plugin that names a program the server, as the host checked it', async () => {
+    const { connected } = await isolate(asking, {
+      permissions: ['process:claude-agent-acp'],
+      capabilities: WINDOW,
+    });
+    expect(JSON.parse(await answerOf(connected))).toEqual(SERVER);
+  });
+
+  it('answers E_PERMISSION, E_WINDOW_UNAVAILABLE and the adapter’s refusal with their codes', async () => {
+    const { windowAgentServer: _port, ...cli } = WINDOW;
+    const off: HostCapabilities = {
+      ...WINDOW,
+      windowAgentServer: () =>
+        Promise.reject(
+          new PluginCapabilityError(diagnostic('E_WINDOW_AGENTS_OFF', { plugin: 'texto' })),
+        ),
+    };
+    const answers = await Promise.all(
+      [
+        isolate(asking, { permissions: ['net:example.com'], capabilities: WINDOW }),
+        isolate(asking, { permissions: ['process:claude'], capabilities: cli }),
+        isolate(asking, { permissions: ['process:claude'], capabilities: off }),
+      ].map(async (isolated) => answerOf((await isolated).connected)),
+    );
+    expect(answers).toEqual(['E_PERMISSION', 'E_WINDOW_UNAVAILABLE', 'E_WINDOW_AGENTS_OFF']);
+  });
+
+  it('never carries a variable the host did not allow, even from a careless adapter', async () => {
+    const careless: HostCapabilities = {
+      ...WINDOW,
+      windowAgentServer: () =>
+        Promise.resolve({
+          ...SERVER,
+          env: [...SERVER.env, { name: 'ANTHROPIC_API_KEY', value: 'sk-secret' }],
+        }),
+    };
+    const { connected } = await isolate(asking, {
+      permissions: ['process:claude'],
+      capabilities: careless,
+    });
+    const answer = await answerOf(connected);
+    expect(answer).toBe('thrown');
+    expect(answer).not.toContain('sk-secret');
+  });
+});
+
 describe('host.cache and host.workspace across the boundary (ADR 0138)', () => {
   /** A cache and a workspace that are maps, each answer carrying a key the guest must not see. */
   function storing() {

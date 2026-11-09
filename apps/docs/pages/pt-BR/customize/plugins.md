@@ -71,6 +71,7 @@ Alguns plugins funcionam conversando com outro programa do seu computador — um
 - **Quem abre o programa é o Tyto, não o plugin**, e só o que tem o nome escrito: `process:claude` não abre nenhum outro. O programa é o que o seu `PATH` encontra, então é o mesmo `claude` que você roda num terminal, com o mesmo login. O Tyto não instala programa nenhum: quando ele não está lá, o plugin fica sabendo e pode avisar você.
 - **Ele roda na pasta aberta no Tyto, e nunca enquanto essa pasta estiver restrita.** Abrir outra pasta, ou confiar ou deixar de confiar nesta, encerra os programas que um plugin abriu; fechar a janela também.
 - **Ele roda como você.** O programa lê e altera o que você pode. Ele recebe a pasta onde roda e algumas configurações do sistema, como onde fica a sua pasta pessoal e o seu proxy, e nunca os segredos do Tyto nem uma variável cujo nome parece uma chave ou um token.
+- **Ele pode alcançar a janela do Tyto como agente**, enquanto `agentsListen` estiver ligado nas suas configurações: o plugin pode dizer a ele como. Aí ele lê o que está aberto na janela, e uma mudança que ele queira fazer chega como proposta para você aprovar ou recusar, como acontece com um agente aberto num terminal do Tyto. A caixa de instalação avisa isso ao lado do nome do programa. Desligar o `agentsListen`, ou uma pasta restrita, deixa ele de fora.
 
 Um plugin que acrescenta um programa novo numa atualização não é iniciado até você aprovar de novo. A linha de comando não abre programas para plugins.
 

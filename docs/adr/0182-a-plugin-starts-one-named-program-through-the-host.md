@@ -166,3 +166,10 @@ three things the decisions above did not spell out:
   asynchronous `taskkill`, closing the window left the program running. The program held the
   handles it inherited from main, and the test harness waited on them for 45 s. When the window
   closes or the app quits, `taskkill` now finishes before main goes on.
+
+## Note, 2026-11-09 — the relay for ACP's servers (TYTO-569)
+
+The first row of "Left open" is decided in ADR 0183: `host.window.agentServer()` answers the
+window's MCP server in ACP's `mcpServers` shape, to a plugin that declares a `process:<name>`.
+The prompt's `process:` paragraph (decision 2) gains a sentence saying that the program can also
+reach the Tyto window as an agent.

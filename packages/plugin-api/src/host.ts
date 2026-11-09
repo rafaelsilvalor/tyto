@@ -61,6 +61,7 @@ import {
   SOURCE_SCHEME,
 } from './sources.js';
 import { type ThemeContribution, checkThemeContribution } from './theme.js';
+import { type HostWindow, checkedWindowAgentServer, hostWindow } from './window.js';
 
 /**
  * `PluginHost` and the in-process implementation of it (`docs/plugin-api.md`, Phase 1).
@@ -206,6 +207,14 @@ export interface PluginHost {
    * which starts no programs, answers `E_PROCESS_UNAVAILABLE`.
    */
   readonly process: HostProcess;
+  /**
+   * The open window, for the agent a plugin starts (ADR 0183). `agentServer()` answers the
+   * window's MCP server in the shape ACP's `mcpServers` takes, to a plugin that declares a
+   * `process:<name>`. Without one it is `E_PERMISSION`; the CLI, which has no window, answers
+   * `E_WINDOW_UNAVAILABLE`; `agentsListen` off is `E_WINDOW_AGENTS_OFF`; a restricted folder is
+   * `E_WINDOW_RESTRICTED`.
+   */
+  readonly window: HostWindow;
 
   readonly log: Logger;
   readonly events: TypedEmitter;
@@ -671,6 +680,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         const channel = processChannel();
         return channel.handle(await processes.start(name, args, channel.events));
       }),
+      window: hostWindow(checkedWindowAgentServer(pluginId, permissions, options.capabilities)),
 
       log,
       events: emitter,

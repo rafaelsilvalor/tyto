@@ -14,6 +14,7 @@ import {
 
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
 import { hostProcess, processChannel } from '../process.js';
+import { type AgentServer, hostWindow } from '../window.js';
 import type { GuestChannel } from './channel.js';
 import { guestFaces } from './faces.js';
 import {
@@ -38,6 +39,7 @@ import {
   hostMessageSchema,
   processStartedSchema,
   signinTokenSchema,
+  windowAgentServerSchema,
   workspaceBytesSchema,
 } from './protocol.js';
 
@@ -316,6 +318,9 @@ export function runGuest(
         },
       });
     }),
+    window: hostWindow(
+      async () => (await request('windowAgentServer', [], windowAgentServerSchema)) as AgentServer,
+    ),
     signin: hostSignin({
       signinAccessToken: async (id) =>
         (await request('signinAccessToken', [id], signinTokenSchema)) as string,
