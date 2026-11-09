@@ -353,8 +353,8 @@ export class PluginsDialog extends LitElement {
             ? html`<p class="plugins__disclosure">${say('plugins.panel.readsDocument')}</p>`
             : nothing
         }
-        ${this.fonts(say, plugin)} ${this.workspace(say, plugin)} ${this.credentials(say, plugin)}
-        ${this.signinLines(say, plugin)}
+        ${this.fonts(say, plugin)} ${this.workspace(say, plugin)} ${this.programs(say, plugin)}
+        ${this.credentials(say, plugin)} ${this.signinLines(say, plugin)}
         ${
           plugin.problems.length === 0
             ? nothing
@@ -459,6 +459,20 @@ export class PluginsDialog extends LitElement {
     return html`${lines.map(
       (line) => html`<p class="plugins__disclosure plugins__workspace">${line}</p>`,
     )}`;
+  }
+
+  /**
+   * `process:<name>` said in words (ADR 0182): the programs Tyto may start for the plugin, by
+   * name, in the open folder and never while it is restricted.
+   */
+  private programs(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
+    const names = plugin.permissions
+      .filter((permission) => permission.startsWith('process:'))
+      .map((permission) => permission.slice('process:'.length));
+    if (names.length === 0) return nothing;
+    return html`<p class="plugins__disclosure plugins__programs">
+      ${say('plugins.process.starts')} ${names.join(', ')}
+    </p>`;
   }
 
   /**

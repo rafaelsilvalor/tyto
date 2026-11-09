@@ -176,6 +176,27 @@ describe('the plugins screen', () => {
     expect(element.querySelector('[data-plugin="svg"] .plugins__fonts')).toBeNull();
   });
 
+  it('names, on its own row, the programs process: permissions let it start (ADR 0182)', async () => {
+    const element = await dialog({
+      folder: VIEW.folder,
+      plugins: [
+        {
+          ...VIEW.plugins[0]!,
+          name: 'agente',
+          origin: 'external',
+          contributes: ['panel'],
+          permissions: ['net:api.example.com', 'process:claude', 'process:codex'],
+        },
+        { ...VIEW.plugins[0]!, name: 'svg', contributes: ['exporter'] },
+      ],
+    });
+
+    expect(text(element, '[data-plugin="agente"] .plugins__programs')).toBe(
+      `${translate('en', 'plugins.process.starts')} claude, codex`,
+    );
+    expect(element.querySelector('[data-plugin="svg"] .plugins__programs')).toBeNull();
+  });
+
   it('says, on its own row, what workspace:read and workspace:write reach (ADR 0138)', async () => {
     const element = await dialog({
       folder: VIEW.folder,

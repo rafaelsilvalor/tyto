@@ -720,6 +720,11 @@ export interface Catalogue {
    */
   readonly 'plugins.workspace.reads': string;
   readonly 'plugins.workspace.writes': string;
+  /**
+   * On the row of a plugin that declares `process:<name>` (ADR 0182), followed by the programs'
+   * names: what Tyto may start for it, on this computer.
+   */
+  readonly 'plugins.process.starts': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
   /**
@@ -1421,6 +1426,7 @@ export const CATALOGUE_KEYS = [
   'plugins.font.sendsMachineFaces',
   'plugins.workspace.reads',
   'plugins.workspace.writes',
+  'plugins.process.starts',
   'plugins.close',
   'plugins.unavailable',
   'plugins.credential.label',

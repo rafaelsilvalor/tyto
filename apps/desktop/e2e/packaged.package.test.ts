@@ -13,7 +13,7 @@ import {
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
-import { dirname, join, relative } from 'node:path';
+import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
@@ -24,6 +24,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { readPackedFile, swapWhitespaceByte } from './asar-patch.js';
 import { writeFakeAgent } from './fake-agent.js';
+import { STAND_IN, writeProgramPlugin, writeStandInProgram } from './stand-in-program.js';
 import {
   type CdpApp,
   closeOverCdp,
@@ -133,10 +134,15 @@ function writeHome(home: string): void {
   writeCodeTemplate(home);
   writeSpy(home);
   writeConnector(home);
+  // The plugin that starts a program through `process:` (TYTO-568); `hold` is not used here.
+  writeProgramPlugin(home, join(home, 'unused.pid'));
   const entry = { enabled: true, permissions: [], source: '.' };
+  const programa = { ...entry, permissions: [`process:${STAND_IN}`] };
   writeFileSync(
     join(home, 'plugins.json'),
-    JSON.stringify({ plugins: { texto: entry, cartaz: entry, espia: entry, conector: entry } }),
+    JSON.stringify({
+      plugins: { texto: entry, cartaz: entry, espia: entry, conector: entry, programa },
+    }),
   );
 }
 
@@ -297,6 +303,14 @@ beforeAll(async () => {
     `${JSON.stringify({ 'conector.baseUrl': 'https://packaged.example', agentCommand: agent })}\n`,
   );
 
+  // The stand-in a plugin starts through `process:` (TYTO-568), first on the app's PATH, under a
+  // folder with a space, as a `.cmd` on Windows. `launchOverCdp` hands the app this process's
+  // environment, so the PATH is set here and put back once the app has started.
+  const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
+  const pathBefore = process.env[pathKey];
+  process.env[pathKey] =
+    `${writeStandInProgram(join(scratch, 'program bin'))}${delimiter}${pathBefore ?? ''}`;
+
   // Over CDP and not `_electron.launch`, which needs the inspect fuse this build switches off
   // (TYTO-249, ADR 0067). Its own data folder and its own `TYTO_HOME`, so the packaged app
   // neither reads nor writes the machine's (TYTO-150, TYTO-48).
@@ -305,6 +319,7 @@ beforeAll(async () => {
     home: join(scratch, 'tyto-home'),
   });
   page = app.page;
+  process.env[pathKey] = pathBefore;
   // `launchOverCdp` waits for the editor and not the bridge (TYTO-175, TYTO-154's rule).
   // `window.tyto` is put on the page by the preload, before a line of the renderer has run, so waiting for it answered _is the
   // preload there_ and then handed a half-loaded window to `afterAll`, which quits it. That
@@ -440,6 +455,49 @@ describe('the packaged app', () => {
         `and exported ${String(texts.length)} .txt file(s)\n`,
     );
     expect(readFileSync(join(out, texts[0]!), 'utf8')).toMatch(/^\S+ \S+$/u);
+  }, 120_000);
+
+  it('starts the program a plugin names through process:, and reads its output back (TYTO-568)', async () => {
+    type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
+    const call = <T>(channel: string, request: unknown): Promise<T> =>
+      page.evaluate(
+        ([name, body]) => (globalThis as never as { tyto: Bridge }).tyto[name as string]!(body),
+        [channel, request] as const,
+      ) as Promise<T>;
+
+    const out = join(scratch, 'program-out');
+    const { exportId } = await call<{ exportId: string }>('export:start', {
+      documentId: 'programa',
+      brief: ['---', 'template: promo-curso', 'formats: [grid-1x1]', '---', '::titulo P'].join(
+        '\n',
+      ),
+      directory: out,
+      outputs: [{ kind: 'echo' }],
+    });
+    const started = Date.now();
+    for (;;) {
+      const { progress } = await call<{ progress?: { status: string; failure?: string } }>(
+        'export:progress',
+        { exportId },
+      );
+      if (progress !== undefined && progress.status !== 'running') {
+        expect(progress.failure).toBeUndefined();
+        break;
+      }
+      if (Date.now() - started > 60_000)
+        throw new Error('the packaged program export never finished');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const [file] = readdirSync(out).filter((name) => name.endsWith('.echo'));
+    const heard = readFileSync(join(out, file!), 'utf8');
+    // Written straight to stdout: this line is what a reviewer reads in test:package.
+    process.stdout.write(
+      `[TYTO-568] packaged app started '${STAND_IN}' for the plugin 'programa' through ` +
+        `process:${STAND_IN} and read back: ${JSON.stringify(heard)}\n`,
+    );
+    expect(heard).toContain('ARGS ["two words","--acp"]');
+    expect(heard).toContain('HELLO FROM THE PLUGIN');
+    expect(heard).toMatch(/EXIT 0$/u);
   }, 120_000);
 
   it("opens a terminal on the person's shell through node-pty and reads echo back (TYTO-497)", async () => {
