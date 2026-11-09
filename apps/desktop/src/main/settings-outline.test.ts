@@ -51,6 +51,8 @@ describe("the app's settings outline", () => {
       'galleryIndex',
       'terminalShell',
       'terminalArgs',
+      'agentsListen',
+      'agentsWindowActions',
     ]);
   });
 

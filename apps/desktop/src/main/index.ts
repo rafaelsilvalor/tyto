@@ -36,7 +36,7 @@ import {
 } from '@tyto/io';
 import { NO_PLUGINS, type ThemeKind, createPluginHost } from '@tyto/plugin-api';
 
-import { type Locale, localeFor, translate } from '../../shared/i18n/index.js';
+import { type CatalogueKey, type Locale, localeFor, translate } from '../../shared/i18n/index.js';
 import {
   formatBriefOnSaveExample,
   googleFontsExample,
@@ -92,6 +92,7 @@ import {
 } from './signin.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
 import { type AgentEndpoint, createAgentEndpoint, osUserName } from './agent-endpoint.js';
+import { createAgentWindow } from './agent-window.js';
 import { type VerificationMode, verificationMode } from './verification-mode.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
@@ -785,6 +786,49 @@ async function start(): Promise<void> {
   // Stops every `tyto` command running in main (ADR 0159 decision 3): a `watch` ends when the
   // window opens another folder. Bound once the runner exists, below the queue.
   let stopCommands = (): void => {};
+  // Whether the agent endpoint listens now (`agentsListen`), set where it starts, below.
+  let agentsListening = false;
+  // An agent's window tools (TYTO-566, ADR 0180): asks the renderer what is in front, and acts
+  // on it once allowed. Under `agentsWindowActions: propose` the person is asked in a box attached
+  // to the window, one at a time. When Tyto is not in front the taskbar flashes and the box waits
+  // on the window: it never takes the focus from another program.
+  let agentsWindowActions = saved.agentsWindowActions;
+  const agentWindow = createAgentWindow({
+    sendState: (askId) => toWindow('agent:state', { askId }),
+    sendAct: (askId, action) => toWindow('agent:act', { askId, action: { ...action } }),
+    pathOf: (documentId) => documents.pathOf(documentId),
+    windowActions: () => agentsWindowActions,
+    ask: async (question) => {
+      const window = mainWindow;
+      if (window === undefined) return false;
+      const say = (key: CatalogueKey): string => translate(uiLocale, key);
+      const message =
+        question.kind === 'open'
+          ? say('agents.ask.open').replace('{path}', question.path)
+          : say('agents.ask.show')
+              .replace('{format}', question.format)
+              .replace('{brief}', question.brief ?? say('agents.ask.noBrief'));
+      const flashing = !window.isFocused();
+      if (flashing) window.flashFrame(true);
+      try {
+        const answer = await dialog.showMessageBox(window, {
+          type: 'question',
+          message,
+          detail: say('agents.ask.detail'),
+          buttons: [
+            say(question.kind === 'open' ? 'agents.ask.open.yes' : 'agents.ask.show.yes'),
+            say('agents.ask.no'),
+          ],
+          defaultId: 1,
+          cancelId: 1,
+          noLink: true,
+        });
+        return answer.response === 0;
+      } finally {
+        if (flashing) window.flashFrame(false);
+      }
+    },
+  });
   // The agent endpoint (TYTO-566, ADR 0180). Built here, because a folder change writes its
   // record again; it listens below the command runner, whose environment serves each agent.
   const agentEndpoint: AgentEndpoint = createAgentEndpoint({
@@ -806,6 +850,7 @@ async function start(): Promise<void> {
         { input: socket, output: socket },
         signal,
         'the window',
+        agentWindow.port,
       ),
     onConnections: (count) => {
       log.info(`agents connected: ${String(count)}`);
@@ -1293,14 +1338,20 @@ async function start(): Promise<void> {
 
   // **The agent endpoint** (TYTO-566, ADR 0180): `tyto mcp --window` reaches the tools `tyto
   // mcp` serves through it, run here with the command runner's environment and the open folder,
-  // so the window applies the CLI's own trust rules. It listens while the window is open.
-  void agentEndpoint.start().catch((cause: unknown) => {
-    log.error('The agent endpoint could not listen.', cause);
-  });
+  // so the window applies the CLI's own trust rules. It listens while the window is open, unless
+  // `agentsListen` is off; the setting applies live, below.
+  agentsListening = setAgentsListening(saved.agentsListen);
   app.on('will-quit', () => {
     agentEndpoint.removeRecordNow();
     void agentEndpoint.close();
   });
+  function setAgentsListening(on: boolean): boolean {
+    const change = on ? agentEndpoint.start() : agentEndpoint.close();
+    void change.catch((cause: unknown) => {
+      log.error(`The agent endpoint could not ${on ? 'listen' : 'close'}.`, cause);
+    });
+    return on;
+  }
 
   // **The terminals** (TYTO-497, ADR 0164): the person's shell in a pseudo-terminal main owns.
   // node-pty is loaded at the first open, so a window that never opens a terminal never loads a
@@ -1422,6 +1473,10 @@ async function start(): Promise<void> {
         terminalShell = { shell: next.terminalShell, args: next.terminalArgs };
       }
       if (keys.includes('zoom')) applyZoom(next.zoom);
+      if (keys.includes('agentsWindowActions')) agentsWindowActions = next.agentsWindowActions;
+      if (keys.includes('agentsListen') && next.agentsListen !== agentsListening) {
+        agentsListening = setAgentsListening(next.agentsListen);
+      }
       if (
         keys.includes('uiFontFamily') ||
         keys.includes('uiFontSize') ||
@@ -2046,6 +2101,14 @@ async function start(): Promise<void> {
       count: () => agentEndpoint.connections(),
       cut: () => {
         agentEndpoint.cut();
+      },
+      reply: (askId, answer) => {
+        agentWindow.reply(askId, answer);
+      },
+      open: async (askId, documentId) => {
+        const path = agentWindow.pathFor(askId);
+        if (path === undefined) return { document: null, documentId: null };
+        return documents.openPath(documentId, path);
       },
     },
     templateDialogs: {

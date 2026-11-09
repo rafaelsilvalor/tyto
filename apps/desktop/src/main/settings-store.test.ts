@@ -130,6 +130,8 @@ describe('fileSettingsStore', () => {
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
       terminalShell: DEFAULT_SETTINGS.terminalShell,
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
+      agentsListen: DEFAULT_SETTINGS.agentsListen,
+      agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
     });
   });
 
@@ -174,6 +176,8 @@ describe('fileSettingsStore', () => {
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
       terminalShell: DEFAULT_SETTINGS.terminalShell,
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
+      agentsListen: DEFAULT_SETTINGS.agentsListen,
+      agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
     });
   });
 
@@ -218,6 +222,8 @@ describe('fileSettingsStore', () => {
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
       terminalShell: DEFAULT_SETTINGS.terminalShell,
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
+      agentsListen: DEFAULT_SETTINGS.agentsListen,
+      agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
     });
   });
 
@@ -261,6 +267,8 @@ describe('fileSettingsStore', () => {
       galleryIndex: DEFAULT_SETTINGS.galleryIndex,
       terminalShell: DEFAULT_SETTINGS.terminalShell,
       terminalArgs: DEFAULT_SETTINGS.terminalArgs,
+      agentsListen: DEFAULT_SETTINGS.agentsListen,
+      agentsWindowActions: DEFAULT_SETTINGS.agentsWindowActions,
     });
   });
 

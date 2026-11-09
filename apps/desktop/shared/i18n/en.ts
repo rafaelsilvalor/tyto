@@ -249,6 +249,14 @@ export const en: Catalogue = {
   'status.agents.many': '{count} agents connected',
   'status.agents.cut':
     'Disconnect: an agent is reading this window over its local endpoint. Click to cut every connection.',
+  'agents.ask.open': 'An agent asks to open {path} in a tab.',
+  'agents.ask.show': 'An agent asks to show the format {format} of {brief} in the preview.',
+  'agents.ask.noBrief': 'the brief in front',
+  'agents.ask.detail':
+    'Nothing is written either way. The setting agentsWindowActions can let agents do this without asking.',
+  'agents.ask.open.yes': 'Open',
+  'agents.ask.show.yes': 'Show',
+  'agents.ask.no': "Don't",
   'status.position': 'Ln {line}, Col {column}',
   'status.selected': '{count} selected',
   'status.kind.settings': 'Settings',

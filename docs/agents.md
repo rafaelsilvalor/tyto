@@ -188,4 +188,7 @@ panel.
 `tyto mcp --window [folder]` relays the same stdio to a running window instead (ADR 0180): the
 window listens on a named pipe or Unix socket announced in `TYTO_HOME/windows/<pid>.json`,
 checks the record's token on the first line, and serves the same tools through `serveAgent`.
-The status bar shows **Agent connected** while one is, and its click cuts them.
+The status bar shows **Agent connected** while one is, and its click cuts them. Served by a
+window, the server adds `brief_in_front` and `selection` (reads of what is on screen, offered
+in any folder) and `open_file` and `show_format` (window actions, trusted folders only, asked
+first unless `agentsWindowActions` is `allow`). `agentsListen: false` stops the listener.

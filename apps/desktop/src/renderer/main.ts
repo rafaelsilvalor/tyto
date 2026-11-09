@@ -54,6 +54,7 @@ import {
   withSelection,
 } from '@tyto/editor';
 
+import { agentStateOf } from './agent-state.js';
 import {
   type IpcEventPayload,
   type IpcRequest,
@@ -5225,6 +5226,62 @@ function tellMenuWhatIsOffered(): void {
   });
 }
 
+/** The document in front and the focused editor's selection, for an agent (TYTO-566). */
+function agentStateNow(): ReturnType<typeof agentStateOf> {
+  const current = active();
+  return agentStateOf(
+    {
+      id: current.id,
+      name: current.name,
+      kind: current.kind,
+      text: current.brief,
+      unsaved: isUnsaved(current),
+      format: isBrief(current.kind) ? current.selection.format : undefined,
+    },
+    focusedPane()?.state(),
+  );
+}
+
+/**
+ * Does what an agent asked of the window, once main allowed it (ADR 0180 decision 6), and says
+ * how it went. A file opens as one the person chose would; a format is shown in the preview of
+ * the brief in front, opening the preview beside it when none is.
+ */
+async function actForAgent(
+  bridge: TytoBridge,
+  askId: number,
+  action: IpcEventPayload<'agent:act'>['action'],
+): Promise<void> {
+  const reply = (acted: { done: true } | { done: false; reason: string }): Promise<object> =>
+    bridge['agent:reply']({ askId, answer: { acted } });
+  if (action.kind === 'open') {
+    const wanted = nextDocumentId();
+    const opened = await bridge['agent:open']({ askId, documentId: wanted });
+    if (opened.document === null) {
+      await reply({ done: false, reason: 'the window could not open that file' });
+      return;
+    }
+    adopt(opened.document, opened.documentId, wanted);
+    await reply({ done: true });
+    return;
+  }
+  const current = active();
+  if (!isBrief(current.kind) || !formatsOf(current.frames).includes(action.format)) {
+    await reply({
+      done: false,
+      reason: `the brief in front has no format ${action.format}; describe_template lists them`,
+    });
+    return;
+  }
+  updateActive((document_) => ({
+    ...document_,
+    selection: { ...document_.selection, format: action.format },
+  }));
+  openPreview(true, false);
+  repaint();
+  await reply({ done: true });
+}
+
 /** Asks main whether the debugging port is open, and shows it on the bar (TYTO-651). */
 async function refreshVerification(bridge: TytoBridge): Promise<void> {
   const mode = await bridge['verification:status']({});
@@ -6431,6 +6488,14 @@ async function load(): Promise<void> {
     bridge.on('agents:changed', ({ count }) => {
       agentCount = count;
       paintStatusBar();
+    });
+    // An agent's asks (TYTO-566, ADR 0180): what is in front, and an action main already
+    // allowed — the person said yes in main's box, or `agentsWindowActions` is `allow`.
+    bridge.on('agent:state', ({ askId }) => {
+      void bridge['agent:reply']({ askId, answer: { state: agentStateNow() } });
+    });
+    bridge.on('agent:act', ({ askId, action }) => {
+      void actForAgent(bridge, askId, action);
     });
     if (elements.statusBar !== null) {
       elements.statusBar.cutAgents = () => {

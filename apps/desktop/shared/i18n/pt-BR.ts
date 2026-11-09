@@ -251,6 +251,14 @@ export const ptBR: Catalogue = {
   'status.agents.many': '{count} agentes conectados',
   'status.agents.cut':
     'Desconectar: um agente está lendo esta janela pela conexão local. Clique para cortar todas as conexões.',
+  'agents.ask.open': 'Um agente pede para abrir {path} numa aba.',
+  'agents.ask.show': 'Um agente pede para mostrar o formato {format} de {brief} no preview.',
+  'agents.ask.noBrief': 'o brief da frente',
+  'agents.ask.detail':
+    'Nada é gravado, nos dois casos. A configuração agentsWindowActions pode deixar os agentes fazerem isso sem perguntar.',
+  'agents.ask.open.yes': 'Abrir',
+  'agents.ask.show.yes': 'Mostrar',
+  'agents.ask.no': 'Não',
   'status.position': 'Lin {line}, Col {column}',
   'status.selected': '{count} selecionados',
   'status.kind.settings': 'Configurações',

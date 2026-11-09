@@ -486,6 +486,14 @@ export interface Catalogue {
   readonly 'status.agents.one': string;
   readonly 'status.agents.many': string;
   readonly 'status.agents.cut': string;
+  /** TYTO-566, ADR 0180: the box an agent's window action asks with, in main. */
+  readonly 'agents.ask.open': string;
+  readonly 'agents.ask.show': string;
+  readonly 'agents.ask.noBrief': string;
+  readonly 'agents.ask.detail': string;
+  readonly 'agents.ask.open.yes': string;
+  readonly 'agents.ask.show.yes': string;
+  readonly 'agents.ask.no': string;
   readonly 'status.position': string;
   readonly 'status.selected': string;
   readonly 'status.kind.settings': string;
@@ -1243,6 +1251,13 @@ export const CATALOGUE_KEYS = [
   'status.agents.one',
   'status.agents.many',
   'status.agents.cut',
+  'agents.ask.open',
+  'agents.ask.show',
+  'agents.ask.noBrief',
+  'agents.ask.detail',
+  'agents.ask.open.yes',
+  'agents.ask.show.yes',
+  'agents.ask.no',
   'status.position',
   'status.selected',
   'status.kind.settings',

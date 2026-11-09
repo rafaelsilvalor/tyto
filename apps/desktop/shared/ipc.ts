@@ -63,6 +63,38 @@ export const verificationStatusSchema = z.discriminatedUnion('on', [
 /** How many agents are connected to the window's endpoint (TYTO-566, ADR 0180). */
 export const agentsStatusSchema = z.object({ count: z.number().int().nonnegative() });
 
+const agentAskId = z.number().int().nonnegative();
+const agentPosition = z.object({
+  line: z.number().int().positive(),
+  column: z.number().int().positive(),
+});
+
+/**
+ * What the window answers an agent's `agent:state` (TYTO-566, ADR 0180): the document in front
+ * by the id main files its path under — never a path, which the window does not hold (ADR
+ * 0113) — its text as typed, and the editor's selection. `null` when no document is in front.
+ */
+export const agentStateSchema = z
+  .object({
+    documentId: z.string().min(1),
+    name: z.string().nullable(),
+    kind: z.string().min(1),
+    text: z.string(),
+    unsaved: z.boolean(),
+    format: z.string().nullable(),
+    ranges: z
+      .array(z.object({ from: agentPosition, to: agentPosition, text: z.string() }))
+      .max(100)
+      .nullable(),
+  })
+  .nullable();
+
+/** What a window action came to, as the window answers `agent:act`. */
+export const agentActedSchema = z.discriminatedUnion('done', [
+  z.object({ done: z.literal(true) }),
+  z.object({ done: z.literal(false), reason: z.string().min(1).max(500) }),
+]);
+
 /** One channel: what may be asked, and what comes back. */
 export interface IpcChannel<
   Request extends z.ZodType = z.ZodType,
@@ -995,6 +1027,31 @@ export const IPC_CHANNELS = {
    * nothing: the connections are main's, and the endpoint keeps listening for the next one.
    */
   'agents:cut': channel(z.object({}), z.object({})),
+
+  /**
+   * The window's answer to an agent's question, `agent:state` or `agent:act` (TYTO-566, ADR
+   * 0180), by the id main asked with. A late or unknown id is ignored.
+   */
+  'agent:reply': channel(
+    z.strictObject({
+      askId: agentAskId,
+      answer: z.union([
+        z.object({ state: agentStateSchema }),
+        z.object({ acted: agentActedSchema }),
+      ]),
+    }),
+    z.object({}),
+  ),
+
+  /**
+   * Opens the file an agent asked for, after the person said yes or `agentsWindowActions` is
+   * `allow` (ADR 0180 decision 6). Named by the ask's id: the path stays in main, which confined
+   * it, and the window hands in only the id its new tab will have (ADR 0113).
+   */
+  'agent:open': channel(
+    z.strictObject({ askId: agentAskId, documentId }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
 
   /**
    * The update notice was clicked (TYTO-131).
@@ -3067,6 +3124,22 @@ export const IPC_EVENTS = {
    */
   /** An agent connected to the window's endpoint, or left (TYTO-566, ADR 0180). */
   'agents:changed': agentsStatusSchema,
+
+  /** An agent asks what is in front (ADR 0180); the window answers on `agent:reply`. */
+  'agent:state': z.object({ askId: agentAskId }),
+
+  /**
+   * An agent's window action, already allowed (ADR 0180 decision 6): open the file the ask
+   * names, through `agent:open`, or show a format of the brief in front. Answered on
+   * `agent:reply`.
+   */
+  'agent:act': z.object({
+    askId: agentAskId,
+    action: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('open') }),
+      z.object({ kind: z.literal('show'), format: z.string().min(1).max(200) }),
+    ]),
+  }),
 
   'app:exit-requested': z.object({ askId: z.number().int().nonnegative() }),
 

@@ -51,6 +51,14 @@ tyto mcp --window: no open window holds this folder; relaying to the most recent
 
 While an agent is connected, the status bar shows **Agent connected** (with a count when there are more). Click it to cut every connection; the agent's server stops, and the window keeps listening for the next one. With no window open, the command says so and stops.
 
+Through the window the agent can also:
+
+- **Read the brief in front**: its name, the format the preview shows and its text as it is in the editor, including what you typed and have not saved. A file outside the folder answers with its name only.
+- **Read the selection**: each selected range with its lines and columns and the text it covers.
+- **Open a file** of the folder in a tab, and **show a format** of the brief in front in the preview. These two need a folder you have [trusted](../editor/workspace-folder.md), and by default the window asks you first in a box that names the file or the format; you choose **Open** (or **Show**) or **Don't**. One question at a time: while a box is up, another request is declined.
+
+Two [settings](../reference/settings.md) change this. `agentsWindowActions` set to `"allow"` lets the agent open and show without asking; a change to a document's text will always be asked. `agentsListen` set to `false` closes the connection, cuts every agent, and no agent can connect until it is `true` again.
+
 ## What the agent can do
 
 Four things, and none of them changes a file:

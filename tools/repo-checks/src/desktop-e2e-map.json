@@ -1937,6 +1937,17 @@
       ],
       "e2e": ["agent-endpoint.desktop.test.ts"],
       "why": "TYTO-566: an agent relayed to the running window, its badge and its cut"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/agent-window.ts",
+        "apps/desktop/src/main/agent-window.test.ts",
+        "apps/desktop/src/renderer/agent-state.ts",
+        "apps/desktop/src/renderer/agent-state.test.ts",
+        "apps/desktop/e2e/agent-window.desktop.test.ts"
+      ],
+      "e2e": ["agent-window.desktop.test.ts"],
+      "why": "TYTO-566: an agent's window tools on the running window, the box and agentsListen"
     }
   ]
 }

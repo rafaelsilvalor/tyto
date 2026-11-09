@@ -410,12 +410,35 @@ describe('toolsFor', () => {
   const tools = [...MCP_TOOLS, { name: 'write_brief', access: 'write' as const }];
 
   it('offers a tool that writes only to a trusted workspace', () => {
-    expect(toolsFor('restricted', tools)).not.toContain('write_brief');
-    expect(toolsFor('trusted', tools)).toContain('write_brief');
+    expect(toolsFor('restricted', {}, tools)).not.toContain('write_brief');
+    expect(toolsFor('trusted', {}, tools)).toContain('write_brief');
+  });
+
+  it('offers window reads wherever a window serves, and window actions only when trusted (ADR 0180)', () => {
+    const matrix = (['restricted', 'trusted'] as const).flatMap((trust) =>
+      [false, true].map((window) => ({
+        trust,
+        window,
+        tools: toolsFor(trust, { window }).filter((name) =>
+          ['brief_in_front', 'selection', 'open_file', 'show_format'].includes(name),
+        ),
+      })),
+    );
+    expect(matrix).toEqual([
+      { trust: 'restricted', window: false, tools: [] },
+      { trust: 'restricted', window: true, tools: ['brief_in_front', 'selection'] },
+      { trust: 'trusted', window: false, tools: [] },
+      {
+        trust: 'trusted',
+        window: true,
+        tools: ['brief_in_front', 'selection', 'open_file', 'show_format'],
+      },
+    ]);
   });
 
   it('offers every read tool either way', () => {
     for (const tool of MCP_TOOLS) {
+      if (tool.access !== 'read') continue;
       expect(toolsFor('restricted')).toContain(tool.name);
       expect(toolsFor('trusted')).toContain(tool.name);
     }

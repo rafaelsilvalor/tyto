@@ -32,6 +32,13 @@ import { type Terminals } from './terminal.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
 import { type VerificationMode } from './verification-mode.js';
+import type { AgentReply } from './agent-window.js';
+
+/** What `agent:open` answers: the tab's document, or nothing when the ask is unknown. */
+export interface OpenedByAgent {
+  readonly document: IpcResponse<'agent:open'>['document'];
+  readonly documentId: string | null;
+}
 import { declaredCredentialKeys } from './plugin-list.js';
 import { type PluginManager } from './plugin-manage.js';
 import { type SigninWindow } from './signin.js';
@@ -224,7 +231,14 @@ export interface IpcDependencies {
   /** Verification mode, read off the command line (TYTO-651, ADR 0178). */
   readonly verification: () => VerificationMode;
   /** The agents connected to the window's endpoint, and cutting them (TYTO-566, ADR 0180). */
-  readonly agents: { readonly count: () => number; readonly cut: () => void };
+  readonly agents: {
+    readonly count: () => number;
+    readonly cut: () => void;
+    /** The window's answer to an agent's ask (`agent:reply`). */
+    readonly reply: (askId: number, answer: AgentReply) => void;
+    /** Opens the file an agent's allowed ask names into the window's new tab (`agent:open`). */
+    readonly open: (askId: number, documentId: string) => Promise<OpenedByAgent>;
+  };
   /**
    * The native folder picker and the OS file manager, wrapped here for the reason the other
    * dialogs are: `dialog` and `shell` are Electron main-process APIs, and a service that
@@ -882,6 +896,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       dependencies.agents.cut();
       return Promise.resolve({});
     },
+
+    'agent:reply': ({ askId, answer }) => {
+      dependencies.agents.reply(askId, answer);
+      return Promise.resolve({});
+    },
+
+    'agent:open': ({ askId, documentId }) => dependencies.agents.open(askId, documentId),
 
     'update:act': () => {
       updates.act();

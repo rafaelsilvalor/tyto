@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 31. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 33. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -461,3 +461,33 @@ The arguments a terminal tab's program starts with, such as ["-NoLogo"], or null
 | Tipo | Padrão |
 | --- | --- |
 | `list of string \| null` | `null` |
+
+## agentsListen
+
+Let AI agents connect to this window through tyto mcp --window (default true). Off closes the connection and cuts every agent.
+
+| Tipo | Padrão |
+| --- | --- |
+| `boolean` | `true` |
+
+**Valores**
+
+| Valor | Significado |
+| --- | --- |
+| `true` | The window listens while it is open; only a program that can read your Tyto folder can connect. |
+| `false` | No agent can connect to the window. |
+
+## agentsWindowActions
+
+How an agent's request to open a file or show a format is handled: asked first, or done directly (default propose). Edits to a document's text are always asked.
+
+| Tipo | Padrão |
+| --- | --- |
+| `string` | `"propose"` |
+
+**Valores**
+
+| Valor | Significado |
+| --- | --- |
+| `"propose"` | A box asks you first, naming the file or the format; you open it or not. |
+| `"allow"` | The window does it when the agent asks. |
