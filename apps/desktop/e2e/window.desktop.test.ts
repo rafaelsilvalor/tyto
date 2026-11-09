@@ -259,6 +259,10 @@ describe('the bridge', () => {
     // `on` sorts in among them and is the one member that is not a channel: it is the receive
     // direction (ADR 0029), built from `IPC_EVENTS` rather than from the channel table.
     expect(channels).toEqual([
+      // TYTO-566, ADR 0180: an agent's open and the window's answers to its asks. Exercised by
+      // `e2e/agent-window.desktop.test.ts`.
+      'agent:open',
+      'agent:reply',
       // TYTO-566, ADR 0180: the status bar's agent badge and its cut. Exercised by
       // `e2e/agent-endpoint.desktop.test.ts`.
       'agents:cut',
@@ -500,6 +504,15 @@ describe('switching the language', () => {
     'status.agents.one',
     'status.agents.many',
     'status.agents.cut',
+    // TYTO-566: the box an agent's window action asks with is main's `showMessageBox`, never
+    // element text. `agent-window.test.ts` checks what it names.
+    'agents.ask.open',
+    'agents.ask.show',
+    'agents.ask.noBrief',
+    'agents.ask.detail',
+    'agents.ask.open.yes',
+    'agents.ask.show.yes',
+    'agents.ask.no',
     'preview.zoom.out',
     'preview.zoom.in',
     // TYTO-323: the strip toggle is a glyph, so its words — which change with the state — are its

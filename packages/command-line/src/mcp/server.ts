@@ -4,7 +4,15 @@ import { z } from 'zod';
 
 import type { CliConsole, CliStdio } from '../environment.js';
 import type { BriefInput, McpSession } from './session.js';
-import { type McpToolName, PREVIEW_MAX_SIDE, ToolRefusal, toolsFor } from './tools.js';
+import { confinedPath } from './confine.js';
+import {
+  type McpToolName,
+  PREVIEW_MAX_SIDE,
+  ToolRefusal,
+  type WindowActionAnswer,
+  type WindowPort,
+  toolsFor,
+} from './tools.js';
 
 /**
  * The protocol half of `tyto mcp` (ADR 0179): the SDK, the tools' schemas and descriptions, and
@@ -70,14 +78,29 @@ async function answering(
   }
 }
 
-/** Builds the server with the tools this workspace's trust allows (ADR 0179 decision 3). */
+/** Whether a path is inside the served folders, real path included (ADR 0179 decision 5). */
+async function servedPath(session: McpSession, path: string): Promise<string | undefined> {
+  const [cwd] = session.roots;
+  if (cwd === undefined) return undefined;
+  const confined = await confinedPath(path, cwd, session.roots);
+  return confined.ok ? confined.path : undefined;
+}
+
+const acted = (answer: WindowActionAnswer): ToolAnswer =>
+  answer.done ? { content: [text('done')] } : { content: [text(answer.reason)], isError: true };
+
+/**
+ * Builds the server with the tools this workspace's trust allows (ADR 0179 decision 3), and the
+ * window's when a window serves them (ADR 0180).
+ */
 export function createMcpServer(
   session: McpSession,
   version: string,
   err: CliConsole['err'],
+  window?: WindowPort,
 ): McpServer {
   const server = new McpServer({ name: 'tyto', version }, { capabilities: { tools: {} } });
-  const offered = new Set(toolsFor(session.trust));
+  const offered = new Set(toolsFor(session.trust, { window: window !== undefined }));
   const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   const offers = (name: McpToolName): boolean => offered.has(name);
 
@@ -177,7 +200,117 @@ export function createMcpServer(
     );
   }
 
+  if (window !== undefined) registerWindowTools(server, session, window, offers, err);
+
   return server;
+}
+
+/** The window's tools (ADR 0180): two reads of what is on screen, and two actions. */
+function registerWindowTools(
+  server: McpServer,
+  session: McpSession,
+  window: WindowPort,
+  offers: (name: McpToolName) => boolean,
+  err: CliConsole['err'],
+): void {
+  const onScreen = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+  const moves = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+
+  if (offers('brief_in_front')) {
+    server.registerTool(
+      'brief_in_front',
+      {
+        title: 'The brief in front',
+        description:
+          'The document in front of the person in the Tyto window: its path, name, kind, the format its preview shows, and its text as it is in the editor, unsaved typing included. A document outside the served folders answers with its name only.',
+        annotations: onScreen,
+      },
+      () =>
+        answering(err, async () => {
+          const front = await window.briefInFront();
+          if (front === undefined) throw new ToolRefusal('no document is in front');
+          if (front.path !== null && (await servedPath(session, front.path)) === undefined) {
+            // Its name is on screen anyway; where it lives and what it says stay out (ADR 0179
+            // decision 5).
+            return {
+              content: [
+                text({ name: front.name, kind: front.kind, outside: true, path: null, text: null }),
+              ],
+            };
+          }
+          return { content: [text(front)] };
+        }),
+    );
+  }
+
+  if (offers('selection')) {
+    server.registerTool(
+      'selection',
+      {
+        title: 'The selection',
+        description:
+          'The ranges selected in the editor in front, lines and columns from 1, with the text each covers. A cursor with nothing selected is a range whose start and end are equal.',
+        annotations: onScreen,
+      },
+      () =>
+        answering(err, async () => {
+          const front = await window.briefInFront();
+          if (
+            front !== undefined &&
+            front.path !== null &&
+            (await servedPath(session, front.path)) === undefined
+          ) {
+            throw new ToolRefusal('the document in front is outside the served folders');
+          }
+          const selected = await window.selection();
+          if (selected === undefined) throw new ToolRefusal('no editor is in front');
+          return { content: [text(selected)] };
+        }),
+    );
+  }
+
+  if (offers('open_file')) {
+    server.registerTool(
+      'open_file',
+      {
+        title: 'Open a file in a tab',
+        description:
+          'Opens a file of the served folder in a tab of the Tyto window. The person may be asked first, and may decline (setting agents.windowActions). Writes nothing.',
+        inputSchema: z.object({
+          path: z
+            .string()
+            .describe('the file, relative to the folder served, or absolute inside it'),
+        }),
+        annotations: moves,
+      },
+      ({ path }) =>
+        answering(err, async () => {
+          const served = await servedPath(session, path);
+          if (served === undefined) {
+            throw new ToolRefusal(
+              `${path} is outside the folder served and its workspace, or does not exist (ADR 0179)`,
+            );
+          }
+          return acted(await window.openFile(served));
+        }),
+    );
+  }
+
+  if (offers('show_format')) {
+    server.registerTool(
+      'show_format',
+      {
+        title: 'Show a format in the preview',
+        description:
+          "Shows one format of the brief in front in the window's preview. The person may be asked first, and may decline (setting agents.windowActions). Writes nothing.",
+        inputSchema: z.object({
+          format: z.string().describe('the format id, as describe_template lists them'),
+        }),
+        annotations: moves,
+      },
+      ({ format }) => answering(err, async () => acted(await window.showFormat(format))),
+    );
+  }
 }
 
 /** Serves until the client closes its end, or `signal` fires. */
@@ -188,9 +321,11 @@ export async function serveMcp(
     readonly version: string;
     readonly err: CliConsole['err'];
     readonly signal?: AbortSignal;
+    /** The window serving these tools, when one does (ADR 0180). */
+    readonly window?: WindowPort;
   },
 ): Promise<void> {
-  const server = createMcpServer(session, options.version, options.err);
+  const server = createMcpServer(session, options.version, options.err, options.window);
   const transport = new StdioServerTransport(stdio.input, stdio.output);
   const closed = new Promise<void>((resolve) => {
     transport.onclose = resolve;

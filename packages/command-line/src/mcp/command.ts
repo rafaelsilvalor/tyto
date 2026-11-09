@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { CliEnvironment, CliStdio } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK, type ExitCode } from '../exit.js';
 import { openSession } from './session.js';
+import type { WindowPort } from './tools.js';
 
 /**
  * `tyto mcp` — Tyto as a Model Context Protocol server on stdio, for an AI agent (ADR 0179).
@@ -60,6 +61,8 @@ export async function serveAgent(
   signal?: AbortSignal,
   /** What the start line says it serves on: `stdio`, or the window's connection. */
   on = 'stdio',
+  /** The window serving the tools, which adds its own (ADR 0180); none on stdio. */
+  window?: WindowPort,
 ): Promise<void> {
   const err = environment.console.err;
   // Everything the reused commands print goes to stderr, their answers included: the stream
@@ -79,6 +82,7 @@ export async function serveAgent(
       version: environment.version,
       err,
       ...(signal === undefined ? {} : { signal }),
+      ...(window === undefined ? {} : { window }),
     });
   } finally {
     await session.close();

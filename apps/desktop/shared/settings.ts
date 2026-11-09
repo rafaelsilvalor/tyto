@@ -241,6 +241,50 @@ export function formatBriefOnSaveExample(): string {
 }
 
 /**
+ * Whether the window listens for AI agents on its local endpoint (TYTO-566, ADR 0180): on by
+ * default, because that is what lets `tyto mcp --window` reach it with no step to turn it on.
+ * Applied live: off closes the listener, cuts every agent connected and removes the record.
+ */
+export const agentsListenContribution = {
+  id: 'agentsListen',
+  schema: z.boolean(),
+  default: true,
+  description:
+    'Let AI agents connect to this window through tyto mcp --window (default true). Off closes the connection and cuts every agent.',
+  options: [
+    {
+      value: true,
+      description:
+        'The window listens while it is open; only a program that can read your Tyto folder can connect.',
+    },
+    { value: false, description: 'No agent can connect to the window.' },
+  ],
+} satisfies ConfigurationContribution<boolean>;
+
+/** How an agent's request to move the window is handled (ADR 0180 decision 6). */
+export type AgentWindowActions = 'propose' | 'allow';
+
+/**
+ * Whether an agent's window action — opening a file in a tab, showing a format — is asked first
+ * (TYTO-566, ADR 0180 decision 6). `propose` by default, Rafael's choice of 2026-11-09. A change to
+ * a document's text is always asked, whatever this says (decision 5).
+ */
+export const agentsWindowActionsContribution = {
+  id: 'agentsWindowActions',
+  schema: z.enum(['propose', 'allow']),
+  default: 'propose' as AgentWindowActions,
+  description:
+    "How an agent's request to open a file or show a format is handled: asked first, or done directly (default propose). Edits to a document's text are always asked.",
+  options: [
+    {
+      value: 'propose',
+      description: 'A box asks you first, naming the file or the format; you open it or not.',
+    },
+    { value: 'allow', description: 'The window does it when the agent asks.' },
+  ],
+} satisfies ConfigurationContribution<AgentWindowActions>;
+
+/**
  * Spaces per indent level in the editor (TYTO-297, ADR 0096): what Tab inserts and Shift+Tab
  * removes, how wide a tab character is drawn, the step of the indent guides, and the indent
  * Format Brief writes a body line with. Spaces only — Tab never inserts a tab character. On
@@ -429,6 +473,8 @@ export function settingContributions(
     galleryIndexContribution,
     terminalShellContribution,
     terminalArgsContribution,
+    agentsListenContribution,
+    agentsWindowActionsContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -485,6 +531,10 @@ export interface Settings {
   /** The program a terminal tab runs and its arguments, `null` for the platform's (TYTO-497). */
   readonly terminalShell: string | null;
   readonly terminalArgs: readonly string[] | null;
+  /** Whether the window listens for agents (TYTO-566, ADR 0180). */
+  readonly agentsListen: boolean;
+  /** Whether an agent's window action is asked first (TYTO-566, ADR 0180). */
+  readonly agentsWindowActions: AgentWindowActions;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -519,13 +569,15 @@ export const DEFAULT_SETTINGS: Settings = {
   galleryIndex: galleryIndexContribution.default,
   terminalShell: terminalShellContribution.default,
   terminalArgs: terminalArgsContribution.default,
+  agentsListen: agentsListenContribution.default,
+  agentsWindowActions: agentsWindowActionsContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The thirty-one out of the resolved values, which already hold every declared key with a value
+ * The thirty-three out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -563,5 +615,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     galleryIndex: pick('galleryIndex'),
     terminalShell: pick('terminalShell'),
     terminalArgs: pick('terminalArgs'),
+    agentsListen: pick('agentsListen'),
+    agentsWindowActions: pick('agentsWindowActions'),
   };
 }

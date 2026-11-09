@@ -177,6 +177,35 @@ describe('the agent endpoint', () => {
     expect(opened.connections()).toBe(0);
   });
 
+  it('stops listening when switched off, cutting agents and removing the record, and listens again (agentsListen)', async () => {
+    const { endpoint: opened, record } = await started();
+    const recordFile = join(home, 'windows', `${String(process.pid)}.json`);
+    const agent = client(record.endpoint, `${hello(record.token)}${initialize}`);
+    await agent.lineCount(2);
+
+    // What `agentsListen: false` does, applied live (ADR 0180 amendment).
+    await opened.close();
+    await agent.closed;
+    await expect(stat(recordFile)).rejects.toThrow();
+    const refused = await new Promise<string>((resolve) => {
+      const socket = connect(record.endpoint);
+      socket.once('connect', () => {
+        socket.destroy();
+        resolve('connected');
+      });
+      socket.once('error', (cause: NodeJS.ErrnoException) => resolve(cause.code ?? 'error'));
+    });
+    expect(refused).not.toBe('connected');
+
+    // And back on: the same endpoint and token, a fresh record.
+    await opened.start();
+    const again = JSON.parse(await readFile(recordFile, 'utf8')) as WindowRecord;
+    expect(again.endpoint).toBe(record.endpoint);
+    const second = client(again.endpoint, `${hello(again.token)}${initialize}`);
+    await second.lineCount(2);
+    second.socket.destroy();
+  });
+
   it('writes the record again when the window opens another folder', async () => {
     const { endpoint: opened, open } = await started();
     open(null);

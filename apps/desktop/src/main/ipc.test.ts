@@ -1034,7 +1034,12 @@ const dependencies = () => {
     templateFolder: createTemplateFolder(),
     updates: updateNotice(),
     verification: () => ({ on: false }) as const,
-    agents: { count: () => 0, cut: () => {} },
+    agents: {
+      count: () => 0,
+      cut: () => {},
+      reply: () => {},
+      open: () => Promise.resolve({ document: null, documentId: null }),
+    },
   };
 };
 
@@ -1703,6 +1708,7 @@ describe('agents:status and agents:cut', () => {
     const handlers = createHandlers({
       ...dependencies(),
       agents: {
+        ...dependencies().agents,
         count: () => count,
         cut: () => {
           count = 0;
@@ -1713,6 +1719,34 @@ describe('agents:status and agents:cut', () => {
     expect(await handlers['agents:status']({})).toEqual({ count: 2 });
     expect(await handlers['agents:cut']({})).toEqual({});
     expect(await handlers['agents:status']({})).toEqual({ count: 0 });
+  });
+});
+
+describe('agent:reply and agent:open', () => {
+  it("hands the window's answer and its open to the agent window, by the ask's id (TYTO-566)", async () => {
+    const replies: unknown[] = [];
+    const opens: unknown[] = [];
+    const handlers = createHandlers({
+      ...dependencies(),
+      agents: {
+        ...dependencies().agents,
+        reply: (askId, answer) => replies.push({ askId, answer }),
+        open: (askId, documentId) => {
+          opens.push({ askId, documentId });
+          return Promise.resolve({ document: null, documentId: null });
+        },
+      },
+    });
+
+    expect(await handlers['agent:reply']({ askId: 4, answer: { acted: { done: true } } })).toEqual(
+      {},
+    );
+    expect(await handlers['agent:open']({ askId: 5, documentId: 'doc-9' })).toEqual({
+      document: null,
+      documentId: null,
+    });
+    expect(replies).toEqual([{ askId: 4, answer: { acted: { done: true } } }]);
+    expect(opens).toEqual([{ askId: 5, documentId: 'doc-9' }]);
   });
 });
 

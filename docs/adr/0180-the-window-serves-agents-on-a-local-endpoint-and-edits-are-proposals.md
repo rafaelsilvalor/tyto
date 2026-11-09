@@ -157,3 +157,42 @@ The window listens. Four things were settled or measured on the way; decisions 1
 
 - **`--window` is offered.** It is shown by `tyto mcp --help` and in the generated reference,
   and the manual's agents page says how to register it, in both editions.
+
+## Amendment — 2026-11-09, TYTO-566 PR 3
+
+The window tools land. Decisions 6 and 7 stand; four details were settled.
+
+- **The settings are `agentsListen` and `agentsWindowActions`**, not `agents.listen` and
+  `agents.windowActions` as decision 6 and the PR 2 amendment wrote them. A built-in setting's
+  key is letters and digits (`LOCAL_KEY` in `packages/plugin-api/src/configuration.ts`): a dot is
+  how a plugin's key is told apart (`<plugin>.<key>`), so a dotted built-in key would read as a
+  plugin's. `agentsListen` applies live: off closes the listener, cuts every agent and removes
+  the record; on listens again with the same endpoint and token.
+- **A third access, in two kinds.** `MCP_TOOLS` gains `window-read` (`brief_in_front`,
+  `selection`: what is on screen, written nowhere) and `window-action` (`open_file`,
+  `show_format`). `toolsFor(trust, { window })` offers window reads wherever a window serves,
+  restricted folder included, and window actions only to a trusted workspace; the stdio server
+  has no window and offers neither. A brief in front whose file is outside the served folders
+  answers with its name only, and its selection is refused, by decision 5 of ADR 0179. An
+  untitled brief has no path to confine and is answered whole.
+- **A proposal for a window action is a box in main**, `showMessageBox` attached to the window,
+  naming the full path or the format and the brief; **one at a time**: a request while a box is
+  up is declined (`declined: another request is pending`) with no second box. When Tyto is not
+  in front, the taskbar flashes and the box waits on the window; it takes no focus from another
+  program (read in the code, Windows' foreground rules; not measured on macOS or Linux). The
+  in-editor proposal of a text edit is PR 4's.
+- **Remote clients reach the pipe.** Measured on Windows 11 with the Server service running: a
+  pipe Node's `net` creates accepts a client that comes through the SMB redirector, so libuv does
+  not set `PIPE_REJECT_REMOTE_CLIENTS`:
+
+  ```
+  local     \\.\pipe\tyto-remote-probe-30368: connected, read "hello\n"
+  via localhost \\localhost\pipe\tyto-remote-probe-30368: connected, read "hello\n"
+  via 127.0.0.1 \\127.0.0.1\pipe\tyto-remote-probe-30368: connected, read "hello\n"
+  server accepted 3 connection(s)
+  ```
+
+  Node exposes neither the flag nor the client's computer name, so closing it needs native code;
+  the coordinator opens a card for it. Meanwhile the token stays the gate: a remote reader with
+  Everyone's read right gets nothing, and a remote caller who may write is the same user, who
+  could read `TYTO_HOME` over the administrative share anyway.

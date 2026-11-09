@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 31. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 33. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -457,3 +457,33 @@ The arguments a terminal tab's program starts with, such as ["-NoLogo"], or null
 | Type | Default |
 | --- | --- |
 | `list of string \| null` | `null` |
+
+## agentsListen
+
+Let AI agents connect to this window through tyto mcp --window (default true). Off closes the connection and cuts every agent.
+
+| Type | Default |
+| --- | --- |
+| `boolean` | `true` |
+
+**Values**
+
+| Value | Meaning |
+| --- | --- |
+| `true` | The window listens while it is open; only a program that can read your Tyto folder can connect. |
+| `false` | No agent can connect to the window. |
+
+## agentsWindowActions
+
+How an agent's request to open a file or show a format is handled: asked first, or done directly (default propose). Edits to a document's text are always asked.
+
+| Type | Default |
+| --- | --- |
+| `string` | `"propose"` |
+
+**Values**
+
+| Value | Meaning |
+| --- | --- |
+| `"propose"` | A box asks you first, naming the file or the format; you open it or not. |
+| `"allow"` | The window does it when the agent asks. |

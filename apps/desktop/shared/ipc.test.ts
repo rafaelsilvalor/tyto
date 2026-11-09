@@ -16,6 +16,9 @@ import {
 describe('the IPC contract', () => {
   it('names every channel exactly once, and nothing else', () => {
     expect([...IPC_CHANNEL_NAMES].sort()).toEqual([
+      // TYTO-566, ADR 0180: an agent's open, and the window's answers to its asks.
+      'agent:open',
+      'agent:reply',
       // TYTO-566, ADR 0180: the status bar's agent badge, and its cut.
       'agents:cut',
       'agents:status',
@@ -205,6 +208,9 @@ describe('the terminal channels', () => {
 describe('the event table', () => {
   it('names every event exactly once, and nothing else', () => {
     expect([...IPC_EVENT_NAMES].sort()).toEqual([
+      // TYTO-566. An agent asks what is in front, or asks the window to act.
+      'agent:act',
+      'agent:state',
       // TYTO-566. An agent connected to the window's endpoint, or left.
       'agents:changed',
       'app:exit-requested',

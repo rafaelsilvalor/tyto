@@ -51,6 +51,14 @@ tyto mcp --window: no open window holds this folder; relaying to the most recent
 
 Enquanto um agente está conectado, a barra de status mostra **Agente conectado** (com o número quando há mais de um). Clique nele para cortar todas as conexões; o servidor do agente para, e a janela continua esperando o próximo. Sem nenhuma janela aberta, o comando diz isso e para.
 
+Pela janela o agente também pode:
+
+- **Ler o brief da frente**: o nome, o formato que o preview mostra e o texto como está no editor, inclusive o que você digitou e não salvou. Um arquivo fora da pasta responde só com o nome.
+- **Ler a seleção**: cada trecho selecionado com as linhas e colunas e o texto que ele cobre.
+- **Abrir um arquivo** da pasta numa aba e **mostrar um formato** do brief da frente no preview. Esses dois exigem uma pasta em que você [confiou](../editor/workspace-folder.md), e por padrão a janela pergunta antes numa caixa que diz o arquivo ou o formato; você escolhe **Abrir** (ou **Mostrar**) ou **Não**. Uma pergunta por vez: enquanto uma caixa está aberta, outro pedido é recusado.
+
+Duas [configurações](../reference/settings.md) mudam isso. `agentsWindowActions` em `"allow"` deixa o agente abrir e mostrar sem perguntar; uma mudança no texto de um documento sempre vai ser perguntada. `agentsListen` em `false` fecha a conexão, corta todos os agentes, e nenhum agente se conecta até ela voltar a `true`.
+
 ## O que o agente pode fazer
 
 Quatro coisas, e nenhuma muda um arquivo:
