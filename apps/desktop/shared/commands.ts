@@ -128,8 +128,11 @@ export const TOOLS_MENU_GROUPS: readonly (readonly MenuCommand[])[] = [
     { id: 'plugins.show', label: 'command.plugins.show' },
     { id: 'queue.show', label: 'command.queue.show' },
   ],
-  // TYTO-497. Another shell, in front in the Terminal tab.
-  [{ id: 'terminal.new', label: 'command.terminal.new' }],
+  // TYTO-497. Another shell, in front in the Terminal tab; TYTO-567, an agent in one.
+  [
+    { id: 'terminal.new', label: 'command.terminal.new' },
+    { id: 'terminal.openAgent', label: 'command.terminal.openAgent' },
+  ],
   [
     // TYTO-206, TYTO-207, TYTO-277. The person's three files, each in a tab.
     { id: 'settings.open', label: 'command.settings.open' },

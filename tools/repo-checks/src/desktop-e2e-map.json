@@ -1957,6 +1957,17 @@
       ],
       "e2e": ["agent-proposal.desktop.test.ts"],
       "why": "TYTO-566: an agent's proposed edit in the real window, accepted, undone and stale"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/terminal-agent.ts",
+        "apps/desktop/src/main/terminal-agent.test.ts",
+        "apps/desktop/src/main/agent-relay.ts",
+        "apps/desktop/e2e/terminal-agent.desktop.test.ts",
+        "apps/desktop/e2e/fake-agent.ts"
+      ],
+      "e2e": ["terminal-agent.desktop.test.ts", "packaged.package.test.ts"],
+      "why": "TYTO-567: Open an Agent Here starts an agent in a terminal that reaches this window through the bundled relay"
     }
   ]
 }

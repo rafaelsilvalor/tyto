@@ -27,14 +27,15 @@ export const guestBuild: Options = {
 };
 
 /**
- * The command tree. One entry: `launchPluginProcess` finds the bootstrap at
+ * The command tree, and `relay`, the window relay alone for the desktop's agent relay bundle
+ * (TYTO-567, ADR 0181). `launchPluginProcess` finds the bootstrap at
  * `./guest/plugin-guest.js` beside the module it is bundled into. The chunks are `tyto mcp`'s
  * protocol half (`src/mcp/server.ts`), imported lazily so the SDK loads with that command only
  * (ADR 0179), and what it shares with the entry; they land in `dist/` beside `index.js`, so the
  * bootstrap's path does not move.
  */
 export const commandLineBuild: Options = {
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/relay.ts'],
   format: ['esm'],
   dts: true,
   sourcemap: true,

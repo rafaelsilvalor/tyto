@@ -84,16 +84,20 @@ describe('the shell a terminal runs (ADR 0164 decision 4)', () => {
 
 describe('the environment a terminal gets', () => {
   it("drops Tyto's plugin variables, Electron's and NODE_OPTIONS, and says it is a colour terminal", () => {
-    const environment = terminalEnvironment({
-      PATH: '/usr/bin',
-      HOME: '/home/person',
-      TYTO_PLUGIN_TOKEN: 'never',
-      ELECTRON_RUN_AS_NODE: '1',
-      electron_enable_logging: '1',
-      NODE_OPTIONS: '--require evil.js',
-      TERM: 'dumb',
-      UNSET: undefined,
-    });
+    const environment = terminalEnvironment(
+      {
+        PATH: '/usr/bin',
+        HOME: '/home/person',
+        TYTO_PLUGIN_TOKEN: 'never',
+        ELECTRON_RUN_AS_NODE: '1',
+        electron_enable_logging: '1',
+        NODE_OPTIONS: '--require evil.js',
+        TERM: 'dumb',
+        TYTO_WINDOW: '1',
+        UNSET: undefined,
+      },
+      4242,
+    );
 
     expect(environment).toEqual({
       PATH: '/usr/bin',
@@ -101,6 +105,8 @@ describe('the environment a terminal gets', () => {
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
       TERM_PROGRAM: 'Tyto',
+      // The window that started it, over one inherited from a terminal Tyto ran in (ADR 0181).
+      TYTO_WINDOW: '4242',
     });
   });
 });

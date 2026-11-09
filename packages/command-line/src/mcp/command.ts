@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { CliEnvironment, CliStdio } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK, type ExitCode } from '../exit.js';
 import { openSession } from './session.js';
+import { WINDOW_PID_VARIABLE, windowPidOf } from './window-endpoint.js';
 import type { WindowPort } from './tools.js';
 
 /**
@@ -36,7 +37,9 @@ export async function mcpCommand(
   if (options.window === true) {
     // The window serves the protocol; this process only copies bytes, so it loads no SDK.
     const { relayToWindow } = await import('./relay.js');
+    const named = windowPidOf(environment.variables?.[WINDOW_PID_VARIABLE]);
     return relayToWindow({
+      ...(named === undefined ? {} : { named }),
       home: environment.home,
       folder: resolve(environment.cwd, folder),
       platform: process.platform,

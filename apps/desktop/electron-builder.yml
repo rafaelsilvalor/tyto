@@ -106,6 +106,8 @@ extraResources:
     to: node
 asarUnpack:
   - out/guest/**
+  # The agent relay (TYTO-567, ADR 0181) runs on the same Node, for the same reason.
+  - out/relay/**
   - node_modules/node-pty/**
 
 # **Three of Electron's fuses are switched off** (TYTO-193, TYTO-249, ADR 0067). A fuse is a byte in the executable that electron-builder flips after packing and

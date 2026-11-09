@@ -146,6 +146,7 @@ const actions = () =>
     runRecipeFresh: vi.fn<() => void>(),
     focusCommandPanel: vi.fn<() => void>(),
     newTerminal: vi.fn<() => void>(),
+    openAgent: vi.fn<() => void>(),
     showTerminal: vi.fn<() => void>(),
     showProblems: vi.fn<() => void>(),
     renderBriefInCommandPanel: vi.fn<() => void>(),
@@ -764,6 +765,7 @@ describe('every menu table', () => {
     expect(spies.showPlugins).toHaveBeenCalledTimes(1);
     expect(spies.showQueue).toHaveBeenCalledTimes(1);
     expect(spies.newTerminal).toHaveBeenCalledTimes(1);
+    expect(spies.openAgent).toHaveBeenCalledTimes(1);
     expect(spies.openSettings).toHaveBeenCalledTimes(1);
     expect(spies.openKeybindings).toHaveBeenCalledTimes(1);
     expect(spies.openSnippets).toHaveBeenCalledTimes(1);

@@ -434,7 +434,30 @@ export const terminalArgsContribution = {
 } satisfies ConfigurationContribution<readonly string[] | null>;
 
 /**
- * The thirty-one, in the order the settings file is documented in. `theme` checks its ids against
+ * The program **Open an Agent Here** starts in a new terminal tab (TYTO-567, ADR 0181): `claude`
+ * by default. Tyto installs none; a program not on `PATH` is a line in the tab, and nothing
+ * starts. Read from `settings.json` only, as `terminalShell` is, for the same reason: a folder
+ * that chose the program to run would be a source shipping code (ADR 0111).
+ */
+export const agentCommandContribution = {
+  id: 'agentCommand',
+  schema: z.string().min(1),
+  default: 'claude',
+  description:
+    'The agent program Open an Agent Here starts in a new terminal tab, such as "claude" or "codex" (default "claude"). Tyto installs none.',
+} satisfies ConfigurationContribution<string>;
+
+/** Arguments added after the ones that connect the agent to the window. */
+export const agentArgsContribution = {
+  id: 'agentArgs',
+  schema: z.array(z.string()).max(64),
+  default: [] as readonly string[],
+  description:
+    'Arguments the agent program starts with, after the ones that connect it to this window, such as ["--model", "opus"] (default none).',
+} satisfies ConfigurationContribution<readonly string[]>;
+
+/**
+ * The thirty-five, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -475,6 +498,8 @@ export function settingContributions(
     terminalArgsContribution,
     agentsListenContribution,
     agentsWindowActionsContribution,
+    agentCommandContribution,
+    agentArgsContribution,
   ] as readonly ConfigurationContribution[];
 }
 
@@ -535,6 +560,9 @@ export interface Settings {
   readonly agentsListen: boolean;
   /** Whether an agent's window action is asked first (TYTO-566, ADR 0180). */
   readonly agentsWindowActions: AgentWindowActions;
+  /** The agent Open an Agent Here starts, and its own arguments (TYTO-567, ADR 0181). */
+  readonly agentCommand: string;
+  readonly agentArgs: readonly string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -571,6 +599,8 @@ export const DEFAULT_SETTINGS: Settings = {
   terminalArgs: terminalArgsContribution.default,
   agentsListen: agentsListenContribution.default,
   agentsWindowActions: agentsWindowActionsContribution.default,
+  agentCommand: agentCommandContribution.default,
+  agentArgs: agentArgsContribution.default,
 };
 
 /** What a queue folder produces until a person chooses otherwise (ADR 0044). */
@@ -617,5 +647,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     terminalArgs: pick('terminalArgs'),
     agentsListen: pick('agentsListen'),
     agentsWindowActions: pick('agentsWindowActions'),
+    agentCommand: pick('agentCommand'),
+    agentArgs: pick('agentArgs'),
   };
 }

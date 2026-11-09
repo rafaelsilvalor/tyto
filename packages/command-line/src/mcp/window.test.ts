@@ -10,7 +10,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CliEnvironment } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK } from '../exit.js';
 import { run } from '../program.js';
-import { NO_WINDOW, WINDOW_REFUSED, WINDOW_UNREACHABLE, relayToWindow } from './relay.js';
+import {
+  NO_WINDOW,
+  WINDOW_REFUSED,
+  WINDOW_UNREACHABLE,
+  namedGoneLine,
+  relayToWindow,
+} from './relay.js';
 import {
   REFUSED_LINE,
   UNIX_SOCKET_PATH_MAX,
@@ -25,6 +31,7 @@ import {
   readFirstLine,
   recordPath,
   sameToken,
+  windowPidOf,
 } from './window-endpoint.js';
 
 /**
@@ -121,7 +128,10 @@ async function fakeWindow(
 }
 
 /** `run(['mcp', '--window'])` over two in-memory streams: what an agent's host is to it. */
-function relay(args: readonly string[] = []) {
+function relay(
+  args: readonly string[] = [],
+  variables?: Readonly<Record<string, string | undefined>>,
+) {
   const input = new PassThrough();
   const output = new PassThrough();
   const lines: string[] = [];
@@ -150,6 +160,7 @@ function relay(args: readonly string[] = []) {
       throw new Error('the relay asked for a rasterizer');
     },
     stdio: () => ({ input, output }),
+    ...(variables === undefined ? {} : { variables }),
   };
   const exit = run(['mcp', '--window', ...args], environment);
   let next = 1;
@@ -245,6 +256,71 @@ describe('tyto mcp --window', () => {
   });
 });
 
+describe('tyto mcp --window from a terminal Tyto started (ADR 0181)', () => {
+  it('relays to the window TYTO_WINDOW names, though its workspace does not hold the folder', async () => {
+    const window = await fakeWindow({ folder: home });
+    const client = relay([], { TYTO_WINDOW: String(process.pid) });
+    expect((await client.request('tools/list')).result.echo).toBe('tools/list');
+    client.input.end();
+
+    expect(await client.exit).toBe(EXIT_OK);
+    expect(window.hellos.map((hello) => hello.accepted)).toEqual([true]);
+    expect(errors.join('')).toContain('relaying to the window that started this terminal');
+    expect(errors.join('')).not.toContain('most recent');
+  });
+
+  it('prefers the named window over the one whose workspace holds the folder', async () => {
+    const holding = await fakeWindow({ pid: 4101, folder }, true);
+    const named = await fakeWindow({ pid: 4102, folder: home }, true);
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const exit = relayToWindow({
+      home,
+      folder,
+      platform: process.platform,
+      stdio: { input, output },
+      err: (text) => errors.push(text),
+      named: 4102,
+      alive: () => true,
+    });
+    input.end();
+
+    expect(await exit).toBe(EXIT_OK);
+    expect(holding.hellos).toEqual([]);
+    expect(named.hellos.map((hello) => hello.accepted)).toEqual([true]);
+  });
+
+  it('falls back to the folder rule when the named window is gone, and says so', async () => {
+    const holding = await fakeWindow({ pid: 4201, folder }, true);
+    await fakeWindow({ pid: 4202, folder: home }, true);
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const exit = relayToWindow({
+      home,
+      folder,
+      platform: process.platform,
+      stdio: { input, output },
+      err: (text) => errors.push(text),
+      named: 4202,
+      alive: (pid) => pid !== 4202,
+    });
+    input.end();
+
+    expect(await exit).toBe(EXIT_OK);
+    expect(holding.hellos.map((hello) => hello.accepted)).toEqual([true]);
+    expect(errors.join('')).toContain(namedGoneLine(4202));
+    expect(errors.join('')).toContain('relaying to the window of');
+  });
+
+  it('reads a process id from TYTO_WINDOW, and nothing else', () => {
+    expect(windowPidOf('4102')).toBe(4102);
+    expect(windowPidOf(' 4102 ')).toBe(4102);
+    for (const value of [undefined, '', '0', '-1', '12a', '1.5', '01', '99999999999']) {
+      expect(windowPidOf(value)).toBeUndefined();
+    }
+  });
+});
+
 /* ------------------------------------------------------------------ the contract -- */
 
 const record = (overrides: Partial<WindowRecord>): WindowRecord => ({
@@ -286,6 +362,19 @@ describe('pickWindow', () => {
   it('does not take a sibling with a common prefix for a parent', () => {
     const sibling = record({ pid: 1, folder: '/work/a', startedAt: '2026-11-09T11:00:00.000Z' });
     expect(pickWindow([sibling], '/work/ab', 'linux')?.why).toBe('most-recent');
+  });
+
+  it('picks the named window first, and ignores a name no open window has', () => {
+    const holding = record({ pid: 1, folder: '/work/a' });
+    const named = record({ pid: 2, folder: '/work/b' });
+    expect(pickWindow([holding, named], '/work/a', 'linux', 2)).toEqual({
+      record: named,
+      why: 'named',
+    });
+    expect(pickWindow([holding, named], '/work/a', 'linux', 3)).toEqual({
+      record: holding,
+      why: 'folder',
+    });
   });
 
   it('compares Windows folders without case, and POSIX ones with it', () => {

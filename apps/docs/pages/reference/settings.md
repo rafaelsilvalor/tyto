@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 33. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 35. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -487,3 +487,19 @@ How an agent's request to open a file or show a format is handled: asked first, 
 | --- | --- |
 | `"propose"` | A box asks you first, naming the file or the format; you open it or not. |
 | `"allow"` | The window does it when the agent asks. |
+
+## agentCommand
+
+The agent program Open an Agent Here starts in a new terminal tab, such as "claude" or "codex" (default "claude"). Tyto installs none.
+
+| Type | Default |
+| --- | --- |
+| `string` | `"claude"` |
+
+## agentArgs
+
+Arguments the agent program starts with, after the ones that connect it to this window, such as ["--model", "opus"] (default none).
+
+| Type | Default |
+| --- | --- |
+| `list of string` | `[]` |

@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./relay": {
+      "types": "./dist/relay.d.ts",
+      "import": "./dist/relay.js"
     }
   },
   "files": [

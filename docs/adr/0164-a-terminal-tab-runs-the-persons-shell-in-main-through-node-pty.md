@@ -288,3 +288,10 @@ plugin panels.
   (`errno -4094`), the Smart App Control pattern this ADR's first measurement saw once, but the
   CodeIntegrity log was not read, so the cause is not confirmed. One earlier run failed renaming
   `release/win-unpacked.tmp` (`EPERM`), cause unknown. Packaged checks are measured on CI.
+
+- 2026-11-09 (TYTO-567, ADR 0181): **decision 4 stands; two additions.** `tyto` stays off the
+  terminal's `PATH`. The environment gains `TYTO_WINDOW`, the window's process id, so an agent
+  started in the terminal relays to that window. `terminal:open` gains `agent: true`, a yes or
+  no that starts the program `agentCommand` names instead of the shell. Main reads that program
+  from `settings.json` only, so decision 3 holds: the renderer names no program. A restricted
+  folder refuses the agent as decision 5 refuses the shell.

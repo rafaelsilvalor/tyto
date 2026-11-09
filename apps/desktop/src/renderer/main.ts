@@ -2030,6 +2030,9 @@ const registry: CommandRegistry = withCommandGate(
     newTerminal: () => {
       void newTerminal();
     },
+    openAgent: () => {
+      void newTerminal(true);
+    },
     showTerminal: () => {
       void changeLayout(withPanelOpen(layout, TERMINAL_PANEL, true)).then(() => {
         focusTerminal();
@@ -6096,10 +6099,13 @@ function wireTerminalPanel(): void {
   };
 }
 
-/** A new terminal in front, the Terminal tab open and focused on it (TYTO-497). */
-async function newTerminal(): Promise<void> {
+/**
+ * A new terminal in front, the Terminal tab open and focused on it (TYTO-497); with `agent`, it
+ * runs the agent `agentCommand` names (TYTO-567).
+ */
+async function newTerminal(agent = false): Promise<void> {
   await changeLayout(withPanelOpen(layout, TERMINAL_PANEL, true));
-  await terminalSessions.create();
+  await terminalSessions.create(undefined, agent);
   await elements.terminalPanel?.updateComplete;
   elements.terminalPanel?.focusTerminal();
 }

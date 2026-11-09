@@ -63,6 +63,7 @@ export const ptBR: Catalogue = {
   'terminal.quit.stay': 'Continuar',
   'panel.terminal': 'Terminal',
   'command.terminal.new': 'Terminal: Novo terminal',
+  'command.terminal.openAgent': 'Terminal: Abrir um agente aqui',
   'command.terminal.show': 'Mostrar o Terminal',
   'command.problems.show': 'Mostrar Problemas',
   'terminal.new': 'Novo terminal',

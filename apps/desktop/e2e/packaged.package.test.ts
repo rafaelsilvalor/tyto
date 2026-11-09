@@ -23,6 +23,7 @@ import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { readPackedFile, swapWhitespaceByte } from './asar-patch.js';
+import { writeFakeAgent } from './fake-agent.js';
 import {
   type CdpApp,
   closeOverCdp,
@@ -289,9 +290,11 @@ beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-packaged-'));
   writeHome(join(scratch, 'tyto-home'));
   mkdirSync(join(scratch, 'user-data'), { recursive: true });
+  // The stand-in agent Open an Agent Here starts (TYTO-567), named in the same file.
+  const agent = writeFakeAgent(join(scratch, 'agent bin'));
   writeFileSync(
     join(scratch, 'user-data', 'settings.json'),
-    '{ "conector.baseUrl": "https://packaged.example" }\n',
+    `${JSON.stringify({ 'conector.baseUrl': 'https://packaged.example', agentCommand: agent })}\n`,
   );
 
   // Over CDP and not `_electron.launch`, which needs the inspect fuse this build switches off
@@ -486,6 +489,50 @@ describe('the packaged app', () => {
         `TYTO_PTY_42 back in ${String(Date.now() - started)} ms; open after kill: ${String(terminals.length)}\n`,
     );
     expect(terminals).toEqual([]);
+  }, 60_000);
+
+  it("starts an agent whose MCP relay, on the bundled Node, lists the window's tools (TYTO-567)", async () => {
+    // ADR 0181: the relay is a file unpacked from the asar, run by the Node the package carries,
+    // and named by the configuration main writes in TYTO_HOME. The agent is a stand-in that
+    // starts what that configuration names, as an agent's host does.
+    type Bridge = Record<string, (request: unknown) => Promise<unknown>>;
+    const call = <T>(channel: string, request: unknown): Promise<T> =>
+      page.evaluate(
+        ([name, body]) => (globalThis as never as { tyto: Bridge }).tyto[name as string]!(body),
+        [channel, request] as const,
+      ) as Promise<T>;
+
+    const opened = await call<{ terminalId?: string; message?: string }>('terminal:open', {
+      cols: 200,
+      rows: 30,
+      agent: true,
+    });
+    expect(opened.message).toBeUndefined();
+    const terminalId = opened.terminalId!;
+    const started = Date.now();
+    let replay = '';
+    while (!replay.includes('AGENT_WINDOW')) {
+      if (Date.now() - started > 30_000) {
+        throw new Error(
+          `the packaged agent never listed the tools; it printed: ${JSON.stringify(replay)}`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const { terminals } = await call<{ terminals: { terminalId: string; replay: string }[] }>(
+        'terminal:list',
+        {},
+      );
+      replay = terminals.find((terminal) => terminal.terminalId === terminalId)?.replay ?? '';
+    }
+    const tools = /AGENT_TOOLS ([a-z_,]+)/u.exec(replay)?.[1] ?? '';
+    const relayed = /relaying to the window that started this terminal[^\r\n]*/u.exec(replay)?.[0];
+    process.stdout.write(
+      `[TYTO-567] packaged relay listed the window's tools in ${String(Date.now() - started)} ms: ` +
+        `${tools}; ${String(relayed)}\n`,
+    );
+    expect(tools.split(',')).toContain('brief_in_front');
+    expect(relayed).toBeDefined();
+    await call('terminal:kill', { terminalId });
   }, 60_000);
 
   it("ships node-pty unpacked with only this platform's runtime files (TYTO-497, TYTO-510)", () => {

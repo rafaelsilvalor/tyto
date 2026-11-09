@@ -1,7 +1,7 @@
 # Conectar um agente de IA
 
 ::: info Como esta página foi conferida
-Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções. A seção sobre a janela aberta foi executada do mesmo jeito na branch que a criou (TYTO-566).
+Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções. A seção sobre a janela aberta foi executada do mesmo jeito na branch que a criou (TYTO-566). A seção sobre o terminal do Tyto rodou pelos testes automáticos do projeto na branch que a criou (TYTO-567), e a linha de log foi copiada dessa execução; as duas linhas `claude mcp add` não foram executadas, e as pastas delas são as padrão dos instaladores, lidas na configuração deles.
 :::
 
 `tyto mcp` deixa um agente de IA, como o Claude Code ou o Claude Desktop, trabalhar com uma pasta de projeto: listar os templates, ler o que um template espera, conferir os erros de um brief e olhar a prévia da arte, antes de mostrar qualquer coisa a você. Ele fala o [Model Context Protocol](https://modelcontextprotocol.io), o jeito como esses agentes alcançam um programa no seu computador.
@@ -60,6 +60,30 @@ Pela janela o agente também pode:
 - **Propor uma mudança** no texto do documento da frente, numa pasta em que você confiou. Nada é gravado: a mudança aparece no editor, o texto antigo riscado e o novo ao lado, sob uma barra que diz **Proposto por um agente** com **Aceitar** e **Recusar**. Aceitar aplica tudo de uma vez, então um Ctrl+Z desfaz tudo; o arquivo não é salvo, como se você tivesse digitado. Se você digitar dentro do texto proposto antes de decidir, a proposta é descartada como desatualizada, nunca aplicada sobre o que você reescreveu. Uma proposta por documento de cada vez; o agente pergunta depois se você aceitou.
 
 Duas [configurações](../reference/settings.md) mudam isso. `agentsWindowActions` em `"allow"` deixa o agente abrir e mostrar sem perguntar; uma mudança no texto de um documento é sempre uma proposta. `agentsListen` em `false` fecha a conexão, corta todos os agentes, e nenhum agente se conecta até ela voltar a `true`.
+
+## Do terminal do Tyto
+
+Num terminal que o Tyto abriu, **Terminal: Abrir um agente aqui** abre o Claude Code (ou o programa que `agentCommand` nomeia) já conectado àquela janela, sem nada para registrar; veja [Terminal](../editor/terminal.md#abrir-um-agente-aqui). Não precisa da linha de comando instalada: o app traz o pequeno programa que faz a conexão.
+
+Para digitar `claude` você mesmo, registre esse programa uma vez. No Windows, com o Tyto instalado só para você (o padrão do instalador):
+
+```
+claude mcp add tyto-window -- "%LOCALAPPDATA%\Programs\Tyto\resources\node\node.exe" "%LOCALAPPDATA%\Programs\Tyto\resources\app.asar.unpacked\out\relay\agent-relay.js"
+```
+
+No macOS, com o Tyto em Aplicativos:
+
+```
+claude mcp add tyto-window -- /Applications/Tyto.app/Contents/Resources/node/node /Applications/Tyto.app/Contents/Resources/app.asar.unpacked/out/relay/agent-relay.js
+```
+
+Aberto num terminal do Tyto, ele chega à janela que abriu aquele terminal, e o log dele diz isso:
+
+```
+tyto mcp --window: relaying to the window that started this terminal, no folder (pid 11960)
+```
+
+Aberto em qualquer outro lugar, ele escolhe uma janela como `tyto mcp --window` escolhe. Esses caminhos continuam os mesmos quando o Tyto atualiza. O app portátil do Windows e o AppImage do Linux se descompactam numa pasta nova a cada vez que abrem; neles, use **Abrir um agente aqui**.
 
 ## O que o agente pode fazer
 
