@@ -104,3 +104,56 @@ without asking, and how a change to a document's text reaches it.
   run `tyto` with that person's plugins and credentials. The gate keeps out other users and
   anything that cannot read the person's files; it is not a sandbox against the person's own
   programs.
+
+## Amendment — 2026-11-09, TYTO-566 PR 2
+
+The window listens. Four things were settled or measured on the way; decisions 1 to 8 stand.
+
+- **The window listens whenever it is open, restricted folder included.** That is what makes an
+  agent useful: it reaches the window the person is working in, with no step to turn it on. In a
+  restricted workspace, or with no folder open, the tools offered are the reads, as decision 7
+  says. The setting that comes with the window tools (TYTO-566 PR 3) gets an off switch beside
+  `agents.windowActions`: `agents.listen`, `true` by default; `false` neither listens nor writes
+  a record. The coordinator decided this on 2026-11-09.
+- **The MCP SDK is bundled into main, in a lazy chunk.** This changes the last sentence of ADR
+  0179 decision 8, which kept `@modelcontextprotocol/server` external to main because the window
+  refused the only command that reached it. The window now serves agents itself, and the packaged
+  app ships no `node_modules` the package could be imported from (`electron-builder.yml`
+  excludes them and re-includes a named few). So the package leaves `external` and Rollup puts it
+  in the chunk `server.js` already was, loaded when the first agent connects and never at start.
+  Measured with `electron-vite build`, `apps/desktop/out/main` before and after: 4,454,493 →
+  5,145,376 bytes; the chunk grew from 5,035 to 694,064 bytes, `index.js` by 1,854. The packaged
+  suite connects to the packaged app and has `tools/list` answered, which is what shows the chunk
+  loads from inside `app.asar`.
+- **The protocol starts reading after the handshake.** `readFirstLine` leaves the connection
+  paused so a frame sent with the handshake is not lost; the SDK's stdio transport adds only a
+  `data` listener, which does not start a stream paused on purpose. `serveMcp` resumes its input
+  once the transport listens, which on stdin changes nothing.
+- **The named pipe's ACL, measured** on Windows 11 with the listener `net` creates, read through
+  `NamedPipeClientStream.GetAccessControl()` (`Get-Acl` fails on a pipe with error 87). The
+  machine and user names, and the middle of the user's SID, are elided:
+
+  ```
+  Owner: <MACHINE>\<user>
+  Sddl: O:S-1-5-21-…-1001G:S-1-5-21-…-1001D:(A;;FR;;;WD)(A;;FR;;;AN)(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;S-1-5-21-…-1001)
+
+  IdentityReference            AccessControlType  PipeAccessRights
+  Everyone                                 Allow Read, Synchronize
+  NT AUTHORITY\ANONYMOUS LOGON             Allow Read, Synchronize
+  NT AUTHORITY\SYSTEM                      Allow           2032127
+  BUILTIN\Administrators                   Allow           2032127
+  <Machine>\<user>                         Allow           2032127
+  ```
+
+  Everyone and anonymous logons may open the pipe to read; only the owner, SYSTEM and
+  Administrators may write. The window writes nothing on a connection before it has read a
+  correct handshake line, and a reader cannot send one, so such a connection gets nothing and is
+  cut after 10 seconds. The token stays the gate, as decision 3 says. The record's own ACL is
+  `TYTO_HOME`'s: on the machine measured, `C:\Users\<user>\.tyto` inherits SYSTEM, Administrators
+  and the owner from the profile, **and carries an explicit read grant to a local
+  `CodexSandboxUsers` group** that another tool added. Whatever can read `TYTO_HOME` can reach the
+  window; that was already true of the person's plugins and credentials there. Whether a remote
+  client can open the pipe over SMB (`PIPE_REJECT_REMOTE_CLIENTS`) was not measured.
+
+- **`--window` is offered.** It is shown by `tyto mcp --help` and in the generated reference,
+  and the manual's agents page says how to register it, in both editions.

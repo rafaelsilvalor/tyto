@@ -223,6 +223,8 @@ export interface IpcDependencies {
   readonly updates: Pick<UpdateService, 'status' | 'act'>;
   /** Verification mode, read off the command line (TYTO-651, ADR 0178). */
   readonly verification: () => VerificationMode;
+  /** The agents connected to the window's endpoint, and cutting them (TYTO-566, ADR 0180). */
+  readonly agents: { readonly count: () => number; readonly cut: () => void };
   /**
    * The native folder picker and the OS file manager, wrapped here for the reason the other
    * dialogs are: `dialog` and `shell` are Electron main-process APIs, and a service that
@@ -873,6 +875,13 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'update:status': () => Promise.resolve(updates.status()),
 
     'verification:status': () => Promise.resolve(dependencies.verification()),
+
+    'agents:status': () => Promise.resolve({ count: dependencies.agents.count() }),
+
+    'agents:cut': () => {
+      dependencies.agents.cut();
+      return Promise.resolve({});
+    },
 
     'update:act': () => {
       updates.act();

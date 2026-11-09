@@ -377,3 +377,9 @@ tyto mcp [options] [folder]
 | Argument | What it does |
 | --- | --- |
 | `[folder]` | the folder whose templates and briefs are served |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--window` | relay to the open Tyto window whose workspace holds the folder, or the most recent one (ADR 0180) |  |

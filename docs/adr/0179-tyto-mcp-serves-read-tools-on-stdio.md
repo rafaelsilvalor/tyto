@@ -130,3 +130,10 @@ Two tightenings within decisions 3 and 5; the rules do not change.
   workspace: there an agent naming references would pull the person's images from a connected
   service, through their credentials, into its own context, and nothing was trusted. There is no
   `https:` image yet (TYTO-559 to TYTO-561); such a scheme would fall under this rule.
+
+## Amendment — 2026-11-09, TYTO-566
+
+ADR 0180 changes the last sentence of decision 8: the window now serves agents on its own
+endpoint, so the desktop's main bundle no longer keeps `@modelcontextprotocol/server` external.
+It is bundled into the lazy chunk that loads when the first agent connects; ADR 0180's amendment
+has the sizes.

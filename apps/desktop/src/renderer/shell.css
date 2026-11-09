@@ -301,6 +301,21 @@ textarea {
 
 /* TYTO-651, ADR 0178: the debugging port is open. The error colour, because anything on the
    machine can drive the window while it is; never shrunk away, since it says why. */
+/* TYTO-566, ADR 0180: an agent is connected. The accent, not the error colour: it is a fact the
+   person chose to allow, and the button cuts it. */
+.status-bar__agents {
+  flex-shrink: 0;
+  border: var(--tyto-focus-width) solid var(--tyto-accent);
+  border-radius: var(--tyto-radius-sm);
+  padding: 0 var(--tyto-space-3);
+  background: transparent;
+  color: var(--tyto-accent);
+  font: inherit;
+  font-weight: var(--tyto-weight-strong);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .status-bar__verification {
   flex-shrink: 0;
   border: var(--tyto-focus-width) solid var(--tyto-error);

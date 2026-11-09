@@ -259,6 +259,10 @@ describe('the bridge', () => {
     // `on` sorts in among them and is the one member that is not a channel: it is the receive
     // direction (ADR 0029), built from `IPC_EVENTS` rather than from the channel table.
     expect(channels).toEqual([
+      // TYTO-566, ADR 0180: the status bar's agent badge and its cut. Exercised by
+      // `e2e/agent-endpoint.desktop.test.ts`.
+      'agents:cut',
+      'agents:status',
       'app:exit-ack',
       'app:exit-answer',
       'app:exit-listening',
@@ -490,6 +494,12 @@ describe('switching the language', () => {
     'status.verification.port',
     'status.verification.on',
     'status.verification.risk',
+    // TYTO-566, ADR 0180: the agent badge is drawn only while an agent is connected, which in
+    // this suite none is. `status-bar.test.ts` paints it in both languages, and
+    // `agent-endpoint.desktop.test.ts` in the real window.
+    'status.agents.one',
+    'status.agents.many',
+    'status.agents.cut',
     'preview.zoom.out',
     'preview.zoom.in',
     // TYTO-323: the strip toggle is a glyph, so its words — which change with the state — are its

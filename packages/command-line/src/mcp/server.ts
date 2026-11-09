@@ -204,6 +204,10 @@ export async function serveMcp(
   options.signal?.addEventListener('abort', stop, { once: true });
   try {
     await server.connect(transport);
+    // The transport only adds a `data` listener, which does not start a stream paused on
+    // purpose: the window's connection is, after its handshake was read (`readFirstLine`, ADR
+    // 0180). On stdin it changes nothing.
+    stdio.input.resume();
     await closed;
   } finally {
     options.signal?.removeEventListener('abort', stop);

@@ -482,6 +482,10 @@ export interface Catalogue {
   readonly 'status.verification.on': string;
   /** Its tooltip: what being on means. */
   readonly 'status.verification.risk': string;
+  /** TYTO-566, ADR 0180: the agent badge, one or `{count}`, and its tooltip, which says it cuts. */
+  readonly 'status.agents.one': string;
+  readonly 'status.agents.many': string;
+  readonly 'status.agents.cut': string;
   readonly 'status.position': string;
   readonly 'status.selected': string;
   readonly 'status.kind.settings': string;
@@ -1236,6 +1240,9 @@ export const CATALOGUE_KEYS = [
   'status.verification.port',
   'status.verification.on',
   'status.verification.risk',
+  'status.agents.one',
+  'status.agents.many',
+  'status.agents.cut',
   'status.position',
   'status.selected',
   'status.kind.settings',

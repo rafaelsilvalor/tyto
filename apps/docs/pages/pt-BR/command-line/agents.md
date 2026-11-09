@@ -1,7 +1,7 @@
 # Conectar um agente de IA
 
 ::: info Como esta página foi conferida
-Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções.
+Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções. A seção sobre a janela aberta foi executada do mesmo jeito na branch que a criou (TYTO-566).
 :::
 
 `tyto mcp` deixa um agente de IA, como o Claude Code ou o Claude Desktop, trabalhar com uma pasta de projeto: listar os templates, ler o que um template espera, conferir os erros de um brief e olhar a prévia da arte, antes de mostrar qualquer coisa a você. Ele fala o [Model Context Protocol](https://modelcontextprotocol.io), o jeito como esses agentes alcançam um programa no seu computador.
@@ -32,6 +32,24 @@ claude mcp add tyto -- node C:/projects/tyto/tyto/apps/cli/dist/index.js mcp C:/
 ```
 
 Depois peça com palavras comuns: "quais templates do Tyto eu tenho?", ou "escreva um brief para o banner com este texto e me mostre a prévia".
+
+## Trabalhar com a janela aberta
+
+`tyto mcp --window` liga o agente à janela do Tyto que você tem aberta, em vez de ler a pasta por conta própria. O agente recebe as mesmas ferramentas; enquanto a janela está aberta ela espera por um agente, e só um programa que consegue ler a chave da conexão na sua pasta do Tyto chega até ela — normalmente, só os programas rodando como você.
+
+**Claude Code**:
+
+```
+claude mcp add tyto-window -- node C:/projects/tyto/tyto/apps/cli/dist/index.js mcp --window C:/projects/my-project
+```
+
+Com várias janelas abertas, ele escolhe aquela cuja pasta contém a pasta que você indicou, ou então a última aberta, e o log dele diz qual:
+
+```
+tyto mcp --window: no open window holds this folder; relaying to the most recent one, no folder (pid 28532)
+```
+
+Enquanto um agente está conectado, a barra de status mostra **Agente conectado** (com o número quando há mais de um). Clique nele para cortar todas as conexões; o servidor do agente para, e a janela continua esperando o próximo. Sem nenhuma janela aberta, o comando diz isso e para.
 
 ## O que o agente pode fazer
 
@@ -67,7 +85,7 @@ Quatro coisas, e nenhuma muda um arquivo:
 - **Só a pasta e a pasta de trabalho dela.** Um caminho fora delas é recusado, e também um atalho dentro da pasta que leva para fora.
 - **Nenhuma senha ou chave.** Nenhuma resposta traz uma credencial, o ambiente de onde os plugins as leem, nem as configurações de plugin do `.tyto/project.json`.
 - **Uma pasta em que você não confiou continua restrita.** Os arquivos de plugin dela não são carregados, como no `tyto render`. Ferramentas que escrevem arquivos estão planejadas; uma pasta em que você não [confiou](../editor/workspace-folder.md) não vai recebê-las.
-- **Não pela janela.** A aba [Comandos](../editor/commands.md) recusa `tyto mcp`: o agente o inicia sozinho.
+- **Não pela janela.** A aba [Comandos](../editor/commands.md) recusa `tyto mcp`, inclusive com `--window`: o agente o inicia sozinho.
 
 ## Quando algo dá errado
 

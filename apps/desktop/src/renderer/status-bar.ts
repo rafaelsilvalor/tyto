@@ -86,6 +86,12 @@ export interface StatusBarState {
    * can hide that the window is open to inspection.
    */
   readonly verification?: { readonly port: number | undefined };
+  /**
+   * How many agents are connected to the window's endpoint (TYTO-566, ADR 0180). Drawn when
+   * one is, whatever `statusBarItems` says, so no setting can hide that an agent is reading the
+   * window; clicking it cuts them.
+   */
+  readonly agents?: number;
 }
 
 /** The ids the buttons run, in `main.ts`'s registry. Exported so a test names the same ones. */
@@ -181,6 +187,7 @@ export class StatusBar extends LitElement {
     run: { attribute: false },
     offered: { attribute: false },
     items: { attribute: false },
+    cutAgents: { attribute: false },
   };
 
   declare state: StatusBarState;
@@ -193,6 +200,8 @@ export class StatusBar extends LitElement {
   declare offered: (id: string) => boolean;
   /** The `statusBarItems` setting: which items show, in order inside their side. */
   declare items: readonly StatusBarItemId[];
+  /** Cuts every agent's connection: the agent badge's click (ADR 0180 decision 8). */
+  declare cutAgents: () => void;
 
   constructor() {
     super();
@@ -226,6 +235,7 @@ export class StatusBar extends LitElement {
     this.run = () => undefined;
     this.offered = () => true;
     this.items = STATUS_BAR_ITEM_IDS;
+    this.cutAgents = () => undefined;
   }
 
   /** Light DOM, so `shell.css` reaches inside — the reasoning is in ADR 0024. */
@@ -262,7 +272,7 @@ export class StatusBar extends LitElement {
   protected override render(): unknown {
     const draw = (id: StatusBarItemId): unknown => this.item(id);
     return html`<div class="status-bar__side">
-        ${this.verificationBadge()}${itemsOnSide(this.items, 'start').map(draw)}
+        ${this.verificationBadge()}${this.agentBadge()}${itemsOnSide(this.items, 'start').map(draw)}
       </div>
       <div class="status-bar__side status-bar__side--end">
         ${itemsOnSide(this.items, 'end').map(draw)}
@@ -287,6 +297,30 @@ export class StatusBar extends LitElement {
       title=${translate(locale, 'status.verification.risk')}
       >${text}</span
     >`;
+  }
+
+  /** The agent badge, beside the verification badge and outside the item list (TYTO-566). */
+  private agentBadge(): unknown {
+    const count = this.state.agents ?? 0;
+    if (count === 0) return nothing;
+    const locale = this.state.locale;
+    const text =
+      count === 1
+        ? translate(locale, 'status.agents.one')
+        : translate(locale, 'status.agents.many').replace('{count}', String(count));
+    const cut = translate(locale, 'status.agents.cut');
+    return html`<button
+      type="button"
+      class="status-bar__agents"
+      data-item="agents"
+      title=${cut}
+      aria-label=${`${text}. ${cut}`}
+      @click=${() => {
+        this.cutAgents();
+      }}
+    >
+      ${text}
+    </button>`;
   }
 
   /** One item by its id, or nothing when it has nothing to show right now. */

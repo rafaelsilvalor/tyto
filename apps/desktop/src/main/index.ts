@@ -2,8 +2,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, watch } from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
+
+import { serveAgent } from '@tyto/command-line';
 
 import {
   type BrowserWindow,
@@ -62,7 +65,12 @@ import {
   steppedZoom,
   typographyExample,
 } from '../../shared/typography.js';
-import { confirmInABox, createCliRunner, registeredRasterizer } from './cli-runner.js';
+import {
+  type CliBaseEnvironment,
+  confirmInABox,
+  createCliRunner,
+  registeredRasterizer,
+} from './cli-runner.js';
 import { SHELL_REFUSED, windowRefusals } from './cli-refusals.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
@@ -83,6 +91,7 @@ import {
   signinWindow,
 } from './signin.js';
 import { crashSummary, fileLog, installCrashHandlers } from './log.js';
+import { type AgentEndpoint, createAgentEndpoint, osUserName } from './agent-endpoint.js';
 import { type VerificationMode, verificationMode } from './verification-mode.js';
 import { type AboutFacts, aboutText, menuTemplate } from './menu.js';
 import { LeakedArrow, popupWithArrows } from './menu-arrows.js';
@@ -776,6 +785,36 @@ async function start(): Promise<void> {
   // Stops every `tyto` command running in main (ADR 0159 decision 3): a `watch` ends when the
   // window opens another folder. Bound once the runner exists, below the queue.
   let stopCommands = (): void => {};
+  // The agent endpoint (TYTO-566, ADR 0180). Built here, because a folder change writes its
+  // record again; it listens below the command runner, whose environment serves each agent.
+  const agentEndpoint: AgentEndpoint = createAgentEndpoint({
+    home: pluginsHome,
+    pid: process.pid,
+    platform: process.platform,
+    user: osUserName(),
+    tmp: tmpdir(),
+    folder: () => workspace.state().folder,
+    serve: (socket, signal) =>
+      serveAgent(
+        {
+          ...cliEnvironment(),
+          console: {
+            out: (text) => log.info(text.trimEnd()),
+            err: (text) => log.info(text.trimEnd()),
+          },
+        },
+        { input: socket, output: socket },
+        signal,
+        'the window',
+      ),
+    onConnections: (count) => {
+      log.info(`agents connected: ${String(count)}`);
+      toWindow('agents:changed', { count });
+    },
+    onError: (message, cause) => {
+      log.error(message, cause);
+    },
+  });
   const workspace = createWorkspaceService({
     trustStore: fsTrustStore({ home: pluginsHome }),
     home: pluginsHome,
@@ -784,6 +823,9 @@ async function start(): Promise<void> {
     },
     onFolder: async (folder, places) => {
       stopCommands();
+      void agentEndpoint.folderChanged().catch((cause: unknown) => {
+        log.error('The agent endpoint record could not be written.', cause);
+      });
       await explorer.setRoot(folder, places);
       // Not awaited: the walk reads every recipe in the folder, which opens meanwhile.
       void recipeSchedule?.setFolder(folder);
@@ -1199,19 +1241,20 @@ async function start(): Promise<void> {
   // **`tyto` commands in main** (TYTO-495, ADR 0159): the CLI's own command tree, run with the
   // window's instances — the rasterizer the export uses, the bundled-Node launcher, this
   // `TYTO_HOME` and the open folder — so a command and the window share one of each.
+  const cliEnvironment = (): CliBaseEnvironment => ({
+    version: app.getVersion(),
+    cwd: workspace.state().folder ?? pluginsHome,
+    home: pluginsHome,
+    variables: process.env,
+    shellRefusal: SHELL_REFUSED,
+    launch,
+    rasterizer: () => {
+      if (windowRasterizer === undefined) throw new Error('This window has no rasterizer.');
+      return windowRasterizer;
+    },
+  });
   const cli = createCliRunner({
-    environment: () => ({
-      version: app.getVersion(),
-      cwd: workspace.state().folder ?? pluginsHome,
-      home: pluginsHome,
-      variables: process.env,
-      shellRefusal: SHELL_REFUSED,
-      launch,
-      rasterizer: () => {
-        if (windowRasterizer === undefined) throw new Error('This window has no rasterizer.');
-        return windowRasterizer;
-      },
-    }),
+    environment: cliEnvironment,
     refuse: windowRefusals({ platform: process.platform, queue: () => queue.view() }),
     confirm: confirmInABox(
       (box) => {
@@ -1246,6 +1289,17 @@ async function start(): Promise<void> {
   };
   app.on('will-quit', () => {
     cli.cancelAll();
+  });
+
+  // **The agent endpoint** (TYTO-566, ADR 0180): `tyto mcp --window` reaches the tools `tyto
+  // mcp` serves through it, run here with the command runner's environment and the open folder,
+  // so the window applies the CLI's own trust rules. It listens while the window is open.
+  void agentEndpoint.start().catch((cause: unknown) => {
+    log.error('The agent endpoint could not listen.', cause);
+  });
+  app.on('will-quit', () => {
+    agentEndpoint.removeRecordNow();
+    void agentEndpoint.close();
   });
 
   // **The terminals** (TYTO-497, ADR 0164): the person's shell in a pseudo-terminal main owns.
@@ -1987,6 +2041,13 @@ async function start(): Promise<void> {
     updates,
     // The badge follows the window's own `show` (below): only a window nobody is shown can skip it.
     verification: () => currentVerificationMode(!showWindow),
+    // TYTO-566, ADR 0180: the status bar's agent badge, and its cut.
+    agents: {
+      count: () => agentEndpoint.connections(),
+      cut: () => {
+        agentEndpoint.cut();
+      },
+    },
     templateDialogs: {
       // No `createDirectory`: a template to edit is a folder that already has one in it.
       chooseTemplate: async () => {

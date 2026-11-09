@@ -60,6 +60,9 @@ export const verificationStatusSchema = z.discriminatedUnion('on', [
   z.object({ on: z.literal(true), port: z.number().int().positive().optional() }),
 ]);
 
+/** How many agents are connected to the window's endpoint (TYTO-566, ADR 0180). */
+export const agentsStatusSchema = z.object({ count: z.number().int().nonnegative() });
+
 /** One channel: what may be asked, and what comes back. */
 export interface IpcChannel<
   Request extends z.ZodType = z.ZodType,
@@ -980,6 +983,18 @@ export const IPC_CHANNELS = {
    * line the app was started with, and nothing turns it on or off while it runs.
    */
   'verification:status': channel(z.object({}), verificationStatusSchema),
+
+  /**
+   * How many agents are connected to the window's endpoint (TYTO-566, ADR 0180), for the status
+   * bar's badge. Asked when the page loads; `agents:changed` says when it moved.
+   */
+  'agents:status': channel(z.object({}), agentsStatusSchema),
+
+  /**
+   * The person cut every agent's connection from the status bar (ADR 0180 decision 8). Names
+   * nothing: the connections are main's, and the endpoint keeps listening for the next one.
+   */
+  'agents:cut': channel(z.object({}), z.object({})),
 
   /**
    * The update notice was clicked (TYTO-131).
@@ -3050,6 +3065,9 @@ export const IPC_EVENTS = {
    * `app:exit-ack` immediately, and answers on `app:exit-answer` whenever the person has
    * decided. Both carry this `askId` back. Only the first leg has a deadline.
    */
+  /** An agent connected to the window's endpoint, or left (TYTO-566, ADR 0180). */
+  'agents:changed': agentsStatusSchema,
+
   'app:exit-requested': z.object({ askId: z.number().int().nonnegative() }),
 
   /**

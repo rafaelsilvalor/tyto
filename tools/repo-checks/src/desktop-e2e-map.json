@@ -1928,6 +1928,15 @@
       ],
       "e2e": ["verification-mode.desktop.test.ts"],
       "why": "TYTO-651: the verification probe against a running window"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/agent-endpoint.ts",
+        "apps/desktop/src/main/agent-endpoint.test.ts",
+        "apps/desktop/e2e/agent-endpoint.desktop.test.ts"
+      ],
+      "e2e": ["agent-endpoint.desktop.test.ts"],
+      "why": "TYTO-566: an agent relayed to the running window, its badge and its cut"
     }
   ]
 }
