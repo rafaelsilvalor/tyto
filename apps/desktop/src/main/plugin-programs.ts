@@ -310,6 +310,9 @@ export function pluginPrograms(options: PluginProgramsOptions): PluginPrograms {
     });
 
     const started: StartedProcess = {
+      // The folder it was spawned in, the one value: a plugin hands it to its agent as ACP's
+      // `cwd` (ADR 0182, note of 2026-11-09).
+      cwd: base.cwd,
       write: (bytes) =>
         new Promise((resolve, reject) => {
           child.stdin.write(bytes, (error) => (error ? reject(error) : resolve()));

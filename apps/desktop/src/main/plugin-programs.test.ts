@@ -249,13 +249,16 @@ describe('pluginPrograms', () => {
 
   it('runs it in the open folder, or home with none, with no shell and the kept environment', async () => {
     const test = host();
-    await test.programs.startProcess('agente', 'claude', ['--acp'], test.quiet);
+    const inFolder = await test.programs.startProcess('agente', 'claude', ['--acp'], test.quiet);
     test.place.value = { folder: null, trust: 'trusted' };
-    await test.programs.startProcess('agente', 'claude', [], test.quiet);
+    const atHome = await test.programs.startProcess('agente', 'claude', [], test.quiet);
     expect(test.spawned.map(({ file, args, options }) => [file, args, options.cwd])).toEqual([
       ['/bin/claude', ['--acp'], '/work'],
       ['/bin/claude', [], '/home/ana'],
     ]);
+    // The folder the plugin is told is the one the program was spawned in (ADR 0182, note of
+    // 2026-11-09): a plugin hands it to its agent as ACP's `cwd`.
+    expect([inFolder.cwd, atHome.cwd]).toEqual(['/work', '/home/ana']);
     expect(test.spawned[0]?.options.env).toEqual({
       PATH: '/bin',
       SystemRoot: 'C:\\Windows',

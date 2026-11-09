@@ -49,9 +49,11 @@ import { agentServerSchema } from '../window.js';
  * and the host sends that program's output back on its own, four requests a host on 18 would
  * refuse and a `process` message a guest on 18 would not read (ADR 0182, TYTO-568); 20 since a
  * plugin may ask for the window's agent server, a request a host on 19 would refuse as an
- * unknown capability (ADR 0183, TYTO-569).
+ * unknown capability (ADR 0183, TYTO-569); 21 since the answer to `processStart` carries the
+ * folder the program runs in, a field the strict schema of a guest on 20 would refuse (ADR 0182,
+ * note of 2026-11-09, TYTO-569).
  */
-export const RPC_PROTOCOL_VERSION = 20;
+export const RPC_PROTOCOL_VERSION = 21;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -340,7 +342,10 @@ export const signinTokenSchema = z.string().min(1);
  * limit and the size of a write are `checkedProcesses`' to refuse, with a diagnostic.
  */
 export const processStartArgsSchema = z.tuple([z.string(), z.array(z.string())]);
-export const processStartedSchema = z.strictObject({ id: z.number().int().nonnegative() });
+export const processStartedSchema = z.strictObject({
+  id: z.number().int().nonnegative(),
+  cwd: z.string().min(1),
+});
 export const processWriteArgsSchema = z.tuple([z.number().int().nonnegative(), bytesSchema]);
 export const processIdArgsSchema = z.tuple([z.number().int().nonnegative()]);
 

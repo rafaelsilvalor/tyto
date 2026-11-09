@@ -173,3 +173,16 @@ The first row of "Left open" is decided in ADR 0183: `host.window.agentServer()`
 window's MCP server in ACP's `mcpServers` shape, to a plugin that declares a `process:<name>`.
 The prompt's `process:` paragraph (decision 2) gains a sentence saying that the program can also
 reach the Tyto window as an agent.
+
+## Note, 2026-11-09 — the folder a program runs in (TYTO-569)
+
+ACP's `session/new` needs the agent's `cwd` as an absolute path, and a plugin cannot know it:
+`host.workspace` takes paths relative to the open folder, and the plugin's process is confined
+to its own folder (ADR 0049). Decision 8 already has the host choose that folder: the open
+workspace, or the home folder with none open. So the host now says which one it chose.
+`StartedProcess` and `PluginProcess` carry `cwd`, the absolute folder the adapter spawned the
+program in, and `checkedProcesses` refuses and ends a program whose adapter reports none.
+Across the isolation boundary the answer to `processStart` is `{ id, cwd }`, which is
+protocol 21. The desktop reports the value it passed to `spawn`, so the two cannot disagree. The
+path is not a secret to a plugin whose program already runs there. No rule changes: decision 8
+still decides the folder, and this only reports it.

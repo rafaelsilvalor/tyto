@@ -127,7 +127,7 @@ export function activate(host) {
         await program.write('hello from the plugin\\n');
         await program.end();
         const exit = await program.exited;
-        return answer(heard + 'EXIT ' + String(exit.code));
+        return answer('REPORTED ' + program.cwd + '\\n' + heard + 'EXIT ' + String(exit.code));
       } catch (cause) {
         return answer(refused(cause));
       }
