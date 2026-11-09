@@ -1,5 +1,35 @@
 # @tyto/io
 
+## 5.4.0
+
+### Minor Changes
+
+- 092d29e: The desktop writes briefs with `to-brief` (TYTO-380, ADR 0172). `@tyto/io` adds
+  `workspaceBriefPorts`, the verb's ports over a workspace folder: `stat` answers the SHA-256 of a
+  file's bytes (`briefDigest`), `write` lands the brief whole and creates its folder, and both
+  confine the real path again after following links, refuse `.tyto/` and refuse a folder that is
+  not trusted, asked on every call. `@tyto/plugin-api` names `ToBriefPorts` and `BriefFolder`, so
+  the adapter implements a port from it. The desktop's recipe runner binds the ports per run and
+  per Apply to the recipe's workspace and trust, with templates looked up as the preview looks up
+  a brief's `template:`.
+
+### Patch Changes
+
+- Updated dependencies [cd096ab]
+- Updated dependencies [ed7a364]
+- Updated dependencies [4a91cef]
+- Updated dependencies [4db076c]
+- Updated dependencies [092d29e]
+- Updated dependencies [c0875cc]
+- Updated dependencies [046a5b9]
+- Updated dependencies [64a7b70]
+  - @tyto/core@0.42.0
+  - @tyto/plugin-api@0.16.0
+  - @tyto/pipeline@0.12.12
+  - @tyto/export-html@0.7.16
+  - @tyto/export-svg@2.0.16
+  - @tyto/template-lang@0.8.15
+
 ## 5.3.1
 
 ### Patch Changes

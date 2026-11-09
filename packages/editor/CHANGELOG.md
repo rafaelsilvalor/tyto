@@ -1,5 +1,26 @@
 # @tyto/editor
 
+## 0.16.0
+
+### Minor Changes
+
+- fdc18fe: TYTO-566: an agent's edit arrives as a proposal (ADR 0180 decision 5). `propose_edit` shows an
+  edit of the document in front, struck-through and inserted text under an Accept / Reject bar;
+  accepted, it is one undo step and saves nothing, and typing in it makes it stale.
+  `proposal_status` tells the agent how it ended. `@tyto/editor` gains the `proposals` extension.
+
+### Patch Changes
+
+- Updated dependencies [cd096ab]
+- Updated dependencies [ed7a364]
+- Updated dependencies [4a91cef]
+- Updated dependencies [4db076c]
+- Updated dependencies [c0875cc]
+- Updated dependencies [64a7b70]
+  - @tyto/core@0.42.0
+  - @tyto/brief-lang@0.8.0
+  - @tyto/template-lang@0.8.15
+
 ## 0.15.0
 
 ### Minor Changes

@@ -1,5 +1,32 @@
 # @tyto/cli
 
+## 0.11.0
+
+### Minor Changes
+
+- bf255a4: TYTO-565: `tyto mcp [folder]` serves a folder's templates and briefs to an AI agent over the
+  Model Context Protocol on stdio, with four read tools: `list_templates`, `describe_template`,
+  `check_brief` and `render_preview` (a PNG at most 1,024 px on its longest side). A restricted
+  folder is offered no tool that writes (ADR 0179). A plugin's process now prints onto stderr, so
+  its output no longer lands in `tyto render --json`'s document. The window refuses `tyto mcp`.
+
+### Patch Changes
+
+- Updated dependencies [edc97c6]
+- Updated dependencies [cd096ab]
+- Updated dependencies [ae4a916]
+- Updated dependencies [bf255a4]
+- Updated dependencies [fdc18fe]
+- Updated dependencies [422b6bc]
+- Updated dependencies [f3196f6]
+- Updated dependencies [639317d]
+- Updated dependencies [661a573]
+- Updated dependencies [c0875cc]
+- Updated dependencies [64a7b70]
+- Updated dependencies [d836583]
+  - @tyto/command-line@0.3.0
+  - @tyto/raster@0.2.4
+
 ## 0.10.9
 
 ### Patch Changes

@@ -1,5 +1,67 @@
 # @tyto/core
 
+## 0.42.0
+
+### Minor Changes
+
+- cd096ab: A panel contribution may register `call(request)` (TYTO-372, ADR 0173): its page asks the
+  plugin's own process to do work, `{ method, params? }` in and JSON out, with the method matching
+  `^[a-z][\w.-]{0,99}$`, both sides at most 1 MiB of JSON and an isolated plugin's call under the
+  30 s deadline of every call. `@tyto/plugin-api` gains `callPanel` and `panelCallerOf`, the host's
+  half, which find the panel by the caller's id and refuse a request that names a plugin or a
+  panel; `RPC_PROTOCOL_VERSION` is 17. `@tyto/core` gains the diagnostic code `E_PANEL_CALL`. The
+  desktop does not offer `call` to a page yet. `@tyto/command-line` changes only a test, which
+  now reads the protocol from `RPC_PROTOCOL_VERSION` instead of a literal.
+- ed7a364: A plugin may declare a browser sign-in and ask the host for its access token (TYTO-374,
+  ADR 0174). The manifest gains `signin: { <id>: { authorize, token, clientId, scopes,
+clientSecret? } }`, each entry paired with a `signin:<id>` permission; endpoints are `https`,
+  or `http` on `127.0.0.1` and `localhost` only, and `clientSecret` is documented as not a
+  secret. `host.signin.accessToken(id)` answers a token through the optional
+  `HostCapabilities.signinAccessToken` port: an undeclared id is `E_PERMISSION`, nobody signed in
+  is `E_SIGNIN_REQUIRED`, and a host without the port, as the CLI, is `E_SIGNIN_UNAVAILABLE`.
+  `host.credentials` refuses every key beginning `signin:`. `RPC_PROTOCOL_VERSION` is 18, and
+  `testPlugin` takes `signins` and offers `signOut`. `@tyto/core` gains the two codes. No host
+  runs a sign-in yet.
+- 4a91cef: A recipe's views read rows from main in pages, and `show` checks its view (TYTO-379, ADR 0171).
+  `RunOptions.views` and `VerbContext.views` map a view name to the arguments it reads
+  (`ViewArgumentSpec`: `column`, `columns`, `values` or `choice`); with a list, `show` refuses a
+  view not in it as `E_RECIPE_VIEW` (new in core) at the view's word, and an unknown, missing or
+  stray argument at its range, columns resolved through the aliases. Without a list `show` takes
+  any one name, as before. Every cell carries `Cell.view`, the last `show` at or above it with its
+  arguments, and `run` hands the list and the included recipe's view on. The `sort` verb's order
+  is exported as `compareCells`. In the desktop, main passes the notebook's views (`table`,
+  `summary`) to every run, the cell on the wire carries its view, and two channels read a cell's
+  kept table: `recipe:rows` answers a page of it sorted and filtered in main over indices, never
+  moving the recipe's rows, with the Summary's totals over the rows the filter keeps, and
+  `recipe:copy` writes rows to the clipboard as quoted tab-separated text built from the whole
+  values. A page names the run it reads and a newer one answers `stale`. The Table view follows.
+- 4db076c: A recipe gains the generic sink `to-brief template=<name> into=<folder> name=<column>
+slots=<slot>:<column>,…` (TYTO-380, ADR 0172): it plans one brief per row in the chosen template,
+  each marked new or overwriting, and writes them on Apply through `ToBriefPorts` the host lends
+  through `createVerbRegistry({ briefs })` and `recipeRegistriesOf`'s `briefs` option; a file
+  changed since the plan fails that write while the others apply. `@tyto/brief-lang` gains
+  `writeBrief`, which writes a brief from a template name and slot values and parses it back,
+  refusing a value that holds a brace. `@tyto/core` gains `fileSafeName`, which the pipeline's
+  `artifactName` now calls, and the diagnostic code `E_RECIPE_BRIEF`.
+- c0875cc: A plugin may declare `process:<name>` and start that one program through the host (TYTO-568,
+  ADR 0182). The name is bare: no path, wildcard or extension. `host.process.start(name, args)`
+  answers a long-lived handle with `write`, `end`, `kill`, `onStdout`, `onStderr` and `exited`,
+  behind the optional `HostCapabilities.startProcess` port and `checkedProcesses`: an undeclared
+  name is `E_PERMISSION`, a host without the port (the CLI) is `E_PROCESS_UNAVAILABLE`, a third
+  running program is `E_PROCESS_LIMIT`, and a write after the end is `E_PROCESS_EXITED`. A
+  plugin's programs end when it stops. `RPC_PROTOCOL_VERSION` is 19. `@tyto/core` gains six
+  `E_PROCESS_*` codes, and the install prompt names each program a plugin may start. No host
+  starts a program yet.
+- 64a7b70: A plugin that declares a `process:<name>` can ask for the window's MCP server and hand it to
+  the agent it starts (TYTO-569, ADR 0183). `host.window.agentServer()` answers
+  `{ name: 'tyto', command, args, env }`, the shape ACP's `session/new` takes in `mcpServers`:
+  the bundled Node, the relay Open an Agent Here names, and `TYTO_WINDOW` and `TYTO_HOME` only,
+  which the host's check enforces with a strict schema. A plugin with no program is
+  `E_PERMISSION`, the CLI is `E_WINDOW_UNAVAILABLE`, and the desktop refuses `agentsListen` off
+  (`E_WINDOW_AGENTS_OFF`) and a restricted folder (`E_WINDOW_RESTRICTED`), read at each call.
+  `RPC_PROTOCOL_VERSION` is 20. The install prompt's `process:` paragraph now says that the
+  program can also reach the Tyto window as an agent, with its edits arriving as proposals.
+
 ## 0.41.0
 
 ### Minor Changes

@@ -1,5 +1,64 @@
 # @tyto/recipe
 
+## 0.3.0
+
+### Minor Changes
+
+- 98322e5: TYTO-385: a recipe's header may say `every 30m` or `every 2h`, parsed into `RecipeAst.every` in
+  minutes. Under 5 minutes, a second `every`, or one after the first step is `E_RECIPE_SYNTAX`.
+  Nothing runs it on that interval yet.
+- 4a91cef: A recipe's views read rows from main in pages, and `show` checks its view (TYTO-379, ADR 0171).
+  `RunOptions.views` and `VerbContext.views` map a view name to the arguments it reads
+  (`ViewArgumentSpec`: `column`, `columns`, `values` or `choice`); with a list, `show` refuses a
+  view not in it as `E_RECIPE_VIEW` (new in core) at the view's word, and an unknown, missing or
+  stray argument at its range, columns resolved through the aliases. Without a list `show` takes
+  any one name, as before. Every cell carries `Cell.view`, the last `show` at or above it with its
+  arguments, and `run` hands the list and the included recipe's view on. The `sort` verb's order
+  is exported as `compareCells`. In the desktop, main passes the notebook's views (`table`,
+  `summary`) to every run, the cell on the wire carries its view, and two channels read a cell's
+  kept table: `recipe:rows` answers a page of it sorted and filtered in main over indices, never
+  moving the recipe's rows, with the Summary's totals over the rows the filter keeps, and
+  `recipe:copy` writes rows to the clipboard as quoted tab-separated text built from the whole
+  values. A page names the run it reads and a newer one answers `stale`. The Table view follows.
+- 4db076c: A recipe gains the generic sink `to-brief template=<name> into=<folder> name=<column>
+slots=<slot>:<column>,…` (TYTO-380, ADR 0172): it plans one brief per row in the chosen template,
+  each marked new or overwriting, and writes them on Apply through `ToBriefPorts` the host lends
+  through `createVerbRegistry({ briefs })` and `recipeRegistriesOf`'s `briefs` option; a file
+  changed since the plan fails that write while the others apply. `@tyto/brief-lang` gains
+  `writeBrief`, which writes a brief from a template name and slot values and parses it back,
+  refusing a value that holds a brace. `@tyto/core` gains `fileSafeName`, which the pipeline's
+  `artifactName` now calls, and the diagnostic code `E_RECIPE_BRIEF`.
+- 321e1f4: The recipe notebook draws `show board by=<column>` as a Board (TYTO-381, ADR 0177): one column per
+  value of the column, grouped without case or accents, with the count main made over the rows the
+  quick filter keeps, and a card per row showing `fields=` (the first three other columns when
+  absent). `order=` places values first, the rest follow by first appearance and an empty value is
+  a "(none)" column at the end. A column draws fifty cards, then "N more". View only. A new
+  channel, `recipe:facets`, counts a column's groups in main, and `recipe:rows` gains `facet` to
+  page one group's rows. In `@tyto/recipe`, a view's `values` argument reads a data file's list of
+  strings (`order=@./board.json#/order`) through the host's data resolver, so `show` reads its
+  arguments asynchronously.
+- 3642f9a: TYTO-421: `decide` takes `tie=local|remote`, the side that wins a row both sides changed since
+  the last run (`local` when not given, as before). It also writes `<column>_push`, the decided
+  value on push rows only, and `<column>_overwritten`, the losing side's value where both
+  changed; `<column>_overrides` is now true on such a row whichever side wins. The decided column
+  may be the `local=` column itself, rewritten in place as `map` rewrites its `into=`.
+  `Decision` gains `overwritten`.
+- a8b91a3: TYTO-449: a recipe's `run` cell opens onto the included recipe's own cells. `@tyto/recipe` adds
+  `VerbOutput.included` and `Cell.included` (the `IncludedRecipe` type), set on a `run` that
+  succeeded; the desktop notebook carries them on the wire and shows them read-only, closed until
+  **Show the included recipe's cells** is clicked.
+
+### Patch Changes
+
+- Updated dependencies [cd096ab]
+- Updated dependencies [ed7a364]
+- Updated dependencies [4a91cef]
+- Updated dependencies [4db076c]
+- Updated dependencies [c0875cc]
+- Updated dependencies [64a7b70]
+  - @tyto/core@0.42.0
+  - @tyto/brief-lang@0.8.0
+
 ## 0.2.0
 
 ### Minor Changes

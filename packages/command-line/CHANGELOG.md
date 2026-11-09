@@ -1,5 +1,99 @@
 # @tyto/command-line
 
+## 0.3.0
+
+### Minor Changes
+
+- edc97c6: TYTO-373: `installPlugin` and `changePluginState` install, remove, disable and enable a plugin
+  as steps that answer a `Result`, for the window to call as `tyto plugin` does. `tyto plugin
+install` also takes a local `.tgz` or `.tar.gz` archive, unpacked with `tar` and no npm, and
+  its permission prompt says what `workspace:read` and `workspace:write` reach.
+- bf255a4: TYTO-565: `tyto mcp [folder]` serves a folder's templates and briefs to an AI agent over the
+  Model Context Protocol on stdio, with four read tools: `list_templates`, `describe_template`,
+  `check_brief` and `render_preview` (a PNG at most 1,024 px on its longest side). A restricted
+  folder is offered no tool that writes (ADR 0179). A plugin's process now prints onto stderr, so
+  its output no longer lands in `tyto render --json`'s document. The window refuses `tyto mcp`.
+- fdc18fe: TYTO-566: an agent's edit arrives as a proposal (ADR 0180 decision 5). `propose_edit` shows an
+  edit of the document in front, struck-through and inserted text under an Accept / Reject bar;
+  accepted, it is one undo step and saves nothing, and typing in it makes it stale.
+  `proposal_status` tells the agent how it ended. `@tyto/editor` gains the `proposals` extension.
+- 422b6bc: TYTO-566: `tyto mcp --window [folder]` relays an agent's stdio to a running window's local
+  endpoint, after reading its record in `TYTO_HOME/windows/` and sending its token (ADR 0180).
+  The window does not listen yet, so the option is hidden and answers that no window is open.
+  The desktop only gains a test: its command panel refuses `mcp --window` as it refuses `mcp`.
+- f3196f6: TYTO-566: the window listens for agents (ADR 0180). It writes its record into
+  `TYTO_HOME/windows/`, checks each connection's token and serves the same tools as `tyto mcp`
+  through the new `serveAgent`. The status bar shows the agents connected, and its click cuts
+  them. `tyto mcp --window` is now offered. The MCP SDK is bundled into a lazy chunk of main.
+- 639317d: TYTO-566: the window's tools for agents (ADR 0180). Served by a window, `tyto mcp` adds
+  `brief_in_front` and `selection` in any folder, and `open_file` and `show_format` in a trusted
+  one, asked first in a box unless `agentsWindowActions` is `allow`. `agentsListen` turns the
+  window's endpoint off and on, live. `serveAgent` takes the window as a `WindowPort`.
+- 661a573: An agent started in Tyto's terminal reaches the open window (TYTO-567, ADR 0181). Terminal: Open
+  an Agent Here starts the program `agentCommand` names (default `claude`, with `agentArgs` after)
+  in a new terminal tab, told through `--mcp-config` (or Codex's `-c`) to start the window relay on
+  the bundled Node; Tyto installs no agent, and a missing program is a line in the tab. Every
+  terminal carries `TYTO_WINDOW`, which `tyto mcp --window` and the relay prefer over the folder
+  rule, falling back to it when that window is gone. `@tyto/command-line` gains the
+  `@tyto/command-line/relay` subpath export.
+- c0875cc: A plugin may declare `process:<name>` and start that one program through the host (TYTO-568,
+  ADR 0182). The name is bare: no path, wildcard or extension. `host.process.start(name, args)`
+  answers a long-lived handle with `write`, `end`, `kill`, `onStdout`, `onStderr` and `exited`,
+  behind the optional `HostCapabilities.startProcess` port and `checkedProcesses`: an undeclared
+  name is `E_PERMISSION`, a host without the port (the CLI) is `E_PROCESS_UNAVAILABLE`, a third
+  running program is `E_PROCESS_LIMIT`, and a write after the end is `E_PROCESS_EXITED`. A
+  plugin's programs end when it stops. `RPC_PROTOCOL_VERSION` is 19. `@tyto/core` gains six
+  `E_PROCESS_*` codes, and the install prompt names each program a plugin may start. No host
+  starts a program yet.
+- 64a7b70: A plugin that declares a `process:<name>` can ask for the window's MCP server and hand it to
+  the agent it starts (TYTO-569, ADR 0183). `host.window.agentServer()` answers
+  `{ name: 'tyto', command, args, env }`, the shape ACP's `session/new` takes in `mcpServers`:
+  the bundled Node, the relay Open an Agent Here names, and `TYTO_WINDOW` and `TYTO_HOME` only,
+  which the host's check enforces with a strict schema. A plugin with no program is
+  `E_PERMISSION`, the CLI is `E_WINDOW_UNAVAILABLE`, and the desktop refuses `agentsListen` off
+  (`E_WINDOW_AGENTS_OFF`) and a restricted folder (`E_WINDOW_RESTRICTED`), read at each call.
+  `RPC_PROTOCOL_VERSION` is 20. The install prompt's `process:` paragraph now says that the
+  program can also reach the Tyto window as an agent, with its edits arriving as proposals.
+
+### Patch Changes
+
+- cd096ab: A panel contribution may register `call(request)` (TYTO-372, ADR 0173): its page asks the
+  plugin's own process to do work, `{ method, params? }` in and JSON out, with the method matching
+  `^[a-z][\w.-]{0,99}$`, both sides at most 1 MiB of JSON and an isolated plugin's call under the
+  30 s deadline of every call. `@tyto/plugin-api` gains `callPanel` and `panelCallerOf`, the host's
+  half, which find the panel by the caller's id and refuse a request that names a plugin or a
+  panel; `RPC_PROTOCOL_VERSION` is 17. `@tyto/core` gains the diagnostic code `E_PANEL_CALL`. The
+  desktop does not offer `call` to a page yet. `@tyto/command-line` changes only a test, which
+  now reads the protocol from `RPC_PROTOCOL_VERSION` instead of a literal.
+- ae4a916: TYTO-373: the plugins screen installs a plugin from a folder or a `.tgz` archive, after a native
+  box that shows the same permissions `tyto plugin install` prints, and removes, disables and
+  enables an installed one; Settings opens `settings.json` at the plugin's keys. Changes apply the
+  next time Tyto starts, and each row says so. `tyto plugin install --help` names the local archive,
+  and a test proves a hostile archive writes nothing outside the folder it is unpacked into.
+- d836583: TYTO-652: `tyto mcp` draws an image a brief cites only when its real path is inside the folder,
+  its workspace or the workspace's asset folders, so a link inside the folder no longer reads a
+  file outside it; an escape answers as a missing file. `render_preview` fetches from a plugin or
+  Google Fonts only in a trusted workspace (ADR 0179 amendment).
+- Updated dependencies [cd096ab]
+- Updated dependencies [ed7a364]
+- Updated dependencies [4a91cef]
+- Updated dependencies [4db076c]
+- Updated dependencies [092d29e]
+- Updated dependencies [c0875cc]
+- Updated dependencies [046a5b9]
+- Updated dependencies [64a7b70]
+  - @tyto/core@0.42.0
+  - @tyto/plugin-api@0.16.0
+  - @tyto/pipeline@0.12.12
+  - @tyto/io@5.4.0
+  - @tyto/export-html@0.7.16
+  - @tyto/export-svg@2.0.16
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.15
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.15
+  - @tyto/templates@1.2.10
+
 ## 0.2.8
 
 ### Patch Changes
