@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 
@@ -87,6 +87,7 @@ import { createDocumentService, openFilters, saveFilters } from './documents.js'
 import { createExportService } from './export.js';
 import { desktopCapabilities, startDesktopPlugins } from './installed-plugins.js';
 import { approveInABox, createDesktopPluginFiles } from './plugin-files.js';
+import { killProgramTree, pluginPrograms } from './plugin-programs.js';
 import { createDesktopGallery } from './gallery.js';
 import { fileLayoutStore } from './layout-store.js';
 import { createSessionService, createTemplateFolder } from './session.js';
@@ -875,6 +876,31 @@ async function start(): Promise<void> {
       log.error(message, cause);
     },
   });
+  // The programs installed plugins start through `process:<name>` (ADR 0182): in main, on the
+  // person's PATH, in the open folder, ended when that folder or its trust changes and when the
+  // window closes.
+  const programs = pluginPrograms({
+    platform: process.platform,
+    environment: () => process.env,
+    exists: existsSync,
+    workspace: () => workspace.state(),
+    home: homedir(),
+    windowPid: process.pid,
+    spawn: (file, args, options) =>
+      spawn(file, [...args], { ...options, stdio: [...options.stdio] }),
+    killTree: (child, now) => {
+      killProgramTree(process.platform, child, {
+        run: (file, args) => {
+          // On the way out, synchronously: a program on Windows holds main's inherited handles,
+          // and an asynchronous taskkill would not run before main is gone (measured, TYTO-568).
+          if (now) spawnSync(file, args, { stdio: 'ignore', windowsHide: true, timeout: 5_000 });
+          else
+            spawn(file, args, { stdio: 'ignore', windowsHide: true }).on('error', () => undefined);
+        },
+        signalGroup: (pid) => process.kill(-pid, 'SIGTERM'),
+      });
+    },
+  });
   const workspace = createWorkspaceService({
     trustStore: fsTrustStore({ home: pluginsHome }),
     home: pluginsHome,
@@ -883,6 +909,7 @@ async function start(): Promise<void> {
     },
     onFolder: async (folder, places) => {
       stopCommands();
+      programs.settle();
       void agentEndpoint.folderChanged().catch((cause: unknown) => {
         log.error('The agent endpoint record could not be written.', cause);
       });
@@ -970,6 +997,7 @@ async function start(): Promise<void> {
       workspace: () => workspace.state(),
     }),
     ...signinCapabilities(signin),
+    startProcess: programs.startProcess,
   };
 
   // The export, composed here for the reason everything else is (ADR 0010): it needs a
@@ -1006,6 +1034,7 @@ async function start(): Promise<void> {
     for (const warning of loaded.warnings) log.warn(warning.message);
   });
   app.on('will-quit', () => {
+    programs.stopAll();
     void plugins.then((loaded) => loaded.close());
   });
 
@@ -1906,6 +1935,9 @@ async function start(): Promise<void> {
       },
       setTrust: async (trusted, source) => {
         const done = trusted ? await workspace.grant(source) : await workspace.revoke(source);
+        // A trust taken back keeps the folder as it is until it reopens (ADR 0111), but not the
+        // programs a plugin started in it (ADR 0182).
+        programs.settle();
         const state = workspace.state();
         if (done.ok) return state;
         // A trust.json that cannot be written: said in the problems panel, nothing changed.
@@ -2281,6 +2313,7 @@ async function start(): Promise<void> {
 
   mainWindow.on('closed', () => {
     exit.windowGone();
+    programs.stopAll();
     // ADR 0175 decision 3: nothing runs on a schedule once the window is gone.
     recipeSchedule?.stop();
   });

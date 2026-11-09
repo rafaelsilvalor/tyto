@@ -148,3 +148,21 @@ program claude on your computer`. Below the list, a paragraph says the plugin ma
 | A panel hearing pushed events from its plugin (ADR 0173 d8)    | A chat panel shows an answer as it streams                      | Not decided  | TYTO-569 |
 | `testPlugin` offering a stand-in program                       | A plugin author tests `host.process` without a real program     | Not built    | —        |
 | The real `claude` and ACP adapters started this way            | The suites run stand-ins that read and write stdio the same way | Not measured | —        |
+
+## Note, 2026-11-09 — the desktop adapter (TYTO-568, second pull request)
+
+`apps/desktop/src/main/plugin-programs.ts` is decision 8, composed in `index.ts`, and adds
+three things the decisions above did not spell out:
+
+- **"Restricted" means `restricted`, as for the terminal.** A trust taken back while the folder
+  is open (`revoked`) keeps the folder trusted until it reopens (ADR 0111), so a program may
+  still start in it. The programs already running end, because the trust they started under
+  changed. `settle` compares the folder and the trust each program started under with the ones
+  open now. It runs after a folder opens or closes, and after trust is granted or taken back.
+- **A program ends with its whole tree.** On Windows that means `taskkill /T /F`, because an npm
+  `.cmd` runs under `cmd.exe` and the program is that shell's child. Elsewhere it means the
+  program's own process group, because the program starts detached.
+- **On the way out, the kill is synchronous.** This was measured on Windows: with an
+  asynchronous `taskkill`, closing the window left the program running. The program held the
+  handles it inherited from main, and the test harness waited on them for 45 s. When the window
+  closes or the app quits, `taskkill` now finishes before main goes on.

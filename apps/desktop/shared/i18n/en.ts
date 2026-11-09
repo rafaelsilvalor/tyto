@@ -425,6 +425,8 @@ export const en: Catalogue = {
     'It can read the files of the folder open in this window, whichever folder that is when it asks, once you trust the folder.',
   'plugins.workspace.writes':
     'It can write files into the folder open in this window, except into .tyto/, once you trust the folder.',
+  'plugins.process.starts':
+    'It may ask Tyto to start these programs on this computer, in the folder open in this window, never while that folder is restricted:',
   'plugins.close': 'Close',
   'plugins.unavailable': 'The plugin list could not be read.',
   'plugins.credential.label': 'Credential',

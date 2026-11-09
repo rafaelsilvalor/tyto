@@ -1968,6 +1968,16 @@
       ],
       "e2e": ["terminal-agent.desktop.test.ts", "packaged.package.test.ts"],
       "why": "TYTO-567: Open an Agent Here starts an agent in a terminal that reaches this window through the bundled relay"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/plugin-programs.ts",
+        "apps/desktop/src/main/plugin-programs.test.ts",
+        "apps/desktop/e2e/plugin-program.desktop.test.ts",
+        "apps/desktop/e2e/stand-in-program.ts"
+      ],
+      "e2e": ["plugin-program.desktop.test.ts", "packaged.package.test.ts"],
+      "why": "TYTO-568: a program an installed plugin starts through process:<name>, ended with the folder, its trust and the window"
     }
   ]
 }

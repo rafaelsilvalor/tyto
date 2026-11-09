@@ -60,6 +60,20 @@ Click **Sign out** to end it. Nothing else starts a sign-in: a plugin that needs
 
 Tyto keeps the sign-in in your system's keychain, and the plugin gets only a short-lived access token from Tyto, never what keeps you signed in. On a computer with no keychain to encrypt with, the sign-in does not finish and the line says why. The command line cannot sign in through a browser: a recipe that needs a sign-in works only in the window.
 
+## Plugins that start a program
+
+::: info Checked differently
+This section was added on 2026-11-09 and checked by the app's end-to-end tests with a stand-in program on this computer. Nobody has followed it by hand with a real agent yet.
+:::
+
+Some plugins work by talking to another program on your computer — an agent panel that talks to the `claude` command you already use, say. Such a plugin asks for a `process:` permission naming that one program, and you see it before you approve: `process:claude` reads **start the program claude on your computer** in the install box, and the plugin's row in the plugins dialog lists the programs it may start.
+
+- **Tyto starts the program, not the plugin**, and only the one named: `process:claude` does not start anything else. The program is the one your `PATH` finds, so it is the same `claude` you run in a terminal, logged in the same way. Tyto installs no program: when it is not there, the plugin is told so and can tell you.
+- **It runs in the folder open in Tyto, and never while that folder is restricted.** Opening another folder, or trusting or distrusting this one, ends the programs a plugin started; so does closing the window.
+- **It runs as you.** The program can read and change what you can. It gets the folder it runs in and a few settings of your system, such as where your home folder is and your proxy, and never Tyto's secrets or a variable whose name looks like a key or a token.
+
+A plugin that adds a new program in an update is not started until you approve it again. The command line starts no programs for plugins.
+
 ## Is a plugin safe?
 
 Each installed plugin runs apart from the window, so a plugin that crashes stops itself and not Tyto, and it can only reach what its permissions allow. The dialog shows those permissions, and both its install box and `tyto plugin install` show them before you approve. Writing a plugin is in the [plugin author's guide](../extend/plugin-authoring.md).
