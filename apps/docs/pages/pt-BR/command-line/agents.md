@@ -57,7 +57,9 @@ Pela janela o agente também pode:
 - **Ler a seleção**: cada trecho selecionado com as linhas e colunas e o texto que ele cobre.
 - **Abrir um arquivo** da pasta numa aba e **mostrar um formato** do brief da frente no preview. Esses dois exigem uma pasta em que você [confiou](../editor/workspace-folder.md), e por padrão a janela pergunta antes numa caixa que diz o arquivo ou o formato; você escolhe **Abrir** (ou **Mostrar**) ou **Não**. Uma pergunta por vez: enquanto uma caixa está aberta, outro pedido é recusado.
 
-Duas [configurações](../reference/settings.md) mudam isso. `agentsWindowActions` em `"allow"` deixa o agente abrir e mostrar sem perguntar; uma mudança no texto de um documento sempre vai ser perguntada. `agentsListen` em `false` fecha a conexão, corta todos os agentes, e nenhum agente se conecta até ela voltar a `true`.
+- **Propor uma mudança** no texto do documento da frente, numa pasta em que você confiou. Nada é gravado: a mudança aparece no editor, o texto antigo riscado e o novo ao lado, sob uma barra que diz **Proposto por um agente** com **Aceitar** e **Recusar**. Aceitar aplica tudo de uma vez, então um Ctrl+Z desfaz tudo; o arquivo não é salvo, como se você tivesse digitado. Se você digitar dentro do texto proposto antes de decidir, a proposta é descartada como desatualizada, nunca aplicada sobre o que você reescreveu. Uma proposta por documento de cada vez; o agente pergunta depois se você aceitou.
+
+Duas [configurações](../reference/settings.md) mudam isso. `agentsWindowActions` em `"allow"` deixa o agente abrir e mostrar sem perguntar; uma mudança no texto de um documento é sempre uma proposta. `agentsListen` em `false` fecha a conexão, corta todos os agentes, e nenhum agente se conecta até ela voltar a `true`.
 
 ## O que o agente pode fazer
 

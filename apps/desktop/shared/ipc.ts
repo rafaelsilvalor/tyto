@@ -89,6 +89,23 @@ export const agentStateSchema = z
   })
   .nullable();
 
+/** Where an agent's proposal stands (ADR 0180 decision 5). */
+export const proposalStatusSchema = z.enum(['proposed', 'accepted', 'rejected', 'stale', 'gone']);
+
+/** A proposal shown, by its id, or why not. */
+export const proposalAnswerSchema = z.discriminatedUnion('proposed', [
+  z.object({ proposed: z.literal(true), id: z.string().min(1).max(100) }),
+  z.object({ proposed: z.literal(false), reason: z.string().min(1).max(500) }),
+]);
+
+/** One edit an agent proposes, positions from 1 as `selection` answers them. */
+const proposedEditSchema = z.object({
+  from: agentPosition,
+  to: agentPosition,
+  insert: z.string().max(200_000),
+  expect: z.string().max(200_000),
+});
+
 /** What a window action came to, as the window answers `agent:act`. */
 export const agentActedSchema = z.discriminatedUnion('done', [
   z.object({ done: z.literal(true) }),
@@ -1038,6 +1055,8 @@ export const IPC_CHANNELS = {
       answer: z.union([
         z.object({ state: agentStateSchema }),
         z.object({ acted: agentActedSchema }),
+        z.object({ proposal: proposalAnswerSchema }),
+        z.object({ status: proposalStatusSchema.nullable() }),
       ]),
     }),
     z.object({}),
@@ -3138,6 +3157,9 @@ export const IPC_EVENTS = {
     action: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('open') }),
       z.object({ kind: z.literal('show'), format: z.string().min(1).max(200) }),
+      // ADR 0180 decision 5: always a proposal, whatever `agentsWindowActions` says.
+      z.object({ kind: z.literal('propose'), edits: z.array(proposedEditSchema).min(1).max(50) }),
+      z.object({ kind: z.literal('status'), id: z.string().min(1).max(100) }),
     ]),
   }),
 

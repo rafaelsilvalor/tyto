@@ -318,6 +318,31 @@ export const panelStyles = {
     borderRadius: panels.radius,
   },
   '.cm-diagnosticSource': { color: panels.muted },
+
+  // An agent's proposed edit (TYTO-566, `proposals.ts`): the old text struck through in the
+  // error colour, the new text on the selection's colour, and a bar like a panel above them.
+  '.cm-proposal-removed': {
+    textDecoration: 'line-through',
+    textDecorationColor: panels.error,
+    color: panels.muted,
+  },
+  '.cm-proposal-inserted': {
+    whiteSpace: 'pre-wrap',
+    backgroundColor: panels.selected,
+    borderBottom: border(panels.lineWidth, panels.accent),
+  },
+  '.cm-proposal-bar': {
+    display: 'flex',
+    alignItems: 'center',
+    gap: panels.paddingInline,
+    paddingBlock: panels.paddingBlock,
+    paddingInline: panels.paddingInline,
+    backgroundColor: panels.surface,
+    color: panels.text,
+    fontSize: panels.textSize,
+    borderLeft: border(panels.barWidth, panels.accent),
+  },
+  '.cm-proposal-title': { fontWeight: panels.strong },
   '.cm-lintRange': {
     backgroundImage: 'none',
     textDecorationLine: 'underline',

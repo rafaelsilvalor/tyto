@@ -43,6 +43,13 @@ import { json } from './json-language.js';
 import { markdown } from './markdown-language.js';
 import { recipe } from './recipe-language.js';
 import { followerState, historyExtension, mirrored, primaryFacet } from './mirror.js';
+import {
+  type ProposalLabels,
+  type ProposalOutcome,
+  proposalLabels,
+  proposalSettled,
+  proposals,
+} from './proposals.js';
 import { template } from './template-language.js';
 import { type VimStatus, vimMode } from './vim-mode.js';
 
@@ -94,6 +101,15 @@ const languages: Readonly<Record<LanguageName, () => Extension>> = {
 export interface EditorOptions {
   /** Initial document. Empty when omitted. */
   readonly doc?: string;
+  /**
+   * An agent's proposals in every document of this editor (TYTO-566, ADR 0180): the bar's words,
+   * and who hears how each proposal ended. Without it a proposal still shows, in English, and
+   * nobody hears.
+   */
+  readonly proposals?: {
+    readonly labels: ProposalLabels;
+    readonly onSettled: (id: string, outcome: ProposalOutcome) => void;
+  };
   /** Defaults to `light`. */
   readonly theme?: ThemeName;
   /** A preview pane that shows a brief without inviting an edit passes `true`. */
@@ -502,6 +518,8 @@ const baseExtensions = (): Extension[] => [
   activeLine(),
   foldGutter(),
   historyExtension(),
+  // An agent's proposed edit, in every document (TYTO-566): drawn only while one is pending.
+  proposals(),
   drawSelection(),
   dropCursor(),
   rectangularSelection(),
@@ -685,6 +703,12 @@ export function createEditor(parent: HTMLElement, options: EditorOptions = {}): 
     columnsCompartment.of(columns),
     numbersCompartment.of(numbers),
     searchSupport(() => searchPhrases),
+    ...(options.proposals === undefined
+      ? []
+      : [
+          proposalLabels.of(options.proposals.labels),
+          proposalSettled.of(options.proposals.onSettled),
+        ]),
     languages[language](),
     ...baseExtensions(),
   ];

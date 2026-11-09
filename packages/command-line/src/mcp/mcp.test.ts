@@ -420,7 +420,14 @@ describe('toolsFor', () => {
         trust,
         window,
         tools: toolsFor(trust, { window }).filter((name) =>
-          ['brief_in_front', 'selection', 'open_file', 'show_format'].includes(name),
+          [
+            'brief_in_front',
+            'selection',
+            'open_file',
+            'show_format',
+            'propose_edit',
+            'proposal_status',
+          ].includes(name),
         ),
       })),
     );
@@ -431,7 +438,14 @@ describe('toolsFor', () => {
       {
         trust: 'trusted',
         window: true,
-        tools: ['brief_in_front', 'selection', 'open_file', 'show_format'],
+        tools: [
+          'brief_in_front',
+          'selection',
+          'open_file',
+          'show_format',
+          'propose_edit',
+          'proposal_status',
+        ],
       },
     ]);
   });

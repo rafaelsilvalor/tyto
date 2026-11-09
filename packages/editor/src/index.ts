@@ -242,6 +242,16 @@ export {
   remeasureCellOutput,
   setCellOutputs,
 } from './cell-outputs.js';
+export {
+  type Proposal,
+  type ProposalLabels,
+  type ProposalOutcome,
+  type ProposedEdit,
+  acceptProposal,
+  pendingProposal,
+  proposeInState,
+  rejectProposal,
+} from './proposals.js';
 
 export { escapeHtml, MARKDOWN_TAGS, markdownToHtml } from './markdown-html.js';
 export {

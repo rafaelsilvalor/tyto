@@ -1,5 +1,8 @@
 import type {
   BriefInFront,
+  EditToPropose,
+  ProposalAnswer,
+  ProposalStatus,
   SelectedRange,
   WindowActionAnswer,
   WindowPort,
@@ -36,10 +39,16 @@ export interface WindowState {
 }
 
 export type AgentReply =
-  { readonly state: WindowState | null } | { readonly acted: WindowActionAnswer };
+  | { readonly state: WindowState | null }
+  | { readonly acted: WindowActionAnswer }
+  | { readonly proposal: ProposalAnswer }
+  | { readonly status: ProposalStatus | null };
 
 export type AgentAction =
-  { readonly kind: 'open' } | { readonly kind: 'show'; readonly format: string };
+  | { readonly kind: 'open' }
+  | { readonly kind: 'show'; readonly format: string }
+  | { readonly kind: 'propose'; readonly edits: readonly EditToPropose[] }
+  | { readonly kind: 'status'; readonly id: string };
 
 /** A question for the person, one at a time; true when they said yes. */
 export type AskPerson = (question: AgentQuestion) => Promise<boolean>;
@@ -157,6 +166,18 @@ export function createAgentWindow(options: AgentWindowOptions): AgentWindow {
       const go = await allowed({ kind: 'show', format, brief });
       if (go !== true) return go;
       return acted(await ask((askId) => options.sendAct(askId, { kind: 'show', format })));
+    },
+    // A text edit is always a proposal (ADR 0180 decision 5): no box and no setting, the
+    // editor itself asks, and the agent hears at once that it was shown.
+    async proposeEdit(edits) {
+      const answer = await ask((askId) => options.sendAct(askId, { kind: 'propose', edits }));
+      return answer !== undefined && 'proposal' in answer
+        ? answer.proposal
+        : { proposed: false, reason: NOT_ANSWERED };
+    },
+    async proposalStatus(id) {
+      const answer = await ask((askId) => options.sendAct(askId, { kind: 'status', id }));
+      return answer !== undefined && 'status' in answer ? (answer.status ?? undefined) : undefined;
     },
   };
 

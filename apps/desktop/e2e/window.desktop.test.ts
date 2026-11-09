@@ -504,6 +504,11 @@ describe('switching the language', () => {
     'status.agents.one',
     'status.agents.many',
     'status.agents.cut',
+    // TYTO-566: the bar over an agent's proposed edit, drawn only while one is pending.
+    // `agent-proposal.desktop.test.ts` shows it in the real window.
+    'agents.proposal.title',
+    'agents.proposal.accept',
+    'agents.proposal.reject',
     // TYTO-566: the box an agent's window action asks with is main's `showMessageBox`, never
     // element text. `agent-window.test.ts` checks what it names.
     'agents.ask.open',

@@ -43,6 +43,8 @@ export const MCP_TOOLS = [
   { name: 'selection', access: 'window-read' },
   { name: 'open_file', access: 'window-action' },
   { name: 'show_format', access: 'window-action' },
+  { name: 'propose_edit', access: 'window-action' },
+  { name: 'proposal_status', access: 'window-action' },
 ] as const satisfies readonly ToolEntry[];
 
 export type McpToolName = (typeof MCP_TOOLS)[number]['name'];
@@ -104,6 +106,27 @@ export interface SelectedRange {
 export type WindowActionAnswer =
   { readonly done: true } | { readonly done: false; readonly reason: string };
 
+/** The longest list of edits one proposal carries. */
+export const PROPOSAL_MAX_EDITS = 50;
+
+/** One edit an agent proposes, positions as `selection` answers them. */
+export interface EditToPropose {
+  readonly from: { readonly line: number; readonly column: number };
+  readonly to: { readonly line: number; readonly column: number };
+  /** The text that replaces the range; empty deletes it. */
+  readonly insert: string;
+  /** The text the agent believes the range holds; a mismatch refuses the proposal. */
+  readonly expect: string;
+}
+
+/** Where a proposal stands (ADR 0180 decision 5). */
+export type ProposalStatus = 'proposed' | 'accepted' | 'rejected' | 'stale' | 'gone';
+
+/** A proposal shown, by its id, or why not. */
+export type ProposalAnswer =
+  | { readonly proposed: true; readonly id: string }
+  | { readonly proposed: false; readonly reason: string };
+
 /**
  * What a window lends the tools (ADR 0180): the state the person sees, and the two actions. The
  * window owns how an action is asked for (`agents.windowActions`); paths reach it already
@@ -116,4 +139,8 @@ export interface WindowPort {
   selection(): Promise<{ readonly ranges: readonly SelectedRange[] } | undefined>;
   openFile(path: string): Promise<WindowActionAnswer>;
   showFormat(format: string): Promise<WindowActionAnswer>;
+  /** Shows an edit of the document in front for the person to accept or reject; never waits. */
+  proposeEdit(edits: readonly EditToPropose[]): Promise<ProposalAnswer>;
+  /** Where a proposal stands; undefined for an id this window never gave. */
+  proposalStatus(id: string): Promise<ProposalStatus | undefined>;
 }

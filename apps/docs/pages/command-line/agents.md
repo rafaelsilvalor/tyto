@@ -57,7 +57,9 @@ Through the window the agent can also:
 - **Read the selection**: each selected range with its lines and columns and the text it covers.
 - **Open a file** of the folder in a tab, and **show a format** of the brief in front in the preview. These two need a folder you have [trusted](../editor/workspace-folder.md), and by default the window asks you first in a box that names the file or the format; you choose **Open** (or **Show**) or **Don't**. One question at a time: while a box is up, another request is declined.
 
-Two [settings](../reference/settings.md) change this. `agentsWindowActions` set to `"allow"` lets the agent open and show without asking; a change to a document's text will always be asked. `agentsListen` set to `false` closes the connection, cuts every agent, and no agent can connect until it is `true` again.
+- **Propose an edit** to the text of the document in front, in a folder you have trusted. Nothing is written: the change shows in the editor, the old text struck through and the new text beside it, under a bar that says **Proposed by an agent** with **Accept** and **Reject**. Accept puts it in as one step, so one Ctrl+Z takes all of it back; the file is not saved, as if you had typed it. If you type inside the proposed text before deciding, the proposal is dropped as stale, never applied to what you rewrote. One proposal per document at a time; the agent asks afterwards whether you accepted it.
+
+Two [settings](../reference/settings.md) change this. `agentsWindowActions` set to `"allow"` lets the agent open and show without asking; a change to a document's text is always a proposal. `agentsListen` set to `false` closes the connection, cuts every agent, and no agent can connect until it is `true` again.
 
 ## What the agent can do
 
