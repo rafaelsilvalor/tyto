@@ -1,5 +1,7 @@
 import { type Diagnostic, diagnostic } from '@tyto/core';
 
+import type { StartProcess } from './process.js';
+
 /**
  * The runtime's own, read off `globalThis`: this package compiles against no platform's
  * types (ADR 0010), and every runtime it targets — Node, a worker, a browser — has both.
@@ -158,6 +160,17 @@ export interface HostCapabilities {
    * through a browser — the CLI — which answers `E_SIGNIN_UNAVAILABLE`.
    */
   signinAccessToken?(plugin: string, id: string): Promise<string | undefined>;
+
+  /**
+   * Starts `program`, already allowed by `process:<program>` and within the plugin's limit
+   * (ADR 0182), with `args` as an array and no shell. **The adapter finds it on `PATH`, runs it
+   * in the open workspace folder with an environment of its own choosing that carries no
+   * secret, refuses a restricted workspace (`E_PROCESS_RESTRICTED`), a program it cannot find
+   * (`E_PROCESS_NOT_FOUND`) and an argument it cannot pass safely (`E_PROCESS_ARGUMENT`)**, as
+   * `PluginCapabilityError`s, and reports the program's output and its end through `events`.
+   * Absent on a host that starts no programs — the CLI — which answers `E_PROCESS_UNAVAILABLE`.
+   */
+  startProcess?: StartProcess;
 }
 
 /**

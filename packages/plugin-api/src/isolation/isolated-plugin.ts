@@ -9,6 +9,7 @@ import {
 } from '../capabilities.js';
 import type { Disposable, Logger, Plugin, PluginHost } from '../host.js';
 import { validatePluginManifest } from '../manifest.js';
+import { type CheckedProcess, checkedProcesses } from '../process.js';
 import type { PluginChannel } from './channel.js';
 import { type CallableSpec, type PointSpec, pointSpecOf } from './points.js';
 import {
@@ -30,6 +31,9 @@ import {
   workspaceReadArgsSchema,
   workspaceWriteArgsSchema,
   helloMessageSchema,
+  processIdArgsSchema,
+  processStartArgsSchema,
+  processWriteArgsSchema,
 } from './protocol.js';
 
 /**
@@ -173,6 +177,14 @@ export function connectIsolatedPlugin(
   const validated = validatePluginManifest(options.manifest);
   const permissions = validated.ok ? validated.value.permissions : [];
   const capabilities = checkedCapabilities(name, permissions, options.capabilities);
+  /**
+   * The programs this plugin started (ADR 0182), by the number the guest names them with. Kept
+   * after they end, so a late write is answered `E_PROCESS_EXITED` rather than "unknown"; a
+   * conversation starts a handful, not thousands. All of them end when the process does.
+   */
+  const processes = checkedProcesses(name, permissions, options.capabilities);
+  const programs = new Map<number, CheckedProcess>();
+  let nextProgram = 0;
 
   return new Promise((settle) => {
     let activated = false;
@@ -189,6 +201,7 @@ export function connectIsolatedPlugin(
     }, activationDeadlineMs);
 
     const refuse = (problems: Diagnostics): void => {
+      processes.stopAll();
       timers.clearTimeout(activation);
       activated = true;
       void channel.close();
@@ -214,6 +227,7 @@ export function connectIsolatedPlugin(
       if (crash !== undefined || closed) return;
       const reason = `it did not answer within ${String(seconds)} s`;
       crash = reason;
+      processes.stopAll();
       answerEveryWaiting([diagnostic('E_PLUGIN_TIMEOUT', { plugin: name, seconds })]);
       // `close`, so the exit is not reported a second time as a crash of its own.
       void channel.close();
@@ -314,6 +328,33 @@ export function connectIsolatedPlugin(
             throw new TypeError(`host.signin.accessToken was given ${describeIssues(args.error)}`);
           // A string, checked by `checkedCapabilities`: never the adapter's token record.
           reply({ ok: true, value: await capabilities.signinAccessToken(args.data[0]) });
+        } else if (message.capability === 'processStart') {
+          const args = processStartArgsSchema.safeParse(message.args);
+          if (!args.success)
+            throw new TypeError(`host.process.start was given ${describeIssues(args.error)}`);
+          const id = nextProgram++;
+          const tell = (event: Record<string, unknown>): void => {
+            if (crash !== undefined || closed) return;
+            channel.send({
+              protocol: RPC_PROTOCOL_VERSION,
+              type: 'process',
+              id,
+              ...event,
+            } as never);
+          };
+          const program = await processes.start(args.data[0], args.data[1], {
+            stdout: (bytes) => tell({ event: 'stdout', bytes }),
+            stderr: (bytes) => tell({ event: 'stderr', bytes }),
+            exit: ({ code, signal }) => tell({ event: 'exit', code, signal }),
+          });
+          programs.set(id, program);
+          reply({ ok: true, value: { id } });
+        } else if (
+          message.capability === 'processWrite' ||
+          message.capability === 'processEnd' ||
+          message.capability === 'processKill'
+        ) {
+          reply({ ok: true, value: await program(message.capability, message.args) });
         } else {
           reply({ ok: true, value: await storage(message.capability, message.args) });
         }
@@ -326,6 +367,29 @@ export function connectIsolatedPlugin(
       }
     }
 
+    /** What a started program's handle asks: a write to its stdin, closing it, or its end. */
+    async function program(
+      capability: 'processWrite' | 'processEnd' | 'processKill',
+      raw: readonly unknown[],
+    ): Promise<null> {
+      const named = { processWrite: 'write', processEnd: 'end', processKill: 'kill' }[capability];
+      const args = (
+        capability === 'processWrite' ? processWriteArgsSchema : processIdArgsSchema
+      ).safeParse(raw);
+      if (!args.success) {
+        throw new TypeError(`a program's ${named} was given ${describeIssues(args.error)}`);
+      }
+      const started = programs.get(args.data[0]);
+      if (started === undefined) {
+        throw new TypeError(`no program numbered ${String(args.data[0])} was started.`);
+      }
+      if (capability === 'processWrite') await started.write(args.data[1] as Uint8Array);
+      else if (capability === 'processEnd') await started.end();
+      else await started.kill();
+      // `null`, not `undefined`: the desktop's channel is JSON, which drops the key.
+      return null;
+    }
+
     /**
      * `host.cache` and `host.workspace` (ADR 0138), checked by the same `checkedCapabilities`.
      * Each answer is rebuilt field by field, so an adapter's extra keys never cross, and a miss
@@ -334,7 +398,15 @@ export function connectIsolatedPlugin(
     async function storage(
       capability: Exclude<
         RequestedCapability,
-        'fetch' | 'credentials' | 'storeCredential' | 'deleteCredential' | 'signinAccessToken'
+        | 'fetch'
+        | 'credentials'
+        | 'storeCredential'
+        | 'deleteCredential'
+        | 'signinAccessToken'
+        | 'processStart'
+        | 'processWrite'
+        | 'processEnd'
+        | 'processKill'
       >,
       raw: readonly unknown[],
     ): Promise<unknown> {
@@ -503,6 +575,7 @@ export function connectIsolatedPlugin(
     channel.onExit((reason) => {
       if (closed || crash !== undefined) return;
       crash = reason;
+      processes.stopAll();
       if (!activated) {
         refuse(failure(name, `its process exited during activation: ${reason}`));
         return;
@@ -561,6 +634,7 @@ export function connectIsolatedPlugin(
       async close() {
         if (closed) return;
         closed = true;
+        processes.stopAll();
         answerEveryWaiting([
           diagnostic('E_PLUGIN_CRASHED', { plugin: name, reason: 'the host closed it' }),
         ]);

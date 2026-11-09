@@ -43,9 +43,11 @@ import { z } from 'zod';
  * schemas of a side on 15 would refuse (ADR 0170, TYTO-378); 17 since a panel may register
  * `call`, a callable the strict panel schema of a side on 16 would refuse (ADR 0173, TYTO-372);
  * 18 since a plugin may ask for a sign-in's access token, a request a host on 17 would refuse
- * as an unknown capability (ADR 0174, TYTO-374).
+ * as an unknown capability (ADR 0174, TYTO-374); 19 since a plugin may start a program it names
+ * and the host sends that program's output back on its own, four requests a host on 18 would
+ * refuse and a `process` message a guest on 18 would not read (ADR 0182, TYTO-568).
  */
-export const RPC_PROTOCOL_VERSION = 18;
+export const RPC_PROTOCOL_VERSION = 19;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -118,6 +120,29 @@ export const eventMessageSchema = z.strictObject({
 });
 
 /**
+ * A program the plugin started, speaking (ADR 0182): a chunk of its stdout or stderr, or its
+ * end. Sent by the host on its own, after the answer to `processStart` that named `id`; `exit`
+ * is the last message about that id.
+ */
+export const processMessageSchema = z.discriminatedUnion('event', [
+  z.strictObject({
+    protocol,
+    type: z.literal('process'),
+    id: z.number().int().nonnegative(),
+    event: z.enum(['stdout', 'stderr']),
+    bytes: z.instanceof(Uint8Array),
+  }),
+  z.strictObject({
+    protocol,
+    type: z.literal('process'),
+    id: z.number().int().nonnegative(),
+    event: z.literal('exit'),
+    code: z.number().int().nullable(),
+    signal: z.string().nullable(),
+  }),
+]);
+
+/**
  * The host's answer to a guest's `request`. A refusal carries the diagnostic, so the guest
  * can reject with the same code the host decided on.
  */
@@ -145,6 +170,7 @@ export const hostMessageSchema = z.union([
   callMessageSchema,
   eventMessageSchema,
   responseMessageSchema,
+  processMessageSchema,
 ]);
 export type HostMessage = z.infer<typeof hostMessageSchema>;
 
@@ -198,6 +224,10 @@ const requestedCapabilitySchema = z.enum([
   'workspaceRead',
   'workspaceWrite',
   'signinAccessToken',
+  'processStart',
+  'processWrite',
+  'processEnd',
+  'processKill',
 ]);
 export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
 
@@ -229,7 +259,8 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
   }),
   /**
    * The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`
-   * and its `.set` and `.delete`, `host.cache`, `host.workspace` and `host.signin`.
+   * and its `.set` and `.delete`, `host.cache`, `host.workspace`, `host.signin` and
+   * `host.process` with what a started program's handle does.
    */
   z.strictObject({
     protocol,
@@ -297,6 +328,16 @@ export const workspaceBytesSchema = bytesSchema;
  */
 export const signinArgsSchema = z.tuple([z.string().min(1)]);
 export const signinTokenSchema = z.string().min(1);
+
+/**
+ * `host.process` (ADR 0182). The name and the arguments go out and a number naming the program
+ * comes back; every later request names it by that number. Shape only: the permission, the
+ * limit and the size of a write are `checkedProcesses`' to refuse, with a diagnostic.
+ */
+export const processStartArgsSchema = z.tuple([z.string(), z.array(z.string())]);
+export const processStartedSchema = z.strictObject({ id: z.number().int().nonnegative() });
+export const processWriteArgsSchema = z.tuple([z.number().int().nonnegative(), bytesSchema]);
+export const processIdArgsSchema = z.tuple([z.number().int().nonnegative()]);
 
 /** What `host.fetch` answers, checked by the guest before the plugin sees it. */
 export const fetchedResponseSchema = z.strictObject({

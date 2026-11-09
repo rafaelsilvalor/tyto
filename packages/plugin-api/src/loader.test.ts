@@ -80,6 +80,20 @@ describe('checkStoredPlugin', () => {
     expect(isErr(result) && result.error[0]?.message).toMatch(/never recorded it/);
   });
 
+  it('refuses an update that adds a program to start until it is approved again (ADR 0182)', () => {
+    const result = checkStoredPlugin(
+      {
+        folder: 'pdf',
+        manifestSource: manifestSource({ permissions: ['net:api.example.com', 'process:claude'] }),
+      },
+      approved,
+      ENGINE,
+    );
+    expect(isErr(result) && result.error[0]?.message).toBe(
+      "Plugin 'pdf' asks for 'process:claude', which were not approved when it was installed. Install it again to approve them.",
+    );
+  });
+
   it('refuses a plugin that now asks for a permission nobody approved', () => {
     const result = checkStoredPlugin(
       {

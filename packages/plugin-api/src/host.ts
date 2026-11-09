@@ -38,6 +38,13 @@ import {
   responseOf,
 } from './capabilities.js';
 import { type DeclaredSetting, type SettingDeclaration, declaredSetting } from './configuration.js';
+import {
+  type CheckedProcesses,
+  type HostProcess,
+  checkedProcesses,
+  hostProcess,
+  processChannel,
+} from './process.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 import {
   type RecipeContributions,
@@ -192,6 +199,13 @@ export interface PluginHost {
    * and a host that cannot sign in (the CLI) is `E_SIGNIN_UNAVAILABLE`.
    */
   readonly signin: HostSignin;
+  /**
+   * A program on this computer, started by the host for this plugin (ADR 0182), behind
+   * `process:<name>`. It runs for as long as the plugin keeps it, with bytes both ways over its
+   * stdin and stdout, and it ends when the plugin stops. Undeclared is `E_PERMISSION`; the CLI,
+   * which starts no programs, answers `E_PROCESS_UNAVAILABLE`.
+   */
+  readonly process: HostProcess;
 
   readonly log: Logger;
   readonly events: TypedEmitter;
@@ -490,6 +504,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
 
   const contributed = new Map<string, Set<ContributionPoint>>();
   const installed = new Map<string, InstalledPlugin>();
+  /** The programs each plugin started, by plugin, so `disposePlugin` ends them (ADR 0182). */
+  const programs = new Map<string, Set<CheckedProcesses>>();
 
   const exporters = new Point<Exporter>('exporter', emitter, contributed);
   const sources = new Point<Provided<unknown>>('source', emitter, contributed);
@@ -585,6 +601,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   ): PluginHost {
     // The permissions of the manifest the host validated, never what the plugin says.
     const checked = checkedCapabilities(pluginId, permissions, options.capabilities);
+    const processes = checkedProcesses(pluginId, permissions, options.capabilities);
     return {
       registerExporter: (exporter) => exporters.add(pluginId, exporter, onConflict),
       registerSource: (contribution) => sources.add(pluginId, contribution, onConflict),
@@ -648,6 +665,12 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       cache: hostCache(checked),
       workspace: hostWorkspace(checked),
       signin: hostSignin(checked),
+      process: hostProcess(async (name, args) => {
+        // Kept from the first start only, so a host asked for often holds nothing it never used.
+        programs.set(pluginId, (programs.get(pluginId) ?? new Set()).add(processes));
+        const channel = processChannel();
+        return channel.handle(await processes.start(name, args, channel.events));
+      }),
 
       log,
       events: emitter,
@@ -804,6 +827,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     },
 
     disposePlugin(pluginId: string): void {
+      for (const processes of programs.get(pluginId) ?? []) processes.stopAll();
+      programs.delete(pluginId);
       for (const point of points) point.removeAllFrom(pluginId);
       contributed.delete(pluginId);
       installed.delete(pluginId);
