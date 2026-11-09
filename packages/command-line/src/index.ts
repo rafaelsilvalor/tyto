@@ -13,6 +13,7 @@ export type {
   CliConsole,
   CliEnvironment,
   CliRasterizer,
+  CliStdio,
   CommandInvocation,
 } from './environment.js';
 export { EXIT_CODES, EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';

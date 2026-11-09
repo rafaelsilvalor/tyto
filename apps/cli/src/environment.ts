@@ -2,8 +2,14 @@ import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { type Readable, Writable } from 'node:stream';
 
-import { type CliEnvironment, type CliRasterizer, launchPluginProcess } from '@tyto/command-line';
+import {
+  type CliEnvironment,
+  type CliRasterizer,
+  type CliStdio,
+  launchPluginProcess,
+} from '@tyto/command-line';
 import { createPlaywrightRasterizer } from '@tyto/raster';
 
 /**
@@ -62,6 +68,36 @@ async function askOnTerminal(question: string): Promise<boolean> {
   }
 }
 
+/** The three standard streams, injectable so a test claims its own and not Vitest's. */
+export interface StandardStreams {
+  readonly stdin: Readable;
+  readonly stdout: Writable;
+  readonly stderr: Writable;
+}
+
+/**
+ * Hands stdin and stdout to `tyto mcp` (ADR 0179), and from then on routes every other write to
+ * stdout onto stderr.
+ *
+ * The protocol gets a stream of its own that writes through stdout's original `write`; then
+ * stdout's `write` itself is replaced by stderr's. Node's `console.log` writes through that
+ * method, as does a library that calls `process.stdout.write`, so a stray line anywhere in this
+ * process lands on stderr instead of in the middle of a frame. A plugin's process never shared
+ * this stdout (`plugin-process.ts`). For the rest of the process's life: `tyto mcp` is its last
+ * command.
+ */
+export function claimStdio(streams: StandardStreams = process): CliStdio {
+  const stdout = streams.stdout;
+  const protocolWrite = stdout.write.bind(stdout) as Writable['write'];
+  const output = new Writable({
+    write(chunk: Buffer, encoding, done) {
+      protocolWrite(chunk, encoding, done);
+    },
+  });
+  stdout.write = streams.stderr.write.bind(streams.stderr) as typeof stdout.write;
+  return { input: streams.stdin, output };
+}
+
 export function defaultEnvironment(): CliEnvironment {
   return {
     home: tytoHome(),
@@ -79,5 +115,6 @@ export function defaultEnvironment(): CliEnvironment {
     cwd: process.cwd(),
     rasterizer: defaultRasterizer,
     launch: launchPluginProcess,
+    stdio: () => claimStdio(),
   };
 }

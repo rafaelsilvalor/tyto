@@ -119,6 +119,7 @@ export const SECTIONS: readonly Section[] = [
       { slug: 'templates', title: { en: 'Templates', 'pt-BR': 'Templates' } },
       { slug: 'deliveries', title: { en: 'Deliveries', 'pt-BR': 'Entregas' } },
       { slug: 'plugins', title: { en: 'Plugins', 'pt-BR': 'Plugins' } },
+      { slug: 'agents', title: { en: 'Connect an AI agent', 'pt-BR': 'Conectar um agente de IA' } },
     ],
   },
   {

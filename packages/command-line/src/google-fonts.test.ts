@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
 import { USER_AGENT } from '@tyto/google-fonts';
@@ -306,4 +307,72 @@ describe('where the plugin connects (ADR 0120)', () => {
     },
     SLOW,
   );
+});
+
+/**
+ * `tyto mcp`'s `check_brief` fetches nothing (ADR 0179 decision 2): the same face a render asks
+ * this file's server for, checked through the protocol, reaches the server zero times, and the
+ * preview of the same brief — the control — reaches it.
+ */
+describe('tyto mcp', () => {
+  async function serveAndCall(calls: readonly { name: string; arguments: object }[]) {
+    await writeFile(
+      join(workspace, 'formats.yaml'),
+      'grid: { w: 300, h: 300, kind: grid, label: Grid }\n',
+    );
+    await mkdir(join(workspace, 'loose'), { recursive: true });
+    await writeFile(
+      join(workspace, 'loose', 'tipo-google.brief'),
+      '---\ntemplate: tipo-google\n---\n',
+    );
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let buffer = '';
+    const answers = new Map<number, (result: unknown) => void>();
+    output.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString('utf8');
+      let end: number;
+      while ((end = buffer.indexOf('\n')) >= 0) {
+        const message = JSON.parse(buffer.slice(0, end)) as { id?: number; result?: unknown };
+        buffer = buffer.slice(end + 1);
+        if (message.id !== undefined) answers.get(message.id)?.(message.result);
+      }
+    });
+    const exit = run(['mcp'], {
+      ...environment(),
+      rasterizer: () => ({ raster: () => Promise.resolve(new Uint8Array([1])) }),
+      stdio: () => ({ input, output }),
+    });
+    let id = 0;
+    const request = (method: string, params: object): Promise<unknown> => {
+      const n = ++id;
+      const answered = new Promise((resolve) => answers.set(n, resolve));
+      input.write(`${JSON.stringify({ jsonrpc: '2.0', id: n, method, params })}\n`);
+      return answered;
+    };
+    await request('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '1' },
+    });
+    const counts: number[] = [];
+    for (const call of calls) {
+      await request('tools/call', call);
+      counts.push(requests.length);
+    }
+    input.end();
+    expect(await exit, stderr()).toBe(EXIT_OK);
+    return counts;
+  }
+
+  // Starts an installed plugin's process, which a loaded machine can hold past 5 s.
+  it('checks a brief without asking Google Fonts, where a preview asks', async () => {
+    const brief = { path: join('loose', 'tipo-google.brief') };
+    const [afterCheck, afterPreview] = await serveAndCall([
+      { name: 'check_brief', arguments: brief },
+      { name: 'render_preview', arguments: { ...brief, format: 'grid' } },
+    ]);
+    expect(afterCheck).toBe(0);
+    expect(afterPreview).toBeGreaterThan(0);
+  }, 60_000);
 });

@@ -5,6 +5,7 @@ import type { CliEnvironment, CommandInvocation } from './environment.js';
 import { deliveryNewCommand } from './delivery.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import { galleryInstallCommand, galleryListCommand, galleryUpdateCommand } from './gallery.js';
+import { mcpCommand } from './mcp/command.js';
 import {
   parseFormatList,
   parsePositiveInteger,
@@ -464,6 +465,20 @@ export function createProgram(
       captured.code = await trustRemoveCommand(folder, environment);
     });
   valuesOf(trustRemove, { '<folder>': FOLDER });
+
+  /* ------------------------------------------------------------------------------ mcp -- */
+
+  const mcp = program
+    .command('mcp')
+    .description(
+      "serve a folder's templates and briefs to an AI agent over MCP on stdio, until the agent disconnects (read-only tools: ADR 0179)",
+    )
+    // An agent's host may start the server anywhere: Claude Desktop names no working folder.
+    .argument('[folder]', 'the folder whose templates and briefs are served', '.')
+    .action(async (folder: string) => {
+      captured.code = await mcpCommand(folder, environment, signal);
+    });
+  valuesOf(mcp, { '<folder>': FOLDER });
 
   // Applied after the tree is built and to every node of it. Commander copies
   // `_exitCallback` to a subcommand when the subcommand is *created*, so an

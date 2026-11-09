@@ -2,6 +2,7 @@ import type { CommandInvocation } from '@tyto/command-line';
 import { describe, expect, it } from 'vitest';
 
 import {
+  MCP_REFUSED,
   TRUST_REFUSED,
   WATCH_REFUSED,
   type WindowRefusalOptions,
@@ -42,6 +43,17 @@ describe('--trust', () => {
 
   it('is not refused when it is absent', async () => {
     expect(await refusals()(invocation(['render'], ['a.brief'], {}), 'C:\\w')).toBeUndefined();
+  });
+});
+
+describe('mcp', () => {
+  it('is refused, and says where it runs instead', async () => {
+    expect(await refusals()(invocation(['mcp']), 'C:\\w')).toBe(MCP_REFUSED);
+    expect(MCP_REFUSED).toContain('terminal');
+  });
+
+  it('leaves a command named after it alone', async () => {
+    expect(await refusals()(invocation(['render'], ['mcp']), 'C:\\w')).toBeUndefined();
   });
 });
 

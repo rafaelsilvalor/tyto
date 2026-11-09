@@ -115,8 +115,10 @@ export function pluginProcessLauncher(options: PluginProcessOptions = {}): Plugi
       // Structured clone, so `host.fetch`'s body crosses as a `Uint8Array` the way it did
       // across a worker's port, rather than as JSON.
       serialization: 'advanced',
-      // Inherited, so a plugin's own `console` lands where it did in a worker thread.
-      stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+      // Both of a plugin's streams onto this process's stderr (fd 2). Its stdout is never
+      // this process's: stdout carries `--json`'s one document and `tyto mcp`'s protocol
+      // frames, and a plugin's `console.log` there broke both (TYTO-565, ADR 0179).
+      stdio: ['ignore', 2, 'inherit', 'ipc'],
     });
     const exits = new Set<(reason: string) => void>();
     let closing = false;

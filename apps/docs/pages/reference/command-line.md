@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 19. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 20. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -363,3 +363,17 @@ tyto trust remove [options] <folder>
 | Argument | What it does |
 | --- | --- |
 | `<folder>` | the workspace folder or profile file, as it was trusted |
+
+## tyto mcp
+
+serve a folder's templates and briefs to an AI agent over MCP on stdio, until the agent disconnects (read-only tools: ADR 0179)
+
+```sh
+tyto mcp [options] [folder]
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `[folder]` | the folder whose templates and briefs are served |
