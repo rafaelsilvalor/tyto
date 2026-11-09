@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import type { RasterOptions, Rasterizer } from '@tyto/raster';
@@ -347,6 +347,63 @@ describe('tyto mcp', () => {
   it('control: renders both artworks when nobody cancels', async () => {
     expect(await framesRastered(false)).toBe(2);
   }, 30_000);
+});
+
+/**
+ * The images a brief cites stay inside the folder too (TYTO-652, ADR 0179 amendment). Written
+ * as an escape (`../`, an absolute path) they were already refused; through a link inside the
+ * folder they were read. Every escape answers as a missing file does, so the agent cannot tell
+ * which files exist out there. A real link on every platform: a junction on Windows, which
+ * needs no privilege, and a symlink elsewhere. A link that cannot be made fails the test.
+ */
+describe('images a brief cites', () => {
+  async function imageErrors(image: string): Promise<{ check: string[]; preview: string[] }> {
+    const client = connect();
+    await client.start();
+    const text = `---\ntemplate: cartaz\nformats: [feed]\nimagem: ${image}\n---\n::slide\n  Um\n`;
+    const codesOf = async (name: string, args: object): Promise<string[]> => {
+      const document = JSON.parse(textOf(await client.call(name, args))) as {
+        diagnostics: { code: string; severity: string }[];
+      };
+      return document.diagnostics
+        .filter((item) => item.severity === 'error')
+        .map((item) => item.code);
+    };
+    const check = await codesOf('check_brief', { text });
+    const preview = await codesOf('render_preview', { text, format: 'feed' });
+    await client.stop();
+    return { check, preview };
+  }
+
+  it('are drawn from inside the folder, and refused as missing from outside it, links included', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'tyto-mcp-images-'));
+    try {
+      await writeFile(join(outside, 'secret.png'), LOGO_PNG);
+      await writeFile(join(folder, 'inside.png'), LOGO_PNG);
+      await symlink(
+        outside,
+        join(folder, 'linked'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      const climbed = join('..', basename(outside));
+
+      // The control: an image inside the folder is drawn.
+      expect(await imageErrors('inside.png')).toEqual({ check: [], preview: [] });
+
+      const missing = { check: ['E_ASSET_NOT_FOUND'], preview: ['E_ASSET_NOT_FOUND'] };
+      for (const [there, absent] of [
+        [join(climbed, 'secret.png'), join(climbed, 'nothing.png')],
+        [join(outside, 'secret.png'), join(outside, 'nothing.png')],
+        [join('linked', 'secret.png'), join('linked', 'nothing.png')],
+      ] as const) {
+        // A file that is there and one that is not answer alike.
+        expect(await imageErrors(there), there).toEqual(missing);
+        expect(await imageErrors(absent), absent).toEqual(missing);
+      }
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
 
 describe('toolsFor', () => {

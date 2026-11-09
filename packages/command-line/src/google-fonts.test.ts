@@ -365,13 +365,27 @@ describe('tyto mcp', () => {
     return counts;
   }
 
+  const brief = { path: join('loose', 'tipo-google.brief') };
+  const checkThenPreview = [
+    { name: 'check_brief', arguments: brief },
+    { name: 'render_preview', arguments: { ...brief, format: 'grid' } },
+  ];
+
   // Starts an installed plugin's process, which a loaded machine can hold past 5 s.
-  it('checks a brief without asking Google Fonts, where a preview asks', async () => {
-    const brief = { path: join('loose', 'tipo-google.brief') };
-    const [afterCheck, afterPreview] = await serveAndCall([
-      { name: 'check_brief', arguments: brief },
-      { name: 'render_preview', arguments: { ...brief, format: 'grid' } },
-    ]);
+  it('fetches nothing outside a trusted workspace, check or preview', async () => {
+    const [afterCheck, afterPreview] = await serveAndCall(checkThenPreview);
+    expect(afterCheck).toBe(0);
+    // Stricter than `tyto render`, which fetches outside any workspace (ADR 0179, TYTO-652).
+    expect(afterPreview).toBe(0);
+  }, 60_000);
+
+  // The control: the same brief in a trusted workspace, where a preview fetches and a check
+  // still does not.
+  it('checks without asking Google Fonts in a trusted workspace, where a preview asks', async () => {
+    await mkdir(join(workspace, '.tyto'), { recursive: true });
+    await writeFile(join(workspace, '.tyto', 'project.json'), '{}');
+    expect(await run(['trust', 'add', workspace], environment({})), stderr()).toBe(EXIT_OK);
+    const [afterCheck, afterPreview] = await serveAndCall(checkThenPreview);
     expect(afterCheck).toBe(0);
     expect(afterPreview).toBeGreaterThan(0);
   }, 60_000);

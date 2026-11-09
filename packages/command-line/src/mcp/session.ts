@@ -19,7 +19,12 @@ import {
   withoutRefused,
 } from '../plugins/index.js';
 import { type RenderContext, loadRenderContext } from '../render-context.js';
-import { type RenderTaskReport, memoryTaskOutput, renderTask } from '../render-task.js';
+import {
+  type RenderTaskReport,
+  type TaskSources,
+  memoryTaskOutput,
+  renderTask,
+} from '../render-task.js';
 import { displayPath, installedOption } from '../render.js';
 import { type LocatedDiagnostic, diagnosticsDocument, registerUnplaced } from '../report.js';
 import { optionalSources, renderSources } from '../sources.js';
@@ -87,6 +92,13 @@ export interface BriefOptions {
   /** Used when the brief's frontmatter names no template, as `--template` is. */
   readonly template?: string;
 }
+
+/** What a preview's miss says outside a trusted workspace (ADR 0179 amendment of 2026-11-09). */
+export const PREVIEW_NOT_FETCHED =
+  'tyto mcp fetches from a plugin or Google Fonts only in a trusted workspace; trust the folder (tyto trust add) to preview what is not cached yet';
+/** What a check's miss says: it never fetches (ADR 0179 decision 2). */
+export const CHECK_NOT_FETCHED =
+  'check_brief fetches nothing; render_preview in a trusted workspace fetches what is not cached';
 
 interface LoadedContext {
   readonly value: RenderContext;
@@ -196,6 +208,22 @@ export async function openSession(environment: CliEnvironment): Promise<McpSessi
     const { value, diagnostics } = loadedContext ?? (await context());
     const plugins = withoutRefused(loaded, value.refusedPlugins);
     const sources = renderSources(environment.home, workspace?.loaded);
+    /**
+     * A check fetches nothing: it answers about the brief's structure, not its fonts or its
+     * remote images. A preview fetches only in a trusted workspace (ADR 0179 amendment of
+     * 2026-11-09), stricter than `tyto render`, which also fetches outside any workspace: there
+     * an agent naming references would pull the person's images from a connected service, with
+     * their credentials, into its own context, and nothing was trusted. The cache is read
+     * either way.
+     */
+    const sourcesFor = (given: TaskSources, previewing: boolean): TaskSources =>
+      previewing && trust === 'trusted'
+        ? given
+        : {
+            ...given,
+            fetches: false,
+            notFetchedBecause: previewing ? PREVIEW_NOT_FETCHED : CHECK_NOT_FETCHED,
+          };
     const report = await renderTask(
       value,
       {
@@ -206,6 +234,7 @@ export async function openSession(environment: CliEnvironment): Promise<McpSessi
         ...(project === undefined ? {} : { projectAssets: project.assets }),
         outDirectory: cwd,
         output: memoryTaskOutput(),
+        assetRoots: [...roots, ...(project?.assets ?? [])],
       },
       {
         // A check exports SVG, which needs no browser; a preview a PNG (ADR 0179 decision 4).
@@ -221,11 +250,7 @@ export async function openSession(environment: CliEnvironment): Promise<McpSessi
         ...(preview ? { rasterizer: sessionRasterizer(), concurrency: 1 } : {}),
         ...(signal === undefined ? {} : { signal }),
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),
-        // A check fetches nothing: it answers about the brief's structure, not its fonts or its
-        // remote images. A preview fetches as `tyto render` would.
-        ...optionalSources(
-          preview || sources === undefined ? sources : { ...sources, fetches: false },
-        ),
+        ...optionalSources(sources === undefined ? undefined : sourcesFor(sources, preview)),
         ...(preview ? googleFontsOption(true, environment.variables) : {}),
       },
       diagnostics,

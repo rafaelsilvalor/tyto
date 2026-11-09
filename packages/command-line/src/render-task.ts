@@ -47,6 +47,7 @@ import {
   activateBuiltIns,
   activateInstalled,
 } from './plugins/index.js';
+import { realPathConfined } from './real-path-assets.js';
 import { type RenderContext, templateWiring } from './render-context.js';
 import { registerOrigin } from './report.js';
 
@@ -114,6 +115,13 @@ export interface RenderTask {
    * read, and the bytes come back in {@link RenderTaskReport.artifacts}.
    */
   readonly output?: ReusableTaskOutput;
+  /**
+   * When present, an image read from disk is drawn only when its real path is inside one of
+   * these folders, and is otherwise missing (`real-path-assets.ts`). `tyto mcp` passes its
+   * folder, its workspace and the workspace's asset folders (ADR 0179, TYTO-652); absent, a
+   * link inside the brief's folder is followed as it always was.
+   */
+  readonly assetRoots?: readonly string[];
 }
 
 /** A {@link ReusableTaskOutput} that keeps nothing and writes nothing: the job's report holds the bytes. */
@@ -381,13 +389,17 @@ export async function renderTask(
   if (cache !== undefined) taskFonts = fontsFor(options.fontDirectories, cache.fontDirectories());
   const fonts = taskFonts;
 
-  const files =
+  const written =
     task.assetsOverride === undefined
       ? briefAssetResolver({
           briefDirectory: task.briefDirectory,
           ...(task.projectAssets === undefined ? {} : { projectAssets: task.projectAssets }),
         })
       : fileAssetResolver({ base: task.assetsOverride });
+  // Wrapped before the source cache: what a plugin source fetched is in `TYTO_HOME`, and is no
+  // path anybody typed.
+  const files =
+    task.assetRoots === undefined ? written : realPathConfined(written, task.assetRoots);
   const resolved = cache === undefined ? files : cache.assets(files);
   // A delivery's export copies what the brief drew from into its `assets/` (ADR 0161), so it
   // records each image as the run resolves it, after the source cache, which marks a fetch.

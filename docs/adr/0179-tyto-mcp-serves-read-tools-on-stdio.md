@@ -108,3 +108,25 @@ document, which it had already been able to break.
 - Measured on 2026-11-09, `apps/desktop/out/main` before and after: 4,422,710 → 4,437,404 bytes
   (+14,694: 9,683 in `index.js`, 5,011 in the stub chunk). Bundled instead of external, the SDK
   was a 694,040-byte chunk main never loads.
+
+## Amendment — 2026-11-09, TYTO-652
+
+Two tightenings within decisions 3 and 5; the rules do not change.
+
+- **The images a brief cites stay inside the folder too.** `briefAssetResolver` already refused
+  an image path that climbs out as written (`../`, an absolute path), with one answer for a file
+  that is there and one that is not; it reads no link's target, by design (`contain.ts`: a
+  mistake boundary, not a sandbox). So through a link inside the folder an image from outside was
+  drawn into a preview, and a missing one answered differently. `tyto mcp` now follows each file
+  an image resolved to to its real path (`real-path-assets.ts`, `RenderTask.assetRoots`), and one
+  outside the folder, its workspace and the workspace's asset folders answers
+  `E_ASSET_NOT_FOUND`, exactly as a missing file. What a plugin source fetched lives in
+  `TYTO_HOME`'s cache and is not checked: nobody typed that path. `tyto render` and `tyto watch`
+  keep the mistake boundary alone, links followed.
+- **A preview fetches only in a trusted workspace.** `check_brief` still fetches nothing.
+  `render_preview` asks a plugin's `asset-source` or `font-source`, Google Fonts included, only
+  when the workspace is trusted; elsewhere it draws what the cache already holds and says why a
+  miss was not fetched. This is stricter than `tyto render`, which also fetches outside any
+  workspace: there an agent naming references would pull the person's images from a connected
+  service, through their credentials, into its own context, and nothing was trusted. There is no
+  `https:` image yet (TYTO-559 to TYTO-561); such a scheme would fall under this rule.
