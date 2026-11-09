@@ -18,6 +18,7 @@ import {
 import {
   type ExportResources,
   type RenderResult,
+  type ReusableTaskOutput,
   briefAssetResolver,
   fileAssetResolver,
   fileResources,
@@ -30,6 +31,7 @@ import {
   sourceCache,
 } from '@tyto/io';
 import {
+  type Artifact,
   type LoadedResources,
   type OutputRequest,
   type TemplateSource,
@@ -106,6 +108,21 @@ export interface RenderTask {
    * Ignored with {@link folder}, which keeps no report to tell Tyto's files apart.
    */
   readonly removeLeftovers?: boolean;
+  /**
+   * Where the artifacts go instead of a folder: `tyto mcp`'s checks and previews, which write
+   * nothing (ADR 0179). {@link outDirectory}, {@link folder} and {@link delivery} are then not
+   * read, and the bytes come back in {@link RenderTaskReport.artifacts}.
+   */
+  readonly output?: ReusableTaskOutput;
+}
+
+/** A {@link ReusableTaskOutput} that keeps nothing and writes nothing: the job's report holds the bytes. */
+export function memoryTaskOutput(): ReusableTaskOutput {
+  return {
+    write: () => Promise.resolve([]),
+    removeLeftovers: () => Promise.resolve([]),
+    finish: () => Promise.resolve([]),
+  };
 }
 
 export interface RenderTaskOptions {
@@ -161,6 +178,8 @@ export interface RenderTaskReport {
   readonly result: RenderResult;
   /** False when anything in `diagnostics` is an error, which is what exit 1 means. */
   readonly ok: boolean;
+  /** What the job produced, bytes included, in scene order; empty when it produced nothing. */
+  readonly artifacts: readonly Artifact[];
 }
 
 /**
@@ -275,7 +294,7 @@ function blockedReport(
     version: options.version,
     templates: [],
   });
-  return { diagnostics, result, ok: false };
+  return { diagnostics, result, ok: false, artifacts: [] };
 }
 
 export async function renderTask(
@@ -294,12 +313,12 @@ export async function renderTask(
   // `--folder` writes the artwork alone (ADR 0157); everything else keeps the contract's
   // `result.json` beside it (ADR 0011).
   const opened =
-    task.folder === undefined
+    task.output !== undefined || task.folder === undefined
       ? undefined
       : await fsArtworkOutput(join(task.outDirectory, task.folder.name), { label: task.id });
   if (opened !== undefined && !opened.ok) return blockedReport(opened.error, inherited, options);
   const forDelivery =
-    task.delivery === undefined
+    task.output !== undefined || task.delivery === undefined
       ? undefined
       : await fsDeliveryExportOutput({
           artwork: task.outDirectory,
@@ -311,6 +330,7 @@ export async function renderTask(
   }
   const delivery = forDelivery?.value;
   const output =
+    task.output ??
     opened?.value ??
     delivery ??
     (await fsTaskOutput(task.outDirectory, {
@@ -518,8 +538,8 @@ export async function renderTask(
   const unwritten = await output.finish(result);
   if (unwritten.length > 0) {
     const reported = [...diagnostics, ...unwritten];
-    return { diagnostics: reported, result: resultOf(reported), ok: false };
+    return { diagnostics: reported, result: resultOf(reported), ok: false, artifacts };
   }
 
-  return { diagnostics, result, ok: !hasErrors(diagnostics) };
+  return { diagnostics, result, ok: !hasErrors(diagnostics), artifacts };
 }

@@ -44,3 +44,4 @@ O `tyto` ainda não vem no instalador do aplicativo. Ele roda a partir de uma c�
 - [Templates](./templates.md) — conferir um template e começar um novo.
 - [Entregas](./deliveries.md) — criar a pasta em que uma peça de trabalho fica.
 - [Plugins](./plugins.md) — instalar, listar, desligar e remover.
+- [Conectar um agente de IA](./agents.md) — deixar o Claude Code ou o Claude Desktop ler seus templates, conferir briefs e ver prévias.

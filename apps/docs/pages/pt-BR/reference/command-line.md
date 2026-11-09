@@ -2,7 +2,7 @@
 
 # Linha de comando
 
-Todos os comandos que o `tyto` aceita: 19. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
+Todos os comandos que o `tyto` aceita: 20. `tyto --help` e `tyto <comando> --help` imprimem o mesmo texto no terminal.
 
 ::: info Ajuda em inglês
 A ajuda da linha de comando existe só em inglês, e esta página a mostra como o terminal a imprime.
@@ -367,3 +367,17 @@ tyto trust remove [options] <folder>
 | Argumento | O que faz |
 | --- | --- |
 | `<folder>` | the workspace folder or profile file, as it was trusted |
+
+## tyto mcp
+
+serve a folder's templates and briefs to an AI agent over MCP on stdio, until the agent disconnects (read-only tools: ADR 0179)
+
+```sh
+tyto mcp [options] [folder]
+```
+
+**Argumentos**
+
+| Argumento | O que faz |
+| --- | --- |
+| `[folder]` | the folder whose templates and briefs are served |

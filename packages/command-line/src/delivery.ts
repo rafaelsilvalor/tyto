@@ -8,6 +8,7 @@ import {
   builtInDelivery,
   diagnostic,
   err,
+  type TemplateManifest,
   ok,
   planDelivery,
   skeletonText,
@@ -18,7 +19,7 @@ import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
 import { NO_PLUGIN_FILES, syncPluginFiles } from './plugin-files.js';
 import { loadInstalledPlugins, pluginCapabilities } from './plugins/index.js';
-import { loadRenderContext } from './render-context.js';
+import { type RenderContext, loadRenderContext } from './render-context.js';
 import { displayPath, installedOption } from './render.js';
 import { formatDiagnostics, registerUnplaced } from './report.js';
 import { type BriefWorkspace, workspaceOfFolder } from './workspace.js';
@@ -138,39 +139,60 @@ async function skeletonOf(
     });
     if (!context.ok) return err([...pluginFiles.diagnostics, ...context.error]);
 
-    // An alias reaches the template it configures; a bare name reaches its entry's default.
-    const selection = context.value.configurations.select(template);
-    const manifest = context.value.registry.get(selection?.template ?? template);
-    if (manifest === undefined) {
-      const available = context.value.registry.list().map((entry) => entry.name);
-      return err([diagnostic('E_UNKNOWN_TEMPLATE', { template, available: available.join(', ') })]);
-    }
-    // A configuration that restricts its formats offers only those (ADR 0155), as the window's
-    // template list does before it writes a skeleton.
-    const restriction = selection?.formats;
-    const formats =
-      restriction === undefined
-        ? manifest.formats
-        : manifest.formats.filter((format) => restriction.includes(format));
-    const brief = selection?.brief;
-    const text = skeletonText(
-      briefSkeleton({
-        name: template,
-        formats,
-        slots: manifest.slots,
-        ...(brief === undefined
-          ? {}
-          : {
-              configured: {
-                skeleton: brief.skeleton,
-                formats: brief.formats,
-                filled: Object.keys(brief.slots),
-              },
-            }),
-      }),
-    );
-    return ok(text, [...pluginFiles.diagnostics, ...context.diagnostics]);
+    const skeleton = templateSkeleton(context.value, template);
+    if (!skeleton.ok) return err(skeleton.error);
+    return ok(skeleton.value.text, [...pluginFiles.diagnostics, ...context.diagnostics]);
   } finally {
     await loaded.close();
   }
+}
+
+/** A template as a new brief starts from it: what was found, and the skeleton's text. */
+export interface TemplateSkeleton {
+  readonly manifest: TemplateManifest;
+  /** The formats the skeleton offers: the template's, narrowed by a configuration (ADR 0155). */
+  readonly formats: readonly string[];
+  readonly text: string;
+}
+
+/**
+ * The skeleton of a new brief for `template` in a loaded render context: `tyto delivery new`'s
+ * brief and `tyto mcp`'s `describe_template` (ADR 0179), so the two never disagree.
+ */
+export function templateSkeleton(
+  context: RenderContext,
+  template: string,
+): Result<TemplateSkeleton, Diagnostics> {
+  // An alias reaches the template it configures; a bare name reaches its entry's default.
+  const selection = context.configurations.select(template);
+  const manifest = context.registry.get(selection?.template ?? template);
+  if (manifest === undefined) {
+    const available = context.registry.list().map((entry) => entry.name);
+    return err([diagnostic('E_UNKNOWN_TEMPLATE', { template, available: available.join(', ') })]);
+  }
+  // A configuration that restricts its formats offers only those (ADR 0155), as the window's
+  // template list does before it writes a skeleton.
+  const restriction = selection?.formats;
+  const formats =
+    restriction === undefined
+      ? manifest.formats
+      : manifest.formats.filter((format) => restriction.includes(format));
+  const brief = selection?.brief;
+  const text = skeletonText(
+    briefSkeleton({
+      name: template,
+      formats,
+      slots: manifest.slots,
+      ...(brief === undefined
+        ? {}
+        : {
+            configured: {
+              skeleton: brief.skeleton,
+              formats: brief.formats,
+              filled: Object.keys(brief.slots),
+            },
+          }),
+    }),
+  );
+  return ok({ manifest, formats, text });
 }

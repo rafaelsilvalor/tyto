@@ -1,3 +1,5 @@
+import type { Readable, Writable } from 'node:stream';
+
 import type { PluginProcessLauncher } from '@tyto/plugin-api';
 
 import type { CloseableRasterizer } from './plugins/rasterizer.js';
@@ -100,6 +102,25 @@ export interface CliEnvironment {
    * Absent in a terminal, which has nothing but the text.
    */
   readonly diagnostics?: (items: readonly LocatedDiagnostic[]) => void;
+  /**
+   * Hands the process's standard input and output over to `tyto mcp`, whose protocol they then
+   * carry and nothing else (ADR 0179). Called once, by that command only. The app that fills it
+   * owns the guarantee: after the call, nothing the process prints reaches {@link CliStdio.output}
+   * but the protocol — the terminal routes every other write to stdout onto stderr.
+   *
+   * Absent everywhere but a terminal. The window has no standard streams of a person's to give,
+   * and refuses `mcp` before it starts (ADR 0159); without the port the command fails as an
+   * internal failure (exit 2) and says why.
+   */
+  readonly stdio?: () => CliStdio;
+}
+
+/** The two streams `tyto mcp` speaks on (ADR 0179). */
+export interface CliStdio {
+  /** One JSON-RPC message per line, from the client. */
+  readonly input: Readable;
+  /** One JSON-RPC message per line, to the client, and nothing else ever. */
+  readonly output: Writable;
 }
 
 /** A command about to run: `['plugin', 'install']`, its arguments and its parsed options. */

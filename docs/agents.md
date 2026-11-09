@@ -138,3 +138,49 @@ sources, it prints the command before running it, and a recipe whose header says
 (ADR 0170) applies its plan, writing to the services it names, as the person's Run does. Ask the
 maintainer before running it on a real workspace. With the mode off, every command fails with
 `connect ECONNREFUSED 127.0.0.1:9333`.
+
+## Tyto as an MCP server
+
+`tyto mcp [folder]` serves a folder's templates and briefs to an agent over the Model Context
+Protocol on stdio (TYTO-565, ADR 0179). The agent's host starts it and talks to it; nobody runs it
+by hand. It offers four tools, all of them reads:
+
+| Tool                | What it answers                                                       |
+| ------------------- | --------------------------------------------------------------------- |
+| `list_templates`    | Every template a brief in the folder can name                         |
+| `describe_template` | A template's formats and sizes, its slots, and a new brief's skeleton |
+| `check_brief`       | A brief's diagnostics with line and column; structure only, no fetch  |
+| `render_preview`    | One format as PNG, at most 1,024 px on its longest side, 4 artworks   |
+
+A brief is named by a path inside the folder (or its workspace) or handed over as text. Nothing
+is written. In a folder nobody trusted, the folder's plugin files are not loaded, as on
+`tyto render`; when write tools arrive, such a folder will not be offered them.
+
+The command is the built CLI, `node <repository>/apps/cli/dist/index.js` (`pnpm cli` builds it).
+
+Name the project folder as the argument: a host may start the server in a folder of its own
+choosing, and the argument is what makes the answer not depend on it.
+
+**Claude Code**:
+
+```
+claude mcp add tyto -- node C:/projects/tyto/tyto/apps/cli/dist/index.js mcp C:/projects/my-project
+```
+
+**Claude Desktop**, in `claude_desktop_config.json` (Settings ▸ Developer ▸ Edit Config), then
+restart the app:
+
+```json
+{
+  "mcpServers": {
+    "tyto": {
+      "command": "node",
+      "args": ["C:/projects/tyto/tyto/apps/cli/dist/index.js", "mcp", "C:/projects/my-project"]
+    }
+  }
+}
+```
+
+The server's own messages, and anything a plugin prints, go to stderr, which both hosts keep in
+their MCP log; stdout carries the protocol only. The window refuses `tyto mcp` in its command
+panel.

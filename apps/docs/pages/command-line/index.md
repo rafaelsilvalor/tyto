@@ -42,3 +42,4 @@ The `tyto` command does from a terminal what the window does: render a brief, wa
 - [Templates](./templates.md) — check a template and start a new one.
 - [Deliveries](./deliveries.md) — make the folder a piece of work is kept in.
 - [Plugins](./plugins.md) — install, list, switch off and remove.
+- [Connect an AI agent](./agents.md) — let Claude Code or Claude Desktop read your templates, check briefs and see previews.

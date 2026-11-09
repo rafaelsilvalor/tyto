@@ -29,6 +29,14 @@ export const WATCH_REFUSED =
   "That folder is the queue panel's, with auto-run on, and a queue folder has one consumer " +
   '(ADR 0159). Turn auto-run off in the queue panel, or watch another folder.';
 
+/**
+ * `tyto mcp` serves an agent on the standard streams of whoever started it (ADR 0179), and the
+ * command panel has none of a person's to give: its output is a panel, not a pipe.
+ */
+export const MCP_REFUSED =
+  'tyto mcp is not available in the window: it serves an agent over stdin and stdout (ADR 0179). ' +
+  'Register tyto mcp with the agent, which starts it, or run it in a terminal.';
+
 export interface WindowRefusalOptions {
   readonly platform: NodeJS.Platform;
   /** The queue panel's folder and whether it runs what arrives on its own. */
@@ -51,6 +59,8 @@ export function windowRefusals(
 
     const [command] = invocation.path;
     const [first] = invocation.args;
+
+    if (command === 'mcp') return MCP_REFUSED;
 
     if (command === 'watch' && first !== undefined) {
       const queue = await options.queue();
