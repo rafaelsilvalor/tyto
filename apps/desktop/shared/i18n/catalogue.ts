@@ -494,6 +494,10 @@ export interface Catalogue {
   readonly 'agents.ask.open.yes': string;
   readonly 'agents.ask.show.yes': string;
   readonly 'agents.ask.no': string;
+  /** TYTO-566, ADR 0180 decision 5: the bar over an agent's proposed edit, in the editor. */
+  readonly 'agents.proposal.title': string;
+  readonly 'agents.proposal.accept': string;
+  readonly 'agents.proposal.reject': string;
   readonly 'status.position': string;
   readonly 'status.selected': string;
   readonly 'status.kind.settings': string;
@@ -1258,6 +1262,9 @@ export const CATALOGUE_KEYS = [
   'agents.ask.open.yes',
   'agents.ask.show.yes',
   'agents.ask.no',
+  'agents.proposal.title',
+  'agents.proposal.accept',
+  'agents.proposal.reject',
   'status.position',
   'status.selected',
   'status.kind.settings',

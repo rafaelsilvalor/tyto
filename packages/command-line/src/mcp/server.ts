@@ -9,6 +9,7 @@ import {
   type McpToolName,
   PREVIEW_MAX_SIDE,
   ToolRefusal,
+  PROPOSAL_MAX_EDITS,
   type WindowActionAnswer,
   type WindowPort,
   toolsFor,
@@ -309,6 +310,73 @@ function registerWindowTools(
         annotations: moves,
       },
       ({ format }) => answering(err, async () => acted(await window.showFormat(format))),
+    );
+  }
+
+  const position = z.object({
+    line: z.number().int().positive().describe('from 1'),
+    column: z.number().int().positive().describe('from 1'),
+  });
+
+  if (offers('propose_edit')) {
+    server.registerTool(
+      'propose_edit',
+      {
+        title: 'Propose an edit',
+        description: `Proposes a change to the text of the document in front of the person. Nothing is written: the change is shown in the editor, and the person accepts or rejects it, which can take minutes. This answers at once with the proposal's id; call proposal_status with that id afterwards to learn whether it was accepted, rejected or became stale. Positions are lines and columns from 1, as the selection tool answers them; each edit names the text it expects in its range, and the proposal is refused if any differs. One proposal per document at a time; at most ${String(PROPOSAL_MAX_EDITS)} edits, apart from one another. An accepted proposal is one undo step and leaves the file unsaved.`,
+        inputSchema: z.object({
+          edits: z
+            .array(
+              z.object({
+                from: position,
+                to: position,
+                insert: z.string().describe('the new text; empty deletes the range'),
+                expect: z.string().describe('the text the range holds now, as read'),
+              }),
+            )
+            .min(1)
+            .max(PROPOSAL_MAX_EDITS),
+        }),
+        annotations: moves,
+      },
+      ({ edits }) =>
+        answering(err, async () => {
+          const front = await window.briefInFront();
+          if (front === undefined) throw new ToolRefusal('no document is in front');
+          if (front.path !== null && (await servedPath(session, front.path)) === undefined) {
+            throw new ToolRefusal('the document in front is outside the served folders');
+          }
+          const answer = await window.proposeEdit(edits);
+          if (!answer.proposed) throw new ToolRefusal(answer.reason);
+          return {
+            content: [
+              text({
+                id: answer.id,
+                status: 'proposed',
+                next: 'call proposal_status with this id; the person may take minutes',
+              }),
+            ],
+          };
+        }),
+    );
+  }
+
+  if (offers('proposal_status')) {
+    server.registerTool(
+      'proposal_status',
+      {
+        title: 'Where a proposal stands',
+        description:
+          'Whether a proposal from propose_edit is still waiting (proposed), was accepted, rejected, became stale because the person edited the same text, or is gone because its tab closed.',
+        inputSchema: z.object({ id: z.string().describe('the id propose_edit answered') }),
+        annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      },
+      ({ id }) =>
+        answering(err, async () => {
+          const status = await window.proposalStatus(id);
+          if (status === undefined) throw new ToolRefusal(`no proposal ${id} in this window`);
+          return { content: [text({ id, status })] };
+        }),
     );
   }
 }

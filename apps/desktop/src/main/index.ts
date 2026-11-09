@@ -795,7 +795,11 @@ async function start(): Promise<void> {
   let agentsWindowActions = saved.agentsWindowActions;
   const agentWindow = createAgentWindow({
     sendState: (askId) => toWindow('agent:state', { askId }),
-    sendAct: (askId, action) => toWindow('agent:act', { askId, action: { ...action } }),
+    sendAct: (askId, action) =>
+      toWindow('agent:act', {
+        askId,
+        action: action.kind === 'propose' ? { kind: 'propose', edits: [...action.edits] } : action,
+      }),
     pathOf: (documentId) => documents.pathOf(documentId),
     windowActions: () => agentsWindowActions,
     ask: async (question) => {

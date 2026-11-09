@@ -1948,6 +1948,15 @@
       ],
       "e2e": ["agent-window.desktop.test.ts"],
       "why": "TYTO-566: an agent's window tools on the running window, the box and agentsListen"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/renderer/agent-proposals.ts",
+        "apps/desktop/src/renderer/agent-proposals.test.ts",
+        "apps/desktop/e2e/agent-proposal.desktop.test.ts"
+      ],
+      "e2e": ["agent-proposal.desktop.test.ts"],
+      "why": "TYTO-566: an agent's proposed edit in the real window, accepted, undone and stale"
     }
   ]
 }

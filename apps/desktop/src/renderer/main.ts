@@ -55,6 +55,9 @@ import {
 } from '@tyto/editor';
 
 import { agentStateOf } from './agent-state.js';
+import { ProposalLedger, offsetsOf } from './agent-proposals.js';
+import type { EditToPropose } from '@tyto/command-line';
+import { proposeInState } from '@tyto/editor';
 import {
   type IpcEventPayload,
   type IpcRequest,
@@ -5226,6 +5229,40 @@ function tellMenuWhatIsOffered(): void {
   });
 }
 
+/** Where each agent proposal stands, for `proposal_status` (TYTO-566, ADR 0180). */
+const proposalLedger = new ProposalLedger();
+
+/**
+ * Shows an agent's edit of the document in front as a proposal (ADR 0180 decision 5). Only in
+ * an editor showing that document: a preview in front has no text to propose into.
+ */
+function proposeForAgent(
+  edits: readonly EditToPropose[],
+): { proposed: true; id: string } | { proposed: false; reason: string } {
+  const current = active();
+  const pane = focusedPane();
+  if (pane === undefined || focusedDocumentId(groups) !== current.id) {
+    return { proposed: false, reason: 'the document in front is not open in an editor' };
+  }
+  const editorState = pane.state();
+  const offsets = offsetsOf(editorState.doc, edits);
+  if (!offsets.ok) return { proposed: false, reason: offsets.reason };
+  const id = proposalLedger.open(current.id);
+  const shown = proposeInState(editorState, { id, edits: offsets.edits });
+  if (!shown.ok) {
+    proposalLedger.settle(id, 'rejected');
+    return {
+      proposed: false,
+      reason:
+        shown.reason === 'pending'
+          ? 'declined: a proposal is pending in this document'
+          : 'the edits do not fit the document',
+    };
+  }
+  pane.view.dispatch({ effects: shown.effect, scrollIntoView: true });
+  return { proposed: true, id };
+}
+
 /** The document in front and the focused editor's selection, for an agent (TYTO-566). */
 function agentStateNow(): ReturnType<typeof agentStateOf> {
   const current = active();
@@ -5254,6 +5291,18 @@ async function actForAgent(
 ): Promise<void> {
   const reply = (acted: { done: true } | { done: false; reason: string }): Promise<object> =>
     bridge['agent:reply']({ askId, answer: { acted } });
+  if (action.kind === 'propose') {
+    await bridge['agent:reply']({ askId, answer: { proposal: proposeForAgent(action.edits) } });
+    return;
+  }
+  if (action.kind === 'status') {
+    const status = proposalLedger.status(
+      action.id,
+      (id) => documentOf(workspace, id) !== undefined,
+    );
+    await bridge['agent:reply']({ askId, answer: { status: status ?? null } });
+    return;
+  }
   if (action.kind === 'open') {
     const wanted = nextDocumentId();
     const opened = await bridge['agent:open']({ askId, documentId: wanted });
@@ -6535,6 +6584,15 @@ async function load(): Promise<void> {
       // The search panel's words, which are the catalogue's even though the panel is
       // CodeMirror's. `applyLocale` is what keeps them current afterwards.
       searchPhrases: searchPhrasesFor(state.locale),
+      // An agent's proposed edit (TYTO-566, ADR 0180): the bar's words, and where it ends up.
+      proposals: {
+        labels: {
+          title: translate(state.locale, 'agents.proposal.title'),
+          accept: translate(state.locale, 'agents.proposal.accept'),
+          reject: translate(state.locale, 'agents.proposal.reject'),
+        },
+        onSettled: (id, outcome) => proposalLedger.settle(id, outcome),
+      },
       // The status bar shows vim's mode (TYTO-248), so the library's own line would say it
       // twice. Its `:` prompt and its notifications still open in its own panel.
       vimStatus: false,

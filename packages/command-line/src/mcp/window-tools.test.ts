@@ -83,6 +83,13 @@ function fakeWindow(front: BriefInFront | undefined): FakeWindow {
       shown.push(format);
       return Promise.resolve(format === 'feed' ? done : { done: false, reason: 'no such format' });
     },
+    proposeEdit: (edits) =>
+      Promise.resolve(
+        edits[0]?.expect === 'Hello'
+          ? { proposed: true as const, id: 'proposal-1' }
+          : { proposed: false as const, reason: 'stale: the text changed' },
+      ),
+    proposalStatus: (id) => Promise.resolve(id === 'proposal-1' ? 'accepted' : undefined),
   };
 }
 
@@ -154,6 +161,8 @@ describe('the window tools', () => {
     expect(tools).toContain('selection');
     expect(tools).not.toContain('open_file');
     expect(tools).not.toContain('show_format');
+    expect(tools).not.toContain('propose_edit');
+    expect(tools).not.toContain('proposal_status');
     await client.close();
   });
 
@@ -181,6 +190,25 @@ describe('the window tools', () => {
       text: 'no such format',
       isError: true,
     });
+    await client.close();
+  });
+
+  it('proposes an edit, answers at once with its id, and tells where it stands', async () => {
+    await trust();
+    const client = await connect(fakeWindow(front(join(folder, 'a.brief'))));
+    const edit = { from: { line: 4, column: 1 }, to: { line: 4, column: 6 }, insert: 'Olá' };
+    const proposed = await client.call('propose_edit', { edits: [{ ...edit, expect: 'Hello' }] });
+    expect(proposed.isError).toBe(false);
+    expect(JSON.parse(proposed.text)).toMatchObject({ id: 'proposal-1', status: 'proposed' });
+    expect(JSON.parse((await client.call('proposal_status', { id: 'proposal-1' })).text)).toEqual({
+      id: 'proposal-1',
+      status: 'accepted',
+    });
+    expect(await client.call('propose_edit', { edits: [{ ...edit, expect: 'Bye' }] })).toEqual({
+      text: 'stale: the text changed',
+      isError: true,
+    });
+    expect((await client.call('proposal_status', { id: 'nope' })).isError).toBe(true);
     await client.close();
   });
 

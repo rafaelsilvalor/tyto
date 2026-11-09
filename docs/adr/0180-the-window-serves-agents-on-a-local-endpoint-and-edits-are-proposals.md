@@ -196,3 +196,23 @@ The window tools land. Decisions 6 and 7 stand; four details were settled.
   the coordinator opens a card for it. Meanwhile the token stays the gate: a remote reader with
   Everyone's read right gets nothing, and a remote caller who may write is the same user, who
   could read `TYTO_HOME` over the administrative share anyway.
+
+## Amendment — 2026-11-09, TYTO-566 PR 4
+
+Decision 5 lands as `propose_edit` and `proposal_status`, both `window-action`: offered in a
+trusted workspace only, and a text edit is a proposal whatever `agentsWindowActions` says.
+
+- **A proposal is a list of edits with what each expects.** Each names its range by lines and
+  columns, as `selection` answers them, and the text the agent read there; one mismatch refuses
+  the whole proposal at once, as stale. Edits must not overlap; at most 50.
+- **One proposal per document**, in the document in front, held by the editor itself
+  (`packages/editor/src/proposals.ts`, a state field and decorations; no `@codemirror/merge`).
+  While it waits it maps through the person's edits; an edit that touches a proposed range makes
+  it stale and removes it, never re-aiming it at rewritten text.
+- **Accepted, it is one undo step and saves nothing**: one transaction with
+  `isolateHistory.of('full')`, as Format Brief; the tab is unsaved afterwards.
+- **The agent does not wait.** `propose_edit` answers with an id at once, because a person may
+  take minutes and MCP clients time out; `proposal_status` answers proposed, accepted, rejected,
+  stale or gone (its tab closed). The window keeps the last 50.
+- **No key is bound.** Escape is vim's way out of insert mode, and a proposal rejected by a person
+  leaving insert mode would be lost; Accept and Reject are the bar's buttons.

@@ -28,7 +28,15 @@ export {
 } from './plugin-actions.js';
 export { permissionPrompt } from './plugin.js';
 export { serveAgent } from './mcp/command.js';
-export type { BriefInFront, SelectedRange, WindowActionAnswer, WindowPort } from './mcp/tools.js';
+export type {
+  BriefInFront,
+  EditToPropose,
+  ProposalAnswer,
+  ProposalStatus,
+  SelectedRange,
+  WindowActionAnswer,
+  WindowPort,
+} from './mcp/tools.js';
 export {
   REFUSED_LINE,
   type WindowRecord,

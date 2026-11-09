@@ -191,4 +191,6 @@ checks the record's token on the first line, and serves the same tools through `
 The status bar shows **Agent connected** while one is, and its click cuts them. Served by a
 window, the server adds `brief_in_front` and `selection` (reads of what is on screen, offered
 in any folder) and `open_file` and `show_format` (window actions, trusted folders only, asked
-first unless `agentsWindowActions` is `allow`). `agentsListen: false` stops the listener.
+first unless `agentsWindowActions` is `allow`). `agentsListen: false` stops the listener. `propose_edit` shows an edit of the document in front for the person
+to accept (one undo step, no save) or reject, and answers at once with an id;
+`proposal_status` says whether it was accepted, rejected, became stale or is gone.
