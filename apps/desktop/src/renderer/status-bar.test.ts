@@ -243,6 +243,37 @@ describe('the status bar', () => {
   });
 });
 
+describe('the verification badge (TYTO-651, ADR 0178)', () => {
+  const badge = (bar: StatusBar): HTMLElement | null =>
+    bar.querySelector<HTMLElement>('.status-bar__verification');
+
+  it('is drawn only while verification mode is on, first on the bar, with its port', async () => {
+    expect(badge((await mount()).bar)).toBeNull();
+
+    const { bar } = await mount({ ...base, verification: { port: 9333 } });
+    const shown = badge(bar);
+    expect(shown?.textContent).toBe('Verification mode · port 9333');
+    expect(shown?.getAttribute('role')).toBe('status');
+    expect(shown?.title).toMatch(/Any program on this computer/u);
+    expect(bar.querySelector('.status-bar__side')?.firstElementChild).toBe(shown);
+  });
+
+  it('says on without a number when main could not learn the port, in both languages', async () => {
+    const english = await mount({ ...base, verification: { port: undefined } });
+    expect(badge(english.bar)?.textContent).toBe('Verification mode · on');
+    document.body.replaceChildren();
+    const portuguese = await mount({ ...base, locale: 'pt-BR', verification: { port: 9333 } });
+    expect(badge(portuguese.bar)?.textContent).toBe('Modo de verificação · porta 9333');
+  });
+
+  it('cannot be hidden by the statusBarItems setting', async () => {
+    const { bar } = await mount({ ...base, verification: { port: 9333 } });
+    bar.items = [];
+    await bar.updateComplete;
+    expect(badge(bar)?.textContent).toBe('Verification mode · port 9333');
+  });
+});
+
 describe('positionText', () => {
   it('says line and column, and the selection only when there is one', () => {
     expect(positionText(base)).toBe('Ln 4, Col 17');

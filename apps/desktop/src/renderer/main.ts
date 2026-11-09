@@ -972,6 +972,8 @@ const byId = <T extends HTMLElement>(id: string): T | null =>
 let elements = resolveElements();
 /** What main last said about a newer version (TYTO-131). Asked for, never only pushed. */
 let updateStatus: UpdateStatus = { state: 'none' };
+/** Verification mode (TYTO-651, ADR 0178): asked once, since nothing changes it while running. */
+let verification: { readonly port: number | undefined } | undefined;
 
 function resolveElements() {
   return {
@@ -5069,6 +5071,7 @@ function paintStatusBar(): void {
       right: dockHasPanels(layout, 'right'),
       bottom: dockHasPanels(layout, 'bottom'),
     },
+    ...(verification === undefined ? {} : { verification }),
   };
 }
 
@@ -5217,6 +5220,13 @@ function tellMenuWhatIsOffered(): void {
   void withBridge(async (bridge) => {
     await bridge['menu:disabled']({ ids });
   });
+}
+
+/** Asks main whether the debugging port is open, and shows it on the bar (TYTO-651). */
+async function refreshVerification(bridge: TytoBridge): Promise<void> {
+  const mode = await bridge['verification:status']({});
+  verification = mode.on ? { port: mode.port } : undefined;
+  repaint();
 }
 
 /** Asks main where the update stands and shows it (TYTO-131). */
@@ -6410,6 +6420,7 @@ async function load(): Promise<void> {
     const bannerProject = elements.workspaceBanner?.querySelector('.workspace-banner__project');
     bannerProject?.addEventListener('click', showProject);
     void refreshUpdate(bridge);
+    void refreshVerification(bridge);
   }
 
   if (bridge !== undefined) {

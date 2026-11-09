@@ -54,6 +54,12 @@ export const updateStatusSchema = z.discriminatedUnion('state', [
 
 export type UpdateStatus = z.infer<typeof updateStatusSchema>;
 
+/** Verification mode (TYTO-651, ADR 0178): off, or on with its port when main knows it. */
+export const verificationStatusSchema = z.discriminatedUnion('on', [
+  z.object({ on: z.literal(false) }),
+  z.object({ on: z.literal(true), port: z.number().int().positive().optional() }),
+]);
+
 /** One channel: what may be asked, and what comes back. */
 export interface IpcChannel<
   Request extends z.ZodType = z.ZodType,
@@ -967,6 +973,13 @@ export const IPC_CHANNELS = {
    * once when it loads and again on every `update:changed`.
    */
   'update:status': channel(z.object({}), updateStatusSchema),
+
+  /**
+   * Whether this window can be inspected over Chromium's debugging port (TYTO-651, ADR 0178),
+   * so the status bar can say so. Asked once when the page loads: the switch is on the command
+   * line the app was started with, and nothing turns it on or off while it runs.
+   */
+  'verification:status': channel(z.object({}), verificationStatusSchema),
 
   /**
    * The update notice was clicked (TYTO-131).

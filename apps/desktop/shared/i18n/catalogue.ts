@@ -477,6 +477,11 @@ export interface Catalogue {
   readonly 'command.layout.toggleDock.right': string;
   readonly 'command.layout.toggleDock.bottom': string;
   readonly 'status.commandBar': string;
+  /** TYTO-651, ADR 0178: the badge, with `{port}` or without it when main could not learn it. */
+  readonly 'status.verification.port': string;
+  readonly 'status.verification.on': string;
+  /** Its tooltip: what being on means. */
+  readonly 'status.verification.risk': string;
   readonly 'status.position': string;
   readonly 'status.selected': string;
   readonly 'status.kind.settings': string;
@@ -1228,6 +1233,9 @@ export const CATALOGUE_KEYS = [
   'command.layout.toggleDock.right',
   'command.layout.toggleDock.bottom',
   'status.commandBar',
+  'status.verification.port',
+  'status.verification.on',
+  'status.verification.risk',
   'status.position',
   'status.selected',
   'status.kind.settings',

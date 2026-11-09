@@ -80,6 +80,12 @@ export interface StatusBarState {
    * right one by default since the preview became a tab. Absent means every area has one.
    */
   readonly areas?: Readonly<Record<HideableDock, boolean>>;
+  /**
+   * Verification mode (TYTO-651, ADR 0178): present while Chromium's debugging port is open,
+   * with its number when main knows it. Drawn whatever `statusBarItems` says, so no setting
+   * can hide that the window is open to inspection.
+   */
+  readonly verification?: { readonly port: number | undefined };
 }
 
 /** The ids the buttons run, in `main.ts`'s registry. Exported so a test names the same ones. */
@@ -255,10 +261,32 @@ export class StatusBar extends LitElement {
 
   protected override render(): unknown {
     const draw = (id: StatusBarItemId): unknown => this.item(id);
-    return html`<div class="status-bar__side">${itemsOnSide(this.items, 'start').map(draw)}</div>
+    return html`<div class="status-bar__side">
+        ${this.verificationBadge()}${itemsOnSide(this.items, 'start').map(draw)}
+      </div>
       <div class="status-bar__side status-bar__side--end">
         ${itemsOnSide(this.items, 'end').map(draw)}
       </div>`;
+  }
+
+  /** The verification badge, first on the bar and outside the item list (TYTO-651). */
+  private verificationBadge(): unknown {
+    const verification = this.state.verification;
+    if (verification === undefined) return nothing;
+    const locale = this.state.locale;
+    const text =
+      verification.port === undefined
+        ? translate(locale, 'status.verification.on')
+        : translate(locale, 'status.verification.port').replace(
+            '{port}',
+            String(verification.port),
+          );
+    return html`<span
+      class="status-bar__verification"
+      role="status"
+      title=${translate(locale, 'status.verification.risk')}
+      >${text}</span
+    >`;
   }
 
   /** One item by its id, or nothing when it has nothing to show right now. */

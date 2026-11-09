@@ -1033,6 +1033,7 @@ const dependencies = () => {
     templateDialogs: templateDialogs(),
     templateFolder: createTemplateFolder(),
     updates: updateNotice(),
+    verification: () => ({ on: false }) as const,
   };
 };
 
@@ -1681,6 +1682,17 @@ describe('update:status and update:act', () => {
     expect(updates.acted.count).toBe(0);
     await handlers['update:act']({});
     expect(updates.acted.count).toBe(1);
+  });
+});
+
+describe('verification:status', () => {
+  it('answers with the mode main read off the command line (TYTO-651)', async () => {
+    const handlers = createHandlers({
+      ...dependencies(),
+      verification: () => ({ on: true, port: 9333 }),
+    });
+
+    expect(await handlers['verification:status']({})).toEqual({ on: true, port: 9333 });
   });
 });
 
