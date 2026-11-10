@@ -1,5 +1,22 @@
 # @tyto/io
 
+## 5.5.0
+
+### Minor Changes
+
+- 846274c: Every program the desktop starts for a plugin is told the plugin's data folder in
+  `TYTO_PROGRAM_DATA` (`PROGRAM_DATA_VARIABLE`, ADR 0187): `~/.tyto/data/plugins/<name>`, created at
+  the first start that passes every refusal, kept across the plugin's updates and deleted when the
+  plugin is removed (`pluginDataDirectory`, `fsPluginStore.remove`).
+
+### Patch Changes
+
+- Updated dependencies [846274c]
+  - @tyto/plugin-api@0.18.0
+  - @tyto/export-html@0.7.18
+  - @tyto/export-svg@2.0.18
+  - @tyto/pipeline@0.12.14
+
 ## 5.4.1
 
 ### Patch Changes

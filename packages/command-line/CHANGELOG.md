@@ -1,5 +1,31 @@
 # @tyto/command-line
 
+## 0.5.0
+
+### Minor Changes
+
+- 313f28f: `tyto mcp` serves what each template's folder says about writing a brief for it (ADR 0186): its
+  `guide.md` and its `examples/*.brief` as resources, capped and cut with a line that says so, and
+  the `model_brief` prompt, which puts generic steps, the template's slots, skeleton, guide and
+  examples in front of the copy. A restricted folder's own templates serve neither.
+- a3a90f6: `tyto mcp` offers three tools that write, to a trusted workspace only (ADR 0185): `write_brief`
+  creates or replaces a `.brief` (a dry run shows the diff and the hash a replacement must name;
+  a brief in a folder a live window has open is not replaced), `new_delivery` makes a delivery as
+  `tyto delivery new` does, and `export` renders into a preset's folder, the delivery's or the
+  workspace's `output`, never a folder the agent names.
+
+### Patch Changes
+
+- Updated dependencies [846274c]
+  - @tyto/plugin-api@0.18.0
+  - @tyto/io@5.5.0
+  - @tyto/export-html@0.7.18
+  - @tyto/export-svg@2.0.18
+  - @tyto/google-fonts@0.1.17
+  - @tyto/pipeline@0.12.14
+  - @tyto/raster@0.2.4
+  - @tyto/templates@1.2.12
+
 ## 0.4.0
 
 ### Minor Changes

@@ -1,5 +1,14 @@
 # @tyto/plugin-api
 
+## 0.18.0
+
+### Minor Changes
+
+- 846274c: Every program the desktop starts for a plugin is told the plugin's data folder in
+  `TYTO_PROGRAM_DATA` (`PROGRAM_DATA_VARIABLE`, ADR 0187): `~/.tyto/data/plugins/<name>`, created at
+  the first start that passes every refusal, kept across the plugin's updates and deleted when the
+  plugin is removed (`pluginDataDirectory`, `fsPluginStore.remove`).
+
 ## 0.17.0
 
 ### Minor Changes
