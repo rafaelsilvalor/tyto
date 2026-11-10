@@ -1,5 +1,47 @@
 # @tyto/desktop
 
+## 0.18.0
+
+### Minor Changes
+
+- d5098a5: TYTO-657, ADR 0184: the desktop runs a plugin's own program and opens a terminal for it. A
+  program the manifest's `programs` maps to a script is run on the bundled Node from the plugin's
+  own folder, after the script's real path is checked to lie inside it
+  (`E_PROCESS_SCRIPT_MISSING` otherwise), under every rule of ADR 0182. `host.terminal.open`
+  opens a Terminal tab running a declared program in the open folder: main starts it, the window
+  adopts it through the new `terminal:opened` event and `terminal:list`, and the plugin hears
+  only that it opened. The plugins screen names a plugin's own programs on a line of their own
+  and says it may open a terminal tab; the user manual says the same in both editions.
+- fb5e691: TYTO-660: a plugin's panel page hears more about the document in front and the window's
+  language. The `document` event now carries the tab's `name` and the `format` the preview
+  shows, and is also sent when another tab or format comes to the front; a new `language` event
+  is sent when a panel loads and whenever the window's language changes. Both are additive.
+
+### Patch Changes
+
+- 336e201: TYTO-654: the explorer e2e waits for a click's open to settle before it presses F2, so a late
+  focus into the editor no longer closes the rename field on a loaded runner. Test only.
+- f35c2d1: TYTO-656: `tyto mcp --window` tries the next window when nobody listens at a record's endpoint,
+  instead of failing. The desktop's packaged suite connects to its own window's record by pid, and
+  the RunAsNode probe gets a `TYTO_HOME` of its own so it leaves no orphan record behind.
+- Updated dependencies [f35c2d1]
+- Updated dependencies [7345ac7]
+  - @tyto/command-line@0.4.0
+  - @tyto/plugin-api@0.17.0
+  - @tyto/core@0.43.0
+  - @tyto/export-html@0.7.17
+  - @tyto/export-svg@2.0.17
+  - @tyto/google-fonts@0.1.16
+  - @tyto/io@5.4.1
+  - @tyto/pipeline@0.12.13
+  - @tyto/theme-pack@0.1.16
+  - @tyto/brief-lang@0.8.1
+  - @tyto/editor@0.16.1
+  - @tyto/fonts@0.5.0
+  - @tyto/recipe@0.3.1
+  - @tyto/template-lang@0.8.16
+  - @tyto/templates@1.2.11
+
 ## 0.17.0
 
 ### Minor Changes
