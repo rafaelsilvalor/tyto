@@ -605,11 +605,9 @@
     },
     {
       "paths": [
-        "apps/desktop/src/main/recipe-apply.ts",
         "apps/desktop/src/main/recipe-clock.ts",
         "apps/desktop/src/main/recipe-facets.ts",
         "apps/desktop/src/main/recipe-rows.ts",
-        "apps/desktop/src/main/recipe-runner.ts",
         "apps/desktop/src/main/recipe-wire.ts",
         "apps/desktop/shared/recipe-views.ts"
       ],
@@ -620,7 +618,7 @@
         "recipe-views.desktop.test.ts",
         "window.desktop.test.ts"
       ],
-      "why": "reviewed: the recipe notebook's runner in main (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts. The Board's groups (TYTO-381) are counted in recipe-facets.ts, tested in recipe-facets.test.ts and ipc.test.ts, and drawn by the views suite"
+      "why": "reviewed: the recipe notebook's runner, in @tyto/io since TYTO-664 (ADR 0188), and what main wraps around it (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in @tyto/io's recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts. The Board's groups (TYTO-381) are counted in recipe-facets.ts, tested in recipe-facets.test.ts and ipc.test.ts, and drawn by the views suite"
     },
     {
       "paths": ["apps/desktop/src/main/recipe-schedule.ts"],

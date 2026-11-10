@@ -125,3 +125,10 @@ Three things have to be settled before a renderer can show anything:
   measured yet.
 - The renderer drops a stale answer by `requestId`, as `brief:preview` does; main's part is
   echoing it and not letting an older run replace the newer one's cells.
+
+## Note, 2026-11-10 — the runner moves to `@tyto/io` (TYTO-664)
+
+`recipe-runner.ts` and Apply's `recipe-apply.ts` now live in `@tyto/io` (ADR 0188), unchanged, so
+`tyto mcp` runs a recipe through the same code. Main still composes them: it hands the runner the
+window's plugins, the workspace's trust, each plugin's section, `TYTO_HOME`, the clock and the
+templates. Every decision here stands.

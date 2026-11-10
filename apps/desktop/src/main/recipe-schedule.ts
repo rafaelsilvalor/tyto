@@ -3,15 +3,15 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 
 import { isError } from '@tyto/core';
-import { isInside } from '@tyto/io';
-import { type RecipeAst, parseRecipe } from '@tyto/recipe';
-
-import { ignoredByTheWatcher } from './explorer.js';
 import {
   INCLUDED_RECIPE_MAX_BYTES,
   type RecipeRunInput,
   type RunnerAnswer,
-} from './recipe-runner.js';
+  isInside,
+} from '@tyto/io';
+import { type RecipeAst, parseRecipe } from '@tyto/recipe';
+
+import { ignoredByTheWatcher } from './explorer.js';
 
 /**
  * Recipes on an interval while the app is open (TYTO-385, ADR 0175), in main.

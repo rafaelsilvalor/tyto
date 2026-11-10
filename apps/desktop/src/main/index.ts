@@ -35,6 +35,7 @@ import {
 } from 'electron';
 import {
   PLUGINS_DIR,
+  createRecipeRunner,
   fsInbox,
   fsPluginStore,
   fsTrustStore,
@@ -141,13 +142,12 @@ import { desktopSources } from './plugin-sources.js';
 import { googleFontsOptionsFor, windowGoogleFonts } from './google-fonts.js';
 import { createPreviewService } from './preview.js';
 import { recipeClock } from './recipe-clock.js';
-import { createRecipeRunner, templateManifestsOf } from './recipe-runner.js';
 import {
   type RecipeSchedule,
   type ScheduleNotice,
   createRecipeSchedule,
 } from './recipe-schedule.js';
-import { createProjectSources } from './project.js';
+import { createProjectSources, templateManifestsOf } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
 import { createDeliveryService } from './delivery.js';

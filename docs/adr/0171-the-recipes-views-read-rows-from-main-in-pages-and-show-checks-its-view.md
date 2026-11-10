@@ -89,3 +89,10 @@ offset, limit ≤ 500, sort?, filter?, columns?}` answers `{columns, rows, total
   answer, closes with its recipe, and is left out of the session: its rows live in main only
   while the run does. The cells under a `run` step (TYTO-449) draw a plain preview and get no
   tab.
+
+## Note, 2026-11-10 — the list moves to `@tyto/recipe` (TYTO-664)
+
+Decision 8's list, `RECIPE_VIEWS`, now lives in `@tyto/recipe` beside `ViewSpecs` (ADR 0188), so
+every host that runs a recipe checks `show` against it. `apps/desktop/shared/recipe-views.ts`
+re-exports it. The notebook still owns the names, and a new view still adds its renderer in the
+desktop.

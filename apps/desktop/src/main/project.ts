@@ -3,6 +3,7 @@ import {
   type FileSystem,
   type FormatCatalogue,
   type TemplateFailure,
+  type TemplateManifest,
   type TemplateRegistry,
   type TemplateConfigurations,
   type TemplateRoot,
@@ -295,5 +296,19 @@ export async function createProjectSources({
       snapshot = await read(chosenFolder);
       return snapshot;
     },
+  };
+}
+
+/**
+ * `to-brief`'s templates (TYTO-380, ADR 0172), found as the preview finds a brief's `template:`
+ * in the snapshot in force: an alias a plugin file names reaches its template's manifest. The
+ * recipe runner lives in `@tyto/io` (ADR 0188); the project snapshot it reads is the desktop's.
+ */
+export function templateManifestsOf(
+  sources: Pick<ProjectSources, 'current'>,
+): (name: string) => Promise<TemplateManifest | undefined> {
+  return (name) => {
+    const { registry, configurations } = sources.current();
+    return Promise.resolve(registry?.get(configurations.select(name)?.template ?? name));
   };
 }

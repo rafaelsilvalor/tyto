@@ -11,10 +11,10 @@ import {
 import { type Credentials } from './credentials.js';
 import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
 import type { Table } from '@tyto/recipe';
 
 import { zoneClock } from './recipe-clock.js';
-import { type RecipeApplyInput, type RecipeRunInput, type RecipeRunner } from './recipe-runner.js';
 import { createTemplateFolder } from './session.js';
 import { BUILT_IN_THEMES, builtInThemeSource, createThemeService } from './themes.js';
 

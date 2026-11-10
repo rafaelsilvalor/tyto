@@ -72,5 +72,6 @@ export type {
   ViewOptionValue,
   ViewSpecs,
 } from './views.js';
+export { RECIPE_VIEWS, type RecipeViewName } from './notebook-views.js';
 export type { Operator, Predicate } from './where.js';
 export { parseWhere, satisfies } from './where.js';

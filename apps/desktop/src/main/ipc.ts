@@ -5,6 +5,7 @@ import { basename } from 'node:path';
 
 import type { IpcMain } from 'electron';
 import type { Diagnostics } from '@tyto/core';
+import type { KeptTable, RecipeRunner } from '@tyto/io';
 import type { SettingOption, SettingOutline } from '@tyto/plugin-api';
 import { type RunClock, systemClock } from '@tyto/recipe';
 
@@ -62,7 +63,6 @@ import {
   todayIn,
 } from './recipe-facets.js';
 import { type RowsQuery, createRowViews, rowsAsTsv, visibleColumns } from './recipe-rows.js';
-import { type KeptTable, type RecipeRunner } from './recipe-runner.js';
 import { type RecipeSchedule } from './recipe-schedule.js';
 import { cellToWire, cut, recipeAnswerToWire, valueToWire } from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
