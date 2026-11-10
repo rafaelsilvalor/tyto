@@ -1,6 +1,7 @@
 import { type Diagnostic, diagnostic } from '@tyto/core';
 
 import type { StartProcess } from './process.js';
+import type { OpenTerminal } from './terminal.js';
 import type { AgentServer } from './window.js';
 
 /**
@@ -172,6 +173,16 @@ export interface HostCapabilities {
    * Absent on a host that starts no programs — the CLI — which answers `E_PROCESS_UNAVAILABLE`.
    */
   startProcess?: StartProcess;
+
+  /**
+   * Opens a terminal tab running `program`, already allowed by `process:<program>` and within
+   * the plugin's limit of one open tab (ADR 0184), with `args` as an array, in the open
+   * workspace folder. **The adapter finds the program as `startProcess` does (on `PATH`, or the
+   * plugin's own script on the bundled Node), refuses what `startProcess` refuses, with the same
+   * codes**, and answers once the tab is open, with `closed` settling when it is gone. Absent on
+   * a host with no terminal — the CLI — which answers `E_TERMINAL_UNAVAILABLE`.
+   */
+  openTerminal?: OpenTerminal;
 
   /**
    * The window's MCP server, for the agent a plugin starts (ADR 0183), already allowed: the

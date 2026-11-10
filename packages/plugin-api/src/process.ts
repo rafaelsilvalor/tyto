@@ -67,6 +67,46 @@ export function programNameProblem(name: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The plugin's own programs (ADR 0184): a manifest's `programs`, from a declared name to a script
+ * inside the plugin's folder that the host runs on its bundled Node instead of looking the name
+ * up on `PATH`.
+ */
+export type PluginProgramScripts = Readonly<Record<string, string>>;
+
+/** A script's extension: what the bundled Node runs as a module or a script, nothing else. */
+const SCRIPT_EXTENSION = /\.(?:mjs|cjs|js)$/u;
+
+/** One segment of a script's path: no `.` or `..`, nothing a shell or a drive reads. */
+const SCRIPT_SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/u;
+
+/**
+ * Why `path` is not a script a manifest's `programs` can name, or `undefined` when it is one: a
+ * relative path with forward slashes, inside the plugin's folder by its spelling alone, ending
+ * in `.mjs`, `.cjs` or `.js`, at most 200 characters. The host confines it again on the disk,
+ * after resolving links, because only it can see where the folder is (ADR 0184 decision 2).
+ */
+export function programScriptProblem(path: string): string | undefined {
+  if (path.length === 0 || path.length > 200) return 'is not 1 to 200 characters';
+  if (path.includes('\\')) return 'uses a backslash; separate folders with /';
+  if (path.startsWith('/') || /^[A-Za-z]:/u.test(path))
+    return 'is absolute; name it from the plugin folder';
+  const segments = path.split('/');
+  if (segments.some((segment) => segment === '.' || segment === '..')) {
+    return 'leaves the plugin folder or names . ; write the path from the plugin folder down';
+  }
+  if (!segments.every((segment) => SCRIPT_SEGMENT.test(segment))) {
+    return 'has a folder or file name with characters other than letters, digits, ., _ and -';
+  }
+  if (!SCRIPT_EXTENSION.test(path)) return 'does not end in .mjs, .cjs or .js';
+  return undefined;
+}
+
+/** The script a declared program runs, when the manifest names one; never an inherited key. */
+export function programScript(scripts: PluginProgramScripts, name: string): string | undefined {
+  return Object.hasOwn(scripts, name) ? scripts[name] : undefined;
+}
+
 /** `process:<name>`, exactly: a permission for `claude` does not start `claude-code`. */
 export function allowsProcess(permissions: readonly string[], name: string): boolean {
   return (
@@ -104,12 +144,18 @@ export interface StartedProcess {
   kill(): void;
 }
 
-/** The port's signature, as {@link HostCapabilities.startProcess} declares it. */
+/**
+ * The port's signature, as {@link HostCapabilities.startProcess} declares it. `script` is the
+ * plugin-relative path the manifest's `programs` names for `program` (ADR 0184), checked for its
+ * spelling: the adapter runs it on the bundled Node from the plugin's folder rather than looking
+ * `program` up on `PATH`. Undefined for a program the person installed.
+ */
 export type StartProcess = (
   plugin: string,
   program: string,
   args: readonly string[],
   events: ProcessEvents,
+  script?: string,
 ) => Promise<StartedProcess>;
 
 /** A program the plugin started, as the plugin holds it. */
@@ -260,6 +306,7 @@ export function checkedProcesses(
   plugin: string,
   permissions: readonly string[],
   capabilities: HostCapabilities | undefined,
+  scripts: PluginProgramScripts = {},
 ): CheckedProcesses {
   /** Running, or starting: a start counts against the limit before the adapter answers. */
   const live = new Set<{ stop(): void }>();
@@ -313,7 +360,10 @@ export function checkedProcesses(
         },
       };
       try {
-        started = await capabilities.startProcess(plugin, name, [...args], watched);
+        const script = programScript(scripts, name);
+        started = await (script === undefined
+          ? capabilities.startProcess(plugin, name, [...args], watched)
+          : capabilities.startProcess(plugin, name, [...args], watched, script));
       } catch (cause) {
         live.delete(slot);
         throw cause;

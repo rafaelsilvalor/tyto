@@ -541,6 +541,37 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
+  // A plugin's own program and a terminal it opens (ADR 0184). A missing script is not "not on
+  // PATH": the plugin's install is broken, and reinstalling it is the fix.
+  E_PROCESS_SCRIPT_MISSING: {
+    severity: 'error',
+    summary:
+      'A plugin asked to start its own program, and the script its manifest names is not in its folder.',
+    template:
+      "Plugin '{plugin}' asked to start its program '{program}', and its script {script} is not in the plugin's folder; reinstall the plugin.",
+    spec: 'docs/adr/0184-a-plugin-runs-its-own-program-on-tytos-node-and-opens-a-terminal-for-it.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_TERMINAL_UNAVAILABLE: {
+    severity: 'error',
+    summary: 'A plugin asked for a terminal tab on a host that has no terminal.',
+    template:
+      "Plugin '{plugin}' asked for a terminal running '{program}', and {host} has no terminal.",
+    spec: 'docs/adr/0184-a-plugin-runs-its-own-program-on-tytos-node-and-opens-a-terminal-for-it.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  E_TERMINAL_LIMIT: {
+    severity: 'error',
+    summary:
+      'A plugin asked for a terminal tab while as many of its terminals as allowed are open.',
+    template:
+      "Plugin '{plugin}' asked for a terminal running '{program}' while {limit} of its terminals is open, the most it may have; finish or close that one first.",
+    spec: 'docs/adr/0184-a-plugin-runs-its-own-program-on-tytos-node-and-opens-a-terminal-for-it.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
   // The window's MCP server, handed to a plugin for the agent it starts (ADR 0183). Three codes,
   // so a panel can tell "turn agentsListen on" and "trust the folder" from "not on this host".
   E_WINDOW_UNAVAILABLE: {

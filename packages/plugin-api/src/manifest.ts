@@ -1,7 +1,7 @@
 import { type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import { z } from 'zod';
 
-import { PROCESS_PERMISSION, programNameProblem } from './process.js';
+import { PROCESS_PERMISSION, programNameProblem, programScriptProblem } from './process.js';
 
 /**
  * `tyto-plugin.json`, as a schema (`docs/plugin-api.md`, Plugin package).
@@ -239,8 +239,39 @@ export const pluginManifestSchema = z
         signinSchema,
       )
       .optional(),
+    /**
+     * The plugin's own programs (ADR 0184): a declared `process:<name>` mapped to a script in
+     * the plugin's folder, which the host runs on its bundled Node instead of looking `<name>`
+     * up on `PATH`. Each key needs its `process:<name>` permission; each value is a relative
+     * path ending in `.mjs`, `.cjs` or `.js`.
+     */
+    programs: z.record(z.string(), z.string()).optional(),
   })
   .superRefine((manifest, context) => {
+    for (const [name, script] of Object.entries(manifest.programs ?? {})) {
+      const nameProblem = programNameProblem(name);
+      if (nameProblem !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['programs', name],
+          message: `names a program that ${nameProblem}`,
+        });
+      } else if (!manifest.permissions.includes(`${PROCESS_PERMISSION}${name}`)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['programs', name],
+          message: `needs the permission ${PROCESS_PERMISSION}${name}`,
+        });
+      }
+      const scriptProblem = programScriptProblem(script);
+      if (scriptProblem !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['programs', name],
+          message: `names a script that ${scriptProblem}`,
+        });
+      }
+    }
     const namespaced = manifest.contributes.filter((point) => NAMESPACED_POINTS.includes(point));
     if (namespaced.length > 0 && manifest.namespace === undefined) {
       context.addIssue({
