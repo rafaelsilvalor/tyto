@@ -75,6 +75,17 @@ export type TerminalOpened =
   | { readonly terminalId: string; readonly title: string }
   | { readonly refused: 'restricted' | 'failed'; readonly message: string };
 
+/** A program main starts in a tab of its own (ADR 0184), with everything already chosen. */
+export interface ProgramLaunch {
+  readonly title: string;
+  readonly file: string;
+  readonly args: readonly string[];
+  readonly cwd: string;
+  readonly env: Record<string, string>;
+  readonly cols: number;
+  readonly rows: number;
+}
+
 export interface TerminalListing {
   readonly terminalId: string;
   readonly title: string;
@@ -92,6 +103,13 @@ export interface Terminals {
   resize(terminalId: string, cols: number, rows: number): void;
   kill(terminalId: string): void;
   list(): readonly TerminalListing[];
+  /**
+   * A tab main opens itself, running a program a plugin declares (ADR 0184 decision 6): the
+   * file, arguments, folder and environment were chosen and checked by the caller in main, never
+   * by the renderer. `closed` settles when the program ends or the tab is closed or killed. The
+   * window learns of it through `terminal:list`, as after a reload.
+   */
+  openProgram(launch: ProgramLaunch): TerminalOpened & { readonly closed?: Promise<void> };
   /** The titles of the terminals whose shell is running another program: the quit question. */
   busy(): readonly string[];
   killAll(): void;
@@ -105,6 +123,8 @@ interface Running {
   readonly replay: { chunks: string[]; sizes: number[]; bytes: number };
   pending: string;
   scheduled: boolean;
+  /** Settles `closed` for a tab main opened for a plugin; called once, whichever end comes. */
+  readonly close: () => void;
 }
 
 /**
@@ -169,6 +189,54 @@ export function createTerminals(dependencies: TerminalDependencies): Terminals {
     if (data !== '') dependencies.output(terminalId, data);
   };
 
+  const start = (
+    shell: Pick<ShellChoice, 'file' | 'args' | 'title'>,
+    options: SpawnOptions,
+    close: () => void = () => undefined,
+  ): TerminalOpened => {
+    let pty: PseudoTerminal;
+    try {
+      pty = dependencies.spawn(shell.file, shell.args, options);
+    } catch (error) {
+      return {
+        refused: 'failed',
+        message: `${shell.title} did not start: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    const terminalId = `terminal-${String(next++)}`;
+    const terminal: Running = {
+      pty,
+      title: shell.title,
+      shellName: programName(shell.file),
+      replay: { chunks: [], sizes: [], bytes: 0 },
+      pending: '',
+      scheduled: false,
+      close,
+    };
+    running.set(terminalId, terminal);
+    pty.onData((data) => {
+      remember(terminal.replay, data, cap);
+      terminal.pending += data;
+      if (terminal.scheduled) return;
+      terminal.scheduled = true;
+      schedule(() => {
+        flush(terminalId);
+      });
+    });
+    pty.onExit(({ exitCode }) => {
+      // A terminal main ended itself, from its tab or on the way out, is already forgotten and
+      // nobody waits for its exit. On Linux that exit can arrive after the window is gone
+      // during a quit, measured on CI, where reporting it crashed main.
+      if (running.get(terminalId) !== terminal) return;
+      // What the shell printed last reaches the window before the exit does.
+      flush(terminalId);
+      running.delete(terminalId);
+      terminal.close();
+      dependencies.exit(terminalId, exitCode);
+    });
+    return { terminalId, title: shell.title };
+  };
+
   return {
     open: ({ cols, rows, agent = false }) => {
       // Before the agent is looked for: an agent is a program started in the folder, as a
@@ -192,50 +260,25 @@ export function createTerminals(dependencies: TerminalDependencies): Terminals {
       } else {
         shell = dependencies.shell();
       }
-      let pty: PseudoTerminal;
-      try {
-        pty = dependencies.spawn(shell.file, shell.args, {
-          cols,
-          rows,
-          cwd: dependencies.folder() ?? dependencies.home(),
-          env: dependencies.environment(),
-        });
-      } catch (error) {
-        return {
-          refused: 'failed',
-          message: `${shell.title} did not start: ${error instanceof Error ? error.message : String(error)}`,
-        };
-      }
-      const terminalId = `terminal-${String(next++)}`;
-      const terminal: Running = {
-        pty,
-        title: shell.title,
-        shellName: programName(shell.file),
-        replay: { chunks: [], sizes: [], bytes: 0 },
-        pending: '',
-        scheduled: false,
-      };
-      running.set(terminalId, terminal);
-      pty.onData((data) => {
-        remember(terminal.replay, data, cap);
-        terminal.pending += data;
-        if (terminal.scheduled) return;
-        terminal.scheduled = true;
-        schedule(() => {
-          flush(terminalId);
-        });
+      return start(shell, {
+        cols,
+        rows,
+        cwd: dependencies.folder() ?? dependencies.home(),
+        env: dependencies.environment(),
       });
-      pty.onExit(({ exitCode }) => {
-        // A terminal main ended itself, from its tab or on the way out, is already forgotten and
-        // nobody waits for its exit. On Linux that exit can arrive after the window is gone
-        // during a quit, measured on CI, where reporting it crashed main.
-        if (running.get(terminalId) !== terminal) return;
-        // What the shell printed last reaches the window before the exit does.
-        flush(terminalId);
-        running.delete(terminalId);
-        dependencies.exit(terminalId, exitCode);
+    },
+
+    openProgram: (launch) => {
+      let close: () => void = () => undefined;
+      const closed = new Promise<void>((resolve) => {
+        close = resolve;
       });
-      return { terminalId, title: shell.title };
+      const opened = start(
+        { file: launch.file, args: launch.args, title: launch.title },
+        { cols: launch.cols, rows: launch.rows, cwd: launch.cwd, env: launch.env },
+        close,
+      );
+      return 'refused' in opened ? opened : { ...opened, closed };
     },
 
     input: (terminalId, data) => {
@@ -250,6 +293,7 @@ export function createTerminals(dependencies: TerminalDependencies): Terminals {
       const terminal = running.get(terminalId);
       if (terminal === undefined) return;
       running.delete(terminalId);
+      terminal.close();
       dependencies.killTree(terminal.pty);
     },
 
@@ -270,7 +314,10 @@ export function createTerminals(dependencies: TerminalDependencies): Terminals {
     killAll: () => {
       const all = [...running.values()];
       running.clear();
-      for (const terminal of all) dependencies.killTree(terminal.pty);
+      for (const terminal of all) {
+        terminal.close();
+        dependencies.killTree(terminal.pty);
+      }
     },
   };
 }

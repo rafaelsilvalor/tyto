@@ -74,10 +74,44 @@ export interface PluginProgramsOptions {
    * asynchronous `taskkill` runs: the kill then finishes before this returns.
    */
   readonly killTree: (child: ProgramChild, now: boolean) => void;
+  /**
+   * What runs a plugin's own program (ADR 0184): the bundled Node, each plugin's folder, and the
+   * disk checks that keep the script inside it. Absent, a `programs` start is refused as a
+   * missing script rather than looked up on `PATH`.
+   */
+  readonly scripts?: PluginScripts;
+}
+
+/** The bundled Node and the disk, for a plugin's own program (ADR 0184 decisions 2 and 3). */
+export interface PluginScripts {
+  /** The bundled Node's binary, the one that runs plugins and the relay (ADR 0050, ADR 0181). */
+  readonly node: string;
+  /** The plugin's own folder, or `undefined` for a plugin that has none (a built-in). */
+  readonly folderOf: (plugin: string) => string | undefined;
+  /** The path with every link resolved; throws when it does not exist. */
+  readonly realpath: (path: string) => string;
+  readonly isFile: (path: string) => boolean;
 }
 
 export interface PluginPrograms {
   readonly startProcess: StartProcess;
+  /**
+   * The file and arguments that run `program` for `plugin`, already refused where a start would
+   * be: a restricted folder, a program not on `PATH`, a missing script. For a terminal tab
+   * (ADR 0184 decision 6), which node-pty starts: a `.cmd` is handed to it as it is, and its
+   * arguments are checked against what `cmd.exe` reads (ADR 0181 decision 5).
+   */
+  terminalLaunch(
+    plugin: string,
+    program: string,
+    args: readonly string[],
+    script?: string,
+  ): {
+    readonly file: string;
+    readonly args: readonly string[];
+    readonly cwd: string;
+    readonly env: Record<string, string>;
+  };
   /**
    * Ends every program started for a folder or a trust that is no longer the one open (ADR 0182
    * decision 8): called after the workspace opens, closes, or is trusted or distrusted.
@@ -232,6 +266,35 @@ export function batchCommand(
   return { file: win32.join(root, 'System32', 'cmd.exe'), args: ['/d', '/s', '/c', `"${line}"`] };
 }
 
+/**
+ * The script a plugin's own program runs, as an absolute path with its links resolved, or
+ * `undefined` when it is not a file inside the plugin's real folder (ADR 0184 decision 2). The
+ * spelling was checked at install; this is the check only the disk can make: a link inside the
+ * folder that points out of it, or a file deleted since.
+ */
+export function pluginScriptFile(
+  platform: NodeJS.Platform,
+  scripts: PluginScripts,
+  plugin: string,
+  script: string,
+): string | undefined {
+  const path = platform === 'win32' ? win32 : posix;
+  const folder = scripts.folderOf(plugin);
+  if (folder === undefined) return undefined;
+  let realFolder: string;
+  let realScript: string;
+  try {
+    realFolder = scripts.realpath(folder);
+    realScript = scripts.realpath(path.join(folder, ...script.split('/')));
+  } catch {
+    return undefined;
+  }
+  const relative = path.relative(realFolder, realScript);
+  // Windows and macOS ignore case in a path; `relative` already compares as each system does.
+  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) return undefined;
+  return scripts.isFile(realScript) ? realScript : undefined;
+}
+
 function refusal(
   code: Parameters<typeof diagnostic>[0],
   parameters: Record<string, string>,
@@ -252,25 +315,67 @@ export function pluginPrograms(options: PluginProgramsOptions): PluginPrograms {
     options.killTree(child, now);
   };
 
-  const startProcess: StartProcess = async (plugin, program, args, events: ProcessEvents) => {
+  /**
+   * Where `program` comes from, refused before anything is looked for while the folder is
+   * restricted (ADR 0182 decision 8): the plugin's own script on the bundled Node when the
+   * manifest names one (ADR 0184), or the program's file on `PATH`.
+   */
+  const locate = (
+    plugin: string,
+    program: string,
+    script: string | undefined,
+  ): {
+    readonly file: string;
+    readonly script: string | undefined;
+    readonly cwd: string;
+    readonly environment: Readonly<Record<string, string | undefined>>;
+  } => {
     const { folder, trust } = options.workspace();
-    // Before the program is even looked for, as the terminal is refused (ADR 0164 decision 5).
     if (folder !== null && trust === 'restricted') {
       throw refusal('E_PROCESS_RESTRICTED', { plugin, program });
     }
     const environment = options.environment();
+    const cwd = folder ?? options.home;
+    if (script !== undefined) {
+      const file =
+        options.scripts === undefined
+          ? undefined
+          : pluginScriptFile(options.platform, options.scripts, plugin, script);
+      if (file === undefined || options.scripts === undefined) {
+        throw refusal('E_PROCESS_SCRIPT_MISSING', { plugin, program, script });
+      }
+      return { file: options.scripts.node, script: file, cwd, environment };
+    }
     const file = findPluginProgram({ ...options, environment }, program);
     if (file === undefined) throw refusal('E_PROCESS_NOT_FOUND', { plugin, program });
+    return { file, script: undefined, cwd, environment };
+  };
 
+  const startProcess: StartProcess = async (
+    plugin,
+    program,
+    args,
+    events: ProcessEvents,
+    script,
+  ) => {
+    const found = locate(plugin, program, script);
+    const { file, environment } = found;
     const env = programEnvironment(environment, options.windowPid);
     const base = {
-      cwd: folder ?? options.home,
+      cwd: found.cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     } as const;
     let child: ProgramChild;
-    if (options.platform === 'win32' && isBatch(file)) {
+    if (found.script !== undefined) {
+      // The bundled Node is a binary: no shell, and the arguments go as an array.
+      child = options.spawn(
+        file,
+        [found.script, ...args],
+        options.platform === 'win32' ? base : { ...base, detached: true },
+      );
+    } else if (options.platform === 'win32' && isBatch(file)) {
       const command = batchCommand(environment, file, args);
       if ('problem' in command) {
         throw refusal('E_PROCESS_ARGUMENT', { plugin, program, problem: command.problem });
@@ -328,6 +433,23 @@ export function pluginPrograms(options: PluginProgramsOptions): PluginPrograms {
 
   return {
     startProcess,
+    terminalLaunch(plugin, program, args, script) {
+      const found = locate(plugin, program, script);
+      if (found.script === undefined && options.platform === 'win32' && isBatch(found.file)) {
+        for (const arg of args) {
+          const problem = batchArgumentProblem(arg);
+          if (problem !== undefined) {
+            throw refusal('E_PROCESS_ARGUMENT', { plugin, program, problem });
+          }
+        }
+      }
+      return {
+        file: found.file,
+        args: found.script === undefined ? [...args] : [found.script, ...args],
+        cwd: found.cwd,
+        env: programEnvironment(found.environment, options.windowPid),
+      };
+    },
     settle() {
       const now = placeOf();
       for (const [child, place] of [...running]) if (place !== now) end(child);

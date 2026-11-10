@@ -75,6 +75,17 @@ Alguns plugins funcionam conversando com outro programa do seu computador — um
 
 Um plugin que acrescenta um programa novo numa atualização não é iniciado até você aprovar de novo. A linha de comando não abre programas para plugins.
 
+### Um programa que vem com o plugin
+
+Alguns plugins trazem o próprio programa em vez de pedir que você o instale, como um painel de agente que já vem com o pequeno adaptador por onde conversa. Esse programa é **código do próprio plugin**: o Tyto o roda com o Node que traz consigo, e não o procura no seu `PATH`. A caixa de instalação avisa: `process:claude-agent-acp` aparece como **run this plugin's own program claude-agent-acp (adapter/claude-agent-acp.mjs) on Tyto's Node**, e um parágrafo logo abaixo explica o que isso quer dizer. A caixa de plugins lista esses programas numa linha só deles.
+
+- **Ele não fica confinado como o plugin fica.** O plugin em si não lê os seus arquivos, mas o programa dele pode ler e alterar arquivos e acessar a rede, como qualquer programa que você roda. Aprovar é confiar em quem escreveu o plugin.
+- **As regras acima continuam valendo.** Ele só roda a partir da pasta do próprio plugin, na pasta aberta no Tyto, nunca enquanto essa pasta estiver restrita, sem os segredos do Tyto nem variáveis com cara de chave ou token, e no máximo dois programas de um plugin rodam ao mesmo tempo. Quando o arquivo some da pasta do plugin, o plugin fica sabendo que precisa ser reinstalado.
+
+### Um terminal aberto por um plugin
+
+Um plugin pode abrir uma aba no **Terminal** do Tyto rodando um dos programas que declara, para algo que precisa de você no teclado, como entrar na conta de um agente. A aba abre na frente, na pasta aberta no Tyto, e você vê tudo o que o programa mostra. O plugin só fica sabendo que a aba abriu: nunca vê o que o programa mostra nem o que você digita. Fica aberta uma aba dessas por plugin de cada vez; feche-a, ou deixe o programa terminar, antes que o plugin abra outra. A aba é sua: ela não fecha quando o plugin para.
+
 ## Um plugin é seguro?
 
 Cada plugin instalado roda separado da janela, então um plugin que trava para a si mesmo e não o Tyto, e ele só alcança o que as permissões deixam. A caixa mostra essas permissões, e tanto a caixa de instalação quanto o `tyto plugin install` as mostram antes de você aprovar. Escrever um plugin está no [guia de autoria de plugins](../extend/), em inglês.

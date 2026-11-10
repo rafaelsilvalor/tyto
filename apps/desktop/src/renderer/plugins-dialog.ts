@@ -470,9 +470,23 @@ export class PluginsDialog extends LitElement {
       .filter((permission) => permission.startsWith('process:'))
       .map((permission) => permission.slice('process:'.length));
     if (names.length === 0) return nothing;
-    return html`<p class="plugins__disclosure plugins__programs">
-      ${say('plugins.process.starts')} ${names.join(', ')}
-    </p>`;
+    // ADR 0184: a program the plugin ships is its own code, said apart from one on PATH.
+    const own = names.filter((name) => plugin.ownPrograms?.includes(name) === true);
+    const installed = names.filter((name) => !own.includes(name));
+    return html`${
+        installed.length === 0
+          ? nothing
+          : html`<p class="plugins__disclosure plugins__programs">
+              ${say('plugins.process.starts')} ${installed.join(', ')}
+            </p>`
+      }${
+        own.length === 0
+          ? nothing
+          : html`<p class="plugins__disclosure plugins__programs plugins__own-programs">
+              ${say('plugins.process.own')} ${own.join(', ')}
+            </p>`
+      }
+      <p class="plugins__disclosure plugins__programs">${say('plugins.process.terminal')}</p>`;
   }
 
   /**

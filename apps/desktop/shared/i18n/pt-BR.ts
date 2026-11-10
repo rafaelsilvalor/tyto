@@ -430,6 +430,10 @@ export const ptBR: Catalogue = {
     'Ele pode gravar arquivos na pasta aberta nesta janela, exceto em .tyto/, depois que você confiar na pasta.',
   'plugins.process.starts':
     'Ele pode pedir ao Tyto que abra estes programas neste computador, na pasta aberta nesta janela, nunca enquanto essa pasta estiver restrita:',
+  'plugins.process.own':
+    'Programas próprios dele, que vieram com o plugin: o Tyto os roda no Node que traz consigo, com os seus direitos e sem confinamento à pasta do plugin, na pasta aberta nesta janela, nunca enquanto essa pasta estiver restrita:',
+  'plugins.process.terminal':
+    'Ele também pode abrir uma aba de terminal rodando um desses programas, para você digitar (para entrar na conta, por exemplo); você vê a aba e pode fechá-la.',
   'plugins.close': 'Fechar',
   'plugins.unavailable': 'Não foi possível ler a lista de plugins.',
   'plugins.credential.label': 'Credencial',

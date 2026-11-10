@@ -725,6 +725,13 @@ export interface Catalogue {
    * names: what Tyto may start for it, on this computer.
    */
   readonly 'plugins.process.starts': string;
+  /**
+   * The same row, for the programs the plugin ships itself (ADR 0184), followed by their names:
+   * its own code, run on Tyto's Node with the person's rights, not confined like its process.
+   */
+  readonly 'plugins.process.own': string;
+  /** After the programs: the plugin may open a terminal tab running one (ADR 0184). */
+  readonly 'plugins.process.terminal': string;
   readonly 'plugins.close': string;
   readonly 'plugins.unavailable': string;
   /**
@@ -1427,6 +1434,8 @@ export const CATALOGUE_KEYS = [
   'plugins.workspace.reads',
   'plugins.workspace.writes',
   'plugins.process.starts',
+  'plugins.process.own',
+  'plugins.process.terminal',
   'plugins.close',
   'plugins.unavailable',
   'plugins.credential.label',

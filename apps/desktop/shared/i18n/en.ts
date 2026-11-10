@@ -427,6 +427,10 @@ export const en: Catalogue = {
     'It can write files into the folder open in this window, except into .tyto/, once you trust the folder.',
   'plugins.process.starts':
     'It may ask Tyto to start these programs on this computer, in the folder open in this window, never while that folder is restricted:',
+  'plugins.process.own':
+    "Its own programs, which came with it: Tyto runs them on its own Node, with your rights and not confined to the plugin's folder, in the folder open in this window, never while that folder is restricted:",
+  'plugins.process.terminal':
+    'It may also open a terminal tab running one of these programs, for you to type into (to sign in, say); you see the tab and can close it.',
   'plugins.close': 'Close',
   'plugins.unavailable': 'The plugin list could not be read.',
   'plugins.credential.label': 'Credential',

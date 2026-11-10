@@ -436,3 +436,68 @@ describe('the quit question', () => {
     expect(asked).toEqual([['zsh'], ['zsh']]);
   });
 });
+
+describe('a terminal main opens for a plugin (TYTO-657, ADR 0184)', () => {
+  const launch = {
+    title: 'claude-agent-acp',
+    file: '/opt/tyto/node/node',
+    args: ['/plugins/agent/adapter/claude-agent-acp.mjs', '--cli', 'auth', 'login'],
+    cwd: '/work/folder',
+    env: { PATH: '/bin', TYTO_WINDOW: '99' },
+    cols: 80,
+    rows: 24,
+  };
+
+  it('runs exactly what main chose, and lists it for the window to adopt', () => {
+    const test = harness();
+    const opened = test.terminals.openProgram(launch);
+    expect('terminalId' in opened && opened.terminalId).toBe('terminal-1');
+    expect(test.spawned[0]).toMatchObject({
+      file: launch.file,
+      args: launch.args,
+      options: { cwd: '/work/folder', env: launch.env, cols: 80, rows: 24 },
+    });
+    expect(test.terminals.list().map((terminal) => terminal.title)).toEqual(['claude-agent-acp']);
+  });
+
+  it('says it closed when its program ends, and when the person closes the tab', async () => {
+    const test = harness();
+    const ended: string[] = [];
+    const first = test.terminals.openProgram(launch);
+    const second = test.terminals.openProgram(launch);
+    void first.closed?.then(() => ended.push('first'));
+    void second.closed?.then(() => ended.push('second'));
+
+    test.spawned[0]?.pty.end(0);
+    await Promise.resolve();
+    expect(ended).toEqual(['first']);
+
+    test.terminals.kill('terminal-2');
+    await Promise.resolve();
+    expect(ended).toEqual(['first', 'second']);
+  });
+
+  it('says it closed when every terminal is ended on the way out', async () => {
+    const test = harness();
+    let closed = false;
+    void test.terminals.openProgram(launch).closed?.then(() => {
+      closed = true;
+    });
+    test.terminals.killAll();
+    await Promise.resolve();
+    expect(closed).toBe(true);
+  });
+
+  it('answers a refusal, with no promise, when the program does not start', () => {
+    const test = harness({
+      spawn: () => {
+        throw new Error('no such file');
+      },
+    });
+    const opened = test.terminals.openProgram(launch);
+    expect(opened).toEqual({
+      refused: 'failed',
+      message: 'claude-agent-acp did not start: no such file',
+    });
+  });
+});
