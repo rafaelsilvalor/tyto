@@ -44,6 +44,7 @@ import {
   checkedProcesses,
   hostProcess,
   processChannel,
+  type PluginProgramScripts,
 } from './process.js';
 import { type ContributionPoint, type PluginManifest, validatePluginManifest } from './manifest.js';
 import {
@@ -61,6 +62,7 @@ import {
   SOURCE_SCHEME,
 } from './sources.js';
 import { type ThemeContribution, checkThemeContribution } from './theme.js';
+import { type HostTerminal, checkedTerminal, hostTerminal } from './terminal.js';
 import { type HostWindow, checkedWindowAgentServer, hostWindow } from './window.js';
 
 /**
@@ -215,6 +217,13 @@ export interface PluginHost {
    * `E_WINDOW_RESTRICTED`.
    */
   readonly window: HostWindow;
+  /**
+   * A Tyto terminal tab running a program the manifest declares as `process:<name>` (ADR 0184),
+   * for a program that needs a person at the keyboard, such as an agent's login. The plugin
+   * hears that it opened and nothing else. One open at a time (`E_TERMINAL_LIMIT`); the CLI,
+   * which has no terminal, answers `E_TERMINAL_UNAVAILABLE`.
+   */
+  readonly terminal: HostTerminal;
 
   readonly log: Logger;
   readonly events: TypedEmitter;
@@ -607,10 +616,11 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     permissions: readonly string[] = [],
     origin: PluginOrigin = 'external',
     recipe: RecipeDeclarations = {},
+    scripts: PluginProgramScripts = {},
   ): PluginHost {
     // The permissions of the manifest the host validated, never what the plugin says.
     const checked = checkedCapabilities(pluginId, permissions, options.capabilities);
-    const processes = checkedProcesses(pluginId, permissions, options.capabilities);
+    const processes = checkedProcesses(pluginId, permissions, options.capabilities, scripts);
     return {
       registerExporter: (exporter) => exporters.add(pluginId, exporter, onConflict),
       registerSource: (contribution) => sources.add(pluginId, contribution, onConflict),
@@ -681,6 +691,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         return channel.handle(await processes.start(name, args, channel.events));
       }),
       window: hostWindow(checkedWindowAgentServer(pluginId, permissions, options.capabilities)),
+      terminal: hostTerminal(checkedTerminal(pluginId, permissions, options.capabilities, scripts)),
 
       log,
       events: emitter,
@@ -719,7 +730,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       }
 
       const result = plugin.activate(
-        hostWith(plugin.id, undefined, manifest.permissions, origin, manifest),
+        hostWith(plugin.id, undefined, manifest.permissions, origin, manifest, manifest.programs),
       );
 
       // Checked *after* activation, against what was actually registered. `contributes` is
@@ -791,6 +802,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
             manifest.permissions,
             origin,
             manifest,
+            manifest.programs,
           ),
         );
       } catch (cause) {

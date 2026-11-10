@@ -3,7 +3,10 @@ import {
   type PluginManifest,
   type PluginCrash,
   type PluginOrigin,
+  PLUGIN_PROCESS_LIMIT,
   PROCESS_PERMISSION,
+  type PluginProgramScripts,
+  programScript,
   validatePluginManifest,
 } from '@tyto/plugin-api';
 
@@ -279,7 +282,9 @@ export function permissionPrompt(manifest: PluginManifest, source: string): stri
   const permissions =
     manifest.permissions.length === 0
       ? '  (none)\n'
-      : manifest.permissions.map((permission) => `  - ${permissionLine(permission)}\n`).join('');
+      : manifest.permissions
+          .map((permission) => `  - ${permissionLine(permission, manifest.programs ?? {})}\n`)
+          .join('');
   return (
     `${manifest.name} ${manifest.version} from ${source}\n` +
     `contributes: ${manifest.contributes.join(', ')}\n` +
@@ -291,34 +296,61 @@ export function permissionPrompt(manifest: PluginManifest, source: string): stri
     'connection is not stopped. credentials: permissions filter host.credentials.\n' +
     workspaceNotice(manifest.permissions) +
     fontNotice(manifest.permissions) +
-    processNotice(manifest.permissions)
+    processNotice(manifest.permissions, manifest.programs ?? {})
   );
 }
 
-/** One permission as the list shows it; `process:<name>` says what it does (ADR 0182). */
-function permissionLine(permission: string): string {
+/** One permission as the list shows it; `process:<name>` says what it does (ADR 0182, 0184). */
+function permissionLine(permission: string, scripts: PluginProgramScripts): string {
   if (!permission.startsWith(PROCESS_PERMISSION)) return permission;
   const program = permission.slice(PROCESS_PERMISSION.length);
+  const script = programScript(scripts, program);
+  if (script !== undefined) {
+    return `${permission}: run this plugin's own program ${program} (${script}) on Tyto's Node`;
+  }
   return `${permission}: start the program ${program} on your computer`;
+}
+
+/** `a`, `a or b`, `a, b or c`, each in backticks. */
+function eitherOf(names: readonly string[]): string {
+  const named = names.map((name) => `\`${name}\``);
+  const last = named.pop() ?? '';
+  return named.length === 0 ? last : `${named.join(', ')} or ${last}`;
 }
 
 /**
  * `process:<name>` in words, only for a plugin that asks for one (ADR 0182): Tyto, not the
- * plugin, starts that one program from the person's PATH, and the program is not confined. It
- * may reach the window as an agent (ADR 0183), and the last sentence says what that means.
+ * plugin, starts that one program, and the program is not confined. A program found on the
+ * person's PATH is code they installed; one the manifest's `programs` maps to a script is the
+ * plugin's own code, run on Tyto's Node, and the prompt says that difference plainly, with what
+ * still holds it and what does not (ADR 0184). Either may reach the window as an agent (ADR
+ * 0183) and run in a terminal tab the person sees (ADR 0184).
  */
-function processNotice(permissions: readonly string[]): string {
+function processNotice(permissions: readonly string[], scripts: PluginProgramScripts): string {
   const programs = permissions
     .filter((permission) => permission.startsWith(PROCESS_PERMISSION))
     .map((permission) => permission.slice(PROCESS_PERMISSION.length));
   if (programs.length === 0) return '';
-  const named = programs.map((program) => `\`${program}\``);
-  const last = named.pop() ?? '';
-  const either = named.length === 0 ? last : `${named.join(', ')} or ${last}`;
-  const one = named.length === 0;
+  const own = programs.filter((program) => programScript(scripts, program) !== undefined);
+  const installed = programs.filter((program) => !own.includes(program));
+  const one = programs.length === 1;
   const those = one
     ? 'That program runs with your rights and is'
     : 'Those programs run with your rights and are';
+  const found =
+    installed.length === 0
+      ? ''
+      : `It may ask Tyto to start ${eitherOf(installed)}, found on your PATH, in the folder open in Tyto,\n` +
+        'and never while that folder is restricted. Tyto starts no other program for it.\n';
+  const shipped =
+    own.length === 0
+      ? ''
+      : `${eitherOf(own)} ${own.length === 1 ? 'is' : 'are'} the plugin's own code, a script that came with it.\n` +
+        'Tyto runs it on the Node it ships with, in the folder open in Tyto, and never while that\n' +
+        "folder is restricted. Unlike the plugin's process, it is not confined: it can read and\n" +
+        'change your files and reach the network, as any program you run can. Tyto runs it only\n' +
+        "from the plugin's folder, passes it no API key or token from its own environment, and runs\n" +
+        `at most ${String(PLUGIN_PROCESS_LIMIT)} of the plugin's programs at once.\n`;
   // ADR 0183: a plugin that names a program may hand it the window's agent server, so the
   // person reads here what that program can then do in the window.
   const reach = one
@@ -328,12 +360,13 @@ function processNotice(permissions: readonly string[]): string {
     : 'Those programs can also reach the Tyto window as agents while Tyto lets agents connect\n' +
       '(setting `agentsListen`): they read what is open there, and their edits arrive as proposals\n' +
       'you approve or reject.\n';
-  return (
-    `It may ask Tyto to start ${either}, found on your PATH, in the folder open in Tyto,\n` +
-    'and never while that folder is restricted. Tyto starts no other program for it.\n' +
-    `${those} not confined to the folder.\n` +
-    reach
-  );
+  // ADR 0184: a program that needs a person at the keyboard, such as a login, runs in a tab.
+  const terminal = one
+    ? 'The plugin may also open a terminal tab in Tyto running that program, for you to type\n' +
+      'into (to sign in, say); you see the tab and can close it.\n'
+    : 'The plugin may also open a terminal tab in Tyto running one of those programs, for you to\n' +
+      'type into (to sign in, say); you see the tab and can close it.\n';
+  return `${found}${shipped}${those} not confined to the folder.\n${reach}${terminal}`;
 }
 
 /**

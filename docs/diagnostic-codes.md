@@ -70,6 +70,9 @@ non-zero.
 | `E_PROCESS_LIMIT` | error | no | A plugin asked to start a program while as many of its programs as allowed run. |
 | `E_PROCESS_ARGUMENT` | error | no | A plugin passed a program an argument the host cannot pass to it unchanged. |
 | `E_PROCESS_EXITED` | error | no | A plugin wrote to a program it started after that program had ended. |
+| `E_PROCESS_SCRIPT_MISSING` | error | no | A plugin asked to start its own program, and the script its manifest names is not in its folder. |
+| `E_TERMINAL_UNAVAILABLE` | error | no | A plugin asked for a terminal tab on a host that has no terminal. |
+| `E_TERMINAL_LIMIT` | error | no | A plugin asked for a terminal tab while as many of its terminals as allowed are open. |
 | `E_WINDOW_UNAVAILABLE` | error | no | A plugin asked for the window's agent server on a host that has no window. |
 | `E_WINDOW_AGENTS_OFF` | error | no | A plugin asked for the window's agent server while agentsListen is off. |
 | `E_WINDOW_RESTRICTED` | error | no | A plugin asked for the window's agent server while the open folder is restricted. |
@@ -298,6 +301,9 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PROCESS_LIMIT` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PROCESS_ARGUMENT` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PROCESS_EXITED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_PROCESS_SCRIPT_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_TERMINAL_UNAVAILABLE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_TERMINAL_LIMIT` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WINDOW_UNAVAILABLE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WINDOW_AGENTS_OFF` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WINDOW_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
@@ -1129,6 +1135,48 @@ Plugin '{plugin}' wrote to '{program}' after it had ended.
 ```
 
 Parameters: `plugin`, `program`
+
+### `E_PROCESS_SCRIPT_MISSING`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0184-a-plugin-runs-its-own-program-on-tytos-node-and-opens-a-terminal-for-it.md`
+
+A plugin asked to start its own program, and the script its manifest names is not in its folder.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked to start its program '{program}', and its script {script} is not in the plugin's folder; reinstall the plugin.
+```
+
+Parameters: `plugin`, `program`, `script`
+
+### `E_TERMINAL_UNAVAILABLE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0184-a-plugin-runs-its-own-program-on-tytos-node-and-opens-a-terminal-for-it.md`
+
+A plugin asked for a terminal tab on a host that has no terminal.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for a terminal running '{program}', and {host} has no terminal.
+```
+
+Parameters: `plugin`, `program`, `host`
+
+### `E_TERMINAL_LIMIT`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0184-a-plugin-runs-its-own-program-on-tytos-node-and-opens-a-terminal-for-it.md`
+
+A plugin asked for a terminal tab while as many of its terminals as allowed are open.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked for a terminal running '{program}' while {limit} of its terminals is open, the most it may have; finish or close that one first.
+```
+
+Parameters: `plugin`, `program`, `limit`
 
 ### `E_WINDOW_UNAVAILABLE`
 

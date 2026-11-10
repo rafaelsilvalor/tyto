@@ -10,6 +10,7 @@ import {
 import type { Disposable, Logger, Plugin, PluginHost } from '../host.js';
 import { validatePluginManifest } from '../manifest.js';
 import { type CheckedProcess, checkedProcesses } from '../process.js';
+import { checkedTerminal } from '../terminal.js';
 import { checkedWindowAgentServer } from '../window.js';
 import type { PluginChannel } from './channel.js';
 import { type CallableSpec, type PointSpec, pointSpecOf } from './points.js';
@@ -35,6 +36,7 @@ import {
   processIdArgsSchema,
   processStartArgsSchema,
   processWriteArgsSchema,
+  terminalOpenArgsSchema,
   windowAgentServerArgsSchema,
 } from './protocol.js';
 
@@ -178,14 +180,16 @@ export function connectIsolatedPlugin(
   // validate grants nothing, and `tryActivate` refuses the plugin anyway.
   const validated = validatePluginManifest(options.manifest);
   const permissions = validated.ok ? validated.value.permissions : [];
+  const scripts = validated.ok ? (validated.value.programs ?? {}) : {};
   const capabilities = checkedCapabilities(name, permissions, options.capabilities);
   /**
    * The programs this plugin started (ADR 0182), by the number the guest names them with. Kept
    * after they end, so a late write is answered `E_PROCESS_EXITED` rather than "unknown"; a
    * conversation starts a handful, not thousands. All of them end when the process does.
    */
-  const processes = checkedProcesses(name, permissions, options.capabilities);
+  const processes = checkedProcesses(name, permissions, options.capabilities, scripts);
   const windowAgentServer = checkedWindowAgentServer(name, permissions, options.capabilities);
+  const openTerminal = checkedTerminal(name, permissions, options.capabilities, scripts);
   const programs = new Map<number, CheckedProcess>();
   let nextProgram = 0;
 
@@ -359,6 +363,12 @@ export function connectIsolatedPlugin(
           }
           // Checked by `checkedWindowAgentServer`: the schema's fields and the two variables only.
           reply({ ok: true, value: await windowAgentServer() });
+        } else if (message.capability === 'terminalOpen') {
+          const args = terminalOpenArgsSchema.safeParse(message.args);
+          if (!args.success)
+            throw new TypeError(`host.terminal.open was given ${describeIssues(args.error)}`);
+          await openTerminal(args.data[0], args.data[1]);
+          reply({ ok: true, value: null });
         } else if (
           message.capability === 'processWrite' ||
           message.capability === 'processEnd' ||
@@ -418,6 +428,7 @@ export function connectIsolatedPlugin(
         | 'processEnd'
         | 'processKill'
         | 'windowAgentServer'
+        | 'terminalOpen'
       >,
       raw: readonly unknown[],
     ): Promise<unknown> {

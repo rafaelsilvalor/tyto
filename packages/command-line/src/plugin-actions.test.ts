@@ -355,7 +355,9 @@ describe('the permission prompt', () => {
         'That program runs with your rights and is not confined to the folder.\n' +
         'That program can also reach the Tyto window as an agent while Tyto lets agents connect\n' +
         '(setting `agentsListen`): it reads what is open there, and its edits arrive as proposals\n' +
-        'you approve or reject.\n',
+        'you approve or reject.\n' +
+        'The plugin may also open a terminal tab in Tyto running that program, for you to type\n' +
+        'into (to sign in, say); you see the tab and can close it.\n',
     );
     expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain('process:');
     expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain(
@@ -372,7 +374,45 @@ describe('the permission prompt', () => {
         'Those programs run with your rights and are not confined to the folder.\n' +
         'Those programs can also reach the Tyto window as agents while Tyto lets agents connect\n' +
         '(setting `agentsListen`): they read what is open there, and their edits arrive as proposals\n' +
-        'you approve or reject.\n',
+        'you approve or reject.\n' +
+        'The plugin may also open a terminal tab in Tyto running one of those programs, for you to\n' +
+        'type into (to sign in, say); you see the tab and can close it.\n',
     );
+  });
+
+  it("says a plugin's own program is its own code, and what holds it (ADR 0184)", () => {
+    const prompt = permissionPrompt(
+      {
+        ...manifest(['process:claude-agent-acp', 'process:codex']),
+        programs: { 'claude-agent-acp': 'adapter/claude-agent-acp.mjs' },
+      },
+      'x',
+    );
+    expect(prompt).toContain(
+      "  - process:claude-agent-acp: run this plugin's own program claude-agent-acp " +
+        "(adapter/claude-agent-acp.mjs) on Tyto's Node\n" +
+        '  - process:codex: start the program codex on your computer\n',
+    );
+    expect(prompt).toContain(
+      'It may ask Tyto to start `codex`, found on your PATH, in the folder open in Tyto,\n' +
+        'and never while that folder is restricted. Tyto starts no other program for it.\n' +
+        "`claude-agent-acp` is the plugin's own code, a script that came with it.\n" +
+        'Tyto runs it on the Node it ships with, in the folder open in Tyto, and never while that\n' +
+        "folder is restricted. Unlike the plugin's process, it is not confined: it can read and\n" +
+        'change your files and reach the network, as any program you run can. Tyto runs it only\n' +
+        "from the plugin's folder, passes it no API key or token from its own environment, and runs\n" +
+        "at most 2 of the plugin's programs at once.\n" +
+        'Those programs run with your rights and are not confined to the folder.\n',
+    );
+    // Only its own programs: nothing says "found on your PATH" for a plugin with none there.
+    const ownOnly = permissionPrompt(
+      {
+        ...manifest(['process:claude-agent-acp']),
+        programs: { 'claude-agent-acp': 'adapter/claude-agent-acp.mjs' },
+      },
+      'x',
+    );
+    expect(ownOnly).not.toContain('found on your PATH');
+    expect(ownOnly).toContain("`claude-agent-acp` is the plugin's own code");
   });
 });

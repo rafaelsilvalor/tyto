@@ -178,6 +178,7 @@ async function isolate(
     readonly namespace?: string;
     readonly writes?: readonly string[];
     readonly signin?: Readonly<Record<string, unknown>>;
+    readonly programs?: Readonly<Record<string, string>>;
     /** `texto` unless a test holds two plugins in one host. */
     readonly name?: string;
   } = {},
@@ -195,6 +196,7 @@ async function isolate(
       ...(options.namespace === undefined ? {} : { namespace: options.namespace }),
       ...(options.writes === undefined ? {} : { writes: options.writes }),
       ...(options.signin === undefined ? {} : { signin: options.signin }),
+      ...(options.programs === undefined ? {} : { programs: options.programs }),
     },
     channel: pair.host,
     ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
@@ -966,6 +968,72 @@ describe('host.window across the boundary (ADR 0183)', () => {
     const answer = await answerOf(connected);
     expect(answer).toBe('thrown');
     expect(answer).not.toContain('sk-secret');
+  });
+});
+
+describe('host.terminal across the boundary (ADR 0184)', () => {
+  const asked: { program: string; args: readonly string[]; script: string | undefined }[] = [];
+  const TERMINAL: HostCapabilities = {
+    fetch: () => Promise.reject(new Error('no network here')),
+    credential: () => Promise.resolve(undefined),
+    describeCredential: () => 'nowhere',
+    openTerminal: (_plugin, program, args, script) => {
+      asked.push({ program, args, script });
+      return Promise.resolve({ closed: new Promise<void>(() => undefined) });
+    },
+  };
+
+  const opening = (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () =>
+        ok(
+          await host.terminal.open('claude-agent-acp', ['--cli', 'auth', 'login']).then(
+            () => 'opened',
+            (cause: { code?: string }) => cause.code ?? 'thrown',
+          ),
+        ),
+    });
+
+  const answersOf = async (
+    connected: Result<IsolatedPlugin, Diagnostics>,
+    times: number,
+  ): Promise<string[]> => {
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const answers: string[] = [];
+    for (let time = 0; time < times; time += 1) {
+      const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+      answers.push(answer.ok ? answer.value : '');
+    }
+    return answers;
+  };
+
+  it('opens the plugin’s own program with the script its manifest names, once at a time', async () => {
+    asked.length = 0;
+    const { connected } = await isolate(opening, {
+      permissions: ['process:claude-agent-acp'],
+      programs: { 'claude-agent-acp': 'adapter/claude-agent-acp.mjs' },
+      capabilities: TERMINAL,
+    });
+    expect(await answersOf(connected, 2)).toEqual(['opened', 'E_TERMINAL_LIMIT']);
+    expect(asked).toEqual([
+      {
+        program: 'claude-agent-acp',
+        args: ['--cli', 'auth', 'login'],
+        script: 'adapter/claude-agent-acp.mjs',
+      },
+    ]);
+  });
+
+  it('answers E_PERMISSION and E_TERMINAL_UNAVAILABLE with their codes', async () => {
+    const { openTerminal: _port, ...cli } = TERMINAL;
+    const answers = await Promise.all(
+      [
+        isolate(opening, { permissions: ['process:claude'], capabilities: TERMINAL }),
+        isolate(opening, { permissions: ['process:claude-agent-acp'], capabilities: cli }),
+      ].map(async (isolated) => (await answersOf((await isolated).connected, 1))[0]),
+    );
+    expect(answers).toEqual(['E_PERMISSION', 'E_TERMINAL_UNAVAILABLE']);
   });
 });
 
