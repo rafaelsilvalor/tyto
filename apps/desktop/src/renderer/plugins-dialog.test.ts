@@ -194,7 +194,33 @@ describe('the plugins screen', () => {
     expect(text(element, '[data-plugin="agente"] .plugins__programs')).toBe(
       `${translate('en', 'plugins.process.starts')} claude, codex`,
     );
+    expect(element.querySelector('[data-plugin="agente"] .plugins__own-programs')).toBeNull();
     expect(element.querySelector('[data-plugin="svg"] .plugins__programs')).toBeNull();
+  });
+
+  it('names a program the plugin ships apart, as its own code, and the terminal it may open (ADR 0184)', async () => {
+    const element = await dialog({
+      folder: VIEW.folder,
+      plugins: [
+        {
+          ...VIEW.plugins[0]!,
+          name: 'agente',
+          origin: 'external',
+          contributes: ['panel'],
+          permissions: ['process:claude-agent-acp', 'process:codex'],
+          ownPrograms: ['claude-agent-acp'],
+        },
+      ],
+    });
+
+    const lines = [...element.querySelectorAll('[data-plugin="agente"] .plugins__programs')].map(
+      (line) => line.textContent?.replace(/\s+/gu, ' ').trim(),
+    );
+    expect(lines).toEqual([
+      `${translate('en', 'plugins.process.starts')} codex`,
+      `${translate('en', 'plugins.process.own')} claude-agent-acp`,
+      translate('en', 'plugins.process.terminal'),
+    ]);
   });
 
   it('says, on its own row, what workspace:read and workspace:write reach (ADR 0138)', async () => {

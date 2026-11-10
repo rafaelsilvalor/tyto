@@ -1,5 +1,15 @@
 import { spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 
@@ -7,6 +17,7 @@ import { PluginCapabilityError, type ProcessExit } from '@tyto/plugin-api';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import {
+  type PluginScripts,
   type ProgramChild,
   type ProgramSpawnOptions,
   batchArgumentProblem,
@@ -14,6 +25,7 @@ import {
   findPluginProgram,
   killProgramTree,
   pluginPrograms,
+  pluginScriptFile,
   programEnvironment,
 } from './plugin-programs.js';
 import type { WorkspaceState } from './workspace.js';
@@ -186,6 +198,7 @@ function host(
     platform?: NodeJS.Platform;
     exists?: (path: string) => boolean;
     place?: { folder: string | null; trust: WorkspaceState['trust'] };
+    scripts?: PluginScripts;
   } = {},
 ) {
   const place = { value: options.place ?? { folder: '/work', trust: 'trusted' as const } };
@@ -216,6 +229,7 @@ function host(
       killed.push(child.pid ?? -1);
       waited.push(now);
     },
+    ...(options.scripts === undefined ? {} : { scripts: options.scripts }),
   });
   const quiet = { stdout: () => undefined, stderr: () => undefined, exit: () => undefined };
   return { programs, place, spawned, children, killed, waited, looked, quiet };
@@ -315,6 +329,150 @@ describe('pluginPrograms', () => {
     expect(exits).toEqual([{ code: 0, signal: null }]);
     expect(test.killed).toEqual([2]);
     expect(test.waited).toEqual([true]);
+  });
+});
+
+describe('a plugin’s own program (ADR 0184)', () => {
+  /** A disk where `/plugins/agent` holds the adapter and a link that points out of the folder. */
+  const disk: PluginScripts = {
+    node: '/opt/tyto/node/node',
+    folderOf: (plugin) => (plugin === 'agent' ? '/plugins/agent' : undefined),
+    realpath: (path) => {
+      const links: Record<string, string> = {
+        '/plugins/agent': '/plugins/agent',
+        '/plugins/agent/adapter': '/plugins/agent/adapter',
+        '/plugins/agent/adapter/claude-agent-acp.mjs':
+          '/plugins/agent/adapter/claude-agent-acp.mjs',
+        '/plugins/agent/escape.mjs': '/home/ana/elsewhere.mjs',
+      };
+      const real = links[path];
+      if (real === undefined) throw new Error(`ENOENT: ${path}`);
+      return real;
+    },
+    isFile: (path) => path.endsWith('.mjs'),
+  };
+  const ADAPTER = 'adapter/claude-agent-acp.mjs';
+
+  it('runs the script on the bundled Node, with no shell, and never looks on PATH', async () => {
+    const test = host({ scripts: disk, exists: files() });
+    const started = await test.programs.startProcess(
+      'agent',
+      'claude-agent-acp',
+      ['--acp'],
+      test.quiet,
+      ADAPTER,
+    );
+    expect(test.spawned[0]).toMatchObject({
+      file: '/opt/tyto/node/node',
+      args: ['/plugins/agent/adapter/claude-agent-acp.mjs', '--acp'],
+      options: { cwd: '/work', detached: true, env: { PATH: '/bin', TYTO_WINDOW: '99' } },
+    });
+    expect(started.cwd).toBe('/work');
+    expect(test.looked).toEqual([]);
+  });
+
+  it('answers E_PROCESS_SCRIPT_MISSING for a missing file, a link out, a folder, or no Node', async () => {
+    const missing = async (
+      plugin: string,
+      script: string,
+      scripts: PluginScripts | 'none' = disk,
+    ): Promise<string> => {
+      const test = host(scripts === 'none' ? {} : { scripts });
+      const code = await codeOf(
+        test.programs.startProcess(plugin, 'claude-agent-acp', [], test.quiet, script),
+      );
+      expect(test.spawned).toEqual([]);
+      return code;
+    };
+    expect(await missing('agent', 'adapter/gone.mjs')).toBe('E_PROCESS_SCRIPT_MISSING');
+    expect(await missing('agent', 'escape.mjs')).toBe('E_PROCESS_SCRIPT_MISSING');
+    expect(await missing('agent', 'adapter')).toBe('E_PROCESS_SCRIPT_MISSING');
+    expect(await missing('built-in', ADAPTER)).toBe('E_PROCESS_SCRIPT_MISSING');
+    expect(await missing('agent', ADAPTER, 'none')).toBe('E_PROCESS_SCRIPT_MISSING');
+  });
+
+  it('refuses a restricted folder before it looks for the script', async () => {
+    let asked = 0;
+    const test = host({
+      place: { folder: '/work', trust: 'restricted' },
+      scripts: {
+        ...disk,
+        folderOf: (plugin) => {
+          asked += 1;
+          return disk.folderOf(plugin);
+        },
+      },
+    });
+    expect(
+      await codeOf(
+        test.programs.startProcess('agent', 'claude-agent-acp', [], test.quiet, ADAPTER),
+      ),
+    ).toBe('E_PROCESS_RESTRICTED');
+    expect(asked).toBe(0);
+  });
+
+  it('keeps a real link out of the folder out, on this disk', () => {
+    const root = mkdtempSync(join(tmpdir(), 'tyto-plugin-script-'));
+    try {
+      const folder = join(root, 'agent');
+      mkdirSync(join(folder, 'adapter'), { recursive: true });
+      writeFileSync(join(folder, 'adapter', 'run.mjs'), '');
+      writeFileSync(join(root, 'outside.mjs'), '');
+      const real: PluginScripts = {
+        node: process.execPath,
+        folderOf: () => folder,
+        realpath: (path) => realpathSync(path),
+        isFile: (path) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false,
+      };
+      expect(pluginScriptFile(process.platform, real, 'agent', 'adapter/run.mjs')).toBe(
+        realpathSync(join(folder, 'adapter', 'run.mjs')),
+      );
+      let linked = true;
+      try {
+        symlinkSync(join(root, 'outside.mjs'), join(folder, 'link.mjs'), 'file');
+      } catch {
+        // Windows without the privilege to make a link: the fake disk above covers the rule.
+        linked = false;
+      }
+      if (linked) {
+        expect(pluginScriptFile(process.platform, real, 'agent', 'link.mjs')).toBeUndefined();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('hands a terminal the same file, and checks a .cmd’s arguments as cmd.exe reads them', () => {
+    const test = host({ scripts: disk });
+    expect(
+      test.programs.terminalLaunch(
+        'agent',
+        'claude-agent-acp',
+        ['--cli', 'auth', 'login'],
+        ADAPTER,
+      ),
+    ).toEqual({
+      file: '/opt/tyto/node/node',
+      args: ['/plugins/agent/adapter/claude-agent-acp.mjs', '--cli', 'auth', 'login'],
+      cwd: '/work',
+      env: { PATH: '/bin', SystemRoot: 'C:\\Windows', TYTO_WINDOW: '99' },
+    });
+    const windows = host({
+      platform: 'win32',
+      place: { folder: 'C:\\work', trust: 'trusted' },
+      exists: files('\\bin\\claude.cmd'),
+    });
+    expect(windows.programs.terminalLaunch('agente', 'claude', ['auth', 'login'])).toMatchObject({
+      file: '\\bin\\claude.cmd',
+      args: ['auth', 'login'],
+    });
+    let code = '';
+    try {
+      windows.programs.terminalLaunch('agente', 'claude', ['a&b']);
+    } catch (cause) {
+      code = cause instanceof PluginCapabilityError ? cause.code : String(cause);
+    }
+    expect(code).toBe('E_PROCESS_ARGUMENT');
   });
 });
 

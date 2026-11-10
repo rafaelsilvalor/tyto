@@ -5,6 +5,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   watch,
   writeFileSync,
 } from 'node:fs';
@@ -914,6 +915,14 @@ async function start(): Promise<void> {
         signalGroup: (pid) => process.kill(-pid, 'SIGTERM'),
       });
     },
+    // A plugin's own program (ADR 0184): its script, from its own folder, on the bundled Node
+    // the relay runs on. The folder is read at each start, so a reinstall moves nothing.
+    scripts: {
+      node: agentRelay.node,
+      folderOf: (plugin) => pluginFolder(plugin),
+      realpath: (path) => realpathSync(path),
+      isFile: (path) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false,
+    },
   });
   const workspace = createWorkspaceService({
     trustStore: fsTrustStore({ home: pluginsHome }),
@@ -1012,6 +1021,23 @@ async function start(): Promise<void> {
     }),
     ...signinCapabilities(signin),
     startProcess: programs.startProcess,
+    // A tab for a plugin's declared program (ADR 0184 decision 6), such as an agent's login:
+    // found and checked as a start is, opened by main, and adopted by the window through
+    // `terminal:list`. The plugin hears that it opened and nothing else.
+    openTerminal: async (
+      plugin: string,
+      program: string,
+      args: readonly string[],
+      script?: string,
+    ) => {
+      const launch = programs.terminalLaunch(plugin, program, args, script);
+      const opened = terminals.openProgram({ ...launch, title: program, cols: 80, rows: 24 });
+      if ('refused' in opened || opened.closed === undefined) {
+        throw new Error('refused' in opened ? opened.message : 'no terminal');
+      }
+      toWindow('terminal:opened', { terminalId: opened.terminalId });
+      return { closed: opened.closed };
+    },
     // The window's MCP server for the agent a plugin starts (ADR 0183): the relay Open an Agent
     // Here names (ADR 0181), refused while the folder is restricted or agentsListen is off.
     windowAgentServer: windowAgentServerPort({

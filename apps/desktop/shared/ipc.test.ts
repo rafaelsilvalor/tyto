@@ -239,6 +239,8 @@ describe('the event table', () => {
       'templates:changed',
       // TYTO-497, ADR 0164. What a terminal printed, and its shell ending.
       'terminal:exit',
+      // TYTO-657, ADR 0184. Main opened a terminal for a plugin's program.
+      'terminal:opened',
       'terminal:output',
       // TYTO-131. The update status changed; the window asks `update:status`.
       'update:changed',

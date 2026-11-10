@@ -2033,6 +2033,12 @@ export const IPC_CHANNELS = {
             status: z.enum(['enabled', 'disabled', 'refused', 'crashed']),
             contributes: z.array(z.string()),
             permissions: z.array(z.string()),
+            /**
+             * The declared programs the manifest maps to a script of the plugin's own (ADR
+             * 0184), which the screen names apart from the programs found on `PATH`. Absent
+             * means none.
+             */
+            ownPrograms: z.array(z.string()).optional(),
             problems: z.array(z.string()),
             /**
              * Each `credentials:<key>` the manifest declares, and whether a value is stored
@@ -3132,6 +3138,13 @@ export const IPC_EVENTS = {
 
   /** A terminal's shell ended, with its exit code; main has already forgotten it. */
   'terminal:exit': z.object({ terminalId, code: z.number().int() }),
+
+  /**
+   * Main opened a terminal for a plugin's declared program (ADR 0184 decision 6), such as an
+   * agent's login. The window shows the Terminal tab with it in front, reading its title and
+   * output through `terminal:list`, as after a reload. Only the id crosses.
+   */
+  'terminal:opened': z.object({ terminalId }),
 
   /**
    * The app is trying to exit and wants to know whether the window minds (TYTO-123).

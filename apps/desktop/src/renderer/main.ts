@@ -6136,6 +6136,18 @@ async function newTerminal(agent = false): Promise<void> {
   elements.terminalPanel?.focusTerminal();
 }
 
+/**
+ * A terminal main opened on its own (ADR 0184), in front: the Terminal tab open, the terminal
+ * adopted from main's list as after a reload, then selected and focused.
+ */
+async function showOpenedTerminal(terminalId: string): Promise<void> {
+  await changeLayout(withPanelOpen(layout, TERMINAL_PANEL, true));
+  await terminalSessions.restore();
+  terminalSessions.select(terminalId);
+  await elements.terminalPanel?.updateComplete;
+  elements.terminalPanel?.focusTerminal();
+}
+
 /** The terminal in front focused, or a first one opened when there is none. */
 function focusTerminal(): void {
   const element = elements.terminalPanel;
@@ -6477,6 +6489,11 @@ async function load(): Promise<void> {
     });
     bridge.on('terminal:exit', (pushed) => {
       terminalSessions.exit(pushed.terminalId, pushed.code);
+    });
+    // A terminal main opened for a plugin's program (ADR 0184), such as an agent's login: drawn
+    // from `terminal:list` like a kept one, then put in front with the tab focused on it.
+    bridge.on('terminal:opened', (pushed) => {
+      void showOpenedTerminal(pushed.terminalId);
     });
     // The terminals main kept across a reload, drawn again from their replay (decision 3).
     void terminalSessions.restore();

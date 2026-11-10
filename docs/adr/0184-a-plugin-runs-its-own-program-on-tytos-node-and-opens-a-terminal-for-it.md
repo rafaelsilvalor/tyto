@@ -159,7 +159,18 @@ args)`.** The tab is a Tyto terminal (ADR 0164): a pseudo-terminal in main, show
 
 | What                                                               | Why it matters                                                             | Status       | Card     |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------ | -------- |
-| The desktop's adapter: bundled Node behind `startProcess`, the tab | Until it lands, `programs` and `host.terminal` do nothing on the desktop   | Not built    | TYTO-657 |
+| The desktop's adapter: bundled Node behind `startProcess`, the tab | Until it lands, `programs` and `host.terminal` do nothing on the desktop   | Built        | TYTO-657 |
 | The plugin shipping the adapter and the login button               | The person still installs the adapter until `tyto-plugin-agent` uses this  | Not built    | TYTO-657 |
 | A real login, end to end, through the tab                          | The suites use a stand-in program                                          | Not measured | TYTO-657 |
 | `testPlugin` offering a stand-in terminal                          | A plugin author tests `host.terminal` by passing `openTerminal` themselves | Not built    | —        |
+
+## Note, 2026-11-10 — the desktop's adapter (TYTO-657, second pull request)
+
+`plugin-programs.ts` runs a `programs` script on the bundled Node that the relay uses
+(`agentRelayPaths().node`) and checks its real path with `pluginScriptFile`. `terminalLaunch`
+gives a terminal the same file under the same refusals. For a `.cmd` from `PATH`, it hands
+node-pty the file as it is and checks each argument as ADR 0181 decision 5 does. Main opens the
+tab itself through `Terminals.openProgram` and pushes `terminal:opened`, carrying only the id.
+The window adopts the tab through `terminal:list`, as it does after a reload, and puts the
+Terminal tab in front. The plugins screen lists a plugin's own programs on a line of their own.
+`plugins:list` carries their names as `ownPrograms`.

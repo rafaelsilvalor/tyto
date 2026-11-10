@@ -1976,8 +1976,17 @@
         "apps/desktop/e2e/plugin-program.desktop.test.ts",
         "apps/desktop/e2e/stand-in-program.ts"
       ],
-      "e2e": ["plugin-program.desktop.test.ts", "packaged.package.test.ts"],
+      "e2e": [
+        "plugin-program.desktop.test.ts",
+        "plugin-own-program.desktop.test.ts",
+        "packaged.package.test.ts"
+      ],
       "why": "TYTO-568: a program an installed plugin starts through process:<name>, ended with the folder, its trust and the window"
+    },
+    {
+      "paths": ["apps/desktop/e2e/plugin-own-program.desktop.test.ts"],
+      "e2e": ["plugin-own-program.desktop.test.ts"],
+      "why": "TYTO-657: a plugin's own program on the bundled Node, and the terminal tab it opens"
     },
     {
       "paths": ["apps/desktop/e2e/window-record.ts", "apps/desktop/e2e/window-record.test.ts"],

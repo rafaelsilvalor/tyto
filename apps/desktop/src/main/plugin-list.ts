@@ -135,6 +135,7 @@ export async function listPlugins(
       status: crashed ? 'crashed' : entry.enabled ? 'enabled' : 'disabled',
       contributes: [...manifest.contributes],
       permissions: [...manifest.permissions],
+      ownPrograms: Object.keys(manifest.programs ?? {}),
       problems: crashed
         ? [diagnostic('W_PLUGIN_CRASHED', { plugin: entry.folder, ...crash }).message]
         : [],

@@ -75,6 +75,17 @@ Some plugins work by talking to another program on your computer — an agent pa
 
 A plugin that adds a new program in an update is not started until you approve it again. The command line starts no programs for plugins.
 
+### A program the plugin brings with it
+
+Some plugins bring their program with them instead of asking you to install it, such as an agent panel that ships the small adapter it talks through. That program is **the plugin's own code**: Tyto runs it with the Node it ships with, and it does not look for it on your `PATH`. The install box says so: `process:claude-agent-acp` reads **run this plugin's own program claude-agent-acp (adapter/claude-agent-acp.mjs) on Tyto's Node**, and a paragraph below says what that means. The plugins dialog lists such programs on a line of their own.
+
+- **It is not confined like the plugin is.** The plugin itself cannot read your files, but its program can read and change them and reach the network, as any program you run can. Approving it means trusting whoever wrote the plugin.
+- **The rules above still hold.** It runs only from the plugin's own folder, in the folder open in Tyto, never while that folder is restricted, without Tyto's secrets or a variable that looks like a key or a token, and at most two of a plugin's programs run at once. When the file is missing from the plugin's folder, the plugin is told to have you reinstall it.
+
+### A terminal a plugin opens
+
+A plugin may open a tab in Tyto's **Terminal** running one of the programs it declares, for something that needs you at the keyboard, such as signing in to an agent. The tab opens in front, in the folder open in Tyto, and you see everything the program prints. The plugin only learns that the tab opened: it never sees what the program prints or what you type. One such tab per plugin is open at a time; close it, or let the program finish, before the plugin opens another. The tab stays yours: it does not close when the plugin stops.
+
 ## Is a plugin safe?
 
 Each installed plugin runs apart from the window, so a plugin that crashes stops itself and not Tyto, and it can only reach what its permissions allow. The dialog shows those permissions, and both its install box and `tyto plugin install` show them before you approve. Writing a plugin is in the [plugin author's guide](../extend/plugin-authoring.md).
