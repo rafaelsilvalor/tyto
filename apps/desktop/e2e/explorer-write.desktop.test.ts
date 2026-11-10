@@ -77,6 +77,53 @@ const rows = (): Promise<string[]> =>
 const row = (name: string) => window.locator(`.explorer__row[data-name="${name}"]`);
 const field = () => window.locator('.explorer__field');
 
+/** Where focus is, by what holds it: what a failure below names. */
+const focusIn = (): Promise<string> =>
+  window.evaluate(() => {
+    const active = document.activeElement;
+    if (active === null || active === document.body) return 'nothing';
+    if (active.closest('.cm-editor') !== null) return 'the editor';
+    const holder = active.closest<HTMLElement>('.explorer__row');
+    if (holder !== null) return `row:${holder.dataset['name'] ?? '?'}`;
+    return `<${active.tagName.toLowerCase()}${active.className === '' ? '' : ` class="${String(active.className)}"`}>`;
+  });
+
+/**
+ * Clicks a row whose file the explorer opens, and waits for the open to settle (TYTO-654).
+ *
+ * The click asks main for the file (`explorer:open`), and its answer moves focus into the tab:
+ * `adopt` → `activate` → `showGroups` → `focusFront` → `EditorView.focus`, measured with a
+ * `focusin` stack. A key sent before that answer lands is taken from whatever had focus: on a
+ * loaded CI runner the answer came after F2, the rename field lost focus, its blur closed it, and
+ * the wait for the field ran out the test's 30 s.
+ *
+ * **TYTO-659 must revisit this.** Once a single click keeps focus in the explorer, focus never
+ * leaves it, and this wait fails by design with the message below.
+ */
+async function clickToOpen(name: string): Promise<void> {
+  await row(name).click();
+  try {
+    await expect.poll(focusIn, { timeout: 10_000 }).not.toMatch(/^row:/u);
+  } catch {
+    throw new Error(
+      `clicking ${name}: the open did not move focus out of the explorer; see TYTO-659 ` +
+        `(focus is on ${await focusIn()})`,
+    );
+  }
+}
+
+/** The rename field, or an error that says where focus went instead of a bare timeout. */
+async function renameField(): Promise<void> {
+  try {
+    await field().waitFor({ timeout: 10_000 });
+  } catch {
+    throw new Error(
+      `the rename field is not there: F2 never opened it, or a blur closed it (TYTO-654); ` +
+        `focus is on ${await focusIn()}`,
+    );
+  }
+}
+
 /** Each tab's label, with a `*` when it holds unsaved text. */
 const tabs = (): Promise<string[]> =>
   window.evaluate(() =>
@@ -311,10 +358,10 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
     await window.keyboard.type('::texto Mais\n');
     await expect.poll(tabs).toContain('capa.brief *');
 
-    await row('capa.brief').click();
+    await clickToOpen('capa.brief');
     await row('capa.brief').focus();
     await window.keyboard.press('F2');
-    await field().waitFor();
+    await renameField();
     await shoot('rename-inline');
     await window.keyboard.press('Control+A');
     await window.keyboard.type('abertura.brief');
@@ -334,10 +381,12 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
   }, 30_000);
 
   it('keeps the field and says why when the name is taken', async () => {
+    // A plain click: an image opens in the preview and focus stays on the row (measured), so
+    // there is no late focus to wait for here.
     await row('logo.png').click();
     await row('logo.png').focus();
     await window.keyboard.press('F2');
-    await field().waitFor();
+    await renameField();
     await window.keyboard.press('Control+A');
     await window.keyboard.type('novo.brief');
     await window.keyboard.press('Enter');
