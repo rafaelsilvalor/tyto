@@ -234,3 +234,12 @@ It never waits and retries: a window writes its record only once it listens, so 
 record never comes before its pipe. Measured on the `desktop-v0.17.0` tag: the failure there was
 the packaged suite reading an orphan record left by a launch the suite itself killed, in the
 same `TYTO_HOME`.
+
+## Amendment — 2026-11-10, TYTO-653
+
+**On Windows, decision 2 is replaced by ADR 0189.** The window listens on `127.0.0.1` with a port
+the system picks, and the record names it as `tcp://127.0.0.1:<port>`. The named pipe accepted
+SMB clients, and Node cannot refuse them. Before listening, the window restricts
+`TYTO_HOME/windows` to its owner and SYSTEM, because on TCP the token is the only gate. macOS and
+Linux keep the Unix socket. Decision 3 is unchanged, except that its last sentences about the
+pipe's ACL now apply only to records left by older windows.

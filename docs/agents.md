@@ -201,8 +201,9 @@ their MCP log; stdout carries the protocol only. The window refuses `tyto mcp` i
 panel.
 
 `tyto mcp --window [folder]` relays the same stdio to a running window instead (ADR 0180): the
-window listens on a named pipe or Unix socket announced in `TYTO_HOME/windows/<pid>.json`,
-checks the record's token on the first line, and serves the same tools through `serveAgent`.
+window listens on loopback TCP (`127.0.0.1`, Windows, ADR 0189) or a Unix socket announced in
+`TYTO_HOME/windows/<pid>.json`, checks the record's token on the first line, and serves the same
+tools through `serveAgent`.
 The status bar shows **Agent connected** while one is, and its click cuts them. Served by a
 window, the server adds `brief_in_front` and `selection` (reads of what is on screen, offered
 in any folder) and `open_file` and `show_format` (window actions, trusted folders only, asked

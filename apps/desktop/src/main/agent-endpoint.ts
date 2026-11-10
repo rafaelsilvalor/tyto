@@ -1,24 +1,26 @@
+import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { chmod, mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { rmSync } from 'node:fs';
-import { type Server, type Socket, createServer } from 'node:net';
+import { type AddressInfo, type Server, type Socket, createServer } from 'node:net';
 import { userInfo } from 'node:os';
-import { posix } from 'node:path';
+import { posix, win32 } from 'node:path';
 
 import {
   REFUSED_LINE,
   type WindowRecord,
   acceptedLine,
   checkHandshake,
-  endpointFor,
+  listenTargetFor,
+  loopbackEndpoint,
   readFirstLine,
   recordPath,
   windowsFolder,
 } from '@tyto/command-line';
 
 /**
- * The window's local endpoint for agents (ADR 0180): a named pipe on Windows, a Unix socket
- * elsewhere, announced by a record in `TYTO_HOME/windows/<pid>.json` that `tyto mcp --window`
+ * The window's local endpoint for agents (ADR 0180): a loopback TCP port on Windows (ADR 0189),
+ * a Unix socket elsewhere, announced by a record in `TYTO_HOME/windows/<pid>.json` that `tyto mcp --window`
  * reads. Each connection must open with the record's token; then it carries MCP frames, served by
  * {@link AgentEndpointOptions.serve} — the same tools `tyto mcp` serves, under the same trust.
  *
@@ -38,6 +40,35 @@ export function osUserName(): string {
   }
 }
 
+/**
+ * Makes `TYTO_HOME/windows` readable by its owner and SYSTEM only, on Windows. On TCP the token
+ * is the only gate (ADR 0189), and the record that holds it would otherwise inherit whatever
+ * `TYTO_HOME` grants: on the maintainer's machine, a read grant to a local group another tool
+ * added. `icacls` drops the inherited entries and grants those two, inheritable, so a record
+ * written there afterwards carries them from the moment it exists.
+ */
+export function restrictFolderOnWindows(folder: string, account: string): Promise<void> {
+  const icacls = win32.join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'icacls.exe');
+  const args = [
+    folder,
+    '/inheritance:r',
+    '/grant:r',
+    '*S-1-5-18:(OI)(CI)F',
+    `${account}:(OI)(CI)F`,
+  ];
+  return new Promise((resolve, reject) => {
+    execFile(icacls, args, { windowsHide: true }, (cause) => {
+      if (cause === null) resolve();
+      else reject(cause);
+    });
+  });
+}
+
+/** The account `icacls` names: `DOMAIN\user` when Windows says the domain, the user otherwise. */
+export function windowsAccount(user: string, domain: string | undefined): string {
+  return domain === undefined || domain === '' ? user : `${domain}\\${user}`;
+}
+
 export interface AgentEndpointOptions {
   /** `TYTO_HOME`. */
   readonly home: string;
@@ -54,6 +85,11 @@ export interface AgentEndpointOptions {
   readonly onConnections?: (count: number) => void;
   readonly onError?: (message: string, cause: unknown) => void;
   readonly now?: () => Date;
+  /**
+   * Restricts the records folder to its owner before the window listens (Windows only; Unix
+   * creates it 0700). The tests' seam; {@link restrictFolderOnWindows} by default.
+   */
+  readonly restrictFolder?: (folder: string) => Promise<void>;
 }
 
 export interface AgentEndpoint {
@@ -76,8 +112,9 @@ export function createAgentEndpoint(options: AgentEndpointOptions): AgentEndpoin
   const token = randomBytes(32).toString('hex');
   const startedAt = (options.now ?? (() => new Date()))().toISOString();
   const record = recordPath(options.home, options.pid, options.platform);
-  const endpoint = endpointFor(options);
-  const posixSocket = options.platform !== 'win32';
+  const target = listenTargetFor(options);
+  // A socket's path is known before it listens; a loopback port only after.
+  let endpoint: string | undefined = 'path' in target ? target.path : undefined;
   const live = new Map<Socket, AbortController>();
   let server: Server | undefined;
   let listening = false;
@@ -85,6 +122,7 @@ export function createAgentEndpoint(options: AgentEndpointOptions): AgentEndpoin
   const report = (): void => options.onConnections?.(live.size);
 
   const writeRecord = async (): Promise<void> => {
+    if (endpoint === undefined) return;
     const contents: WindowRecord = {
       version: 1,
       pid: options.pid,
@@ -133,12 +171,19 @@ export function createAgentEndpoint(options: AgentEndpointOptions): AgentEndpoin
     async start() {
       const folder = windowsFolder(options.home, options.platform);
       await mkdir(folder, { recursive: true, mode: 0o700 });
-      if (posixSocket) {
-        const socketFolder = posix.dirname(endpoint);
+      if ('path' in target) {
+        const socketFolder = posix.dirname(target.path);
         await mkdir(socketFolder, { recursive: true, mode: 0o700 });
         await chmod(socketFolder, 0o700);
         // A socket file left by a process that had this pid before refuses `listen`.
-        await rm(endpoint, { force: true });
+        await rm(target.path, { force: true });
+      } else {
+        const restrict =
+          options.restrictFolder ??
+          ((path: string) =>
+            restrictFolderOnWindows(path, windowsAccount(osUserName(), process.env['USERDOMAIN'])));
+        // Before listening: a window that cannot keep its token to its owner does not listen.
+        await restrict(folder);
       }
       server = createServer((socket) => {
         socket.on('error', () => socket.destroy());
@@ -147,13 +192,17 @@ export function createAgentEndpoint(options: AgentEndpointOptions): AgentEndpoin
       server.on('error', (cause) => options.onError?.('the agent endpoint failed', cause));
       await new Promise<void>((resolve, reject) => {
         server?.once('error', reject);
-        server?.listen(endpoint, () => {
+        const onListening = (): void => {
           server?.off('error', reject);
           resolve();
-        });
+        };
+        // Loopback only, never `0.0.0.0`, which every machine on the network could reach.
+        if ('path' in target) server?.listen(target.path, onListening);
+        else server?.listen(target.port, target.host, onListening);
       });
       listening = true;
-      if (posixSocket) await chmod(endpoint, 0o600);
+      if ('path' in target) await chmod(target.path, 0o600);
+      else endpoint = loopbackEndpoint((server.address() as AddressInfo).port);
       await writeRecord();
     },
     async folderChanged() {
@@ -174,7 +223,7 @@ export function createAgentEndpoint(options: AgentEndpointOptions): AgentEndpoin
         listening = false;
         await new Promise<void>((resolve) => server?.close(() => resolve()));
       }
-      if (posixSocket) await rm(endpoint, { force: true });
+      if ('path' in target) await rm(target.path, { force: true });
     },
     removeRecordNow() {
       rmSync(record, { force: true });
