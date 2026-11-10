@@ -5,14 +5,13 @@ import { dirname, join } from 'node:path';
 
 import { type CliEnvironment, type LocatedDiagnostic, run } from '@tyto/command-line';
 import { ok } from '@tyto/core';
-import { nodeFileSystem } from '@tyto/io';
+import { type RecipePlace, createRecipeRunner, nodeFileSystem } from '@tyto/io';
 import type { RecipeContributions, RecipeVerbContribution } from '@tyto/plugin-api';
 import type { RunClock, Table } from '@tyto/recipe';
 import { BUILT_IN_TEMPLATES_DIRECTORY } from '@tyto/templates';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createProjectSources } from './project.js';
-import { type RecipePlace, createRecipeRunner, templateManifestsOf } from './recipe-runner.js';
+import { createProjectSources, templateManifestsOf } from './project.js';
 
 /**
  * `to-brief` in the notebook (TYTO-380, ADR 0172), as main composes it: a table of three rows

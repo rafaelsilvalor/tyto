@@ -1,9 +1,8 @@
 import type { Diagnostic } from '@tyto/core';
+import type { AppliedRecord, RunnerAnswer, RunnerCell } from '@tyto/io';
 import { type CellValue, type IncludedRecipe, type Plan, type Table, cellText } from '@tyto/recipe';
 
 import { type IpcResponse, RECIPE_WIRE_LIMITS } from '../../shared/ipc.js';
-import type { AppliedRecord } from './recipe-apply.js';
-import type { RunnerAnswer, RunnerCell } from './recipe-runner.js';
 
 /**
  * A recipe run as it crosses to the window (TYTO-377, ADR 0148): each cell's first rows and how

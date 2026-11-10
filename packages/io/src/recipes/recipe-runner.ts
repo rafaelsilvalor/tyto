@@ -10,14 +10,6 @@ import {
   lineColumnAtIndex,
 } from '@tyto/core';
 import {
-  type RecipeStateOptions,
-  type WorkspaceDataOptions,
-  isInside,
-  recipeStateStore,
-  workspaceBriefPorts,
-  workspaceDataResolver,
-} from '@tyto/io';
-import {
   type DataResolver,
   type RecipeContributions,
   type RecipeRegistries,
@@ -36,20 +28,25 @@ import {
   type Step,
   type Table,
   type ViewSpecs,
+  RECIPE_VIEWS,
   parseRecipe,
   runRecipe,
 } from '@tyto/recipe';
 
-import { RECIPE_VIEWS } from '../../shared/recipe-views.js';
+import { isInside } from '../contain.js';
+import { type RecipeStateOptions, recipeStateStore } from '../recipe-state.js';
+import { workspaceBriefPorts } from '../workspace-briefs.js';
+import { type WorkspaceDataOptions, workspaceDataResolver } from '../workspace-data.js';
 
-import type { ProjectSources } from './project.js';
 import { type AppliedRecord, applyCell } from './recipe-apply.js';
 
 /**
- * The recipe notebook's runner, in main (TYTO-377, ADR 0148).
+ * The recipe notebook's runner (TYTO-377, ADR 0148), in `@tyto/io` since TYTO-664 (ADR 0188) so
+ * the desktop's main and `tyto mcp` run a recipe through the same code.
  *
  * The window sends a recipe's text on a pause in typing, on save and on Run; main runs its
- * cells and answers each one's table. What it composes is the desktop's alone: the installed
+ * cells and answers each one's table. What it composes is the host's, every adapter behind an
+ * option a test or another host overrides, with io's own as the defaults: the installed
  * plugins' verbs with each plugin's own project section asked per call (ADR 0147), the
  * workspace's data files behind the folder's trust (ADR 0137), the recipe's state **read-only**
  * (ADR 0140: a run writes no state, an applied plan does, TYTO-378), the clock in the person's
@@ -750,19 +747,6 @@ function dataFor(
     recipeFolder: directory,
     trust: place.trust,
   });
-}
-
-/**
- * `to-brief`'s templates (TYTO-380, ADR 0172), found as the preview finds a brief's `template:`
- * in the snapshot in force: an alias a plugin file names reaches its template's manifest.
- */
-export function templateManifestsOf(
-  sources: Pick<ProjectSources, 'current'>,
-): (name: string) => Promise<TemplateManifest | undefined> {
-  return (name) => {
-    const { registry, configurations } = sources.current();
-    return Promise.resolve(registry?.get(configurations.select(name)?.template ?? name));
-  };
 }
 
 /**

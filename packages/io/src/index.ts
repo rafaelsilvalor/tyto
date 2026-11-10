@@ -166,6 +166,26 @@ export {
 } from './workspace-briefs.js';
 
 export {
+  INCLUDED_RECIPE_MAX_BYTES,
+  type KeptTable,
+  type RecipeApplyInput,
+  type RecipePlace,
+  type RecipeRegistryRequest,
+  type RecipeRunInput,
+  type RecipeRunner,
+  type RecipeRunnerOptions,
+  type RunHeld,
+  type RunnerAnswer,
+  type RunnerCell,
+  type RunnerCellStatus,
+  createRecipeRunner,
+  oldestFetchedAt,
+  readOnlyState,
+} from './recipes/recipe-runner.js';
+
+export type { AppliedRecord } from './recipes/recipe-apply.js';
+
+export {
   type FsTrustStore,
   type FsTrustStoreOptions,
   TRUST_FILE,

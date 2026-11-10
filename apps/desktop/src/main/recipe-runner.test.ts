@@ -3,17 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ok } from '@tyto/core';
-import type { RecipeContributions, RecipeState, RecipeVerbContribution } from '@tyto/plugin-api';
-import type { RunClock, Table } from '@tyto/recipe';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
 import {
   type RecipePlace,
   type RecipeRunInput,
   createRecipeRunner,
   oldestFetchedAt,
   readOnlyState,
-} from './recipe-runner.js';
+} from '@tyto/io';
+import type { RecipeContributions, RecipeState, RecipeVerbContribution } from '@tyto/plugin-api';
+import type { RunClock, Table } from '@tyto/recipe';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import { recipeAnswerToWire } from './recipe-wire.js';
 
 /**

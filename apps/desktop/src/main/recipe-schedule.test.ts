@@ -3,16 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { diagnostic, ok } from '@tyto/core';
-import type { RecipeContributions } from '@tyto/plugin-api';
-import type { RunClock, Table } from '@tyto/recipe';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import {
   type RecipePlace,
   type RecipeRunInput,
   type RunnerAnswer,
   createRecipeRunner,
-} from './recipe-runner.js';
+} from '@tyto/io';
+import type { RecipeContributions } from '@tyto/plugin-api';
+import type { RunClock, Table } from '@tyto/recipe';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
   type ScheduleNotice,
   createRecipeSchedule,

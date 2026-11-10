@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { ok } from '@tyto/core';
-import { recipeStateStore } from '@tyto/io';
 import type { RecipeContributions, RecipeVerbContribution } from '@tyto/plugin-api';
 import type { JsonValue, RunClock, Table } from '@tyto/recipe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { recipeStateStore } from '../recipe-state.js';
 
 import { type RecipePlace, type RecipeRunInput, createRecipeRunner } from './recipe-runner.js';
 
