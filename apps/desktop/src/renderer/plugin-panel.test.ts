@@ -8,6 +8,8 @@ import {
   PANEL_SANDBOX,
   type PluginPanel,
   announceDocument,
+  announceLanguage,
+  frontAnnouncer,
   servePanelBridge,
 } from './plugin-panel.js';
 
@@ -196,16 +198,60 @@ describe('the bridge', () => {
     expect(bridge.request).not.toHaveBeenCalled();
   });
 
-  it('tells every open panel what the document says', async () => {
+  it('tells every open panel what the document says, its name and its format', async () => {
     const panel = await mounted();
     const posted = vi
       .spyOn(panel.frameWindow()!, 'postMessage')
       .mockImplementation(() => undefined);
 
-    announceDocument(document, '::titulo Oi');
+    announceDocument(document, { text: '::titulo Oi', name: 'aviso.brief', format: 'story' });
     expect(posted).toHaveBeenCalledWith(
-      { tyto: 'panel', type: 'event', event: 'document', text: '::titulo Oi' },
+      {
+        tyto: 'panel',
+        type: 'event',
+        event: 'document',
+        text: '::titulo Oi',
+        name: 'aviso.brief',
+        format: 'story',
+      },
       '*',
     );
+  });
+
+  it('tells every open panel the window’s language', async () => {
+    const panel = await mounted();
+    const posted = vi
+      .spyOn(panel.frameWindow()!, 'postMessage')
+      .mockImplementation(() => undefined);
+
+    announceLanguage(document, 'pt-BR');
+    expect(posted).toHaveBeenCalledWith(
+      { tyto: 'panel', type: 'event', event: 'language', language: 'pt-BR' },
+      '*',
+    );
+  });
+
+  it('announces the front again only when the tab, its name or its format changes', async () => {
+    const panel = await mounted();
+    const posted = vi
+      .spyOn(panel.frameWindow()!, 'postMessage')
+      .mockImplementation(() => undefined);
+    const announce = frontAnnouncer(document);
+    const front = { text: '::titulo Oi', name: 'aviso.brief', format: 'feed' };
+
+    announce('doc-1', front);
+    announce('doc-1', { ...front, text: '::titulo Oi de novo' });
+    expect(posted).toHaveBeenCalledTimes(1);
+
+    announce('doc-1', { ...front, format: 'story' });
+    announce('doc-1', { ...front, format: 'story', name: 'outro.brief' });
+    announce('doc-2', { ...front, format: 'story', name: 'outro.brief' });
+    expect(posted.mock.calls.map(([message]) => (message as { format: string }).format)).toEqual([
+      'feed',
+      'story',
+      'story',
+      'story',
+    ]);
+    expect(posted).toHaveBeenCalledTimes(4);
   });
 });

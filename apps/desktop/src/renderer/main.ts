@@ -137,8 +137,11 @@ import { type GalleryDialog, GALLERY_DIALOG_TAG } from './gallery-dialog.js';
 import { previewAnalysis } from './brief-analysis.js';
 import {
   type OfferedPanel,
+  type PanelDocument,
   PluginPanel,
   announceDocument,
+  announceLanguage,
+  frontAnnouncer,
   servePanelBridge,
 } from './plugin-panel.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
@@ -4687,7 +4690,8 @@ async function loadPluginPanels(bridge: TytoBridge): Promise<void> {
       bridge['panel:request']({ panelId, capability, args: [...args] }),
   });
   document.addEventListener('plugin-panel-load', () => {
-    announceDocument(document, contentOf(active()));
+    announceDocument(document, panelDocumentNow());
+    announceLanguage(document, state.locale);
   });
 
   // Answered once the plugins have started, and main has put their template packs into the
@@ -5165,6 +5169,9 @@ function applyLocale(next: Locale): void {
     paintWorkspaceBanner(elements.workspaceBanner, workspaceShown, next);
   }
   editor?.setSearchPhrases(searchPhrasesFor(state.locale));
+  // The plugins' panels are pages Tyto does not draw; a panel that follows the window's
+  // language hears it here (TYTO-660).
+  announceLanguage(document, next);
   // A recipe's cells carry the language in their key, so showing them again builds them anew.
   recipeNotebook.reshow();
   repaint();
@@ -5209,9 +5216,27 @@ function repaint(): void {
   paintCommandBar();
   paintStatusBar();
   tellMenuWhatIsOffered();
+  tellPanelsWhatIsInFront();
   if (elements.updateNotice !== null) {
     paintUpdateNotice(elements.updateNotice, updateStatus, state.locale);
   }
+}
+
+/** The document in front as a plugin's panel hears it (ADR 0045, TYTO-660). */
+function panelDocumentNow(): PanelDocument {
+  const current = active();
+  return {
+    text: contentOf(current),
+    name: current.name ?? null,
+    format: isBrief(current.kind) ? (current.selection.format ?? null) : null,
+  };
+}
+
+/** Announces the tab and format in front to the plugins' panels when they change (TYTO-660). */
+const announceFront = frontAnnouncer(document);
+
+function tellPanelsWhatIsInFront(): void {
+  announceFront(active().id, panelDocumentNow());
 }
 
 /** The menu ids main was last told to disable, joined; `undefined` before the first. */
@@ -5377,7 +5402,8 @@ async function request(
   // The panes that show it now are told to lint again by the analysis's `relint`.
   analysis.publish(documentId, { ...answer, brief });
   // The plugins' panels hear the focused document on the same pause the preview compiles on.
-  if (documentId === active().id) announceDocument(document, brief);
+  if (documentId === active().id)
+    announceDocument(document, { ...panelDocumentNow(), text: brief });
 
   const errors = errorCount(answer.diagnostics);
 

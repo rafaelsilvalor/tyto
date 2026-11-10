@@ -421,7 +421,7 @@ export const ptBR: Catalogue = {
   'plugins.status.crashed': 'travou',
   'plugins.permissions.none': 'nenhuma',
   'plugins.panel.readsDocument':
-    'O painel dele recebe o texto do brief aberto sempre que ele muda, sem pedir permissão.',
+    'O painel dele recebe o texto, o nome e o formato mostrado do brief aberto sempre que mudam, sem pedir permissão.',
   'plugins.font.sendsMachineFaces':
     'Os templates em código dele recebem os arquivos destas fontes instaladas neste computador, que podem ser licenciadas para você e não para o autor do plugin:',
   'plugins.workspace.reads':

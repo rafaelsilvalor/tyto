@@ -24,9 +24,13 @@ import { DockedPanel } from './panels.js';
  * not have — a `plugin`, a `panelId` — is refused with that answer rather than relayed, so a
  * page that tries to name another plugin hears no and never waits (ADR 0173). `call`, with
  * `args: [method, params]`, asks the panel's own plugin's process. A message from anything
- * that is not one of these iframes is ignored. The page hears `{ type: 'event', event: 'document', text }`
- * whenever the open brief changes: **the document's text leaves the editor for the plugin's
- * code**, which is stated in ADR 0045 and on the plugins screen.
+ * that is not one of these iframes is ignored. The page hears
+ * `{ type: 'event', event: 'document', text, name, format }` whenever the open brief changes:
+ * **the document's text leaves the editor for the plugin's code**, which is stated in ADR 0045
+ * and on the plugins screen. `name` and `format` (TYTO-660) are the tab's name and the format
+ * the preview shows, so a panel can say what is in front; and `{ type: 'event', event:
+ * 'language', language }` when the panel loads and whenever the window's language changes, so
+ * a panel can speak it.
  */
 
 export type OfferedPanel = IpcResponse<'plugins:panels'>['panels'][number];
@@ -154,11 +158,45 @@ export function servePanelBridge(
   });
 }
 
-/** Tells every open panel what the open document now says. */
-export function announceDocument(root: ParentNode, text: string): void {
+/** What a panel hears about the document in front (ADR 0045; `name` and `format` since TYTO-660). */
+export interface PanelDocument {
+  /** The text in the editor, typed and unsaved included. */
+  readonly text: string;
+  /** The tab's name; null for a brief never saved. */
+  readonly name: string | null;
+  /** The format the preview shows; null when it shows none, or the tab is not a brief. */
+  readonly format: string | null;
+}
+
+function tellPanels(root: ParentNode, event: Record<string, unknown>): void {
   for (const panel of openPanels(root)) {
-    panel
-      .frameWindow()
-      ?.postMessage({ tyto: 'panel', type: 'event', event: 'document', text }, '*');
+    panel.frameWindow()?.postMessage({ tyto: 'panel', type: 'event', ...event }, '*');
   }
+}
+
+/** Tells every open panel what the open document now says, and what it is. */
+export function announceDocument(root: ParentNode, front: PanelDocument): void {
+  tellPanels(root, { event: 'document', text: front.text, name: front.name, format: front.format });
+}
+
+/** Tells every open panel the window's language (`en`, `pt-BR`), which a panel may follow. */
+export function announceLanguage(root: ParentNode, language: string): void {
+  tellPanels(root, { event: 'language', language });
+}
+
+/**
+ * Tells the panels when another tab comes to the front, or the preview shows another format
+ * (TYTO-660). Called on every repaint, so it announces only when the tab, its name or its format
+ * changed since the last time: the text alone is announced on the preview's pause in typing.
+ */
+export function frontAnnouncer(
+  root: ParentNode,
+): (documentId: string, front: PanelDocument) => void {
+  let sent: string | undefined;
+  return (documentId, front) => {
+    const key = JSON.stringify([documentId, front.name, front.format]);
+    if (key === sent) return;
+    sent = key;
+    announceDocument(root, front);
+  };
 }

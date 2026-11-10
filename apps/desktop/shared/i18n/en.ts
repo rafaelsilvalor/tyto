@@ -418,7 +418,7 @@ export const en: Catalogue = {
   'plugins.status.crashed': 'crashed',
   'plugins.permissions.none': 'none',
   'plugins.panel.readsDocument':
-    'Its panel receives the text of the open brief whenever it changes, with no permission asked.',
+    "Its panel receives the open brief's text, name and shown format whenever they change, with no permission asked.",
   'plugins.font.sendsMachineFaces':
     "Its code templates are sent the files of these faces installed on this computer, which may be licensed to you and not to the plugin's author:",
   'plugins.workspace.reads':

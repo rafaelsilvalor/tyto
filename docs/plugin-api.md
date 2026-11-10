@@ -254,11 +254,16 @@ parent.postMessage(
   '*',
 );
 // answer: { tyto: 'panel', type: 'response', id: 1, ok: true, value } | { ok: false, code, message }
-// hear: { tyto: 'panel', type: 'event', event: 'document', text } on every pause in typing
+// hear: { tyto: 'panel', type: 'event', event: 'document', text, name, format } on every pause
+// in typing and whenever another tab or format comes to the front (name and format may be null)
+// hear: { tyto: 'panel', type: 'event', event: 'language', language } ('en' | 'pt-BR') when the
+// panel loads and whenever the window's language changes
 ```
 
-**A panel receives the open brief's text**, with no permission asked, and the plugins screen
-says so on that plugin's row. A panel's `fetch` answers with the body as text. **A panel may store
+**A panel receives the open brief's text, name and shown format**, with no permission asked,
+and the plugins screen says so on that plugin's row. It also hears the window's language, so a
+panel can speak it; an older Tyto sends neither `name`, `format` nor `language`, so a page falls
+back when they are absent. A panel's `fetch` answers with the body as text. **A panel may store
 and forget its own plugin's declared keys** (ADR 0134, extending ADR 0045), under the same check
 and ceiling as the plugin's process; it still reads only what `credentials` reads, and nothing of
 another plugin's.

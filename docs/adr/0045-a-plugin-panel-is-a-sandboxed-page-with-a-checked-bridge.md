@@ -88,3 +88,13 @@ one panel shown.)
 - `panelPolicy` allows `'unsafe-inline'` styles and not inline scripts. A panel ships its script
   as a file.
 - A panel's `fetch` answer carries the body as text, not bytes.
+
+## Note, 2026-11-10 — the page hears the brief's name and format, and the language (TYTO-660)
+
+The `document` event now also carries `name` (the tab's name, null for a brief never saved) and
+`format` (the format the preview shows, null when none), and it is sent as well when another tab
+or format comes to the front, not only on a pause in typing. A second event,
+`{ type: 'event', event: 'language', language }`, is sent when a panel loads and whenever the
+window's language changes, so a panel can follow it as the rest of the window does. Both are
+additive: a page written for the first shape keeps working, and a page for the new one falls
+back when a field is absent. The plugins screen's disclosure names the name and format too.
