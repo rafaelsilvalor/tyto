@@ -1,7 +1,7 @@
 # Connect an AI agent
 
 ::: info How this page was checked
-Every command was run on 2026-11-09 on a development build of the branch that added it (TYTO-565, CLI 0.10.9) on Windows 11, with a small agent stand-in that speaks the protocol the way Claude Code does. The outputs below are copied from those runs. The section on the open window was run the same way on the branch that added it (TYTO-566). The section on Tyto's terminal was run by the project's automated tests on the branch that added it (TYTO-567), and its log line copied from that run; the two `claude mcp add` lines were not run, and their folders are the installers' defaults, read in their configuration. The section on changing files was checked by the project's automated tests on the branch that added it (TYTO-565, 2026-11-10); no output in it was copied from a run by hand.
+Every command was run on 2026-11-09 on a development build of the branch that added it (TYTO-565, CLI 0.10.9) on Windows 11, with a small agent stand-in that speaks the protocol the way Claude Code does. The outputs below are copied from those runs. The section on the open window was run the same way on the branch that added it (TYTO-566). The section on Tyto's terminal was run by the project's automated tests on the branch that added it (TYTO-567), and its log line copied from that run; the two `claude mcp add` lines were not run, and their folders are the installers' defaults, read in their configuration. The section on changing files was checked by the project's automated tests on the branch that added it (TYTO-565, 2026-11-10); no output in it was copied from a run by hand. The section on a template's guide and examples was checked the same way (TYTO-565, 2026-11-10).
 :::
 
 `tyto mcp` lets an AI agent such as Claude Code or Claude Desktop work with a project folder: list its templates, read what a template expects, check a brief for errors and look at a preview of the artwork, before it shows you anything. It speaks the [Model Context Protocol](https://modelcontextprotocol.io), the way those agents reach a program on your computer.
@@ -123,6 +123,17 @@ In a folder you have [trusted](../editor/workspace-folder.md), the agent can als
 - **Export** a brief's artwork. The files go where your folder says, never where the agent says: an export preset's folder, the delivery's export folder, or the folder's `output`. If none is set, it is refused. Cancelling the request in the agent stops the export after the slides already being drawn.
 
 **A brief in a folder you have open in a Tyto window is not replaced.** The window keeps the text it opened, and its next save would erase the agent's change without a word. The agent is told to propose the change in the window instead, with `tyto mcp --window`, where you accept or reject it. It can still create a new brief there.
+
+## Teach it how a template is written
+
+A template's fields say what goes where, not how your text becomes a brief. A template can carry that in its own folder, and the agent reads it before writing:
+
+- **A guide**: a `guide.md` beside the template's `manifest.yaml`, in the author's words: which part of a text goes into which field, how a long list is split across slides, and the mistakes already made. See [Writing templates](https://github.com/rafaelsilvalor/tyto/blob/main/docs/template-authoring.md) for what to put in it.
+- **Examples**: the briefs in the template's `examples` folder.
+
+The agent finds both in the list of resources Tyto offers, and many agents also show a ready-made request, **Shape copy into a brief** (`model_brief`): you paste the text and name the template, and the agent gets the steps, the template's fields, its guide and its examples in one go. Without a template, it gets the list of templates to choose from.
+
+A guide is cut at 64 KB and an example at 16 KB, with a line saying so, and only the first eight examples are offered. **In a folder you have not trusted, its own templates offer no guide and no examples**: a guide is text written to instruct an agent, and nobody vouched for this folder. The templates that come with Tyto and the ones plugins add keep theirs.
 
 ## What stays out of its reach
 

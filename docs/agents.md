@@ -162,6 +162,12 @@ write nothing. In a folder nobody trusted, the folder's plugin files are not loa
 only where the workspace says, and a brief in a folder a live window has open is not replaced
 (propose it through `--window` instead).
 
+It also serves what each template's folder says about writing a brief for it (ADR 0186): the
+resources `tyto://template/<name>/guide` (its `guide.md`) and `tyto://template/<name>/examples/<file>`
+(its `examples/*.brief`), capped at 64 KiB per guide, 16 KiB per example and eight examples, and
+the prompt `model_brief(copy, template?)`, which puts the steps, the template's slots, skeleton,
+guide and examples in front of the copy. A restricted folder's own templates serve neither.
+
 The command is the built CLI, `node <repository>/apps/cli/dist/index.js` (`pnpm cli` builds it).
 
 Name the project folder as the argument: a host may start the server in a folder of its own

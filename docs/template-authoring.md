@@ -10,6 +10,8 @@ promo-curso/
   template.html     layout in Tyto markup (recommended) …
   template.ts       … or in TypeScript (heavy logic). One of the two.
   assets/           fonts, fixed images
+  examples/         briefs written for it, served to agents as examples (ADR 0186)
+  guide.md          how a person's copy becomes a brief for it, for agents; optional
   preview.png
 ```
 
@@ -989,6 +991,27 @@ built-in pack or in its own repository.
 
 Unsaved template work counts for the quit question as one more unsaved document, and closing the
 mode over it asks first.
+
+## guide.md — teaching an agent to write the brief
+
+The manifest says what each slot is; it does not say how somebody's raw copy maps onto it. That
+is what an optional `guide.md` beside `manifest.yaml` is for (ADR 0186). `tyto mcp` serves it to
+an agent as the resource `tyto://template/<name>/guide` and puts it, with the briefs in
+`examples/`, in the `model_brief` prompt, after the template's slots and skeleton and before the
+copy. It is plain Markdown, read as text and never run; `tyto template check` does not read it.
+
+Write it for an agent that has the manifest and the examples but has never seen the piece:
+
+- what the piece is for, in one sentence;
+- which part of typical copy goes into which slot, and what to drop;
+- how a long list is split across repeated slots (slides), and how much fits in one, saying
+  whether that was measured or read off an example;
+- the mistakes already made, each with the copy that caused it.
+
+Keep it under 64 KiB, and each example under 16 KiB; the server cuts past that and says so, and
+serves the first eight examples by file name. A guide or an example reached through a link that
+leads out of the template's folder is not served. In a restricted workspace, a template that
+the folder itself supplies serves neither: a guide is text that instructs an agent.
 
 ## Agent workflow
 

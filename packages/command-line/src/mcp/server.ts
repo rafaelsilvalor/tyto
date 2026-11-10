@@ -1,10 +1,11 @@
-import { McpServer } from '@modelcontextprotocol/server';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 
 import type { CliConsole, CliStdio } from '../environment.js';
 import type { BriefInput, McpSession } from './session.js';
 import { confinedPath } from './confine.js';
+import { chooseTemplatePrompt, exampleUri, guideUri, modelBriefPrompt } from './prompt.js';
 import {
   type McpToolName,
   PREVIEW_MAX_SIDE,
@@ -100,7 +101,10 @@ export function createMcpServer(
   err: CliConsole['err'],
   window?: WindowPort,
 ): McpServer {
-  const server = new McpServer({ name: 'tyto', version }, { capabilities: { tools: {} } });
+  const server = new McpServer(
+    { name: 'tyto', version },
+    { capabilities: { tools: {}, resources: {}, prompts: {} } },
+  );
   const offered = new Set(toolsFor(session.trust, { window: window !== undefined }));
   const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   const offers = (name: McpToolName): boolean => offered.has(name);
@@ -201,10 +205,123 @@ export function createMcpServer(
     );
   }
 
+  registerGuidance(server, session);
   registerWriteTools(server, session, offers, err);
   if (window !== undefined) registerWindowTools(server, session, window, offers, err);
 
   return server;
+}
+
+/** One value of a URI template's variable; the SDK hands a list for an exploded one. */
+const single = (value: string | string[] | undefined): string =>
+  decodeURIComponent(Array.isArray(value) ? (value[0] ?? '') : (value ?? ''));
+
+/**
+ * What each template's own folder says about writing a brief for it (ADR 0186): its `guide.md`
+ * and example briefs as resources, and the `model_brief` prompt that puts them in front of the
+ * copy. All of it reads; none of it is a tool, so trust decides per template what is served, not
+ * whether the resources exist.
+ */
+function registerGuidance(server: McpServer, session: McpSession): void {
+  const refused = (cause: unknown): never => {
+    // A resource read has no `isError`: a refusal travels as the request's error, with its
+    // sentence as the message.
+    throw new Error(cause instanceof Error ? cause.message : String(cause));
+  };
+
+  async function served(): Promise<readonly Awaited<ReturnType<McpSession['templateGuidance']>>[]> {
+    const templates = await session.listTemplates();
+    return Promise.all(templates.map((template) => session.templateGuidance(template.name)));
+  }
+
+  server.registerResource(
+    'template-guide',
+    new ResourceTemplate('tyto://template/{name}/guide', {
+      list: async () => ({
+        resources: (await served())
+          .filter((guidance) => guidance.guide !== undefined)
+          .map((guidance) => ({
+            uri: guideUri(guidance.name),
+            name: `${guidance.name} guide`,
+            mimeType: 'text/markdown',
+            description: `How to write a brief for ${guidance.name}, from the template's own guide.md`,
+          })),
+      }),
+    }),
+    {
+      title: "A template's guide",
+      description:
+        "How to write a brief for one template, in its author's words: the template's own guide.md, as text. Not served for a template a restricted folder supplies.",
+      mimeType: 'text/markdown',
+    },
+    async (uri, variables) => {
+      const guidance = await session.templateGuidance(single(variables['name'])).catch(refused);
+      if (guidance.withheld !== undefined) refused(guidance.withheld);
+      if (guidance.guide === undefined) refused(`template '${guidance.name}' ships no guide.md`);
+      return {
+        contents: [{ uri: uri.href, mimeType: 'text/markdown', text: guidance.guide?.text ?? '' }],
+      };
+    },
+  );
+
+  server.registerResource(
+    'template-example',
+    new ResourceTemplate('tyto://template/{name}/examples/{file}', {
+      list: async () => ({
+        resources: (await served()).flatMap((guidance) =>
+          guidance.examples.map((example) => ({
+            uri: exampleUri(guidance.name, example.file),
+            name: `${guidance.name} example ${example.file}`,
+            mimeType: 'text/plain',
+          })),
+        ),
+      }),
+    }),
+    {
+      title: "A template's example brief",
+      description:
+        'One example brief a template ships in its examples folder, as text. Not served for a template a restricted folder supplies.',
+      mimeType: 'text/plain',
+    },
+    async (uri, variables) => {
+      const file = single(variables['file']);
+      const guidance = await session.templateGuidance(single(variables['name'])).catch(refused);
+      if (guidance.withheld !== undefined) refused(guidance.withheld);
+      const example = guidance.examples.find((item) => item.file === file);
+      if (example === undefined) {
+        refused(`template '${guidance.name}' serves no example '${file}'`);
+      }
+      return { contents: [{ uri: uri.href, mimeType: 'text/plain', text: example?.text ?? '' }] };
+    },
+  );
+
+  server.registerPrompt(
+    'model_brief',
+    {
+      title: 'Shape copy into a brief',
+      description:
+        "Turns raw copy into a brief: the steps in Tyto's tools, then the template's formats, slots, skeleton, guide and examples. Without a template, lists the templates to choose from.",
+      argsSchema: z.object({
+        copy: z.string().describe('the raw text the piece should say'),
+        template: z
+          .string()
+          .optional()
+          .describe('the template, as list_templates names it; leave out to choose one first'),
+      }),
+    },
+    async ({ copy, template }) => {
+      const prompt =
+        template === undefined || template === ''
+          ? chooseTemplatePrompt(copy, await session.listTemplates())
+          : modelBriefPrompt(copy, {
+              guidance: await session.templateGuidance(template).catch(refused),
+              description: await session.describeTemplate(template).catch(refused),
+            });
+      return {
+        messages: [{ role: 'user' as const, content: { type: 'text' as const, text: prompt } }],
+      };
+    },
+  );
 }
 
 const dryRun = z.boolean().optional().describe('true: answer what would change and write nothing');

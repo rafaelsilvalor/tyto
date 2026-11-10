@@ -827,3 +827,128 @@ describe('the tools that write', () => {
     expect(await framesExported(false)).toBe(3);
   }, 30_000);
 });
+
+/**
+ * A template's own guide and examples (ADR 0186), as resources and in the `model_brief` prompt:
+ * served for a trusted workspace's templates and the built-in pack's, withheld for a restricted
+ * folder's own.
+ */
+describe('the guidance a template ships', () => {
+  const GUIDE = '# cartaz\n\nOne slide per line of the copy.\n';
+  const EXAMPLE = '---\ntemplate: cartaz\n---\n::slide\n  One\n';
+
+  beforeEach(async () => {
+    const template = join(folder, 'templates', 'cartaz');
+    await writeFile(join(template, 'guide.md'), GUIDE);
+    await mkdir(join(template, 'examples'), { recursive: true });
+    await writeFile(join(template, 'examples', 'one.brief'), EXAMPLE);
+  });
+
+  interface ResourceList {
+    resources: { uri: string }[];
+  }
+  interface ResourceRead {
+    contents: { uri: string; text: string }[];
+  }
+  interface PromptAnswer {
+    messages: { role: string; content: { type: string; text: string } }[];
+  }
+
+  async function trustedHome(): Promise<string> {
+    const home = await mkdtemp(join(tmpdir(), 'tyto-mcp-home-'));
+    await mkdir(join(folder, '.tyto'), { recursive: true });
+    await writeFile(join(folder, '.tyto', 'project.json'), '{}');
+    const trusted = await run(['trust', 'add', folder], {
+      console: { out: () => undefined, err: () => undefined },
+      version: '0.0.0-test',
+      cwd: folder,
+      home,
+      confirm: () => Promise.resolve(true),
+      rasterizer: () => fakeRasterizer(),
+    });
+    expect(trusted).toBe(EXIT_OK);
+    return home;
+  }
+
+  it('serves the guide and examples of a trusted folder’s template, and puts them in the prompt', async () => {
+    const home = await trustedHome();
+    try {
+      const client = connect({ home });
+      await client.start();
+
+      const listed = (await client.request('resources/list')).result as unknown as ResourceList;
+      const uris = listed.resources.map((resource) => resource.uri);
+      expect(uris).toContain('tyto://template/cartaz/guide');
+      expect(uris).toContain('tyto://template/cartaz/examples/one.brief');
+
+      const guide = (
+        await client.request('resources/read', {
+          uri: 'tyto://template/cartaz/guide',
+        })
+      ).result as unknown as ResourceRead;
+      expect(guide.contents[0]?.text).toBe(GUIDE);
+      const example = (
+        await client.request('resources/read', {
+          uri: 'tyto://template/cartaz/examples/one.brief',
+        })
+      ).result as unknown as ResourceRead;
+      expect(example.contents[0]?.text).toBe(EXAMPLE);
+
+      const prompt = (
+        await client.request('prompts/get', {
+          name: 'model_brief',
+          arguments: { copy: 'COPY-TO-SHAPE', template: 'cartaz' },
+        })
+      ).result as unknown as PromptAnswer;
+      const text = prompt.messages[0]?.content.text ?? '';
+      expect(text).toContain('One slide per line of the copy.');
+      expect(text).toContain('::slide\n  One');
+      expect(text).toContain('template: cartaz');
+      expect(text).toContain('COPY-TO-SHAPE');
+      await client.stop();
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('withholds them for a restricted folder’s own template, and says why', async () => {
+    await restrictedWorkspace();
+    const client = connect();
+    await client.start();
+
+    const listed = (await client.request('resources/list')).result as unknown as ResourceList;
+    const uris = listed.resources.map((resource) => resource.uri);
+    expect(uris.filter((uri) => uri.startsWith('tyto://template/cartaz/'))).toEqual([]);
+    // The built-in pack is no text this folder supplies: its examples are still served.
+    expect(uris.some((uri) => /^tyto:\/\/template\/[^/]+\/examples\//u.test(uri))).toBe(true);
+
+    const read = await client.request('resources/read', { uri: 'tyto://template/cartaz/guide' });
+    expect(read.result).toBeUndefined();
+    expect(JSON.stringify(read.error)).toContain('restricted folder');
+
+    const prompt = (
+      await client.request('prompts/get', {
+        name: 'model_brief',
+        arguments: { copy: 'COPY', template: 'cartaz' },
+      })
+    ).result as unknown as PromptAnswer;
+    const text = prompt.messages[0]?.content.text ?? '';
+    expect(text).toContain('Not served: this template comes from a restricted folder');
+    expect(text).not.toContain('One slide per line');
+    expect(client.lines.join('\n')).not.toContain('One slide per line');
+    await client.stop();
+  }, 30_000);
+
+  it('lists the templates to choose from when the prompt names none', async () => {
+    const client = connect();
+    await client.start();
+    const prompt = (
+      await client.request('prompts/get', {
+        name: 'model_brief',
+        arguments: { copy: 'COPY' },
+      })
+    ).result as unknown as PromptAnswer;
+    expect(prompt.messages[0]?.content.text).toContain('- cartaz — A template with no text');
+    await client.stop();
+  }, 30_000);
+});
