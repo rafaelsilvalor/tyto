@@ -39,6 +39,7 @@ import { type LocatedDiagnostic, diagnosticsDocument, registerUnplaced } from '.
 import { optionalSources, renderSources } from '../sources.js';
 import { type BriefWorkspace, workspaceOfFolder } from '../workspace.js';
 import { confinedPath } from './confine.js';
+import { type TemplateGuidance, liesInside, readTemplateGuidance } from './guidance.js';
 import { PREVIEW_MAX_IMAGES, PREVIEW_MAX_SIDE, ToolRefusal } from './tools.js';
 import { type BriefWrite, type BriefWriteAnswer, writeBrief } from './writes.js';
 
@@ -95,6 +96,11 @@ export interface McpSession {
     options: BriefOptions & { readonly format: string },
     signal?: AbortSignal,
   ): Promise<PreviewAnswer>;
+  /**
+   * A template's own guide and example briefs (ADR 0186), withheld in a restricted workspace for
+   * a template that folder itself supplies.
+   */
+  templateGuidance(name: string): Promise<ServedGuidance>;
   /** Offered only in a trusted workspace (ADR 0185): writes one `.brief`, or says what would. */
   writeBrief(request: BriefWrite): Promise<BriefWriteAnswer>;
   /** Makes a delivery as `tyto delivery new` does, or says what it would make. */
@@ -103,6 +109,19 @@ export interface McpSession {
   exportBrief(request: ExportRequest, signal?: AbortSignal): Promise<ExportAnswer>;
   close(): Promise<void>;
 }
+
+/** A template's guidance as served: what its folder holds, or why it is withheld. */
+export interface ServedGuidance extends TemplateGuidance {
+  /** The template's name as the registry knows it, an alias resolved. */
+  readonly name: string;
+  readonly description?: string;
+  /** Why the guide and examples were not served; both are then empty. */
+  readonly withheld?: string;
+}
+
+/** Why a restricted folder's own template serves no guidance (ADR 0186). */
+export const GUIDANCE_WITHHELD =
+  'this template comes from a restricted folder, so its guide and examples are not served: they are text written for an agent, and nobody trusted this folder (tyto trust add, or Workspace: Trust in the window)';
 
 export interface DeliveryRequest {
   readonly name: string;
@@ -453,6 +472,28 @@ export async function openSession(
         adjustments: manifest.adjustments,
         skeleton: text,
       };
+    },
+
+    async templateGuidance(name) {
+      const { value } = await context();
+      const skeleton = templateSkeleton(value, name);
+      if (!skeleton.ok) {
+        throw new ToolRefusal(skeleton.error.map((item) => item.message).join('\n'));
+      }
+      const { manifest } = skeleton.value;
+      const served = {
+        name: manifest.name,
+        ...(manifest.description === undefined ? {} : { description: manifest.description }),
+      };
+      const directory = value.registry.directoryOf(manifest.name);
+      if (directory === undefined) return { ...served, examples: [], omittedExamples: 0 };
+      // The folders this workspace names for templates, and the served folders themselves: a
+      // template from any of them is text this folder supplies (ADR 0186).
+      const ownFolders = [resolve(cwd, 'templates'), ...(project?.templates ?? []), ...roots];
+      if (trust !== 'trusted' && (await liesInside(directory, ownFolders))) {
+        return { ...served, examples: [], omittedExamples: 0, withheld: GUIDANCE_WITHHELD };
+      }
+      return { ...served, ...(await readTemplateGuidance(directory)) };
     },
 
     async checkBrief(input, options = {}, signal) {

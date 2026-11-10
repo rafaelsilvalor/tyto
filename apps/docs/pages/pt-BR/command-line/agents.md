@@ -1,7 +1,7 @@
 # Conectar um agente de IA
 
 ::: info Como esta página foi conferida
-Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções. A seção sobre a janela aberta foi executada do mesmo jeito na branch que a criou (TYTO-566). A seção sobre o terminal do Tyto rodou pelos testes automáticos do projeto na branch que a criou (TYTO-567), e a linha de log foi copiada dessa execução; as duas linhas `claude mcp add` não foram executadas, e as pastas delas são as padrão dos instaladores, lidas na configuração deles. A seção sobre mudar arquivos foi conferida pelos testes automáticos do projeto na branch que a criou (TYTO-565, 2026-11-10); nenhuma saída nela foi copiada de uma execução à mão.
+Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções. A seção sobre a janela aberta foi executada do mesmo jeito na branch que a criou (TYTO-566). A seção sobre o terminal do Tyto rodou pelos testes automáticos do projeto na branch que a criou (TYTO-567), e a linha de log foi copiada dessa execução; as duas linhas `claude mcp add` não foram executadas, e as pastas delas são as padrão dos instaladores, lidas na configuração deles. A seção sobre mudar arquivos foi conferida pelos testes automáticos do projeto na branch que a criou (TYTO-565, 2026-11-10); nenhuma saída nela foi copiada de uma execução à mão. A seção sobre o guia e os exemplos de um template foi conferida do mesmo jeito (TYTO-565, 2026-11-10).
 :::
 
 `tyto mcp` deixa um agente de IA, como o Claude Code ou o Claude Desktop, trabalhar com uma pasta de projeto: listar os templates, ler o que um template espera, conferir os erros de um brief e olhar a prévia da arte, antes de mostrar qualquer coisa a você. Ele fala o [Model Context Protocol](https://modelcontextprotocol.io), o jeito como esses agentes alcançam um programa no seu computador.
@@ -123,6 +123,17 @@ Numa pasta em que você [confiou](../editor/workspace-folder.md), o agente tamb�
 - **Exportar** a arte de um brief. Os arquivos vão para onde a sua pasta diz, nunca para onde o agente diz: a pasta de um preset de exportação, a pasta de exportação da entrega ou o `output` da pasta. Sem nenhum dos três, é recusado. Cancelar o pedido no agente para a exportação depois dos slides que já estão sendo desenhados.
 
 **Um brief numa pasta que você tem aberta numa janela do Tyto não é substituído.** A janela fica com o texto que abriu, e o próximo salvar dela apagaria a mudança do agente sem aviso. O agente é orientado a propor a mudança na janela, com `tyto mcp --window`, onde você aceita ou rejeita. Ele ainda pode criar um brief novo ali.
+
+## Ensine como um template se escreve
+
+Os campos de um template dizem o que vai onde, não como o seu texto vira um brief. Um template pode trazer isso na própria pasta, e o agente lê antes de escrever:
+
+- **Um guia**: um `guide.md` ao lado do `manifest.yaml` do template, nas palavras de quem o fez: que parte de um texto vai em que campo, como uma lista longa se divide em lâminas e os erros que já aconteceram. [Writing templates](https://github.com/rafaelsilvalor/tyto/blob/main/docs/template-authoring.md) diz o que pôr nele.
+- **Exemplos**: os briefs da pasta `examples` do template.
+
+O agente encontra os dois na lista de recursos que o Tyto oferece, e muitos agentes também mostram um pedido pronto, **Shape copy into a brief** (`model_brief`): você cola o texto e diz o template, e o agente recebe de uma vez os passos, os campos do template, o guia e os exemplos. Sem template, ele recebe a lista de templates para escolher.
+
+Um guia é cortado em 64 KB e um exemplo em 16 KB, com uma linha dizendo isso, e só os oito primeiros exemplos são oferecidos. **Numa pasta em que você não confiou, os templates dela mesma não oferecem guia nem exemplos**: um guia é texto escrito para instruir um agente, e ninguém respondeu por essa pasta. Os templates que vêm com o Tyto e os que os plugins trazem continuam com os seus.
 
 ## O que fica fora do alcance dele
 

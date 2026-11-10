@@ -142,3 +142,9 @@ has the sizes.
 
 The writes of decision 2 land as `write_brief`, `new_delivery` and `export`, under decision 3's
 rule; ADR 0185 decides what they may write, where, and how a change is shown first.
+
+## Amendment — 2026-11-10, TYTO-565 PR 3
+
+The prompts and resources of decision 2 land as `model_brief` and two resources per template,
+its `guide.md` and its example briefs; ADR 0186 decides where they come from and why a
+restricted folder's own template serves neither.
