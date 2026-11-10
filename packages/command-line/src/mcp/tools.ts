@@ -42,6 +42,7 @@ export const MCP_TOOLS = [
   { name: 'write_brief', access: 'write' },
   { name: 'new_delivery', access: 'write' },
   { name: 'export', access: 'write' },
+  { name: 'run_recipe', access: 'write' },
   { name: 'brief_in_front', access: 'window-read' },
   { name: 'selection', access: 'window-read' },
   { name: 'open_file', access: 'window-action' },

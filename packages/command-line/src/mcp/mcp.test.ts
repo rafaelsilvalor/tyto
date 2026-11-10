@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
+import { ok } from '@tyto/core';
+import type { RecipeContributions, RecipeVerbContribution } from '@tyto/plugin-api';
 import type { RasterOptions, Rasterizer } from '@tyto/raster';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -10,7 +12,7 @@ import type { CliEnvironment } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK } from '../exit.js';
 import { run } from '../program.js';
 import { NO_STDIO } from './command.js';
-import { openSession } from './session.js';
+import { RECIPE_RUN_FIRST, openSession } from './session.js';
 import { recordPath } from './window-endpoint.js';
 import { MCP_TOOLS, PREVIEW_MAX_SIDE, toolsFor } from './tools.js';
 
@@ -518,7 +520,7 @@ describe('the tools that write', () => {
       true,
     );
     await client.stop();
-    for (const name of ['write_brief', 'new_delivery', 'export']) {
+    for (const name of ['write_brief', 'new_delivery', 'export', 'run_recipe']) {
       expect(toolsFor('restricted')).not.toContain(name);
     }
   }, 30_000);
@@ -825,6 +827,185 @@ describe('the tools that write', () => {
 
   it('control: export every artwork when nobody cancels', async () => {
     expect(await framesExported(false)).toBe(3);
+  }, 30_000);
+
+  /**
+   * `run_recipe` (ADR 0185, note of 2026-11-10). No generic verb starts a table, so the recipe
+   * reads a neutral source, `demo.rows`, handed to the session as its recipe verbs; then
+   * `compose` writes a column and `to-brief` plans one brief per row into the workspace
+   * (ADR 0172), which only an apply writes.
+   */
+  const RECIPE = [
+    'recipe lessons',
+    // Applied on Run in the window; an agent's call only plans it (ADR 0170).
+    'apply auto',
+    'demo.rows',
+    'compose title="Lesson {topic|trim}"',
+    'to-brief template=cartaz into=../briefs name=key slots=slide:title',
+    '',
+  ].join('\n');
+
+  const lesson = (key: string, topic: string) => ({
+    key,
+    values: { key, topic },
+    provenance: { source: 'demo', id: key, fetchedAt: '2026-11-10T09:00:00.000Z' },
+  });
+
+  /** The neutral source, and every section a call of it was handed. */
+  function demoVerbs() {
+    const sections: unknown[] = [];
+    const rows: RecipeVerbContribution = {
+      id: 'demo.rows',
+      kind: 'source',
+      arguments: [],
+      page: (request) => {
+        sections.push(request.section);
+        return Promise.resolve(
+          ok({
+            table: {
+              columns: [
+                { name: 'key', type: 'text', origin: 'demo' },
+                { name: 'topic', type: 'text', origin: 'demo' },
+              ],
+              rows: [lesson('one', 'Openings'), lesson('two', 'Endings')],
+            },
+          }),
+        );
+      },
+    };
+    const contributions: RecipeContributions = {
+      recipeVerbs: () => [rows],
+      ownedRecipeVerbs: () => [{ plugin: 'someplugin', verb: rows }],
+      recipeDerivations: () => [],
+    };
+    return { contributions, sections };
+  }
+
+  async function recipeWorkspace(): Promise<void> {
+    // A section with a value no answer may carry (ADR 0179 decision 4).
+    await writeFile(
+      join(folder, '.tyto', 'project.json'),
+      JSON.stringify({ output: 'exports', plugins: { someplugin: { token: SECRET } } }),
+    );
+    await mkdir(join(folder, 'recipes'), { recursive: true });
+    await writeFile(join(folder, 'recipes', 'lessons.recipe'), RECIPE);
+  }
+
+  const recipeSession = (contributions: RecipeContributions) =>
+    openSession(
+      {
+        console: { out: () => undefined, err: () => undefined },
+        version: '0.0.0-test',
+        cwd: folder,
+        home,
+        rasterizer: () => fakeRasterizer(),
+      },
+      { recipeContributions: contributions },
+    );
+
+  it('run a recipe and answer its table, writing nothing, and apply a plan only by the id the run showed', async () => {
+    await recipeWorkspace();
+    const demo = demoVerbs();
+    const session = await recipeSession(demo.contributions);
+    try {
+      const ran = await session.runRecipe({ path: 'recipes/lessons.recipe' });
+      if (!('cells' in ran)) throw new Error('a run answers its cells');
+      // The source was handed its section, and no answer carries it.
+      expect(demo.sections).toEqual([{ token: SECRET }]);
+      expect(JSON.stringify(ran)).not.toContain(SECRET);
+      expect(JSON.stringify(ran)).not.toContain('payload');
+      expect(ran.applied).toBe(false);
+      expect(ran.cells.map((cell) => cell.status)).toEqual(['ok', 'ok', 'ok']);
+      expect(ran.cells[1]?.table).toMatchObject({ total: 2, omitted: 0 });
+      expect(ran.cells[1]?.table?.rows.map((row) => row.values['title'])).toEqual([
+        'Lesson Openings',
+        'Lesson Endings',
+      ]);
+      const plan = ran.cells[2]?.plan;
+      expect(plan).toMatchObject({ applicable: true, count: 2 });
+      expect(plan?.operations.map((operation) => operation.description)).toEqual([
+        'briefs/one.brief: new',
+        'briefs/two.brief: new',
+      ]);
+      const planId = plan?.id ?? -1;
+      // The run planned the briefs and wrote none.
+      await expect(readdir(join(folder, 'briefs'))).rejects.toThrow();
+
+      // A plan id the run did not show is refused, and nothing is written.
+      const wrong = await session.runRecipe({
+        path: 'recipes/lessons.recipe',
+        apply: { cell: 2, plan: planId + 100 },
+      });
+      expect(wrong).toMatchObject({ applied: false });
+      await expect(readdir(join(folder, 'briefs'))).rejects.toThrow();
+
+      const applied = await session.runRecipe({
+        path: 'recipes/lessons.recipe',
+        apply: { cell: 2, plan: planId },
+      });
+      expect(applied).toMatchObject({
+        applied: true,
+        cell: { applied: { operations: [{ status: 'applied' }, { status: 'applied' }] } },
+      });
+      expect((await readdir(join(folder, 'briefs'))).sort()).toEqual(['one.brief', 'two.brief']);
+
+      // The same plan twice is refused: applied already.
+      const again = await session.runRecipe({
+        path: 'recipes/lessons.recipe',
+        apply: { cell: 2, plan: planId },
+      });
+      expect(again).toMatchObject({ applied: false });
+      expect(JSON.stringify(again)).toContain('applied already');
+    } finally {
+      await session.close();
+    }
+  }, 30_000);
+
+  it('run only a .recipe inside the folder, and apply nothing no run of the session showed', async () => {
+    await recipeWorkspace();
+    const client = trustedClient();
+    await client.start();
+    const brief = await client.call('run_recipe', { path: 'task/brief.brief' });
+    expect(brief.isError).toBe(true);
+    expect(textOf(brief)).toContain('.recipe');
+    const outside = await client.call('run_recipe', { path: '../elsewhere.recipe' });
+    expect(outside.isError).toBe(true);
+    const unseen = await client.call('run_recipe', {
+      path: 'recipes/lessons.recipe',
+      apply: { cell: 2, plan: 1 },
+    });
+    expect(unseen.isError).toBe(true);
+    expect(textOf(unseen)).toBe(RECIPE_RUN_FIRST);
+    // Over the protocol the verbs are the installed plugins', and none is installed here.
+    const ran = await client.call('run_recipe', { path: 'recipes/lessons.recipe' });
+    const unknown = JSON.parse(textOf(ran)) as { cells: { status: string }[] };
+    expect(unknown.cells[0]?.status).toBe('failed');
+    expect(textOf(ran)).toContain('demo.rows');
+    await expect(readdir(join(folder, 'briefs'))).rejects.toThrow();
+    await client.stop();
+  }, 30_000);
+
+  it('refuse to run a recipe in a folder nobody trusted, even when asked without the protocol', async () => {
+    await recipeWorkspace();
+    await run(['trust', 'remove', folder], {
+      console: { out: () => undefined, err: () => undefined },
+      version: '0.0.0-test',
+      cwd: folder,
+      home,
+      confirm: () => Promise.resolve(true),
+      rasterizer: () => fakeRasterizer(),
+    });
+    const demo = demoVerbs();
+    const session = await recipeSession(demo.contributions);
+    try {
+      expect(session.trust).toBe('restricted');
+      await expect(session.runRecipe({ path: 'recipes/lessons.recipe' })).rejects.toThrow(
+        'trusted workspace',
+      );
+      expect(demo.sections).toEqual([]);
+    } finally {
+      await session.close();
+    }
   }, 30_000);
 });
 

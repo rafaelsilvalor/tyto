@@ -459,6 +459,43 @@ function registerWriteTools(
         }),
     );
   }
+
+  if (offers('run_recipe')) {
+    server.registerTool(
+      'run_recipe',
+      {
+        title: 'Run a recipe',
+        description:
+          "Runs a .recipe file inside the served folder and answers each cell: its status, diagnostics with line and column, its table (columns, at most 50 rows and how many there are) and, for a cell that plans writes, its plan (target, operations as one line each, and an id). A run changes nothing outside this session, an `apply auto` recipe included: it only plans. To carry out one cell's plan, call again with apply set to that cell's index and the plan id the run answered; a plan replaced since, applied already or from a cell that did not run is refused. Sources fetch with this workspace's settings, which are never shown.",
+        inputSchema: z.object({
+          path: z
+            .string()
+            .describe('the .recipe file, relative to the folder tyto mcp was started in'),
+          apply: z
+            .object({
+              cell: z.number().int().min(0).describe("the cell's index, as the run answered it"),
+              plan: z.number().int().describe("the plan's id, as the run answered it"),
+            })
+            .optional()
+            .describe('leave out to run; give it to apply the plan the last run showed'),
+        }),
+        // It reaches services the workspace's plugins connect to, and an apply writes to them.
+        annotations: { ...writes, openWorldHint: true },
+      },
+      (input) =>
+        answering(err, async () => {
+          const answer = await session.runRecipe({
+            path: input.path,
+            ...(input.apply === undefined ? {} : { apply: input.apply }),
+          });
+          const failed =
+            'cells' in answer
+              ? answer.diagnostics.some((item) => item.severity === 'error')
+              : !answer.applied;
+          return { content: [text(answer)], ...(failed ? { isError: true } : {}) };
+        }),
+    );
+  }
 }
 
 /** The window's tools (ADR 0180): two reads of what is on screen, and two actions. */

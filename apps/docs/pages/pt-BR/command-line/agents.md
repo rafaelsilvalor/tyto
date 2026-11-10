@@ -116,11 +116,12 @@ Quatro coisas que não mudam arquivo nenhum:
 
 ## O que ele pode mudar, numa pasta em que você confia
 
-Numa pasta em que você [confiou](../editor/workspace-folder.md), o agente também pode mudar arquivos, de três jeitos. Numa pasta em que você não confiou, eles nem são oferecidos.
+Numa pasta em que você [confiou](../editor/workspace-folder.md), o agente também pode mudar arquivos, de quatro jeitos. Numa pasta em que você não confiou, eles nem são oferecidos.
 
 - **Escrever um brief**: criar um arquivo `.brief` ou substituir um. Ele escreve briefs e mais nada, então não mexe no `.tyto/project.json`, num template nem nos arquivos de um plugin. Antes de substituir um brief ele pergunta o que mudaria e recebe as linhas tiradas e acrescentadas; depois precisa dizer qual versão leu, e um brief que alguém mudou nesse meio-tempo é recusado em vez de sobrescrito.
 - **Criar uma entrega**, como o [`tyto delivery new`](./deliveries.md): a pasta, as pastas que o seu layout lista e o brief, começado de um template se ele nomear um. Um brief que já existe nunca é sobrescrito.
 - **Exportar** a arte de um brief. Os arquivos vão para onde a sua pasta diz, nunca para onde o agente diz: a pasta de um preset de exportação, a pasta de exportação da entrega ou o `output` da pasta. Sem nenhum dos três, é recusado. Cancelar o pedido no agente para a exportação depois dos slides que já estão sendo desenhados.
+- **Rodar uma receita** e ler as tabelas dela. Rodar não muda nada, nem numa receita marcada para aplicar sozinha: só mostra o que cada passo escreveria. Para executar as mudanças de um passo, o agente nomeia esse passo e o plano que viu; um plano que mudou desde então, ou que já foi executado, é recusado. As configurações de plugin da sua pasta chegam à receita e nunca ao agente.
 
 **Um brief numa pasta que você tem aberta numa janela do Tyto não é substituído.** A janela fica com o texto que abriu, e o próximo salvar dela apagaria a mudança do agente sem aviso. O agente é orientado a propor a mudança na janela, com `tyto mcp --window`, onde você aceita ou rejeita. Ele ainda pode criar um brief novo ali.
 

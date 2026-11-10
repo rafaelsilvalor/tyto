@@ -143,24 +143,27 @@ maintainer before running it on a real workspace. With the mode off, every comma
 
 `tyto mcp [folder]` serves a folder's templates and briefs to an agent over the Model Context
 Protocol on stdio (TYTO-565, ADR 0179). The agent's host starts it and talks to it; nobody runs it
-by hand. It offers four reads to any folder, and three writes to a trusted one:
+by hand. It offers four reads to any folder, and four writes to a trusted one:
 
-| Tool                | What it answers                                                       |
-| ------------------- | --------------------------------------------------------------------- |
-| `list_templates`    | Every template a brief in the folder can name                         |
-| `describe_template` | A template's formats and sizes, its slots, and a new brief's skeleton |
-| `check_brief`       | A brief's diagnostics with line and column; structure only, no fetch  |
-| `render_preview`    | One format as PNG, at most 1,024 px on its longest side, 4 artworks   |
-| `write_brief`       | Creates or replaces one `.brief`; `dry_run` shows the diff and hash   |
-| `new_delivery`      | `tyto delivery new`: the folder, its layout's folders and the brief   |
-| `export`            | Renders to a preset's folder, the delivery's or the workspace output  |
+| Tool                | What it answers                                                        |
+| ------------------- | ---------------------------------------------------------------------- |
+| `list_templates`    | Every template a brief in the folder can name                          |
+| `describe_template` | A template's formats and sizes, its slots, and a new brief's skeleton  |
+| `check_brief`       | A brief's diagnostics with line and column; structure only, no fetch   |
+| `render_preview`    | One format as PNG, at most 1,024 px on its longest side, 4 artworks    |
+| `write_brief`       | Creates or replaces one `.brief`; `dry_run` shows the diff and hash    |
+| `new_delivery`      | `tyto delivery new`: the folder, its layout's folders and the brief    |
+| `export`            | Renders to a preset's folder, the delivery's or the workspace output   |
+| `run_recipe`        | Runs a `.recipe`: each cell's table and plan; applies a plan by its id |
 
 A brief is named by a path inside the folder (or its workspace) or handed over as text. The reads
 write nothing. In a folder nobody trusted, the folder's plugin files are not loaded, as on
 `tyto render`, and the write tools are not offered (ADR 0179 decision 3). The writes follow ADR
 0185: only `.brief` files, a replacement needs the SHA-256 a dry run answered, an export goes
 only where the workspace says, and a brief in a folder a live window has open is not replaced
-(propose it through `--window` instead).
+(propose it through `--window` instead). `run_recipe` changes nothing on a run, `apply auto`
+included; it applies one cell's plan only by the plan id a run in the same session answered,
+and no answer carries a plan's payload or a section (ADR 0185, note of 2026-11-10).
 
 It also serves what each template's folder says about writing a brief for it (ADR 0186): the
 resources `tyto://template/<name>/guide` (its `guide.md`) and `tyto://template/<name>/examples/<file>`
