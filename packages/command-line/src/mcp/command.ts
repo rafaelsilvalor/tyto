@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { CliEnvironment, CliStdio } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK, type ExitCode } from '../exit.js';
 import { openSession } from './session.js';
+import { windowsHolding } from './writes.js';
 import { WINDOW_PID_VARIABLE, windowPidOf } from './window-endpoint.js';
 import type { WindowPort } from './tools.js';
 
@@ -77,7 +78,8 @@ export async function serveAgent(
   // Lazy, so the SDK is loaded when an agent connects and not before: tsup splits it into a
   // chunk of its own beside `index.js`, and the window's bundle does the same (ADR 0180).
   const { serveMcp } = await import('./server.js');
-  const session = await openSession(quiet);
+  const heldOpen = windowsHolding(environment.home, process.platform);
+  const session = await openSession(quiet, heldOpen === undefined ? {} : { heldOpen });
   try {
     err(`tyto mcp: serving on ${on}, workspace ${session.trust} (${session.roots.join(', ')})
 `);

@@ -1,11 +1,19 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-import type { Diagnostics, Trust } from '@tyto/core';
+import {
+  type Diagnostics,
+  type Trust,
+  builtInDelivery,
+  deliveryOfBrief,
+  planDelivery,
+} from '@tyto/core';
+import { createDelivery } from '@tyto/io';
 
 import type { CliEnvironment, CliRasterizer } from '../environment.js';
 import { templateSkeleton } from '../delivery.js';
 import { googleFontsOption } from '../google-fonts.js';
+import { needsRasterizer, outputRequests, unavailableTypes } from '../options.js';
 import {
   NO_PLUGIN_FILES,
   type SyncedPluginFiles,
@@ -16,6 +24,7 @@ import {
   type LoadedPlugins,
   loadInstalledPlugins,
   pluginCapabilities,
+  reachableExporters,
   withoutRefused,
 } from '../plugins/index.js';
 import { type RenderContext, loadRenderContext } from '../render-context.js';
@@ -31,6 +40,7 @@ import { optionalSources, renderSources } from '../sources.js';
 import { type BriefWorkspace, workspaceOfFolder } from '../workspace.js';
 import { confinedPath } from './confine.js';
 import { PREVIEW_MAX_IMAGES, PREVIEW_MAX_SIDE, ToolRefusal } from './tools.js';
+import { type BriefWrite, type BriefWriteAnswer, writeBrief } from './writes.js';
 
 /**
  * What `tyto mcp` holds for as long as the client is connected (ADR 0179): the workspace of the
@@ -85,7 +95,56 @@ export interface McpSession {
     options: BriefOptions & { readonly format: string },
     signal?: AbortSignal,
   ): Promise<PreviewAnswer>;
+  /** Offered only in a trusted workspace (ADR 0185): writes one `.brief`, or says what would. */
+  writeBrief(request: BriefWrite): Promise<BriefWriteAnswer>;
+  /** Makes a delivery as `tyto delivery new` does, or says what it would make. */
+  newDelivery(request: DeliveryRequest): Promise<DeliveryAnswer>;
+  /** Renders a brief to the folder its workspace names, or says where it would. */
+  exportBrief(request: ExportRequest, signal?: AbortSignal): Promise<ExportAnswer>;
   close(): Promise<void>;
+}
+
+export interface DeliveryRequest {
+  readonly name: string;
+  readonly template?: string;
+  readonly dryRun?: boolean;
+}
+
+export interface DeliveryAnswer {
+  readonly made: boolean;
+  /** The delivery's folder and its brief, as the person would type them. */
+  readonly folder: string;
+  readonly brief: string;
+  /** The folders made, or that a dry run would make; one already there is not listed. */
+  readonly folders: readonly string[];
+  readonly reused: boolean;
+}
+
+/**
+ * Where an export goes is never the agent's to say (ADR 0185): a preset's folder, the brief's
+ * delivery's `exports`, or else the workspace's `output`, each written by the person.
+ */
+export interface ExportRequest {
+  readonly path: string;
+  readonly preset?: string;
+  readonly delivery?: boolean;
+  /** Only with neither a preset nor a delivery, which decide their own. */
+  readonly formats?: readonly string[];
+  readonly types?: readonly string[];
+  readonly template?: string;
+  readonly dryRun?: boolean;
+}
+
+export interface ExportAnswer extends CheckAnswer {
+  readonly exported: boolean;
+  /** The folder written to, as the person would type it. */
+  readonly folder: string;
+  /** Null: the brief's own list. */
+  readonly formats: readonly string[] | null;
+  readonly types: readonly string[];
+  /** The files written, relative to {@link folder}; empty for a dry run. */
+  readonly files: readonly string[];
+  readonly cancelled: boolean;
 }
 
 export interface BriefOptions {
@@ -100,6 +159,16 @@ export const PREVIEW_NOT_FETCHED =
 export const CHECK_NOT_FETCHED =
   'check_brief fetches nothing; render_preview in a trusted workspace fetches what is not cached';
 
+/** Where an export writes, from the workspace's own configuration (ADR 0185). */
+interface ExportTo {
+  readonly directory: string;
+  readonly types: readonly string[];
+  readonly formats?: readonly string[];
+  /** A delivery's: where `result.json` goes, the brief's folder (ADR 0157 §6). */
+  readonly report?: string;
+  readonly rasterized: boolean;
+}
+
 interface LoadedContext {
   readonly value: RenderContext;
   readonly diagnostics: Diagnostics;
@@ -108,7 +177,28 @@ interface LoadedContext {
 /** What the server reports for a brief handed over as text. */
 const INLINE_BRIEF = '<inline brief>';
 
-export async function openSession(environment: CliEnvironment): Promise<McpSession> {
+const messagesOf = (problems: Diagnostics): string =>
+  problems.map((problem) => problem.message).join('\n');
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface SessionOptions {
+  /** Why a brief may not be replaced now, when a window holds it (ADR 0185 decision 4). */
+  readonly heldOpen?: (path: string) => Promise<string | undefined>;
+}
+
+export async function openSession(
+  environment: CliEnvironment,
+  sessionOptions: SessionOptions = {},
+): Promise<McpSession> {
+  const { heldOpen } = sessionOptions;
   const { cwd } = environment;
   const shown = (path: string): string => displayPath(cwd, path);
   const workspace: BriefWorkspace | undefined = await workspaceOfFolder(
@@ -183,6 +273,58 @@ export async function openSession(environment: CliEnvironment): Promise<McpSessi
     };
   }
 
+  /**
+   * Where an export goes (ADR 0185): every answer is a folder the person wrote in a sheet of
+   * this trusted workspace, never one the agent names.
+   */
+  function exportDestination(
+    request: ExportRequest,
+    briefPath: string,
+  ): Omit<ExportTo, 'rasterized'> {
+    const decides = request.preset !== undefined || request.delivery === true;
+    if (request.preset !== undefined && request.delivery === true) {
+      throw new ToolRefusal('give preset or delivery, not both');
+    }
+    if (decides && (request.formats !== undefined || request.types !== undefined)) {
+      throw new ToolRefusal(
+        'a preset and a delivery decide their own formats and types; leave them out',
+      );
+    }
+    if (request.preset !== undefined) {
+      const preset = project?.exportPresets.find((entry) => entry.name === request.preset);
+      if (preset === undefined) {
+        const known = (project?.exportPresets ?? []).map((entry) => entry.name);
+        throw new ToolRefusal(
+          `no export preset '${request.preset}' in this workspace; known: ${known.length === 0 ? 'none' : known.join(', ')}`,
+        );
+      }
+      return { directory: preset.folder, types: preset.types, formats: preset.formats };
+    }
+    if (request.delivery === true) {
+      const layout = project?.delivery ?? builtInDelivery(workspace?.loaded.folder ?? cwd);
+      const delivery = deliveryOfBrief(layout, briefPath);
+      if (delivery === undefined) {
+        throw new ToolRefusal(`${shown(briefPath)} is not the brief of a delivery`);
+      }
+      return {
+        directory: delivery.exports,
+        report: delivery.report,
+        types: layout.types ?? ['png'],
+        ...(layout.formats === undefined ? {} : { formats: layout.formats }),
+      };
+    }
+    if (project?.output === undefined) {
+      throw new ToolRefusal(
+        "this workspace names no output folder; set 'output' in its project file, or export with a preset or delivery",
+      );
+    }
+    return {
+      directory: project.output,
+      types: request.types ?? ['png'],
+      ...(request.formats === undefined ? {} : { formats: request.formats }),
+    };
+  }
+
   let rasterizer: CliRasterizer | undefined;
   /** One Chromium for the session, started by the first preview (ADR 0179). */
   const sessionRasterizer = (): CliRasterizer => (rasterizer ??= environment.rasterizer());
@@ -203,10 +345,13 @@ export async function openSession(environment: CliEnvironment): Promise<McpSessi
     preview: boolean,
     signal: AbortSignal | undefined,
     loadedContext?: LoadedContext,
+    exportTo?: ExportTo,
   ): Promise<{ readonly report: RenderTaskReport; readonly answer: CheckAnswer }> {
     const brief = await briefOf(input);
     const { value, diagnostics } = loadedContext ?? (await context());
     const plugins = withoutRefused(loaded, value.refusedPlugins);
+    // An export fetches as a preview does: it is offered only in a trusted workspace.
+    const fetching = preview || exportTo !== undefined;
     const sources = renderSources(environment.home, workspace?.loaded);
     /**
      * A check fetches nothing: it answers about the brief's structure, not its fonts or its
@@ -232,26 +377,39 @@ export async function openSession(environment: CliEnvironment): Promise<McpSessi
         briefPath: brief.shown,
         briefDirectory: brief.directory,
         ...(project === undefined ? {} : { projectAssets: project.assets }),
-        outDirectory: cwd,
-        output: memoryTaskOutput(),
         assetRoots: [...roots, ...(project?.assets ?? [])],
+        ...(exportTo === undefined
+          ? { outDirectory: cwd, output: memoryTaskOutput() }
+          : {
+              outDirectory: exportTo.directory,
+              ...(exportTo.report === undefined ? {} : { delivery: { report: exportTo.report } }),
+            }),
       },
       {
-        // A check exports SVG, which needs no browser; a preview a PNG (ADR 0179 decision 4).
-        outputs: [
-          preview
-            ? { kind: 'png', ...(options.scale === undefined ? {} : { scale: options.scale }) }
-            : { kind: 'svg' },
-        ],
+        // A check exports SVG, which needs no browser; a preview a PNG (ADR 0179 decision 4);
+        // an export what its destination says (ADR 0185).
+        outputs:
+          exportTo !== undefined
+            ? outputRequests({ types: exportTo.types })
+            : [
+                preview
+                  ? {
+                      kind: 'png',
+                      ...(options.scale === undefined ? {} : { scale: options.scale }),
+                    }
+                  : { kind: 'svg' },
+              ],
         version: environment.version,
         plugins,
         ...(options.template === undefined ? {} : { template: options.template }),
         ...(options.format === undefined ? {} : { formats: [options.format] }),
+        ...(exportTo?.formats === undefined ? {} : { formats: exportTo.formats }),
         ...(preview ? { rasterizer: sessionRasterizer(), concurrency: 1 } : {}),
+        ...(exportTo?.rasterized === true ? { rasterizer: sessionRasterizer() } : {}),
         ...(signal === undefined ? {} : { signal }),
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),
-        ...optionalSources(sources === undefined ? undefined : sourcesFor(sources, preview)),
-        ...(preview ? googleFontsOption(true, environment.variables) : {}),
+        ...optionalSources(sources === undefined ? undefined : sourcesFor(sources, fetching)),
+        ...(fetching ? googleFontsOption(true, environment.variables) : {}),
       },
       diagnostics,
     );
@@ -329,6 +487,102 @@ export async function openSession(environment: CliEnvironment): Promise<McpSessi
           png: artifact.bytes,
         })),
         omitted: Math.max(0, pngs.length - PREVIEW_MAX_IMAGES),
+      };
+    },
+
+    async writeBrief(request) {
+      return writeBrief(request, {
+        cwd,
+        roots,
+        shown,
+        ...(heldOpen === undefined ? {} : { heldOpen }),
+      });
+    },
+
+    async newDelivery(request) {
+      // The layout and its root are the trusted workspace's; this tool is offered nowhere else.
+      const root = workspace?.loaded.folder ?? cwd;
+      const layout = project?.delivery ?? builtInDelivery(root);
+      const plan = planDelivery(layout, request.name);
+      if (!plan.ok) throw new ToolRefusal(messagesOf(plan.error));
+      let brief = '';
+      if (request.template !== undefined) {
+        const skeleton = templateSkeleton((await context()).value, request.template);
+        if (!skeleton.ok) throw new ToolRefusal(messagesOf(skeleton.error));
+        brief = skeleton.value.text;
+      }
+      const wanted = [plan.value.folder, ...plan.value.folders];
+      if (request.dryRun === true) {
+        const missing: string[] = [];
+        for (const folder of wanted) {
+          if (!(await exists(folder)) && !missing.includes(folder)) missing.push(folder);
+        }
+        if (await exists(plan.value.brief)) {
+          throw new ToolRefusal(
+            `${shown(plan.value.brief)} is already there; a delivery's brief is never overwritten`,
+          );
+        }
+        return {
+          made: false,
+          folder: shown(plan.value.folder),
+          brief: shown(plan.value.brief),
+          folders: missing.map(shown),
+          reused: !missing.includes(plan.value.folder),
+        };
+      }
+      // `createDelivery` follows every path through `realpath` and refuses one that leads out
+      // of the root, and never overwrites a brief (ADR 0157 §3, decision 5).
+      const made = await createDelivery(plan.value, { root, brief, shown });
+      if (!made.ok) throw new ToolRefusal(messagesOf(made.error));
+      return {
+        made: true,
+        folder: shown(plan.value.folder),
+        brief: shown(plan.value.brief),
+        folders: made.value.made.map(shown),
+        reused: made.value.reused,
+      };
+    },
+
+    async exportBrief(request, signal) {
+      const confined = await confinedPath(request.path, cwd, roots);
+      if (!confined.ok) throw new ToolRefusal(confined.reason);
+      const briefPath = confined.path;
+      const destination = exportDestination(request, briefPath);
+      const loadedContext = await context();
+      const { exporters } = reachableExporters(
+        withoutRefused(loaded, loadedContext.value.refusedPlugins),
+      );
+      const unavailable = unavailableTypes(destination.types, exporters);
+      if (unavailable !== undefined) throw new ToolRefusal(unavailable);
+      const summary = {
+        folder: shown(destination.directory),
+        formats: destination.formats ?? null,
+        types: destination.types,
+      };
+      if (request.dryRun === true) {
+        return {
+          status: 'ok',
+          diagnostics: [],
+          exported: false,
+          ...summary,
+          files: [],
+          cancelled: false,
+        };
+      }
+      const { report, answer } = await run(
+        { path: briefPath },
+        request.template === undefined ? {} : { template: request.template },
+        false,
+        signal,
+        loadedContext,
+        { ...destination, rasterized: needsRasterizer(destination.types, exporters) },
+      );
+      return {
+        ...answer,
+        exported: report.result.artifacts.length > 0,
+        ...summary,
+        files: report.result.artifacts.map((artifact) => artifact.name),
+        cancelled: report.result.cancelled,
       };
     },
 
