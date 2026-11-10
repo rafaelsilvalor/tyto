@@ -81,6 +81,7 @@ Alguns plugins trazem o próprio programa em vez de pedir que você o instale, c
 
 - **Ele não fica confinado como o plugin fica.** O plugin em si não lê os seus arquivos, mas o programa dele pode ler e alterar arquivos e acessar a rede, como qualquer programa que você roda. Aprovar é confiar em quem escreveu o plugin.
 - **As regras acima continuam valendo.** Ele só roda a partir da pasta do próprio plugin, na pasta aberta no Tyto, nunca enquanto essa pasta estiver restrita, sem os segredos do Tyto nem variáveis com cara de chave ou token, e no máximo dois programas de um plugin rodam ao mesmo tempo. Quando o arquivo some da pasta do plugin, o plugin fica sabendo que precisa ser reinstalado.
+- **Ele tem uma pasta própria para o que guarda**, como algo que baixa na primeira vez que você o usa. A pasta fica dentro da pasta do próprio Tyto (`~/.tyto/data/plugins/<plugin>`), continua lá quando o plugin é atualizado e é apagada quando você remove o plugin. O Tyto dá a mesma pasta a todo programa que um plugin abre, inclusive um do seu `PATH`.
 
 ### Um terminal aberto por um plugin
 

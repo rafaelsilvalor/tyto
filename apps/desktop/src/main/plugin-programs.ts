@@ -3,6 +3,7 @@ import { posix, win32 } from 'node:path';
 import { WINDOW_PID_VARIABLE } from '@tyto/command-line/relay';
 import { diagnostic } from '@tyto/core';
 import {
+  PROGRAM_DATA_VARIABLE,
   PluginCapabilityError,
   type ProcessEvents,
   type StartProcess,
@@ -80,6 +81,13 @@ export interface PluginProgramsOptions {
    * missing script rather than looked up on `PATH`.
    */
   readonly scripts?: PluginScripts;
+  /**
+   * Creates the plugin's data folder when it is missing and answers its absolute path
+   * (ADR 0187), named to every program the plugin starts as `TYTO_PROGRAM_DATA`. Asked only
+   * once a start has passed every refusal, so a refused start creates nothing. Absent, a
+   * program gets no data folder.
+   */
+  readonly dataFolderOf?: (plugin: string) => string;
 }
 
 /** The bundled Node and the disk, for a plugin's own program (ADR 0184 decisions 2 and 3). */
@@ -205,12 +213,15 @@ const KEPT = new Set([
 const SECRET_SHAPED = /(?:^|_)(?:API_?KEY|KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIALS?)$/u;
 
 /**
- * The program's environment: the allowlist out of main's, and `TYTO_WINDOW`. Never
- * `TYTO_PLUGIN_*`, `ELECTRON_*`, `NODE_OPTIONS` or a variable shaped like a secret.
+ * The program's environment: the allowlist out of main's, `TYTO_WINDOW`, and the plugin's data
+ * folder as `TYTO_PROGRAM_DATA` when it has one (ADR 0187). Never `TYTO_PLUGIN_*`, `ELECTRON_*`,
+ * `NODE_OPTIONS` or a variable shaped like a secret. Both of Tyto's variables are the host's:
+ * a value main's environment holds under either name is replaced, never passed through.
  */
 export function programEnvironment(
   environment: Readonly<Record<string, string | undefined>>,
   windowPid: number,
+  dataFolder?: string,
 ): Record<string, string> {
   const kept: Record<string, string> = {};
   for (const [key, value] of Object.entries(environment)) {
@@ -219,7 +230,11 @@ export function programEnvironment(
     if (SECRET_SHAPED.test(upper)) continue;
     if (KEPT.has(upper) || upper.startsWith('LC_')) kept[key] = value;
   }
-  return { ...kept, [WINDOW_PID_VARIABLE]: String(windowPid) };
+  return {
+    ...kept,
+    [WINDOW_PID_VARIABLE]: String(windowPid),
+    ...(dataFolder === undefined ? {} : { [PROGRAM_DATA_VARIABLE]: dataFolder }),
+  };
 }
 
 /**
@@ -360,7 +375,7 @@ export function pluginPrograms(options: PluginProgramsOptions): PluginPrograms {
   ) => {
     const found = locate(plugin, program, script);
     const { file, environment } = found;
-    const env = programEnvironment(environment, options.windowPid);
+    const env = programEnvironment(environment, options.windowPid, options.dataFolderOf?.(plugin));
     const base = {
       cwd: found.cwd,
       env,
@@ -447,7 +462,11 @@ export function pluginPrograms(options: PluginProgramsOptions): PluginPrograms {
         file: found.file,
         args: found.script === undefined ? [...args] : [found.script, ...args],
         cwd: found.cwd,
-        env: programEnvironment(found.environment, options.windowPid),
+        env: programEnvironment(
+          found.environment,
+          options.windowPid,
+          options.dataFolderOf?.(plugin),
+        ),
       };
     },
     settle() {

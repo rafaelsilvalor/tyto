@@ -56,6 +56,15 @@ export const PROCESS_WRITE_LIMIT_BYTES = 1024 * 1024;
  */
 export const PROCESS_UNREAD_LIMIT_BYTES = 1024 * 1024;
 
+/**
+ * The variable that names the plugin's data folder to every program the host starts for it
+ * (ADR 0187): an absolute path the host created, outside the plugin's own folder and its cache,
+ * kept across the plugin's updates and deleted when it is removed. The plugin's own process
+ * cannot reach it (ADR 0049); its program, which runs as the person, can. Set by the host, never
+ * passed through from main's environment.
+ */
+export const PROGRAM_DATA_VARIABLE = 'TYTO_PROGRAM_DATA';
+
 /** Why `name` is not a program a permission can name, or `undefined` when it is one. */
 export function programNameProblem(name: string): string | undefined {
   if (name.includes('/') || name.includes('\\')) return 'is a path; name the program alone';

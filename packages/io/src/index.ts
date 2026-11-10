@@ -78,6 +78,7 @@ export {
   PLUGIN_STATE_FILE,
   PLUGINS_DIR,
   fsPluginStore,
+  pluginDataDirectory,
 } from './fs-plugin-store.js';
 export {
   type InstalledCodePack,

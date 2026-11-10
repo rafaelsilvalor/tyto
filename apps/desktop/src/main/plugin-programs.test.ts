@@ -199,6 +199,8 @@ function host(
     exists?: (path: string) => boolean;
     place?: { folder: string | null; trust: WorkspaceState['trust'] };
     scripts?: PluginScripts;
+    dataFolderOf?: (plugin: string) => string;
+    environment?: Readonly<Record<string, string | undefined>>;
   } = {},
 ) {
   const place = { value: options.place ?? { folder: '/work', trust: 'trusted' as const } };
@@ -210,7 +212,8 @@ function host(
   const looked: string[] = [];
   const programs = pluginPrograms({
     platform: options.platform ?? 'linux',
-    environment: () => ({ PATH: '/bin', Path: undefined, SystemRoot: 'C:\\Windows' }),
+    environment: () =>
+      options.environment ?? { PATH: '/bin', Path: undefined, SystemRoot: 'C:\\Windows' },
     exists: (path) => {
       looked.push(path);
       return (options.exists ?? files('/bin/claude'))(path);
@@ -230,6 +233,7 @@ function host(
       waited.push(now);
     },
     ...(options.scripts === undefined ? {} : { scripts: options.scripts }),
+    ...(options.dataFolderOf === undefined ? {} : { dataFolderOf: options.dataFolderOf }),
   });
   const quiet = { stdout: () => undefined, stderr: () => undefined, exit: () => undefined };
   return { programs, place, spawned, children, killed, waited, looked, quiet };
@@ -473,6 +477,89 @@ describe('a plugin’s own program (ADR 0184)', () => {
       code = cause instanceof PluginCapabilityError ? cause.code : String(cause);
     }
     expect(code).toBe('E_PROCESS_ARGUMENT');
+  });
+});
+
+describe('the plugin’s data folder (ADR 0187)', () => {
+  const disk: PluginScripts = {
+    node: '/opt/tyto/node/node',
+    folderOf: (plugin) => (plugin === 'agent' ? '/plugins/agent' : undefined),
+    realpath: (path) => path,
+    isFile: (path) => path === '/plugins/agent/adapter/launch.mjs',
+  };
+  /** A data folder per plugin, and every plugin it was asked for. */
+  const folders = () => {
+    const asked: string[] = [];
+    return {
+      asked,
+      dataFolderOf: (plugin: string) => {
+        asked.push(plugin);
+        return `/tyto/data/plugins/${plugin}`;
+      },
+    };
+  };
+
+  it('names it to a program from PATH, a plugin’s own program and a terminal tab', async () => {
+    const data = folders();
+    const test = host({ scripts: disk, dataFolderOf: data.dataFolderOf });
+    await test.programs.startProcess('agente', 'claude', [], test.quiet);
+    await test.programs.startProcess(
+      'agent',
+      'claude-agent-acp',
+      [],
+      test.quiet,
+      'adapter/launch.mjs',
+    );
+    const tab = test.programs.terminalLaunch(
+      'agent',
+      'claude-agent-acp',
+      ['--cli'],
+      'adapter/launch.mjs',
+    );
+    expect(test.spawned.map(({ options }) => options.env['TYTO_PROGRAM_DATA'])).toEqual([
+      '/tyto/data/plugins/agente',
+      '/tyto/data/plugins/agent',
+    ]);
+    expect(tab.env['TYTO_PROGRAM_DATA']).toBe('/tyto/data/plugins/agent');
+    expect(data.asked).toEqual(['agente', 'agent', 'agent']);
+  });
+
+  it('creates nothing for a start it refuses', async () => {
+    const data = folders();
+    const restricted = host({
+      place: { folder: '/work', trust: 'restricted' },
+      scripts: disk,
+      dataFolderOf: data.dataFolderOf,
+    });
+    const nowhere = host({ exists: files(), scripts: disk, dataFolderOf: data.dataFolderOf });
+    expect(
+      await codeOf(restricted.programs.startProcess('agente', 'claude', [], restricted.quiet)),
+    ).toBe('E_PROCESS_RESTRICTED');
+    expect(await codeOf(nowhere.programs.startProcess('agente', 'claude', [], nowhere.quiet))).toBe(
+      'E_PROCESS_NOT_FOUND',
+    );
+    expect(
+      await codeOf(
+        nowhere.programs.startProcess('agent', 'claude-agent-acp', [], nowhere.quiet, 'gone.mjs'),
+      ),
+    ).toBe('E_PROCESS_SCRIPT_MISSING');
+    expect(data.asked).toEqual([]);
+  });
+
+  it('is the host’s value, never one from main’s environment', async () => {
+    const forged = { PATH: '/bin', TYTO_PROGRAM_DATA: '/somewhere/else', TYTO_WINDOW: '1' };
+    const without = host({ environment: forged });
+    await without.programs.startProcess('agente', 'claude', [], without.quiet);
+    expect(without.spawned[0]?.options.env).toEqual({ PATH: '/bin', TYTO_WINDOW: '99' });
+
+    const data = folders();
+    const withFolder = host({ environment: forged, dataFolderOf: data.dataFolderOf });
+    await withFolder.programs.startProcess('agente', 'claude', [], withFolder.quiet);
+    expect(withFolder.spawned[0]?.options.env).toEqual({
+      PATH: '/bin',
+      TYTO_WINDOW: '99',
+      TYTO_PROGRAM_DATA: '/tyto/data/plugins/agente',
+    });
   });
 });
 

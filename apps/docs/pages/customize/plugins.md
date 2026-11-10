@@ -81,6 +81,7 @@ Some plugins bring their program with them instead of asking you to install it, 
 
 - **It is not confined like the plugin is.** The plugin itself cannot read your files, but its program can read and change them and reach the network, as any program you run can. Approving it means trusting whoever wrote the plugin.
 - **The rules above still hold.** It runs only from the plugin's own folder, in the folder open in Tyto, never while that folder is restricted, without Tyto's secrets or a variable that looks like a key or a token, and at most two of a plugin's programs run at once. When the file is missing from the plugin's folder, the plugin is told to have you reinstall it.
+- **It has a folder of its own for what it keeps**, such as something it downloads the first time you use it. The folder is inside Tyto's own folder (`~/.tyto/data/plugins/<plugin>`), it stays when the plugin is updated, and it is deleted when you remove the plugin. Tyto gives the same folder to every program a plugin starts, including one from your `PATH`.
 
 ### A terminal a plugin opens
 
