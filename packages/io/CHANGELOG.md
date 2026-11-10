@@ -1,5 +1,17 @@
 # @tyto/io
 
+## 5.4.1
+
+### Patch Changes
+
+- Updated dependencies [7345ac7]
+  - @tyto/plugin-api@0.17.0
+  - @tyto/core@0.43.0
+  - @tyto/export-html@0.7.17
+  - @tyto/export-svg@2.0.17
+  - @tyto/pipeline@0.12.13
+  - @tyto/template-lang@0.8.16
+
 ## 5.4.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@tyto/templates",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "type": "module",
   "description": "Built-in templates, shipped as a template-pack plugin.",
   "license": "UNLICENSED",
