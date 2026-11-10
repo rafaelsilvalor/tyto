@@ -10,6 +10,7 @@ import {
   parseAnswer,
   pickWindow,
   WINDOW_PID_VARIABLE,
+  connectTargetOf,
   processAlive,
   readFirstLine,
 } from './window-endpoint.js';
@@ -48,6 +49,17 @@ export interface RelayOptions {
   readonly connectTo?: (endpoint: string) => Socket;
 }
 
+/**
+ * Connects to a record's endpoint: a loopback port or a socket path. Undefined when the record
+ * names neither, a non-loopback `tcp://` host included, which is never connected to: the
+ * handshake would carry the token there.
+ */
+export function connectToEndpoint(endpoint: string): Socket | undefined {
+  const target = connectTargetOf(endpoint);
+  if (target === undefined) return undefined;
+  return 'path' in target ? connect(target.path) : connect(target.port, target.host);
+}
+
 function pickedLine(picked: PickedWindow): string {
   const { record, why } = picked;
   const where = record.folder ?? 'no folder';
@@ -69,17 +81,20 @@ export function namedGoneLine(pid: number): string {
 /** Connects and sends the handshake; resolves with the socket once the window accepted it. */
 async function open(
   record: WindowRecord,
-  connectTo: (endpoint: string) => Socket,
+  connectTo: (endpoint: string) => Socket | undefined,
 ): Promise<{ socket: Socket } | { failure: string; readonly nobodyListens?: true }> {
   const socket = connectTo(record.endpoint);
+  // An endpoint this relay cannot reach is skipped like one nobody listens at.
+  if (socket === undefined) return { failure: WINDOW_UNREACHABLE, nobodyListens: true };
   const connected = await new Promise<NodeJS.ErrnoException | true>((resolve) => {
     socket.once('connect', () => resolve(true));
     socket.once('error', (cause: NodeJS.ErrnoException) => resolve(cause));
   });
   if (connected !== true) {
     socket.destroy();
-    // No pipe or socket at the record's endpoint: a record whose window is gone, and whose pid
-    // another process now has, so the liveness check let it through (TYTO-656).
+    // No port or socket at the record's endpoint: a record whose window is gone, and whose pid
+    // another process now has, so the liveness check let it through (TYTO-656). A relay older
+    // than ADR 0189 reads a `tcp://` endpoint as a pipe's name and lands here too, with ENOENT.
     const nobodyListens = connected.code === 'ENOENT' || connected.code === 'ECONNREFUSED';
     return nobodyListens
       ? { failure: WINDOW_UNREACHABLE, nobodyListens: true }
@@ -128,7 +143,7 @@ export async function relayToWindow(options: RelayOptions): Promise<ExitCode> {
     return EXIT_INTERNAL;
   }
   let records = await listWindows(options.home, options.platform, options.alive ?? processAlive);
-  const connectTo = options.connectTo ?? ((endpoint: string) => connect(endpoint));
+  const connectTo = options.connectTo ?? connectToEndpoint;
   let first = true;
   let unreachable = false;
   for (;;) {

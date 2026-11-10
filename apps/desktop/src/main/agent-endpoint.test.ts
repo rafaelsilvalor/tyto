@@ -1,18 +1,27 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { type Socket, connect } from 'node:net';
-import { tmpdir } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { type WindowRecord, run, serveAgent } from '@tyto/command-line';
+import {
+  type WindowRecord,
+  connectTargetOf,
+  connectToEndpoint,
+  run,
+  serveAgent,
+} from '@tyto/command-line';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { type AgentEndpoint, createAgentEndpoint } from './agent-endpoint.js';
+import { type AgentEndpoint, createAgentEndpoint, osUserName } from './agent-endpoint.js';
 
 /**
  * The window's endpoint (ADR 0180) with the real MCP server behind it: `serveAgent` from
- * `@tyto/command-line`, the code `tyto mcp` runs, over a real named pipe on Windows and a real
- * Unix socket elsewhere. The last test drives it through `tyto mcp --window` itself.
+ * `@tyto/command-line`, the code `tyto mcp` runs, over a real loopback port on Windows (ADR 0189)
+ * and a real Unix socket elsewhere. On Windows the records folder is restricted by the real
+ * `icacls`. Linux CI runs none of the Windows-only tests here. The last test drives the endpoint
+ * through `tyto mcp --window` itself.
  */
 
 let home: string;
@@ -79,7 +88,8 @@ async function started(serve?: (socket: Socket, signal: AbortSignal) => Promise<
 
 /** A raw client: writes `text` in one write, and collects every line the window answers. */
 function client(at: string, text: string) {
-  const socket = connect(at);
+  const socket = connectToEndpoint(at);
+  if (socket === undefined) throw new Error(`no endpoint a client can reach: ${at}`);
   const lines: string[] = [];
   let buffered = '';
   const waiters: { count: number; resolve: () => void }[] = [];
@@ -122,7 +132,7 @@ describe('the agent endpoint', () => {
     expect(record).toMatchObject({ version: 1, pid: process.pid, folder });
     expect(record.token).toMatch(/^[0-9a-f]{64}$/u);
     if (process.platform === 'win32') {
-      expect(record.endpoint).toBe(`\\\\.\\pipe\\tyto-test-${String(process.pid)}`);
+      expect(record.endpoint).toMatch(/^tcp:\/\/127\.0\.0\.1:[1-9][0-9]*$/u);
     } else {
       // Owner only: the record, its folder and the socket (ADR 0180 decision 3).
       const mode = async (path: string) => (await stat(path)).mode & 0o777;
@@ -151,7 +161,7 @@ describe('the agent endpoint', () => {
     agent.socket.destroy();
   });
 
-  it('refuses a wrong token with no reason, closes, and serves nothing', async () => {
+  it('gives a wrong token nothing before it closes: one refusal line, no pid, no folder, no frame', async () => {
     let served = 0;
     const { record } = await started(() => {
       served += 1;
@@ -164,6 +174,66 @@ describe('the agent endpoint', () => {
     expect(served).toBe(0);
     expect(counts).toEqual([]);
   });
+
+  it('refuses a browser: an HTTP request is a malformed first line, and nothing is served', async () => {
+    let served = 0;
+    const { record } = await started(() => {
+      served += 1;
+      return Promise.resolve();
+    });
+    const browser = client(
+      record.endpoint,
+      `POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: text/plain\r\n\r\n${hello(record.token)}`,
+    );
+    await browser.closed;
+
+    expect(browser.lines).toEqual([JSON.stringify({ tyto: 'window', ok: false })]);
+    expect(served).toBe(0);
+  });
+
+  it.runIf(process.platform === 'win32')(
+    "listens on loopback only: this machine's own network addresses are refused (ADR 0189)",
+    async () => {
+      const { record } = await started();
+      const target = connectTargetOf(record.endpoint);
+      if (target === undefined || 'path' in target) throw new Error('not a loopback port');
+      const addresses = Object.values(networkInterfaces())
+        .flat()
+        .filter((entry) => entry !== undefined && entry.family === 'IPv4' && !entry.internal)
+        .map((entry) => entry?.address ?? '');
+      // A machine with no network address has nothing to probe; the output says which it had.
+      process.stdout.write(`network addresses probed: ${addresses.join(', ') || 'none'}\n`);
+      for (const address of addresses) {
+        const answer = await new Promise<string>((resolve) => {
+          const socket = connect(target.port, address);
+          socket.once('connect', () => {
+            socket.destroy();
+            resolve('connected');
+          });
+          socket.once('error', (cause: NodeJS.ErrnoException) => resolve(cause.code ?? 'error'));
+        });
+        expect(answer, address).toBe('ECONNREFUSED');
+      }
+    },
+  );
+
+  it.runIf(process.platform === 'win32')(
+    'keeps the record to its owner and SYSTEM: the records folder inherits nothing from TYTO_HOME',
+    async () => {
+      await started();
+      const recordFile = join(home, 'windows', `${String(process.pid)}.json`);
+      const acl = execFileSync('icacls', [recordFile], { encoding: 'utf8' });
+      process.stdout.write(acl);
+      const entries = acl
+        .split(/\r?\n/u)
+        .map((line) => line.replace(recordFile, '').trim())
+        .filter((line) => line.includes(':('));
+      expect(entries).toHaveLength(2);
+      expect(entries.some((entry) => entry.startsWith('NT AUTHORITY\\SYSTEM:'))).toBe(true);
+      const user = osUserName().toLowerCase();
+      expect(entries.some((entry) => entry.toLowerCase().includes(`\\${user}:`))).toBe(true);
+    },
+  );
 
   it('counts the agents connected, and cuts them all', async () => {
     const { endpoint: opened, record } = await started();
@@ -188,7 +258,11 @@ describe('the agent endpoint', () => {
     await agent.closed;
     await expect(stat(recordFile)).rejects.toThrow();
     const refused = await new Promise<string>((resolve) => {
-      const socket = connect(record.endpoint);
+      const socket = connectToEndpoint(record.endpoint);
+      if (socket === undefined) {
+        resolve('unreachable');
+        return;
+      }
       socket.once('connect', () => {
         socket.destroy();
         resolve('connected');
@@ -197,10 +271,12 @@ describe('the agent endpoint', () => {
     });
     expect(refused).not.toBe('connected');
 
-    // And back on: the same endpoint and token, a fresh record.
+    // And back on: the same token, a fresh record. A socket keeps its path; a loopback port is
+    // whichever the system gives this time.
     await opened.start();
     const again = JSON.parse(await readFile(recordFile, 'utf8')) as WindowRecord;
-    expect(again.endpoint).toBe(record.endpoint);
+    expect(again.token).toBe(record.token);
+    if (process.platform !== 'win32') expect(again.endpoint).toBe(record.endpoint);
     const second = client(again.endpoint, `${hello(again.token)}${initialize}`);
     await second.lineCount(2);
     second.socket.destroy();

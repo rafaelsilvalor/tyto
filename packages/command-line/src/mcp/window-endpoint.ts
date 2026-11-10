@@ -27,7 +27,10 @@ export const UNIX_SOCKET_PATH_MAX = 103;
 export const windowRecordSchema = z.object({
   version: z.literal(1),
   pid: z.number().int().positive(),
-  /** A named pipe on Windows, a Unix socket path elsewhere: what `net.connect` takes. */
+  /**
+   * `tcp://127.0.0.1:<port>` on Windows (ADR 0189), a Unix socket path elsewhere; read with
+   * {@link connectTargetOf}.
+   */
   endpoint: z.string().min(1),
   /** The workspace folder the window has open, absolute; null when it has none. */
   folder: z.string().min(1).nullable(),
@@ -61,24 +64,56 @@ export interface EndpointPlace {
   readonly home: string;
   readonly pid: number;
   readonly platform: Platform;
-  /** The OS user name; part of the pipe name, so two users' windows never share one. */
+  /** The OS user name; part of the socket folder's name, so two users never share one. */
   readonly user: string;
   /** `os.tmpdir()`: where a socket goes when `TYTO_HOME` is too deep for one. */
   readonly tmp: string;
 }
 
 /**
- * Where a window listens. On Windows a named pipe, `\\.\pipe\tyto-<user>-<pid>`. Elsewhere a Unix
- * socket beside the record, or — when that path would pass {@link UNIX_SOCKET_PATH_MAX} bytes —
- * in `<tmp>/tyto-<user>/`, a folder the window creates with mode 0700.
+ * The only host a Windows window listens on, and the only one a relay connects to. A named pipe
+ * made by Node accepts clients that come through the SMB redirector, and Node cannot refuse them
+ * (ADR 0189), so Windows serves on loopback TCP, which no other machine can reach.
  */
-export function endpointFor(place: EndpointPlace): string {
-  const name = `tyto-${safeName(place.user)}`;
-  if (place.platform === 'win32') return `\\\\.\\pipe\\${name}-${String(place.pid)}`;
+export const LOOPBACK_HOST = '127.0.0.1';
+
+const LOOPBACK_PREFIX = `tcp://${LOOPBACK_HOST}:`;
+
+/** What `net.Server.listen` and `net.connect` take: a loopback port, or a Unix socket's path. */
+export type EndpointTarget =
+  { readonly host: typeof LOOPBACK_HOST; readonly port: number } | { readonly path: string };
+
+/**
+ * Where a window listens. On Windows a loopback TCP port the system picks (port 0); the record
+ * then names it with {@link loopbackEndpoint}. Elsewhere a Unix socket beside the record, or —
+ * when that path would pass {@link UNIX_SOCKET_PATH_MAX} bytes — in `<tmp>/tyto-<user>/`, a folder
+ * the window creates with mode 0700.
+ */
+export function listenTargetFor(place: EndpointPlace): EndpointTarget {
+  if (place.platform === 'win32') return { host: LOOPBACK_HOST, port: 0 };
   const socket = `${String(place.pid)}.sock`;
   const beside = posix.join(windowsFolder(place.home, 'linux'), socket);
-  if (Buffer.byteLength(beside, 'utf8') <= UNIX_SOCKET_PATH_MAX) return beside;
-  return posix.join(place.tmp, name, socket);
+  if (Buffer.byteLength(beside, 'utf8') <= UNIX_SOCKET_PATH_MAX) return { path: beside };
+  return { path: posix.join(place.tmp, `tyto-${safeName(place.user)}`, socket) };
+}
+
+/** The record's endpoint for a window listening on a loopback port: `tcp://127.0.0.1:<port>`. */
+export function loopbackEndpoint(port: number): string {
+  return `${LOOPBACK_PREFIX}${String(port)}`;
+}
+
+/**
+ * Where a record's endpoint says to connect, or undefined when it names nothing this contract
+ * writes. A `tcp://` endpoint must be loopback with a port in range: a record that points
+ * anywhere else would have the relay send its token over the network, so it is refused.
+ * Anything else is a socket path (a named pipe, from a window older than ADR 0189, included).
+ */
+export function connectTargetOf(endpoint: string): EndpointTarget | undefined {
+  if (!endpoint.startsWith('tcp://')) return { path: endpoint };
+  if (!endpoint.startsWith(LOOPBACK_PREFIX)) return undefined;
+  const port = endpoint.slice(LOOPBACK_PREFIX.length);
+  if (!/^[1-9][0-9]{0,4}$/u.test(port) || Number(port) > 65_535) return undefined;
+  return { host: LOOPBACK_HOST, port: Number(port) };
 }
 
 /** Whether a process is running: signal 0 tests without sending; EPERM means it runs as another. */
