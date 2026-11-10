@@ -1,5 +1,11 @@
 # @tyto/template-kit
 
+## 0.11.5
+
+### Patch Changes
+
+- @tyto/export-html@0.7.18
+
 ## 0.11.4
 
 ### Patch Changes

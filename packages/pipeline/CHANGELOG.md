@@ -1,5 +1,13 @@
 # @tyto/pipeline
 
+## 0.12.14
+
+### Patch Changes
+
+- Updated dependencies [846274c]
+  - @tyto/plugin-api@0.18.0
+  - @tyto/raster@0.2.4
+
 ## 0.12.13
 
 ### Patch Changes

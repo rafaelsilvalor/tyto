@@ -1,5 +1,14 @@
 # @tyto/cli
 
+## 0.11.2
+
+### Patch Changes
+
+- Updated dependencies [313f28f]
+- Updated dependencies [a3a90f6]
+  - @tyto/command-line@0.5.0
+  - @tyto/raster@0.2.4
+
 ## 0.11.1
 
 ### Patch Changes
