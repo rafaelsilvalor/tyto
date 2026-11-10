@@ -116,11 +116,12 @@ Four things that change no file:
 
 ## What it can change, in a folder you trust
 
-In a folder you have [trusted](../editor/workspace-folder.md), the agent can also change files, in three ways. In a folder you have not trusted it is not offered them at all.
+In a folder you have [trusted](../editor/workspace-folder.md), the agent can also change files, in four ways. In a folder you have not trusted it is not offered them at all.
 
 - **Write a brief**: create a `.brief` file, or replace one. It writes briefs and nothing else, so it cannot touch `.tyto/project.json`, a template or a plugin's files. Before replacing a brief it asks what would change and gets the lines removed and added; it then has to name the version it read, so a brief somebody changed in the meantime is refused instead of overwritten.
 - **Make a delivery**, as [`tyto delivery new`](./deliveries.md) does: the folder, the folders your layout lists and the brief, started from a template if it names one. An existing brief is never overwritten.
 - **Export** a brief's artwork. The files go where your folder says, never where the agent says: an export preset's folder, the delivery's export folder, or the folder's `output`. If none is set, it is refused. Cancelling the request in the agent stops the export after the slides already being drawn.
+- **Run a recipe** and read its tables. A run changes nothing, even in a recipe set to apply on its own: it only shows what each step would write. To carry out one step's changes, the agent names that step and the plan it was shown; a plan that changed since, or one already carried out, is refused. Your folder's plugin settings reach the recipe and never the agent.
 
 **A brief in a folder you have open in a Tyto window is not replaced.** The window keeps the text it opened, and its next save would erase the agent's change without a word. The agent is told to propose the change in the window instead, with `tyto mcp --window`, where you accept or reject it. It can still create a new brief there.
 

@@ -114,3 +114,27 @@ their file.
 - That the window ignores a change on disk to an open brief is a defect of its own, outside this
   ADR. Any editor or `git checkout` that writes the file is erased by the next save. It is the
   card the coordinator opens from this measurement.
+
+## Note, 2026-11-10 — a fourth tool that writes, `run_recipe` (TYTO-565, TYTO-664)
+
+Decision 1's list gains `run_recipe`, with the `write` access, so it is offered only to a trusted
+workspace. It runs a `.recipe` inside the served folders through the notebook's own runner, which
+moved to `@tyto/io` for this (ADR 0188), with the installed plugins' verbs and each plugin's own
+section of this workspace (ADR 0147).
+
+- **A run is the dry run.** It answers each cell's status, located diagnostics, its table (at
+  most 50 rows, with the total) and, for a cell that plans writes, the plan: target, count, one
+  line per operation, and an id. It runs as a save does, sources included, and never as the
+  window's Run: `apply auto` stays a plan, because Run is the person's approval and an agent's
+  call is not (ADR 0170). A run itself writes nothing (ADR 0172 decision 2).
+- **An apply names the cell and the plan id that run answered**, and the runner hands the verb
+  the very plan it kept (ADR 0170 decision 3). A plan replaced since, applied already, or from a
+  cell that did not run is refused; asking before any run of that recipe in this session is
+  refused too. The session keeps the cells; a new session runs again.
+- **Nothing secret leaves** (decision 8). A plan's payload is the plugin's own data and is left
+  out, as is each row's provenance. Sections reach the verbs and never the answer. A tested
+  section value is absent from every answer.
+- Its annotations say it writes (`destructiveHint: true`) and reaches the world
+  (`openWorldHint: true`), since the services a workspace's plugins connect to are not files here.
+- The tool has no path for where anything goes: `to-brief` writes where the recipe says, inside
+  the workspace (ADR 0172 decision 4), and a plugin's action writes to its own service.

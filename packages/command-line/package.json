@@ -37,6 +37,7 @@
     "@tyto/pipeline": "workspace:*",
     "@tyto/plugin-api": "workspace:*",
     "@tyto/raster": "workspace:*",
+    "@tyto/recipe": "workspace:*",
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",
     "commander": "^15.0.0",

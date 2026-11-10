@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, extname, resolve } from 'node:path';
 
 import {
   type Diagnostics,
@@ -8,7 +8,9 @@ import {
   deliveryOfBrief,
   planDelivery,
 } from '@tyto/core';
-import { createDelivery } from '@tyto/io';
+import { type RecipeRunner, createDelivery, createRecipeRunner } from '@tyto/io';
+import type { RecipeContributions } from '@tyto/plugin-api';
+import { systemClock } from '@tyto/recipe';
 
 import type { CliEnvironment, CliRasterizer } from '../environment.js';
 import { templateSkeleton } from '../delivery.js';
@@ -22,6 +24,8 @@ import {
 } from '../plugin-files.js';
 import {
   type LoadedPlugins,
+  activateBuiltIns,
+  activateInstalled,
   loadInstalledPlugins,
   pluginCapabilities,
   reachableExporters,
@@ -36,10 +40,17 @@ import {
 } from '../render-task.js';
 import { displayPath, installedOption } from '../render.js';
 import { type LocatedDiagnostic, diagnosticsDocument, registerUnplaced } from '../report.js';
-import { optionalSources, renderSources } from '../sources.js';
+import { optionalSources, projectSections, renderSources } from '../sources.js';
 import { type BriefWorkspace, workspaceOfFolder } from '../workspace.js';
 import { confinedPath } from './confine.js';
 import { type TemplateGuidance, liesInside, readTemplateGuidance } from './guidance.js';
+import {
+  type RecipeApplyAnswer,
+  type RecipeRunAnswer,
+  type RecipeSource,
+  cellAnswer,
+  runAnswer,
+} from './recipes.js';
 import { PREVIEW_MAX_IMAGES, PREVIEW_MAX_SIDE, ToolRefusal } from './tools.js';
 import { type BriefWrite, type BriefWriteAnswer, writeBrief } from './writes.js';
 
@@ -107,6 +118,11 @@ export interface McpSession {
   newDelivery(request: DeliveryRequest): Promise<DeliveryAnswer>;
   /** Renders a brief to the folder its workspace names, or says where it would. */
   exportBrief(request: ExportRequest, signal?: AbortSignal): Promise<ExportAnswer>;
+  /**
+   * Offered only in a trusted workspace (ADR 0185, note of 2026-11-10): runs a recipe and answers
+   * its cells, changing nothing; or applies one cell's plan, by the id that run answered.
+   */
+  runRecipe(request: RecipeRequest): Promise<RecipeRunAnswer | RecipeApplyAnswer>;
   close(): Promise<void>;
 }
 
@@ -166,6 +182,16 @@ export interface ExportAnswer extends CheckAnswer {
   readonly cancelled: boolean;
 }
 
+/** A recipe to run, or the plan of one of its cells to apply, as the last run showed it. */
+export interface RecipeRequest {
+  readonly path: string;
+  readonly apply?: { readonly cell: number; readonly plan: number };
+}
+
+/** What `run_recipe` says when asked to apply what no run of this session showed. */
+export const RECIPE_RUN_FIRST =
+  'run the recipe first, without apply, and apply a plan by the cell index and plan id that run answered';
+
 export interface BriefOptions {
   /** Used when the brief's frontmatter names no template, as `--template` is. */
   readonly template?: string;
@@ -211,6 +237,12 @@ async function exists(path: string): Promise<boolean> {
 export interface SessionOptions {
   /** Why a brief may not be replaced now, when a window holds it (ADR 0185 decision 4). */
   readonly heldOpen?: (path: string) => Promise<string | undefined>;
+  /**
+   * The recipe verbs `run_recipe` runs with, in place of the installed plugins'. For a test: no
+   * generic verb starts a table, so a recipe that reads anything needs a source, and a test's is
+   * handed here rather than installed as a plugin process.
+   */
+  readonly recipeContributions?: RecipeContributions;
 }
 
 export async function openSession(
@@ -342,6 +374,41 @@ export async function openSession(
       types: request.types ?? ['png'],
       ...(request.formats === undefined ? {} : { formats: request.formats }),
     };
+  }
+
+  /**
+   * One recipe runner for the session, made at the first `run_recipe`: it keeps each recipe's
+   * cells, so an apply hands the verb the very plan the run showed (ADR 0170 decision 3). Its
+   * verbs are the installed plugins', activated into a host of its own as a render's are, minus
+   * the ones the render context refused.
+   */
+  let recipeRunner: Promise<RecipeRunner> | undefined;
+  function sessionRecipeRunner(home: string): Promise<RecipeRunner> {
+    recipeRunner ??= context().then(({ value }) => {
+      const contributions =
+        sessionOptions.recipeContributions ??
+        (() => {
+          const host = activateBuiltIns();
+          activateInstalled(host, withoutRefused(loaded, value.refusedPlugins));
+          return host.registry;
+        })();
+      const folder = workspace?.loaded.folder;
+      return createRecipeRunner({
+        contributions,
+        // The tool is offered only in a trusted workspace; anything else is held as restricted.
+        placeOf: () =>
+          Promise.resolve(folder === undefined ? { trust: 'none' } : { trust, folder }),
+        sectionFor: (_directory, plugin) =>
+          trust === 'trusted' ? projectSections(workspace?.loaded, {})[plugin] : undefined,
+        home,
+        clock: () => systemClock,
+        templates: async (name) => {
+          const current = (await context()).value;
+          return current.registry.get(current.configurations.select(name)?.template ?? name);
+        },
+      });
+    });
+    return recipeRunner;
   }
 
   let rasterizer: CliRasterizer | undefined;
@@ -624,6 +691,46 @@ export async function openSession(
         ...summary,
         files: report.result.artifacts.map((artifact) => artifact.name),
         cancelled: report.result.cancelled,
+      };
+    },
+
+    async runRecipe(request) {
+      if (trust !== 'trusted' || workspace === undefined) {
+        throw new ToolRefusal('run_recipe runs only in a trusted workspace');
+      }
+      if (environment.home === undefined) {
+        throw new ToolRefusal('run_recipe needs a Tyto home folder (TYTO_HOME) for its state');
+      }
+      if (extname(request.path).toLowerCase() !== '.recipe') {
+        throw new ToolRefusal('run_recipe runs a .recipe file and nothing else');
+      }
+      const confined = await confinedPath(request.path, cwd, roots);
+      if (!confined.ok) throw new ToolRefusal(confined.reason);
+      const path = confined.path;
+      const runner = await sessionRecipeRunner(environment.home);
+      const source: RecipeSource = { shown: shown(path), text: await readFile(path, 'utf8') };
+      if (request.apply === undefined) {
+        // `saved`, never `explicit`: every cell runs, sources included, and `apply auto` stays
+        // a plan, since a Run is the person's approval and an agent's call is not (ADR 0170).
+        const answer = await runner.run({
+          documentId: path,
+          text: source.text,
+          path,
+          saved: true,
+          fresh: true,
+        });
+        return runAnswer(answer, source);
+      }
+      const { cell, plan } = request.apply;
+      const after = await runner.apply({ documentId: path, index: cell, planId: plan, path });
+      if (after === undefined) throw new ToolRefusal(RECIPE_RUN_FIRST);
+      // A refusal (a plan replaced, applied already, a stale cell) is `E_RECIPE_APPLY` on this
+      // answer, and the cell may still carry an earlier Apply's record: that is not this one.
+      const refused = after.diagnostics.some((item) => item.code === 'E_RECIPE_APPLY');
+      return {
+        recipe: source.shown,
+        applied: !refused && after.applied !== undefined && after.planId === plan,
+        cell: cellAnswer(after, source),
       };
     },
 
