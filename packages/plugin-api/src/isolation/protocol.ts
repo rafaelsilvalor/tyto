@@ -51,9 +51,11 @@ import { agentServerSchema } from '../window.js';
  * plugin may ask for the window's agent server, a request a host on 19 would refuse as an
  * unknown capability (ADR 0183, TYTO-569); 21 since the answer to `processStart` carries the
  * folder the program runs in, a field the strict schema of a guest on 20 would refuse (ADR 0182,
- * note of 2026-11-09, TYTO-569).
+ * note of 2026-11-09, TYTO-569); 22 since a plugin may ask for a terminal tab running a program
+ * it declares, a request a host on 21 would refuse as an unknown capability (ADR 0184,
+ * TYTO-657).
  */
-export const RPC_PROTOCOL_VERSION = 21;
+export const RPC_PROTOCOL_VERSION = 22;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -235,6 +237,7 @@ const requestedCapabilitySchema = z.enum([
   'processEnd',
   'processKill',
   'windowAgentServer',
+  'terminalOpen',
 ]);
 export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
 
@@ -371,3 +374,9 @@ export function describeIssues(error: z.ZodError): string {
  */
 export const windowAgentServerArgsSchema = z.tuple([]);
 export const windowAgentServerSchema = agentServerSchema;
+
+/**
+ * `host.terminal.open` (ADR 0184): the name and the arguments go out, nothing comes back but
+ * that the tab opened. Shape only: the permission and the limit are `checkedTerminal`'s.
+ */
+export const terminalOpenArgsSchema = z.tuple([z.string(), z.array(z.string())]);

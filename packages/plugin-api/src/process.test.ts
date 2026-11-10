@@ -93,6 +93,58 @@ const manifest = (permissions: readonly string[]) => ({
   permissions,
 });
 
+describe('programs in the manifest (ADR 0184)', () => {
+  const withPrograms = (permissions: readonly string[], declared: Record<string, string>) => ({
+    ...manifest(permissions),
+    programs: declared,
+  });
+
+  it('accepts a declared program mapped to a script inside the plugin folder', () => {
+    for (const script of ['adapter/claude-agent-acp.mjs', 'run.js', 'a/b/c_d-1.cjs']) {
+      const result = validatePluginManifest(
+        withPrograms(['process:claude-agent-acp'], { 'claude-agent-acp': script }),
+      );
+      expect(result.ok, script).toBe(true);
+    }
+  });
+
+  it('refuses a script that leaves the folder, is absolute, or is not a Node script', () => {
+    const cases: Record<string, string> = {
+      '../escape.mjs': 'leaves the plugin folder',
+      'adapter/../../escape.mjs': 'leaves the plugin folder',
+      './run.mjs': 'leaves the plugin folder',
+      '/opt/run.mjs': 'is absolute',
+      'C:/run.mjs': 'is absolute',
+      'adapter\\run.mjs': 'uses a backslash',
+      'adapter/run.exe': 'does not end in .mjs',
+      'adapter/run.cmd': 'does not end in .mjs',
+      'adapter/run': 'does not end in .mjs',
+      'adapter/r un.mjs': 'characters other than',
+      'adapter//run.mjs': 'characters other than',
+      '': 'is not 1 to 200 characters',
+    };
+    for (const [script, problem] of Object.entries(cases)) {
+      const result = validatePluginManifest(withPrograms(['process:agent'], { agent: script }));
+      expect(result.ok, script).toBe(false);
+      if (!result.ok) {
+        expect(result.error[0]?.message, script).toContain('programs.agent');
+        expect(result.error[0]?.message, script).toContain(problem);
+      }
+    }
+  });
+
+  it('refuses a program the permissions do not declare, and a name no permission could', () => {
+    const undeclared = validatePluginManifest(withPrograms(['process:claude'], { agent: 'a.mjs' }));
+    expect(undeclared.ok).toBe(false);
+    if (!undeclared.ok)
+      expect(undeclared.error[0]?.message).toContain('needs the permission process:agent');
+
+    const badName = validatePluginManifest(withPrograms([], { 'Agent.exe': 'a.mjs' }));
+    expect(badName.ok).toBe(false);
+    if (!badName.ok) expect(badName.error[0]?.message).toContain('names a program that');
+  });
+});
+
 describe('process:<name> in the manifest', () => {
   it('accepts one program by its bare name', () => {
     for (const name of ['claude', 'claude-code-acp', 'gemini', 'node22', 'a.b_c']) {

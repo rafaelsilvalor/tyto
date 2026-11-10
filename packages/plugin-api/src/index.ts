@@ -263,9 +263,20 @@ export {
   allowsProcess,
   checkedProcesses,
   hostProcess,
+  type PluginProgramScripts,
   processChannel,
   programNameProblem,
+  programScript,
+  programScriptProblem,
 } from './process.js';
+export {
+  type HostTerminal,
+  type OpenTerminal,
+  type OpenedTerminal,
+  PLUGIN_TERMINAL_LIMIT,
+  checkedTerminal,
+  hostTerminal,
+} from './terminal.js';
 export {
   AGENT_SERVER_VARIABLES,
   type AgentServer,

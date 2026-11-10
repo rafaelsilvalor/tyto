@@ -790,6 +790,27 @@ await agent.write(
 
 **No permission of its own: it answers a plugin that declares at least one `process:<name>`**, and is `E_PERMISSION` for any other. The answer carries no secret, it is of no use without a program to hand it to, and a program the plugin starts could reach the window anyway. The install prompt says so in the `process:` paragraph. Ask again for each conversation: **`agentsListen` off is `E_WINDOW_AGENTS_OFF`** and **a restricted folder is `E_WINDOW_RESTRICTED`**, both read at each call. A host with no window (the CLI) answers `E_WINDOW_UNAVAILABLE`. `env` holds `TYTO_WINDOW` and `TYTO_HOME` and nothing else (`AGENT_SERVER_VARIABLES`), checked on the host's side with a strict schema. The port is `HostCapabilities.windowAgentServer(plugin)`, optional; `checkedWindowAgentServer` stands in front of it. Across the isolation boundary the request is `windowAgentServer` (protocol 20). In `testPlugin`, pass `windowAgentServer` in `capabilities` to stand in for the window.
 
+### A plugin's own program and `host.terminal` (ADR 0184)
+
+**A declared program may be the plugin's own script**, run on Tyto's bundled Node instead of found on the `PATH`:
+
+```json
+{
+  "permissions": ["process:claude-agent-acp"],
+  "programs": { "claude-agent-acp": "adapter/claude-agent-acp.mjs" }
+}
+```
+
+Each key of `programs` needs its `process:<name>` permission. Each value is a path inside the plugin's folder: forward slashes, no `.` or `..`, ending in `.mjs`, `.cjs` or `.js`, at most 200 characters (`programScriptProblem`). `host.process.start('claude-agent-acp', args)` then runs `node <script> <args…>` with everything else ADR 0182 says: the open folder, the environment allowlist, the limit, the lifetime. The host checks again on the disk, after links, that the file is inside the plugin's folder; a missing one is `E_PROCESS_SCRIPT_MISSING`. **The script is not confined like the plugin's process is**: it runs with the person's rights, and the install prompt says so in words. The port receives the script as the fifth argument of `startProcess`.
+
+**A plugin may open a Tyto terminal tab running a program it declares**, for a program that needs a person at the keyboard, such as an agent's login:
+
+```ts
+await host.terminal.open('claude-agent-acp', ['--cli', 'auth', 'login', '--claudeai']);
+```
+
+It resolves once the tab is open. **The plugin hears nothing after that**: no output, no exit. It reads the result from the program's own state the next time it asks. **One open tab per plugin** (`PLUGIN_TERMINAL_LIMIT`); a second while it is open is `E_TERMINAL_LIMIT`. An undeclared name is `E_PERMISSION`, a host with no terminal (the CLI) answers `E_TERMINAL_UNAVAILABLE`, and the adapter refuses as for `host.process.start`, with the same codes. The tab is the person's: it stays when the plugin stops. The port is `HostCapabilities.openTerminal(plugin, program, args, script?)`, answering `{ closed }`; `checkedTerminal` stands in front of it. Across the isolation boundary the request is `terminalOpen` (protocol 22). In `testPlugin`, pass `openTerminal` in `capabilities` to stand in for the window.
+
 ## Isolation
 
 - Main: each plugin in a process of its own under Node's permission model: a child of the CLI's Node, or of the Node the desktop carries (ADR 0050). Typed RPC; the host is a proxy.
