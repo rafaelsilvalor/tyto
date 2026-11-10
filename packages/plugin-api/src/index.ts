@@ -254,6 +254,7 @@ export {
   PROCESS_PERMISSION,
   PROCESS_UNREAD_LIMIT_BYTES,
   PROCESS_WRITE_LIMIT_BYTES,
+  PROGRAM_DATA_VARIABLE,
   type PluginProcess,
   type ProcessEvents,
   type ProcessExit,

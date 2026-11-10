@@ -186,3 +186,9 @@ Across the isolation boundary the answer to `processStart` is `{ id, cwd }`, whi
 protocol 21. The desktop reports the value it passed to `spawn`, so the two cannot disagree. The
 path is not a secret to a plugin whose program already runs there. No rule changes: decision 8
 still decides the folder, and this only reports it.
+
+## Note, 2026-11-10 — `TYTO_PROGRAM_DATA` (TYTO-666)
+
+Decision 8's environment gains one variable the host sets, as it sets `TYTO_WINDOW`:
+`TYTO_PROGRAM_DATA`, the plugin's data folder (ADR 0187). A value under that name in main's
+environment is never passed on.

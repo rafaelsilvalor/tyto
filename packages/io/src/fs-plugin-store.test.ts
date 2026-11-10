@@ -10,7 +10,7 @@ import {
 } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { fsPluginStore } from './fs-plugin-store.js';
+import { fsPluginStore, pluginDataDirectory } from './fs-plugin-store.js';
 
 /** The store on a real temp disk: every claim here is about what ends up in a folder. */
 
@@ -151,6 +151,30 @@ describe('fsPluginStore', () => {
     await store.remove('pdf');
 
     expect(await store.list()).toEqual([]);
+  });
+
+  it("keeps a plugin's data folder across an update and deletes it with the plugin", async () => {
+    const store = fsPluginStore(home);
+    await store.add('pdf', source);
+    const data = pluginDataDirectory(home, 'pdf');
+    await mkdir(data, { recursive: true });
+    await writeFile(join(data, 'kept.txt'), 'downloaded');
+
+    await store.add('pdf', source);
+    expect(await readFile(join(data, 'kept.txt'), 'utf8')).toBe('downloaded');
+
+    await store.remove('pdf');
+    await expect(lstat(data)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it("names a plugin's data folder outside its own folder and its cache", () => {
+    expect(pluginDataDirectory(home, 'pdf')).toBe(join(home, 'data', 'plugins', 'pdf'));
+  });
+
+  it('refuses a data folder for a name no plugin can have', () => {
+    for (const name of ['..', 'a/b', 'A', 'con', '']) {
+      expect(() => pluginDataDirectory(home, name)).toThrow(/data folder/u);
+    }
   });
 
   it('reports a state file it cannot read as a diagnostic naming it', async () => {

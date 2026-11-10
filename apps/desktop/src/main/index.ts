@@ -40,6 +40,7 @@ import {
   fsTrustStore,
   installedPacks,
   nodeFileSystem,
+  pluginDataDirectory,
   syncPluginFiles as syncPluginFolders,
   withoutRefused,
 } from '@tyto/io';
@@ -922,6 +923,13 @@ async function start(): Promise<void> {
       folderOf: (plugin) => pluginFolder(plugin),
       realpath: (path) => realpathSync(path),
       isFile: (path) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false,
+    },
+    // What a plugin's programs keep, such as an adapter they downloaded (ADR 0187): outside the
+    // plugin's folder, which an update replaces, and deleted with the plugin.
+    dataFolderOf: (plugin) => {
+      const folder = pluginDataDirectory(pluginsHome, plugin);
+      mkdirSync(folder, { recursive: true });
+      return folder;
     },
   });
   const workspace = createWorkspaceService({

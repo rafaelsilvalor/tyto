@@ -174,3 +174,10 @@ tab itself through `Terminals.openProgram` and pushes `terminal:opened`, carryin
 The window adopts the tab through `terminal:list`, as it does after a reload, and puts the
 Terminal tab in front. The plugins screen lists a plugin's own programs on a line of their own.
 `plugins:list` carries their names as `ownPrograms`.
+
+## Note, 2026-11-10 — a data folder, and what a program downloads (TYTO-666)
+
+ADR 0187 gives every program a plugin starts a data folder in `TYTO_PROGRAM_DATA`, kept across
+updates and deleted with the plugin. It amends decision 4: a script that downloads code keeps
+"fixed at install" in substance only when the plugin's release commits the hash of everything it
+fetches, and the script refuses anything else.

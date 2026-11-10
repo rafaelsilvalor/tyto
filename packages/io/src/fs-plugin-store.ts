@@ -34,6 +34,7 @@ import {
  *   plugins.json          what install approved, per plugin
  *   crashes.json          when a plugin's process last ended unasked (ADR 0041)
  *   plugins/<name>/       tyto-plugin.json, dist/index.js, whatever else it ships
+ *   data/plugins/<name>/  what the plugin's programs keep (ADR 0187), across its updates
  * ```
  *
  * `<home>` is `~/.tyto` for both apps — the composition root decides, and a test hands a
@@ -45,6 +46,23 @@ export const PLUGINS_DIR = 'plugins';
 export const PLUGIN_STATE_FILE = 'plugins.json';
 export const PLUGIN_CRASHES_FILE = 'crashes.json';
 export const PLUGIN_MANIFEST_FILE = 'tyto-plugin.json';
+
+/** A plugin name a folder can be named after, as the cache's (ADR 0138) and the manifest's. */
+const PLAIN_PLUGIN_NAME = /^[a-z0-9][a-z0-9-]*$/u;
+const WINDOWS_DEVICE = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/u;
+
+/**
+ * The folder a plugin's programs keep their files in (ADR 0187): `<home>/data/plugins/<name>`.
+ * **Not inside `plugins/<name>`**, which an update replaces whole, so what a program downloaded
+ * survives the next version; deleted with the plugin by `remove`. Throws for a name that is not
+ * a plain folder name, which no installed plugin has.
+ */
+export function pluginDataDirectory(home: string, name: string): string {
+  if (!PLAIN_PLUGIN_NAME.test(name) || WINDOWS_DEVICE.test(name)) {
+    throw new Error(`'${name}' is not a plugin name a data folder can be named after`);
+  }
+  return join(home, 'data', PLUGINS_DIR, name);
+}
 
 function isMissing(cause: unknown): boolean {
   return (cause as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
@@ -191,6 +209,11 @@ export function fsPluginStore(home: string): PluginStore {
 
     async remove(name: string): Promise<void> {
       await rm(join(pluginsDirectory, name), { recursive: true, force: true });
+      // What its programs kept goes with it (ADR 0187). A folder copied in by hand under a name
+      // no plugin could have has no data folder to delete.
+      if (PLAIN_PLUGIN_NAME.test(name) && !WINDOWS_DEVICE.test(name)) {
+        await rm(pluginDataDirectory(home, name), { recursive: true, force: true });
+      }
     },
 
     directoryOf(name: string): string {
