@@ -143,7 +143,7 @@ maintainer before running it on a real workspace. With the mode off, every comma
 
 `tyto mcp [folder]` serves a folder's templates and briefs to an agent over the Model Context
 Protocol on stdio (TYTO-565, ADR 0179). The agent's host starts it and talks to it; nobody runs it
-by hand. It offers four tools, all of them reads:
+by hand. It offers four reads to any folder, and three writes to a trusted one:
 
 | Tool                | What it answers                                                       |
 | ------------------- | --------------------------------------------------------------------- |
@@ -151,10 +151,16 @@ by hand. It offers four tools, all of them reads:
 | `describe_template` | A template's formats and sizes, its slots, and a new brief's skeleton |
 | `check_brief`       | A brief's diagnostics with line and column; structure only, no fetch  |
 | `render_preview`    | One format as PNG, at most 1,024 px on its longest side, 4 artworks   |
+| `write_brief`       | Creates or replaces one `.brief`; `dry_run` shows the diff and hash   |
+| `new_delivery`      | `tyto delivery new`: the folder, its layout's folders and the brief   |
+| `export`            | Renders to a preset's folder, the delivery's or the workspace output  |
 
-A brief is named by a path inside the folder (or its workspace) or handed over as text. Nothing
-is written. In a folder nobody trusted, the folder's plugin files are not loaded, as on
-`tyto render`; when write tools arrive, such a folder will not be offered them.
+A brief is named by a path inside the folder (or its workspace) or handed over as text. The reads
+write nothing. In a folder nobody trusted, the folder's plugin files are not loaded, as on
+`tyto render`, and the write tools are not offered (ADR 0179 decision 3). The writes follow ADR
+0185: only `.brief` files, a replacement needs the SHA-256 a dry run answered, an export goes
+only where the workspace says, and a brief in a folder a live window has open is not replaced
+(propose it through `--window` instead).
 
 The command is the built CLI, `node <repository>/apps/cli/dist/index.js` (`pnpm cli` builds it).
 

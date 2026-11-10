@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -10,6 +10,8 @@ import type { CliEnvironment } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK } from '../exit.js';
 import { run } from '../program.js';
 import { NO_STDIO } from './command.js';
+import { openSession } from './session.js';
+import { recordPath } from './window-endpoint.js';
 import { MCP_TOOLS, PREVIEW_MAX_SIDE, toolsFor } from './tools.js';
 
 import briefSource from '../__fixtures__/cartaz.brief?raw';
@@ -457,4 +459,371 @@ describe('toolsFor', () => {
       expect(toolsFor('trusted')).toContain(tool.name);
     }
   });
+});
+
+/**
+ * The tools that write (ADR 0185), in a trusted workspace: the folder holds a project file that
+ * names an output folder and a preset, and `trust add` trusted it in a home of the test's own.
+ */
+describe('the tools that write', () => {
+  let home: string;
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'tyto-mcp-home-'));
+    await mkdir(join(folder, '.tyto'), { recursive: true });
+    await writeFile(
+      join(folder, '.tyto', 'project.json'),
+      JSON.stringify({
+        output: 'exports',
+        exportPresets: { redes: { formats: ['feed'], types: ['svg'], folder: 'entregas' } },
+      }),
+    );
+    const trusted = await run(['trust', 'add', folder], {
+      console: { out: () => undefined, err: () => undefined },
+      version: '0.0.0-test',
+      cwd: folder,
+      home,
+      confirm: () => Promise.resolve(true),
+      rasterizer: () => fakeRasterizer(),
+    });
+    expect(trusted).toBe(EXIT_OK);
+  });
+
+  afterEach(async () => {
+    await rm(home, { recursive: true, force: true });
+  });
+
+  const trustedClient = () => connect({ home });
+  const answerOf = <T>(result: { content: { type: string; text?: string }[] }): T =>
+    JSON.parse(textOf(result)) as T;
+
+  interface Written {
+    written: boolean;
+    path: string;
+    change: string;
+    sha256: string | null;
+    diff: string;
+  }
+
+  it('are offered in a trusted workspace, and only there', async () => {
+    const client = trustedClient();
+    await client.start();
+    const listed = await client.request('tools/list');
+    const tools = listed.result?.['tools'] as {
+      name: string;
+      annotations?: { destructiveHint?: boolean };
+    }[];
+    expect(tools.map((tool) => tool.name).sort()).toEqual(toolsFor('trusted').slice().sort());
+    expect(tools.find((tool) => tool.name === 'write_brief')?.annotations?.destructiveHint).toBe(
+      true,
+    );
+    await client.stop();
+    for (const name of ['write_brief', 'new_delivery', 'export']) {
+      expect(toolsFor('restricted')).not.toContain(name);
+    }
+  }, 30_000);
+
+  it('write a new brief, show a replacement before making it, and refuse a stale one', async () => {
+    const client = trustedClient();
+    await client.start();
+    const created = answerOf<Written>(
+      await client.call('write_brief', { path: 'nova/a.brief', text: 'titulo: Um\n' }),
+    );
+    expect(created).toMatchObject({ written: true, change: 'create', diff: '+titulo: Um' });
+    expect(await readFile(join(folder, 'nova', 'a.brief'), 'utf8')).toBe('titulo: Um\n');
+
+    // Replacing needs the file's hash, which a dry run answers, writing nothing.
+    const blind = await client.call('write_brief', {
+      path: 'nova/a.brief',
+      text: 'titulo: Dois\n',
+    });
+    expect(blind.isError).toBe(true);
+    expect(textOf(blind)).toContain('dry_run');
+    const planned = answerOf<Written>(
+      await client.call('write_brief', {
+        path: 'nova/a.brief',
+        text: 'titulo: Dois\n',
+        dry_run: true,
+      }),
+    );
+    expect(planned).toMatchObject({
+      written: false,
+      change: 'replace',
+      sha256: created.sha256,
+      diff: '-titulo: Um\n+titulo: Dois',
+    });
+    expect(await readFile(join(folder, 'nova', 'a.brief'), 'utf8')).toBe('titulo: Um\n');
+
+    // Someone changes the file after the dry run: the hash no longer matches.
+    await writeFile(join(folder, 'nova', 'a.brief'), 'titulo: Outro\n');
+    const stale = await client.call('write_brief', {
+      path: 'nova/a.brief',
+      text: 'titulo: Dois\n',
+      replace: planned.sha256,
+    });
+    expect(stale.isError).toBe(true);
+    expect(textOf(stale)).toMatch(/^stale:/u);
+    expect(await readFile(join(folder, 'nova', 'a.brief'), 'utf8')).toBe('titulo: Outro\n');
+
+    const again = answerOf<Written>(
+      await client.call('write_brief', {
+        path: 'nova/a.brief',
+        text: 'titulo: Dois\n',
+        dry_run: true,
+      }),
+    );
+    const replaced = answerOf<Written>(
+      await client.call('write_brief', {
+        path: 'nova/a.brief',
+        text: 'titulo: Dois\n',
+        replace: again.sha256,
+      }),
+    );
+    expect(replaced).toMatchObject({ written: true, change: 'replace' });
+    expect(await readFile(join(folder, 'nova', 'a.brief'), 'utf8')).toBe('titulo: Dois\n');
+    // Nothing left beside it from the temporary write.
+    expect(await readdir(join(folder, 'nova'))).toEqual(['a.brief']);
+    await client.stop();
+  }, 30_000);
+
+  it('write only a .brief, and only inside the folder, links included', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'tyto-mcp-write-out-'));
+    try {
+      await writeFile(join(outside, 'there.brief'), 'titulo: Fora\n');
+      await symlink(
+        outside,
+        join(folder, 'linked'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      const client = trustedClient();
+      await client.start();
+      const escapes = [
+        join('..', basename(outside), 'new.brief'),
+        join(outside, 'new.brief'),
+        join('linked', 'there.brief'),
+        join('linked', 'new.brief'),
+        join('linked', 'deeper', 'new.brief'),
+      ];
+      for (const path of ['.tyto/project.json', 'templates/cartaz/template.html', ...escapes]) {
+        for (const dryRun of [true, false]) {
+          const answer = await client.call('write_brief', {
+            path,
+            text: 'titulo: X\n',
+            dry_run: dryRun,
+          });
+          expect(answer.isError, path).toBe(true);
+          expect(textOf(answer), path).toContain(
+            escapes.includes(path) ? 'is outside the folder' : 'writes only .brief',
+          );
+        }
+      }
+      await client.stop();
+      expect(await readdir(outside)).toEqual(['there.brief']);
+      expect(await readFile(join(outside, 'there.brief'), 'utf8')).toBe('titulo: Fora\n');
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('refuse to replace a brief a window holds, and say what to do instead', async () => {
+    await writeFile(join(folder, 'open.brief'), 'titulo: Aberto\n');
+    const session = await openSession(
+      {
+        console: { out: () => undefined, err: () => undefined },
+        version: '0.0.0-test',
+        cwd: folder,
+        home,
+        rasterizer: () => fakeRasterizer(),
+      },
+      { heldOpen: () => Promise.resolve('a Tyto window has this brief open; propose the edit') },
+    );
+    try {
+      const { sha256 } = await session.writeBrief({
+        path: 'open.brief',
+        text: 'titulo: Novo\n',
+        dryRun: true,
+      });
+      await expect(
+        session.writeBrief({ path: 'open.brief', text: 'titulo: Novo\n', replace: sha256 ?? '' }),
+      ).rejects.toThrow('propose the edit');
+      expect(await readFile(join(folder, 'open.brief'), 'utf8')).toBe('titulo: Aberto\n');
+    } finally {
+      await session.close();
+    }
+  }, 30_000);
+
+  /** A live window's record: this test's own process id, so the pid is alive. */
+  async function windowRecord(open: string | null): Promise<void> {
+    await mkdir(join(home, 'windows'), { recursive: true });
+    await writeFile(
+      recordPath(home, process.pid, process.platform),
+      JSON.stringify({
+        version: 1,
+        pid: process.pid,
+        endpoint: 'unused',
+        folder: open,
+        token: 'f'.repeat(32),
+        startedAt: new Date().toISOString(),
+      }),
+    );
+  }
+
+  async function replaceWhileWindowHas(open: string | null): Promise<{
+    replaced: { isError?: boolean; text: string };
+    created: { isError?: boolean };
+  }> {
+    await writeFile(join(folder, 'open.brief'), 'titulo: Aberto\n');
+    await windowRecord(open);
+    const client = trustedClient();
+    await client.start();
+    const { sha256 } = answerOf<Written>(
+      await client.call('write_brief', {
+        path: 'open.brief',
+        text: 'titulo: Novo\n',
+        dry_run: true,
+      }),
+    );
+    const replaced = await client.call('write_brief', {
+      path: 'open.brief',
+      text: 'titulo: Novo\n',
+      replace: sha256,
+    });
+    const created = await client.call('write_brief', { path: 'fresh.brief', text: 'titulo: Um\n' });
+    await client.stop();
+    return { replaced: { ...replaced, text: textOf(replaced) }, created };
+  }
+
+  it('refuse to replace a brief in a folder a live window has open, and still create one', async () => {
+    const { replaced, created } = await replaceWhileWindowHas(folder);
+    expect(replaced.isError).toBe(true);
+    expect(replaced.text).toContain('propose_edit');
+    expect(await readFile(join(folder, 'open.brief'), 'utf8')).toBe('titulo: Aberto\n');
+    expect(created.isError).toBeUndefined();
+  }, 30_000);
+
+  it('control: replace it when the live window has another folder open, or none', async () => {
+    const elsewhere = await mkdtemp(join(tmpdir(), 'tyto-mcp-elsewhere-'));
+    try {
+      for (const open of [elsewhere, null]) {
+        const { replaced } = await replaceWhileWindowHas(open);
+        expect(replaced.isError, String(open)).toBeUndefined();
+        expect(await readFile(join(folder, 'open.brief'), 'utf8')).toBe('titulo: Novo\n');
+      }
+    } finally {
+      await rm(elsewhere, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("make a delivery from a template's skeleton, and never overwrite its brief", async () => {
+    const client = trustedClient();
+    await client.start();
+    const planned = answerOf<{ made: boolean; brief: string; folders: string[] }>(
+      await client.call('new_delivery', { name: 'TYTO-1', template: 'cartaz', dry_run: true }),
+    );
+    expect(planned.made).toBe(false);
+    expect(planned.folders.length).toBeGreaterThan(0);
+    await expect(readFile(join(folder, planned.brief), 'utf8')).rejects.toThrow();
+
+    const made = answerOf<{ made: boolean; brief: string }>(
+      await client.call('new_delivery', { name: 'TYTO-1', template: 'cartaz' }),
+    );
+    expect(made).toMatchObject({ made: true, brief: planned.brief });
+    expect(await readFile(join(folder, made.brief), 'utf8')).toContain('template: cartaz');
+
+    const twice = await client.call('new_delivery', { name: 'TYTO-1' });
+    expect(twice.isError).toBe(true);
+    await client.stop();
+  }, 30_000);
+
+  interface Exported {
+    exported: boolean;
+    folder: string;
+    types: string[];
+    files: string[];
+  }
+
+  it("export into the folder the workspace names, a preset's or the output, never the caller's", async () => {
+    const client = trustedClient();
+    await client.start();
+    const dry = answerOf<Exported>(
+      await client.call('export', { path: 'task/brief.brief', types: ['svg'], dry_run: true }),
+    );
+    expect(dry).toMatchObject({ exported: false, folder: 'exports', files: [] });
+    await expect(readdir(join(folder, 'exports'))).rejects.toThrow();
+
+    const toOutput = answerOf<Exported>(
+      await client.call('export', { path: 'task/brief.brief', types: ['svg'] }),
+    );
+    expect(toOutput.exported).toBe(true);
+    expect(toOutput.files).toHaveLength(2);
+    for (const file of toOutput.files) await readFile(join(folder, 'exports', file));
+
+    const toPreset = answerOf<Exported>(
+      await client.call('export', { path: 'task/brief.brief', preset: 'redes' }),
+    );
+    expect(toPreset).toMatchObject({ exported: true, folder: 'entregas', types: ['svg'] });
+
+    const mixed = await client.call('export', {
+      path: 'task/brief.brief',
+      preset: 'redes',
+      types: ['png'],
+    });
+    expect(textOf(mixed)).toContain('decide their own');
+    const unknown = await client.call('export', { path: 'task/brief.brief', preset: 'nope' });
+    expect(textOf(unknown)).toContain('known: redes');
+    const notDelivery = await client.call('export', { path: 'task/brief.brief', delivery: true });
+    expect(textOf(notDelivery)).toContain('not the brief of a delivery');
+    // A folder the caller names is not an argument the tool has: it is dropped.
+    const named = await client.call('export', {
+      path: 'task/brief.brief',
+      types: ['svg'],
+      out: 'elsewhere',
+      dry_run: true,
+    });
+    expect(answerOf<Exported>(named).folder).toBe('exports');
+    await client.stop();
+  }, 30_000);
+
+  /**
+   * As `framesRastered` above, for an export to PNG in the output folder: three artworks, two
+   * rastered at a time as `tyto render` does, so the third starts only if nobody cancelled.
+   */
+  async function framesExported(cancel: boolean): Promise<number> {
+    await writeFile(
+      join(folder, 'task', 'three.brief'),
+      '---\ntemplate: cartaz\nformats: [feed]\n---\n::slide\n  Um\n::slide\n  Dois\n::slide\n  Tres\n',
+    );
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const rasterizer = fakeRasterizer(gate);
+    const client = connect({ home, rasterizer: () => rasterizer });
+    await client.start();
+    const id = client.nextId();
+    client.send({
+      id,
+      method: 'tools/call',
+      params: {
+        name: 'export',
+        arguments: { path: 'task/three.brief', types: ['png'], formats: ['feed'] },
+      },
+    });
+    await expect.poll(() => rasterizer.calls.length).toBe(2);
+    if (cancel) client.send({ method: 'notifications/cancelled', params: { requestId: id } });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const count = rasterizer.calls.length;
+    await client.stop();
+    return count;
+  }
+
+  it('stop exporting when the client cancels the call', async () => {
+    expect(await framesExported(true)).toBe(2);
+  }, 30_000);
+
+  it('control: export every artwork when nobody cancels', async () => {
+    expect(await framesExported(false)).toBe(3);
+  }, 30_000);
 });

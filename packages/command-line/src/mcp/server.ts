@@ -201,9 +201,147 @@ export function createMcpServer(
     );
   }
 
+  registerWriteTools(server, session, offers, err);
   if (window !== undefined) registerWindowTools(server, session, window, offers, err);
 
   return server;
+}
+
+const dryRun = z.boolean().optional().describe('true: answer what would change and write nothing');
+
+/**
+ * The tools that write (ADR 0185), offered only in a trusted workspace (ADR 0179 decision 3).
+ * Each can say what it would change first, with `dry_run`, and its annotations tell the agent's
+ * host it changes files, so a host that asks before such a call asks the person.
+ */
+function registerWriteTools(
+  server: McpServer,
+  session: McpSession,
+  offers: (name: McpToolName) => boolean,
+  err: CliConsole['err'],
+): void {
+  const writes = {
+    readOnlyHint: false,
+    destructiveHint: true,
+    idempotentHint: false,
+    openWorldHint: false,
+  };
+
+  if (offers('write_brief')) {
+    server.registerTool(
+      'write_brief',
+      {
+        title: 'Write a brief',
+        description:
+          'Creates or replaces one .brief file inside the served folder; no other kind of file. Call it with dry_run first: it answers what would change, as lines (- removed, + added), and the sha256 of the file there now. Replacing a file needs replace set to that sha256, so a file someone changed since is refused as stale instead of overwritten. A file open in a Tyto window is not replaced: propose the edit in the window instead (tyto mcp --window, propose_edit).',
+        inputSchema: z.object({
+          path: z
+            .string()
+            .describe('the .brief file, relative to the folder tyto mcp was started in'),
+          text: z.string().describe('the whole text of the brief'),
+          dry_run: dryRun,
+          replace: z
+            .string()
+            .optional()
+            .describe('the sha256 a dry run answered for the file there; required to replace it'),
+        }),
+        annotations: writes,
+      },
+      (input) =>
+        answering(err, async () => ({
+          content: [
+            text(
+              await session.writeBrief({
+                path: input.path,
+                text: input.text,
+                ...(input.dry_run === undefined ? {} : { dryRun: input.dry_run }),
+                ...(input.replace === undefined ? {} : { replace: input.replace }),
+              }),
+            ),
+          ],
+        })),
+    );
+  }
+
+  if (offers('new_delivery')) {
+    server.registerTool(
+      'new_delivery',
+      {
+        title: 'Make a delivery',
+        description:
+          "Makes a delivery as tyto delivery new does: a folder named after the piece of work, the folders the workspace's layout lists, and a brief in it, started from a template's skeleton when one is named. An existing folder is reused; an existing brief is never overwritten. dry_run answers the folders and the brief it would make.",
+        inputSchema: z.object({
+          name: z.string().describe("the delivery's name, usually its ticket"),
+          template: z
+            .string()
+            .optional()
+            .describe('start the brief from this template, as list_templates names it'),
+          dry_run: dryRun,
+        }),
+        annotations: { ...writes, destructiveHint: false },
+      },
+      (input) =>
+        answering(err, async () => ({
+          content: [
+            text(
+              await session.newDelivery({
+                name: input.name,
+                ...(input.template === undefined ? {} : { template: input.template }),
+                ...(input.dry_run === undefined ? {} : { dryRun: input.dry_run }),
+              }),
+            ),
+          ],
+        })),
+    );
+  }
+
+  if (offers('export')) {
+    server.registerTool(
+      'export',
+      {
+        title: 'Export a brief',
+        description:
+          "Renders a brief's artwork to files, into a folder this workspace names: an export preset's folder (preset), the brief's delivery's exports folder (delivery), or else the workspace's output folder. The folder is never chosen by the caller. A preset and a delivery decide their own formats and types; otherwise formats narrow the brief's list and types default to png. Files already there with the same names are overwritten. dry_run answers the folder, formats and types and renders nothing.",
+        inputSchema: z.object({
+          path: z
+            .string()
+            .describe('the .brief file, relative to the folder tyto mcp was started in'),
+          preset: z.string().optional().describe("an export preset's name, from the workspace"),
+          delivery: z.boolean().optional().describe("true: export into the brief's delivery"),
+          formats: z
+            .array(z.string())
+            .optional()
+            .describe('format ids, as describe_template lists them'),
+          types: z
+            .array(z.string())
+            .optional()
+            .describe('png, jpeg, webp, svg, or a kind an installed exporter adds'),
+          template: briefShape.template,
+          dry_run: dryRun,
+        }),
+        annotations: writes,
+      },
+      (input, context) =>
+        answering(err, async () => {
+          const answer = await session.exportBrief(
+            {
+              path: input.path,
+              ...(input.preset === undefined ? {} : { preset: input.preset }),
+              ...(input.delivery === undefined ? {} : { delivery: input.delivery }),
+              ...(input.formats === undefined ? {} : { formats: input.formats }),
+              ...(input.types === undefined ? {} : { types: input.types }),
+              ...(input.template === undefined ? {} : { template: input.template }),
+              ...(input.dry_run === undefined ? {} : { dryRun: input.dry_run }),
+            },
+            context.mcpReq.signal,
+          );
+          return {
+            content: [text(answer)],
+            ...(answer.status === 'error' ? { isError: true } : {}),
+          };
+        }),
+    );
+  }
 }
 
 /** The window's tools (ADR 0180): two reads of what is on screen, and two actions. */

@@ -137,3 +137,8 @@ ADR 0180 changes the last sentence of decision 8: the window now serves agents o
 endpoint, so the desktop's main bundle no longer keeps `@modelcontextprotocol/server` external.
 It is bundled into the lazy chunk that loads when the first agent connects; ADR 0180's amendment
 has the sizes.
+
+## Amendment — 2026-11-10, TYTO-565 PR 2
+
+The writes of decision 2 land as `write_brief`, `new_delivery` and `export`, under decision 3's
+rule; ADR 0185 decides what they may write, where, and how a change is shown first.

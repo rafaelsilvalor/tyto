@@ -1,7 +1,7 @@
 # Connect an AI agent
 
 ::: info How this page was checked
-Every command was run on 2026-11-09 on a development build of the branch that added it (TYTO-565, CLI 0.10.9) on Windows 11, with a small agent stand-in that speaks the protocol the way Claude Code does. The outputs below are copied from those runs. The section on the open window was run the same way on the branch that added it (TYTO-566). The section on Tyto's terminal was run by the project's automated tests on the branch that added it (TYTO-567), and its log line copied from that run; the two `claude mcp add` lines were not run, and their folders are the installers' defaults, read in their configuration.
+Every command was run on 2026-11-09 on a development build of the branch that added it (TYTO-565, CLI 0.10.9) on Windows 11, with a small agent stand-in that speaks the protocol the way Claude Code does. The outputs below are copied from those runs. The section on the open window was run the same way on the branch that added it (TYTO-566). The section on Tyto's terminal was run by the project's automated tests on the branch that added it (TYTO-567), and its log line copied from that run; the two `claude mcp add` lines were not run, and their folders are the installers' defaults, read in their configuration. The section on changing files was checked by the project's automated tests on the branch that added it (TYTO-565, 2026-11-10); no output in it was copied from a run by hand.
 :::
 
 `tyto mcp` lets an AI agent such as Claude Code or Claude Desktop work with a project folder: list its templates, read what a template expects, check a brief for errors and look at a preview of the artwork, before it shows you anything. It speaks the [Model Context Protocol](https://modelcontextprotocol.io), the way those agents reach a program on your computer.
@@ -87,7 +87,7 @@ Started anywhere else, it picks a window as `tyto mcp --window` does. These path
 
 ## What the agent can do
 
-Four things, and none of them changes a file:
+Four things that change no file:
 
 - **List the templates** a brief in the folder can use: yours, the ones that come with Tyto and the ones plugins add.
 - **Describe a template**: its sizes, the fields it expects and the skeleton a new brief starts from.
@@ -114,11 +114,21 @@ Four things, and none of them changes a file:
 
 - **See a preview** of one size as an image. A large size is shrunk to 1,024 pixels on its longest side, and a carousel shows its first four slides, so the images stay small enough for the agent to look at. A 1200 × 628 banner came back as a 1024 × 536 PNG.
 
+## What it can change, in a folder you trust
+
+In a folder you have [trusted](../editor/workspace-folder.md), the agent can also change files, in three ways. In a folder you have not trusted it is not offered them at all.
+
+- **Write a brief**: create a `.brief` file, or replace one. It writes briefs and nothing else, so it cannot touch `.tyto/project.json`, a template or a plugin's files. Before replacing a brief it asks what would change and gets the lines removed and added; it then has to name the version it read, so a brief somebody changed in the meantime is refused instead of overwritten.
+- **Make a delivery**, as [`tyto delivery new`](./deliveries.md) does: the folder, the folders your layout lists and the brief, started from a template if it names one. An existing brief is never overwritten.
+- **Export** a brief's artwork. The files go where your folder says, never where the agent says: an export preset's folder, the delivery's export folder, or the folder's `output`. If none is set, it is refused. Cancelling the request in the agent stops the export after the slides already being drawn.
+
+**A brief in a folder you have open in a Tyto window is not replaced.** The window keeps the text it opened, and its next save would erase the agent's change without a word. The agent is told to propose the change in the window instead, with `tyto mcp --window`, where you accept or reject it. It can still create a new brief there.
+
 ## What stays out of its reach
 
 - **Only the folder and its workspace.** A path outside them is refused, and so is a shortcut inside the folder that leads outside.
 - **No passwords or keys.** No answer carries a credential, the environment the plugins read them from, or the plugin settings in `.tyto/project.json`.
-- **A folder you have not trusted stays restricted.** Its plugin files are not loaded, as on `tyto render`. Tools that write files are planned; a folder you have not [trusted](../editor/workspace-folder.md) will not be offered them.
+- **A folder you have not trusted stays restricted.** Its plugin files are not loaded, as on `tyto render`. The agent is offered nothing that changes a file there.
 - **Not from the window.** The [Commands](../editor/commands.md) tab refuses `tyto mcp`, `--window` included: the agent starts it on its own.
 
 ## When something goes wrong

@@ -1,7 +1,7 @@
 # Conectar um agente de IA
 
 ::: info Como esta página foi conferida
-Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções. A seção sobre a janela aberta foi executada do mesmo jeito na branch que a criou (TYTO-566). A seção sobre o terminal do Tyto rodou pelos testes automáticos do projeto na branch que a criou (TYTO-567), e a linha de log foi copiada dessa execução; as duas linhas `claude mcp add` não foram executadas, e as pastas delas são as padrão dos instaladores, lidas na configuração deles.
+Cada comando foi executado em 2026-11-09 num build de desenvolvimento da branch que o criou (TYTO-565, CLI 0.10.9) no Windows 11, com um pequeno substituto de agente que fala o protocolo do jeito que o Claude Code fala. As saídas abaixo foram copiadas dessas execuções. A seção sobre a janela aberta foi executada do mesmo jeito na branch que a criou (TYTO-566). A seção sobre o terminal do Tyto rodou pelos testes automáticos do projeto na branch que a criou (TYTO-567), e a linha de log foi copiada dessa execução; as duas linhas `claude mcp add` não foram executadas, e as pastas delas são as padrão dos instaladores, lidas na configuração deles. A seção sobre mudar arquivos foi conferida pelos testes automáticos do projeto na branch que a criou (TYTO-565, 2026-11-10); nenhuma saída nela foi copiada de uma execução à mão.
 :::
 
 `tyto mcp` deixa um agente de IA, como o Claude Code ou o Claude Desktop, trabalhar com uma pasta de projeto: listar os templates, ler o que um template espera, conferir os erros de um brief e olhar a prévia da arte, antes de mostrar qualquer coisa a você. Ele fala o [Model Context Protocol](https://modelcontextprotocol.io), o jeito como esses agentes alcançam um programa no seu computador.
@@ -87,7 +87,7 @@ Aberto em qualquer outro lugar, ele escolhe uma janela como `tyto mcp --window` 
 
 ## O que o agente pode fazer
 
-Quatro coisas, e nenhuma muda um arquivo:
+Quatro coisas que não mudam arquivo nenhum:
 
 - **Listar os templates** que um brief na pasta pode usar: os seus, os que vêm com o Tyto e os que os plugins acrescentam.
 - **Descrever um template**: os tamanhos, os campos que ele espera e o esqueleto de onde um brief novo começa.
@@ -114,11 +114,21 @@ Quatro coisas, e nenhuma muda um arquivo:
 
 - **Ver a prévia** de um tamanho como imagem. Um tamanho grande é reduzido a 1.024 pixels no lado maior, e um carrossel mostra os quatro primeiros slides, para as imagens caberem no que o agente consegue olhar. Um banner de 1200 × 628 voltou como um PNG de 1024 × 536.
 
+## O que ele pode mudar, numa pasta em que você confia
+
+Numa pasta em que você [confiou](../editor/workspace-folder.md), o agente também pode mudar arquivos, de três jeitos. Numa pasta em que você não confiou, eles nem são oferecidos.
+
+- **Escrever um brief**: criar um arquivo `.brief` ou substituir um. Ele escreve briefs e mais nada, então não mexe no `.tyto/project.json`, num template nem nos arquivos de um plugin. Antes de substituir um brief ele pergunta o que mudaria e recebe as linhas tiradas e acrescentadas; depois precisa dizer qual versão leu, e um brief que alguém mudou nesse meio-tempo é recusado em vez de sobrescrito.
+- **Criar uma entrega**, como o [`tyto delivery new`](./deliveries.md): a pasta, as pastas que o seu layout lista e o brief, começado de um template se ele nomear um. Um brief que já existe nunca é sobrescrito.
+- **Exportar** a arte de um brief. Os arquivos vão para onde a sua pasta diz, nunca para onde o agente diz: a pasta de um preset de exportação, a pasta de exportação da entrega ou o `output` da pasta. Sem nenhum dos três, é recusado. Cancelar o pedido no agente para a exportação depois dos slides que já estão sendo desenhados.
+
+**Um brief numa pasta que você tem aberta numa janela do Tyto não é substituído.** A janela fica com o texto que abriu, e o próximo salvar dela apagaria a mudança do agente sem aviso. O agente é orientado a propor a mudança na janela, com `tyto mcp --window`, onde você aceita ou rejeita. Ele ainda pode criar um brief novo ali.
+
 ## O que fica fora do alcance dele
 
 - **Só a pasta e a pasta de trabalho dela.** Um caminho fora delas é recusado, e também um atalho dentro da pasta que leva para fora.
 - **Nenhuma senha ou chave.** Nenhuma resposta traz uma credencial, o ambiente de onde os plugins as leem, nem as configurações de plugin do `.tyto/project.json`.
-- **Uma pasta em que você não confiou continua restrita.** Os arquivos de plugin dela não são carregados, como no `tyto render`. Ferramentas que escrevem arquivos estão planejadas; uma pasta em que você não [confiou](../editor/workspace-folder.md) não vai recebê-las.
+- **Uma pasta em que você não confiou continua restrita.** Os arquivos de plugin dela não são carregados, como no `tyto render`. Nada que muda um arquivo é oferecido ao agente ali.
 - **Não pela janela.** A aba [Comandos](../editor/commands.md) recusa `tyto mcp`, inclusive com `--window`: o agente o inicia sozinho.
 
 ## Quando algo dá errado
