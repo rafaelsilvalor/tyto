@@ -42,6 +42,10 @@ const PANEL_SCRIPT = `window.addEventListener('message', (event) => {
     document.getElementById('count').textContent =
       String((data.text.match(/^::/gmu) || []).length) + ' diretivas';
     window.__lastDocument = data.text;
+    window.__lastFront = { name: data.name, format: data.format };
+  }
+  if (data && data.tyto === 'panel' && data.type === 'event' && data.event === 'language') {
+    window.__languages = (window.__languages || []).concat(data.language);
   }
   // A call's answer, rendered: what the plugin's process said, or the host's refusal.
   if (data && data.tyto === 'panel' && data.type === 'response' && data.id >= 100) {
@@ -231,6 +235,33 @@ describe('a plugin panel in the window', () => {
       { timeout: 10_000, polling: 25 },
     );
     await page.screenshot({ path: join(tmpdir(), 'tyto-49-panel.png') });
+    // TYTO-660: with the text, what the tab is: a brief never saved has no name yet.
+    const front = (await frame.evaluate(
+      () => (globalThis as { __lastFront?: unknown }).__lastFront,
+    )) as { name?: unknown; format?: unknown };
+    expect(front.name).toBeNull();
+    expect(front.format === null || typeof front.format === 'string').toBe(true);
+  }, 30_000);
+
+  it('hears the window’s language when it loads and when it changes (TYTO-660)', async () => {
+    const frame = await panelFrame();
+    const languages = (): Promise<unknown> =>
+      frame.evaluate(() => (globalThis as { __languages?: unknown }).__languages);
+    const first = ((await languages()) as string[] | undefined)?.at(-1);
+    expect(['en', 'pt-BR']).toContain(first);
+    await runFromBar('shell.toggleLocale');
+    const other = first === 'en' ? 'pt-BR' : 'en';
+    await frame.waitForFunction(
+      (expected) => (globalThis as { __languages?: string[] }).__languages?.at(-1) === expected,
+      other,
+      { timeout: 10_000, polling: 25 },
+    );
+    await runFromBar('shell.toggleLocale');
+    await frame.waitForFunction(
+      (expected) => (globalThis as { __languages?: string[] }).__languages?.at(-1) === expected,
+      first,
+      { timeout: 10_000, polling: 25 },
+    );
   }, 30_000);
 
   it('gets E_PERMISSION for a fetch its plugin never declared', async () => {
