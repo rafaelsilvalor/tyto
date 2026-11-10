@@ -42,12 +42,15 @@ export {
   type WindowRecord,
   acceptedLine,
   checkHandshake,
-  endpointFor,
+  connectTargetOf,
   handshakeLine,
+  listenTargetFor,
+  loopbackEndpoint,
   readFirstLine,
   recordPath,
   windowsFolder,
 } from './mcp/window-endpoint.js';
+export { connectToEndpoint } from './mcp/relay.js';
 export { type PluginSourceKind } from './plugins/fetch.js';
 export { type CloseableRasterizer } from './plugins/rasterizer.js';
 export {
