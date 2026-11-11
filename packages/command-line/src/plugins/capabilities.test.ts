@@ -101,6 +101,29 @@ describe('the cache and the workspace files of each command (ADR 0138)', () => {
     );
   });
 
+  it('keeps a plugin’s durable records under TYTO_HOME, and none without one (ADR 0191)', async () => {
+    const kept = checkedCapabilities(
+      'agent',
+      [],
+      pluginCapabilities({}, { hostName: 'tyto render', home }),
+    );
+    await kept.storageSet('ledger.2026-11', { spentMicros: 12 });
+    const again = checkedCapabilities(
+      'agent',
+      [],
+      pluginCapabilities({}, { hostName: 'tyto render', home }),
+    );
+    expect(await again.storageGet('ledger.2026-11')).toEqual({ spentMicros: 12 });
+    const none = checkedCapabilities(
+      'agent',
+      [],
+      pluginCapabilities({}, { hostName: 'tyto render' }),
+    );
+    expect(await refusal(none.storageGet('ledger'))).toBe(
+      "Plugin 'agent' could not use its stored record 'ledger': tyto render keeps no records for plugins.",
+    );
+  });
+
   it('keeps no cache without a TYTO_HOME, and says which command', async () => {
     const checked = checkedCapabilities(
       'jira',

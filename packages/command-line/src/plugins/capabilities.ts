@@ -1,5 +1,5 @@
 import type { Trust } from '@tyto/core';
-import { pluginCache, workspaceFiles } from '@tyto/io';
+import { pluginCache, pluginStorage, workspaceFiles } from '@tyto/io';
 import type { FetchedResponse, HostCapabilities, HostFetchInit } from '@tyto/plugin-api';
 
 /**
@@ -72,6 +72,7 @@ export function pluginCapabilities(
   return {
     ...(command.hostName === undefined ? {} : { hostName: command.hostName }),
     ...(command.home === undefined ? {} : pluginCache({ home: command.home })),
+    ...(command.home === undefined ? {} : pluginStorage({ home: command.home })),
     ...(workspace === undefined
       ? {}
       : workspaceFiles({ folder: () => workspace.folder, trust: () => workspace.trust })),
