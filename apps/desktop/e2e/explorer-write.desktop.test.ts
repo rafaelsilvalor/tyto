@@ -276,7 +276,8 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
     const offered = await app!.evaluate(
       () => (globalThis as { offered?: string[][] }).offered ?? [],
     );
-    expect(offered.at(-1)).toEqual(['New File…', 'New Folder…']);
+    // TYTO-402: New Recipe and New Vocabulary follow the two New items.
+    expect(offered.at(-1)).toEqual(['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…']);
   }, 30_000);
 
   it('opens the menu from the keyboard under the row, once per key (TYTO-364)', async () => {
@@ -316,7 +317,14 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
       const { left, bottom } = box as { left: number; bottom: number };
       return { x: Math.round(left * zoom), y: Math.round(bottom * zoom) };
     };
-    const rowItems = ['New File…', 'New Folder…', 'Rename…', 'Delete'];
+    const rowItems = [
+      'New File…',
+      'New Folder…',
+      'New Recipe…',
+      'New Vocabulary…',
+      'Rename…',
+      'Delete',
+    ];
 
     await stub(99);
     await row('logo.png').click();
@@ -409,7 +417,8 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
     await expect.poll(tabs, { timeout: 10_000 }).toContain('velho.brief');
     const before = (await tabs()).length;
 
-    await pickFromMenu('3');
+    // Delete, after the four New items and Rename (TYTO-402).
+    await pickFromMenu('5');
     await row('velho').click({ button: 'right' });
 
     await expect.poll(rows, { timeout: 10_000 }).not.toContain('velho');
@@ -422,7 +431,14 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
     const offered = await app!.evaluate(
       () => (globalThis as { offered?: string[][] }).offered ?? [],
     );
-    expect(offered.at(-1)).toEqual(['New File…', 'New Folder…', 'Rename…', 'Delete']);
+    expect(offered.at(-1)).toEqual([
+      'New File…',
+      'New Folder…',
+      'New Recipe…',
+      'New Vocabulary…',
+      'Rename…',
+      'Delete',
+    ]);
 
     await expect.poll(tabs).not.toContain('velho.brief');
     expect((await tabs()).length).toBe(before);

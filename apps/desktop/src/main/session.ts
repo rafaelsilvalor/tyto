@@ -131,8 +131,12 @@ export const savedHashOf = (text: string): string =>
  */
 export const hasPath = (
   kind: StoredTab['kind'],
-): kind is 'brief' | 'text' | 'markdown' | 'recipe' =>
-  kind === 'brief' || kind === 'text' || kind === 'markdown' || kind === 'recipe';
+): kind is 'brief' | 'text' | 'markdown' | 'recipe' | 'vocabulary' =>
+  kind === 'brief' ||
+  kind === 'text' ||
+  kind === 'markdown' ||
+  kind === 'recipe' ||
+  kind === 'vocabulary';
 
 /**
  * The groups a folder with no tabs kept opens with (TYTO-513, ADR 0165): the window's own, less

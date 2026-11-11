@@ -498,8 +498,14 @@ const settingOutline = z.object({
   members: z.object({ options: settingOptions }).optional(),
 });
 
+/** The longest vocabulary text the window sends main to check or complete (TYTO-402). */
+export const VOCABULARY_TEXT_MAX = 1_000_000;
+
+/** The most problems one vocabulary check carries: Problems shows them all, never thousands. */
+export const VOCABULARY_WIRE_DIAGNOSTICS = 500;
+
 /** What a file opens as in a tab (TYTO-247, ADR 0132): `DocumentFormat` in `file-icons.ts`. */
-const documentFormat = z.enum(['brief', 'text', 'markdown', 'recipe']);
+const documentFormat = z.enum(['brief', 'text', 'markdown', 'recipe', 'vocabulary']);
 
 /**
  * A brief the window has open, as both sides agree to describe one.
@@ -614,7 +620,11 @@ const explorerEntryName = z.string().max(1000);
 /** Why a new or a rename did not happen: a name main refuses, a name taken, or an entry gone. */
 const explorerWriteFailure = z.object({
   ok: z.literal(false),
-  reason: z.enum(['invalid', 'exists', 'gone', 'failed']),
+  /**
+   * `recipe-name` (TYTO-402): a new recipe whose name `recipeSkeleton` refuses with
+   * `E_RECIPE_FORM`, since a `run` line could not name it.
+   */
+  reason: z.enum(['invalid', 'exists', 'gone', 'failed', 'recipe-name']),
   /** With `failed` only: the system's error code (`EPERM`, `EROFS`), never a path. */
   detail: z.string().max(100).optional(),
 });
@@ -651,6 +661,8 @@ const sessionTabKind = z.enum([
   'text',
   'markdown',
   'recipe',
+  // TYTO-402, ADR 0176: a recipe's vocabulary, appended for the same reason.
+  'vocabulary',
 ]);
 
 /** The template mode's two files, by the name each buffer has in the window (TYTO-44). */
@@ -1505,6 +1517,13 @@ export const IPC_CHANNELS = {
       parentId: explorerEntryId.nullable(),
       name: explorerEntryName,
       kind: z.enum(['file', 'folder']),
+      /**
+       * New recipe and New vocabulary (TYTO-402, ADR 0176): main adds `.recipe` or
+       * `.vocab.json` to a name without it and writes `recipeSkeleton` or `vocabularySkeleton`
+       * in the same call that refuses an existing file. A recipe name `recipeSkeleton` refuses
+       * answers `recipe-name`.
+       */
+      seed: z.enum(['recipe', 'vocabulary']).optional(),
     }),
     z.discriminatedUnion('ok', [
       z.object({
@@ -3019,6 +3038,71 @@ export const IPC_CHANNELS = {
   'recipe:verbs': channel(
     z.object({}),
     z.object({ verbs: z.array(z.string().max(200)).max(5000) }),
+  ),
+
+  /**
+   * A vocabulary tab's problems (TYTO-402, ADR 0176 decision 5): `lintVocabulary` over the text
+   * the window holds, every problem at the characters of the file. Pure: no file is read, so it
+   * takes no document, and it answers in a folder nobody trusted too.
+   */
+  'vocabulary:lint': channel(
+    z.strictObject({ text: z.string().max(VOCABULARY_TEXT_MAX) }),
+    z.object({ diagnostics: z.array(diagnostic).max(VOCABULARY_WIRE_DIAGNOSTICS) }),
+  ),
+
+  /**
+   * What can go at `position` in a vocabulary tab (TYTO-402): a section not yet written at the
+   * top level, and a rule's or a rewrite's field inside one of its entries. Main's answer is
+   * `@tyto/editor`'s `JsonCompletionAnswer`; the window adds each section's description.
+   */
+  'vocabulary:complete': channel(
+    z.strictObject({
+      text: z.string().max(VOCABULARY_TEXT_MAX),
+      position: z.number().int().nonnegative(),
+      explicit: z.boolean(),
+    }),
+    z.object({
+      answer: z
+        .object({
+          from: z.number().int().nonnegative(),
+          quoted: z.boolean(),
+          options: z
+            .array(
+              z.object({
+                label: z.string().max(200),
+                insert: z.string().max(1000),
+                select: z.tuple([z.number().int(), z.number().int()]).optional(),
+                kind: z.enum(['property', 'value']).optional(),
+              }),
+            )
+            .max(50),
+        })
+        .nullable(),
+    }),
+  ),
+
+  /**
+   * What the key under the pointer is in a vocabulary tab (TYTO-402): a section, or a named
+   * table of one with how many entries it holds and the pointer a recipe reads it by. The window
+   * words it in its language.
+   */
+  'vocabulary:hover': channel(
+    z.strictObject({
+      text: z.string().max(VOCABULARY_TEXT_MAX),
+      position: z.number().int().nonnegative(),
+    }),
+    z.object({
+      answer: z
+        .object({
+          from: z.number().int().nonnegative(),
+          to: z.number().int().nonnegative(),
+          section: z.enum(['rules', 'rewrites', 'lookups']),
+          /** Absent over the section's own key. */
+          name: z.string().max(1000).optional(),
+          entries: z.number().int().nonnegative().optional(),
+        })
+        .nullable(),
+    }),
   ),
 
   /**

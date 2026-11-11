@@ -31,10 +31,10 @@ import {
 export type AppFileKind = 'settings' | 'keybindings' | 'snippets';
 
 /**
- * A text file a tab can hold (TYTO-247, ADR 0132): plain, Markdown, or a recipe (TYTO-377), which
- * the notebook runs instead of anything compiling it.
+ * A text file a tab can hold (TYTO-247, ADR 0132): plain, Markdown, a recipe (TYTO-377), which
+ * the notebook runs instead of anything compiling it, or a recipe's vocabulary (TYTO-402).
  */
-export type TextKind = 'text' | 'markdown' | 'recipe';
+export type TextKind = 'text' | 'markdown' | 'recipe' | 'vocabulary';
 
 /** What a document is when it is not a brief, which is `undefined`. */
 export type DocumentKind = AppFileKind | TextKind;
@@ -57,11 +57,22 @@ export const isAppFile = (kind: string | undefined): kind is AppFileKind =>
   kind === 'settings' || kind === 'keybindings' || kind === 'snippets';
 
 export const hasPath = (kind: DocumentKind | undefined): kind is TextKind | undefined =>
-  kind === undefined || kind === 'text' || kind === 'markdown' || kind === 'recipe';
+  kind === undefined ||
+  kind === 'text' ||
+  kind === 'markdown' ||
+  kind === 'recipe' ||
+  kind === 'vocabulary';
 
 /** A `.recipe` tab (TYTO-377): run on the pause, on save and by Run, its cells drawn under it. */
 export const isRecipe = (kind: DocumentKind | 'preview' | undefined): kind is 'recipe' =>
   kind === 'recipe';
+
+/**
+ * A `.vocab.json` tab (TYTO-402, ADR 0176): JSON a recipe reads, checked by main's
+ * `vocabulary:lint` on the pause, on opening and on a restore, its problems at their range.
+ */
+export const isVocabulary = (kind: DocumentKind | 'preview' | undefined): kind is 'vocabulary' =>
+  kind === 'vocabulary';
 
 /**
  * A document a preview shows (TYTO-247): a brief's art, or a Markdown file drawn. What a

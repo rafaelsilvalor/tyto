@@ -19,7 +19,8 @@ import {
   RECIPE_WIRE_LIMITS,
   parseIpc,
 } from '../../shared/ipc.js';
-import { TAB_EXTENSIONS, isTextFile } from '../../shared/file-icons.js';
+import { TAB_EXTENSIONS, isTextFile, opensInTab } from '../../shared/file-icons.js';
+import { seedOf, vocabularyComplete, vocabularyHover, vocabularyLint } from './recipe-authoring.js';
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
@@ -604,6 +605,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'recipe:verbs': () => Promise.resolve({ verbs: [...recipes.verbs()] }),
 
+    // TYTO-402, ADR 0176: the vocabulary tab's help, from `@tyto/recipe`'s own lint.
+    'vocabulary:lint': ({ text }) => Promise.resolve(vocabularyLint(text)),
+    'vocabulary:complete': ({ text, position, explicit }) =>
+      Promise.resolve(vocabularyComplete(text, position, explicit)),
+    'vocabulary:hover': ({ text, position }) => Promise.resolve(vocabularyHover(text, position)),
+
     // TYTO-385, ADR 0175: by the ids main gave, never a path (ADR 0086). Run now answers at once;
     // how the run ends arrives with `schedule:changed`.
     'schedule:list': () =>
@@ -788,8 +795,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     // TYTO-352, ADR 0121: the explorer writes by id and name; the tabs follow here, in the one
     // place that holds both the explorer and the documents.
-    'explorer:create': async ({ documentId, parentId, name, kind }) => {
-      const made = await explorer.create(parentId, name, kind);
+    // TYTO-402, ADR 0176: New recipe and New vocabulary write their skeleton through the same
+    // create, so an existing file is refused, never replaced.
+    'explorer:create': async ({ documentId, parentId, name, kind, seed }) => {
+      const seeded = seed === undefined || kind !== 'file' ? undefined : seedOf(name, seed);
+      if (seeded !== undefined && !seeded.ok) return seeded;
+      const made = await explorer.create(parentId, seeded?.name ?? name, kind, seeded?.text);
       if (!made.ok) return made;
       const opened =
         made.entry.kind === 'brief' || (made.entry.kind === 'file' && isTextFile(made.entry.name))
@@ -997,8 +1008,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     // row. Only a file a tab opens, the explorer's own rule (`TAB_EXTENSIONS`).
     'cli:open-diagnostic': async ({ documentId, runId, index }) => {
       const path = cli.diagnosticPath(runId, index);
-      const name = path?.toLowerCase();
-      if (path === undefined || !TAB_EXTENSIONS.some((extension) => name?.endsWith(extension))) {
+      if (path === undefined || !opensInTab(path)) {
         return { document: null, documentId: null };
       }
       return documents.openPath(documentId, path);

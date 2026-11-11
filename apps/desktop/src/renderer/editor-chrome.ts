@@ -112,6 +112,9 @@ export function editorChromeFor(kind: Kind): EditorChrome {
       return TEXT;
     case 'recipe':
       return RECIPE;
+    case 'vocabulary':
+      // A recipe's vocabulary (TYTO-402): text a recipe reads, with no command of its own.
+      return TEXT;
   }
 }
 
@@ -175,7 +178,8 @@ export const languageOf = (kind: Kind): LanguageName | undefined => {
   }
   if (kind === 'markdown') return 'markdown';
   if (kind === 'recipe') return 'recipe';
-  return isAppFile(kind) ? 'json' : 'plain';
+  // A vocabulary is JSON with comments, coloured as the app files are (TYTO-402).
+  return isAppFile(kind) || kind === 'vocabulary' ? 'json' : 'plain';
 };
 
 /** One document's own editor extensions: CodeMirror's `Extension`, named through the editor. */
@@ -185,7 +189,9 @@ export type DocumentExtension = ReturnType<typeof jsonAssist>;
  * The tabs that get help of their own, and the help each gets: the app files' (TYTO-304), and a
  * recipe's verb completion (TYTO-377).
  */
-export type AppFileAssists = Readonly<Partial<Record<AppFileKind | 'recipe', DocumentExtension>>>;
+export type AppFileAssists = Readonly<
+  Partial<Record<AppFileKind | 'recipe' | 'vocabulary', DocumentExtension>>
+>;
 
 /**
  * The extensions a tab of this kind is opened with beside its language — `settings.json`'s
@@ -195,7 +201,7 @@ export type AppFileAssists = Readonly<Partial<Record<AppFileKind | 'recipe', Doc
  * gets its verbs (TYTO-377).
  */
 export const assistOf = (kind: Kind, assists: AppFileAssists): readonly DocumentExtension[] => {
-  if (!isAppFile(kind) && kind !== 'recipe') return [];
+  if (!isAppFile(kind) && kind !== 'recipe' && kind !== 'vocabulary') return [];
   const assist = assists[kind];
   return assist === undefined ? [] : [assist];
 };

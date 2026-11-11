@@ -1,4 +1,4 @@
-import { extname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import {
   type CliEnvironment,
@@ -12,7 +12,7 @@ import {
 } from '@tyto/command-line';
 import type { Rasterizer } from '@tyto/raster';
 
-import { TAB_EXTENSIONS } from '../../shared/file-icons.js';
+import { opensInTab } from '../../shared/file-icons.js';
 
 /**
  * `tyto` commands run in main, in-process, for the window (ADR 0159, TYTO-495).
@@ -86,8 +86,7 @@ export interface CliDiagnosticRow {
 /** The runs whose rows a click can still open; the panel shows the same last five. */
 export const KEPT_RUNS = 5;
 
-const opensInATab = (path: string): boolean =>
-  (TAB_EXTENSIONS as readonly string[]).includes(extname(path).toLowerCase());
+const opensInATab = opensInTab;
 
 const SEVERITIES = new Set(['error', 'warning', 'info']);
 

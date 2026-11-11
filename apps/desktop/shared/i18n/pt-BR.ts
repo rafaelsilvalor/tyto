@@ -276,6 +276,19 @@ export const ptBR: Catalogue = {
   'dialog.files.recipe': 'Receita',
   'status.kind.recipe': 'Receita',
   'problems.empty.recipe': 'Nada a relatar sobre esta receita',
+  'dialog.files.vocabulary': 'Vocabulário',
+  'status.kind.vocabulary': 'Vocabulário',
+  'problems.empty.vocabulary': 'Nada a relatar sobre este vocabulário',
+  'command.explorer.newRecipe': 'Nova receita',
+  'command.explorer.newVocabulary': 'Novo vocabulário',
+  'vocabulary.section.rules':
+    'Tabelas que um passo rules lê: cada entrada é um filtro when e as colunas que ele define.',
+  'vocabulary.section.rewrites':
+    'Listas que um passo rewrite lê: cada entrada é um padrão e a sua troca, em ordem.',
+  'vocabulary.section.lookups':
+    'Tabelas que um passo map lê: cada chave e o valor em que ela se transforma.',
+  'vocabulary.hover.entries': 'Entradas',
+  'vocabulary.hover.pointer': 'Uma receita lê como',
   'command.recipe.run': 'Executar receita',
   'recipe.cell.rows': '{count} linhas',
   'recipe.cell.rows.one': '{count} linha',
@@ -572,6 +585,8 @@ export const ptBR: Catalogue = {
   'explorer.more': 'mais {count} não mostrados',
   'explorer.menu.newFile': 'Novo arquivo…',
   'explorer.menu.newFolder': 'Nova pasta…',
+  'explorer.menu.newRecipe': 'Nova receita…',
+  'explorer.menu.newVocabulary': 'Novo vocabulário…',
   'explorer.menu.rename': 'Renomear…',
   'explorer.menu.delete': 'Excluir',
   'explorer.collapseAll': 'Recolher tudo',
@@ -590,6 +605,8 @@ export const ptBR: Catalogue = {
   'explorer.error.invalid': 'Esse nome não pode ser usado em um arquivo ou pasta.',
   'explorer.error.trash': 'Não deu para mover para a {bin}. Nada foi apagado.',
   'explorer.error.failed': 'Não deu para gravar a mudança: {reason}.',
+  'explorer.error.recipeName':
+    '“{name}” não é um nome de receita (E_RECIPE_FORM): comece com uma letra ou um dígito, depois letras, dígitos, - e _.',
   'project.none': 'Nenhuma pasta aberta',
   'project.unset': 'não definido',
   'project.origin.folder': 'esta pasta',

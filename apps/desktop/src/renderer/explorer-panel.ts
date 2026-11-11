@@ -3,8 +3,10 @@ import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
 
 import {
+  type ExplorerEditing,
   type ExplorerEntry,
   type ExplorerListing,
+  type ExplorerSeed,
   type ExplorerRow,
   type ExplorerTree,
   EMPTY_TREE,
@@ -68,6 +70,7 @@ export interface ExplorerSource {
     parentId: string | null,
     name: string,
     kind: 'file' | 'folder',
+    seed?: ExplorerSeed,
   ) => Promise<IpcResponse<'explorer:create'>>;
   /** A rename; the window renames the tabs it moved. */
   readonly rename: (entryId: string, name: string) => Promise<IpcResponse<'explorer:rename'>>;
@@ -103,11 +106,22 @@ const INDENT = 16;
 export const EXPLORER_MENU = {
   newFile: 'explorer.menu.newFile',
   newFolder: 'explorer.menu.newFolder',
+  // TYTO-402, ADR 0176: a new file written from its skeleton.
+  newRecipe: 'explorer.menu.newRecipe',
+  newVocabulary: 'explorer.menu.newVocabulary',
   rename: 'explorer.menu.rename',
   delete: 'explorer.menu.delete',
 } as const satisfies Record<string, CatalogueKey>;
 
 type MenuId = (typeof EXPLORER_MENU)[keyof typeof EXPLORER_MENU];
+
+/** The menu's New items, on a row and on the empty space alike. */
+const NEW_ITEMS: readonly MenuId[] = [
+  EXPLORER_MENU.newFile,
+  EXPLORER_MENU.newFolder,
+  EXPLORER_MENU.newRecipe,
+  EXPLORER_MENU.newVocabulary,
+];
 
 const fill = (text: string, values: Record<string, string | number>): string =>
   Object.entries(values).reduce(
@@ -153,7 +167,19 @@ const REFUSALS: Partial<Record<string, CatalogueKey>> = {
   invalid: 'explorer.error.invalid',
   'trash-failed': 'explorer.error.trash',
   failed: 'explorer.error.failed',
+  'recipe-name': 'explorer.error.recipeName',
 };
+
+/** What the name field of a new entry is called, by what it makes. */
+function newFieldLabel(
+  kind: 'file' | 'folder',
+  editing: ExplorerEditing | undefined,
+): CatalogueKey {
+  const seed = editing !== undefined && 'seed' in editing ? editing.seed : undefined;
+  if (seed === 'recipe') return EXPLORER_MENU.newRecipe;
+  if (seed === 'vocabulary') return EXPLORER_MENU.newVocabulary;
+  return kind === 'folder' ? EXPLORER_MENU.newFolder : EXPLORER_MENU.newFile;
+}
 
 /** The line under the field, or under a row whose delete failed, for what main answered. */
 export function refusalText(
@@ -238,10 +264,10 @@ export class ExplorerPanel extends DockedPanel {
   }
 
   /** The field of a new file or folder, where `startCreating` puts it. */
-  startNew(kind: 'file' | 'folder', parent?: string | null): void {
+  startNew(kind: 'file' | 'folder', parent?: string | null, seed?: ExplorerSeed): void {
     if (this.folderName === null || this.folderName === undefined) return;
     this.notice = undefined;
-    this.tree = startCreating(this.tree, kind, parent);
+    this.tree = startCreating(this.tree, kind, parent, seed);
     const editing = this.tree.editing;
     const folder = editing !== undefined && 'parentId' in editing ? editing.parentId : null;
     if (folder !== null && !this.tree.children.has(folder)) void this.relist([folder]);
@@ -356,7 +382,7 @@ export class ExplorerPanel extends DockedPanel {
     try {
       const answer =
         'parentId' in editing
-          ? await this.source.create(folder, name, editing.kind)
+          ? await this.source.create(folder, name, editing.kind, editing.seed)
           : await this.source.rename(editing.renameId, name);
       if (mine !== this.generation || this.tree.editing === undefined) return;
       if (answer.ok) {
@@ -445,13 +471,8 @@ export class ExplorerPanel extends DockedPanel {
     if (row !== undefined) this.tree = withSelected(this.tree, row.entry.id);
     const ids: readonly MenuId[] =
       row === undefined
-        ? [EXPLORER_MENU.newFile, EXPLORER_MENU.newFolder]
-        : [
-            EXPLORER_MENU.newFile,
-            EXPLORER_MENU.newFolder,
-            EXPLORER_MENU.rename,
-            EXPLORER_MENU.delete,
-          ];
+        ? [...NEW_ITEMS]
+        : [...NEW_ITEMS, EXPLORER_MENU.rename, EXPLORER_MENU.delete];
     const items = ids.map((id) => ({ id, label: this.say(id), enabled: true }));
     this.menuOpen = true;
     let chosen: string | null;
@@ -464,6 +485,8 @@ export class ExplorerPanel extends DockedPanel {
     const parent = row === undefined ? null : undefined;
     if (chosen === EXPLORER_MENU.newFile) this.startNew('file', parent);
     else if (chosen === EXPLORER_MENU.newFolder) this.startNew('folder', parent);
+    else if (chosen === EXPLORER_MENU.newRecipe) this.startNew('file', parent, 'recipe');
+    else if (chosen === EXPLORER_MENU.newVocabulary) this.startNew('file', parent, 'vocabulary');
     else if (chosen === EXPLORER_MENU.rename && row !== undefined) {
       this.tree = startRenaming(this.tree, row.entry.id);
     } else if (chosen === EXPLORER_MENU.delete && row !== undefined) {
@@ -636,7 +659,7 @@ export class ExplorerPanel extends DockedPanel {
       return html`<li class="explorer__new explorer__row--editing" role="none" style=${indent}>
         <span class="explorer__chevron"></span
         ><span class="explorer__icon">${icon(kind === 'folder' ? 'folder' : 'file')}</span
-        >${this.field(kind === 'folder' ? 'explorer.menu.newFolder' : 'explorer.menu.newFile')}
+        >${this.field(newFieldLabel(kind, this.tree.editing))}
       </li>`;
     }
     const { entry } = row;

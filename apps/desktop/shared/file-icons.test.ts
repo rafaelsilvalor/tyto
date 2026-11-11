@@ -7,6 +7,7 @@ import {
   documentFormatOf,
   fileIconFor,
   isTextFile,
+  opensInTab,
 } from './file-icons.js';
 
 const file = (name: string): FileIconSubject => ({ name, kind: 'file' });
@@ -100,6 +101,15 @@ describe('what a file opens as', () => {
     ['manifest.yaml', 'brief', false],
     ['.md', 'brief', false],
     ['x.constructor', 'brief', false],
+    // TYTO-402, ADR 0176: only a vocabulary is a `.json` a tab opens.
+    ['empresa.vocab.json', 'vocabulary', true],
+    ['EMPRESA.VOCAB.JSON', 'vocabulary', true],
+    ['C:\\work\\empresa.vocab.json', 'vocabulary', true],
+    ['/work/empresa.vocab.json', 'vocabulary', true],
+    ['.vocab.json', 'brief', false],
+    ['/work/.vocab.json', 'brief', false],
+    ['settings.json', 'brief', false],
+    ['empresa.vocab.jsonc', 'brief', false],
   ] as const)('%s opens as %s', (name, format, text) => {
     expect(documentFormatOf(name)).toBe(format);
     expect(isTextFile(name)).toBe(text);
@@ -108,5 +118,12 @@ describe('what a file opens as', () => {
   it('draws a recipe with the generic file icon, and opens it in a tab', () => {
     expect(fileIconFor({ name: 'semanal.recipe', kind: 'file' })).toBe('file');
     expect(TAB_EXTENSIONS).toContain('.recipe');
+  });
+
+  it('opens a vocabulary in a tab by its double extension, and no other .json', () => {
+    expect(opensInTab('C:\\work\\Empresa.Vocab.Json')).toBe(true);
+    expect(opensInTab('C:\\work\\dados.json')).toBe(false);
+    expect(opensInTab('C:\\work\\semanal.recipe')).toBe(true);
+    expect(fileIconFor({ name: 'empresa.vocab.json', kind: 'file' })).toBe('json');
   });
 });

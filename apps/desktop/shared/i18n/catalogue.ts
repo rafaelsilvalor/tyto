@@ -519,6 +519,19 @@ export interface Catalogue {
   readonly 'dialog.files.recipe': string;
   readonly 'status.kind.recipe': string;
   readonly 'problems.empty.recipe': string;
+  /** TYTO-402, ADR 0176: a `.vocab.json` tab, in the save dialog, the status bar and Problems. */
+  readonly 'dialog.files.vocabulary': string;
+  readonly 'status.kind.vocabulary': string;
+  readonly 'problems.empty.vocabulary': string;
+  /** TYTO-402: New recipe and New vocabulary as commands, the explorer's field opened for them. */
+  readonly 'command.explorer.newRecipe': string;
+  readonly 'command.explorer.newVocabulary': string;
+  /** TYTO-402: the vocabulary tab's hover and completion, over a section's key or a table's name. */
+  readonly 'vocabulary.section.rules': string;
+  readonly 'vocabulary.section.rewrites': string;
+  readonly 'vocabulary.section.lookups': string;
+  readonly 'vocabulary.hover.entries': string;
+  readonly 'vocabulary.hover.pointer': string;
   /** TYTO-377: the one command that runs a whole recipe, the person's approval (ADR 0148). */
   readonly 'command.recipe.run': string;
   /**
@@ -963,6 +976,10 @@ export interface Catalogue {
   readonly 'explorer.error.invalid': string;
   readonly 'explorer.error.trash': string;
   readonly 'explorer.error.failed': string;
+  /** TYTO-402: New recipe and New vocabulary in the explorer's menu, and a refused recipe name. */
+  readonly 'explorer.menu.newRecipe': string;
+  readonly 'explorer.menu.newVocabulary': string;
+  readonly 'explorer.error.recipeName': string;
   readonly 'project.none': string;
   readonly 'project.unset': string;
   readonly 'project.origin.folder': string;
@@ -1338,6 +1355,16 @@ export const CATALOGUE_KEYS = [
   'dialog.files.recipe',
   'status.kind.recipe',
   'problems.empty.recipe',
+  'dialog.files.vocabulary',
+  'status.kind.vocabulary',
+  'problems.empty.vocabulary',
+  'command.explorer.newRecipe',
+  'command.explorer.newVocabulary',
+  'vocabulary.section.rules',
+  'vocabulary.section.rewrites',
+  'vocabulary.section.lookups',
+  'vocabulary.hover.entries',
+  'vocabulary.hover.pointer',
   'command.recipe.run',
   'recipe.cell.rows',
   'recipe.cell.rows.one',
@@ -1623,6 +1650,9 @@ export const CATALOGUE_KEYS = [
   'explorer.error.invalid',
   'explorer.error.trash',
   'explorer.error.failed',
+  'explorer.menu.newRecipe',
+  'explorer.menu.newVocabulary',
+  'explorer.error.recipeName',
   'project.none',
   'project.unset',
   'project.origin.folder',

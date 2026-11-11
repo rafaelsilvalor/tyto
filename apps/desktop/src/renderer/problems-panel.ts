@@ -159,7 +159,7 @@ export interface CommandProblemRow {
 
 /** A brief, one of the app's own files, or a text file (`DocumentState.kind`). */
 export type ProblemsKind =
-  'brief' | 'settings' | 'keybindings' | 'snippets' | 'text' | 'markdown' | 'recipe';
+  'brief' | 'settings' | 'keybindings' | 'snippets' | 'text' | 'markdown' | 'recipe' | 'vocabulary';
 
 /** The sentence the empty panel says, by what it is about. */
 const EMPTY_KEYS: Readonly<Record<ProblemsKind, CatalogueKey>> = {
@@ -173,6 +173,8 @@ const EMPTY_KEYS: Readonly<Record<ProblemsKind, CatalogueKey>> = {
   markdown: 'problems.empty.text',
   // TYTO-377: a recipe is checked, by its run, so an empty panel is a check that passed.
   recipe: 'problems.empty.recipe',
+  // TYTO-402: a vocabulary is checked by main's lint, so an empty panel is a check that passed.
+  vocabulary: 'problems.empty.vocabulary',
 };
 
 const EMPTY_STATE: ProblemsState = {

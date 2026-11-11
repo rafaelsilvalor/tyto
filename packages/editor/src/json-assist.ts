@@ -69,6 +69,18 @@ export interface JsonAssistSource {
   hover(text: string, position: number): JsonHoverAnswer | null;
 }
 
+/**
+ * The same two questions answered later: the vocabulary tab's are main's (TYTO-402, ADR 0176)
+ * and cross the bridge. CodeMirror drops an answer that lands after the text moved on.
+ */
+export interface JsonAssistSourceLater {
+  complete(text: string, position: number, explicit: boolean): Promise<JsonCompletionAnswer | null>;
+  hover(text: string, position: number): Promise<JsonHoverAnswer | null>;
+}
+
+type Answered<T> = T | Promise<T>;
+type AnySource = JsonAssistSource | JsonAssistSourceLater;
+
 /** A pick: the string or word replaced, and the selection the suggestion asks for. */
 function applyOf(suggestion: JsonSuggestion, quoted: boolean) {
   return (view: EditorView, completion: Completion, from: number, to: number): void => {
@@ -89,25 +101,45 @@ function applyOf(suggestion: JsonSuggestion, quoted: boolean) {
   };
 }
 
-function completionsFrom(source: JsonAssistSource) {
-  return (context: CompletionContext): CompletionResult | null => {
-    const answer = source.complete(context.state.doc.toString(), context.pos, context.explicit);
-    if (answer === null || answer.options.length === 0) return null;
-    return {
-      from: answer.from,
-      // Typing on inside the word filters the same list; a quote, a colon or a comma asks again.
-      validFor: /^[\w.-]*$/u,
-      // In the host's order, which is the order a setting declares its values in — the default
-      // first — rather than CodeMirror's alphabetical one when nothing is typed yet.
-      options: answer.options.map((suggestion, index) => ({
-        label: suggestion.label,
-        boost: Math.max(-99, -index),
-        ...(suggestion.detail === undefined ? {} : { detail: suggestion.detail }),
-        ...(suggestion.info === undefined ? {} : { info: suggestion.info }),
-        type: suggestion.kind === 'property' ? 'property' : 'enum',
-        apply: applyOf(suggestion, answer.quoted),
-      })),
-    };
+/** The list for one answer, or none when it offers nothing. */
+function completionOf(answer: JsonCompletionAnswer | null): CompletionResult | null {
+  if (answer === null || answer.options.length === 0) return null;
+  return {
+    from: answer.from,
+    // Typing on inside the word filters the same list; a quote, a colon or a comma asks again.
+    validFor: /^[\w.-]*$/u,
+    // In the host's order, which is the order a setting declares its values in — the default
+    // first — rather than CodeMirror's alphabetical one when nothing is typed yet.
+    options: answer.options.map((suggestion, index) => ({
+      label: suggestion.label,
+      boost: Math.max(-99, -index),
+      ...(suggestion.detail === undefined ? {} : { detail: suggestion.detail }),
+      ...(suggestion.info === undefined ? {} : { info: suggestion.info }),
+      type: suggestion.kind === 'property' ? 'property' : 'enum',
+      apply: applyOf(suggestion, answer.quoted),
+    })),
+  };
+}
+
+function completionsFrom(source: AnySource) {
+  return (context: CompletionContext): Answered<CompletionResult | null> => {
+    const answer: Answered<JsonCompletionAnswer | null> = source.complete(
+      context.state.doc.toString(),
+      context.pos,
+      context.explicit,
+    );
+    return answer instanceof Promise ? answer.then(completionOf) : completionOf(answer);
+  };
+}
+
+/** The tooltip for one answer, or none. */
+function tooltipOf(answer: JsonHoverAnswer | null) {
+  if (answer === null) return null;
+  return {
+    pos: answer.from,
+    end: answer.to,
+    above: true,
+    create: () => ({ dom: hoverDom(answer) }),
   };
 }
 
@@ -153,19 +185,16 @@ export function hoverDom(answer: JsonHoverAnswer): HTMLElement {
  * Completion and hover for the JSON language from `source`. Mounted on a JSON tab's own
  * extensions (`EditorHandle.blank`'s third argument), so a brief never asks it anything.
  */
-export function jsonAssist(source: JsonAssistSource): Extension {
+export function jsonAssist(source: JsonAssistSource | JsonAssistSourceLater): Extension {
   return [
     autocompletion(),
     jsonLanguage.data.of({ autocomplete: completionsFrom(source) }),
     hoverTooltip((view, position) => {
-      const answer = source.hover(view.state.doc.toString(), position);
-      if (answer === null) return null;
-      return {
-        pos: answer.from,
-        end: answer.to,
-        above: true,
-        create: () => ({ dom: hoverDom(answer) }),
-      };
+      const answer: Answered<JsonHoverAnswer | null> = source.hover(
+        view.state.doc.toString(),
+        position,
+      );
+      return answer instanceof Promise ? answer.then(tooltipOf) : tooltipOf(answer);
     }),
   ];
 }

@@ -100,12 +100,14 @@ export interface ExplorerService {
   /**
    * Makes an empty file or folder called `name` in the folder `parentId` names (`null` is the
    * root). Fails with `exists` rather than replace anything, and with `invalid` for a name
-   * {@link checkEntryName} refuses.
+   * {@link checkEntryName} refuses. A file is written with `text` when it is given: a new
+   * recipe's or vocabulary's skeleton (TYTO-402), in the same call that refuses an existing file.
    */
   create(
     parentId: string | null,
     name: string,
     kind: 'file' | 'folder',
+    text?: string,
   ): Promise<ExplorerWrite<{ entry: ExplorerEntry; path: string }>>;
   /**
    * Renames the entry in place, in its own folder. The entry keeps its id and everything under
@@ -475,7 +477,9 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
     const current = root;
     const entry = entryOf.get(entryId);
     if (current === undefined || entry === undefined || entry.kind === 'folder') return undefined;
-    if (!extensions.includes(extname(entry.path).toLowerCase())) return undefined;
+    // By ending, not `extname`: `.vocab.json` is a tab's and `extname` reads it `.json` (TYTO-402).
+    const lower = entry.path.toLowerCase();
+    if (!extensions.some((ending) => lower.endsWith(ending))) return undefined;
     try {
       // Asked again at the click: the file may have become a link to somewhere else since.
       const real = await realpath(entry.path);
@@ -572,7 +576,7 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       });
     },
 
-    async create(parentId, name, kind) {
+    async create(parentId, name, kind, text = '') {
       const current = root;
       if (current === undefined) return GONE;
       if (!checkEntryName(name)) return INVALID;
@@ -584,7 +588,7 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
         // `wx` and a mkdir that is not recursive: each fails on anything already there, so
         // the check and the write are one call and nothing can slip between them.
         if (kind === 'folder') await mkdir(target);
-        else await writeFile(target, '', { encoding: 'utf8', flag: 'wx' });
+        else await writeFile(target, text, { encoding: 'utf8', flag: 'wx' });
       } catch (cause) {
         const code = codeOf(cause);
         if (code === 'EEXIST') return EXISTS;

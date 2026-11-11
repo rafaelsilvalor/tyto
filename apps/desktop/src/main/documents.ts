@@ -105,6 +105,9 @@ export const saveFilters = (locale: Locale, format: DocumentFormat): DialogFilte
       return [{ name: translate(locale, 'dialog.files.text'), extensions: ['md', 'txt'] }];
     case 'recipe':
       return [{ name: translate(locale, 'dialog.files.recipe'), extensions: ['recipe'] }];
+    case 'vocabulary':
+      // A filter takes one extension; the name the dialog suggests keeps `.vocab.json` (TYTO-402).
+      return [{ name: translate(locale, 'dialog.files.vocabulary'), extensions: ['json'] }];
   }
 };
 

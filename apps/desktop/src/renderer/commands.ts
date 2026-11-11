@@ -139,6 +139,13 @@ export const RECIPE_RUN_FRESH = 'recipe.runFresh';
  */
 export const RECIPE_OPEN_CELL_VIEW = 'recipe.openCellView';
 /**
+ * TYTO-402 (ADR 0176). New recipe and New vocabulary: the explorer's name field, opened in the
+ * selected folder, makes `<name>.recipe` or `<name>.vocab.json` from its skeleton. Offered with
+ * any tab in front; with no folder open they do nothing, as New File does.
+ */
+export const EXPLORER_NEW_RECIPE = 'explorer.newRecipe';
+export const EXPLORER_NEW_VOCABULARY = 'explorer.newVocabulary';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -376,6 +383,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [RECIPE_RUN_FROM_CELL]: 'command.recipe.runFromCell',
   [RECIPE_RUN_FRESH]: 'command.recipe.runFresh',
   [RECIPE_OPEN_CELL_VIEW]: 'command.recipe.openCellView',
+  [EXPLORER_NEW_RECIPE]: 'command.explorer.newRecipe',
+  [EXPLORER_NEW_VOCABULARY]: 'command.explorer.newVocabulary',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -509,6 +518,8 @@ export interface DesktopActions {
   runRecipeFresh(): void;
   /** TYTO-379. Opens the recipe in front's cursor cell full size, in a tab of its own. */
   openRecipeCellView(): void;
+  /** TYTO-402. Opens the explorer's name field for a new recipe or vocabulary. */
+  newSeededFile(seed: 'recipe' | 'vocabulary'): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -696,6 +707,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(RECIPE_OPEN_CELL_VIEW, () => {
     actions.openRecipeCellView();
+  });
+  add(EXPLORER_NEW_RECIPE, () => {
+    actions.newSeededFile('recipe');
+  });
+  add(EXPLORER_NEW_VOCABULARY, () => {
+    actions.newSeededFile('vocabulary');
   });
   add(THEME_PICK, () => {
     actions.pickTheme();
