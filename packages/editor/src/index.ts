@@ -256,6 +256,7 @@ export {
 export { escapeHtml, MARKDOWN_TAGS, markdownToHtml } from './markdown-html.js';
 export {
   type JsonAssistSource,
+  type JsonAssistSourceLater,
   type JsonCompletionAnswer,
   type JsonHoverAnswer,
   type JsonSuggestion,

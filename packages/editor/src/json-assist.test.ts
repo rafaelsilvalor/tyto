@@ -4,7 +4,12 @@ import { EditorState } from '@codemirror/state';
 import { EditorView, runScopeHandlers } from '@codemirror/view';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type JsonAssistSource, hoverDom, jsonAssist } from './json-assist.js';
+import {
+  type JsonAssistSource,
+  type JsonAssistSourceLater,
+  hoverDom,
+  jsonAssist,
+} from './json-assist.js';
 import { json } from './json-language.js';
 
 /**
@@ -41,7 +46,11 @@ afterEach(() => {
   view = undefined;
 });
 
-function mount(doc: string, at: number, assist: JsonAssistSource = source): EditorView {
+function mount(
+  doc: string,
+  at: number,
+  assist: JsonAssistSource | JsonAssistSourceLater = source,
+): EditorView {
   const parent = document.createElement('div');
   document.body.append(parent);
   view = new EditorView({
@@ -113,6 +122,27 @@ describe('the JSON tabs’ completion', () => {
     type(target, '"');
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(completionStatus(target.state)).toBeNull();
+  });
+});
+
+describe('a source that answers later (TYTO-402)', () => {
+  it('lists and picks what arrives across a bridge', async () => {
+    const later: JsonAssistSourceLater = {
+      complete: (text, position, explicit) =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(source.complete(text, position, explicit));
+          }, 10);
+        }),
+      hover: () => Promise.resolve(null),
+    };
+    const target = mount('{\n  \n}', 4, later);
+    type(target, '"al');
+    await vi.waitFor(() => {
+      expect(labels(target)).toEqual(['alpha']);
+    });
+    await pickFirst(target);
+    expect(target.state.doc.toString()).toBe('{\n  "alpha": 1\n}');
   });
 });
 

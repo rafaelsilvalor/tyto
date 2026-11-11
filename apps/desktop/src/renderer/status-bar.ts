@@ -42,6 +42,7 @@ export type TabKind =
   | 'text'
   | 'markdown'
   | 'recipe'
+  | 'vocabulary'
   | 'preview'
   | 'markdown-preview';
 
@@ -54,6 +55,7 @@ const NOT_EXPORTED: ReadonlySet<TabKind> = new Set([
   'text',
   'markdown',
   'recipe',
+  'vocabulary',
   'markdown-preview',
 ]);
 
@@ -115,6 +117,8 @@ const KIND_LABELS: Readonly<Record<TabKind, CatalogueKey>> = {
   markdown: 'status.kind.markdown',
   // TYTO-377: "Recipe" / "Receita".
   recipe: 'status.kind.recipe',
+  // TYTO-402: "Vocabulary" / "Vocabulário".
+  vocabulary: 'status.kind.vocabulary',
   preview: 'preview.heading',
   'markdown-preview': 'preview.heading',
 };

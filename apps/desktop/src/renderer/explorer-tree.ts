@@ -19,9 +19,17 @@ export type ExplorerEntry = ExplorerListing['entries'][number];
  * `error` the line under it, after main refused the name.
  */
 export type ExplorerEditing = (
-  | { readonly parentId: string | null; readonly kind: 'file' | 'folder' }
+  | {
+      readonly parentId: string | null;
+      readonly kind: 'file' | 'folder';
+      /** New recipe or New vocabulary (TYTO-402): main writes the skeleton under the name. */
+      readonly seed?: ExplorerSeed;
+    }
   | { readonly renameId: string }
 ) & { readonly draft: string; readonly error?: string };
+
+/** What a new file is seeded with (TYTO-402, ADR 0176), as `explorer:create` names it. */
+export type ExplorerSeed = 'recipe' | 'vocabulary';
 
 export interface ExplorerTree {
   /** The open folder's own listing, or nothing while it is asked. */
@@ -166,6 +174,7 @@ export function startCreating(
   tree: ExplorerTree,
   kind: 'file' | 'folder',
   parent?: string | null,
+  seed?: ExplorerSeed,
 ): ExplorerTree {
   const selected = rowsOf(tree).find(
     (row) => row.type === 'entry' && row.entry.id === tree.selected,
@@ -179,7 +188,10 @@ export function startCreating(
           ? selected.entry.id
           : selected.parent;
   const opened = parentId === null ? tree : withExpanded(tree, parentId, true);
-  return { ...opened, editing: { parentId, kind, draft: '' } };
+  return {
+    ...opened,
+    editing: { parentId, kind, draft: '', ...(seed === undefined ? {} : { seed }) },
+  };
 }
 
 /** Opens the field over an entry's name, holding the name it has now. */

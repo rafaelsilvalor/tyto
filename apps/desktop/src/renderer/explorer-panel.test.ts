@@ -44,8 +44,11 @@ function source(disk: Disk) {
     trash: 'ok' as 'ok' | 'trash-failed',
   };
   const value: ExplorerSource = {
-    create: (parentId, name, kind) => {
-      wrote.push(['create', parentId, name, kind]);
+    create: (parentId, name, kind, seed) => {
+      wrote.push(['create', parentId, name, kind, ...(seed === undefined ? [] : [seed])]);
+      if (seed === 'recipe' && name.includes(' ')) {
+        return Promise.resolve({ ok: false, reason: 'recipe-name' });
+      }
       if (name === 'promo.brief') return Promise.resolve({ ok: false, reason: 'exists' });
       const kindOf = kind === 'folder' ? 'folder' : name.endsWith('.brief') ? 'brief' : 'file';
       const entry = { id: `new-${name}`, name, kind: kindOf } as const;
@@ -449,7 +452,7 @@ describe('new, rename and delete', () => {
     expect(rows(element)).toContain('logo.png');
   });
 
-  it('offers four items on a row and the two New items on the empty space', async () => {
+  it('offers six items on a row and the four New items on the empty space', async () => {
     const { element, control } = await mount(disk());
     control.chosen = 'explorer.menu.rename';
     row(element, 'logo.png').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
@@ -465,8 +468,8 @@ describe('new, rename and delete', () => {
     await settle(element);
 
     expect(control.menus).toEqual([
-      ['New File…', 'New Folder…', 'Rename…', 'Delete'],
-      ['New File…', 'New Folder…'],
+      ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…', 'Rename…', 'Delete'],
+      ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…'],
     ]);
     expect(rows(element)[0]).toBe('slides');
     expect(field(element)).not.toBeNull();
@@ -493,7 +496,8 @@ describe('the context menu from the keyboard (TYTO-364)', () => {
         ({ left: 12, top: 100 + index * 22, bottom: 122 + index * 22 }) as DOMRect;
     });
   };
-  const ROW_ITEMS = ['New File…', 'New Folder…', 'Rename…', 'Delete'];
+  const NEW_ITEMS = ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…'];
+  const ROW_ITEMS = [...NEW_ITEMS, 'Rename…', 'Delete'];
 
   it('opens a row’s menu with Shift+F10, under the selected row’s left edge', async () => {
     const { element, control } = await mount(disk());
@@ -520,16 +524,13 @@ describe('the context menu from the keyboard (TYTO-364)', () => {
     expect(control.points).toEqual([[12, 144]]);
   });
 
-  it('offers only the two New items while no row is selected, the empty space’s menu', async () => {
+  it('offers only the four New items while no row is selected, the empty space’s menu', async () => {
     const { element, control } = await mount(disk());
     layOut(element);
     await press(element, 'ContextMenu');
     await press(element, 'F10', { shiftKey: true });
 
-    expect(control.menus).toEqual([
-      ['New File…', 'New Folder…'],
-      ['New File…', 'New Folder…'],
-    ]);
+    expect(control.menus).toEqual([NEW_ITEMS, NEW_ITEMS]);
     // Under the focused row, the first, which takes the focus while none is selected.
     expect(control.points).toEqual([
       [12, 122],
@@ -552,6 +553,23 @@ describe('the context menu from the keyboard (TYTO-364)', () => {
     field(element)!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settle(element);
     expect(wrote).toEqual([['create', null, 'novo.brief', 'file']]);
+  });
+
+  it('asks for a seeded recipe from New Recipe, and says why a name is refused (TYTO-402)', async () => {
+    const { element, control, wrote } = await mount(disk());
+    row(element, 'logo.png').click();
+    await settle(element);
+    control.chosen = 'explorer.menu.newRecipe';
+    await press(element, 'F10', { shiftKey: true });
+
+    expect(field(element)?.getAttribute('aria-label')).toBe('New Recipe…');
+    field(element)!.value = 'my recipe';
+    field(element)!.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    await settle(element);
+    field(element)!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle(element);
+    expect(wrote).toEqual([['create', null, 'my recipe', 'file', 'recipe']]);
+    expect(element.querySelector('.explorer__error')?.textContent).toContain('E_RECIPE_FORM');
   });
 
   it('asks for no second menu while one is open, nor from a key typed in the field', async () => {

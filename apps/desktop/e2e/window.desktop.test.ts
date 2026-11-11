@@ -439,6 +439,11 @@ describe('the bridge', () => {
       // TYTO-651, ADR 0178: the status bar's verification badge. Exercised by
       // `e2e/verification-mode.desktop.test.ts`.
       'verification:status',
+      // TYTO-402, ADR 0176: the vocabulary tab's help. Exercised by
+      // `e2e/recipe-authoring.desktop.test.ts`.
+      'vocabulary:complete',
+      'vocabulary:hover',
+      'vocabulary:lint',
       // TYTO-272: View > Zoom and its keys, which write the `zoom` setting. Exercised by
       // `e2e/typography.desktop.test.ts`.
       'window:zoom',
@@ -1002,6 +1007,20 @@ describe('switching the language', () => {
     'status.kind.recipe',
     'problems.empty.recipe',
     'command.recipe.run',
+    // TYTO-402: a vocabulary tab's kind, empty Problems line, save filter and hover, drawn only
+    // with one open, and New recipe and New vocabulary as commands; `status-bar.test.ts`,
+    // `problems-panel.test.ts`, `vocabulary-assist.test.ts` and `documents.test.ts` paint them,
+    // and `recipe-authoring.desktop.test.ts` runs both commands in the real window.
+    'dialog.files.vocabulary',
+    'status.kind.vocabulary',
+    'problems.empty.vocabulary',
+    'command.explorer.newRecipe',
+    'command.explorer.newVocabulary',
+    'vocabulary.section.rules',
+    'vocabulary.section.rewrites',
+    'vocabulary.section.lookups',
+    'vocabulary.hover.entries',
+    'vocabulary.hover.pointer',
     'recipe.cell.rows',
     'recipe.cell.rows.one',
     'recipe.cell.columns',

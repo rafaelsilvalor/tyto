@@ -116,6 +116,7 @@ import {
   cellStatuses,
   createRecipeNotebook,
 } from './recipe-notebook.js';
+import { vocabularyAssist } from './vocabulary-assist.js';
 import { AGE_TICK, type CellViewContext, cellOutputOf, tickAges } from './recipe-cell-view.js';
 import { type ViewContext, fullSizeBody } from './recipe-views.js';
 import {
@@ -225,6 +226,7 @@ import {
   isRecipe,
   isStale,
   isUnsaved,
+  isVocabulary,
   kindOfFormat,
   newDocument,
   rebaseEdit,
@@ -786,6 +788,22 @@ const appFileAssists: AppFileAssists = {
   ],
   // A recipe's (TYTO-377): its verbs at the start of a line, and the lines under its cells.
   recipe: [tabThroughCompletions(), recipeCompletion(() => recipeVerbs), cellOutputs()],
+  // A vocabulary's (TYTO-402, ADR 0176): its sections and fields, and what a key is, from main.
+  vocabulary: [
+    tabThroughCompletions(),
+    jsonAssist(
+      vocabularyAssist(
+        {
+          complete: (request) =>
+            window.tyto?.['vocabulary:complete'](request) ?? Promise.resolve({ answer: null }),
+          hover: (request) =>
+            window.tyto?.['vocabulary:hover'](request) ?? Promise.resolve({ answer: null }),
+        },
+        (key) => translate(state.locale, key),
+        () => active().name,
+      ),
+    ),
+  ],
 };
 
 /**
@@ -1279,6 +1297,8 @@ const TAB_ICONS: Readonly<Record<DocumentKind, IconName>> = {
   markdown: 'text',
   // TYTO-377: the explorer's generic file icon, as its row has.
   recipe: 'file',
+  // TYTO-402: the explorer's JSON icon, as a `.vocab.json` row has.
+  vocabulary: 'json',
 };
 
 const tabIconOf = (document_: DocumentState): IconName =>
@@ -2082,6 +2102,16 @@ const registry: CommandRegistry = withCommandGate(
       const cell = cellAtOrAbove(shown.answer, cursorOf(pane.state()).line);
       if (cell !== undefined) openRecipeCell(front.id, cell);
     },
+    newSeededFile: (seed) => {
+      // TYTO-402, ADR 0176: the explorer's name field, where New File opens it; the explorer is
+      // shown first when it is closed.
+      void (async () => {
+        if (!panelShown(EXPLORER_PANEL)) {
+          await changeLayout(withPanelOpen(layout, EXPLORER_PANEL, true));
+        }
+        elements.explorerPanel?.startNew('file', undefined, seed);
+      })();
+    },
     openDocumentation: () => {
       // TYTO-318. Names nothing: main opens one of its two literals, by the menu's language.
       void withBridge(async (bridge) => {
@@ -2790,6 +2820,8 @@ function adopt(
   });
   // A recipe runs as a pause would (TYTO-377): no source fetches until a save or Run.
   if (isRecipe(kind)) openedRecipe(created.id);
+  // A vocabulary is checked as it opens (TYTO-402), as an app file is.
+  if (isVocabulary(kind)) void lintVocabularyTab(created.id);
   void refreshRecent();
 }
 
@@ -3050,6 +3082,33 @@ async function validateSettings(bridge: TytoBridge, documentId: string): Promise
     dirty: isUnsaved(target),
   });
   setFileDiagnostics(documentId, text, diagnostics);
+}
+
+/**
+ * A vocabulary tab checked by main (TYTO-402, ADR 0176 decision 5): every problem
+ * `lintVocabulary` finds, at its range in the file, in the lint and in Problems. Dropped when the
+ * text moved on before the answer came, as an app file's check is (`setFileDiagnostics`).
+ */
+async function lintVocabularyTab(documentId: string): Promise<void> {
+  const target = documentOf(workspace, documentId);
+  const bridge = window.tyto;
+  if (target === undefined || bridge === undefined) return;
+  const text = contentOf(target);
+  const { diagnostics } = await bridge['vocabulary:lint']({ text });
+  setFileDiagnostics(documentId, text, diagnostics);
+}
+
+/** A vocabulary checked again on the pause in typing a brief compiles on. */
+function askVocabulary(documentId: string): void {
+  const existing = pending.get(documentId);
+  if (existing !== undefined) clearTimeout(existing);
+  pending.set(
+    documentId,
+    setTimeout(() => {
+      pending.delete(documentId);
+      void lintVocabularyTab(documentId);
+    }, PREVIEW_DELAY),
+  );
 }
 
 /** {@link validateAppFile} on the pause the preview compiles on. */
@@ -3893,11 +3952,17 @@ function wireExplorerPanel(): void {
     openFolder: () => {
       runCommand('workspace.openFolder');
     },
-    create: async (parentId, name, kind) => {
+    create: async (parentId, name, kind, seed) => {
       const bridge = window.tyto;
       if (bridge === undefined) return EXPLORER_NO_BRIDGE;
       const wanted = nextDocumentId();
-      const made = await bridge['explorer:create']({ documentId: wanted, parentId, name, kind });
+      const made = await bridge['explorer:create']({
+        documentId: wanted,
+        parentId,
+        name,
+        kind,
+        ...(seed === undefined ? {} : { seed }),
+      });
       if (made.ok && made.document !== null) adopt(made.document, made.documentId, wanted);
       return made;
     },
@@ -4470,7 +4535,10 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
   for (const [index, tab] of answer.tabs.entries()) {
     const opened = await fileOf(bridge, tab);
     const kind = restoredKind(tab, opened.document);
-    const textKind = kind === 'text' || kind === 'markdown' || kind === 'recipe' ? kind : undefined;
+    const textKind =
+      kind === 'text' || kind === 'markdown' || kind === 'recipe' || kind === 'vocabulary'
+        ? kind
+        : undefined;
     let built: DocumentState | undefined;
     if (opened.document !== null && opened.documentId !== null) {
       const language = languageOf(kind);
@@ -4569,6 +4637,7 @@ async function restoreSession(bridge: TytoBridge, handle: EditorHandle): Promise
         void request(bridge, document_.id, contentOf(document_), { fetch });
       else if (isAppFile(document_.kind)) void validateAppFile(bridge, document_.id);
       else if (isRecipe(document_.kind)) openedRecipe(document_.id);
+      else if (isVocabulary(document_.kind)) void lintVocabularyTab(document_.id);
     }
   }
   if (rows.length > 0) {
@@ -6861,6 +6930,7 @@ async function load(): Promise<void> {
         if (isAppFile(edited.kind)) askAppFile(bridge, documentId);
         else if (isBrief(edited.kind)) ask(bridge, documentId, contentOf(edited));
         else if (edited.kind === 'markdown') askMarkdown(documentId);
+        else if (isVocabulary(edited.kind)) askVocabulary(documentId);
         else if (isRecipe(edited.kind)) {
           // Folds follow their lines now, not on the next answer: a fold keyed by a line that
           // moved would show on whichever cell landed there (TYTO-451).

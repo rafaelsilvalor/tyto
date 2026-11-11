@@ -13,7 +13,7 @@ import { recipeCredentialStore } from './recipe-credentials.js';
 import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
 import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
-import type { Table } from '@tyto/recipe';
+import { type Table, vocabularySkeleton } from '@tyto/recipe';
 
 import { zoneClock } from './recipe-clock.js';
 import { createTemplateFolder } from './session.js';
@@ -113,8 +113,11 @@ const projectFolder = () => {
 /** The explorer as the handlers see it: one brief and one picture, each by an id it minted. */
 const explorerFiles = () => {
   const asked: (string | null)[] = [];
+  /** What each new file was written with (TYTO-402): a seeded one holds its skeleton. */
+  const written: { name: string; text: string | undefined }[] = [];
   return {
     asked,
+    written,
     list: (entryId: string | null) => {
       asked.push(entryId);
       return Promise.resolve(
@@ -158,9 +161,13 @@ const explorerFiles = () => {
       parentId: string | null,
       name: string,
       kind: 'file' | 'folder',
+      text?: string,
     ): ReturnType<ExplorerService['create']> => {
       asked.push(parentId);
-      if (name === 'taken.brief') return Promise.resolve({ ok: false, reason: 'exists' });
+      if (name === 'taken.brief' || name === 'taken.recipe') {
+        return Promise.resolve({ ok: false, reason: 'exists' });
+      }
+      written.push({ name, text });
       const entryKind = kind === 'folder' ? 'folder' : name.endsWith('.brief') ? 'brief' : 'file';
       return Promise.resolve({
         ok: true,
@@ -2854,6 +2861,47 @@ describe('the explorer write channels', () => {
     await expect(
       create({ documentId: 'document-9', parentId: null, name: 'semanal.recipe', kind: 'file' }),
     ).resolves.toMatchObject({ documentId: 'document-9', document: { format: 'recipe' } });
+  });
+
+  it('writes a new recipe and a new vocabulary from their skeletons (TYTO-402, ADR 0176)', async () => {
+    const deps = dependencies();
+    const create = guard('explorer:create', createHandlers(deps)['explorer:create']);
+
+    await expect(
+      create({ documentId: 'd-1', parentId: null, name: 'semanal', kind: 'file', seed: 'recipe' }),
+    ).resolves.toMatchObject({ documentId: 'd-1', document: { format: 'recipe' } });
+    await expect(
+      create({
+        documentId: 'd-2',
+        parentId: null,
+        name: 'empresa',
+        kind: 'file',
+        seed: 'vocabulary',
+      }),
+    ).resolves.toMatchObject({ documentId: 'd-2', document: { format: 'vocabulary' } });
+    expect(deps.explorer.written).toEqual([
+      { name: 'semanal.recipe', text: expect.stringMatching(/^recipe semanal\n/u) as string },
+      { name: 'empresa.vocab.json', text: vocabularySkeleton() },
+    ]);
+  });
+
+  it('refuses a recipe name a run line could not name, and writes nothing (TYTO-402)', async () => {
+    const deps = dependencies();
+    const create = guard('explorer:create', createHandlers(deps)['explorer:create']);
+
+    await expect(
+      create({
+        documentId: 'd-1',
+        parentId: null,
+        name: 'my recipe',
+        kind: 'file',
+        seed: 'recipe',
+      }),
+    ).resolves.toEqual({ ok: false, reason: 'recipe-name' });
+    await expect(
+      create({ documentId: 'd-2', parentId: null, name: 'taken', kind: 'file', seed: 'recipe' }),
+    ).resolves.toEqual({ ok: false, reason: 'exists' });
+    expect(deps.explorer.written).toEqual([]);
   });
 
   it('moves the tabs under a renamed entry and answers each one, never a path', async () => {

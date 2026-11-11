@@ -119,7 +119,7 @@ export const isPreviewImage = (name: string): boolean =>
  * (TYTO-377). Main names it from the path's extension at every open; the window never guesses it
  * from a name.
  */
-export type DocumentFormat = 'brief' | 'text' | 'markdown' | 'recipe';
+export type DocumentFormat = 'brief' | 'text' | 'markdown' | 'recipe' | 'vocabulary';
 
 /** A format that is not a brief: a text file of one kind or another. */
 type TextFormat = Exclude<DocumentFormat, 'brief'>;
@@ -134,11 +134,34 @@ const TEXT_FORMATS: Readonly<Record<string, TextFormat>> = {
   recipe: 'recipe',
 };
 
-/** The extensions a tab opens, with the dot, as the explorer and the dialogs ask for them. */
-export const TAB_EXTENSIONS = ['.brief', '.txt', '.md', '.recipe'] as const;
+/**
+ * A recipe's vocabulary (TYTO-402, ADR 0176): the one `.json` a tab opens, by its double
+ * extension. Every other `.json` stays out, the app files' line ADR 0132 keeps.
+ */
+export const VOCABULARY_SUFFIX = '.vocab.json';
+
+/**
+ * The endings a tab opens, with the dot, as the explorer and the dialogs ask for them. Compared
+ * with `endsWith` on the lower-cased name ({@link opensInTab}), never `extname`, which reads
+ * `.vocab.json` as `.json`.
+ */
+export const TAB_EXTENSIONS = ['.brief', '.txt', '.md', '.recipe', VOCABULARY_SUFFIX] as const;
+
+/** Whether a tab opens a file of this name or path (`TAB_EXTENSIONS`). */
+export const opensInTab = (name: string): boolean => {
+  const lower = name.toLowerCase();
+  return TAB_EXTENSIONS.some((ending) => lower.endsWith(ending));
+};
+
+/** Whether a name or a path is a vocabulary file's: a stem, then `.vocab.json`. */
+const isVocabulary = (name: string): boolean => {
+  const base = name.slice(Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')) + 1);
+  return base.toLowerCase().endsWith(VOCABULARY_SUFFIX) && base.length > VOCABULARY_SUFFIX.length;
+};
 
 /** The text format of a file of this name, or none. Own keys only: `x.constructor` is no text. */
 const textFormatOf = (name: string): TextFormat | undefined => {
+  if (isVocabulary(name)) return 'vocabulary';
   const extension = extensionOf(name);
   return Object.prototype.hasOwnProperty.call(TEXT_FORMATS, extension)
     ? TEXT_FORMATS[extension]

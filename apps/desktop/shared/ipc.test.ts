@@ -143,6 +143,10 @@ describe('the IPC contract', () => {
       'update:act',
       'update:status',
       'verification:status',
+      // TYTO-402, ADR 0176: the vocabulary tab's lint, completion and hover.
+      'vocabulary:complete',
+      'vocabulary:hover',
+      'vocabulary:lint',
       'window:zoom',
       'workspace:folder',
       'workspace:open-recent',

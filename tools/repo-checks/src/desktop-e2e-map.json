@@ -16,9 +16,10 @@
       "e2e": [
         "explorer-image.desktop.test.ts",
         "explorer.desktop.test.ts",
+        "recipe-authoring.desktop.test.ts",
         "text-tabs.desktop.test.ts"
       ],
-      "why": "reviewed: which icon an explorer row and a tab draw (TYTO-282), which names a click shows in the preview (TYTO-366), and which open in a tab as text (TYTO-247); only the explorer's suites assert them"
+      "why": "reviewed: which icon an explorer row and a tab draw (TYTO-282), which names a click shows in the preview (TYTO-366), and which open in a tab as text (TYTO-247), a .vocab.json among them (TYTO-402); only the explorer's suites and the authoring suite assert them"
     },
     {
       "paths": ["apps/desktop/shared/layout.ts"],
@@ -196,11 +197,12 @@
         "explorer-image.desktop.test.ts",
         "explorer-write.desktop.test.ts",
         "explorer.desktop.test.ts",
+        "recipe-authoring.desktop.test.ts",
         "text-tabs.desktop.test.ts",
         "window.desktop.test.ts",
         "workspace.desktop.test.ts"
       ],
-      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, its new, rename and delete (TYTO-352), and the image a click shows in the preview (TYTO-366); its channels are in the bridge's list"
+      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, its new, rename and delete (TYTO-352), New recipe and New vocabulary (TYTO-402), and the image a click shows in the preview (TYTO-366); its channels are in the bridge's list"
     },
     {
       "paths": ["apps/desktop/src/main/export.ts"],
@@ -638,6 +640,14 @@
       ],
       "e2e": ["schedules.desktop.test.ts", "window.desktop.test.ts"],
       "why": "reviewed: the recipe scheduler in main and its Schedules panel (TYTO-385, ADR 0175); window.desktop's channel list reaches its schedule:list, schedule:run-now and schedule:open, and the schedules suite lists a trusted folder's recipe, runs it now and opens it. Its cadence, skipped ticks, trust, needed parameters, notification dedupe and stop are in recipe-schedule.test.ts with fake timers; the panel's rows and words are in schedule-panel.test.ts"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/recipe-authoring.ts",
+        "apps/desktop/src/renderer/vocabulary-assist.ts"
+      ],
+      "e2e": ["recipe-authoring.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: New recipe and New vocabulary, and the vocabulary tab's lint, completion and hover (TYTO-402, ADR 0176); window.desktop's channel list reaches vocabulary:lint, vocabulary:complete and vocabulary:hover, and the authoring suite makes both files in an empty trusted folder and marks a refused rule at its character. The seeds, the escape mapping and the answers are in recipe-authoring.test.ts, the wording in vocabulary-assist.test.ts"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],

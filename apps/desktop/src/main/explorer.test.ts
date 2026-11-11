@@ -49,6 +49,7 @@ import {
   watchRecursively,
 } from './explorer.js';
 import { IMAGE_MAX_BYTES, imageMimeOf, readExplorerImage } from './explorer-image.js';
+import { TAB_EXTENSIONS } from '../../shared/file-icons.js';
 
 /**
  * The explorer's listing and watcher on a real disk (TYTO-279, ADR 0115): what the window is
@@ -244,6 +245,21 @@ describe('the brief a click opens', () => {
 
     await rm(join(work, 'slide 2.brief'));
     expect(await explorer.filePath(idOf('slide 2.brief'), ['.brief'])).toBeUndefined();
+  });
+
+  it('opens a vocabulary by its double ending, and no other .json (TYTO-402)', async () => {
+    await writeFile(join(work, 'empresa.vocab.json'), '{}');
+    await writeFile(join(work, 'dados.json'), '{}');
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const root = await explorer.list(null);
+    const idOf = (name: string): string =>
+      root.entries.find((entry) => entry.name === name)?.id ?? '';
+
+    expect(await explorer.filePath(idOf('empresa.vocab.json'), TAB_EXTENSIONS)).toBe(
+      join(work, 'empresa.vocab.json'),
+    );
+    expect(await explorer.filePath(idOf('dados.json'), TAB_EXTENSIONS)).toBeUndefined();
   });
 });
 
@@ -707,6 +723,23 @@ describe('making a new entry', () => {
     });
     expect(await readFile(join(work, 'slide 2.brief'), 'utf8')).toBe('kept');
     expect((await readdir(join(work, 'slides'))).sort()).toEqual(['capa.brief', 'extra']);
+  });
+
+  it('writes a skeleton into a new file, and never over one that is there (TYTO-402)', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    await writeFile(join(work, 'semanal.recipe'), 'recipe semanal\nwhere done\n');
+
+    await expect(
+      explorer.create(null, 'semanal.recipe', 'file', 'recipe semanal\n'),
+    ).resolves.toEqual({ ok: false, reason: 'exists' });
+    const made = await explorer.create(null, 'nova.recipe', 'file', 'recipe nova\n');
+
+    expect(made).toMatchObject({ ok: true, entry: { name: 'nova.recipe', kind: 'file' } });
+    expect(await readFile(join(work, 'semanal.recipe'), 'utf8')).toBe(
+      'recipe semanal\nwhere done\n',
+    );
+    expect(await readFile(join(work, 'nova.recipe'), 'utf8')).toBe('recipe nova\n');
   });
 
   it('writes nothing for a name that is refused, and nothing outside the folder', async () => {
