@@ -237,3 +237,82 @@ describe('resolveProject', () => {
     expect(project.diagnostics[0]?.[0]?.range).toEqual(sourceRange(0, 6));
   });
 });
+
+describe('recipes.call.hosts (TYTO-671, ADR 0193)', () => {
+  const hosts = (list: unknown): Record<string, unknown> => ({
+    recipes: { call: { hosts: list } },
+  });
+
+  it('is a known key, read in lower case without a trailing dot', () => {
+    const project = resolveProject([folder(hosts(['Hooks.Example.com.', 'api.example.org']))]);
+    expect(project.callHosts).toEqual(['hooks.example.com', 'api.example.org']);
+    expect(project.diagnostics[0]).toEqual([]);
+  });
+
+  it('is empty when no sheet writes it', () => {
+    expect(resolveProject([folder({ output: 'out' })]).callHosts).toEqual([]);
+  });
+
+  it("withholds a restricted sheet's list and says so", () => {
+    const project = resolveProject([folder(hosts(['hooks.example.com']), 'restricted')]);
+    expect(project.callHosts).toEqual([]);
+    expect(codes(project.diagnostics[0])).toEqual(['W_PROJECT_KEY_INVALID']);
+    expect(project.diagnostics[0]?.[0]?.message).toContain('trusted folder');
+  });
+
+  it("keeps the profile's list when the restricted folder writes its own", () => {
+    const project = resolveProject([
+      profileSheet(hosts(['hooks.example.com'])),
+      folder(hosts(['evil.example.net']), 'restricted'),
+    ]);
+    expect(project.callHosts).toEqual(['hooks.example.com']);
+  });
+
+  it("replaces an earlier sheet's list whole", () => {
+    const project = resolveProject([
+      profileSheet(hosts(['hooks.example.com', 'api.example.org'])),
+      folder(hosts(['api.example.org'])),
+    ]);
+    expect(project.callHosts).toEqual(['api.example.org']);
+  });
+
+  it('refuses a port, a scheme, a path or a wildcard, entry by entry', () => {
+    const project = resolveProject([
+      folder(
+        hosts([
+          'hooks.example.com:8443',
+          'https://hooks.example.com',
+          'hooks.example.com/run',
+          '*.example.com',
+          7,
+          'ok.example.com',
+        ]),
+      ),
+    ]);
+    expect(project.callHosts).toEqual(['ok.example.com']);
+    expect(codes(project.diagnostics[0])).toEqual(Array(5).fill('W_PROJECT_KEY_INVALID'));
+  });
+
+  it('lets the sheet before keep its say when every entry is refused', () => {
+    const project = resolveProject([
+      profileSheet(hosts(['hooks.example.com'])),
+      folder(hosts(['*.example.com'])),
+    ]);
+    expect(project.callHosts).toEqual(['hooks.example.com']);
+  });
+
+  it('names an unknown subkey and a value of the wrong shape', () => {
+    const project = resolveProject([
+      folder({ recipes: { call: { hosts: 'hooks.example.com', method: 'GET' }, other: 1 } }),
+    ]);
+    expect(project.callHosts).toEqual([]);
+    expect(codes(project.diagnostics[0]).sort()).toEqual([
+      'W_PROJECT_KEY_INVALID',
+      'W_PROJECT_KEY_UNKNOWN',
+      'W_PROJECT_KEY_UNKNOWN',
+    ]);
+    expect(codes(resolveProject([folder({ recipes: [] })]).diagnostics[0])).toEqual([
+      'W_PROJECT_KEY_INVALID',
+    ]);
+  });
+});

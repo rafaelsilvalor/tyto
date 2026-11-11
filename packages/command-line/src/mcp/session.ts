@@ -31,6 +31,7 @@ import {
   reachableExporters,
   withoutRefused,
 } from '../plugins/index.js';
+import { environmentRecipeCredentials } from '../recipe-credentials.js';
 import { type RenderContext, loadRenderContext } from '../render-context.js';
 import {
   type RenderTaskReport,
@@ -405,6 +406,14 @@ export async function openSession(
         templates: async (name) => {
           const current = (await context()).value;
           return current.registry.get(current.configurations.select(name)?.template ?? name);
+        },
+        // TYTO-671, ADR 0193 decision 8: `call` plans against the workspace's list and the
+        // credentials in the environment, and sends nothing: an agent previews a dispatch and
+        // never carries one out (ADR 0185).
+        calls: {
+          hostsFor: () => (trust === 'trusted' ? workspace?.loaded.project.callHosts : undefined),
+          credentials: environmentRecipeCredentials(environment.variables ?? {}),
+          sends: false,
         },
       });
     });

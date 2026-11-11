@@ -178,6 +178,7 @@ export {
   type RecipeRegistryRequest,
   type RecipeRunInput,
   type RecipeRunner,
+  type RecipeRunnerCalls,
   type RecipeRunnerOptions,
   type RunHeld,
   type RunnerAnswer,
@@ -189,6 +190,14 @@ export {
 } from './recipes/recipe-runner.js';
 
 export type { AppliedRecord } from './recipes/recipe-apply.js';
+export {
+  type RecipeCallOptions,
+  type RecipeCredentials,
+  type RecipeFetch,
+  type RecipeFetchAnswer,
+  type RecipeFetchInit,
+  recipeCallPorts,
+} from './recipes/recipe-calls.js';
 
 export {
   type FsTrustStore,

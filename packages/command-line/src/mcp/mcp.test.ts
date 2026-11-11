@@ -1031,6 +1031,77 @@ describe('the tools that write', () => {
       await session.close();
     }
   }, 30_000);
+
+  /**
+   * TYTO-671, ADR 0193 decision 8: `call` plans against the workspace's list and the credential
+   * in the environment, and an agent's apply sends nothing (ADR 0185).
+   */
+  it('plan a call against the list and the environment, and send nothing on apply', async () => {
+    const TOKEN = 'tok-mcp-never-shown';
+    await writeFile(
+      join(folder, '.tyto', 'project.json'),
+      JSON.stringify({ recipes: { call: { hosts: ['hooks.example.com'] } } }),
+    );
+    await mkdir(join(folder, 'recipes'), { recursive: true });
+    const recipe = (host: string, token: string) =>
+      [
+        'recipe dispatch',
+        'demo.rows',
+        `call url=https://${host}/run token=${token} body={"key": "{key|}"}`,
+        '',
+      ].join('\n');
+    await writeFile(join(folder, 'recipes', 'ok.recipe'), recipe('hooks.example.com', 'routine'));
+    await writeFile(join(folder, 'recipes', 'host.recipe'), recipe('evil.example.net', 'routine'));
+    await writeFile(join(folder, 'recipes', 'token.recipe'), recipe('hooks.example.com', 'other'));
+    const fetched: unknown[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (...args: Parameters<typeof fetch>) => {
+      fetched.push(args[0]);
+      return Promise.reject(new Error('no network in this test'));
+    };
+    const session = await openSession(
+      {
+        console: { out: () => undefined, err: () => undefined },
+        version: '0.0.0-test',
+        cwd: folder,
+        home,
+        variables: { TYTO_RECIPE_CREDENTIAL_ROUTINE: TOKEN },
+        rasterizer: () => fakeRasterizer(),
+      },
+      { recipeContributions: demoVerbs().contributions },
+    );
+    try {
+      const ran = await session.runRecipe({ path: 'recipes/ok.recipe' });
+      if (!('cells' in ran)) throw new Error('a run answers its cells');
+      const plan = ran.cells[1]?.plan;
+      expect(plan).toMatchObject({
+        count: 2,
+        target: 'requests to hooks.example.com (this host sends none)',
+      });
+      expect(JSON.stringify(ran)).not.toContain(TOKEN);
+
+      const applied = await session.runRecipe({
+        path: 'recipes/ok.recipe',
+        apply: { cell: 1, plan: plan?.id ?? -1 },
+      });
+      expect(applied).toMatchObject({ applied: false });
+      expect(JSON.stringify(applied)).toContain('this host sends no requests');
+      expect(fetched).toEqual([]);
+
+      for (const [path, said] of [
+        ['recipes/host.recipe', 'recipes.call.hosts'],
+        ['recipes/token.recipe', "no credential named 'other'"],
+      ] as const) {
+        const refused = await session.runRecipe({ path });
+        if (!('cells' in refused)) throw new Error('a run answers its cells');
+        expect(refused.cells[1]?.diagnostics.map(({ code }) => code)).toEqual(['E_RECIPE_CALL']);
+        expect(JSON.stringify(refused.cells[1]?.diagnostics)).toContain(said);
+      }
+    } finally {
+      globalThis.fetch = realFetch;
+      await session.close();
+    }
+  }, 30_000);
 });
 
 /**

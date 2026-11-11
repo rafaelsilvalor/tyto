@@ -17,6 +17,7 @@ import {
   presetPaths,
   readPresets,
 } from './presets.js';
+import { RECIPES_KEY, readRecipes } from './recipes.js';
 
 /**
  * A workspace's `.tyto/project.json`: the places a project keeps its things (TYTO-278,
@@ -119,6 +120,12 @@ export interface ResolvedProject {
    */
   readonly delivery: ResolvedDelivery;
   /**
+   * `recipes.call.hosts` (TYTO-671, ADR 0193): the hosts a recipe's `call` may send to, lower
+   * case, from trusted sheets only, the later sheet's list replacing the earlier's whole. Empty
+   * when no trusted sheet writes one.
+   */
+  readonly callHosts: readonly string[];
+  /**
    * Which kind of sheet each value came from, so the window can say "from the profile" or
    * "from this folder" (TYTO-347). A key no sheet set has no origin.
    */
@@ -145,6 +152,7 @@ const KNOWN_KEYS = new Set<string>([
   'plugins',
   EXPORT_PRESETS_KEY,
   DELIVERY_KEY,
+  RECIPES_KEY,
 ]);
 
 /** What one sheet sets; a key it does not set, or sets to nothing usable, is absent. */
@@ -156,6 +164,7 @@ interface LayerValues {
   sections?: Readonly<Record<string, unknown>>;
   presets?: ReadonlyMap<string, SheetPreset | null>;
   delivery?: SheetDelivery;
+  callHosts?: readonly string[];
 }
 
 /**
@@ -202,6 +211,7 @@ export function resolveProject(
     }
     if (values.delivery !== undefined)
       deliveries.push({ delivery: values.delivery, kind: layer.kind });
+    if (values.callHosts !== undefined) merged.callHosts = values.callHosts;
     return found;
   });
   const exportPresets: ExportPreset[] = [];
@@ -230,6 +240,7 @@ export function resolveProject(
     sections,
     exportPresets,
     delivery: mergeDelivery(workspace.root, deliveries),
+    callHosts: merged.callHosts ?? [],
     origins: { ...origins, sections: sectionOrigins },
     diagnostics,
   };
@@ -353,6 +364,9 @@ function readLayer(
         },
         found,
       );
+    } else if (entry.key === RECIPES_KEY) {
+      const recipes = readRecipes(entry, layer.trust, found);
+      if (recipes?.callHosts !== undefined) values.callHosts = recipes.callHosts;
     } else if (entry.key === 'plugins') {
       const sections = sectionsOf(layer, entry, found);
       if (sections !== undefined) values.sections = sections;
