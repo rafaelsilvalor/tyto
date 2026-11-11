@@ -103,6 +103,8 @@ export const PROJECT_PANEL = 'project';
 export const COMMANDS_PANEL = 'commands';
 /** TYTO-497 (ADR 0164): the person's shell, in terminals main owns. */
 export const TERMINAL_PANEL = 'terminal';
+/** TYTO-385 (ADR 0175): the recipes main runs on an interval in the open folder. */
+export const SCHEDULES_PANEL = 'schedules';
 
 /**
  * A plugin's panel (TYTO-49, ADR 0045): an id under this prefix, drawn by one element.
@@ -205,6 +207,17 @@ export const DEFAULT_LAYOUT: Layout = {
       // `layoutFrom` adds it, closed, to a saved layout that predates it.
       id: PROJECT_PANEL,
       element: 'tyto-project-panel',
+      dock: 'bottom',
+      open: false,
+      size: 140,
+      fixed: false,
+    },
+    {
+      // TYTO-385. After Project, closed until asked for: most folders schedule nothing, and a
+      // tab of the bottom strip costs nothing while closed (ADR 0163). `layoutFrom` adds it,
+      // closed, to a saved layout that predates it.
+      id: SCHEDULES_PANEL,
+      element: 'tyto-schedule-panel',
       dock: 'bottom',
       open: false,
       size: 140,

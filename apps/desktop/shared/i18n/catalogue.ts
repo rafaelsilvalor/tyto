@@ -426,6 +426,8 @@ export interface Catalogue {
   /** TYTO-45. Closed in the default layout, like the panel it names. */
   readonly 'panel.queue': string;
   readonly 'panel.project': string;
+  /** TYTO-385, ADR 0175. A tab of the bottom strip, closed in the default layout. */
+  readonly 'panel.schedules': string;
   /** TYTO-279. The explorer, closed in the default layout until a folder is opened. */
   readonly 'panel.explorer': string;
 
@@ -942,6 +944,27 @@ export interface Catalogue {
   readonly 'project.unset': string;
   readonly 'project.origin.folder': string;
   readonly 'project.origin.profile': string;
+  /**
+   * TYTO-385, ADR 0175: the Schedules panel. `needs` names the parameters without a default;
+   * `problem` is followed by the diagnostic code when the run had one.
+   */
+  readonly 'schedules.heading': string;
+  readonly 'schedules.empty': string;
+  readonly 'schedules.unavailable': string;
+  readonly 'schedules.column.recipe': string;
+  readonly 'schedules.column.lastRun': string;
+  readonly 'schedules.column.nextRun': string;
+  readonly 'schedules.column.outcome': string;
+  readonly 'schedules.column.actions': string;
+  readonly 'schedules.outcome.none': string;
+  readonly 'schedules.outcome.running': string;
+  readonly 'schedules.outcome.ok': string;
+  readonly 'schedules.outcome.problem': string;
+  readonly 'schedules.outcome.held': string;
+  readonly 'schedules.outcome.waiting': string;
+  readonly 'schedules.outcome.needs': string;
+  readonly 'schedules.runNow': string;
+  readonly 'schedules.open': string;
   readonly 'queue.folder.none': string;
   readonly 'queue.folder.choose': string;
   readonly 'queue.folder.clear': string;
@@ -1235,6 +1258,7 @@ export const CATALOGUE_KEYS = [
   'panel.problems',
   'panel.queue',
   'panel.project',
+  'panel.schedules',
   'panel.explorer',
   'search.find',
   'search.replace',
@@ -1561,6 +1585,23 @@ export const CATALOGUE_KEYS = [
   'project.unset',
   'project.origin.folder',
   'project.origin.profile',
+  'schedules.heading',
+  'schedules.empty',
+  'schedules.unavailable',
+  'schedules.column.recipe',
+  'schedules.column.lastRun',
+  'schedules.column.nextRun',
+  'schedules.column.outcome',
+  'schedules.column.actions',
+  'schedules.outcome.none',
+  'schedules.outcome.running',
+  'schedules.outcome.ok',
+  'schedules.outcome.problem',
+  'schedules.outcome.held',
+  'schedules.outcome.waiting',
+  'schedules.outcome.needs',
+  'schedules.runNow',
+  'schedules.open',
   'queue.folder.none',
   'queue.folder.choose',
   'queue.folder.clear',

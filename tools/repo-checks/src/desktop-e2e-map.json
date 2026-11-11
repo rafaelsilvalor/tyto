@@ -621,9 +621,13 @@
       "why": "reviewed: the recipe notebook's runner, in @tyto/io since TYTO-664 (ADR 0188), and what main wraps around it (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in @tyto/io's recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts. The Board's groups (TYTO-381) are counted in recipe-facets.ts, tested in recipe-facets.test.ts and ipc.test.ts, and drawn by the views suite"
     },
     {
-      "paths": ["apps/desktop/src/main/recipe-schedule.ts"],
-      "e2e": ["window.desktop.test.ts"],
-      "why": "reviewed: the recipe scheduler in main (TYTO-385, ADR 0175); window.desktop's channel list reaches its schedule:list, schedule:run-now and schedule:open. Its cadence, skipped ticks, trust, needed parameters, notification dedupe and stop are in recipe-schedule.test.ts with fake timers; the Schedules panel and its suite are the card's third pull request"
+      "paths": [
+        "apps/desktop/src/main/recipe-schedule.ts",
+        "apps/desktop/src/renderer/schedule-panel.ts",
+        "apps/desktop/e2e/schedules.desktop.test.ts"
+      ],
+      "e2e": ["schedules.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: the recipe scheduler in main and its Schedules panel (TYTO-385, ADR 0175); window.desktop's channel list reaches its schedule:list, schedule:run-now and schedule:open, and the schedules suite lists a trusted folder's recipe, runs it now and opens it. Its cadence, skipped ticks, trust, needed parameters, notification dedupe and stop are in recipe-schedule.test.ts with fake timers; the panel's rows and words are in schedule-panel.test.ts"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
