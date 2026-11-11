@@ -73,9 +73,9 @@ non-zero.
 | `E_PROCESS_SCRIPT_MISSING` | error | no | A plugin asked to start its own program, and the script its manifest names is not in its folder. |
 | `E_TERMINAL_UNAVAILABLE` | error | no | A plugin asked for a terminal tab on a host that has no terminal. |
 | `E_TERMINAL_LIMIT` | error | no | A plugin asked for a terminal tab while as many of its terminals as allowed are open. |
-| `E_WINDOW_UNAVAILABLE` | error | no | A plugin asked for the window's agent server on a host that has no window. |
-| `E_WINDOW_AGENTS_OFF` | error | no | A plugin asked for the window's agent server while agentsListen is off. |
-| `E_WINDOW_RESTRICTED` | error | no | A plugin asked for the window's agent server while the open folder is restricted. |
+| `E_WINDOW_UNAVAILABLE` | error | no | A plugin asked to reach the window on a host that has no window. |
+| `E_WINDOW_AGENTS_OFF` | error | no | A plugin asked to reach the window while agentsListen is off. |
+| `E_WINDOW_RESTRICTED` | error | no | A plugin asked to reach the window while the open folder is restricted. |
 | `E_PLUGIN_CACHE` | error | no | A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache. |
 | `E_WORKSPACE_FILE` | error | no | A plugin's workspace file was refused: outside the folder, through a link, missing, too large, inside .tyto/, or no folder is open. |
 | `E_WORKSPACE_FILE_RESTRICTED` | error | no | A plugin asked for a file of a workspace the person has not trusted. |
@@ -1182,12 +1182,12 @@ Parameters: `plugin`, `program`, `limit`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md`
 
-A plugin asked for the window's agent server on a host that has no window.
+A plugin asked to reach the window on a host that has no window.
 
 It is the plugin's call that is refused; what the plugin does with that is its own.
 
 ```
-Plugin '{plugin}' asked for the window's agent server, and {host} has no window.
+Plugin '{plugin}' asked to reach the window, and {host} has no window.
 ```
 
 Parameters: `plugin`, `host`
@@ -1196,12 +1196,12 @@ Parameters: `plugin`, `host`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md`
 
-A plugin asked for the window's agent server while agentsListen is off.
+A plugin asked to reach the window while agentsListen is off.
 
 It is the plugin's call that is refused; what the plugin does with that is its own.
 
 ```
-Plugin '{plugin}' asked for the window's agent server, and agentsListen is off in settings.json; turn it on to let agents reach the window.
+Plugin '{plugin}' asked to reach the window, and agentsListen is off in settings.json; turn it on to let agents reach the window.
 ```
 
 Parameters: `plugin`
@@ -1210,12 +1210,12 @@ Parameters: `plugin`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md`
 
-A plugin asked for the window's agent server while the open folder is restricted.
+A plugin asked to reach the window while the open folder is restricted.
 
 It is the plugin's call that is refused; what the plugin does with that is its own.
 
 ```
-Plugin '{plugin}' asked for the window's agent server, and the open folder is restricted; trust it to let agents reach the window.
+Plugin '{plugin}' asked to reach the window, and the open folder is restricted; trust it to let agents reach the window.
 ```
 
 Parameters: `plugin`

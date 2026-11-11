@@ -971,6 +971,96 @@ describe('host.window across the boundary (ADR 0183)', () => {
   });
 });
 
+describe('host.window.tools and callTool across the boundary (ADR 0190)', () => {
+  const TOOL = {
+    name: 'check_brief',
+    description: 'Checks a brief and lists its problems.',
+    inputSchema: { type: 'object', properties: { path: { type: 'string' } } },
+  };
+  const called: { plugin: string; name: string; input: unknown }[] = [];
+  const TOOLS: HostCapabilities = {
+    fetch: () => Promise.reject(new Error('no network here')),
+    credential: () => Promise.resolve(undefined),
+    describeCredential: () => 'nowhere',
+    windowTools: () => Promise.resolve([TOOL]),
+    callWindowTool: (plugin, name, input) => {
+      called.push({ plugin, name, input });
+      return Promise.resolve({ content: [{ type: 'text', text: 'no problems' }], isError: false });
+    },
+  };
+
+  const asking = (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () =>
+        ok(
+          await Promise.all([
+            host.window.tools(),
+            host.window.callTool('check_brief', { path: 'a.brief' }),
+          ]).then(
+            (answers) => JSON.stringify(answers),
+            (cause: { code?: string }) => cause.code ?? `thrown: ${String(cause)}`,
+          ),
+        ),
+    });
+
+  const answerOf = async (connected: Result<IsolatedPlugin, Diagnostics>): Promise<string> => {
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    return answer.ok ? answer.value : '';
+  };
+
+  it('lists and calls the window’s tools for a plugin that declares window:tools', async () => {
+    called.length = 0;
+    const { connected } = await isolate(asking, {
+      permissions: ['window:tools'],
+      capabilities: TOOLS,
+    });
+    expect(JSON.parse(await answerOf(connected))).toEqual([
+      [TOOL],
+      { content: [{ type: 'text', text: 'no problems' }], isError: false },
+    ]);
+    expect(called).toEqual([{ plugin: 'texto', name: 'check_brief', input: { path: 'a.brief' } }]);
+  });
+
+  it('answers E_PERMISSION, E_WINDOW_UNAVAILABLE and the adapter’s refusal with their codes', async () => {
+    called.length = 0;
+    const { windowTools: _list, callWindowTool: _call, ...cli } = TOOLS;
+    const restricted: HostCapabilities = {
+      ...TOOLS,
+      windowTools: () =>
+        Promise.reject(
+          new PluginCapabilityError(diagnostic('E_WINDOW_RESTRICTED', { plugin: 'texto' })),
+        ),
+    };
+    const answers = await Promise.all(
+      [
+        // A program's permission reaches the agent server, not the tools.
+        isolate(asking, { permissions: ['process:claude'], capabilities: TOOLS }),
+        isolate(asking, { permissions: ['window:tools'], capabilities: cli }),
+        isolate(asking, { permissions: ['window:tools'], capabilities: restricted }),
+      ].map(async (isolated) => answerOf((await isolated).connected)),
+    );
+    expect(answers).toEqual(['E_PERMISSION', 'E_WINDOW_UNAVAILABLE', 'E_WINDOW_RESTRICTED']);
+    // Only the restricted host was asked to call: its list refused, its call did not.
+    expect(called.length).toBe(1);
+  });
+
+  it('never hands a plugin a field the window added to a tool or an answer', async () => {
+    const careless: HostCapabilities = {
+      ...TOOLS,
+      windowTools: () => Promise.resolve([{ ...TOOL, annotations: { token: 'sk-secret' } }]),
+    };
+    const { connected } = await isolate(asking, {
+      permissions: ['window:tools'],
+      capabilities: careless,
+    });
+    const answer = await answerOf(connected);
+    expect(answer).toMatch(/^thrown/u);
+    expect(answer).not.toContain('sk-secret');
+  });
+});
+
 describe('host.terminal across the boundary (ADR 0184)', () => {
   const asked: { program: string; args: readonly string[]; script: string | undefined }[] = [];
   const TERMINAL: HostCapabilities = {

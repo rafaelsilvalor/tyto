@@ -63,7 +63,12 @@ import {
 } from './sources.js';
 import { type ThemeContribution, checkThemeContribution } from './theme.js';
 import { type HostTerminal, checkedTerminal, hostTerminal } from './terminal.js';
-import { type HostWindow, checkedWindowAgentServer, hostWindow } from './window.js';
+import {
+  type HostWindow,
+  checkedWindowAgentServer,
+  checkedWindowTools,
+  hostWindow,
+} from './window.js';
 
 /**
  * `PluginHost` and the in-process implementation of it (`docs/plugin-api.md`, Phase 1).
@@ -214,7 +219,8 @@ export interface PluginHost {
    * window's MCP server in the shape ACP's `mcpServers` takes, to a plugin that declares a
    * `process:<name>`. Without one it is `E_PERMISSION`; the CLI, which has no window, answers
    * `E_WINDOW_UNAVAILABLE`; `agentsListen` off is `E_WINDOW_AGENTS_OFF`; a restricted folder is
-   * `E_WINDOW_RESTRICTED`.
+   * `E_WINDOW_RESTRICTED`. `tools()` and `callTool(name, input)` call the same tools in process,
+   * behind `window:tools`, with the same refusals; an edit stays a proposal (ADR 0190).
    */
   readonly window: HostWindow;
   /**
@@ -690,7 +696,10 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         const channel = processChannel();
         return channel.handle(await processes.start(name, args, channel.events));
       }),
-      window: hostWindow(checkedWindowAgentServer(pluginId, permissions, options.capabilities)),
+      window: hostWindow({
+        agentServer: checkedWindowAgentServer(pluginId, permissions, options.capabilities),
+        ...checkedWindowTools(pluginId, permissions, options.capabilities),
+      }),
       terminal: hostTerminal(checkedTerminal(pluginId, permissions, options.capabilities, scripts)),
 
       log,
