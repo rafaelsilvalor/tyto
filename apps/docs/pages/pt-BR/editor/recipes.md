@@ -115,6 +115,29 @@ Quando Aplicar é recusado, o motivo aparece embaixo do plano, em vermelho, até
 
 Uma receita cujo cabeçalho tem a linha `apply auto` aplica os seus planos sem clique, mas só em **Executar receita** (ou **Executar daqui**, **Buscar de novo**) numa pasta confiável. Uma pausa na digitação ou um salvamento nunca aplicam. Numa pasta não confiável os planos são feitos e mostrados, e o plano diz _apply auto espera: esta pasta não é confiável, então Aplicar pede um clique_.
 
+## Rodar em intervalo
+
+Uma linha de cabeçalho `every 5m` (ou `every 30m`, `every 2h`) roda a receita sozinha enquanto o Tyto está aberto, quando a receita está em qualquer lugar da pasta aberta como espaço de trabalho e essa pasta é confiável:
+
+```
+recipe watch
+every 5m
+```
+
+- O intervalo mais curto é de 5 minutos; não há um mais longo. Uma receita sem a linha só roda quando você pede.
+- Ela roda o arquivo como está salvo, não o que está digitado numa aba sem salvar. A primeira execução vem um intervalo depois de a pasta ser aberta, e cada uma depois disso um intervalo depois do início da anterior. Uma execução que ainda está rodando quando chega a hora da próxima faz a próxima ser pulada, não enfileirada.
+- Nada roda com o Tyto fechado: ele não instala nenhum serviço em segundo plano. Depois que o computador dorme, uma receita cuja hora passou roda uma vez.
+- Numa pasta confiável, uma execução sozinha conta como **Executar receita**, então uma receita com `apply auto` aplica os seus planos. Numa pasta não confiável ela não roda nada, e o painel diz que ela está retida.
+- Uma receita cujo `param` não tem padrão aparece na lista, mas nunca roda sozinha: não há ninguém ali para dar o valor.
+
+Quando uma execução tem um problema (um passo que falha, ou um plano cujas gravações falham), o Tyto mostra uma notificação do sistema operacional, com o nome da receita e o código do problema; clique nela para abrir a receita. As execuções seguintes com problema ficam quietas até uma execução sair limpa de novo. Uma execução limpa não avisa nada, e um plano aguardando **Aplicar** também não.
+
+### O painel Agendamentos
+
+**Mostrar ou esconder: Agendamentos**, na barra de comandos, abre a aba **Agendamentos** do painel inferior. Ela tem uma linha para cada receita da pasta aberta que roda em intervalo: o nome e o intervalo, quando rodou por último, quando roda de novo e como terminou a última execução: _sem problemas_, _problema_ com o código do problema, _retida: pasta restrita_, _plano aguardando Aplicar_, _precisa de_ e os parâmetros que faltam, ou _ainda não rodou_.
+
+**Rodar agora** roda a receita na hora, sem esperar a vez dela; o botão fica esmaecido enquanto a receita roda e para uma receita que precisa de um parâmetro. **Abrir** abre a receita numa aba.
+
 ## Escrever um brief por linha
 
 `to-brief` é um passo que transforma cada linha da tabela num brief, no template que você nomeia, numa pasta do espaço de trabalho:

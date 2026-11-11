@@ -115,6 +115,29 @@ When Apply is refused, the reason shows under the plan, in red, until the next r
 
 A recipe whose header has the line `apply auto` applies its plans without a click, but only on **Run recipe** (or **Run from here**, **Fetch again**) in a trusted folder. A pause in typing or a save never applies. In a folder not trusted the plans are made and shown, and the plan says _apply auto waits: this folder is not trusted, so Apply asks for a click_.
 
+## Run on an interval
+
+A header line `every 5m` (or `every 30m`, `every 2h`) runs the recipe on its own while Tyto is open, when the recipe is anywhere in the open workspace folder and that folder is trusted:
+
+```
+recipe watch
+every 5m
+```
+
+- The shortest interval is 5 minutes; there is no longest. A recipe without the line runs only when you ask.
+- It runs the file as saved, not what is typed in a tab and unsaved. Its first run is one interval after the folder is opened, and each run after that one interval after the last one started. A run still going when the next one is due makes it skip that one rather than queue it.
+- Nothing runs while Tyto is closed: it installs no background service. After the computer sleeps, a recipe whose time passed runs once.
+- In a trusted folder a run on its own counts as **Run recipe**, so a recipe with `apply auto` applies its plans. In a folder not trusted it runs nothing, and the panel says it is held.
+- A recipe whose `param` has no default is listed but never run on its own: nobody is there to give the value.
+
+When a run has a problem (a step that fails, or a plan whose writes fail), Tyto raises one notification of the operating system, with the recipe's name and the problem's code; click it to open the recipe. Later runs with problems stay quiet until a run is clean again. A clean run is silent, and so is a plan waiting for **Apply**.
+
+### The Schedules panel
+
+**Show or hide: Schedules**, in the command bar, opens the **Schedules** tab of the bottom panel. It has a row for every recipe of the open folder that runs on an interval: its name and interval, when it last ran, when it runs next, and how the last run ended: _ok_, _problem_ with the problem's code, _held: restricted folder_, _plan waiting for Apply_, _needs_ and the parameters it lacks, or _not run yet_.
+
+**Run now** runs the recipe at once, without waiting for its time; it is dimmed while the recipe runs and for a recipe that needs a parameter. **Open** opens the recipe in a tab.
+
 ## Write a brief per row
 
 `to-brief` is a step that turns each row of the table into a brief, in the template you name, in a folder of the workspace:

@@ -146,6 +146,7 @@ import {
 } from './plugin-panel.js';
 import { type QueuePanel, QUEUE_PANEL_TAG } from './queue-panel.js';
 import { type ProjectPanel, PROJECT_PANEL_TAG } from './project-panel.js';
+import { type SchedulePanel, SCHEDULE_PANEL_TAG } from './schedule-panel.js';
 import { type CommandPanel, COMMAND_PANEL_TAG } from './command-panel.js';
 import { type TerminalPanel, TERMINAL_PANEL_TAG } from './terminal-panel.js';
 import { TerminalSessions } from './terminal-sessions.js';
@@ -316,6 +317,7 @@ import {
   PROBLEMS_PANEL,
   QUEUE_PANEL,
   PROJECT_PANEL,
+  SCHEDULES_PANEL,
   COMMANDS_PANEL,
   TERMINAL_PANEL,
   EXPLORER_PANEL,
@@ -1002,6 +1004,8 @@ function resolveElements() {
     queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
     // TYTO-347. A dock panel too, `null` while closed; painted from the workspace answer.
     projectPanel: document.querySelector<ProjectPanel>(PROJECT_PANEL_TAG),
+    // TYTO-385. A tab of the bottom strip, `null` while closed; painted from `schedule:list`.
+    schedulePanel: document.querySelector<SchedulePanel>(SCHEDULE_PANEL_TAG),
     // TYTO-496. Beside Problems, `null` while closed; it draws `commandSessions`.
     commandPanel: document.querySelector<CommandPanel>(COMMAND_PANEL_TAG),
     // TYTO-497. After Commands, `null` while closed; it draws `terminalSessions`' screens.
@@ -1496,6 +1500,55 @@ async function refreshQueue(): Promise<void> {
     } catch {
       queueElement.view = 'failed';
     }
+  });
+}
+
+/** The Schedules panels `wireSchedulePanel` has handed its callbacks to, for the queue's reason. */
+const wiredSchedulePanels = new WeakSet<SchedulePanel>();
+
+/**
+ * The Schedules panel (TYTO-385, ADR 0175 decision 6): its two buttons, and its first answer.
+ * Asked when the element is born and then only on `schedule:changed`, as the queue is: main
+ * owns the timers and says when anything moved.
+ */
+function wireSchedulePanel(): void {
+  const scheduleElement = elements.schedulePanel;
+  if (scheduleElement === null || wiredSchedulePanels.has(scheduleElement)) return;
+  wiredSchedulePanels.add(scheduleElement);
+  scheduleElement.actions = {
+    // By the id main gave, never a path (ADR 0086). How the run ends arrives with
+    // `schedule:changed`, which asks for the list again.
+    runNow: (scheduleId) => {
+      void withBridge(async (bridge) => {
+        await bridge['schedule:run-now']({ scheduleId });
+      });
+    },
+    open: (scheduleId) => {
+      openSchedule(scheduleId);
+    },
+  };
+  void refreshSchedules();
+}
+
+/** Asks main for the schedules and hands them to the panel, if the panel is open. */
+async function refreshSchedules(): Promise<void> {
+  await withBridge(async (bridge) => {
+    const scheduleElement = elements.schedulePanel;
+    if (scheduleElement === null) return;
+    try {
+      scheduleElement.view = await bridge['schedule:list']({});
+    } catch {
+      scheduleElement.view = 'failed';
+    }
+  });
+}
+
+/** Opens a scheduled recipe in a tab, by its id: the panel's Open and a notification's click. */
+function openSchedule(scheduleId: string): void {
+  void withBridge(async (bridge) => {
+    const wanted = nextDocumentId();
+    const opened = await bridge['schedule:open']({ documentId: wanted, scheduleId });
+    adopt(opened.document, opened.documentId, wanted);
   });
 }
 
@@ -4817,6 +4870,7 @@ const PANEL_NAMES: Readonly<Record<string, CatalogueKey>> = {
   problems: 'panel.problems',
   queue: 'panel.queue',
   project: 'panel.project',
+  schedules: 'panel.schedules',
   explorer: 'panel.explorer',
   commands: 'panel.commands',
   terminal: 'panel.terminal',
@@ -5010,6 +5064,9 @@ function dockHost(): DockHost {
       if (panelId === PROJECT_PANEL) {
         return { label, heading: { id: 'project-heading', key: 'project.heading' } as const };
       }
+      if (panelId === SCHEDULES_PANEL) {
+        return { label, heading: { id: 'schedules-heading', key: 'schedules.heading' } as const };
+      }
       return { label };
     },
     onPick: (panelId) => {
@@ -5118,6 +5175,7 @@ async function applyLayout(persist: boolean): Promise<void> {
   elements = resolveElements();
   wirePanelControls();
   wireQueuePanel();
+  wireSchedulePanel();
   wireExplorerPanel();
   // A Project panel the dock just made has no answer yet; the last one is still true.
   if (elements.projectPanel) elements.projectPanel.view = workspaceShown;
@@ -6500,6 +6558,13 @@ async function load(): Promise<void> {
 
     bridge.on('queue:changed', () => {
       if (elements.queuePanel !== null) void refreshQueue();
+    });
+
+    // TYTO-385, ADR 0175: a schedule was found or gone, or a run started or ended. `open` is a
+    // clicked notification's recipe, opened by its id as the panel's Open does.
+    bridge.on('schedule:changed', (pushed) => {
+      if (elements.schedulePanel !== null) void refreshSchedules();
+      if (pushed.open !== undefined) openSchedule(pushed.open);
     });
 
     // The open folder changed on disk (TYTO-279, ADR 0115): the explorer lists its open

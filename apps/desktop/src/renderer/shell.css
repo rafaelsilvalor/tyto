@@ -3689,6 +3689,109 @@ tyto-gallery-dialog[open] {
   color: var(--tyto-accent);
 }
 
+/*
+ * The Schedules panel (TYTO-385, ADR 0175): one row per scheduled recipe. A table so the times
+ * and outcomes line up down the column; the name and the actions take what is left.
+ */
+.schedules__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--tyto-space-2) var(--tyto-space-5);
+  font-size: var(--tyto-text-sm);
+}
+
+.schedules__note {
+  margin: var(--tyto-space-1) 0;
+  color: var(--tyto-text-muted);
+}
+
+.schedules__note--bad {
+  color: var(--tyto-error);
+}
+
+.schedules__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schedules__table th {
+  padding: var(--tyto-space-1) var(--tyto-space-4) var(--tyto-space-1) 0;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-xs);
+  font-weight: normal;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.schedules__table td {
+  padding: var(--tyto-space-1) var(--tyto-space-4) var(--tyto-space-1) 0;
+  vertical-align: baseline;
+}
+
+.schedules__last,
+.schedules__next {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.schedules__name {
+  overflow-wrap: anywhere;
+}
+
+.schedules__every {
+  margin-left: var(--tyto-space-3);
+  color: var(--tyto-text-muted);
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-xs);
+}
+
+.schedules__outcome[data-outcome='ok'] {
+  color: var(--tyto-success);
+}
+
+.schedules__outcome[data-outcome='problem'] {
+  color: var(--tyto-error);
+}
+
+.schedules__outcome[data-outcome='held'],
+.schedules__outcome[data-outcome='needs'] {
+  color: var(--tyto-warning);
+}
+
+.schedules__outcome[data-outcome='none'],
+.schedules__outcome[data-outcome='running'],
+.schedules__outcome[data-outcome='waiting'] {
+  color: var(--tyto-text-muted);
+}
+
+.schedules__actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.schedules__button {
+  margin-left: var(--tyto-space-2);
+  padding: var(--tyto-space-1) var(--tyto-space-4);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  background: var(--tyto-surface);
+  color: var(--tyto-text);
+  font: inherit;
+  font-size: var(--tyto-text-xs);
+  cursor: pointer;
+}
+
+.schedules__button:hover:not(:disabled),
+.schedules__button:focus-visible {
+  background: var(--tyto-hover);
+}
+
+.schedules__button:disabled {
+  color: var(--tyto-text-muted);
+  cursor: default;
+}
+
 /* Workspace: Manage Trust (TYTO-278): the plugins screen's frame, at the small width. */
 tyto-trust-dialog {
   display: contents;

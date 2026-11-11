@@ -612,6 +612,11 @@ describe('switching the language', () => {
     'command.workspace.showProject',
     'panel.project',
     ...CATALOGUE_KEYS.filter((key) => key.startsWith('project.')),
+    // TYTO-385: the Schedules tab is closed in the default layout, so none of its words is on
+    // screen at load; `schedule-panel.test.ts` holds them and `schedules.desktop.test.ts` draws
+    // the panel in the real window.
+    'panel.schedules',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('schedules.')),
     // TYTO-279: the explorer is closed until a folder is opened, so none of its words is on
     // screen at load; `explorer-panel.test.ts` holds them.
     'panel.explorer',
