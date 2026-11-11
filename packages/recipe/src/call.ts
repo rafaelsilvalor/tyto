@@ -205,7 +205,7 @@ async function planCalls(context: VerbContext, ports: CallPorts | undefined): Pr
       return refuse(
         `has no credential named '${token.value}' stored on this machine; store it first, in ` +
           'the window under Recipe credentials in the plugins screen (Show plugins), or in the ' +
-          'command line as TYTO_RECIPE_CREDENTIAL_<NAME>',
+          'command line as TYTO_RECIPE_CREDENTIAL_<NAME>, which tyto recipe run --apply reads',
         at(token.range),
       );
     }

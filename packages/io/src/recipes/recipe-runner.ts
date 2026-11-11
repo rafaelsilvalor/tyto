@@ -161,6 +161,11 @@ export interface RecipeRunInput {
    * outside any workspace it is held as restricted and runs nothing.
    */
   readonly scheduled?: boolean | undefined;
+  /**
+   * TYTO-673: values for the recipe's `param` lines, by name, as `tyto recipe run --param`
+   * types them. Absent, each parameter takes its default (the notebook's case).
+   */
+  readonly params?: Readonly<Record<string, string>> | undefined;
 }
 
 export type RunnerCellStatus = 'ok' | 'failed' | 'skipped' | 'stale';
@@ -325,7 +330,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       const directory = request.path === undefined ? undefined : dirname(request.path);
       const place = await options.placeOf(directory);
       const explicitRun = request.explicit === true || request.scheduled === true;
-      const header = headerSignature(recipe, request.path, place);
+      const header = headerSignature(recipe, request.path, place, request.params);
       const previous = kept.get(request.documentId);
       const reusable = previous?.header === header ? previous.cells : [];
 
@@ -371,6 +376,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
           { ...recipe, steps: steps.slice(start, stop) },
           {
             ...(input === undefined ? {} : { input }),
+            ...(request.params === undefined ? {} : { params: request.params }),
             verbs: registries.verbs,
             derivations: registries.derivations,
             resolveRecipe: async (name) => {
@@ -699,15 +705,22 @@ async function includedTexts(
 }
 
 /**
- * What every cell depends on besides its own line: the header, the parameters and their
- * defaults, the file and the folder's answer. Any change reruns every cell, since a parameter
- * fills any line and a folder trusted since the last run reads data it did not.
+ * What every cell depends on besides its own line: the header, the parameters, their defaults
+ * and the values a run supplied (TYTO-673), the file and the folder's answer. Any change
+ * reruns every cell, since a parameter fills any line and a folder trusted since the last run
+ * reads data it did not.
  */
-function headerSignature(recipe: RecipeAst, path: string | undefined, place: RecipePlace): string {
+function headerSignature(
+  recipe: RecipeAst,
+  path: string | undefined,
+  place: RecipePlace,
+  supplied: Readonly<Record<string, string>> = {},
+): string {
   return JSON.stringify([
     recipe.name,
     recipe.description,
     recipe.params.map((param) => [param.name, param.defaultValue ?? null]),
+    Object.entries(supplied).sort(([left], [right]) => left.localeCompare(right)),
     path ?? null,
     place.trust,
     place.folder ?? null,

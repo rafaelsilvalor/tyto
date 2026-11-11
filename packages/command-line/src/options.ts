@@ -123,6 +123,30 @@ export function parseSection(value: string, previous?: SectionOverrides): Sectio
   return { ...known, [plugin]: { ...known[plugin], [key]: sectionValue(text) } };
 }
 
+/** What `tyto recipe run --param` collects: a value for each of the recipe's `param` lines. */
+export type RecipeParams = Readonly<Record<string, string>>;
+
+/** `<name>=<value>`: a parameter's name as a recipe's `param` line writes it, then the text. */
+const PARAM_FLAG = /^([A-Za-z_][\w-]*)=(.*)$/su;
+
+/**
+ * Commander's collector for the repeatable `--param <name>=<value>` (TYTO-673). The value is
+ * the text typed, never read as JSON: a recipe fills it into its lines as text. The same name
+ * typed twice keeps the last. A name the recipe does not declare is the run's to refuse
+ * (`E_RECIPE_PARAM`), since only the recipe knows its parameters.
+ */
+export function parseParam(value: string, previous?: RecipeParams): RecipeParams {
+  const match = PARAM_FLAG.exec(value);
+  if (match === null) {
+    throw new InvalidArgumentError(
+      `'${value}' is not <name>=<value>: a parameter's name, an equals sign and the value, ` +
+        'such as project=DEMO.',
+    );
+  }
+  const [, name = '', text = ''] = match;
+  return { ...previous, [name]: text };
+}
+
 export interface OutputOptions {
   readonly types: readonly OutputKind[];
   readonly scale?: number;
