@@ -1,7 +1,7 @@
 # Recipes
 
 ::: info How this page was checked
-Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a step in a tab was checked on 2026-11-08 by the same suite, drawing the 5,000 rows full size and closing the recipe. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Writing briefs with `to-brief` was checked on 2026-11-08 by a test of the desktop's main process that plans three rows into a folder, applies the plan and renders each brief with `tyto render`, not in the window. A run on an interval fetching past a source's cache was checked on 2026-11-11 by a test of the desktop's main process with a source that keeps its answers for ten minutes, not in the window. Menus and labels below are the English window's.
+Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a step in a tab was checked on 2026-11-08 by the same suite, drawing the 5,000 rows full size and closing the recipe. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Writing briefs with `to-brief` was checked on 2026-11-08 by a test of the desktop's main process that plans three rows into a folder, applies the plan and renders each brief with `tyto render`, not in the window. A run on an interval fetching past a source's cache was checked on 2026-11-11 by a test of the desktop's main process with a source that keeps its answers for ten minutes, not in the window. Sending with `call` was checked on 2026-11-11 by tests of the shared recipe runner against a stand-in endpoint, not over the network and not in the window. Menus and labels below are the English window's.
 :::
 
 A recipe (`.recipe`) is a list of steps, one per line, that fetch rows from a source, filter and reshape them, and plan what to write. Tyto opens a recipe in a tab as a notebook: **under each step, its result**, a table you can read while you write the next line.
@@ -157,6 +157,39 @@ Like every step that writes, it writes nothing while the recipe runs: it answers
 A value is brief text, so `**bold**` in a cell is bold in the brief. A value that holds `{` or `}` stops the step and names the row and the column: briefs have no way to write a brace, so fix the data first, with `rewrite`. An empty value leaves the slot to the template's default.
 
 `to-brief` writes only in a trusted folder: in a folder not trusted, or a recipe in no workspace, the step says so and plans nothing. Run `tyto render` on the briefs afterwards, as for briefs written by hand; a required slot left out is reported there.
+
+## Send a request per row
+
+`call` is a step that sends one HTTP `POST` per row to an address you name, with a credential stored on your machine:
+
+```
+call url=https://hooks.example.com/run token=routine body={"key": "{key|}", "title": "{title|}"}
+```
+
+- `url=` is an `https://` address. No other kind is sent to, and an address with a user, a password or a `#` is refused.
+- `token=` names the credential, in lower-case letters, digits and `-`. The recipe holds only the name; Tyto sends the value as `Authorization: Bearer …` and never shows it in a plan or a message.
+- `body=` is JSON to the end of the line, or `body=@./call.json#/routine` to read it from a data file. Each text in it is filled from the row, `{title|}` on a recipe line; numbers, `true`, `false` and `null` are sent as written. A body is at most 16 KiB.
+
+**The address's host must be on the workspace's list**, in `.tyto/project.json`:
+
+```json
+{ "recipes": { "call": { "hosts": ["hooks.example.com"] } } }
+```
+
+Each host is named whole: no `https://`, port, path or `*`. Only a trusted folder's list counts; a folder not trusted, or a recipe in no workspace, plans no request. A list in the folder replaces the one in a work profile.
+
+Like every step that writes, it sends nothing while the recipe runs: it answers a plan with one line per row, `POST <address> <body>`. **Apply** sends them one by one. An answer from 200 to 299 is _applied_; any other status fails that row with the status, _hooks.example.com answered HTTP 503_, and the others still go. A redirect is not followed, so it fails its row too, and a request with no answer after 30 seconds fails. What the address answers is never shown or kept.
+
+To send each row once, remember what was sent: a row whose request failed is not remembered, so the next run plans it again.
+
+```
+last dispatched
+where last_stored_at is empty
+call url=https://hooks.example.com/run token=routine body=@./call.json#/routine
+remember dispatched columns=title
+```
+
+**Where the credential comes from.** In the command line it is an environment variable, `TYTO_RECIPE_CREDENTIAL_` followed by the name in upper case with every character that is not a letter or a digit turned into `_`: `token=routine-hook` reads `TYTO_RECIPE_CREDENTIAL_ROUTINE_HOOK`. `tyto mcp`'s `run_recipe` checks the list and the credential and shows the plan, and never sends: an agent can preview a dispatch, not carry one out. A place to store a credential in the window, and sending from the window, are coming; until then the window shows the plan and says it sends none.
 
 ## Change the language
 

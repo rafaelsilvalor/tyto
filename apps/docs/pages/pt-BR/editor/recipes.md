@@ -1,7 +1,7 @@
 # Receitas
 
 ::: info Como esta página foi conferida
-Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo numa aba foi conferido em 2026-11-08 pela mesma suíte, desenhando as 5.000 linhas em tamanho cheio e fechando a receita. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Escrever briefs com `to-brief` foi conferido em 2026-11-08 por um teste do processo principal do app de mesa que planeja três linhas numa pasta, aplica o plano e renderiza cada brief com `tyto render`, não na janela. Uma execução por intervalo buscando além do cache da fonte foi conferida em 2026-11-11 por um teste do processo principal do app de mesa com uma fonte que guarda as respostas por dez minutos, não na janela. Os menus e rótulos abaixo são os da janela em português.
+Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo numa aba foi conferido em 2026-11-08 pela mesma suíte, desenhando as 5.000 linhas em tamanho cheio e fechando a receita. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Escrever briefs com `to-brief` foi conferido em 2026-11-08 por um teste do processo principal do app de mesa que planeja três linhas numa pasta, aplica o plano e renderiza cada brief com `tyto render`, não na janela. Uma execução por intervalo buscando além do cache da fonte foi conferida em 2026-11-11 por um teste do processo principal do app de mesa com uma fonte que guarda as respostas por dez minutos, não na janela. Enviar com `call` foi conferido em 2026-11-11 por testes do executor de receitas compartilhado contra um endereço simulado, não pela rede e não na janela. Os menus e rótulos abaixo são os da janela em português.
 :::
 
 Uma receita (`.recipe`) é uma lista de passos, um por linha, que buscam linhas de uma fonte, filtram e reorganizam essas linhas e planejam o que gravar. O Tyto abre uma receita numa aba como um caderno: **embaixo de cada passo, o resultado dele**, uma tabela que você lê enquanto escreve a próxima linha.
@@ -157,6 +157,39 @@ Como todo passo que grava, ele não grava nada enquanto a receita roda: responde
 Um valor é texto de brief, então `**negrito**` numa célula é negrito no brief. Um valor com `{` ou `}` para o passo e nomeia a linha e a coluna: briefs não têm como escrever uma chave, então corrija os dados antes, com `rewrite`. Um valor vazio deixa o slot com o padrão do template.
 
 `to-brief` só grava numa pasta confiável: numa pasta não confiável, ou numa receita fora de qualquer espaço de trabalho, o passo diz isso e não planeja nada. Rode `tyto render` nos briefs depois, como em briefs escritos à mão; um slot obrigatório que ficou de fora é apontado ali.
+
+## Enviar uma requisição por linha
+
+`call` é um passo que envia um `POST` HTTP por linha para um endereço que você nomeia, com uma credencial guardada na sua máquina:
+
+```
+call url=https://hooks.example.com/run token=routine body={"key": "{key|}", "title": "{title|}"}
+```
+
+- `url=` é um endereço `https://`. Nenhum outro tipo recebe envio, e um endereço com usuário, senha ou `#` é recusado.
+- `token=` nomeia a credencial, em letras minúsculas, dígitos e `-`. A receita guarda só o nome; o Tyto envia o valor como `Authorization: Bearer …` e nunca o mostra num plano ou numa mensagem.
+- `body=` é JSON até o fim da linha, ou `body=@./call.json#/routine` para lê-lo de um arquivo de dados. Cada texto dentro dele é preenchido a partir da linha, `{title|}` numa linha de receita; números, `true`, `false` e `null` vão como escritos. Um corpo tem no máximo 16 KiB.
+
+**O host do endereço precisa estar na lista do espaço de trabalho**, em `.tyto/project.json`:
+
+```json
+{ "recipes": { "call": { "hosts": ["hooks.example.com"] } } }
+```
+
+Cada host é nomeado inteiro: sem `https://`, porta, caminho ou `*`. Só a lista de uma pasta confiável vale; uma pasta não confiável, ou uma receita fora de qualquer espaço de trabalho, não planeja nenhuma requisição. Uma lista na pasta substitui a de um perfil de trabalho.
+
+Como todo passo que grava, ele não envia nada enquanto a receita roda: responde um plano com uma linha por linha da tabela, `POST <endereço> <corpo>`. **Aplicar** envia as requisições uma a uma. Uma resposta de 200 a 299 fica _applied_; qualquer outro status faz aquela linha falhar com o status, _hooks.example.com answered HTTP 503_, e as outras seguem. Um redirecionamento não é seguido, então também faz a linha falhar, e uma requisição sem resposta depois de 30 segundos falha. O que o endereço responde nunca é mostrado nem guardado.
+
+Para enviar cada linha uma vez só, lembre o que foi enviado: uma linha cuja requisição falhou não é lembrada, então a próxima execução a planeja de novo.
+
+```
+last dispatched
+where last_stored_at is empty
+call url=https://hooks.example.com/run token=routine body=@./call.json#/routine
+remember dispatched columns=title
+```
+
+**De onde vem a credencial.** Na linha de comando, ela é uma variável de ambiente, `TYTO_RECIPE_CREDENTIAL_` seguido do nome em maiúsculas, com todo caractere que não é letra nem dígito trocado por `_`: `token=routine-hook` lê `TYTO_RECIPE_CREDENTIAL_ROUTINE_HOOK`. O `run_recipe` do `tyto mcp` confere a lista e a credencial e mostra o plano, e nunca envia: um agente pode ver um envio antes, não realizá-lo. Um lugar para guardar uma credencial na janela, e o envio a partir da janela, estão a caminho; até lá a janela mostra o plano e diz que não envia nada.
 
 ## Trocar o idioma
 

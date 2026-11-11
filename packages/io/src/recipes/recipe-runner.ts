@@ -10,6 +10,7 @@ import {
   lineColumnAtIndex,
 } from '@tyto/core';
 import {
+  type CallPorts,
   type DataResolver,
   type RecipeContributions,
   type RecipeRegistries,
@@ -36,6 +37,7 @@ import {
 import { isInside } from '../contain.js';
 import { type RecipeStateOptions, recipeStateStore } from '../recipe-state.js';
 import { workspaceBriefPorts } from '../workspace-briefs.js';
+import { type RecipeCredentials, type RecipeFetch, recipeCallPorts } from './recipe-calls.js';
 import { type WorkspaceDataOptions, workspaceDataResolver } from '../workspace-data.js';
 
 import {
@@ -93,6 +95,22 @@ export interface RecipeRegistryRequest {
   readonly now?: (() => string) | undefined;
   /** TYTO-380, ADR 0172: `to-brief`'s ports, bound to this run's workspace and recipe. */
   readonly briefs?: ToBriefPorts | undefined;
+  /** TYTO-671, ADR 0193: `call`'s ports, bound to this run's workspace. */
+  readonly calls?: CallPorts | undefined;
+}
+
+/**
+ * TYTO-671, ADR 0193: what the host lends `call`. The runner binds it to each run's place, so a
+ * recipe outside a trusted workspace has no list and plans no request.
+ */
+export interface RecipeRunnerCalls {
+  /** `recipes.call.hosts` of the workspace a recipe in `directory` is in, from trusted sheets. */
+  readonly hostsFor: (directory: string | undefined) => readonly string[] | undefined;
+  readonly credentials: RecipeCredentials;
+  /** `false` for a host that previews and never sends (`tyto mcp`, ADR 0185). */
+  readonly sends: boolean;
+  /** The platform's `fetch` when absent; a test injects one. */
+  readonly fetch?: RecipeFetch;
 }
 
 export interface RecipeRunnerOptions {
@@ -111,6 +129,11 @@ export interface RecipeRunnerOptions {
    * brief's `template:`. Absent, `to-brief` says this host writes no briefs.
    */
   readonly templates?: (name: string) => Promise<TemplateManifest | undefined>;
+  /**
+   * TYTO-671, ADR 0193: `call`'s hosts, credentials and whether it sends. Absent, `call` checks
+   * only its address and its Apply is refused as from a host that sends none.
+   */
+  readonly calls?: RecipeRunnerCalls;
   /** Overrides for a test; the app takes the defaults. */
   readonly registries?: (request: RecipeRegistryRequest) => RecipeRegistries;
   readonly state?: (options: RecipeStateOptions) => RecipeState;
@@ -265,6 +288,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         refresh: request.refresh,
         ...(request.now === undefined ? {} : { now: request.now }),
         ...(request.briefs === undefined ? {} : { briefs: request.briefs }),
+        ...(request.calls === undefined ? {} : { calls: request.calls }),
       }));
   const stateOf = options.state ?? recipeStateStore;
   const dataOf = options.data ?? workspaceDataResolver;
@@ -313,6 +337,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
           place.trust === 'trusted' ? options.sectionFor(directory, plugin) : undefined,
         refresh: request.fresh === true,
         briefs: briefsFor(place, directory, options.templates),
+        calls: callsFor(place, directory, options.calls),
       });
       const steps = recipe.steps;
       // Each included recipe is read once per run, so the signatures, the policy and the run
@@ -510,6 +535,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       refresh: false,
       now,
       briefs: briefsFor(place, directory, options.templates, now),
+      calls: callsFor(place, directory, options.calls, now),
     });
     const answer = await applyCell({
       cells,
@@ -803,6 +829,27 @@ function briefsFor(
     recipeFolder: inWorkspace ? directory : undefined,
     trust: () => trust,
     template: templates,
+    ...(now === undefined ? {} : { now }),
+  });
+}
+
+/**
+ * `call`'s ports for a recipe in `directory` (ADR 0193 decision 4): the workspace's list only in
+ * a trusted folder, so a recipe in no workspace or a restricted one plans no request.
+ */
+function callsFor(
+  place: RecipePlace,
+  directory: string | undefined,
+  calls: RecipeRunnerCalls | undefined,
+  now?: () => string,
+): CallPorts | undefined {
+  if (calls === undefined) return undefined;
+  const trusted = place.trust === 'trusted' && place.folder !== undefined;
+  return recipeCallPorts({
+    hosts: () => (trusted ? calls.hostsFor(directory) : undefined),
+    credentials: calls.credentials,
+    sends: calls.sends,
+    ...(calls.fetch === undefined ? {} : { fetch: calls.fetch }),
     ...(now === undefined ? {} : { now }),
   });
 }
