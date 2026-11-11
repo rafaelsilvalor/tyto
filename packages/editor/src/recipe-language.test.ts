@@ -99,6 +99,20 @@ describe('the recipe colours', () => {
     ]);
   });
 
+  it('colours every 5m as a header line, not as a step (TYTO-385)', () => {
+    const source = ['recipe watch', 'every 5m', 'apply auto', 'example.mark done', ''].join('\n');
+
+    expect(spans(source)).toEqual([
+      ['recipe', 'keyword'],
+      ['watch', 'name'],
+      ['every', 'keyword'],
+      ['5m', 'value'],
+      ['apply', 'keyword'],
+      ['auto', 'value'],
+      ['example.mark', 'verb'],
+    ]);
+  });
+
   it('colours a namespaced verb as one verb, and a data reference', () => {
     const source = [
       'jira.pull project={project}',
