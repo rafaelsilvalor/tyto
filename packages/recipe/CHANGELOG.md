@@ -1,5 +1,20 @@
 # @tyto/recipe
 
+## 0.4.0
+
+### Minor Changes
+
+- 58baf48: The recipe runner and its Apply move from the desktop's main into `@tyto/io` (`createRecipeRunner`,
+  ADR 0188), unchanged, so `tyto mcp` can run a recipe through the same code. The notebook's views,
+  `RECIPE_VIEWS`, move into `@tyto/recipe`. The desktop behaves as before.
+
+### Patch Changes
+
+- Updated dependencies [4cae56d]
+- Updated dependencies [94c593c]
+  - @tyto/core@0.43.1
+  - @tyto/brief-lang@0.8.2
+
 ## 0.3.1
 
 ### Patch Changes
