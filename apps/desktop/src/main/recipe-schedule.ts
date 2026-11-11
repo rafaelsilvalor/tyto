@@ -29,7 +29,8 @@ import { ignoredByTheWatcher } from './explorer.js';
  *
  * **What a run may do** is the runner's: `scheduled` counts as Run in a trusted folder and as
  * nothing anywhere else (ADR 0175 decision 4), and its cells are kept under
- * `schedule:<realpath>`, apart from any tab's.
+ * `schedule:<realpath>`, apart from any tab's. Every scheduled run is fresh: its sources skip
+ * their own caches (TYTO-648), while a person's Run keeps them.
  *
  * **How loud**: the first run with a problem after a clean one is handed to `notify`, and later
  * runs with problems are not, until a clean run resets it. The notice names the recipe and a
@@ -215,6 +216,10 @@ export function createRecipeSchedule(options: RecipeScheduleOptions): RecipeSche
             scheduled: true,
             // Every scheduled run reads its sources again, from the first cell.
             from: 0,
+            // TYTO-648, ADR 0175 note 2026-11-11: and live, past every plugin's own cache, so a
+            // watcher sees a change at the next tick, not when a cache outlasting the interval
+            // expires. It forgets only this schedule's kept cells, never a tab's.
+            fresh: true,
           });
           problem = problemOf(answer);
           outcome =
