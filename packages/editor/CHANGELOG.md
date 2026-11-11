@@ -1,5 +1,20 @@
 # @tyto/editor
 
+## 0.16.3
+
+### Patch Changes
+
+- c9a266d: A Schedules tab in the bottom panel lists every recipe of the open folder that runs on an
+  interval, with its last run, next run and last outcome, and Run now and Open (TYTO-385). The
+  recipe editor colours the `every` header line as it colours `apply`.
+- Updated dependencies [9aa8b41]
+- Updated dependencies [68a241a]
+- Updated dependencies [fe22e84]
+- Updated dependencies [0ed9eba]
+  - @tyto/core@0.44.0
+  - @tyto/brief-lang@0.8.3
+  - @tyto/template-lang@0.8.18
+
 ## 0.16.2
 
 ### Patch Changes

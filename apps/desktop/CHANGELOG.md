@@ -1,5 +1,55 @@
 # @tyto/desktop
 
+## 0.21.0
+
+### Minor Changes
+
+- e7c1db1: TYTO-671, ADR 0193: the window sends a recipe's `call` requests. A person stores the credential
+  a `call` line names in the plugins screen's new Recipe credentials section, write-only, kept in
+  the keychain under `recipe:<name>`, listed by name and forgotten from there; Apply then sends
+  each planned request to a host the trusted folder's `recipes.call.hosts` allows. `recipe:` is
+  reserved in `@tyto/plugin-api` (`RECIPE_CREDENTIAL_KEY_PREFIX`) like `signin-client:`: no
+  plugin's `credentials:` permission or `host.credentials` call reaches it. `@tyto/recipe` exports
+  `CALL_CREDENTIAL_NAME`, and its "store it first" refusal names the screen and the CLI's variable.
+- c9a266d: A Schedules tab in the bottom panel lists every recipe of the open folder that runs on an
+  interval, with its last run, next run and last outcome, and Run now and Open (TYTO-385). The
+  recipe editor colours the `every` header line as it colours `apply`.
+- fb2a524: TYTO-390, ADR 0192: a plugin's `signin.<id>` may leave `clientId` out, and the person types the
+  OAuth client in the plugins screen. The client is kept in the keychain under
+  `signin-client:<plugin>:<id>`, write-only like a credential; a manifest that declares its client
+  still wins, a `clientSecret` without a `clientId` is refused, and saving or clearing the client
+  ends the sign-in made with the previous one. `signin-client:` is reserved from a plugin's own
+  credentials, as `signin:` is.
+
+### Patch Changes
+
+- 86d8494: A scheduled recipe run reads its sources live, past every plugin's own cache, so a recipe on
+  `every 5m` sees what changed at its next tick. A person's Run still uses the caches.
+- Updated dependencies [f1c7f59]
+- Updated dependencies [9aa8b41]
+- Updated dependencies [68a241a]
+- Updated dependencies [e7c1db1]
+- Updated dependencies [fe22e84]
+- Updated dependencies [091d64f]
+- Updated dependencies [0ed9eba]
+- Updated dependencies [c9a266d]
+- Updated dependencies [fb2a524]
+  - @tyto/io@5.7.0
+  - @tyto/recipe@0.5.0
+  - @tyto/core@0.44.0
+  - @tyto/command-line@0.7.0
+  - @tyto/plugin-api@0.20.0
+  - @tyto/editor@0.16.3
+  - @tyto/brief-lang@0.8.3
+  - @tyto/export-html@0.7.20
+  - @tyto/export-svg@2.0.20
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.19
+  - @tyto/pipeline@0.12.16
+  - @tyto/template-lang@0.8.18
+  - @tyto/templates@1.2.14
+  - @tyto/theme-pack@0.1.19
+
 ## 0.20.0
 
 ### Minor Changes

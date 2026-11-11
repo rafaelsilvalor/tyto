@@ -1,5 +1,34 @@
 # @tyto/core
 
+## 0.44.0
+
+### Minor Changes
+
+- 9aa8b41: TYTO-402, ADR 0176: the pure functions the window authors recipes with. `recipeSkeleton` writes
+  a new recipe that runs as made; `GENERIC_VERB_FORMS` gives every generic verb's fields and
+  `formOfArguments` a contributed verb's; `formatStep` writes a form's values as one recipe line
+  that parses and reads back through `valuesOfStep`; `referencesOf` lists the data files and
+  included recipes a recipe names. `@tyto/core` gains `E_RECIPE_FORM`.
+- 68a241a: TYTO-671, ADR 0193: `call`'s adapter and the workspace's allow-list. `.tyto/project.json` learns
+  `recipes.call.hosts`, read from trusted sheets only, a later sheet's list replacing an earlier
+  one whole, as `ResolvedProject.callHosts`. `@tyto/io` adds `recipeCallPorts`: the platform's
+  `fetch` with no redirect followed, an abort at the deadline, the host re-checked with `URL`
+  against the list, the credential read and set as the header on the host's side, the response's
+  body never read, and every failure said with the credential replaced by `[credential]`. The
+  recipe runner takes a `calls` option and binds it to each run's folder. `tyto mcp`'s
+  `run_recipe` plans `call` against the list and `TYTO_RECIPE_CREDENTIAL_<NAME>` and sends nothing.
+- fe22e84: TYTO-671, ADR 0193: `call url=<https address> token=<credential> body=<json>`, a generic action
+  that plans one POST per row to a host the workspace allows and sends nothing until Apply. The
+  body is JSON whose strings are `{column}` templates; the verb names the credential and never
+  holds it. `CallPorts` is the port a host lends through `createVerbRegistry({ calls })`, and
+  `recipeRegistriesOf` forwards its own `calls` option. `@tyto/core` gains `E_RECIPE_CALL`.
+- 0ed9eba: TYTO-402, ADR 0176 decision 5: `lintVocabulary` checks a `*.vocab.json` where it is written, its
+  rules, rewrites and lookups by their verbs' schemas and its filters, patterns, templates and
+  replacements at the file's characters, mapped through the JSON string escapes;
+  `vocabularySkeleton` writes one that lints clean. `@tyto/recipe` depends on `jsonc-parser`, the
+  reader `@tyto/io` uses for data files. `@tyto/core` gains `E_VOCABULARY_SYNTAX` and
+  `E_VOCABULARY_SHAPE`.
+
 ## 0.43.1
 
 ### Patch Changes
