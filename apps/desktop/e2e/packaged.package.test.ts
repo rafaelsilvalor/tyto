@@ -10,14 +10,13 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { delimiter, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FuseV1Options, getCurrentFuseWire } from '@electron/fuses';
-import { type WindowRecord, handshakeLine } from '@tyto/command-line';
+import { type WindowRecord, connectToEndpoint, handshakeLine } from '@tyto/command-line';
 import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
 import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -895,7 +894,11 @@ describe('the packaged app', () => {
       { jsonrpc: '2.0', id: 2, method: 'tools/list' },
     ];
     const lines = await new Promise<string[]>((resolve, reject) => {
-      const socket = connect(record.endpoint);
+      // Windows serves on loopback TCP since ADR 0189: the record names `tcp://127.0.0.1:<port>`,
+      // which `net.connect` would read as a pipe path (TYTO-670, `desktop-v0.20.0`: `connect ENOENT`).
+      const socket = connectToEndpoint(record.endpoint);
+      if (socket === undefined)
+        throw new Error(`no endpoint a client can reach: ${record.endpoint}`);
       const received: string[] = [];
       let buffered = '';
       socket.once('error', reject);
