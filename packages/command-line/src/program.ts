@@ -9,6 +9,7 @@ import { mcpCommand } from './mcp/command.js';
 import {
   parseFormatList,
   parsePositiveInteger,
+  parseParam,
   parseQuality,
   parseSection,
   parseTypes,
@@ -16,6 +17,7 @@ import {
 import { pluginCleanCommand, pluginSyncCommand } from './plugin-files.js';
 import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
+import { recipeRunCommand } from './recipe-run.js';
 import { renderCommand } from './render.js';
 import { withDiagnosticsSink } from './report.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
@@ -465,6 +467,43 @@ export function createProgram(
       captured.code = await trustRemoveCommand(folder, environment);
     });
   valuesOf(trustRemove, { '<folder>': FOLDER });
+
+  /* --------------------------------------------------------------------------- recipe -- */
+
+  const recipe = program
+    .command('recipe')
+    .description('run a recipe from the terminal, through the runner the window uses (ADR 0188)');
+
+  const recipeRun = recipe
+    .command('run')
+    .description(
+      'plan a recipe in its workspace and print every cell, row count and operation; --apply applies every plan once, in a trusted folder only',
+    )
+    .argument('<recipe>', 'path to the .recipe file')
+    .option(
+      '--json',
+      'print the whole answer as one JSON document, every row and every operation with its payload',
+      false,
+    )
+    .option(
+      '--apply',
+      "apply every plan once, as a click on Apply does, and commit the recipe's state; refused outside a trusted folder",
+      false,
+    )
+    .option(
+      '--param <name=value>',
+      "give one of the recipe's param lines a value for this run; repeatable",
+      parseParam,
+    )
+    .option(
+      '--section <plugin.key=value>',
+      "set a key of a plugin's project section for this run, over .tyto/project.json; repeatable, value read as JSON or else as text",
+      parseSection,
+    )
+    .action(async (file: string) => {
+      captured.code = await recipeRunCommand(file, recipeRun.opts(), environment);
+    });
+  valuesOf(recipeRun, { '<recipe>': { kind: 'file' } });
 
   /* ------------------------------------------------------------------------------ mcp -- */
 
