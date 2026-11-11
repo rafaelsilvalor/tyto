@@ -1,5 +1,38 @@
 # @tyto/plugin-api
 
+## 0.20.0
+
+### Minor Changes
+
+- e7c1db1: TYTO-671, ADR 0193: the window sends a recipe's `call` requests. A person stores the credential
+  a `call` line names in the plugins screen's new Recipe credentials section, write-only, kept in
+  the keychain under `recipe:<name>`, listed by name and forgotten from there; Apply then sends
+  each planned request to a host the trusted folder's `recipes.call.hosts` allows. `recipe:` is
+  reserved in `@tyto/plugin-api` (`RECIPE_CREDENTIAL_KEY_PREFIX`) like `signin-client:`: no
+  plugin's `credentials:` permission or `host.credentials` call reaches it. `@tyto/recipe` exports
+  `CALL_CREDENTIAL_NAME`, and its "store it first" refusal names the screen and the CLI's variable.
+- fe22e84: TYTO-671, ADR 0193: `call url=<https address> token=<credential> body=<json>`, a generic action
+  that plans one POST per row to a host the workspace allows and sends nothing until Apply. The
+  body is JSON whose strings are `{column}` templates; the verb names the credential and never
+  holds it. `CallPorts` is the port a host lends through `createVerbRegistry({ calls })`, and
+  `recipeRegistriesOf` forwards its own `calls` option. `@tyto/core` gains `E_RECIPE_CALL`.
+- fb2a524: TYTO-390, ADR 0192: a plugin's `signin.<id>` may leave `clientId` out, and the person types the
+  OAuth client in the plugins screen. The client is kept in the keychain under
+  `signin-client:<plugin>:<id>`, write-only like a credential; a manifest that declares its client
+  still wins, a `clientSecret` without a `clientId` is refused, and saving or clearing the client
+  ends the sign-in made with the previous one. `signin-client:` is reserved from a plugin's own
+  credentials, as `signin:` is.
+
+### Patch Changes
+
+- Updated dependencies [9aa8b41]
+- Updated dependencies [68a241a]
+- Updated dependencies [e7c1db1]
+- Updated dependencies [fe22e84]
+- Updated dependencies [0ed9eba]
+  - @tyto/recipe@0.5.0
+  - @tyto/core@0.44.0
+
 ## 0.19.0
 
 ### Minor Changes

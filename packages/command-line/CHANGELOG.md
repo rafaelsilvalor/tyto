@@ -1,5 +1,48 @@
 # @tyto/command-line
 
+## 0.7.0
+
+### Minor Changes
+
+- 68a241a: TYTO-671, ADR 0193: `call`'s adapter and the workspace's allow-list. `.tyto/project.json` learns
+  `recipes.call.hosts`, read from trusted sheets only, a later sheet's list replacing an earlier
+  one whole, as `ResolvedProject.callHosts`. `@tyto/io` adds `recipeCallPorts`: the platform's
+  `fetch` with no redirect followed, an abort at the deadline, the host re-checked with `URL`
+  against the list, the credential read and set as the header on the host's side, the response's
+  body never read, and every failure said with the credential replaced by `[credential]`. The
+  recipe runner takes a `calls` option and binds it to each run's folder. `tyto mcp`'s
+  `run_recipe` plans `call` against the list and `TYTO_RECIPE_CREDENTIAL_<NAME>` and sends nothing.
+- 091d64f: `tyto recipe run <recipe>` runs a recipe from the terminal through the shared runner, in the
+  workspace that holds it (TYTO-673). Without `--apply` it plans only, commits no state and
+  prints every cell, row count and operation; `--json` prints the whole answer as one document,
+  every row and operation with its payload, nothing cut. `--apply` applies every plan once and
+  commits the recipe's state, in a trusted folder only, and is how the CLI sends `call`'s
+  requests. `--param name=value` gives a `param` line a value, and `--section` works as on
+  `tyto render`. The runner in `@tyto/io` takes the values for a run's `param` lines.
+
+### Patch Changes
+
+- Updated dependencies [f1c7f59]
+- Updated dependencies [9aa8b41]
+- Updated dependencies [68a241a]
+- Updated dependencies [e7c1db1]
+- Updated dependencies [fe22e84]
+- Updated dependencies [091d64f]
+- Updated dependencies [0ed9eba]
+- Updated dependencies [fb2a524]
+  - @tyto/io@5.7.0
+  - @tyto/recipe@0.5.0
+  - @tyto/core@0.44.0
+  - @tyto/plugin-api@0.20.0
+  - @tyto/export-html@0.7.20
+  - @tyto/export-svg@2.0.20
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.19
+  - @tyto/pipeline@0.12.16
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.18
+  - @tyto/templates@1.2.14
+
 ## 0.6.0
 
 ### Minor Changes
