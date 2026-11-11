@@ -1,5 +1,51 @@
 # @tyto/desktop
 
+## 0.20.0
+
+### Minor Changes
+
+- 4cae56d: A plugin can have the host send a credential in a header, `host.fetch(url, { credentialHeaders })`,
+  without ever holding it, only to a host a `net:` permission of its own names (`E_CREDENTIAL_HOST`
+  otherwise). `host.storage` keeps small durable JSON records under the plugin's data folder,
+  kept by updates and a wiped cache and removed with the plugin (`E_PLUGIN_STORAGE`). ADR 0191; the
+  isolation protocol is 24.
+- 94c593c: A plugin that declares `window:tools` lists and calls the window's tools in process with
+  `host.window.tools()` and `host.window.callTool(name, input)` (ADR 0190): the same server an agent
+  connected to the window reaches, under the same trust, `agentsListen` and restricted-folder
+  refusals, with edits as proposals. The isolation protocol is 23. `E_WINDOW_UNAVAILABLE`,
+  `E_WINDOW_AGENTS_OFF` and `E_WINDOW_RESTRICTED` now say "asked to reach the window".
+
+### Patch Changes
+
+- 9bc6f97: On Windows the window serves agents on loopback TCP (`127.0.0.1`) instead of a named pipe, which
+  accepted clients through the SMB redirector, and keeps `TYTO_HOME/windows` to its owner and
+  SYSTEM (ADR 0189). The relay connects to no `tcp://` endpoint off loopback. `endpointFor` is
+  replaced by `listenTargetFor`, `loopbackEndpoint`, `connectTargetOf` and `connectToEndpoint`.
+- 58baf48: The recipe runner and its Apply move from the desktop's main into `@tyto/io` (`createRecipeRunner`,
+  ADR 0188), unchanged, so `tyto mcp` can run a recipe through the same code. The notebook's views,
+  `RECIPE_VIEWS`, move into `@tyto/recipe`. The desktop behaves as before.
+- Updated dependencies [9bc6f97]
+- Updated dependencies [4cae56d]
+- Updated dependencies [cf973ad]
+- Updated dependencies [58baf48]
+- Updated dependencies [94c593c]
+- Updated dependencies [94c593c]
+  - @tyto/command-line@0.6.0
+  - @tyto/plugin-api@0.19.0
+  - @tyto/io@5.6.0
+  - @tyto/core@0.43.1
+  - @tyto/recipe@0.4.0
+  - @tyto/export-html@0.7.19
+  - @tyto/export-svg@2.0.19
+  - @tyto/google-fonts@0.1.18
+  - @tyto/pipeline@0.12.15
+  - @tyto/theme-pack@0.1.18
+  - @tyto/brief-lang@0.8.2
+  - @tyto/editor@0.16.2
+  - @tyto/fonts@0.5.0
+  - @tyto/template-lang@0.8.17
+  - @tyto/templates@1.2.13
+
 ## 0.19.0
 
 ### Minor Changes

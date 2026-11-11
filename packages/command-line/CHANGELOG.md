@@ -1,5 +1,43 @@
 # @tyto/command-line
 
+## 0.6.0
+
+### Minor Changes
+
+- 9bc6f97: On Windows the window serves agents on loopback TCP (`127.0.0.1`) instead of a named pipe, which
+  accepted clients through the SMB redirector, and keeps `TYTO_HOME/windows` to its owner and
+  SYSTEM (ADR 0189). The relay connects to no `tcp://` endpoint off loopback. `endpointFor` is
+  replaced by `listenTargetFor`, `loopbackEndpoint`, `connectTargetOf` and `connectToEndpoint`.
+- 4cae56d: A plugin can have the host send a credential in a header, `host.fetch(url, { credentialHeaders })`,
+  without ever holding it, only to a host a `net:` permission of its own names (`E_CREDENTIAL_HOST`
+  otherwise). `host.storage` keeps small durable JSON records under the plugin's data folder,
+  kept by updates and a wiped cache and removed with the plugin (`E_PLUGIN_STORAGE`). ADR 0191; the
+  isolation protocol is 24.
+- cf973ad: `tyto mcp` offers `run_recipe` in a trusted workspace (ADR 0185, note of 2026-11-10): a run answers
+  each cell's table and plan and changes nothing, `apply auto` included; an apply names the cell and
+  the plan id that run answered. No answer carries a plan's payload or a plugin's section.
+- 94c593c: The install prompt says in words what `window:tools` lets a plugin do: use Tyto's tools in the
+  open window, reading what is open there and proposing edits the person accepts or rejects, while
+  `agentsListen` is on (ADR 0190).
+
+### Patch Changes
+
+- Updated dependencies [4cae56d]
+- Updated dependencies [58baf48]
+- Updated dependencies [94c593c]
+  - @tyto/plugin-api@0.19.0
+  - @tyto/io@5.6.0
+  - @tyto/core@0.43.1
+  - @tyto/recipe@0.4.0
+  - @tyto/export-html@0.7.19
+  - @tyto/export-svg@2.0.19
+  - @tyto/google-fonts@0.1.18
+  - @tyto/pipeline@0.12.15
+  - @tyto/fonts@0.5.0
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.17
+  - @tyto/templates@1.2.13
+
 ## 0.5.0
 
 ### Minor Changes

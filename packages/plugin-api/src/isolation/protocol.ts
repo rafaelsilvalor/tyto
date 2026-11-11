@@ -1,7 +1,12 @@
 import { type Diagnostic, diagnosticCodeList } from '@tyto/core';
 import { z } from 'zod';
 
-import { agentServerSchema } from '../window.js';
+import {
+  agentServerSchema,
+  windowToolInputSchema,
+  windowToolResultSchema,
+  windowToolSchema,
+} from '../window.js';
 
 /**
  * The messages between the host and an isolated plugin (E11.2, ADR 0041).
@@ -53,9 +58,12 @@ import { agentServerSchema } from '../window.js';
  * folder the program runs in, a field the strict schema of a guest on 20 would refuse (ADR 0182,
  * note of 2026-11-09, TYTO-569); 22 since a plugin may ask for a terminal tab running a program
  * it declares, a request a host on 21 would refuse as an unknown capability (ADR 0184,
- * TYTO-657).
+ * TYTO-657); 23 since a plugin may list and call the window's tools in process, two requests a
+ * host on 22 would refuse as unknown capabilities (ADR 0190, TYTO-661); 24 since `fetch` may
+ * carry `credentialHeaders`, which the strict schema of a host on 23 would refuse, and a plugin
+ * may keep durable records, three requests a host on 23 would refuse (ADR 0191, TYTO-661).
  */
-export const RPC_PROTOCOL_VERSION = 22;
+export const RPC_PROTOCOL_VERSION = 24;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -226,6 +234,9 @@ const requestedCapabilitySchema = z.enum([
   'storeCredential',
   'deleteCredential',
   'cacheGet',
+  'storageGet',
+  'storageSet',
+  'storageDelete',
   'cachePut',
   'cacheDelete',
   'cacheList',
@@ -237,6 +248,8 @@ const requestedCapabilitySchema = z.enum([
   'processEnd',
   'processKill',
   'windowAgentServer',
+  'windowTools',
+  'windowCallTool',
   'terminalOpen',
 ]);
 export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
@@ -297,8 +310,21 @@ export const fetchArgsSchema = z.tuple([
       method: z.string().min(1).optional(),
       headers: z.record(z.string(), z.string()).optional(),
       body: z.union([z.string(), z.instanceof(Uint8Array)]).optional(),
+      /** Header to credential key: names only; the host reads the secret (ADR 0191). */
+      credentialHeaders: z.record(z.string(), z.string().min(1)).optional(),
     })
     .optional(),
+]);
+
+/**
+ * `host.storage` (ADR 0191): a key out, and for `get` a found flag with the value, because a
+ * stored `null` is a record and not a miss. The value's checks are `checkedCapabilities`'s.
+ */
+export const storageKeyArgsSchema = z.tuple([z.string()]);
+export const storageSetArgsSchema = z.tuple([z.string(), z.unknown()]);
+export const storageGetSchema = z.union([
+  z.strictObject({ found: z.literal(false) }),
+  z.strictObject({ found: z.literal(true), value: z.unknown() }),
 ]);
 
 export const credentialsArgsSchema = z.tuple([z.string().min(1)]);
@@ -374,6 +400,16 @@ export function describeIssues(error: z.ZodError): string {
  */
 export const windowAgentServerArgsSchema = z.tuple([]);
 export const windowAgentServerSchema = agentServerSchema;
+
+/**
+ * `host.window.tools` and `host.window.callTool` (ADR 0190): the tools come back through the same
+ * strict schema the host's check used; a call sends a name and a JSON object, and its answer
+ * comes back the same way. Shape only: the permission is `checkedWindowTools`'s.
+ */
+export const windowToolsArgsSchema = z.tuple([]);
+export const windowToolsSchema = z.array(windowToolSchema);
+export const windowCallToolArgsSchema = z.tuple([z.string(), windowToolInputSchema]);
+export { windowToolResultSchema };
 
 /**
  * `host.terminal.open` (ADR 0184): the name and the arguments go out, nothing comes back but

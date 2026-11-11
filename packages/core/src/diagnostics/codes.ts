@@ -449,6 +449,19 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
+  // A credential the host puts in a request's header for the plugin, which never holds it
+  // (ADR 0191): only to a host the plugin names in a net: permission of its own, never through
+  // net:*.
+  E_CREDENTIAL_HOST: {
+    severity: 'error',
+    summary:
+      'A plugin asked the host to send a credential to a host its manifest does not name in a net: permission of its own.',
+    template:
+      "Plugin '{plugin}' asked to send credential '{key}' to {host}, which no net: permission of its own names (net:* does not count).",
+    spec: 'docs/adr/0191-the-host-sends-a-plugins-secret-and-keeps-its-durable-records.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
   E_CREDENTIAL_TOO_LARGE: {
     severity: 'error',
     summary: 'A credential to store is larger than the ceiling every host keeps (ADR 0134).',
@@ -572,30 +585,31 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
-  // The window's MCP server, handed to a plugin for the agent it starts (ADR 0183). Three codes,
-  // so a panel can tell "turn agentsListen on" and "trust the folder" from "not on this host".
+  // The window's MCP server, handed to a plugin for the agent it starts (ADR 0183), and the
+  // window's tools, called by a plugin in process (ADR 0190). Three codes, so a panel can tell
+  // "turn agentsListen on" and "trust the folder" from "not on this host".
   E_WINDOW_UNAVAILABLE: {
     severity: 'error',
-    summary: "A plugin asked for the window's agent server on a host that has no window.",
-    template: "Plugin '{plugin}' asked for the window's agent server, and {host} has no window.",
+    summary: 'A plugin asked to reach the window on a host that has no window.',
+    template: "Plugin '{plugin}' asked to reach the window, and {host} has no window.",
     spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
   E_WINDOW_AGENTS_OFF: {
     severity: 'error',
-    summary: "A plugin asked for the window's agent server while agentsListen is off.",
+    summary: 'A plugin asked to reach the window while agentsListen is off.',
     template:
-      "Plugin '{plugin}' asked for the window's agent server, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
+      "Plugin '{plugin}' asked to reach the window, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
     spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
   E_WINDOW_RESTRICTED: {
     severity: 'error',
-    summary: "A plugin asked for the window's agent server while the open folder is restricted.",
+    summary: 'A plugin asked to reach the window while the open folder is restricted.',
     template:
-      "Plugin '{plugin}' asked for the window's agent server, and the open folder is restricted; trust it to let agents reach the window.",
+      "Plugin '{plugin}' asked to reach the window, and the open folder is restricted; trust it to let agents reach the window.",
     spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
@@ -608,6 +622,16 @@ export const diagnosticCodes = {
       "A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache.",
     template: "Plugin '{plugin}' could not use its cache entry '{key}': {problem}.",
     spec: 'docs/adr/0138-a-plugin-cache-and-workspace-files-cross-the-host-boundary.md',
+    fatal: false,
+    fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
+  },
+  // A plugin's durable records, under its data folder (ADR 0191).
+  E_PLUGIN_STORAGE: {
+    severity: 'error',
+    summary:
+      "A plugin's storage call was refused: a key or value the store does not take, an unreadable record, or a host with no storage.",
+    template: "Plugin '{plugin}' could not use its stored record '{key}': {problem}.",
+    spec: 'docs/adr/0191-the-host-sends-a-plugins-secret-and-keeps-its-durable-records.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },

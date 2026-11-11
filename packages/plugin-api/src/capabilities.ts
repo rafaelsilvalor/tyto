@@ -1,8 +1,14 @@
 import { type Diagnostic, diagnostic } from '@tyto/core';
 
+import {
+  PLUGIN_STORAGE_VALUE_LIMIT_BYTES,
+  jsonSafeProblem,
+  storageKeyProblem,
+  storageRefusal,
+} from './storage.js';
 import type { StartProcess } from './process.js';
 import type { OpenTerminal } from './terminal.js';
-import type { AgentServer } from './window.js';
+import type { AgentServer, WindowTool, WindowToolResult } from './window.js';
 
 /**
  * The runtime's own, read off `globalThis`: this package compiles against no platform's
@@ -82,6 +88,14 @@ export interface HostFetchInit {
   readonly method?: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: string | Uint8Array;
+  /**
+   * Headers whose value is one of the plugin's credentials, named by key and set by the host
+   * (ADR 0191): `{ 'x-api-key': 'anthropic-api-key' }`. The plugin's process never holds the
+   * secret. Each key needs its `credentials:<key>` permission, and the request's host must be
+   * one a `net:` permission of the plugin's names exactly or under `*.<domain>`; `net:*` does
+   * not count, and any other host is `E_CREDENTIAL_HOST`. Never passed on to the adapter.
+   */
+  readonly credentialHeaders?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -193,6 +207,36 @@ export interface HostCapabilities {
    * `E_WINDOW_UNAVAILABLE`.
    */
   windowAgentServer?(plugin: string): Promise<AgentServer>;
+
+  /**
+   * A plugin's durable record, as the JSON text it was stored as, or `undefined` (ADR 0191).
+   * Kept under the plugin's data folder (ADR 0187): an update keeps it, removing the plugin
+   * deletes it. A record on disk that cannot be read is refused with `E_PLUGIN_STORAGE`, never
+   * answered as missing. Absent on a host with no storage, which answers `E_PLUGIN_STORAGE`.
+   */
+  storageGet?(plugin: string, key: string): Promise<string | undefined>;
+  /** Stores a record's JSON text, already checked, all at once. */
+  storageSet?(plugin: string, key: string, json: string): Promise<void>;
+  /** Forgets a record; `true` when there was one. */
+  storageDelete?(plugin: string, key: string): Promise<boolean>;
+
+  /**
+   * The tools the window serves an agent now (ADR 0190), already allowed: the plugin declares
+   * `window:tools`. **The adapter refuses as {@link windowAgentServer} does** — a restricted
+   * folder `E_WINDOW_RESTRICTED`, `agentsListen` off `E_WINDOW_AGENTS_OFF` — read on every call.
+   * Absent on a host with no window — the CLI — which answers `E_WINDOW_UNAVAILABLE`.
+   */
+  windowTools?(plugin: string): Promise<readonly WindowTool[]>;
+  /**
+   * Calls one window tool for the plugin, in process, with the same refusals, the same trust and
+   * the same rules an agent connected to the window gets: edits are proposals (ADR 0180). A
+   * tool's own refusal is an answer with `isError: true`, never a throw.
+   */
+  callWindowTool?(
+    plugin: string,
+    name: string,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<WindowToolResult>;
 }
 
 /**
@@ -237,6 +281,24 @@ export function allowsHost(permissions: readonly string[], hostname: string): bo
  */
 const SIGNIN_KEY_PREFIX = 'signin:';
 
+/**
+ * Whether a `net:` permission names this host itself, exactly or under `*.<domain>`: the hosts a
+ * credential may be sent to (ADR 0191). `net:*` reaches every host and names none.
+ */
+export function namesHost(permissions: readonly string[], hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return permissions.some((permission) => {
+    if (!permission.startsWith('net:')) return false;
+    const pattern = permission.slice('net:'.length).toLowerCase();
+    if (pattern === '*') return false;
+    if (pattern.startsWith('*.')) return host.endsWith(pattern.slice(1));
+    return pattern === host;
+  });
+}
+
+/** An HTTP header name, as RFC 9110 calls a token. */
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/u;
+
 export function allowsCredential(permissions: readonly string[], key: string): boolean {
   if (key.startsWith(SIGNIN_KEY_PREFIX)) return false;
   return permissions.includes(`credentials:${key}`);
@@ -267,6 +329,9 @@ export interface PluginCapabilities {
   workspaceRead(path: string): Promise<Uint8Array>;
   workspaceWrite(path: string, bytes: Uint8Array): Promise<void>;
   signinAccessToken(id: string): Promise<string>;
+  storageGet(key: string): Promise<unknown>;
+  storageSet(key: string, value: unknown): Promise<void>;
+  storageDelete(key: string): Promise<boolean>;
 }
 
 /**
@@ -383,6 +448,84 @@ function refuse(problem: Diagnostic): Promise<never> {
  * built-in's is. An undeclared request is still `E_PERMISSION`, and a declared one then
  * fails for want of a network or a secret rather than for how the plugin asked.
  */
+function noStorage(capabilities: HostCapabilities | undefined): string {
+  return `${capabilities?.hostName ?? 'this host'} keeps no records for plugins`;
+}
+
+/**
+ * A request whose `credentialHeaders` the host fills in (ADR 0191). Everything is checked before
+ * any secret is read: the header names, a clash with a plain header, each key's permission and
+ * the host. The secret then goes into the adapter's request and nowhere else: **an error the
+ * adapter throws is rethrown with every secret it carried replaced**, so not even a careless
+ * adapter's message hands it to the plugin.
+ */
+async function fetchWithCredentials(
+  url: InstanceType<typeof URL>,
+  init: HostFetchInit,
+  credentialHeaders: Readonly<Record<string, string>>,
+  context: { readonly plugin: string; readonly permissions: readonly string[] },
+  capabilities: HostCapabilities,
+): Promise<FetchedResponse> {
+  const { plugin, permissions } = context;
+  const plain = Object.keys(init.headers ?? {}).map((name) => name.toLowerCase());
+  for (const [header, key] of Object.entries(credentialHeaders)) {
+    if (!HEADER_NAME.test(header)) {
+      throw new TypeError(
+        `host.fetch was asked for a credential in '${header}', which is not a header name.`,
+      );
+    }
+    if (plain.includes(header.toLowerCase())) {
+      throw new TypeError(
+        `host.fetch was given '${header}' both as a header and as a credential header.`,
+      );
+    }
+    if (!allowsCredential(permissions, key)) {
+      throw new PluginCapabilityError(
+        diagnostic('E_PERMISSION', {
+          plugin,
+          capability: `host.fetch with credential '${key}' (credentials:${key})`,
+        }),
+      );
+    }
+    if (!namesHost(permissions, url.hostname)) {
+      throw new PluginCapabilityError(
+        diagnostic('E_CREDENTIAL_HOST', { plugin, key, host: url.hostname }),
+      );
+    }
+  }
+  const secrets: string[] = [];
+  const headers: Record<string, string> = { ...init.headers };
+  for (const [header, key] of Object.entries(credentialHeaders)) {
+    const value = await capabilities.credential(plugin, key);
+    if (value === undefined) {
+      throw new PluginCapabilityError(
+        diagnostic('E_CREDENTIAL_MISSING', {
+          plugin,
+          key,
+          source: capabilities.describeCredential(plugin, key),
+        }),
+      );
+    }
+    secrets.push(value);
+    headers[header] = value;
+  }
+  try {
+    return await capabilities.fetch(url.href, { ...init, headers });
+  } catch (cause) {
+    throw scrubbed(cause, secrets);
+  }
+}
+
+/** The error with every secret in its message and stack replaced, as a plain `Error`. */
+function scrubbed(cause: unknown, secrets: readonly string[]): Error {
+  const scrub = (text: string): string =>
+    secrets.reduce((clean, secret) => clean.split(secret).join('[credential]'), text);
+  const message = cause instanceof Error ? cause.message : String(cause);
+  const error = new Error(scrub(message));
+  if (cause instanceof Error && cause.stack !== undefined) error.stack = scrub(cause.stack);
+  return error;
+}
+
 export function checkedCapabilities(
   plugin: string,
   permissions: readonly string[],
@@ -415,7 +558,63 @@ export function checkedCapabilities(
       if (capabilities === undefined) {
         return Promise.reject(new Error('this host was composed without a network for plugins.'));
       }
-      return capabilities.fetch(parsed.href, init);
+      const { credentialHeaders, ...plain } = init;
+      if (credentialHeaders === undefined || Object.keys(credentialHeaders).length === 0) {
+        return capabilities.fetch(parsed.href, plain);
+      }
+      return fetchWithCredentials(
+        parsed,
+        plain,
+        credentialHeaders,
+        { plugin, permissions },
+        capabilities,
+      );
+    },
+
+    async storageGet(key) {
+      const refused = storageKeyProblem(key);
+      if (refused !== undefined) return refuse(storageRefusal(plugin, key, refused));
+      if (capabilities?.storageGet === undefined) {
+        return refuse(storageRefusal(plugin, key, noStorage(capabilities)));
+      }
+      const json = await capabilities.storageGet(plugin, key);
+      if (json === undefined) return undefined;
+      try {
+        return JSON.parse(json) as unknown;
+      } catch {
+        return refuse(storageRefusal(plugin, key, 'the stored record is not JSON'));
+      }
+    },
+
+    async storageSet(key, value) {
+      const refused = storageKeyProblem(key);
+      if (refused !== undefined) return refuse(storageRefusal(plugin, key, refused));
+      const unsafe = jsonSafeProblem(value);
+      if (unsafe !== undefined) return refuse(storageRefusal(plugin, key, unsafe));
+      const json = JSON.stringify(value);
+      const bytes = credentialByteLength(json);
+      if (bytes > PLUGIN_STORAGE_VALUE_LIMIT_BYTES) {
+        return refuse(
+          storageRefusal(
+            plugin,
+            key,
+            `the record is ${String(bytes)} bytes as JSON; the ceiling is ${String(PLUGIN_STORAGE_VALUE_LIMIT_BYTES)}`,
+          ),
+        );
+      }
+      if (capabilities?.storageSet === undefined) {
+        return refuse(storageRefusal(plugin, key, noStorage(capabilities)));
+      }
+      await capabilities.storageSet(plugin, key, json);
+    },
+
+    async storageDelete(key) {
+      const refused = storageKeyProblem(key);
+      if (refused !== undefined) return refuse(storageRefusal(plugin, key, refused));
+      if (capabilities?.storageDelete === undefined) {
+        return refuse(storageRefusal(plugin, key, noStorage(capabilities)));
+      }
+      return capabilities.storageDelete(plugin, key);
     },
 
     async credentials(key) {

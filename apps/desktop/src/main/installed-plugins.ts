@@ -1,7 +1,7 @@
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { pluginCache, workspaceFiles } from '@tyto/io';
+import { pluginCache, pluginStorage, workspaceFiles } from '@tyto/io';
 import type {
   FetchedResponse,
   HostCapabilities,
@@ -108,7 +108,7 @@ export interface DesktopPluginFiles {
   readonly workspace: () => Pick<WorkspaceState, 'folder' | 'trust'>;
 }
 
-/** The six ports of ADR 0138 and the name their refusals give. */
+/** The six ports of ADR 0138, the three of ADR 0191, and the name their refusals give. */
 export type DesktopPluginFilePorts = Required<
   Pick<
     HostCapabilities,
@@ -117,6 +117,9 @@ export type DesktopPluginFilePorts = Required<
     | 'cachePut'
     | 'cacheDelete'
     | 'cacheList'
+    | 'storageGet'
+    | 'storageSet'
+    | 'storageDelete'
     | 'workspaceRead'
     | 'workspaceWrite'
   >
@@ -135,6 +138,8 @@ export function desktopPluginFiles(files: DesktopPluginFiles): DesktopPluginFile
   return {
     hostName: DESKTOP_HOST_NAME,
     ...pluginCache({ home: files.home }),
+    // Durable records under the plugin's data folder (ADR 0191).
+    ...pluginStorage({ home: files.home }),
     ...workspaceFiles({
       folder: () => files.workspace().folder ?? undefined,
       trust: () => (files.workspace().trust === 'restricted' ? 'restricted' : 'trusted'),

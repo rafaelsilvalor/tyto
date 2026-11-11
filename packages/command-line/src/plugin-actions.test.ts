@@ -367,6 +367,15 @@ describe('the permission prompt', () => {
     expect(permissionPrompt(manifest(['net:api.example.com']), 'x')).not.toContain('Tyto window');
   });
 
+  it('says in words what window:tools lets the plugin do, and only when asked (ADR 0190)', () => {
+    expect(permissionPrompt(manifest(['net:api.example.com', 'window:tools']), 'x')).toContain(
+      '  - net:api.example.com\n' +
+        "  - window:tools: use Tyto's tools in the open window: read what is open there and propose\n" +
+        '    edits you accept or reject, while Tyto lets agents connect (setting `agentsListen`)\n',
+    );
+    expect(permissionPrompt(manifest(['process:claude']), 'x')).not.toContain('window:tools');
+  });
+
   it('names every program, joined by "or", when a plugin declares several', () => {
     expect(permissionPrompt(manifest(['process:claude', 'process:codex']), 'x')).toContain(
       'It may ask Tyto to start `claude` or `codex`, found on your PATH, in the folder open in Tyto,\n' +

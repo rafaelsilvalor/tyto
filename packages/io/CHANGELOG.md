@@ -1,5 +1,31 @@
 # @tyto/io
 
+## 5.6.0
+
+### Minor Changes
+
+- 4cae56d: A plugin can have the host send a credential in a header, `host.fetch(url, { credentialHeaders })`,
+  without ever holding it, only to a host a `net:` permission of its own names (`E_CREDENTIAL_HOST`
+  otherwise). `host.storage` keeps small durable JSON records under the plugin's data folder,
+  kept by updates and a wiped cache and removed with the plugin (`E_PLUGIN_STORAGE`). ADR 0191; the
+  isolation protocol is 24.
+- 58baf48: The recipe runner and its Apply move from the desktop's main into `@tyto/io` (`createRecipeRunner`,
+  ADR 0188), unchanged, so `tyto mcp` can run a recipe through the same code. The notebook's views,
+  `RECIPE_VIEWS`, move into `@tyto/recipe`. The desktop behaves as before.
+
+### Patch Changes
+
+- Updated dependencies [4cae56d]
+- Updated dependencies [58baf48]
+- Updated dependencies [94c593c]
+  - @tyto/plugin-api@0.19.0
+  - @tyto/core@0.43.1
+  - @tyto/recipe@0.4.0
+  - @tyto/export-html@0.7.19
+  - @tyto/export-svg@2.0.19
+  - @tyto/pipeline@0.12.15
+  - @tyto/template-lang@0.8.17
+
 ## 5.5.0
 
 ### Minor Changes

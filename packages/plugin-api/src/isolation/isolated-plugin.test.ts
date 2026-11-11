@@ -43,6 +43,7 @@ import {
 import {
   CREDENTIAL_VALUE_LIMIT_BYTES,
   type HostCapabilities,
+  type HostFetchInit,
   PLUGIN_FILE_LIMIT_BYTES,
   PluginCapabilityError,
 } from '../capabilities.js';
@@ -73,9 +74,16 @@ const runConfined = (guest: GuestChannel, load: () => Promise<unknown>): void =>
  * The runtime's own, read off `globalThis`: this package compiles against no platform's
  * types (ADR 0010), and every runtime it targets has these.
  */
-const { structuredClone, queueMicrotask, setTimeout, TextEncoder } = globalThis as unknown as {
+const {
+  structuredClone,
+  queueMicrotask,
+  setTimeout,
+  TextEncoder,
+  TextDecoder: Utf8Decoder,
+} = globalThis as unknown as {
   structuredClone<T>(value: T): T;
   TextEncoder: new () => { encode(text: string): Uint8Array };
+  TextDecoder: new () => { decode(bytes: Uint8Array): string };
   queueMicrotask(callback: () => void): void;
   setTimeout(callback: (value?: unknown) => void, delay: number): unknown;
 };
@@ -90,7 +98,7 @@ interface Pair {
   closed(): boolean;
 }
 
-function channelPair(start: (guest: GuestChannel) => void): Pair {
+function channelPair(start: (guest: GuestChannel) => void, heard?: unknown[]): Pair {
   const toHost = new Set<(message: unknown) => void>();
   const toGuest = new Set<(message: unknown) => void>();
   const exits = new Set<(reason: string) => void>();
@@ -107,7 +115,10 @@ function channelPair(start: (guest: GuestChannel) => void): Pair {
   };
 
   const host: PluginChannel = {
-    send: (message) => deliver(toGuest, message),
+    send: (message) => {
+      heard?.push(structuredClone(message));
+      deliver(toGuest, message);
+    },
     onMessage: (listener) => void toHost.add(listener),
     onExit: (listener) => void exits.add(listener),
     keepAlive: () => undefined,
@@ -181,9 +192,14 @@ async function isolate(
     readonly programs?: Readonly<Record<string, string>>;
     /** `texto` unless a test holds two plugins in one host. */
     readonly name?: string;
+    /** Every message the host sends the plugin's process, as it crossed. */
+    readonly heard?: unknown[];
   } = {},
 ): Promise<{ readonly pair: Pair; readonly connected: Result<IsolatedPlugin, Diagnostics> }> {
-  const pair = channelPair((guest) => runConfined(guest, () => Promise.resolve({ activate })));
+  const pair = channelPair(
+    (guest) => runConfined(guest, () => Promise.resolve({ activate })),
+    options.heard,
+  );
   const lines = options.log;
   const connected = await connectIsolatedPlugin({
     requireSandbox: true,
@@ -968,6 +984,167 @@ describe('host.window across the boundary (ADR 0183)', () => {
     const answer = await answerOf(connected);
     expect(answer).toBe('thrown');
     expect(answer).not.toContain('sk-secret');
+  });
+});
+
+describe('host.window.tools and callTool across the boundary (ADR 0190)', () => {
+  const TOOL = {
+    name: 'check_brief',
+    description: 'Checks a brief and lists its problems.',
+    inputSchema: { type: 'object', properties: { path: { type: 'string' } } },
+  };
+  const called: { plugin: string; name: string; input: unknown }[] = [];
+  const TOOLS: HostCapabilities = {
+    fetch: () => Promise.reject(new Error('no network here')),
+    credential: () => Promise.resolve(undefined),
+    describeCredential: () => 'nowhere',
+    windowTools: () => Promise.resolve([TOOL]),
+    callWindowTool: (plugin, name, input) => {
+      called.push({ plugin, name, input });
+      return Promise.resolve({ content: [{ type: 'text', text: 'no problems' }], isError: false });
+    },
+  };
+
+  const asking = (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () =>
+        ok(
+          await Promise.all([
+            host.window.tools(),
+            host.window.callTool('check_brief', { path: 'a.brief' }),
+          ]).then(
+            (answers) => JSON.stringify(answers),
+            (cause: { code?: string }) => cause.code ?? `thrown: ${String(cause)}`,
+          ),
+        ),
+    });
+
+  const answerOf = async (connected: Result<IsolatedPlugin, Diagnostics>): Promise<string> => {
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    return answer.ok ? answer.value : '';
+  };
+
+  it('lists and calls the window’s tools for a plugin that declares window:tools', async () => {
+    called.length = 0;
+    const { connected } = await isolate(asking, {
+      permissions: ['window:tools'],
+      capabilities: TOOLS,
+    });
+    expect(JSON.parse(await answerOf(connected))).toEqual([
+      [TOOL],
+      { content: [{ type: 'text', text: 'no problems' }], isError: false },
+    ]);
+    expect(called).toEqual([{ plugin: 'texto', name: 'check_brief', input: { path: 'a.brief' } }]);
+  });
+
+  it('answers E_PERMISSION, E_WINDOW_UNAVAILABLE and the adapter’s refusal with their codes', async () => {
+    called.length = 0;
+    const { windowTools: _list, callWindowTool: _call, ...cli } = TOOLS;
+    const restricted: HostCapabilities = {
+      ...TOOLS,
+      windowTools: () =>
+        Promise.reject(
+          new PluginCapabilityError(diagnostic('E_WINDOW_RESTRICTED', { plugin: 'texto' })),
+        ),
+    };
+    const answers = await Promise.all(
+      [
+        // A program's permission reaches the agent server, not the tools.
+        isolate(asking, { permissions: ['process:claude'], capabilities: TOOLS }),
+        isolate(asking, { permissions: ['window:tools'], capabilities: cli }),
+        isolate(asking, { permissions: ['window:tools'], capabilities: restricted }),
+      ].map(async (isolated) => answerOf((await isolated).connected)),
+    );
+    expect(answers).toEqual(['E_PERMISSION', 'E_WINDOW_UNAVAILABLE', 'E_WINDOW_RESTRICTED']);
+    // Only the restricted host was asked to call: its list refused, its call did not.
+    expect(called.length).toBe(1);
+  });
+
+  it('never hands a plugin a field the window added to a tool or an answer', async () => {
+    const careless: HostCapabilities = {
+      ...TOOLS,
+      windowTools: () => Promise.resolve([{ ...TOOL, annotations: { token: 'sk-secret' } }]),
+    };
+    const { connected } = await isolate(asking, {
+      permissions: ['window:tools'],
+      capabilities: careless,
+    });
+    const answer = await answerOf(connected);
+    expect(answer).toMatch(/^thrown/u);
+    expect(answer).not.toContain('sk-secret');
+  });
+});
+
+describe('credentialHeaders and host.storage across the boundary (ADR 0191)', () => {
+  const SECRET = 'sk-probe-55e0b7a4';
+  const sent: HostFetchInit[] = [];
+  const records = new Map<string, string>();
+  const HOST: HostCapabilities = {
+    fetch: (_url, init) => {
+      sent.push(init);
+      return Promise.resolve({
+        url: 'https://api.example.com/v1/messages',
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: new TextEncoder().encode('{"ok":true}'),
+      });
+    },
+    credential: (_plugin, key) => Promise.resolve(key === 'api-key' ? SECRET : undefined),
+    describeCredential: () => 'the test keychain',
+    storageGet: (_plugin, key) => Promise.resolve(records.get(key)),
+    storageSet: (_plugin, key, json) => {
+      records.set(key, json);
+      return Promise.resolve();
+    },
+    storageDelete: (_plugin, key) => Promise.resolve(records.delete(key)),
+  };
+
+  const asking = (host: PluginHost) =>
+    host.registerExporter({
+      ...textExporter,
+      exportFrame: async () => {
+        const response = await host.fetch('https://api.example.com/v1/messages', {
+          method: 'POST',
+          credentialHeaders: { 'x-api-key': 'api-key' },
+        });
+        await host.storage.set('ledger.2026-11', { spentMicros: 4200 });
+        await host.storage.set('empty', null);
+        const back = {
+          status: response.status,
+          ledger: await host.storage.get('ledger.2026-11'),
+          empty: await host.storage.get('empty'),
+          missing: (await host.storage.get('missing')) === undefined,
+        };
+        return ok(JSON.stringify(back));
+      },
+    });
+
+  it('sends the secret from the host, and the plugin’s process never receives it', async () => {
+    const heard: unknown[] = [];
+    const { connected } = await isolate(asking, {
+      permissions: ['net:api.example.com', 'credentials:api-key'],
+      capabilities: HOST,
+      heard,
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok ? JSON.parse(answer.value) : answer).toEqual({
+      status: 200,
+      ledger: { spentMicros: 4200 },
+      empty: null,
+      missing: true,
+    });
+    expect(sent.at(-1)?.headers?.['x-api-key']).toBe(SECRET);
+    expect(sent.at(-1)).not.toHaveProperty('credentialHeaders');
+    expect(heard.length).toBeGreaterThan(0);
+    expect(
+      JSON.stringify(heard, (_key, value: unknown) =>
+        value instanceof Uint8Array ? new Utf8Decoder().decode(value) : value,
+      ),
+    ).not.toContain(SECRET);
   });
 });
 

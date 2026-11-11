@@ -15,7 +15,8 @@ import {
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
 import { hostProcess, processChannel } from '../process.js';
 import { hostTerminal } from '../terminal.js';
-import { type AgentServer, hostWindow } from '../window.js';
+import { hostStorage } from '../storage.js';
+import { type AgentServer, type WindowTool, type WindowToolResult, hostWindow } from '../window.js';
 import type { GuestChannel } from './channel.js';
 import { guestFaces } from './faces.js';
 import {
@@ -40,7 +41,10 @@ import {
   hostMessageSchema,
   processStartedSchema,
   signinTokenSchema,
+  storageGetSchema,
   windowAgentServerSchema,
+  windowToolResultSchema,
+  windowToolsSchema,
   workspaceBytesSchema,
 } from './protocol.js';
 
@@ -283,6 +287,20 @@ export function runGuest(
       async (key) => (await request('deleteCredential', [key], forgottenSchema)) as boolean,
     ),
     // Each answer checked against its schema on the way in, as `fetch`'s is (ADR 0138).
+    storage: hostStorage({
+      storageGet: async (key) => {
+        const stored = (await request('storageGet', [key], storageGetSchema)) as {
+          found: boolean;
+          value?: unknown;
+        };
+        return stored.found ? stored.value : undefined;
+      },
+      storageSet: async (key, value) => {
+        await request('storageSet', [key, value], storedSchema);
+      },
+      storageDelete: async (key) =>
+        (await request('storageDelete', [key], forgottenSchema)) as boolean,
+    }),
     cache: hostCache({
       cacheGet: async (key) =>
         ((await request('cacheGet', [key], cacheEntrySchema)) as PluginCacheEntry | null) ??
@@ -322,9 +340,17 @@ export function runGuest(
         },
       });
     }),
-    window: hostWindow(
-      async () => (await request('windowAgentServer', [], windowAgentServerSchema)) as AgentServer,
-    ),
+    window: hostWindow({
+      agentServer: async () =>
+        (await request('windowAgentServer', [], windowAgentServerSchema)) as AgentServer,
+      tools: async () => (await request('windowTools', [], windowToolsSchema)) as WindowTool[],
+      callTool: async (name, input) =>
+        (await request(
+          'windowCallTool',
+          [name, { ...input }],
+          windowToolResultSchema,
+        )) as WindowToolResult,
+    }),
     terminal: hostTerminal(async (name, args) => {
       await request('terminalOpen', [name, [...args]], storedSchema);
     }),

@@ -1,5 +1,20 @@
 # @tyto/core
 
+## 0.43.1
+
+### Patch Changes
+
+- 4cae56d: A plugin can have the host send a credential in a header, `host.fetch(url, { credentialHeaders })`,
+  without ever holding it, only to a host a `net:` permission of its own names (`E_CREDENTIAL_HOST`
+  otherwise). `host.storage` keeps small durable JSON records under the plugin's data folder,
+  kept by updates and a wiped cache and removed with the plugin (`E_PLUGIN_STORAGE`). ADR 0191; the
+  isolation protocol is 24.
+- 94c593c: A plugin that declares `window:tools` lists and calls the window's tools in process with
+  `host.window.tools()` and `host.window.callTool(name, input)` (ADR 0190): the same server an agent
+  connected to the window reaches, under the same trust, `agentsListen` and restricted-folder
+  refusals, with edits as proposals. The isolation protocol is 23. `E_WINDOW_UNAVAILABLE`,
+  `E_WINDOW_AGENTS_OFF` and `E_WINDOW_RESTRICTED` now say "asked to reach the window".
+
 ## 0.43.0
 
 ### Minor Changes
