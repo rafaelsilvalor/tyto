@@ -16,7 +16,7 @@ const RULE = z.strictObject({
   set: z.record(z.string(), z.string().nullable()),
 });
 
-const RULES = z.array(RULE).min(1, 'a rules table holds at least one entry');
+export const RULES = z.array(RULE).min(1, 'a rules table holds at least one entry');
 
 type Rule = z.infer<typeof RULE>;
 
