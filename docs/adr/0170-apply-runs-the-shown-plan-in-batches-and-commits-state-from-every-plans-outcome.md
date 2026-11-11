@@ -89,3 +89,32 @@ conditions: a scheduled run in a trusted folder counts as an explicit Run, so `a
 applies its plans, and in a restricted folder it runs nothing. `every` is a second header
 line, parsed into `RecipeAst.every` and refused the same ways `apply auto` is: a malformed
 one, a second one, or one after the first step.
+
+## Note, 2026-11-11 — a run that plans nothing to write commits its state (TYTO-650)
+
+Apply is offered only for a plan with at least one operation, and decision 4 commits state
+only through Apply. A sync whose sheet and tracker already agree plans 0 operations on every
+row, so it never stored what it saw, and every later run was a first run (found in TYTO-421's
+by-hand run, 48 real rows). Buraqueira stored its state on every run.
+
+The coordinator chose the automatic commit over an explicit "Remember" action, since no write
+leaves the machine. The runner (`@tyto/io`, ADR 0188) commits the run's `remember` writes with
+an **empty outcome**, as an Apply of the empty plans would, only when all of these hold:
+
+- the run is **explicit**: Run, Run from here, Fetch again, or a scheduled run (ADR 0175). A
+  pause in typing and a save never commit, and neither does `tyto mcp`'s `run_recipe`, which
+  runs as a save: an agent's call is not a person's approval;
+- the folder is **trusted**;
+- the run is **still the current one** for its document when its turn comes;
+- **every cell is ok**: none stale, failed or skipped, the bar decision 4 sets for Apply;
+- **at least one cell holds a plan, and every plan holds no operation**, none applied already.
+  A recipe with no plan cell commits nothing: a notebook that only reads still writes no state
+  (ADR 0140 decision 4).
+
+It waits in the recipe file's Apply queue, after any Apply and `apply auto` of the same file,
+so it never commits beside a real Apply. **`applied_at` is not stamped**: nothing was applied,
+so `stateToCommit` stores each row without it (decision 5), and `last_applied_at` keeps the
+value of the last run that applied something to that row, or reads empty.
+
+`apply auto` already committed in this case, through an Apply of the empty plan; that path is
+unchanged, and its plan cell carries an applied record with no operations.

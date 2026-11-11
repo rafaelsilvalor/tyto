@@ -38,7 +38,12 @@ import { type RecipeStateOptions, recipeStateStore } from '../recipe-state.js';
 import { workspaceBriefPorts } from '../workspace-briefs.js';
 import { type WorkspaceDataOptions, workspaceDataResolver } from '../workspace-data.js';
 
-import { type AppliedRecord, applyCell } from './recipe-apply.js';
+import {
+  type AppliedRecord,
+  applyCell,
+  commitWithoutApply,
+  commitsWithoutApply,
+} from './recipe-apply.js';
 
 /**
  * The recipe notebook's runner (TYTO-377, ADR 0148), in `@tyto/io` since TYTO-664 (ADR 0188) so
@@ -49,8 +54,9 @@ import { type AppliedRecord, applyCell } from './recipe-apply.js';
  * option a test or another host overrides, with io's own as the defaults: the installed
  * plugins' verbs with each plugin's own project section asked per call (ADR 0147), the
  * workspace's data files behind the folder's trust (ADR 0137), the recipe's state **read-only**
- * (ADR 0140: a run writes no state, an applied plan does, TYTO-378), the clock in the person's
- * zone (ADR 0139), and `run x` reading `x.recipe` beside the recipe and nowhere else.
+ * (ADR 0140: a run writes no state, an applied plan does, TYTO-378; so does an explicit Run in a
+ * trusted folder whose plans hold no operation, once its cells ran, TYTO-650), the clock in the
+ * person's zone (ADR 0139), and `run x` reading `x.recipe` beside the recipe and nowhere else.
  *
  * **Cells are kept in memory per document**, with each step's signature, so a run starts at the
  * first step that changed and reads the table the cell before it kept. A change to the header
@@ -400,6 +406,17 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
           }
         }
       }
+      // TYTO-650, ADR 0170 note of 2026-11-11: an explicit Run in a trusted folder whose plans
+      // hold no operation commits its `remember` writes, which no Apply would ever commit. In
+      // the Apply queue, after `apply auto`'s, so it never commits beside a real Apply.
+      if (explicitRun && place.trust === 'trusted' && current) {
+        const lane = await applyLaneOf(request.documentId, request.path);
+        diagnostics.push(
+          ...(await queued(lane, () =>
+            rememberWithoutApply(request.documentId, request.path, place, run),
+          )),
+        );
+      }
       const final = current ? (kept.get(request.documentId)?.cells ?? next) : next;
 
       // Which cells fetch, for the notebook's Fetch again; the reader already holds every text.
@@ -520,6 +537,23 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
     return applied === undefined
       ? { ...view, diagnostics: [...view.diagnostics, ...answer.diagnostics] }
       : view;
+  }
+
+  /**
+   * TYTO-650: commits the `remember` writes of run `run` when its plans hold no operation, read
+   * from the cells kept when its turn in the queue comes. A run started since owns the cells
+   * by then, and this one commits nothing.
+   */
+  async function rememberWithoutApply(
+    documentId: string,
+    path: string | undefined,
+    place: RecipePlace,
+    run: number,
+  ): Promise<readonly Diagnostic[]> {
+    if (latest.get(documentId) !== run) return [];
+    const cells = kept.get(documentId)?.cells;
+    if (cells === undefined || !commitsWithoutApply(cells)) return [];
+    return commitWithoutApply(cells, writableStateFor(place, path, options.home, stateOf));
   }
 }
 
