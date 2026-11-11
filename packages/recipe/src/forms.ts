@@ -406,6 +406,19 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       ],
       'sink',
     ),
+    form(
+      'call',
+      'Plans one POST per row to an allowed host, sent on Apply.',
+      'call url=https://hooks.example.com/run token=routine body=@./call.json#/routine',
+      [
+        named('url', 'text', true, "The https address, on a host the workspace's project allows."),
+        named('token', 'name', true, 'The stored credential sent as a bearer token.'),
+        named('body', 'data', true, 'The JSON body, its strings {column} templates.', {
+          inline: true,
+        }),
+      ],
+      'action',
+    ),
   ].map((entry) => [entry.verb, entry]),
 );
 
