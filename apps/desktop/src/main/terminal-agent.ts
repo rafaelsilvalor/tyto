@@ -158,20 +158,29 @@ export function windowAgentServerPort(
   options: WindowAgentServerPortOptions,
 ): (plugin: string) => Promise<AgentServer> {
   return (plugin) => {
-    const { folder, trust } = options.workspace();
-    // As the terminal and a plugin's program are refused (ADR 0164 decision 5, ADR 0182).
-    if (folder !== null && trust === 'restricted') {
-      return Promise.reject(
-        new PluginCapabilityError(diagnostic('E_WINDOW_RESTRICTED', { plugin })),
-      );
-    }
-    if (!options.listening()) {
-      return Promise.reject(
-        new PluginCapabilityError(diagnostic('E_WINDOW_AGENTS_OFF', { plugin })),
-      );
-    }
+    const refused = windowRefusal(plugin, options);
+    if (refused !== undefined) return Promise.reject(refused);
     return Promise.resolve(windowAgentServer(options));
   };
+}
+
+/**
+ * Why the window refuses a plugin now, or `undefined`: the same two refusals for the agent server
+ * (ADR 0183 decision 4) and the window's tools called in process (ADR 0190), in this order.
+ */
+export function windowRefusal(
+  plugin: string,
+  options: Pick<WindowAgentServerPortOptions, 'listening' | 'workspace'>,
+): PluginCapabilityError | undefined {
+  const { folder, trust } = options.workspace();
+  // As the terminal and a plugin's program are refused (ADR 0164 decision 5, ADR 0182).
+  if (folder !== null && trust === 'restricted') {
+    return new PluginCapabilityError(diagnostic('E_WINDOW_RESTRICTED', { plugin }));
+  }
+  if (!options.listening()) {
+    return new PluginCapabilityError(diagnostic('E_WINDOW_AGENTS_OFF', { plugin }));
+  }
+  return undefined;
 }
 
 /** A TOML literal string: no escapes inside, so a Windows path reads as it is written. */

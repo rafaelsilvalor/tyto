@@ -1938,6 +1938,14 @@
     },
     {
       "paths": [
+        "apps/desktop/src/main/window-tools.ts",
+        "apps/desktop/src/main/window-tools.test.ts"
+      ],
+      "e2e": ["agent-endpoint.desktop.test.ts"],
+      "why": "TYTO-661: a plugin's in-process session on the same serveAgent the endpoint runs; unit-tested against the real server, no window of its own"
+    },
+    {
+      "paths": [
         "apps/desktop/src/main/agent-window.ts",
         "apps/desktop/src/main/agent-window.test.ts",
         "apps/desktop/src/renderer/agent-state.ts",
