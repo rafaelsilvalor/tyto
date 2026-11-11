@@ -228,6 +228,7 @@ non-zero.
 | `E_RECIPE_RULES` | error | no | A 'rules' table cannot be read, sets a column 'into=' does not name, or has an entry no row can reach. |
 | `E_RECIPE_REWRITE` | error | no | A 'rewrite' list cannot be read, or a replacement names a group its pattern lacks or writes a '$' that means nothing. |
 | `E_RECIPE_TEMPLATE` | error | no | A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist. |
+| `E_RECIPE_FORM` | error | yes | A step's form names a verb without a form, misses a required field, or holds a value one recipe line cannot carry. |
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 | `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
@@ -394,6 +395,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_RULES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_REWRITE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_TEMPLATE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
+| `E_RECIPE_FORM` | yes | No line is written, so the recipe keeps the text it had. |
 | `E_VIM_CONTRIBUTION` | no | Only that contribution is left out; vim and every other contribution keep working. |
 
 ## Errors
@@ -2413,6 +2415,20 @@ Template '{template}' {problem}.
 ```
 
 Parameters: `template`, `problem`
+
+### `E_RECIPE_FORM`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0176-a-recipe-and-its-vocabulary-are-authored-in-the-window-and-the-text-stays-the-source.md`
+
+A step's form names a verb without a form, misses a required field, or holds a value one recipe line cannot carry.
+
+No line is written, so the recipe keeps the text it had.
+
+```
+This step cannot be written as a recipe line: {problem}.
+```
+
+Parameters: `problem`
 
 ### `E_VIM_CONTRIBUTION`
 

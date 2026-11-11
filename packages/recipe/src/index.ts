@@ -22,6 +22,18 @@ export { isDataReference, parseDataReference, readDataArgument, resolvePointer }
 export type { DecideAction, DecideRules, DecideSides, Decision } from './decide.js';
 export { decideValue } from './decide.js';
 export { resolveColumn } from './columns.js';
+export type { FieldKind, FieldPlacement, VerbField, VerbForm } from './forms.js';
+export { GENERIC_VERB_FORMS, formOfArguments } from './forms.js';
+export type { StepValues } from './format-step.js';
+export { formatStep, valuesOfStep } from './format-step.js';
+export type {
+  DataFileReference,
+  IncludedRecipeReference,
+  RecipeReferences,
+  RefusedReference,
+} from './references.js';
+export { leavesFolder, referencesOf } from './references.js';
+export { recipeSkeleton } from './skeleton.js';
 export type { PageFetcher, PageLimits, PageResult, SourcePage } from './paging.js';
 export { PAGE_LIMITS, pagedSource } from './paging.js';
 export { MINIMUM_INTERVAL_MINUTES, parseRecipe } from './parse.js';
