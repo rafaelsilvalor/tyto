@@ -14,6 +14,7 @@ import {
   type SourcePage,
   type Table,
   type ToBriefPorts,
+  type CallPorts,
   type Verb,
   type VerbContext,
   type VerbRegistry,
@@ -311,6 +312,12 @@ export interface RecipeRegistryOptions {
    * briefs.
    */
   readonly briefs?: ToBriefPorts;
+  /**
+   * The workspace's allowed hosts, the machine's recipe credentials and the network, lent to the
+   * generic `call` (ADR 0193), bound the same way. Without them `call` plans and its Apply says
+   * the host sends no requests.
+   */
+  readonly calls?: CallPorts;
 }
 
 /**
@@ -329,7 +336,7 @@ export function recipeRegistriesOf(
   const sectionOf = options.sectionOf ?? (() => undefined);
   const refresh = options.refresh === true;
   const now = options.now ?? (() => new Date().toISOString());
-  const ownVerbs = createVerbRegistry({ briefs: options.briefs });
+  const ownVerbs = createVerbRegistry({ briefs: options.briefs, calls: options.calls });
   const ownDerivations = createDerivationRegistry();
   const contributedVerb = (name: string) =>
     contributions.ownedRecipeVerbs().find((owned) => owned.verb.id === name);

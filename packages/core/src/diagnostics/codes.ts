@@ -1938,6 +1938,18 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
   },
+  // `call` checks its address, its credential and its body before it plans, so a request to a
+  // host the workspace did not allow is never shown, let alone sent (ADR 0193).
+  E_RECIPE_CALL: {
+    severity: 'error',
+    summary:
+      "'call' cannot plan its requests: an address that is not https, a host the workspace's project does not allow, a credential not stored on this machine, or a body too large.",
+    template: "'call' {problem}.",
+    spec: 'docs/adr/0193-call-sends-one-request-per-row-to-a-host-the-workspace-allows.md',
+    fatal: false,
+    fatality:
+      'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is sent.',
+  },
   E_RECIPE_VERB: {
     severity: 'error',
     summary: 'A verb a plugin contributes could not do its work, in its own words.',

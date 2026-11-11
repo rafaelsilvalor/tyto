@@ -7,6 +7,7 @@ import type { Plan } from './plan.js';
 import type { Cell } from './run.js';
 import type { ApplyOutcome, RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
+import { type CallPorts, callVerb } from './call.js';
 import { type ToBriefPorts, toBriefVerb } from './to-brief.js';
 import { genericVerbs } from './verbs.js';
 import type { ViewOptionValue, ViewSpecs } from './views.js';
@@ -138,6 +139,7 @@ export const GENERIC_VERBS = [
   'group',
   'count',
   'to-brief',
+  'call',
 ] as const;
 
 const CONTRIBUTED_NAME = /^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/u;
@@ -199,6 +201,10 @@ function createRegistry<Entry>(
  * `briefs` lends `to-brief` the host's templates and workspace files (ADR 0172), bound to the
  * workspace and the recipe the run belongs to. Without it `to-brief` is still in the vocabulary
  * and says this host writes no briefs.
+ *
+ * `calls` lends `call` the workspace's allowed hosts, the machine's stored credentials and the
+ * network (ADR 0193), bound the same way. Without it `call` still plans, and its Apply says this
+ * host sends no requests.
  */
 export function createVerbRegistry(options: VerbRegistryOptions = {}): VerbRegistry {
   const registry = createRegistry<Verb>('verb', (name) =>
@@ -208,11 +214,13 @@ export function createVerbRegistry(options: VerbRegistryOptions = {}): VerbRegis
   );
   for (const [name, verb] of Object.entries(genericVerbs)) registry.entries.set(name, verb);
   registry.entries.set('to-brief', toBriefVerb(options.briefs));
+  registry.entries.set('call', callVerb(options.calls));
   return registry;
 }
 
 export interface VerbRegistryOptions {
   readonly briefs?: ToBriefPorts | undefined;
+  readonly calls?: CallPorts | undefined;
 }
 
 /**
