@@ -1,5 +1,15 @@
 # @tyto/editor
 
+## 0.16.2
+
+### Patch Changes
+
+- Updated dependencies [4cae56d]
+- Updated dependencies [94c593c]
+  - @tyto/core@0.43.1
+  - @tyto/brief-lang@0.8.2
+  - @tyto/template-lang@0.8.17
+
 ## 0.16.1
 
 ### Patch Changes
