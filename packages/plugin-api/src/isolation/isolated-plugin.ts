@@ -38,6 +38,8 @@ import {
   processWriteArgsSchema,
   terminalOpenArgsSchema,
   windowAgentServerArgsSchema,
+  storageKeyArgsSchema,
+  storageSetArgsSchema,
   windowCallToolArgsSchema,
   windowToolsArgsSchema,
 } from './protocol.js';
@@ -451,6 +453,9 @@ export function connectIsolatedPlugin(
       raw: readonly unknown[],
     ): Promise<unknown> {
       const named = {
+        storageGet: 'host.storage.get',
+        storageSet: 'host.storage.set',
+        storageDelete: 'host.storage.delete',
         cacheGet: 'host.cache.get',
         cachePut: 'host.cache.put',
         cacheDelete: 'host.cache.delete',
@@ -464,6 +469,18 @@ export function connectIsolatedPlugin(
         return args.data;
       };
       switch (capability) {
+        case 'storageGet': {
+          const key = parse(storageKeyArgsSchema)[0];
+          const value = await capabilities.storageGet(key);
+          return value === undefined ? { found: false } : { found: true, value };
+        }
+        case 'storageSet': {
+          const [key, value] = parse(storageSetArgsSchema);
+          await capabilities.storageSet(key, value);
+          return null;
+        }
+        case 'storageDelete':
+          return capabilities.storageDelete(parse(storageKeyArgsSchema)[0]);
         case 'cacheGet': {
           const entry = await capabilities.cacheGet(parse(cacheKeyArgsSchema)[0]);
           return entry === undefined ? null : { bytes: entry.bytes, storedAt: entry.storedAt };

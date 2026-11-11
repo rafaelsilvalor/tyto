@@ -60,6 +60,7 @@ non-zero.
 | `E_PLUGIN_TIMEOUT` | error | no | An isolated plugin did not answer within its deadline, and its process was ended. |
 | `E_PANEL_CALL` | error | no | A panel's page asked its plugin something the host refused: no 'call', a bad method, over 1 MiB of JSON, or an answer that is not JSON. |
 | `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
+| `E_CREDENTIAL_HOST` | error | no | A plugin asked the host to send a credential to a host its manifest does not name in a net: permission of its own. |
 | `E_CREDENTIAL_TOO_LARGE` | error | no | A credential to store is larger than the ceiling every host keeps (ADR 0134). |
 | `E_CREDENTIAL_READ_ONLY` | error | no | A plugin tried to store or forget a credential on a host that only reads them. |
 | `E_SIGNIN_REQUIRED` | error | no | A plugin asked for an access token of a sign-in it declared, and nobody signed in. |
@@ -77,6 +78,7 @@ non-zero.
 | `E_WINDOW_AGENTS_OFF` | error | no | A plugin asked to reach the window while agentsListen is off. |
 | `E_WINDOW_RESTRICTED` | error | no | A plugin asked to reach the window while the open folder is restricted. |
 | `E_PLUGIN_CACHE` | error | no | A plugin's cache call was refused: an empty or oversized key, an entry over the ceiling, or a host with no cache. |
+| `E_PLUGIN_STORAGE` | error | no | A plugin's storage call was refused: a key or value the store does not take, an unreadable record, or a host with no storage. |
 | `E_WORKSPACE_FILE` | error | no | A plugin's workspace file was refused: outside the folder, through a link, missing, too large, inside .tyto/, or no folder is open. |
 | `E_WORKSPACE_FILE_RESTRICTED` | error | no | A plugin asked for a file of a workspace the person has not trusted. |
 | `W_PLUGIN_CRASHED` | warning | no | An installed plugin's process crashed on an earlier run. History, not a refusal. |
@@ -291,6 +293,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_TIMEOUT` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
 | `E_PANEL_CALL` | no | Only that call is refused; the panel stays open and its plugin keeps running. |
 | `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_CREDENTIAL_HOST` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_TOO_LARGE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_READ_ONLY` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_SIGNIN_REQUIRED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
@@ -308,6 +311,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_WINDOW_AGENTS_OFF` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WINDOW_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_CACHE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
+| `E_PLUGIN_STORAGE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WORKSPACE_FILE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_WORKSPACE_FILE_RESTRICTED` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_PLUGIN_FETCH` | yes | A plugin that did not load contributed no slot to skip. |
@@ -996,6 +1000,20 @@ Plugin '{plugin}' asked for credential '{key}', and {source} holds none.
 
 Parameters: `plugin`, `key`, `source`
 
+### `E_CREDENTIAL_HOST`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0191-the-host-sends-a-plugins-secret-and-keeps-its-durable-records.md`
+
+A plugin asked the host to send a credential to a host its manifest does not name in a net: permission of its own.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' asked to send credential '{key}' to {host}, which no net: permission of its own names (net:* does not count).
+```
+
+Parameters: `plugin`, `key`, `host`
+
 ### `E_CREDENTIAL_TOO_LARGE`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
@@ -1230,6 +1248,20 @@ It is the plugin's call that is refused; what the plugin does with that is its o
 
 ```
 Plugin '{plugin}' could not use its cache entry '{key}': {problem}.
+```
+
+Parameters: `plugin`, `key`, `problem`
+
+### `E_PLUGIN_STORAGE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0191-the-host-sends-a-plugins-secret-and-keeps-its-durable-records.md`
+
+A plugin's storage call was refused: a key or value the store does not take, an unreadable record, or a host with no storage.
+
+It is the plugin's call that is refused; what the plugin does with that is its own.
+
+```
+Plugin '{plugin}' could not use its stored record '{key}': {problem}.
 ```
 
 Parameters: `plugin`, `key`, `problem`

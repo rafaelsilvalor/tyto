@@ -688,18 +688,45 @@ interface PluginHost {
 
 ### `host.fetch` and `host.credentials` (ADR 0042)
 
-| Permission            | Allows                                                       |
-| --------------------- | ------------------------------------------------------------ |
-| `net:api.example.com` | `host.fetch` to that host, any port, `http` or `https`       |
-| `net:*.example.com`   | every host below `example.com`, and not `example.com` itself |
-| `net:*`               | any host                                                     |
-| `credentials:<key>`   | `host.credentials('<key>')`, `.set('<key>', v)`, `.delete`   |
+| Permission            | Allows                                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `net:api.example.com` | `host.fetch` to that host, any port, `http` or `https`                                             |
+| `net:*.example.com`   | every host below `example.com`, and not `example.com` itself                                       |
+| `net:*`               | any host                                                                                           |
+| `credentials:<key>`   | `host.credentials('<key>')`, `.set('<key>', v)`, `.delete`, and `credentialHeaders` naming `<key>` |
 
 **Checked on the host's side, against the manifest the host validated** — never in the plugin's process — by one function, `checkedCapabilities`, which the in-process host uses too. A refusal **rejects** with a `PluginCapabilityError` whose `code` is `E_PERMISSION`, the way the platform's `fetch` rejects; a declared key with no value is `E_CREDENTIAL_MISSING`, naming where the host looked. **Redirects are not followed**: the 3xx comes back with its `location`, and the next request is checked like the first, so a declared host cannot hand the request to an undeclared one. The response crosses whole — status, headers, body as bytes — with `text()` and `json()` built on the plugin's side.
 
 **A plugin can store and forget its own declared keys** (ADR 0134). `host.credentials` is a function with two methods: `host.credentials(key)` reads, as it always has; `host.credentials.set(key, value)` stores and resolves to nothing; `host.credentials.delete(key)` forgets and resolves to `true` when there was a value. Both sit behind the same `credentials:<key>` permission and the same `checkedCapabilities`, so an undeclared key is `E_PERMISSION` on either side of the isolation boundary. A value is a non-empty string of at most **16 KiB in UTF-8** (`CREDENTIAL_VALUE_LIMIT_BYTES`); over it is `E_CREDENTIAL_TOO_LARGE`, and an empty one is refused as a `TypeError` — forgetting is `delete`. The writers are optional on `HostCapabilities` (`storeCredential`, `deleteCredential`): a host without them answers both with `E_CREDENTIAL_READ_ONLY`, naming where it reads from.
 
 The network and the secrets are a port, `HostCapabilities`. **In the CLI a credential is an environment variable**, `TYTO_PLUGIN_<NAME>_<KEY>`, both halves upper-cased with every character that is not a letter or a digit turned into `_` — plugin `meu-pdf`'s `api.token` is `TYTO_PLUGIN_MEU_PDF_API_TOKEN` — and an empty variable is unset. **The CLI's credentials are read-only**: a plugin's `set` or `delete` there is `E_CREDENTIAL_READ_ONLY`, naming the variable, because the environment is the person's to set and a value written into it would vanish with the process. **On the desktop a credential is a keychain entry and nothing else** (`CLAUDE.md`): `safeStorage`, under the account `plugin:<name>:<key>`, with no environment fallback. A person stores one in the plugins screen, beside the plugin that declares it (TYTO-187), or the plugin stores one itself with `host.credentials.set`; until then a declared key answers `E_CREDENTIAL_MISSING`, and its message points to that screen. The window can set or forget only a key an installed manifest declares, within the same 16 KiB, and it never reads one back: the screen learns whether a key is set and nothing more. **The account prefix `signin:<plugin>:<id>` is reserved** for the tokens browser sign-in keeps (ADR 0131, ADR 0174): `plugin:<name>:<key>` can never produce it, so no `credentials:<key>` reaches a sign-in token. The desktop's network is Electron's `net.fetch`, with `redirect: 'manual'`, so it honours the system's proxy.
+
+**The host can send a credential for the plugin, which then never holds it** (ADR 0191). `credentialHeaders` maps a header name to a credential key, and the host reads the value and sets the header on its side:
+
+```ts
+const response = await host.fetch('https://api.example.com/v1/messages', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  credentialHeaders: { 'x-api-key': 'api-key' },
+  body,
+});
+```
+
+Only the key's name crosses the isolation boundary. Each key needs its `credentials:<key>`, and **the request's host must be one a `net:` permission of the plugin's names itself**, exactly or under `*.<domain>`: `net:*` does not count, and any other host is `E_CREDENTIAL_HOST`, before the secret is read. A header that is not an HTTP token, or that `headers` also sets, is a `TypeError`; a key with no value is `E_CREDENTIAL_MISSING`. An error the adapter throws comes back with the secret replaced by `[credential]`. A panel's page does not get `credentialHeaders`; it asks its plugin through `call`.
+
+### `host.storage` (ADR 0191)
+
+**A plugin's own durable records**, for state that is not a copy of anything — what a person spent this month, say — and so must survive restarts, updates and a wiped cache:
+
+```ts
+await host.storage.set('ledger.2026-11', { spentMicros: 4200 });
+const ledger = await host.storage.get('ledger.2026-11'); // { spentMicros: 4200 }, or undefined
+await host.storage.delete('ledger.2026-11'); // true when there was one
+```
+
+No permission: it holds only what the plugin put there. A key is 1 to 128 of `A–Z a–z 0–9 _ . -` (`PLUGIN_STORAGE_KEY_LIMIT`); a value is JSON that reads back as itself — plain objects, arrays, strings, finite numbers, booleans, `null` — of at most **64 KiB** as UTF-8 JSON text (`PLUGIN_STORAGE_VALUE_LIMIT_BYTES`). A stored `null` is a record; a miss is `undefined`. **A record that exists and cannot be read is refused, never answered as missing**, so a plugin can tell "nothing yet" from "something broken". Every refusal is `E_PLUGIN_STORAGE`.
+
+On disk a record is `<home>/data/plugins/<name>/storage/<sha256(key)>.json`, under the data folder ADR 0187 gives the plugin: **an update keeps it, removing the plugin deletes it**, disabling keeps it, and a wiped `cache/` does not reach it. The CLI and the desktop both keep records; a command composed without a home answers `E_PLUGIN_STORAGE`. The ports are `HostCapabilities.storageGet`, `storageSet` and `storageDelete`, which carry the record as JSON text; across the isolation boundary the requests are `storageGet`, `storageSet` and `storageDelete` (protocol 24). `testPlugin` keeps records in memory.
 
 ### `host.cache` and `host.workspace` (ADR 0138)
 

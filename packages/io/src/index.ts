@@ -146,6 +146,11 @@ export {
 } from './workspace-data.js';
 
 export { type PluginCacheOptions, type PluginCachePorts, pluginCache } from './plugin-cache.js';
+export {
+  type PluginStorageOptions,
+  type PluginStoragePorts,
+  pluginStorage,
+} from './plugin-storage.js';
 
 export {
   RECIPE_STATE_LIMIT_BYTES,
