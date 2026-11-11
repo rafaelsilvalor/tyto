@@ -446,6 +446,17 @@ export const ptBR: Catalogue = {
   'plugins.credential.kept':
     'Guardada no cofre do sistema. O Tyto não a mostra de novo; digite outra para trocá-la.',
   'plugins.credential.failed': 'Não foi possível salvar nem apagar a credencial.',
+  'plugins.recipeCredentials.heading': 'Credenciais de receitas',
+  'plugins.recipeCredentials.intro':
+    'A linha call de uma receita nomeia uma com token=<nome> e só a envia a um endereço que o projeto do espaço de trabalho permite. Guardada no cofre do sistema, para todas as pastas deste computador. O Tyto não a mostra de novo; salve o mesmo nome para trocá-la.',
+  'plugins.recipeCredentials.none': 'Nenhuma guardada.',
+  'plugins.recipeCredentials.name': 'Nome',
+  'plugins.recipeCredentials.value': 'Valor',
+  'plugins.recipeCredentials.save': 'Salvar',
+  'plugins.recipeCredentials.forget': 'Esquecer',
+  'plugins.recipeCredentials.badName':
+    'Um nome tem letras minúsculas, dígitos e -, começa por uma letra e tem até 64 caracteres.',
+  'plugins.recipeCredentials.failed': 'Não foi possível salvar nem esquecer a credencial.',
   'plugins.column.actions': 'Ações',
   'plugins.action.installFolder': 'Instalar de uma pasta…',
   'plugins.action.installArchive': 'Instalar de um arquivo…',

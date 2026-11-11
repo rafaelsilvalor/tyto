@@ -119,6 +119,13 @@ export interface WorkspaceService {
    */
   sectionFor(recipeDirectory: string | undefined, plugin: string): unknown;
   /**
+   * `recipes.call.hosts` of the open folder's project, for a recipe in `recipeDirectory`
+   * (TYTO-671, ADR 0193 decision 4), read on every call as {@link sectionFor} is. `undefined`
+   * when the recipe is outside the open folder or nothing is open; a restricted folder's list is
+   * already withheld by the resolver, and the runner refuses one whatever this answers.
+   */
+  callHostsFor(recipeDirectory: string | undefined): readonly string[] | undefined;
+  /**
    * The open folder's delivery layout and the folder it must stay inside (TYTO-489, ADR 0157);
    * `undefined` with nothing open, where the window makes no delivery.
    */
@@ -311,6 +318,12 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       if (!isInside(open.folder, recipeDirectory)) return undefined;
       const sections: Readonly<Record<string, unknown>> = open.project.sections;
       return Object.prototype.hasOwnProperty.call(sections, plugin) ? sections[plugin] : undefined;
+    },
+
+    callHostsFor(recipeDirectory) {
+      if (open === undefined || recipeDirectory === undefined) return undefined;
+      if (!isInside(open.folder, recipeDirectory)) return undefined;
+      return open.project.callHosts;
     },
 
     deliveryLayout() {

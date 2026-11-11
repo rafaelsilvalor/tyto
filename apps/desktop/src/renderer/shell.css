@@ -4253,3 +4253,57 @@ tyto-recent-folders[open] {
 .plugins__signin-client-failed {
   color: var(--tyto-error);
 }
+
+/* TYTO-671, ADR 0193: the credentials a recipe's call names, under the table. One line per
+   name with Forget, then the form, laid out as a plugin's credentials are. */
+.plugins__recipe-credentials {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--tyto-space-4);
+  gap: var(--tyto-space-2);
+}
+
+.plugins__recipe-credentials-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--tyto-weight-strong);
+}
+
+.plugins__recipe-credentials .plugins__disclosure,
+.plugins__recipe-credentials-none,
+.plugins__recipe-credential-failed {
+  margin: 0;
+}
+
+.plugins__recipe-credentials-none {
+  color: var(--tyto-text-muted);
+}
+
+.plugins__recipe-credential-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: var(--tyto-space-2);
+  list-style: none;
+}
+
+.plugins__recipe-credential,
+.plugins__recipe-credential-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  gap: var(--tyto-space-3);
+}
+
+.plugins__recipe-credential-name,
+.plugins__recipe-credential-value {
+  width: 20ch;
+  min-width: 0;
+  font: inherit;
+}
+
+.plugins__recipe-credential-failed {
+  color: var(--tyto-error);
+}

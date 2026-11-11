@@ -86,6 +86,7 @@ import {
 import { SHELL_REFUSED, windowRefusals } from './cli-refusals.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
+import { desktopRecipeCalls, recipeCredentialStore } from './recipe-credentials.js';
 import { openDocumentation } from './documentation.js';
 import { createDocumentService, openFilters, saveFilters } from './documents.js';
 import { createExportService } from './export.js';
@@ -1013,6 +1014,9 @@ async function start(): Promise<void> {
     encryption: safeStorage,
     store: fileCredentialStore(join(app.getPath('userData'), 'credentials')),
   });
+  // A recipe's `call` credentials (TYTO-671, ADR 0193 decision 5): `recipe:<name>` in the same
+  // keychain store, stored and forgotten from the plugins screen, read only by `call`'s adapter.
+  const recipeCredentials = recipeCredentialStore(credentials);
   // One composition of what a plugin may reach, shared by its process and its panel, so the
   // two can never be granted different things (ADR 0042, ADR 0045).
   // A plugin's cache beside the sources' in `TYTO_HOME`, and the files of the folder open in the
@@ -1269,6 +1273,12 @@ async function start(): Promise<void> {
     clock: () => recipeClock(recipeTimeZone),
     // `to-brief`'s templates (TYTO-380, ADR 0172), as the preview finds a brief's.
     templates: templateManifestsOf(sources),
+    // `call` (TYTO-671, ADR 0193): the open folder's `recipes.call.hosts`, the keychain's
+    // `recipe:<name>` credentials and the platform's `fetch`; the window sends.
+    calls: desktopRecipeCalls({
+      hostsFor: (directory) => workspace.callHostsFor(directory),
+      credentials: recipeCredentials,
+    }),
   });
   // **Recipes on an interval while the app is open** (TYTO-385, ADR 0175): every recipe in the
   // open folder whose header says `every`, run through the same runner as `scheduled`. A
@@ -2094,6 +2104,7 @@ async function start(): Promise<void> {
     },
     // TYTO-374: who is signed in, and signing in and out, only when the person clicks.
     signin: signinWindow(pluginStore, signin),
+    recipeCredentials,
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.
     plugins: {

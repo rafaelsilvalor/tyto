@@ -42,6 +42,7 @@ export interface OpenedByAgent {
 }
 import { declaredCredentialKeys } from './plugin-list.js';
 import { type PluginManager } from './plugin-manage.js';
+import { type RecipeCredentialStore } from './recipe-credentials.js';
 import { type SigninWindow } from './signin.js';
 import { type DeliveryService } from './delivery.js';
 import { type DesktopLog } from './log.js';
@@ -397,6 +398,8 @@ export interface IpcDependencies {
    * signing in and out. Never a token.
    */
   readonly signin: SigninWindow;
+  /** A recipe's `call` credentials (TYTO-671, ADR 0193): names listed, values never read back. */
+  readonly recipeCredentials: RecipeCredentialStore;
   /** The installed plugins' panels and their bridge (ADR 0045). */
   readonly panels: PanelService;
   /** The installed plugins' keymaps, once they have started (TYTO-207). */
@@ -1055,6 +1058,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         ...(clientSecret === undefined ? {} : { clientSecret }),
       }),
     'signin:client-clear': ({ plugin, id }) => dependencies.signin.clearClient(plugin, id),
+
+    'recipe-credential:list': () => dependencies.recipeCredentials.list(),
+    'recipe-credential:set': ({ name, value }) => dependencies.recipeCredentials.set(name, value),
+    'recipe-credential:forget': ({ name }) => dependencies.recipeCredentials.forget(name),
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),

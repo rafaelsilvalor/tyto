@@ -176,3 +176,24 @@ template takes from the row, and the plan is the only place a person sees it.
 - The CLI and `tyto mcp` run `call` through the same runner (ADR 0188); only the desktop and the
   CLI lend `send`.
 - A person whose endpoint wants another method, header or body format cannot use `call` yet.
+
+## Note — 2026-11-11, TYTO-671 third pull request: where the desktop stores a credential
+
+- **The place is a "Recipe credentials" section of the plugins screen** (Show plugins), under the
+  list of plugins and above the install buttons, not a command and a dialog of its own. A person
+  looking for where a token goes looks where the plugins' credentials and sign-ins already are,
+  and the section reuses their write-only field: a name field, a password field and Save, the
+  names stored listed below with Forget, the value emptied once saved and never handed back to
+  the window. It is not on a plugin's row because `call` is Tyto's verb, not a plugin's.
+- **Three channels, names only out**: `recipe-credential:list` answers `{ names }`;
+  `recipe-credential:set` takes `{ name, value }`, the name one `token=` accepts
+  (`CALL_CREDENTIAL_NAME`, now exported by `@tyto/recipe`) and the value 1 byte to 16 KiB in
+  UTF-8, as a plugin credential's; `recipe-credential:forget` takes `{ name }` and answers
+  `{ forgotten }`. Listing reads the store's file names and never decrypts.
+- **`recipe:` is reserved in `@tyto/plugin-api`** (`RECIPE_CREDENTIAL_KEY_PREFIX`), as
+  `signin-client:` is (ADR 0192): a `credentials:recipe:…` permission is refused at install and
+  `host.credentials('recipe:…')` is `E_PERMISSION`. A plugin's accounts are `plugin:<name>:<key>`
+  already, so this guards a future change to that rule, not a hole today.
+- **The window sends.** Main lends `call` the open folder's `recipes.call.hosts` (a recipe
+  outside the open folder has no list), the keychain store and the platform's `fetch`, with
+  `sends: true`. "Store it first" now names the screen and the CLI's variable.

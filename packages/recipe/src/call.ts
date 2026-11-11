@@ -80,8 +80,11 @@ export const CALL_BODY_LIMIT_BYTES = 16 * 1024;
  */
 export const CALL_PLAN_LIMITS: PlanLimits = { ...PLAN_LIMITS, maxOperations: 1000 };
 
-/** A credential's name: lower-case words, as a store's or a plugin's is. */
-const CREDENTIAL_NAME = /^[a-z][a-z0-9-]{0,63}$/u;
+/**
+ * A credential's name: lower-case words, as a store's or a plugin's is. Exported so the desktop's
+ * screen that stores one refuses the names `token=` would refuse (ADR 0193 decision 5).
+ */
+export const CALL_CREDENTIAL_NAME = /^[a-z][a-z0-9-]{0,63}$/u;
 
 /**
  * `https://host[:port][/path][?query]`, without a user, a password or a fragment. Read by hand
@@ -177,7 +180,7 @@ async function planCalls(context: VerbContext, ports: CallPorts | undefined): Pr
 
   const host = httpsHost(url.value);
   if (!host.ok) return refuse(`url=${url.value} ${host.error}`, at(url.range));
-  if (!CREDENTIAL_NAME.test(token.value)) {
+  if (!CALL_CREDENTIAL_NAME.test(token.value)) {
     return refuse(
       `names a credential in lower-case letters, digits and -, and '${token.value}' is not one`,
       at(token.range),
@@ -200,7 +203,9 @@ async function planCalls(context: VerbContext, ports: CallPorts | undefined): Pr
     }
     if (!(await ports.hasCredential(token.value))) {
       return refuse(
-        `has no credential named '${token.value}' stored on this machine; store it first`,
+        `has no credential named '${token.value}' stored on this machine; store it first, in ` +
+          'the window under Recipe credentials in the plugins screen (Show plugins), or in the ' +
+          'command line as TYTO_RECIPE_CREDENTIAL_<NAME>',
         at(token.range),
       );
     }

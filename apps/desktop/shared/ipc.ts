@@ -1,4 +1,5 @@
 import { slotSchema, templateManifestSchema } from '@tyto/core';
+import { CALL_CREDENTIAL_NAME } from '@tyto/recipe';
 import {
   ASSET_SOURCE_MAX_BYTES,
   CREDENTIAL_VALUE_LIMIT_BYTES,
@@ -2187,6 +2188,40 @@ export const IPC_CHANNELS = {
   'signin:client-clear': channel(
     z.strictObject({ plugin: z.string().min(1).max(214), id: z.string().min(1).max(64) }),
     z.object({ cleared: z.boolean() }),
+  ),
+
+  /**
+   * The names of the recipe credentials stored on this machine (TYTO-671, ADR 0193 decision 5),
+   * sorted. **Names only**: no channel reads a value back, and the one reader is `call`'s
+   * adapter in main.
+   */
+  'recipe-credential:list': channel(
+    z.strictObject({}),
+    z.object({ names: z.array(z.string().regex(CALL_CREDENTIAL_NAME)) }),
+  ),
+
+  /**
+   * Stores a recipe credential in the keychain under `recipe:<name>`, replacing one stored
+   * before. **Write-only**: the answer says it was stored. The name is one `token=` accepts,
+   * and the value is held to a plugin credential's ceiling in UTF-8 bytes (ADR 0134).
+   */
+  'recipe-credential:set': channel(
+    z.strictObject({
+      name: z.string().regex(CALL_CREDENTIAL_NAME),
+      value: z
+        .string()
+        .min(1)
+        .refine((value) => credentialByteLength(value) <= CREDENTIAL_VALUE_LIMIT_BYTES, {
+          message: `is over ${String(CREDENTIAL_VALUE_LIMIT_BYTES)} bytes`,
+        }),
+    }),
+    z.object({ stored: z.literal(true) }),
+  ),
+
+  /** Forgets one; `forgotten` is false when nothing was stored under that name. */
+  'recipe-credential:forget': channel(
+    z.strictObject({ name: z.string().regex(CALL_CREDENTIAL_NAME) }),
+    z.object({ forgotten: z.boolean() }),
   ),
 
   /**

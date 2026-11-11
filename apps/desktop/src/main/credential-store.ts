@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { type CredentialStore } from './credentials.js';
@@ -16,9 +16,11 @@ import { type CredentialStore } from './credentials.js';
  * `encodeURIComponent` maps every separator to `%XX`, which is reversible and leaves the
  * ordinary names (`jira`, `drive`) legible in a folder listing.
  */
+const CIPHERTEXT_EXTENSION = '.bin';
+
 export function fileCredentialStore(directory: string): CredentialStore {
   const fileFor = (account: string): string =>
-    join(directory, `${encodeURIComponent(account)}.bin`);
+    join(directory, `${encodeURIComponent(account)}${CIPHERTEXT_EXTENSION}`);
 
   return {
     read: async (account) => {
@@ -47,6 +49,27 @@ export function fileCredentialStore(directory: string): CredentialStore {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
         throw error;
       }
+    },
+
+    accounts: async () => {
+      let names: string[];
+      try {
+        names = await readdir(directory);
+      } catch (error) {
+        // No folder yet is nothing stored yet, as `read` answers.
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+        throw error;
+      }
+      const accounts: string[] = [];
+      for (const name of names) {
+        if (!name.endsWith(CIPHERTEXT_EXTENSION)) continue;
+        try {
+          accounts.push(decodeURIComponent(name.slice(0, -CIPHERTEXT_EXTENSION.length)));
+        } catch {
+          // A file a person named by hand that this store never wrote: not an account.
+        }
+      }
+      return accounts;
     },
   };
 }

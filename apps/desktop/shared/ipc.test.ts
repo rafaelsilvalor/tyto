@@ -94,6 +94,10 @@ describe('the IPC contract', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      // TYTO-671, ADR 0193: a recipe's call credentials, stored, listed by name and forgotten.
+      'recipe-credential:forget',
+      'recipe-credential:list',
+      'recipe-credential:set',
       'recipe:apply',
       'recipe:copy',
       'recipe:facets',
@@ -547,6 +551,8 @@ describe('what the contract does not promise', () => {
       'plugins:vim',
       // TYTO-377. Nor "which verbs may a recipe name": the generic ones and every plugin's.
       'recipe:verbs',
+      // TYTO-671. Nor "which recipe credentials are stored": the machine's, by name only.
+      'recipe-credential:list',
       // TYTO-385. Nor "which recipes run on an interval": the open workspace's, main's.
       'schedule:list',
       // TYTO-207. Nor "what does keybindings.json say": there is one file, and main knows it.

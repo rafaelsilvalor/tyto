@@ -326,6 +326,19 @@ describe('host.signin.accessToken (ADR 0174)', () => {
       ]),
     ).toEqual(['E_PERMISSION', 'E_PERMISSION', 'E_PERMISSION']);
   });
+
+  it("keeps it out of every recipe: key, a recipe call's credential (ADR 0193)", async () => {
+    const { capabilities } = signedIn();
+    const checked = checkedCapabilities('texto', ['credentials:recipe:routine'], capabilities);
+
+    expect(
+      await Promise.all([
+        codeOf(checked.credentials('recipe:routine')),
+        codeOf(checked.storeCredential('recipe:routine', 'x')),
+        codeOf(checked.deleteCredential('recipe:routine')),
+      ]),
+    ).toEqual(['E_PERMISSION', 'E_PERMISSION', 'E_PERMISSION']);
+  });
 });
 
 describe('the in-process host', () => {

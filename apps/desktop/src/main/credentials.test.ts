@@ -27,6 +27,7 @@ const memoryStore = (): CredentialStore & { readonly written: Map<string, Buffer
       return Promise.resolve();
     },
     delete: (account) => Promise.resolve(written.delete(account)),
+    accounts: () => Promise.resolve([...written.keys()]),
   };
 };
 
