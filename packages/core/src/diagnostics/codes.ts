@@ -2131,6 +2131,17 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs.',
   },
+  // ADR 0176: a form writes one recipe line, and the text stays the source. A value the line
+  // format cannot hold is refused before anything is written, never written half-quoted.
+  E_RECIPE_FORM: {
+    severity: 'error',
+    summary:
+      "A step's form names a verb without a form, misses a required field, or holds a value one recipe line cannot carry.",
+    template: 'This step cannot be written as a recipe line: {problem}.',
+    spec: 'docs/adr/0176-a-recipe-and-its-vocabulary-are-authored-in-the-window-and-the-text-stays-the-source.md',
+    fatal: true,
+    fatality: 'No line is written, so the recipe keeps the text it had.',
+  },
   // Zero rows is a legitimate answer, but it cannot be told from a misspelt value if it is silent.
   W_RECIPE_WHERE_EMPTY: {
     severity: 'warning',
