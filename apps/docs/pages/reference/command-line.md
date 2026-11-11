@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 20. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 21. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -363,6 +363,29 @@ tyto trust remove [options] <folder>
 | Argument | What it does |
 | --- | --- |
 | `<folder>` | the workspace folder or profile file, as it was trusted |
+
+## tyto recipe run
+
+plan a recipe in its workspace and print every cell, row count and operation; --apply applies every plan once, in a trusted folder only
+
+```sh
+tyto recipe run [options] <recipe>
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<recipe>` | path to the .recipe file |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--json` | print the whole answer as one JSON document, every row and every operation with its payload |  |
+| `--apply` | apply every plan once, as a click on Apply does, and commit the recipe's state; refused outside a trusted folder |  |
+| `--param <name=value>` | give one of the recipe's param lines a value for this run; repeatable |  |
+| `--section <plugin.key=value>` | set a key of a plugin's project section for this run, over .tyto/project.json; repeatable, value read as JSON or else as text |  |
 
 ## tyto mcp
 
