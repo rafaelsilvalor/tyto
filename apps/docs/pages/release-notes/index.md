@@ -3,6 +3,7 @@
 What changed in each version of the desktop app, newest first. Each page is the text published
 with that release, written in Brazilian Portuguese.
 
+- [Tyto 0.20.0](./desktop-v0.20.0) — an agent panel that talks to Claude, and agents that write briefs
 - [Tyto 0.17.0](./desktop-v0.17.0) — an AI agent works with the open window and proposes edits
 - [Tyto 0.15.0](./desktop-v0.15.0) — a fetched plugin brings everything, not only its templates
 - [Tyto 0.14.1](./desktop-v0.14.1) — the gallery, the command panel and a terminal inside the window
