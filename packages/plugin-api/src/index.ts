@@ -244,8 +244,18 @@ export {
   hostCredentials,
   hostSignin,
   hostWorkspace,
+  namesHost,
   workspacePath,
 } from './capabilities.js';
+export {
+  type HostStorage,
+  PLUGIN_STORAGE_KEY_LIMIT,
+  PLUGIN_STORAGE_VALUE_LIMIT_BYTES,
+  type StorageCalls,
+  hostStorage,
+  jsonSafeProblem,
+  storageKeyProblem,
+} from './storage.js';
 export {
   type CheckedProcess,
   type CheckedProcesses,

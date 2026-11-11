@@ -122,6 +122,7 @@ function capabilitiesOf(
   secrets: Map<string, string>,
   signins: Map<string, string>,
 ): HostCapabilities {
+  const records = new Map<string, string>();
   const fetch =
     options.fetch ??
     ((url: string) =>
@@ -139,6 +140,13 @@ function capabilitiesOf(
     },
     deleteCredential: (_plugin, key) => Promise.resolve(secrets.delete(key)),
     signinAccessToken: (_plugin, id) => Promise.resolve(signins.get(id)),
+    // Durable records in memory, as JSON text, for the harness's life (ADR 0191).
+    storageGet: (_plugin, key) => Promise.resolve(records.get(key)),
+    storageSet: (_plugin, key, json) => {
+      records.set(key, json);
+      return Promise.resolve();
+    },
+    storageDelete: (_plugin, key) => Promise.resolve(records.delete(key)),
     ...options.capabilities,
   };
 }

@@ -61,6 +61,7 @@ import {
   type OwnedSource,
   SOURCE_SCHEME,
 } from './sources.js';
+import { type HostStorage, hostStorage } from './storage.js';
 import { type ThemeContribution, checkThemeContribution } from './theme.js';
 import { type HostTerminal, checkedTerminal, hostTerminal } from './terminal.js';
 import {
@@ -193,6 +194,13 @@ export interface PluginHost {
    * or a host with no cache, is `E_PLUGIN_CACHE`.
    */
   readonly cache: HostCache;
+  /**
+   * The plugin's durable records (ADR 0191): JSON values of at most 64 KiB under keys of 1 to
+   * 128 of `A–Z a–z 0–9 _ . -`, kept under its data folder (ADR 0187), so they survive restarts,
+   * updates and a wiped cache, and go when the plugin is removed. No permission. A refused key
+   * or value, an unreadable record, or a host with no storage is `E_PLUGIN_STORAGE`.
+   */
+  readonly storage: HostStorage;
   /**
    * The open folder's files, at a path relative to it (ADR 0138), behind `workspace:read` and
    * `workspace:write`. A path that leaves the folder, a write into `.tyto/`, a file over
@@ -688,6 +696,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         (key) => checked.deleteCredential(key),
       ),
       cache: hostCache(checked),
+      storage: hostStorage(checked),
       workspace: hostWorkspace(checked),
       signin: hostSignin(checked),
       process: hostProcess(async (name, args) => {

@@ -59,9 +59,11 @@ import {
  * note of 2026-11-09, TYTO-569); 22 since a plugin may ask for a terminal tab running a program
  * it declares, a request a host on 21 would refuse as an unknown capability (ADR 0184,
  * TYTO-657); 23 since a plugin may list and call the window's tools in process, two requests a
- * host on 22 would refuse as unknown capabilities (ADR 0190, TYTO-661).
+ * host on 22 would refuse as unknown capabilities (ADR 0190, TYTO-661); 24 since `fetch` may
+ * carry `credentialHeaders`, which the strict schema of a host on 23 would refuse, and a plugin
+ * may keep durable records, three requests a host on 23 would refuse (ADR 0191, TYTO-661).
  */
-export const RPC_PROTOCOL_VERSION = 23;
+export const RPC_PROTOCOL_VERSION = 24;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -232,6 +234,9 @@ const requestedCapabilitySchema = z.enum([
   'storeCredential',
   'deleteCredential',
   'cacheGet',
+  'storageGet',
+  'storageSet',
+  'storageDelete',
   'cachePut',
   'cacheDelete',
   'cacheList',
@@ -305,8 +310,21 @@ export const fetchArgsSchema = z.tuple([
       method: z.string().min(1).optional(),
       headers: z.record(z.string(), z.string()).optional(),
       body: z.union([z.string(), z.instanceof(Uint8Array)]).optional(),
+      /** Header to credential key: names only; the host reads the secret (ADR 0191). */
+      credentialHeaders: z.record(z.string(), z.string().min(1)).optional(),
     })
     .optional(),
+]);
+
+/**
+ * `host.storage` (ADR 0191): a key out, and for `get` a found flag with the value, because a
+ * stored `null` is a record and not a miss. The value's checks are `checkedCapabilities`'s.
+ */
+export const storageKeyArgsSchema = z.tuple([z.string()]);
+export const storageSetArgsSchema = z.tuple([z.string(), z.unknown()]);
+export const storageGetSchema = z.union([
+  z.strictObject({ found: z.literal(false) }),
+  z.strictObject({ found: z.literal(true), value: z.unknown() }),
 ]);
 
 export const credentialsArgsSchema = z.tuple([z.string().min(1)]);
