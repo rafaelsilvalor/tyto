@@ -11,6 +11,10 @@ import type { AddressInfo } from 'node:net';
  * challenge and the redirect for the code it issues, and `/token` refuses a code whose
  * verifier does not hash to that challenge (RFC 7636 section 4.6), a redirect that differs, or
  * a code already spent. There is no consent screen: `/authorize` redirects straight back.
+ *
+ * **It knows its clients** (ADR 0192): `/authorize` refuses a `client_id` it was not started
+ * with, and `/token` refuses a grant whose client is unknown or whose `client_secret` is not the
+ * one registered for it, so a client the app did not take from where it should fails here.
  */
 
 export const FAKE_ACCESS_TOKEN = 'fake-access-374';
@@ -45,7 +49,20 @@ const body = (request: IncomingMessage): Promise<string> =>
     request.on('error', reject);
   });
 
-export function startFakeAuthorizationServer(): Promise<FakeAuthorizationServer> {
+/** The clients the server issued: each id with its secret, or `undefined` for none. */
+export type FakeClients = Readonly<Record<string, string | undefined>>;
+
+export function startFakeAuthorizationServer(
+  clients: FakeClients,
+): Promise<FakeAuthorizationServer> {
+  const known = (id: string | null): id is string =>
+    id !== null && Object.prototype.hasOwnProperty.call(clients, id);
+  /** The grant names a known client and carries exactly its secret, or none when it has none. */
+  const authenticated = (grant: URLSearchParams): boolean => {
+    const id = grant.get('client_id');
+    if (!known(id)) return false;
+    return (grant.get('client_secret') ?? undefined) === clients[id];
+  };
   const issued = new Map<string, Issued>();
   const grants: URLSearchParams[] = [];
   const authorizations: URLSearchParams[] = [];
@@ -63,6 +80,10 @@ export function startFakeAuthorizationServer(): Promise<FakeAuthorizationServer>
       authorizations.push(query);
       const redirectUri = query.get('redirect_uri') ?? '';
       const challenge = query.get('code_challenge');
+      if (!known(query.get('client_id'))) {
+        json(400, { error: 'unauthorized_client', error_description: 'unknown client_id' });
+        return;
+      }
       if (query.get('code_challenge_method') !== 'S256' || challenge === null) {
         json(400, { error: 'invalid_request', error_description: 'PKCE S256 is required' });
         return;
@@ -82,6 +103,10 @@ export function startFakeAuthorizationServer(): Promise<FakeAuthorizationServer>
       void body(request).then((text) => {
         const grant = new URLSearchParams(text);
         grants.push(grant);
+        if (!authenticated(grant)) {
+          json(401, { error: 'invalid_client', error_description: 'client id or secret' });
+          return;
+        }
         if (grant.get('grant_type') === 'refresh_token') {
           if (grant.get('refresh_token') !== FAKE_REFRESH_TOKEN) {
             json(400, { error: 'invalid_grant' });

@@ -31,6 +31,11 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  * never does. The screen is handed `signins` and never a token: main keeps the refresh token in
  * the keychain and the access token in its memory.
  *
+ * **A sign-in's client, when the manifest leaves it to the person (ADR 0192).** Such a line
+ * also has a Client ID field, an optional Client secret field, Save and Clear, handed to
+ * `onSigninClient`. Write-only like a credential: the line says whether a client is set and
+ * never shows it. Sign in is disabled until one is.
+ *
  * **The notice is not decoration.** A permission a person approved at install is recorded
  * and shown, and until TYTO-48 isolates plugins it is not enforced; a screen listing
  * permissions without that sentence would read as a sandbox that does not exist.
@@ -68,6 +73,16 @@ export type SigninStart = (plugin: string, id: string) => Promise<IpcResponse<'s
 
 /** Signs out of one declared sign-in. Rejects when main refused the request. */
 export type SigninOut = (plugin: string, id: string) => Promise<void>;
+
+/**
+ * Stores the client a person typed for a sign-in, or clears it when `client` is absent
+ * (ADR 0192). Rejects when main refused the request.
+ */
+export type SigninClientChange = (
+  plugin: string,
+  id: string,
+  client?: { readonly clientId: string; readonly clientSecret?: string },
+) => Promise<void>;
 
 /** A sign-in that did not finish: which one, and main's sentence. */
 interface SigninFailure {
@@ -131,6 +146,8 @@ export class PluginsDialog extends LitElement {
     signins: { attribute: false },
     onSigninStart: { attribute: false },
     onSigninOut: { attribute: false },
+    onSigninClient: { attribute: false },
+    failedSigninClient: { state: true },
     signingIn: { state: true },
     signinFailure: { state: true },
     failedCredential: { state: true },
@@ -161,6 +178,10 @@ export class PluginsDialog extends LitElement {
   declare onSigninStart: SigninStart | undefined;
   /** Where Sign out goes. */
   declare onSigninOut: SigninOut | undefined;
+  /** Where a sign-in's client goes. No client fields while it is absent. */
+  declare onSigninClient: SigninClientChange | undefined;
+  /** `plugin:id` of the client change main refused last, so its line can say so. */
+  declare failedSigninClient: string | undefined;
   /** `plugin:id` of the sign-in waiting on the browser, so no second one starts beside it. */
   declare signingIn: string | undefined;
   declare signinFailure: SigninFailure | undefined;
@@ -180,6 +201,8 @@ export class PluginsDialog extends LitElement {
     this.signins = undefined;
     this.onSigninStart = undefined;
     this.onSigninOut = undefined;
+    this.onSigninClient = undefined;
+    this.failedSigninClient = undefined;
     this.signingIn = undefined;
     this.signinFailure = undefined;
   }
@@ -259,8 +282,95 @@ export class PluginsDialog extends LitElement {
   }
 
   /**
+   * The client fields of a sign-in whose manifest leaves the client to the person (ADR 0192):
+   * whether one is set, a Client ID field, a Client secret field, Save, and Clear once set. The
+   * fields are emptied once saved, so a value is on screen only while it is being typed.
+   */
+  private signinClient(say: (key: CatalogueKey) => string, row: SigninRow): unknown {
+    const change = this.onSigninClient;
+    if (row.client === 'manifest' || change === undefined) return nothing;
+    const key = signinKey(row.plugin, row.id);
+    const run = async (
+      client?: { readonly clientId: string; readonly clientSecret?: string },
+      form?: HTMLFormElement,
+    ): Promise<void> => {
+      try {
+        await change(row.plugin, row.id, client);
+        if (this.failedSigninClient === key) this.failedSigninClient = undefined;
+        form?.reset();
+      } catch {
+        this.failedSigninClient = key;
+      }
+    };
+    const set = row.client === 'set';
+    return html`<form
+      class="plugins__signin-client"
+      data-client=${row.client}
+      @submit=${(event: SubmitEvent) => {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+        const clientId =
+          form.querySelector<HTMLInputElement>('.plugins__signin-client-id')?.value.trim() ?? '';
+        const clientSecret =
+          form.querySelector<HTMLInputElement>('.plugins__signin-client-secret')?.value.trim() ??
+          '';
+        if (clientId === '') return;
+        void run(clientSecret === '' ? { clientId } : { clientId, clientSecret }, form);
+      }}
+    >
+      <span class="plugins__signin-client-state"
+        >${say('plugins.signin.client.label')}:
+        ${say(set ? 'plugins.signin.client.set' : 'plugins.signin.client.missing')}</span
+      >
+      <input
+        class="plugins__signin-client-id"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="512"
+        placeholder=${say('plugins.signin.client.id')}
+        aria-label=${`${say('plugins.signin.client.id')} ${row.id}`}
+      />
+      <input
+        class="plugins__signin-client-secret"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="512"
+        placeholder=${say('plugins.signin.client.secret')}
+        aria-label=${`${say('plugins.signin.client.secret')} ${row.id}`}
+      />
+      <button class="plugins__signin-client-save" type="submit">
+        ${say('plugins.signin.client.save')}
+      </button>
+      ${
+        set
+          ? html`<button
+              class="plugins__signin-client-clear"
+              type="button"
+              @click=${() => {
+                void run();
+              }}
+            >
+              ${say('plugins.signin.client.clear')}
+            </button>`
+          : nothing
+      }
+      ${
+        this.failedSigninClient === key
+          ? html`<p class="plugins__signin-client-failed" role="alert">
+              ${say('plugins.signin.client.failed')}
+            </p>`
+          : nothing
+      }
+      <p class="plugins__disclosure">${say('plugins.signin.client.kept')}</p>
+    </form>`;
+  }
+
+  /**
    * One line per declared sign-in: its id, who is signed in, and Sign in or Sign out. While a
    * sign-in waits on the browser, every Sign in is disabled and the line says to finish there.
+   * A sign-in with no client yet has Sign in disabled and says to set one (ADR 0192).
    */
   private signinLines(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
     if (plugin.origin !== 'external') return nothing;
@@ -269,6 +379,7 @@ export class PluginsDialog extends LitElement {
     const line = (row: SigninRow): TemplateResult => {
       const key = signinKey(row.plugin, row.id);
       const waiting = this.signingIn === key;
+      const noClient = row.client === 'missing';
       const state = row.signedIn
         ? row.label === undefined
           ? say('plugins.signin.signedIn')
@@ -289,7 +400,7 @@ export class PluginsDialog extends LitElement {
             class="plugins__signin-start"
             type="button"
             ?hidden=${this.onSigninStart === undefined}
-            ?disabled=${this.signingIn !== undefined}
+            ?disabled=${this.signingIn !== undefined || noClient}
             @click=${() => {
               void this.signIn(row.plugin, row.id);
             }}
@@ -300,12 +411,19 @@ export class PluginsDialog extends LitElement {
         class="plugins__signin"
         data-signin=${row.id}
         data-signed-in=${row.signedIn ? 'true' : 'false'}
+        data-client=${row.client}
       >
         <span class="plugins__signin-id"
           >${say('plugins.signin.label')} <code>${row.id}</code></span
         >
         <span class="plugins__signin-state">${state}</span>
         ${button}
+        ${
+          noClient && !row.signedIn
+            ? html`<p class="plugins__signin-hint">${say('plugins.signin.client.needed')}</p>`
+            : nothing
+        }
+        ${this.signinClient(say, row)}
         ${waiting ? html`<p class="plugins__signin-waiting" role="status">${say('plugins.signin.waiting')}</p>` : nothing}
         ${
           this.signinFailure?.key === key

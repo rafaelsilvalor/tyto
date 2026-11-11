@@ -309,6 +309,23 @@ describe('host.signin.accessToken (ADR 0174)', () => {
       ]),
     ).toEqual(['E_PERMISSION', 'E_PERMISSION', 'E_PERMISSION']);
   });
+
+  it('keeps it out of every signin-client: key too, the client a person supplied (ADR 0192)', async () => {
+    const { capabilities } = signedIn();
+    const checked = checkedCapabilities(
+      'texto',
+      ['signin:provider', 'credentials:signin-client:provider'],
+      capabilities,
+    );
+
+    expect(
+      await Promise.all([
+        codeOf(checked.credentials('signin-client:provider')),
+        codeOf(checked.storeCredential('signin-client:provider', 'x')),
+        codeOf(checked.deleteCredential('signin-client:provider')),
+      ]),
+    ).toEqual(['E_PERMISSION', 'E_PERMISSION', 'E_PERMISSION']);
+  });
 });
 
 describe('the in-process host', () => {

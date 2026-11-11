@@ -2,6 +2,8 @@ import {
   CREDENTIAL_VALUE_LIMIT_BYTES,
   type HostCapabilities,
   type PluginStore,
+  type ResolvedSigninDeclaration,
+  SIGNIN_CLIENT_KEY_PREFIX,
   type SigninDeclaration,
   parsePluginManifest,
 } from '@tyto/plugin-api';
@@ -39,6 +41,11 @@ import {
  *
  * A plugin's call never opens a browser (decision 6): `accessToken` only reads and refreshes.
  * Only `start`, which the window calls when a person asks, opens one.
+ *
+ * **A manifest may leave the client out** (ADR 0192): the person then supplies one in the
+ * plugins screen, kept as `{ clientId, clientSecret? }` under `signin-client:<plugin>:<id>`
+ * in the same keychain, and the sign-in runs with the manifest's entry and that client. A
+ * manifest that declares its client always wins: the stored one is never read for it.
  */
 
 /** The label when the provider sent no `id_token` with a name or email in it. */
@@ -58,6 +65,25 @@ const EXPIRY_MARGIN_MS = 60 * 1000;
 export function signinAccount(plugin: string, id: string): string {
   return `signin:${plugin}:${id}`;
 }
+
+/** The keychain account of the client a person supplied for a sign-in (ADR 0192). */
+export function signinClientAccount(plugin: string, id: string): string {
+  return `${SIGNIN_CLIENT_KEY_PREFIX}${plugin}:${id}`;
+}
+
+const storedClientSchema = z.object({
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1).optional(),
+});
+
+/** The OAuth client a person supplied for a manifest that declares none. */
+export type SigninClient = z.infer<typeof storedClientSchema>;
+
+/**
+ * Where a sign-in's client comes from, for the window: the manifest's, one the person set, or
+ * none yet. Never the value.
+ */
+export type SigninClientState = 'manifest' | 'set' | 'missing';
 
 const storedSigninSchema = z.object({
   refresh: z.string().min(1),
@@ -81,6 +107,7 @@ export type SigninOutcome =
       readonly ok: false;
       readonly reason:
         | 'undeclared'
+        | 'no-client'
         | 'denied'
         | 'state-mismatch'
         | 'timeout'
@@ -92,7 +119,7 @@ export type SigninOutcome =
     };
 
 export interface SigninServiceOptions {
-  readonly credentials: Pick<Credentials, 'get' | 'set' | 'delete'>;
+  readonly credentials: Pick<Credentials, 'get' | 'has' | 'set' | 'delete'>;
   /** The installed plugin's `signin.<id>`, read now, or `undefined` when it declares none. */
   readonly declarationOf: (plugin: string, id: string) => Promise<SigninDeclaration | undefined>;
   readonly fetch: TokenFetch;
@@ -120,6 +147,16 @@ export interface SigninService {
   status(plugin: string, id: string): Promise<SigninStatus | undefined>;
   /** Deletes the entry and forgets the access token; `true` when there was one. */
   signOut(plugin: string, id: string): Promise<boolean>;
+  /**
+   * Stores the client a person supplied for a sign-in whose manifest declares none, and ends
+   * the sign-in made with the previous one (ADR 0192). Throws for an undeclared sign-in and
+   * for one whose manifest declares its client.
+   */
+  setClient(plugin: string, id: string, client: SigninClient): Promise<void>;
+  /** Forgets the supplied client and the sign-in made with it; `true` when there was one. */
+  clearClient(plugin: string, id: string): Promise<boolean>;
+  /** Whether a client is stored for the sign-in, answered without decrypting it. */
+  hasClient(plugin: string, id: string): Promise<boolean>;
 }
 
 interface HeldToken {
@@ -157,6 +194,56 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
     }
   };
 
+  const readClient = async (plugin: string, id: string): Promise<SigninClient | undefined> => {
+    const plaintext = await credentials.get(signinClientAccount(plugin, id));
+    if (plaintext === null) return undefined;
+    try {
+      const parsed = storedClientSchema.safeParse(JSON.parse(plaintext));
+      return parsed.success ? parsed.data : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  /**
+   * The entry a sign-in runs with: the manifest's when it names its client — a stored one is
+   * then never read — or the manifest's endpoints and scopes with the client the person set.
+   */
+  const resolve = async (
+    plugin: string,
+    id: string,
+  ): Promise<ResolvedSigninDeclaration | 'no-client' | undefined> => {
+    const declaration = await options.declarationOf(plugin, id);
+    if (declaration === undefined) return undefined;
+    if (declaration.clientId !== undefined) {
+      return { ...declaration, clientId: declaration.clientId };
+    }
+    const client = await readClient(plugin, id);
+    if (client === undefined) return 'no-client';
+    return {
+      ...declaration,
+      clientId: client.clientId,
+      ...(client.clientSecret === undefined ? {} : { clientSecret: client.clientSecret }),
+    };
+  };
+
+  /** The sign-in whose client a person may set: declared, and without a client of its own. */
+  const settable = async (plugin: string, id: string): Promise<void> => {
+    const declaration = await options.declarationOf(plugin, id);
+    if (declaration === undefined) {
+      throw new TypeError(`${plugin} declares no sign-in '${id}'`);
+    }
+    if (declaration.clientId !== undefined) {
+      throw new TypeError(`${plugin} declares the client of its sign-in '${id}' itself`);
+    }
+  };
+
+  /** A sign-in made with one client is not the person's sign-in with another. */
+  const endSignin = async (account: string): Promise<boolean> => {
+    held.delete(account);
+    return credentials.delete(account);
+  };
+
   const refresh = async (
     plugin: string,
     id: string,
@@ -164,8 +251,8 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
   ): Promise<string | undefined> => {
     const stored = await readStored(account);
     if (stored === undefined) return undefined;
-    const declaration = await options.declarationOf(plugin, id);
-    if (declaration === undefined) return undefined;
+    const declaration = await resolve(plugin, id);
+    if (declaration === undefined || declaration === 'no-client') return undefined;
     const answered = await refreshTokens(declaration, stored.refresh, options.fetch);
     if (!answered.ok) {
       if (answered.error === 'invalid_grant') {
@@ -202,12 +289,19 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
     },
 
     async start(plugin, id) {
-      const declaration = await options.declarationOf(plugin, id);
+      const declaration = await resolve(plugin, id);
       if (declaration === undefined) {
         return {
           ok: false,
           reason: 'undeclared',
           message: `${plugin} declares no sign-in '${id}'`,
+        };
+      }
+      if (declaration === 'no-client') {
+        return {
+          ok: false,
+          reason: 'no-client',
+          message: `no client is set for the sign-in '${id}' of ${plugin}; set one in the plugins screen`,
         };
       }
       const pkce = await createPkce(options.random);
@@ -290,12 +384,31 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
     },
 
     async signOut(plugin, id) {
-      const account = signinAccount(plugin, id);
-      held.delete(account);
-      const deleted = await credentials.delete(account);
+      const deleted = await endSignin(signinAccount(plugin, id));
       if (deleted) changed();
       return deleted;
     },
+
+    async setClient(plugin, id, client) {
+      await settable(plugin, id);
+      const plaintext = JSON.stringify(storedClientSchema.parse(client));
+      if (Buffer.byteLength(plaintext, 'utf8') > CREDENTIAL_VALUE_LIMIT_BYTES) {
+        throw new TypeError(`the client is larger than ${CREDENTIAL_VALUE_LIMIT_BYTES} bytes`);
+      }
+      await credentials.set(signinClientAccount(plugin, id), plaintext);
+      await endSignin(signinAccount(plugin, id));
+      changed();
+    },
+
+    async clearClient(plugin, id) {
+      await settable(plugin, id);
+      const cleared = await credentials.delete(signinClientAccount(plugin, id));
+      const signedOut = await endSignin(signinAccount(plugin, id));
+      if (cleared || signedOut) changed();
+      return cleared;
+    },
+
+    hasClient: (plugin, id) => credentials.has(signinClientAccount(plugin, id)),
   };
 }
 
@@ -337,6 +450,8 @@ export interface SigninRow {
    */
   readonly label?: string;
   readonly since?: string;
+  /** Where its client comes from (ADR 0192); never the client itself. */
+  readonly client: SigninClientState;
 }
 
 /**
@@ -346,17 +461,23 @@ export interface SigninRow {
  */
 export async function listSignins(
   store: Pick<PluginStore, 'list'>,
-  service: Pick<SigninService, 'status'>,
+  service: Pick<SigninService, 'status' | 'hasClient'>,
 ): Promise<readonly SigninRow[]> {
   const rows: SigninRow[] = [];
   for (const stored of await store.list()) {
     if (stored.manifestSource === undefined) continue;
     const parsed = parsePluginManifest(stored.manifestSource);
     if (!parsed.ok) continue;
-    for (const id of Object.keys(parsed.value.signin ?? {})) {
+    for (const [id, declaration] of Object.entries(parsed.value.signin ?? {})) {
+      const client: SigninClientState =
+        declaration.clientId !== undefined
+          ? 'manifest'
+          : (await service.hasClient(stored.folder, id))
+            ? 'set'
+            : 'missing';
       const status = await service.status(stored.folder, id);
       if (status === undefined) {
-        rows.push({ plugin: stored.folder, id, signedIn: false });
+        rows.push({ plugin: stored.folder, id, signedIn: false, client });
         continue;
       }
       rows.push({
@@ -365,17 +486,23 @@ export async function listSignins(
         signedIn: true,
         since: status.since,
         ...(status.label === DEFAULT_SIGNIN_LABEL ? {} : { label: status.label }),
+        client,
       });
     }
   }
   return rows;
 }
 
-/** What the plugins screen reaches through `signin:list`, `signin:start` and `signin:out`. */
+/**
+ * What the plugins screen reaches through `signin:list`, `signin:start`, `signin:out`,
+ * `signin:client` and `signin:client-clear`.
+ */
 export interface SigninWindow {
   list(): Promise<IpcResponse<'signin:list'>>;
   start(plugin: string, id: string): Promise<IpcResponse<'signin:start'>>;
   out(plugin: string, id: string): Promise<IpcResponse<'signin:out'>>;
+  client(plugin: string, id: string, client: SigninClient): Promise<IpcResponse<'signin:client'>>;
+  clearClient(plugin: string, id: string): Promise<IpcResponse<'signin:client-clear'>>;
 }
 
 /**
@@ -387,7 +514,10 @@ export interface SigninWindow {
  */
 export function signinWindow(
   store: Pick<PluginStore, 'list'>,
-  service: Pick<SigninService, 'start' | 'status' | 'signOut'>,
+  service: Pick<
+    SigninService,
+    'start' | 'status' | 'signOut' | 'setClient' | 'clearClient' | 'hasClient'
+  >,
 ): SigninWindow {
   const declarationOf = installedSigninDeclarations(store);
   const declared = async (plugin: string, id: string): Promise<void> => {
@@ -417,6 +547,14 @@ export function signinWindow(
       await declared(plugin, id);
       return { signedOut: await service.signOut(plugin, id) };
     },
+    // The service refuses a sign-in nobody declares and one whose manifest names its client:
+    // the person never overrides a client the plugin's author fixed (ADR 0192). The answer
+    // says it was stored and never echoes it.
+    client: async (plugin, id, client) => {
+      await service.setClient(plugin, id, client);
+      return { stored: true };
+    },
+    clearClient: async (plugin, id) => ({ cleared: await service.clearClient(plugin, id) }),
   };
 }
 

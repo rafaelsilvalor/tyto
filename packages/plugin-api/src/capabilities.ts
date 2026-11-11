@@ -6,6 +6,7 @@ import {
   storageKeyProblem,
   storageRefusal,
 } from './storage.js';
+import { SIGNIN_CLIENT_KEY_PREFIX } from './manifest.js';
 import type { StartProcess } from './process.js';
 import type { OpenTerminal } from './terminal.js';
 import type { AgentServer, WindowTool, WindowToolResult } from './window.js';
@@ -277,7 +278,8 @@ export function allowsHost(permissions: readonly string[], hostname: string): bo
 /**
  * A credential key under `signin:` is never a plugin's, whatever it declares: the host keeps a
  * sign-in's refresh token there (ADR 0174), and a plugin reaches a sign-in only through
- * `host.signin.accessToken`.
+ * `host.signin.accessToken`. `signin-client:` is reserved the same way, for the client a person
+ * supplies (ADR 0192).
  */
 const SIGNIN_KEY_PREFIX = 'signin:';
 
@@ -300,7 +302,7 @@ export function namesHost(permissions: readonly string[], hostname: string): boo
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/u;
 
 export function allowsCredential(permissions: readonly string[], key: string): boolean {
-  if (key.startsWith(SIGNIN_KEY_PREFIX)) return false;
+  if (key.startsWith(SIGNIN_KEY_PREFIX) || key.startsWith(SIGNIN_CLIENT_KEY_PREFIX)) return false;
   return permissions.includes(`credentials:${key}`);
 }
 

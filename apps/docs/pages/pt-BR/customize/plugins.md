@@ -60,6 +60,27 @@ Clique em **Sair** para encerrar. Nada mais começa um login: um plugin que prec
 
 O Tyto guarda o login no chaveiro do sistema, e o plugin recebe do Tyto só um token de acesso de curta duração, nunca o que mantém você conectado. Num computador sem chaveiro para criptografar, o login não termina e a linha diz por quê. A linha de comando não faz login pelo navegador: uma receita que precisa de login só funciona na janela.
 
+### Um login que pede o seu próprio cliente
+
+::: info Conferida de outro jeito
+Esta seção entrou em 2026-11-11 e foi conferida pelo teste de ponta a ponta do app, que digita um cliente na tela e entra num serviço de login de teste que só aceita esse cliente. Ninguém criou um cliente num provedor de verdade e a seguiu à mão ainda.
+:::
+
+Um provedor reconhece o app que pede o seu login pelo **cliente OAuth**: um ID do cliente e, às vezes, um segredo do cliente. Alguns plugins trazem o próprio cliente. Outros deixam o cliente com você, para que uma equipe use o seu sem escrevê-lo num plugin que qualquer pessoa lê. Num login assim, a linha mostra também **Cliente OAuth: não preenchido**, dois campos e **Salvar**, e **Entrar** fica desligado até o cliente ser preenchido:
+
+1. Digite o **ID do cliente** e, quando o provedor tiver dado um, o **Segredo do cliente (opcional)**. Clique em **Salvar**.
+2. A linha diz **Cliente OAuth: preenchido**, e os campos ficam vazios de novo: o Tyto nunca mostra o cliente de volta. Clique em **Entrar** e siga como acima.
+
+O Tyto guarda o cliente no chaveiro do sistema, junto do login, nunca no `settings.json`. **Salvar outro cliente, ou clicar em Apagar, desconecta** esse login, porque o que mantinha você conectado foi emitido para o cliente antigo. Um plugin que traz o próprio cliente não mostra os campos: o cliente dele não pode ser trocado.
+
+Alguém da sua equipe pode passar o cliente para você. Para criar um, num provedor que emite clientes por projeto — o Google Cloud, por exemplo:
+
+1. Abra o console do provedor e escolha ou crie um projeto.
+2. Configure a tela de consentimento que o provedor pede, e adicione você como usuário de teste se o app ficar em teste.
+3. Ative as APIs que o plugin diz usar.
+4. Crie um cliente OAuth do tipo **App para computador** (Desktop app). O Tyto faz o login pelo seu navegador e por uma porta só deste computador, que é o que esse tipo permite.
+5. Copie o ID e o segredo do cliente para os campos acima. O segredo de um cliente para computador não é confidencial: toda cópia instalada de um app o carrega.
+
 ## Plugins que abrem um programa
 
 ::: info Conferida de outro jeito

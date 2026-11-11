@@ -511,8 +511,9 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
         signedIn: true,
         label: 'ana@example.test',
         since: '2026-11-08T12:00:00.000Z',
+        client: 'manifest',
       },
-      { plugin: 'pdf', id: 'sheets', signedIn: false },
+      { plugin: 'pdf', id: 'sheets', signedIn: false, client: 'manifest' },
     ],
     start: SigninStart = () => Promise.resolve({ ok: true }),
   ): Promise<PluginsDialog> {
@@ -525,6 +526,11 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
     };
     element.onSigninOut = (plugin, id) => {
       asked.push(`out ${plugin} ${id}`);
+      return Promise.resolve();
+    };
+    element.onSigninClient = (plugin, id, client) => {
+      if (client?.clientId === 'refused') return Promise.reject(new Error('refused'));
+      asked.push(`client ${plugin} ${id} ${client === undefined ? '-' : JSON.stringify(client)}`);
       return Promise.resolve();
     };
     await element.updateComplete;
@@ -557,7 +563,13 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
 
   it('says Signed in, in its own words, when the provider sent no name', async () => {
     const element = await withSignins([
-      { plugin: 'pdf', id: 'drive', signedIn: true, since: '2026-11-08T12:00:00.000Z' },
+      {
+        plugin: 'pdf',
+        id: 'drive',
+        signedIn: true,
+        since: '2026-11-08T12:00:00.000Z',
+        client: 'manifest',
+      },
     ]);
     element.locale = 'pt-BR';
     await element.updateComplete;
@@ -582,8 +594,8 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
     let finish: (answer: Awaited<ReturnType<SigninStart>>) => void = () => undefined;
     const element = await withSignins(
       [
-        { plugin: 'pdf', id: 'sheets', signedIn: false },
-        { plugin: 'pdf', id: 'mail', signedIn: false },
+        { plugin: 'pdf', id: 'sheets', signedIn: false, client: 'manifest' },
+        { plugin: 'pdf', id: 'mail', signedIn: false, client: 'manifest' },
       ],
       () => new Promise((resolve) => (finish = resolve)),
     );
@@ -603,6 +615,83 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
     expect(signin(element, 'sheets').querySelector('.plugins__signin-waiting')).toBeNull();
     expect(text(signin(element, 'sheets'), '.plugins__signin-failed')).toBe(
       'The sign-in did not finish: nothing came back within five minutes',
+    );
+  });
+
+  it('offers no client fields on a sign-in whose manifest names its client (ADR 0192)', async () => {
+    const element = await withSignins();
+
+    expect(element.querySelector('.plugins__signin-client')).toBeNull();
+    expect(element.querySelector('.plugins__signin-hint')).toBeNull();
+  });
+
+  it('disables Sign in and says why until a client is set, then hands main what was typed', async () => {
+    const element = await withSignins([
+      { plugin: 'pdf', id: 'sheets', signedIn: false, client: 'missing' },
+    ]);
+    const line = signin(element, 'sheets');
+
+    expect(line.querySelector<HTMLButtonElement>('.plugins__signin-start')!.disabled).toBe(true);
+    expect(text(line, '.plugins__signin-hint')).toBe(
+      translate('en', 'plugins.signin.client.needed'),
+    );
+    expect(text(line, '.plugins__signin-client-state')).toBe('OAuth client: not set');
+    expect(line.querySelector('.plugins__signin-client-clear')).toBeNull();
+    expect(line.querySelector<HTMLInputElement>('.plugins__signin-client-secret')!.type).toBe(
+      'password',
+    );
+
+    line.querySelector<HTMLInputElement>('.plugins__signin-client-id')!.value = ' person-client ';
+    line.querySelector<HTMLInputElement>('.plugins__signin-client-secret')!.value = 'secret';
+    line.querySelector<HTMLFormElement>('.plugins__signin-client')!.requestSubmit();
+    await settle(element);
+
+    expect(asked).toEqual([
+      'client pdf sheets {"clientId":"person-client","clientSecret":"secret"}',
+    ]);
+    // Emptied once saved: the value is on screen only while it is typed.
+    expect(line.querySelector<HTMLInputElement>('.plugins__signin-client-id')!.value).toBe('');
+    expect(line.querySelector<HTMLInputElement>('.plugins__signin-client-secret')!.value).toBe('');
+  });
+
+  it('sends no secret when the field is empty, and nothing at all without a client id', async () => {
+    const element = await withSignins([
+      { plugin: 'pdf', id: 'sheets', signedIn: false, client: 'missing' },
+    ]);
+    const line = signin(element, 'sheets');
+    const form = line.querySelector<HTMLFormElement>('.plugins__signin-client')!;
+
+    line.querySelector<HTMLInputElement>('.plugins__signin-client-secret')!.value = 'secret';
+    form.requestSubmit();
+    await settle(element);
+    expect(asked).toEqual([]);
+
+    line.querySelector<HTMLInputElement>('.plugins__signin-client-id')!.value = 'person-client';
+    line.querySelector<HTMLInputElement>('.plugins__signin-client-secret')!.value = '';
+    form.requestSubmit();
+    await settle(element);
+    expect(asked).toEqual(['client pdf sheets {"clientId":"person-client"}']);
+  });
+
+  it('says a client is set without showing it, clears it, and says when main refused', async () => {
+    const element = await withSignins([
+      { plugin: 'pdf', id: 'sheets', signedIn: false, client: 'set' },
+    ]);
+    const line = signin(element, 'sheets');
+
+    expect(line.querySelector<HTMLButtonElement>('.plugins__signin-start')!.disabled).toBe(false);
+    expect(line.querySelector('.plugins__signin-hint')).toBeNull();
+    expect(text(line, '.plugins__signin-client-state')).toBe('OAuth client: set');
+
+    line.querySelector<HTMLButtonElement>('.plugins__signin-client-clear')!.click();
+    await settle(element);
+    expect(asked).toEqual(['client pdf sheets -']);
+
+    line.querySelector<HTMLInputElement>('.plugins__signin-client-id')!.value = 'refused';
+    line.querySelector<HTMLFormElement>('.plugins__signin-client')!.requestSubmit();
+    await settle(element);
+    expect(text(line, '.plugins__signin-client-failed')).toBe(
+      translate('en', 'plugins.signin.client.failed'),
     );
   });
 });

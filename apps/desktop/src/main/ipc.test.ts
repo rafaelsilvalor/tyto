@@ -941,7 +941,15 @@ const dependencies = () => {
     signin: {
       list: () =>
         Promise.resolve({
-          signins: [{ plugin: 'drive-plugin', id: 'drive', signedIn: true, label: 'a@b.test' }],
+          signins: [
+            {
+              plugin: 'drive-plugin',
+              id: 'drive',
+              signedIn: true,
+              label: 'a@b.test',
+              client: 'set' as const,
+            },
+          ],
         }),
       start: (plugin: string, id: string) =>
         Promise.resolve({
@@ -951,6 +959,11 @@ const dependencies = () => {
         }),
       out: (plugin: string, id: string) =>
         Promise.resolve({ signedOut: plugin === 'drive-plugin' && id === 'drive' }),
+      client: (_plugin: string, _id: string, client: { clientId: string }) =>
+        client.clientId === 'refused'
+          ? Promise.reject(new TypeError('declares the client itself'))
+          : Promise.resolve({ stored: true as const }),
+      clearClient: (plugin: string) => Promise.resolve({ cleared: plugin === 'drive-plugin' }),
     },
     info: () => ({ version: '0.1.0', platform: 'linux', locale: 'pt-BR', templates: ['promo'] }),
     panels: {
@@ -1847,11 +1860,64 @@ describe('signin:list, signin:start and signin:out (TYTO-374)', () => {
     });
   });
 
+  it('stores and clears a supplied client, answering without it (ADR 0192)', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const stored = await handlers['signin:client']({
+      plugin: 'drive-plugin',
+      id: 'drive',
+      clientId: 'person-client',
+      clientSecret: 'person-secret',
+    });
+    expect(stored).toEqual({ stored: true });
+    expect(JSON.stringify(stored)).not.toMatch(/person-client|person-secret/u);
+    await expect(
+      handlers['signin:client']({ plugin: 'drive-plugin', id: 'drive', clientId: 'refused' }),
+    ).rejects.toThrow('declares the client itself');
+    expect(await handlers['signin:client-clear']({ plugin: 'drive-plugin', id: 'drive' })).toEqual({
+      cleared: true,
+    });
+  });
+
+  it('bounds a supplied client and lists where it comes from, never what it is', () => {
+    const request = IPC_CHANNELS['signin:client'].request;
+    expect(request.safeParse({ plugin: 'p', id: 'd', clientId: '' }).success).toBe(false);
+    expect(request.safeParse({ plugin: 'p', id: 'd', clientId: 'a'.repeat(513) }).success).toBe(
+      false,
+    );
+    expect(
+      request.safeParse({ plugin: 'p', id: 'd', clientId: 'c', clientSecret: '' }).success,
+    ).toBe(false);
+    expect(request.safeParse({ plugin: 'p', id: 'd', clientId: 'c' }).success).toBe(true);
+    const parsed = IPC_CHANNELS['signin:list'].response.parse({
+      signins: [
+        {
+          plugin: 'p',
+          id: 'd',
+          signedIn: false,
+          client: 'set',
+          clientId: 'person-client',
+          clientSecret: 'person-secret',
+        },
+      ],
+    });
+    expect(JSON.stringify(parsed)).not.toMatch(/person-client|person-secret/u);
+  });
+
   it('has no field for a token, in either direction', () => {
     const listed = IPC_CHANNELS['signin:list'].response;
     // A strict reading: an answer that carried a token would lose it, never pass it on.
     const parsed = listed.parse({
-      signins: [{ plugin: 'p', id: 'd', signedIn: true, refresh: 'r', accessToken: 'a' }],
+      signins: [
+        {
+          plugin: 'p',
+          id: 'd',
+          signedIn: true,
+          client: 'manifest',
+          refresh: 'r',
+          accessToken: 'a',
+        },
+      ],
     });
     expect(JSON.stringify(parsed)).not.toMatch(/"r"|"a"/u);
     expect(
