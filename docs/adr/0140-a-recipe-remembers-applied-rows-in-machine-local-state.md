@@ -112,3 +112,7 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
 > committed while a cell is stale or failed. `stateToCommit` also merges `applied_at`, the latest
 > time the host stamped on a row's applied operations, into that row's puts, so a later run
 > reads `last_applied_at`. `AppliedOperation` gains `reason?` and `appliedAt?`.
+>
+> **Amended by ADR 0170's note of 2026-11-11 (TYTO-650).** An explicit Run in a trusted folder
+> whose plans all hold no operation commits its `remember` writes with an empty outcome, since no
+> Apply ever would. A recipe with no plan cell still writes no state.

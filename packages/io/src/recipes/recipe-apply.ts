@@ -125,23 +125,66 @@ export function runOutcome(
 }
 
 /** Commits the recipe's state after an Apply, or says why it did not. */
-async function commitState(
+function commitState(
   request: ApplyRequest,
   applied: AppliedRecord,
   verb: string,
 ): Promise<readonly Diagnostic[]> {
-  const remembers = request.cells.flatMap((cell) => cell.remembers ?? []);
+  return commitRemembers(
+    request.cells,
+    request.state,
+    () => runOutcome(request.cells, request.index, applied),
+    verb,
+  );
+}
+
+/**
+ * Whether a run's kept cells commit their `remember` writes with no Apply (TYTO-650, ADR 0170
+ * note of 2026-11-11): every cell is ok, at least one holds a plan, every plan holds no
+ * operation, and none was applied (an applied one committed already). A recipe with no plan
+ * cell commits nothing, as ADR 0140 decision 4 keeps for a notebook that only reads. The run
+ * being explicit, in a trusted folder and still the current one is the runner's to check.
+ */
+export function commitsWithoutApply(cells: readonly ApplyCell[]): boolean {
+  const plans = cells.filter((cell) => cell.plan !== undefined);
+  return (
+    plans.length > 0 &&
+    cells.every((cell) => cell.status === 'ok') &&
+    plans.every((cell) => cell.plan?.operations.length === 0 && cell.applied === undefined)
+  );
+}
+
+/**
+ * Commits the `remember` writes of a run that planned nothing to write, as an Apply of its empty
+ * plans would: the outcome is empty, so every write is stored and none is stamped `applied_at`,
+ * since nothing was applied. Call it only when {@link commitsWithoutApply} holds.
+ */
+export function commitWithoutApply(
+  cells: readonly ApplyCell[],
+  state: RecipeState | undefined,
+): Promise<readonly Diagnostic[]> {
+  const verb = cells.find((cell) => cell.plan !== undefined)?.verb ?? 'plan';
+  return commitRemembers(cells, state, () => ({ operations: [] }), verb);
+}
+
+/** Commits the run's `remember` writes against an outcome, or says why it did not. */
+async function commitRemembers(
+  cells: readonly ApplyCell[],
+  state: RecipeState | undefined,
+  outcomeOf: () => ApplyOutcome,
+  verb: string,
+): Promise<readonly Diagnostic[]> {
+  const remembers = cells.flatMap((cell) => cell.remembers ?? []);
   if (remembers.length === 0) return [];
   const notRemembered = (problem: string) => [
     diagnostic('W_RECIPE_NOT_REMEMBERED', { verb, problem }),
   ];
-  if (request.cells.some((cell) => cell.status !== 'ok')) {
+  if (cells.some((cell) => cell.status !== 'ok')) {
     return notRemembered('a cell of the recipe is stale or failed; run the recipe again first');
   }
-  if (request.state === undefined) return notRemembered('the recipe keeps no state here');
-  const outcome = runOutcome(request.cells, request.index, applied);
-  for (const commit of stateToCommit(remembers, outcome)) {
-    const written = await request.state.write(commit.store, commit.puts, commit.deletes);
+  if (state === undefined) return notRemembered('the recipe keeps no state here');
+  for (const commit of stateToCommit(remembers, outcomeOf())) {
+    const written = await state.write(commit.store, commit.puts, commit.deletes);
     if (!written.ok) {
       const why = written.error.map((found) => found.message.replace(/\.$/u, '')).join('; ');
       return notRemembered(`writing store '${commit.store}' failed (${why})`);
