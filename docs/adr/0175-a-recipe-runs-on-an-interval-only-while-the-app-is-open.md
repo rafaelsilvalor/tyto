@@ -83,12 +83,27 @@ The second pull request settles what the record left to the code:
 
 - A recipe's first run is one interval after main finds it, not at once: opening a folder does
   not fire every recipe in it, and an `every 5m` recipe runs twice in its first ten minutes.
-- A scheduled run starts from the first cell, so every source is called again; it does not ask
-  sources to skip their own caches, as Fetch again does. A plugin whose cache outlives the
-  interval answers from it.
+- A scheduled run starts from the first cell, so every source is called again. Whether it also
+  skips the plugins' own caches is settled by the note of 2026-11-11 below.
 - Main walks the folder again when a burst of changes names a `.recipe` file. A folder renamed
   or moved with recipes inside is reported by the watcher under the folder's name alone, so its
   recipes are found again only at the next `.recipe` change or when the folder is reopened.
 - A notification's click focuses the window and pushes `schedule:changed` with the schedule's
   id in `open`; the window opens it through `schedule:open`, by that id, as `queue:open-brief`
   opens a task's brief.
+
+## Note, 2026-11-11: a scheduled run reads live
+
+TYTO-648 settles what the note of 2026-11-08 left open. A plugin's own cache (ADR 0138) can
+outlive the shortest interval: a source that keeps answers for ten minutes would hand an
+`every 5m` recipe rows up to ten minutes old, and a watcher would react late or not at all.
+
+- Every scheduled run passes `fresh`, as Fetch again does: each source's `page` is handed
+  `refresh: true` (ADR 0148) and skips its cache. No recipe header or argument asks for it; a
+  schedule exists to see the source as it is now.
+- `fresh` also forgets the kept cells of the run's own document, `schedule:<realpath>`, which
+  a run from the first cell recomputes anyway. A tab's cells for the same file are never
+  touched, and a person's Run keeps using the plugins' caches as before.
+- The cost: one live request per source cell per tick, for every scheduled recipe in the open
+  folder. A provider's quota is spent in proportion to the number of scheduled recipes and the
+  shortness of their intervals; a cache no longer absorbs it.
