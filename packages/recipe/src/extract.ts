@@ -174,7 +174,7 @@ function targetNames(
 
 /** One step of a rewrite list: every match of `pattern` becomes `replace`. */
 const STEP = z.strictObject({ pattern: z.string(), replace: z.string() });
-const STEPS = z.array(STEP).min(1, 'a rewrite list holds at least one step');
+export const STEPS = z.array(STEP).min(1, 'a rewrite list holds at least one step');
 type Step = z.infer<typeof STEP>;
 
 /** A replacement read into literal text and the named groups it puts back. */

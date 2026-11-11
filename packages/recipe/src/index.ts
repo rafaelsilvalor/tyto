@@ -34,6 +34,13 @@ export type {
 } from './references.js';
 export { leavesFolder, referencesOf } from './references.js';
 export { recipeSkeleton } from './skeleton.js';
+export type { VocabularyEntry, VocabularyOutline, VocabularySection } from './vocabulary.js';
+export {
+  VOCABULARY_EXTENSION,
+  VOCABULARY_SECTIONS,
+  lintVocabulary,
+  vocabularySkeleton,
+} from './vocabulary.js';
 export type { PageFetcher, PageLimits, PageResult, SourcePage } from './paging.js';
 export { PAGE_LIMITS, pagedSource } from './paging.js';
 export { MINIMUM_INTERVAL_MINUTES, parseRecipe } from './parse.js';
