@@ -62,6 +62,14 @@ export type {
   VerbRegistryOptions,
   VerbResult,
 } from './registry.js';
+export type { CallPorts, CallRequest, CallResponse } from './call.js';
+export {
+  CALL_BODY_LIMIT_BYTES,
+  CALL_DEADLINE_MS,
+  CALL_PLAN_LIMITS,
+  CALL_WRITE,
+  httpsHost,
+} from './call.js';
 export type { BriefFolder, ToBriefPorts } from './to-brief.js';
 export { TO_BRIEF_PLAN_LIMITS, TO_BRIEF_WRITE, briefFolder } from './to-brief.js';
 export { GENERIC_VERBS, createDerivationRegistry, createVerbRegistry } from './registry.js';
