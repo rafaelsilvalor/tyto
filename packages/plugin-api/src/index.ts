@@ -96,7 +96,9 @@ export {
 export {
   type ContributionPoint,
   type PluginManifest,
+  type ResolvedSigninDeclaration,
   type SigninDeclaration,
+  SIGNIN_CLIENT_KEY_PREFIX,
   CONTRIBUTION_POINTS,
   parsePluginManifest,
   pluginManifestSchema,

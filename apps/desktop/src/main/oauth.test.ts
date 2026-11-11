@@ -1,4 +1,4 @@
-import type { SigninDeclaration } from '@tyto/plugin-api';
+import type { ResolvedSigninDeclaration } from '@tyto/plugin-api';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -20,7 +20,7 @@ const RFC_OCTETS = [
 const RFC_VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
 const RFC_CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 
-const declaration: SigninDeclaration = {
+const declaration: ResolvedSigninDeclaration = {
   authorize: 'https://auth.example.test/authorize?access_type=offline',
   token: 'https://auth.example.test/token',
   clientId: 'client-1',

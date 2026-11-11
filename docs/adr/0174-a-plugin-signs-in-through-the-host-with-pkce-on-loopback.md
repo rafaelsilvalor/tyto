@@ -117,3 +117,7 @@ then the plugins screen, the user manual and an end-to-end test against a fake p
   from the query reaches it. The screen reaches `signin:list`, `signin:start` and `signin:out`
   and hears `signin:changed`; none carries a token. `signin:list` leaves the label out when the
   keychain holds the English default, so the window says "Signed in" in its own words.
+- 2026-11-11 (TYTO-390): **decision 4 is amended by ADR 0192.** `clientId` is optional: a
+  manifest that leaves it out signs in with a client the person types in the plugins screen,
+  kept in the keychain under `signin-client:<plugin>:<id>`; a manifest that declares it still
+  wins, and a `clientSecret` without a `clientId` is refused.

@@ -2102,7 +2102,9 @@ export const IPC_CHANNELS = {
    * Who is signed in to each browser sign-in an installed plugin declares (TYTO-374, ADR 0174).
    * **Never a token**: `label` is the provider's email or name claim, shown only to say who,
    * and absent when the provider sent none, so the window says "Signed in" in its own words.
-   * `plugin` is the plugin's folder, which is its name.
+   * `plugin` is the plugin's folder, which is its name. `client` says where the sign-in's OAuth
+   * client comes from (ADR 0192): the manifest, one the person `set`, or `missing` — **never
+   * the client id or secret**.
    */
   'signin:list': channel(
     z.object({}),
@@ -2115,6 +2117,7 @@ export const IPC_CHANNELS = {
             signedIn: z.boolean(),
             label: z.string().min(1).optional(),
             since: z.string().min(1).optional(),
+            client: z.enum(['manifest', 'set', 'missing']),
           }),
         )
         .max(500),
@@ -2135,6 +2138,7 @@ export const IPC_CHANNELS = {
       z.object({
         ok: z.literal(false),
         reason: z.enum([
+          'no-client',
           'denied',
           'state-mismatch',
           'timeout',
@@ -2157,6 +2161,32 @@ export const IPC_CHANNELS = {
   'signin:out': channel(
     z.strictObject({ plugin: z.string().min(1).max(214), id: z.string().min(1).max(64) }),
     z.object({ signedOut: z.boolean() }),
+  ),
+
+  /**
+   * Stores the OAuth client a person supplied for a sign-in whose manifest declares none
+   * (ADR 0192), in the keychain under `signin-client:<plugin>:<id>`, and signs out of the
+   * sign-in made with the previous one. **Write-only**: the answer says it was stored, and no
+   * channel reads it back. **Rejected** for a plugin or id nobody declares, and for a sign-in
+   * whose manifest names its own client, which a person never overrides.
+   */
+  'signin:client': channel(
+    z.strictObject({
+      plugin: z.string().min(1).max(214),
+      id: z.string().min(1).max(64),
+      clientId: z.string().min(1).max(512),
+      clientSecret: z.string().min(1).max(512).optional(),
+    }),
+    z.object({ stored: z.literal(true) }),
+  ),
+
+  /**
+   * Forgets the client a person supplied and the sign-in made with it (ADR 0192). `cleared` is
+   * false when no client was stored. Rejected as `signin:client` is.
+   */
+  'signin:client-clear': channel(
+    z.strictObject({ plugin: z.string().min(1).max(214), id: z.string().min(1).max(64) }),
+    z.object({ cleared: z.boolean() }),
   ),
 
   /**

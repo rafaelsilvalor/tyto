@@ -474,6 +474,17 @@ export const en: Catalogue = {
   'plugins.signin.failed': 'The sign-in did not finish:',
   'plugins.signin.kept':
     'Tyto keeps the sign-in in the system keychain. The plugin gets only a short-lived access token, never what keeps you signed in.',
+  'plugins.signin.client.label': 'OAuth client',
+  'plugins.signin.client.set': 'set',
+  'plugins.signin.client.missing': 'not set',
+  'plugins.signin.client.id': 'Client ID',
+  'plugins.signin.client.secret': 'Client secret (optional)',
+  'plugins.signin.client.save': 'Save',
+  'plugins.signin.client.clear': 'Clear',
+  'plugins.signin.client.failed': 'The client could not be saved or cleared.',
+  'plugins.signin.client.needed': 'Set the OAuth client this sign-in uses before signing in.',
+  'plugins.signin.client.kept':
+    'Tyto keeps the client in the system keychain. Saving or clearing it signs you out of this sign-in.',
   'plugins.signin.page.signedIn': 'Signed in.',
   'plugins.signin.page.unfinished': 'The sign-in did not finish.',
   'plugins.signin.page.refused':

@@ -111,6 +111,9 @@ describe('the IPC contract', () => {
       'settings:outline',
       'settings:validate',
       // TYTO-374, ADR 0174: who is signed in, and signing in and out from the plugins screen.
+      // ADR 0192: the client a person supplies, written and forgotten, never read back.
+      'signin:client',
+      'signin:client-clear',
       'signin:list',
       'signin:out',
       'signin:start',

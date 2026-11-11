@@ -398,8 +398,10 @@ describe('the bridge', () => {
       // `e2e/settings-assist.desktop.test.ts`.
       'settings:outline',
       'settings:validate',
-      // TYTO-374: browser sign-in from the plugins screen. Exercised by
-      // `e2e/signin.desktop.test.ts`.
+      // TYTO-374: browser sign-in from the plugins screen, and the client a person supplies
+      // (ADR 0192). Exercised by `e2e/signin.desktop.test.ts`.
+      'signin:client',
+      'signin:client-clear',
       'signin:list',
       'signin:out',
       'signin:start',

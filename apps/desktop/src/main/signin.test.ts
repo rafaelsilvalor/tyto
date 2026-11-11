@@ -15,6 +15,7 @@ import {
   listSignins,
   signinAccount,
   signinCallbackPage,
+  signinClientAccount,
   signinCapabilities,
   signinWindow,
 } from './signin.js';
@@ -38,13 +39,14 @@ const idToken = (claims: object): string =>
   `e30.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
 
 /** The keychain, in plaintext: what `credentials.set` was handed is what a test reads. */
-function keychain(): Pick<Credentials, 'get' | 'set' | 'delete'> & {
+function keychain(): Pick<Credentials, 'get' | 'has' | 'set' | 'delete'> & {
   entries: Map<string, string>;
 } {
   const entries = new Map<string, string>();
   return {
     entries,
     get: (account) => Promise.resolve(entries.get(account) ?? null),
+    has: (account) => Promise.resolve(entries.has(account)),
     set: (account, secret) => {
       entries.set(account, secret);
       return Promise.resolve();
@@ -58,6 +60,8 @@ interface Provider {
   /** Every grant the token endpoint received, in order. */
   readonly grants: URLSearchParams[];
   challenge: string | undefined;
+  /** The `client_id` the last authorize URL carried. */
+  authorizedClient: string | undefined;
   /** What the next refresh answers. */
   refreshAnswer: { status: number; body: object };
   codeAnswer: object;
@@ -67,6 +71,7 @@ function provider(): Provider {
   const state: Provider = {
     grants: [],
     challenge: undefined,
+    authorizedClient: undefined,
     refreshAnswer: { status: 200, body: { access_token: 'access-2', expires_in: 3600 } },
     codeAnswer: {
       access_token: 'access-1',
@@ -109,6 +114,8 @@ function rig(
     callbackPage?: () => CallbackPage;
     /** Where the "browser" puts the landing page it was answered. */
     landed?: string[];
+    /** The `drive` entry the installed manifest declares; `declaration` when absent. */
+    entry?: SigninDeclaration;
   } = {},
 ): Rig {
   const keys = keychain();
@@ -117,7 +124,9 @@ function rig(
   const service = createSigninService({
     credentials: keys,
     declarationOf: (plugin, id) =>
-      Promise.resolve(plugin === 'drive-plugin' && id === 'drive' ? declaration : undefined),
+      Promise.resolve(
+        plugin === 'drive-plugin' && id === 'drive' ? (options.entry ?? declaration) : undefined,
+      ),
     fetch: fake.fetch,
     now: () => clock.now,
     ...(options.onChanged === undefined ? {} : { onChanged: options.onChanged }),
@@ -125,6 +134,7 @@ function rig(
     openBrowser: async (url) => {
       const authorize = new URL(url);
       fake.challenge = authorize.searchParams.get('code_challenge') ?? undefined;
+      fake.authorizedClient = authorize.searchParams.get('client_id') ?? undefined;
       const callback = new URL(authorize.searchParams.get('redirect_uri') ?? '');
       callback.searchParams.set('code', 'code-1');
       callback.searchParams.set(
@@ -383,7 +393,7 @@ describe('the window side (TYTO-374)', () => {
   it('lists every declared sign-in with who is signed in, and never a token', async () => {
     const { service } = rig();
     expect(await listSignins(store, service)).toEqual([
-      { plugin: 'drive-plugin', id: 'drive', signedIn: false },
+      { plugin: 'drive-plugin', id: 'drive', signedIn: false, client: 'manifest' },
     ]);
 
     await service.start('drive-plugin', 'drive');
@@ -396,6 +406,7 @@ describe('the window side (TYTO-374)', () => {
         signedIn: true,
         label: 'person@example.test',
         since: '2026-11-08T12:00:00.000Z',
+        client: 'manifest',
       },
     ]);
     expect(JSON.stringify(rows)).not.toMatch(/refresh-1|access-1/u);
@@ -407,7 +418,13 @@ describe('the window side (TYTO-374)', () => {
     await service.start('drive-plugin', 'drive');
 
     expect(await listSignins(store, service)).toEqual([
-      { plugin: 'drive-plugin', id: 'drive', signedIn: true, since: '2026-11-08T12:00:00.000Z' },
+      {
+        plugin: 'drive-plugin',
+        id: 'drive',
+        signedIn: true,
+        since: '2026-11-08T12:00:00.000Z',
+        client: 'manifest',
+      },
     ]);
   });
 
@@ -474,5 +491,157 @@ describe('the window side (TYTO-374)', () => {
     expect(landed[0]).toContain('<html lang="pt-BR">');
     expect(landed[0]).toContain(translate('pt-BR', 'plugins.signin.page.signedIn'));
     expect(landed[0]).toContain(translate('pt-BR', 'plugins.signin.page.close'));
+  });
+});
+
+describe('a client the person supplies (ADR 0192)', () => {
+  const { clientId: _manifestClient, ...withoutClient } = declaration;
+  const CLIENT_ACCOUNT = signinClientAccount('drive-plugin', 'drive');
+  const PERSON = { clientId: 'person-client', clientSecret: 'person-secret' };
+  const manifest = (entry: SigninDeclaration): string =>
+    JSON.stringify({
+      name: 'drive-plugin',
+      version: '1.0.0',
+      engine: '>=0.1',
+      contributes: ['template-pack'],
+      permissions: ['signin:drive'],
+      signin: { drive: entry },
+    });
+  const storeOf = (entry: SigninDeclaration) => ({
+    list: () => Promise.resolve([{ folder: 'drive-plugin', manifestSource: manifest(entry) }]),
+  });
+
+  it('answers no-client, and opens no browser, until a client is set', async () => {
+    const { service, provider: fake } = rig({ entry: withoutClient });
+
+    expect(await service.start('drive-plugin', 'drive')).toMatchObject({
+      ok: false,
+      reason: 'no-client',
+    });
+    expect(fake.challenge).toBeUndefined();
+    expect(await service.accessToken('drive-plugin', 'drive')).toBeUndefined();
+  });
+
+  it('signs in with the stored client and secret, and refreshes with them', async () => {
+    const { service, keys, provider: fake, clock } = rig({ entry: withoutClient });
+    await service.setClient('drive-plugin', 'drive', PERSON);
+
+    expect(await service.start('drive-plugin', 'drive')).toMatchObject({ ok: true });
+    expect(fake.authorizedClient).toBe('person-client');
+    expect(fake.grants[0]?.get('client_id')).toBe('person-client');
+    expect(fake.grants[0]?.get('client_secret')).toBe('person-secret');
+    expect(JSON.parse(keys.entries.get(CLIENT_ACCOUNT) ?? '')).toEqual(PERSON);
+
+    clock.now += 2 * 3600 * 1000;
+    expect(await service.accessToken('drive-plugin', 'drive')).toBe('access-2');
+    expect(fake.grants[1]?.get('grant_type')).toBe('refresh_token');
+    expect(fake.grants[1]?.get('client_id')).toBe('person-client');
+    expect(fake.grants[1]?.get('client_secret')).toBe('person-secret');
+  });
+
+  it('ends the sign-in made with the previous client when another is set or it is cleared', async () => {
+    let told = 0;
+    const {
+      service,
+      keys,
+      provider: fake,
+    } = rig({
+      entry: withoutClient,
+      onChanged: () => (told += 1),
+    });
+    await service.setClient('drive-plugin', 'drive', PERSON);
+    await service.start('drive-plugin', 'drive');
+    expect(await service.accessToken('drive-plugin', 'drive')).toBe('access-1');
+
+    await service.setClient('drive-plugin', 'drive', { clientId: 'another-client' });
+
+    expect(keys.entries.has(ACCOUNT)).toBe(false);
+    expect(await service.accessToken('drive-plugin', 'drive')).toBeUndefined();
+    expect(JSON.parse(keys.entries.get(CLIENT_ACCOUNT) ?? '')).toEqual({
+      clientId: 'another-client',
+    });
+
+    await service.start('drive-plugin', 'drive');
+    expect(keys.entries.has(ACCOUNT)).toBe(true);
+    expect(await service.clearClient('drive-plugin', 'drive')).toBe(true);
+    expect([...keys.entries.keys()]).toEqual([]);
+    expect(await service.accessToken('drive-plugin', 'drive')).toBeUndefined();
+    expect(await service.clearClient('drive-plugin', 'drive')).toBe(false);
+    // Two sets, two sign-ins and one clear; the clear that found nothing told nobody.
+    expect(told).toBe(5);
+    expect(fake.grants.filter((grant) => grant.get('grant_type') === 'refresh_token')).toEqual([]);
+  });
+
+  it("uses the manifest's client when it declares one, whatever the keychain holds", async () => {
+    const { service, keys, provider: fake } = rig();
+    keys.entries.set(CLIENT_ACCOUNT, JSON.stringify(PERSON));
+
+    await service.start('drive-plugin', 'drive');
+
+    expect(fake.authorizedClient).toBe('client-1');
+    expect(fake.grants[0]?.get('client_id')).toBe('client-1');
+    expect(fake.grants[0]?.has('client_secret')).toBe(false);
+  });
+
+  it('refuses a client for a manifest that names its own, and for a sign-in nobody declares', async () => {
+    const { service, keys } = rig();
+
+    await expect(service.setClient('drive-plugin', 'drive', PERSON)).rejects.toThrow(
+      "drive-plugin declares the client of its sign-in 'drive' itself",
+    );
+    await expect(service.clearClient('drive-plugin', 'drive')).rejects.toThrow(TypeError);
+    await expect(service.setClient('drive-plugin', 'other', PERSON)).rejects.toThrow(
+      "drive-plugin declares no sign-in 'other'",
+    );
+    expect(keys.entries.size).toBe(0);
+  });
+
+  it('lists where the client comes from and never the client', async () => {
+    const { service } = rig({ entry: withoutClient });
+    const store = storeOf(withoutClient);
+
+    expect(await listSignins(store, service)).toEqual([
+      { plugin: 'drive-plugin', id: 'drive', signedIn: false, client: 'missing' },
+    ]);
+    await service.setClient('drive-plugin', 'drive', PERSON);
+    const rows = await listSignins(store, service);
+
+    expect(rows).toEqual([{ plugin: 'drive-plugin', id: 'drive', signedIn: false, client: 'set' }]);
+    expect(JSON.stringify(rows)).not.toMatch(/person-client|person-secret/u);
+  });
+
+  it('stores and clears through the window, answering without the client', async () => {
+    const { service, keys } = rig({ entry: withoutClient });
+    const window = signinWindow(storeOf(withoutClient), service);
+
+    const stored = await window.client('drive-plugin', 'drive', PERSON);
+
+    expect(stored).toEqual({ stored: true });
+    expect(keys.entries.has(CLIENT_ACCOUNT)).toBe(true);
+    expect(await window.start('drive-plugin', 'drive')).toEqual({ ok: true });
+    expect(await window.clearClient('drive-plugin', 'drive')).toEqual({ cleared: true });
+    expect(keys.entries.size).toBe(0);
+    expect(await window.start('drive-plugin', 'drive')).toMatchObject({
+      ok: false,
+      reason: 'no-client',
+    });
+  });
+
+  it("keeps the plugin's own credentials out of the client's account, whatever it declares", async () => {
+    const { service, keys } = rig({ entry: withoutClient });
+    await service.setClient('drive-plugin', 'drive', PERSON);
+    const checked = checkedCapabilities(
+      'drive-plugin',
+      ['signin:drive', 'credentials:signin-client:drive'],
+      { ...desktopCapabilities(keys, () => Promise.reject(new Error('no network'))) },
+    );
+
+    for (const key of ['signin-client:drive', CLIENT_ACCOUNT]) {
+      await expect(checked.credentials(key)).rejects.toMatchObject({ code: 'E_PERMISSION' });
+      await expect(checked.deleteCredential(key)).rejects.toMatchObject({
+        code: 'E_PERMISSION',
+      });
+    }
+    expect(JSON.parse(keys.entries.get(CLIENT_ACCOUNT) ?? '')).toEqual(PERSON);
   });
 });

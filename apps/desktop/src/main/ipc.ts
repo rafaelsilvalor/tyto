@@ -1049,6 +1049,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'signin:list': () => dependencies.signin.list(),
     'signin:start': ({ plugin, id }) => dependencies.signin.start(plugin, id),
     'signin:out': ({ plugin, id }) => dependencies.signin.out(plugin, id),
+    'signin:client': ({ plugin, id, clientId, clientSecret }) =>
+      dependencies.signin.client(plugin, id, {
+        clientId,
+        ...(clientSecret === undefined ? {} : { clientSecret }),
+      }),
+    'signin:client-clear': ({ plugin, id }) => dependencies.signin.clearClient(plugin, id),
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),
