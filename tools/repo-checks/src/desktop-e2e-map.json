@@ -138,6 +138,7 @@
         "installed-plugins.desktop.test.ts",
         "log.desktop.test.ts",
         "plugins.desktop.test.ts",
+        "recipe-credentials.desktop.test.ts",
         "window.desktop.test.ts"
       ],
       "why": "reviewed: credentials reach plugins through installed-plugins"
@@ -148,6 +149,7 @@
         "installed-plugins.desktop.test.ts",
         "log.desktop.test.ts",
         "plugins.desktop.test.ts",
+        "recipe-credentials.desktop.test.ts",
         "window.desktop.test.ts"
       ],
       "why": "reviewed: credentials reach plugins through installed-plugins"
@@ -619,6 +621,14 @@
         "window.desktop.test.ts"
       ],
       "why": "reviewed: the recipe notebook's runner, in @tyto/io since TYTO-664 (ADR 0188), and what main wraps around it (TYTO-377); the .recipe tab runs it on a pause, the notebook suite runs it against an installed source, and window.desktop's channel list reaches it; its logic is in recipe-runner.test.ts. Apply (TYTO-378) runs from the runner, its logic in @tyto/io's recipe-apply.test.ts, and the notebook suite clicks Apply. The view's pages (TYTO-379) and the view list every run checks show against are driven by the Table view suite; their logic, and copy's, is in recipe-rows.test.ts and ipc.test.ts. The Board's groups (TYTO-381) are counted in recipe-facets.ts, tested in recipe-facets.test.ts and ipc.test.ts, and drawn by the views suite"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/recipe-credentials.ts",
+        "apps/desktop/e2e/recipe-credentials.desktop.test.ts"
+      ],
+      "e2e": ["recipe-credentials.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: a recipe's call credentials (TYTO-671, ADR 0193), stored, listed by name and forgotten from the plugins screen; window.desktop's channel list reaches recipe-credential:list, :set and :forget, and the recipe-credentials suite stores one through the screen, reads the page and the keychain file, forgets it, and runs a call line's plan. Sending is proved in main by recipe-calls.test.ts with an injected fetch"
     },
     {
       "paths": [
@@ -1508,6 +1518,7 @@
       "e2e": [
         "installed-plugins.desktop.test.ts",
         "plugins.desktop.test.ts",
+        "recipe-credentials.desktop.test.ts",
         "signin.desktop.test.ts",
         "status-bar.desktop.test.ts",
         "window.desktop.test.ts"

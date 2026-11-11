@@ -140,6 +140,13 @@ const SIGNIN_PERMISSION = 'signin:';
 export const SIGNIN_CLIENT_KEY_PREFIX = 'signin-client:';
 
 /**
+ * The prefix of the keychain account the host keeps a recipe's `call` credential under (ADR
+ * 0193 decision 5). Reserved like `signin:`: a plugin's own accounts are `plugin:<name>:<key>`,
+ * and no `credentials:<key>` may start with it either, so a manifest cannot even name one.
+ */
+export const RECIPE_CREDENTIAL_KEY_PREFIX = 'recipe:';
+
+/**
  * One OAuth 2.0 provider a plugin signs in to through the host (ADR 0174): authorization code
  * with PKCE, run by the host in the system browser. Tyto keeps no provider list; the plugin
  * names its own endpoints here, where a person reads them before installing.
@@ -359,6 +366,15 @@ export const pluginManifestSchema = z
           code: 'custom',
           path: ['permissions', index],
           message: "names a sign-in's tokens, which only the host holds; use host.signin",
+        });
+      }
+      // A recipe's `call` credential is the person's, for Tyto's own verb (ADR 0193): no
+      // plugin's permission names one.
+      if (permission.startsWith(`credentials:${RECIPE_CREDENTIAL_KEY_PREFIX}`)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['permissions', index],
+          message: "names a recipe's credential, which only the host's call verb reads",
         });
       }
     });

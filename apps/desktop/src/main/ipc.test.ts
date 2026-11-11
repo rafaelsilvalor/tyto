@@ -9,6 +9,7 @@ import {
   type UpdateStatus,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
+import { recipeCredentialStore } from './recipe-credentials.js';
 import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
 import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
@@ -37,6 +38,8 @@ const credentials = (): Credentials => {
     get: (account) => Promise.resolve(stored.get(account) ?? null),
     has: (account) => Promise.resolve(stored.has(account)),
     delete: (account) => Promise.resolve(stored.delete(account)),
+    accounts: (prefix) =>
+      Promise.resolve([...stored.keys()].filter((account) => account.startsWith(prefix)).sort()),
   };
 };
 
@@ -937,6 +940,8 @@ const dependencies = () => {
     },
     menu: menuRebuilds(),
     plugins: pluginList(keychain),
+    // TYTO-671: the real store over the same fake keychain, so a test reads what it wrote.
+    recipeCredentials: recipeCredentialStore(keychain),
     // What each sign-in request reached main as; the service is `signin.test.ts`'s.
     signin: {
       list: () =>
@@ -1843,6 +1848,48 @@ describe('plugins:list', () => {
     ]);
     // What main sends must satisfy the contract the preload validates it against.
     expect(IPC_CHANNELS['plugins:list'].response.safeParse(answer).success).toBe(true);
+  });
+});
+
+describe('recipe-credential:list, :set and :forget (TYTO-671, ADR 0193)', () => {
+  it('stores under recipe:<name>, lists names only, and forgets', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+    await deps.credentials.set('plugin:pdf:routine', 'a plugin key, not a recipe credential');
+
+    expect(await handlers['recipe-credential:set']({ name: 'routine', value: 's3cr3t' })).toEqual({
+      stored: true,
+    });
+    expect(await deps.credentials.get('recipe:routine')).toBe('s3cr3t');
+    const listed = await handlers['recipe-credential:list']({});
+    expect(listed).toEqual({ names: ['routine'] });
+    expect(JSON.stringify(listed)).not.toContain('s3cr3t');
+
+    expect(await handlers['recipe-credential:forget']({ name: 'routine' })).toEqual({
+      forgotten: true,
+    });
+    expect(await deps.credentials.has('recipe:routine')).toBe(false);
+    expect(await handlers['recipe-credential:forget']({ name: 'routine' })).toEqual({
+      forgotten: false,
+    });
+    expect(await handlers['recipe-credential:list']({})).toEqual({ names: [] });
+  });
+
+  it('refuses a name token= would refuse, and an empty or oversized value', () => {
+    const set = IPC_CHANNELS['recipe-credential:set'].request;
+    expect(set.safeParse({ name: 'routine-2', value: 'x' }).success).toBe(true);
+    for (const name of ['Routine', '2routine', 'a/b', '../x', 'a'.repeat(65), '']) {
+      expect(set.safeParse({ name, value: 'x' }).success).toBe(false);
+    }
+    expect(set.safeParse({ name: 'routine', value: '' }).success).toBe(false);
+    expect(set.safeParse({ name: 'routine', value: 'a'.repeat(16_384) }).success).toBe(true);
+    expect(set.safeParse({ name: 'routine', value: 'a'.repeat(16_385) }).success).toBe(false);
+    expect(set.safeParse({ name: 'routine', value: 'x', account: 'plugin:x:y' }).success).toBe(
+      false,
+    );
+    expect(
+      IPC_CHANNELS['recipe-credential:forget'].request.safeParse({ name: 'signin:drive' }).success,
+    ).toBe(false);
   });
 });
 

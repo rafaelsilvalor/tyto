@@ -754,6 +754,15 @@ export interface Catalogue {
    * next start; the results carry `{plugin}`. `approve.*` and `remove.*` are the native boxes'
    * words, and `picker.archive` the open dialog's filter name: never element text.
    */
+  readonly 'plugins.recipeCredentials.heading': string;
+  readonly 'plugins.recipeCredentials.intro': string;
+  readonly 'plugins.recipeCredentials.none': string;
+  readonly 'plugins.recipeCredentials.name': string;
+  readonly 'plugins.recipeCredentials.value': string;
+  readonly 'plugins.recipeCredentials.save': string;
+  readonly 'plugins.recipeCredentials.forget': string;
+  readonly 'plugins.recipeCredentials.badName': string;
+  readonly 'plugins.recipeCredentials.failed': string;
   readonly 'plugins.column.actions': string;
   readonly 'plugins.action.installFolder': string;
   readonly 'plugins.action.installArchive': string;
@@ -1484,6 +1493,15 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.clear',
   'plugins.credential.kept',
   'plugins.credential.failed',
+  'plugins.recipeCredentials.heading',
+  'plugins.recipeCredentials.intro',
+  'plugins.recipeCredentials.none',
+  'plugins.recipeCredentials.name',
+  'plugins.recipeCredentials.value',
+  'plugins.recipeCredentials.save',
+  'plugins.recipeCredentials.forget',
+  'plugins.recipeCredentials.badName',
+  'plugins.recipeCredentials.failed',
   'plugins.column.actions',
   'plugins.action.installFolder',
   'plugins.action.installArchive',

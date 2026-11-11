@@ -18,6 +18,8 @@ export interface CredentialStore {
   read(account: string): Promise<Buffer | undefined>;
   write(account: string, ciphertext: Buffer): Promise<void>;
   delete(account: string): Promise<boolean>;
+  /** Every account something is stored under. Names only: no ciphertext is read. */
+  accounts(): Promise<readonly string[]>;
 }
 
 export interface CredentialsOptions {
@@ -76,6 +78,11 @@ export interface Credentials {
    */
   has(account: string): Promise<boolean>;
   delete(account: string): Promise<boolean>;
+  /**
+   * The accounts stored under `prefix`, sorted (TYTO-671): the recipe credentials screen lists
+   * names. **Never decrypts**, for `has`'s reason.
+   */
+  accounts(prefix: string): Promise<readonly string[]>;
 }
 
 export function createCredentials(options: CredentialsOptions): Credentials {
@@ -100,5 +107,8 @@ export function createCredentials(options: CredentialsOptions): Credentials {
     has: async (account) => (await store.read(account)) !== undefined,
 
     delete: (account) => store.delete(account),
+
+    accounts: async (prefix) =>
+      (await store.accounts()).filter((account) => account.startsWith(prefix)).sort(),
   };
 }

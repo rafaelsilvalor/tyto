@@ -241,7 +241,9 @@ describe('call', () => {
 
     const ran = await run([`call url=${URL} token=missing body={}`], new FakeHost());
     expect(ran.errors[0]?.message).toBe(
-      "'call' has no credential named 'missing' stored on this machine; store it first.",
+      "'call' has no credential named 'missing' stored on this machine; store it first, in the " +
+        'window under Recipe credentials in the plugins screen (Show plugins), or in the command ' +
+        'line as TYTO_RECIPE_CREDENTIAL_<NAME>, which tyto recipe run --apply reads.',
     );
     expect(ran.at).toEqual(['token=missing']);
   });

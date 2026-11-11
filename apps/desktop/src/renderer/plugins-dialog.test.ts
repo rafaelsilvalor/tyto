@@ -695,3 +695,94 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
     );
   });
 });
+
+describe("the plugins screen's recipe credentials (TYTO-671, ADR 0193)", () => {
+  async function withRecipeCredentials(names: readonly string[] | undefined, refuse = false) {
+    const element = await dialog();
+    const changes: { name: string; value?: string }[] = [];
+    element.recipeCredentials = names;
+    element.onRecipeCredential = (name, value) => {
+      changes.push(value === undefined ? { name } : { name, value });
+      if (refuse) return Promise.reject(new Error('refused'));
+      element.recipeCredentials = value === undefined ? [] : [name];
+      return Promise.resolve();
+    };
+    await element.updateComplete;
+    const section = element.querySelector<HTMLElement>('.plugins__recipe-credentials')!;
+    const form = section.querySelector<HTMLFormElement>('.plugins__recipe-credential-form')!;
+    return { element, changes, section, form };
+  }
+
+  const settled = async (element: PluginsDialog) => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await element.updateComplete;
+  };
+
+  const fill = (form: HTMLFormElement, name: string, value: string) => {
+    form.querySelector<HTMLInputElement>('.plugins__recipe-credential-name')!.value = name;
+    form.querySelector<HTMLInputElement>('.plugins__recipe-credential-value')!.value = value;
+  };
+
+  it('draws nothing without a place to send a change', async () => {
+    const element = await dialog();
+    expect(element.querySelector('.plugins__recipe-credentials')).toBeNull();
+  });
+
+  it('lists each name with Forget, and says when none is stored', async () => {
+    const listed = await withRecipeCredentials(['routine', 'second-hook']);
+    expect(
+      [...listed.section.querySelectorAll('.plugins__recipe-credential')].map((row) =>
+        row.getAttribute('data-name'),
+      ),
+    ).toEqual(['routine', 'second-hook']);
+    expect(text(listed.section, '.plugins__recipe-credentials-title')).toBe('Recipe credentials');
+
+    const empty = await withRecipeCredentials([]);
+    expect(text(empty.section, '.plugins__recipe-credentials-none')).toBe('None stored.');
+    expect(
+      empty.section.querySelector<HTMLInputElement>('.plugins__recipe-credential-value')?.type,
+    ).toBe('password');
+  });
+
+  it('hands the value over once, empties the form, and never draws it', async () => {
+    const { element, changes, form } = await withRecipeCredentials([]);
+    fill(form, 'routine', 'typed-secret');
+
+    form.requestSubmit();
+    await settled(element);
+
+    expect(changes).toEqual([{ name: 'routine', value: 'typed-secret' }]);
+    expect(form.querySelector<HTMLInputElement>('.plugins__recipe-credential-value')!.value).toBe(
+      '',
+    );
+    expect(element.innerHTML).not.toContain('typed-secret');
+    expect(element.querySelector('[data-name="routine"]')).not.toBeNull();
+  });
+
+  it('forgets a name with no value', async () => {
+    const { element, changes, section } = await withRecipeCredentials(['routine']);
+    section.querySelector<HTMLButtonElement>('.plugins__recipe-credential-forget')!.click();
+    await settled(element);
+
+    expect(changes).toEqual([{ name: 'routine' }]);
+  });
+
+  it('refuses a name token= would refuse before sending, and says when main refused', async () => {
+    const bad = await withRecipeCredentials([]);
+    fill(bad.form, 'Routine', 'x');
+    bad.form.requestSubmit();
+    await settled(bad.element);
+    expect(bad.changes).toEqual([]);
+    expect(text(bad.element, '.plugins__recipe-credential-failed')).toBe(
+      translate('en', 'plugins.recipeCredentials.badName'),
+    );
+
+    const refused = await withRecipeCredentials(['routine'], true);
+    refused.section.querySelector<HTMLButtonElement>('.plugins__recipe-credential-forget')!.click();
+    await settled(refused.element);
+    expect(text(refused.element, '.plugins__recipe-credential-failed')).toBe(
+      translate('en', 'plugins.recipeCredentials.failed'),
+    );
+  });
+});

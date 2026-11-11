@@ -65,6 +65,7 @@ export type {
 export type { CallPorts, CallRequest, CallResponse } from './call.js';
 export {
   CALL_BODY_LIMIT_BYTES,
+  CALL_CREDENTIAL_NAME,
   CALL_DEADLINE_MS,
   CALL_PLAN_LIMITS,
   CALL_WRITE,

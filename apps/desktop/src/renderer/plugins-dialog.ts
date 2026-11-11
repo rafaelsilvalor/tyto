@@ -36,6 +36,13 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  * `onSigninClient`. Write-only like a credential: the line says whether a client is set and
  * never shows it. Sign in is disabled until one is.
  *
+ * **Recipe credentials (TYTO-671, ADR 0193).** Below the table, the credentials a recipe's
+ * `call` line names with `token=<name>`: the names stored, each with Forget, and a form to store
+ * one, handed to `onRecipeCredential`. Write-only too: the screen is handed names and never a
+ * value, and the value field is emptied once saved. Here rather than on a plugin's row because
+ * `call` is Tyto's own verb, and beside the plugins' credentials because a person looks for a
+ * token where the others are.
+ *
  * **The notice is not decoration.** A permission a person approved at install is recorded
  * and shown, and until TYTO-48 isolates plugins it is not enforced; a screen listing
  * permissions without that sentence would read as a sandbox that does not exist.
@@ -83,6 +90,15 @@ export type SigninClientChange = (
   id: string,
   client?: { readonly clientId: string; readonly clientSecret?: string },
 ) => Promise<void>;
+
+/**
+ * Stores a recipe credential under `name`, or forgets it when `value` is absent (TYTO-671).
+ * Rejects when main refused the request.
+ */
+export type RecipeCredentialChange = (name: string, value?: string) => Promise<void>;
+
+/** A name `token=` accepts (ADR 0193 decision 5), checked before anything is sent. */
+const RECIPE_CREDENTIAL_NAME = /^[a-z][a-z0-9-]{0,63}$/u;
 
 /** A sign-in that did not finish: which one, and main's sentence. */
 interface SigninFailure {
@@ -147,6 +163,9 @@ export class PluginsDialog extends LitElement {
     onSigninStart: { attribute: false },
     onSigninOut: { attribute: false },
     onSigninClient: { attribute: false },
+    recipeCredentials: { attribute: false },
+    onRecipeCredential: { attribute: false },
+    failedRecipeCredential: { state: true },
     failedSigninClient: { state: true },
     signingIn: { state: true },
     signinFailure: { state: true },
@@ -185,6 +204,12 @@ export class PluginsDialog extends LitElement {
   /** `plugin:id` of the sign-in waiting on the browser, so no second one starts beside it. */
   declare signingIn: string | undefined;
   declare signinFailure: SigninFailure | undefined;
+  /** The recipe credentials' names, or nothing while they are asked or could not be read. */
+  declare recipeCredentials: readonly string[] | undefined;
+  /** Where storing and forgetting a recipe credential goes. No section while it is absent. */
+  declare onRecipeCredential: RecipeCredentialChange | undefined;
+  /** Why the last store or forget did not happen: a name `token=` refuses, or main's refusal. */
+  declare failedRecipeCredential: 'name' | 'refused' | undefined;
 
   constructor() {
     super();
@@ -205,6 +230,9 @@ export class PluginsDialog extends LitElement {
     this.failedSigninClient = undefined;
     this.signingIn = undefined;
     this.signinFailure = undefined;
+    this.recipeCredentials = undefined;
+    this.onRecipeCredential = undefined;
+    this.failedRecipeCredential = undefined;
   }
 
   private async act(step: () => Promise<Outcome | undefined>): Promise<void> {
@@ -690,6 +718,110 @@ export class PluginsDialog extends LitElement {
     </div>`;
   }
 
+  /**
+   * The recipe credentials (TYTO-671, ADR 0193): every name stored with Forget, then a name
+   * field, a password field and Save. The value is on screen only while it is typed: the form
+   * is emptied once main stored it, and no name's value is ever handed to this element.
+   */
+  private recipeCredentialSection(say: (key: CatalogueKey) => string): unknown {
+    const change = this.onRecipeCredential;
+    if (change === undefined) return nothing;
+    const names = this.recipeCredentials;
+    const run = async (name: string, value?: string, form?: HTMLFormElement): Promise<void> => {
+      try {
+        await change(name, value);
+        this.failedRecipeCredential = undefined;
+        form?.reset();
+      } catch {
+        this.failedRecipeCredential = 'refused';
+      }
+    };
+    return html`<section
+      class="plugins__recipe-credentials"
+      aria-label=${say('plugins.recipeCredentials.heading')}
+    >
+      <h3 class="plugins__recipe-credentials-title">${say('plugins.recipeCredentials.heading')}</h3>
+      <p class="plugins__disclosure">${say('plugins.recipeCredentials.intro')}</p>
+      ${
+        names === undefined
+          ? nothing
+          : names.length === 0
+            ? html`<p class="plugins__recipe-credentials-none">
+                ${say('plugins.recipeCredentials.none')}
+              </p>`
+            : html`<ul class="plugins__recipe-credential-list">
+                ${names.map(
+                  (name) =>
+                    html`<li class="plugins__recipe-credential" data-name=${name}>
+                      <code>${name}</code>
+                      <button
+                        class="plugins__recipe-credential-forget"
+                        type="button"
+                        aria-label=${`${say('plugins.recipeCredentials.forget')} ${name}`}
+                        @click=${() => {
+                          void run(name);
+                        }}
+                      >
+                        ${say('plugins.recipeCredentials.forget')}
+                      </button>
+                    </li>`,
+                )}
+              </ul>`
+      }
+      <form
+        class="plugins__recipe-credential-form"
+        @submit=${(event: SubmitEvent) => {
+          event.preventDefault();
+          const form = event.currentTarget as HTMLFormElement;
+          const name =
+            form
+              .querySelector<HTMLInputElement>('.plugins__recipe-credential-name')
+              ?.value.trim() ?? '';
+          const value =
+            form.querySelector<HTMLInputElement>('.plugins__recipe-credential-value')?.value ?? '';
+          if (!RECIPE_CREDENTIAL_NAME.test(name)) {
+            this.failedRecipeCredential = 'name';
+            return;
+          }
+          if (value === '') return;
+          void run(name, value, form);
+        }}
+      >
+        <input
+          class="plugins__recipe-credential-name"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          maxlength="64"
+          placeholder=${say('plugins.recipeCredentials.name')}
+          aria-label=${say('plugins.recipeCredentials.name')}
+        />
+        <input
+          class="plugins__recipe-credential-value"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder=${say('plugins.recipeCredentials.value')}
+          aria-label=${say('plugins.recipeCredentials.value')}
+        />
+        <button class="plugins__recipe-credential-save" type="submit">
+          ${say('plugins.recipeCredentials.save')}
+        </button>
+      </form>
+      ${
+        this.failedRecipeCredential === undefined
+          ? nothing
+          : html`<p class="plugins__recipe-credential-failed" role="alert">
+              ${say(
+                this.failedRecipeCredential === 'name'
+                  ? 'plugins.recipeCredentials.badName'
+                  : 'plugins.recipeCredentials.failed',
+              )}
+            </p>`
+      }
+    </section>`;
+  }
+
   private body(say: (key: CatalogueKey) => string): unknown {
     const view = this.view;
     if (view === undefined) return nothing;
@@ -731,7 +863,7 @@ export class PluginsDialog extends LitElement {
       <h2 class="plugins__title">${say('plugins.heading')}</h2>
       <p class="plugins__notice" role="note">${say('plugins.notice')}</p>
       <p class="plugins__inactive">${say('plugins.inactive')}</p>
-      ${this.body(say)}
+      ${this.body(say)} ${this.recipeCredentialSection(say)}
       <p class="plugins__install">${say('plugins.install')}</p>
       ${this.outcomeLine(say)}
       <div class="plugins__actions">

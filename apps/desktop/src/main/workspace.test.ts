@@ -299,6 +299,34 @@ describe('the section a recipe verb is handed (TYTO-377, ADR 0147, ADR 0148)', (
   });
 });
 
+describe('the hosts call may reach (TYTO-671, ADR 0193 decision 4)', () => {
+  it("are the open folder's recipes.call.hosts once trusted, and none elsewhere", async () => {
+    await writeFile(
+      join(work, '.tyto', 'project.json'),
+      '{ "recipes": { "call": { "hosts": ["hooks.example.com"] } } }',
+    );
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    const recipes = join(work, 'recipes');
+    expect(workspace.callHostsFor(recipes)).toBeUndefined();
+
+    await workspace.open(work);
+    // Restricted: the resolver read no list from an untrusted sheet.
+    expect(workspace.callHostsFor(recipes)).toEqual([]);
+
+    expect((await workspace.grant('folder')).ok).toBe(true);
+    expect(workspace.callHostsFor(recipes)).toEqual(['hooks.example.com']);
+    expect(workspace.callHostsFor(join(scratch, 'elsewhere'))).toBeUndefined();
+    expect(workspace.callHostsFor(undefined)).toBeUndefined();
+
+    await workspace.close();
+    expect(workspace.callHostsFor(recipes)).toBeUndefined();
+  });
+});
+
 describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
   async function named(text: string): Promise<string> {
     const folder = join(home, 'profiles', 'saude');

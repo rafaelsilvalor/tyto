@@ -1626,6 +1626,17 @@ function openPluginsDialog(): void {
     else await bridge['signin:client']({ plugin, id, ...client });
     await relistSignins(bridge);
   };
+  // TYTO-671, ADR 0193: a recipe's call credential goes to main once and never comes back; the
+  // section is handed names only, asked again after every change. A refusal is rethrown so the
+  // section can say so.
+  dialog.recipeCredentials = undefined;
+  dialog.onRecipeCredential = async (name, value) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    if (value === undefined) await bridge['recipe-credential:forget']({ name });
+    else await bridge['recipe-credential:set']({ name, value });
+    await relistRecipeCredentials(bridge);
+  };
   void withBridge(async (bridge) => {
     try {
       dialog.view = await bridge['plugins:list']({});
@@ -1633,7 +1644,22 @@ function openPluginsDialog(): void {
       dialog.view = 'failed';
     }
     await relistSignins(bridge);
+    await relistRecipeCredentials(bridge);
   });
+}
+
+/**
+ * The recipe credentials' names, for the plugins screen (TYTO-671). A list that cannot be read
+ * leaves the section without one rather than claiming none is stored.
+ */
+async function relistRecipeCredentials(bridge: TytoBridge): Promise<void> {
+  const dialog = elements.pluginsDialog;
+  if (dialog === null || dialog === undefined) return;
+  try {
+    dialog.recipeCredentials = (await bridge['recipe-credential:list']({})).names;
+  } catch {
+    dialog.recipeCredentials = undefined;
+  }
 }
 
 /**

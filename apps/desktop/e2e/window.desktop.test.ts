@@ -368,6 +368,11 @@ describe('the bridge', () => {
       'queue:set-auto-run',
       'queue:set-folder',
       'queue:set-kinds',
+      // TYTO-671, ADR 0193: a recipe's call credentials from the plugins screen, written,
+      // listed by name and forgotten. Exercised by `e2e/recipe-credentials.desktop.test.ts`.
+      'recipe-credential:forget',
+      'recipe-credential:list',
+      'recipe-credential:set',
       // TYTO-377, ADR 0148: the recipe notebook's runner in main, which a `.recipe` tab runs
       // (`recipe-tab.desktop.test.ts`); `recipe-runner.test.ts` covers the logic. TYTO-378's
       // `recipe:apply` has no window caller until the notebook's Apply button; its logic is in

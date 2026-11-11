@@ -206,6 +206,14 @@ describe('a browser sign-in (ADR 0174)', () => {
     ).toEqual(['permissions.1']);
   });
 
+  it("refuses a credentials: permission that names a recipe's credential (ADR 0193)", () => {
+    expect(pathsOf({ ...VALID, permissions: ['credentials:recipe:routine'] })).toEqual([
+      'permissions.0',
+    ]);
+    // A key that only contains the word is a plugin's own.
+    expect(pathsOf({ ...VALID, permissions: ['credentials:my-recipe:routine'] })).toEqual([]);
+  });
+
   it('accepts an entry without a client id, which the person supplies (ADR 0192)', () => {
     const { clientId: _omitted, ...withoutClient } = PROVIDER;
     const parsed = parsePluginManifest(
