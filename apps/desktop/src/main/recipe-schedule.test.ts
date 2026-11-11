@@ -9,7 +9,7 @@ import {
   type RunnerAnswer,
   createRecipeRunner,
 } from '@tyto/io';
-import type { RecipeContributions } from '@tyto/plugin-api';
+import type { PageRequest, RecipeContributions } from '@tyto/plugin-api';
 import type { RunClock, Table } from '@tyto/recipe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -131,6 +131,7 @@ describe('when a scheduled recipe runs', () => {
       path: real,
       scheduled: true,
       from: 0,
+      fresh: true,
     });
     expect(schedule.list()).toEqual([
       expect.objectContaining({
@@ -351,8 +352,17 @@ describe('a scheduled run through the real runner', () => {
   };
   const clock: RunClock = { now: () => new Date(), offsetMinutes: () => 0 };
 
-  function realHarness(trust: RecipePlace['trust']) {
-    const calls = { pull: 0 };
+  /** How long the caching stand-in keeps an answer: tyto-plugin-jira's ten minutes. */
+  const CACHE_MS = 10 * MINUTE;
+
+  /**
+   * `cache` makes the source keep its answer for {@link CACHE_MS}, as a real plugin does
+   * (ADR 0138), and answer from it unless the run hands it `refresh`: `calls.pull` then counts
+   * live fetches only, and `calls.cached` the answers the cache gave.
+   */
+  function realHarness(trust: RecipePlace['trust'], cache = false) {
+    const calls = { pull: 0, cached: 0 };
+    let keptAt: number | undefined;
     const contributions: RecipeContributions = {
       recipeVerbs: () => [pull],
       ownedRecipeVerbs: () => [{ plugin: 'acme', verb: pull }],
@@ -362,8 +372,14 @@ describe('a scheduled run through the real runner', () => {
       id: 'acme.pull',
       kind: 'source' as const,
       arguments: [],
-      page: () => {
-        calls.pull += 1;
+      page: (request: PageRequest) => {
+        const fresh = keptAt !== undefined && Date.now() - keptAt < CACHE_MS;
+        if (cache && fresh && request.refresh !== true) {
+          calls.cached += 1;
+        } else {
+          calls.pull += 1;
+          keptAt = Date.now();
+        }
         return Promise.resolve(ok({ table: TASKS }));
       },
     };
@@ -380,8 +396,38 @@ describe('a scheduled run through the real runner', () => {
       notify: (notice) => notices.push(notice),
       changed: () => undefined,
     });
-    return { calls, notices, schedule };
+    return { calls, notices, runner, schedule };
   }
+
+  it('fetches live on every tick past a cache that outlives the interval (TYTO-648)', async () => {
+    await write('watch.recipe', WATCH);
+    const { calls, schedule } = realHarness('trusted', true);
+    await schedule.setFolder(workspace);
+
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    await schedule.idle();
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    await schedule.idle();
+
+    // The second tick is five minutes into a ten-minute cache, and still fetches live.
+    expect(calls).toEqual({ pull: 2, cached: 0 });
+    expect(schedule.list()[0]?.outcome).toBe('ok');
+  });
+
+  it("keeps a person's Run on the plugin's cache, as before", async () => {
+    await write('watch.recipe', WATCH);
+    const { calls, runner, schedule } = realHarness('trusted', true);
+    await schedule.setFolder(workspace);
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    await schedule.idle();
+    const path = await realpath(join(workspace, 'watch.recipe'));
+
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    const answer = await runner.run({ documentId: 'tab:1', text: WATCH, path, explicit: true });
+
+    expect(answer.cells.map((cell) => cell.status)).toEqual(['ok']);
+    expect(calls).toEqual({ pull: 1, cached: 1 });
+  });
 
   it('fetches in a trusted folder on every tick', async () => {
     await write('watch.recipe', WATCH);
