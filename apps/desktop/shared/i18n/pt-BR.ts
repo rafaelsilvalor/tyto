@@ -477,6 +477,17 @@ export const ptBR: Catalogue = {
   'plugins.signin.failed': 'O login não terminou:',
   'plugins.signin.kept':
     'O Tyto guarda o login no chaveiro do sistema. O plugin recebe só um token de acesso de curta duração, nunca o que mantém você conectado.',
+  'plugins.signin.client.label': 'Cliente OAuth',
+  'plugins.signin.client.set': 'preenchido',
+  'plugins.signin.client.missing': 'não preenchido',
+  'plugins.signin.client.id': 'ID do cliente',
+  'plugins.signin.client.secret': 'Segredo do cliente (opcional)',
+  'plugins.signin.client.save': 'Salvar',
+  'plugins.signin.client.clear': 'Apagar',
+  'plugins.signin.client.failed': 'Não foi possível salvar nem apagar o cliente.',
+  'plugins.signin.client.needed': 'Preencha o cliente OAuth deste login antes de entrar.',
+  'plugins.signin.client.kept':
+    'O Tyto guarda o cliente no chaveiro do sistema. Salvar ou apagar o cliente desconecta este login.',
   'plugins.signin.page.signedIn': 'Login feito.',
   'plugins.signin.page.unfinished': 'O login não terminou.',
   'plugins.signin.page.refused':

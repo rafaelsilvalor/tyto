@@ -788,6 +788,20 @@ export interface Catalogue {
   readonly 'plugins.signin.waiting': string;
   readonly 'plugins.signin.failed': string;
   readonly 'plugins.signin.kept': string;
+  /**
+   * ADR 0192: the OAuth client a person supplies for a sign-in whose manifest declares none.
+   * Write-only: the row says whether one is set, never which.
+   */
+  readonly 'plugins.signin.client.label': string;
+  readonly 'plugins.signin.client.set': string;
+  readonly 'plugins.signin.client.missing': string;
+  readonly 'plugins.signin.client.id': string;
+  readonly 'plugins.signin.client.secret': string;
+  readonly 'plugins.signin.client.save': string;
+  readonly 'plugins.signin.client.clear': string;
+  readonly 'plugins.signin.client.failed': string;
+  readonly 'plugins.signin.client.needed': string;
+  readonly 'plugins.signin.client.kept': string;
   readonly 'plugins.signin.page.signedIn': string;
   readonly 'plugins.signin.page.unfinished': string;
   readonly 'plugins.signin.page.refused': string;
@@ -1499,6 +1513,16 @@ export const CATALOGUE_KEYS = [
   'plugins.signin.waiting',
   'plugins.signin.failed',
   'plugins.signin.kept',
+  'plugins.signin.client.label',
+  'plugins.signin.client.set',
+  'plugins.signin.client.missing',
+  'plugins.signin.client.id',
+  'plugins.signin.client.secret',
+  'plugins.signin.client.save',
+  'plugins.signin.client.clear',
+  'plugins.signin.client.failed',
+  'plugins.signin.client.needed',
+  'plugins.signin.client.kept',
   'plugins.signin.page.signedIn',
   'plugins.signin.page.unfinished',
   'plugins.signin.page.refused',

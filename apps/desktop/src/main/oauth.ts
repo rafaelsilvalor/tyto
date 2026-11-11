@@ -1,4 +1,4 @@
-import type { SigninDeclaration } from '@tyto/plugin-api';
+import type { ResolvedSigninDeclaration } from '@tyto/plugin-api';
 import { z } from 'zod';
 
 /**
@@ -53,7 +53,7 @@ export function createState(random: RandomBytes = webCryptoRandom): string {
 }
 
 export interface AuthorizeRequest {
-  readonly declaration: SigninDeclaration;
+  readonly declaration: ResolvedSigninDeclaration;
   readonly redirectUri: string;
   readonly challenge: string;
   readonly state: string;
@@ -166,7 +166,7 @@ export function parseTokenAnswer(status: number, text: string): TokenResult {
 }
 
 async function requestToken(
-  declaration: SigninDeclaration,
+  declaration: ResolvedSigninDeclaration,
   fields: Record<string, string>,
   fetch: TokenFetch,
 ): Promise<TokenResult> {
@@ -198,7 +198,7 @@ async function requestToken(
 }
 
 export interface CodeExchange {
-  readonly declaration: SigninDeclaration;
+  readonly declaration: ResolvedSigninDeclaration;
   readonly code: string;
   readonly verifier: string;
   readonly redirectUri: string;
@@ -221,7 +221,7 @@ export function exchangeCode(exchange: CodeExchange): Promise<TokenResult> {
 
 /** A new access token for a stored refresh token (RFC 6749 section 6). */
 export function refreshTokens(
-  declaration: SigninDeclaration,
+  declaration: ResolvedSigninDeclaration,
   refreshToken: string,
   fetch: TokenFetch,
 ): Promise<TokenResult> {

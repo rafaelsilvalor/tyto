@@ -60,6 +60,27 @@ Click **Sign out** to end it. Nothing else starts a sign-in: a plugin that needs
 
 Tyto keeps the sign-in in your system's keychain, and the plugin gets only a short-lived access token from Tyto, never what keeps you signed in. On a computer with no keychain to encrypt with, the sign-in does not finish and the line says why. The command line cannot sign in through a browser: a recipe that needs a sign-in works only in the window.
 
+### A sign-in that asks for your own client
+
+::: info Checked differently
+This section was added on 2026-11-11 and checked by the app's end-to-end test, which types a client on the screen and signs in against a test sign-in service that accepts only that client. Nobody has created a client with a real provider and followed it by hand yet.
+:::
+
+A provider recognises the app that asks you to sign in by its **OAuth client**: a client ID, and sometimes a client secret. Some plugins name their own client. Others leave it to you, so that a team can use its own client without writing it into a plugin anybody can read. On such a sign-in the line also shows **OAuth client: not set**, two fields and **Save**, and **Sign in** stays off until a client is set:
+
+1. Type the **Client ID** and, when your provider gave you one, the **Client secret (optional)**. Click **Save**.
+2. The line says **OAuth client: set**, and the fields are empty again: Tyto never shows the client back. Click **Sign in** and go on as above.
+
+Tyto keeps the client in your system's keychain, beside the sign-in, never in `settings.json`. **Saving another client, or clicking Clear, signs you out** of that sign-in, because what kept you signed in was issued to the old client. A plugin that names its own client shows no fields: its client cannot be replaced.
+
+Somebody on your team may hand you the client. To create one yourself, with a provider that issues clients per project — Google Cloud, for example:
+
+1. Open the provider's console and choose or create a project.
+2. Configure the consent screen the provider asks for, and add yourself as a test user if the app stays in testing.
+3. Enable the APIs the plugin says it uses.
+4. Create an OAuth client of the type **Desktop app**. Tyto signs in through your browser and a port on this computer only, which is what that type allows.
+5. Copy the client ID and the client secret into the fields above. A desktop client's secret is not confidential: every installed copy of an app carries it.
+
 ## Plugins that start a program
 
 ::: info Checked differently

@@ -4210,3 +4210,46 @@ tyto-recent-folders[open] {
 .plugins__signin-failed {
   color: var(--tyto-error);
 }
+
+/* ADR 0192: a sign-in whose client the person supplies. The hint and the client's fields take
+   their own line under the sign-in, laid out as a credential's are. */
+.plugins__signin-hint {
+  width: 100%;
+  margin: 0;
+  color: var(--tyto-text-muted);
+}
+
+.plugins__signin-client {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  gap: var(--tyto-space-3);
+}
+
+.plugins__signin-client-state {
+  color: var(--tyto-text-muted);
+}
+
+.plugins__signin-client[data-client='set'] .plugins__signin-client-state {
+  color: inherit;
+  font-weight: var(--tyto-weight-strong);
+}
+
+.plugins__signin-client-id,
+.plugins__signin-client-secret {
+  width: 26ch;
+  min-width: 0;
+  font: inherit;
+}
+
+.plugins__signin-client-failed,
+.plugins__signin-client .plugins__disclosure {
+  width: 100%;
+  margin: 0;
+}
+
+.plugins__signin-client-failed {
+  color: var(--tyto-error);
+}

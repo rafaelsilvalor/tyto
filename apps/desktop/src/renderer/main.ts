@@ -1617,6 +1617,15 @@ function openPluginsDialog(): void {
     await bridge['signin:out']({ plugin, id });
     await relistSignins(bridge);
   };
+  // ADR 0192: the client a person supplies goes to main once and never comes back; the list
+  // says only whether one is set. A refusal is rethrown so the line can say so.
+  dialog.onSigninClient = async (plugin, id, client) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    if (client === undefined) await bridge['signin:client-clear']({ plugin, id });
+    else await bridge['signin:client']({ plugin, id, ...client });
+    await relistSignins(bridge);
+  };
   void withBridge(async (bridge) => {
     try {
       dialog.view = await bridge['plugins:list']({});

@@ -134,29 +134,59 @@ const SIGNIN_ID = /^[a-z][a-z0-9-]*$/;
 const SIGNIN_PERMISSION = 'signin:';
 
 /**
+ * The prefix of the keychain account the host keeps a person-supplied sign-in client under
+ * (ADR 0192). Reserved like `signin:`: no `credentials:<key>` may start with it.
+ */
+export const SIGNIN_CLIENT_KEY_PREFIX = 'signin-client:';
+
+/**
  * One OAuth 2.0 provider a plugin signs in to through the host (ADR 0174): authorization code
  * with PKCE, run by the host in the system browser. Tyto keeps no provider list; the plugin
  * names its own endpoints here, where a person reads them before installing.
  */
-const signinSchema = z.strictObject({
-  /** The authorization endpoint the browser opens. */
-  authorize: signinUrl,
-  /** The token endpoint the host exchanges the code at, and refreshes at. */
-  token: signinUrl,
-  clientId: z.string().min(1, 'must not be empty'),
-  scopes: z
-    .array(z.string().min(1, 'must not be empty'))
-    .refine((values) => new Set(values).size === values.length, 'must not repeat a scope'),
-  /**
-   * **Not a secret.** An installed app cannot keep one: Google issues its desktop clients a
-   * "client secret" its own documentation calls non-confidential, and its token endpoint asks
-   * for it anyway. Optional, sent only when declared, and readable by anybody who reads the
-   * manifest, so a provider that treats it as confidential cannot be declared this way.
-   */
-  clientSecret: z.string().min(1, 'must not be empty').optional(),
-});
+const signinSchema = z
+  .strictObject({
+    /** The authorization endpoint the browser opens. */
+    authorize: signinUrl,
+    /** The token endpoint the host exchanges the code at, and refreshes at. */
+    token: signinUrl,
+    /**
+     * The OAuth client the provider issued. **Optional** (ADR 0192): absent, the person who
+     * installs the plugin supplies their own in the plugins screen, so an organisation's client
+     * never has to be written into a manifest anybody can read. Declared, it is the client, and
+     * nobody can override it.
+     */
+    clientId: z.string().min(1, 'must not be empty').optional(),
+    scopes: z
+      .array(z.string().min(1, 'must not be empty'))
+      .refine((values) => new Set(values).size === values.length, 'must not repeat a scope'),
+    /**
+     * **Not a secret.** An installed app cannot keep one: Google issues its desktop clients a
+     * "client secret" its own documentation calls non-confidential, and its token endpoint asks
+     * for it anyway. Optional, sent only when declared, and readable by anybody who reads the
+     * manifest, so a provider that treats it as confidential cannot be declared this way.
+     */
+    clientSecret: z.string().min(1, 'must not be empty').optional(),
+  })
+  .superRefine((entry, context) => {
+    // A secret belongs to one client: without the client it pairs with, it would be sent beside
+    // whatever client the person supplies, which is never the one it was issued to (ADR 0192).
+    if (entry.clientSecret !== undefined && entry.clientId === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['clientSecret'],
+        message: 'is declared without the clientId it belongs to',
+      });
+    }
+  });
 
 export type SigninDeclaration = z.infer<typeof signinSchema>;
+
+/**
+ * A sign-in the host can run: the manifest's entry with a client id, its own or the one the
+ * person supplied when the manifest declares none (ADR 0192).
+ */
+export type ResolvedSigninDeclaration = SigninDeclaration & { readonly clientId: string };
 
 export const pluginManifestSchema = z
   .strictObject({
@@ -319,8 +349,12 @@ export const pluginManifestSchema = z
           });
         }
       }
-      // A sign-in's tokens are the host's (ADR 0174): no permission reaches them as a credential.
-      if (permission.startsWith(`credentials:${SIGNIN_PERMISSION}`)) {
+      // A sign-in's tokens and the client a person supplied are the host's (ADR 0174, ADR
+      // 0192): no permission reaches them as a credential.
+      if (
+        permission.startsWith(`credentials:${SIGNIN_PERMISSION}`) ||
+        permission.startsWith(`credentials:${SIGNIN_CLIENT_KEY_PREFIX}`)
+      ) {
         context.addIssue({
           code: 'custom',
           path: ['permissions', index],

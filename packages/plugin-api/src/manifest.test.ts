@@ -198,6 +198,28 @@ describe('a browser sign-in (ADR 0174)', () => {
     expect(
       pathsOf({ ...SIGNING, permissions: ['signin:provider', 'credentials:signin:provider'] }),
     ).toEqual(['permissions.1']);
+    expect(
+      pathsOf({
+        ...SIGNING,
+        permissions: ['signin:provider', 'credentials:signin-client:provider'],
+      }),
+    ).toEqual(['permissions.1']);
+  });
+
+  it('accepts an entry without a client id, which the person supplies (ADR 0192)', () => {
+    const { clientId: _omitted, ...withoutClient } = PROVIDER;
+    const parsed = parsePluginManifest(
+      JSON.stringify({ ...SIGNING, signin: { provider: withoutClient } }),
+    );
+    expect(parsed.ok).toBe(true);
+    expect(parsed.ok && parsed.value.signin?.provider?.clientId).toBeUndefined();
+  });
+
+  it('refuses a client secret without the client id it belongs to', () => {
+    const { clientId: _omitted, ...withoutClient } = PROVIDER;
+    expect(
+      pathsOf({ ...SIGNING, signin: { provider: { ...withoutClient, clientSecret: 's' } } }),
+    ).toEqual(['signin.provider.clientSecret']);
   });
 
   it('refuses unknown keys, an empty client id and a repeated scope', () => {

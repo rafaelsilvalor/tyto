@@ -39,6 +39,10 @@ import { type Locale, isLocale, translate } from '../shared/i18n/index.js';
  *
  * `TYTO_HOME` and `--user-data-dir` are this suite's own folder, so the keychain entry is a
  * file under it and the machine's real store is never written.
+ *
+ * A second plugin declares its sign-in without a client (ADR 0192): the person types one on
+ * the screen, and the fake provider knows only that client and its secret, so a sign-in that
+ * did not use what was typed is refused at the far end.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -54,6 +58,11 @@ const BRIEF = ['---', 'template: promo-curso', '---', '::titulo Do plugin'].join
 const PLUGIN = 'provedor';
 const SIGNIN = 'conta';
 const LINE = `.plugins__row[data-plugin="${PLUGIN}"] [data-signin="${SIGNIN}"]`;
+/** The plugin whose manifest leaves the client to the person (ADR 0192). */
+const OWN_CLIENT = 'provedor-cliente';
+const OWN_LINE = `.plugins__row[data-plugin="${OWN_CLIENT}"] [data-signin="${SIGNIN}"]`;
+const PERSON_CLIENT_ID = 'person-client-0192';
+const PERSON_CLIENT_SECRET = 'person-secret-0192';
 
 let scratch: string;
 let home: string;
@@ -63,52 +72,70 @@ let page: Page;
 let locale: Locale;
 /** The keychain entry's file, under this suite's user-data folder (`credential-store.ts`). */
 let entry: string;
+/** Whether this machine's `safeStorage` can encrypt, read once the app is up. */
+let keychain: boolean;
+
+/** A keychain entry's file under this suite's user-data folder. */
+const entryFile = (account: string): string =>
+  join(scratch, 'user-data', 'credentials', `${encodeURIComponent(account)}.bin`);
 
 /**
- * One installed plugin that declares a sign-in against the fake provider, and an exporter that
- * writes what `host.signin.accessToken` and `host.credentials('signin:…')` answered.
+ * One installed plugin that declares a sign-in against the fake provider, and an exporter of
+ * `kind` that writes what `host.signin.accessToken` and `host.credentials(<reserved>)` answered.
+ * Without `clientId`, the manifest leaves the client to the person (ADR 0192).
  */
-function writeHome(): void {
-  const folder = join(home, 'plugins', PLUGIN);
+function writePlugin(
+  name: string,
+  kind: string,
+  reserved: string,
+  clientId: string | undefined,
+): void {
+  const folder = join(home, 'plugins', name);
   mkdirSync(join(folder, 'dist'), { recursive: true });
-  const permissions = [`signin:${SIGNIN}`];
   writeFileSync(
     join(folder, 'tyto-plugin.json'),
     JSON.stringify({
-      name: PLUGIN,
+      name,
       version: '1.0.0',
       engine: `>=${PLUGIN_API_VERSION}`,
       contributes: ['exporter'],
-      permissions,
+      permissions: [`signin:${SIGNIN}`],
       signin: {
         [SIGNIN]: {
           authorize: `${provider.origin}/authorize`,
           token: `${provider.origin}/token`,
-          clientId: 'tyto-e2e',
+          ...(clientId === undefined ? {} : { clientId }),
           scopes: ['files'],
         },
       },
     }),
   );
-  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name: PLUGIN, type: 'module' }));
+  writeFileSync(join(folder, 'package.json'), JSON.stringify({ name, type: 'module' }));
   const said = (call: string): string =>
     `${call}.then((value) => String(value), (cause) => 'refused:' + (cause.code ?? cause.message))`;
   writeFileSync(
     join(folder, 'dist', 'index.js'),
     `export function activate(host) {
   host.registerExporter({
-    id: 'token', mime: 'text/plain', extension: 'tok', kinds: ['tok'], rasterized: false,
+    id: ${JSON.stringify(kind)}, mime: 'text/plain', extension: ${JSON.stringify(kind)},
+    kinds: [${JSON.stringify(kind)}], rasterized: false,
     exportFrame: () => Promise.all([
       ${said(`host.signin.accessToken(${JSON.stringify(SIGNIN)})`)},
-      ${said(`host.credentials(${JSON.stringify(`signin:${SIGNIN}`)})`)},
+      ${said(`host.credentials(${JSON.stringify(reserved)})`)},
     ]).then((seen) => ({ ok: true, value: seen.join(' '), diagnostics: [] })),
   });
 }
 `,
   );
+}
+
+function writeHome(): void {
+  writePlugin(PLUGIN, 'tok', `signin:${SIGNIN}`, 'tyto-e2e');
+  writePlugin(OWN_CLIENT, 'tokc', `signin-client:${SIGNIN}`, undefined);
+  const approved = { enabled: true, permissions: [`signin:${SIGNIN}`], source: '.' };
   writeFileSync(
     join(home, 'plugins.json'),
-    JSON.stringify({ plugins: { [PLUGIN]: { enabled: true, permissions, source: '.' } } }),
+    JSON.stringify({ plugins: { [PLUGIN]: approved, [OWN_CLIENT]: approved } }),
   );
 }
 
@@ -125,14 +152,14 @@ interface Progress {
   readonly progress?: { readonly status: string; readonly failure?: string };
 }
 
-/** Exports the plugin's `tok` and answers what its two calls said, space-separated. */
-async function pluginSees(label: string): Promise<string> {
+/** Exports a plugin's `kind` and answers what its two calls said, space-separated. */
+async function pluginSees(label: string, kind = 'tok'): Promise<string> {
   const directory = join(scratch, 'out', label);
   const { exportId } = await call<{ exportId: string }>('export:start', {
     documentId: 'e2e',
     brief: BRIEF,
     directory,
-    outputs: [{ kind: 'tok' }],
+    outputs: [{ kind }],
   });
   const started = Date.now();
   for (;;) {
@@ -144,7 +171,7 @@ async function pluginSees(label: string): Promise<string> {
     if (Date.now() - started > 20_000) throw new Error('the export never finished');
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  const [file] = readdirSync(directory).filter((name) => name.endsWith('.tok'));
+  const [file] = readdirSync(directory).filter((name) => name.endsWith(`.${kind}`));
   return readFileSync(join(directory, file!), 'utf8');
 }
 
@@ -155,14 +182,13 @@ const opened = (): Promise<string[]> =>
 beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-signin-'));
   home = join(scratch, 'tyto-home');
-  entry = join(
-    scratch,
-    'user-data',
-    'credentials',
-    `${encodeURIComponent(`signin:${PLUGIN}:${SIGNIN}`)}.bin`,
-  );
-  // Before the manifest: it names the provider's port, which the system picks.
-  provider = await startFakeAuthorizationServer();
+  entry = entryFile(`signin:${PLUGIN}:${SIGNIN}`);
+  // Before the manifest: it names the provider's port, which the system picks. It knows the
+  // first plugin's client, and the one the person will type for the second.
+  provider = await startFakeAuthorizationServer({
+    'tyto-e2e': undefined,
+    [PERSON_CLIENT_ID]: PERSON_CLIENT_SECRET,
+  });
   writeHome();
 
   app = await _electron.launch({
@@ -221,7 +247,7 @@ describe('browser sign-in from the plugins screen', () => {
     expect(landing).toContain(translate(locale, 'plugins.signin.page.signedIn'));
     expect(landing).not.toContain('code-1');
 
-    const keychain = await app.evaluate(({ safeStorage }) => safeStorage.isEncryptionAvailable());
+    keychain = await app.evaluate(({ safeStorage }) => safeStorage.isEncryptionAvailable());
     process.stdout.write(`[TYTO-374] safeStorage available=${String(keychain)}\n`);
     if (!keychain) {
       // A machine with nothing to encrypt with refuses to store the refresh token in plaintext,
@@ -269,5 +295,68 @@ describe('browser sign-in from the plugins screen', () => {
     expect(await pluginSees('signed-out')).toBe('refused:E_SIGNIN_REQUIRED refused:E_PERMISSION');
     // Signing out opened no browser either: one URL, the sign-in's.
     expect(await opened()).toHaveLength(1);
+  });
+
+  it('signs in with a client typed on the screen when the manifest names none (ADR 0192)', async () => {
+    const clientEntry = entryFile(`signin-client:${OWN_CLIENT}:${SIGNIN}`);
+    const tokenEntry = entryFile(`signin:${OWN_CLIENT}:${SIGNIN}`);
+    await page.waitForSelector(`${OWN_LINE}[data-client="missing"]`);
+    expect(await page.isDisabled(`${OWN_LINE} .plugins__signin-start`)).toBe(true);
+    expect(await page.textContent(`${OWN_LINE} .plugins__signin-hint`)).toBe(
+      translate(locale, 'plugins.signin.client.needed'),
+    );
+    // The plugin's own credentials never reach the client's account, whatever it names.
+    expect(await pluginSees('no-client', 'tokc')).toBe(
+      'refused:E_SIGNIN_REQUIRED refused:E_PERMISSION',
+    );
+
+    await page.fill(`${OWN_LINE} .plugins__signin-client-id`, PERSON_CLIENT_ID);
+    await page.fill(`${OWN_LINE} .plugins__signin-client-secret`, PERSON_CLIENT_SECRET);
+    await page.click(`${OWN_LINE} .plugins__signin-client-save`);
+    if (!keychain) {
+      await page.waitForSelector(`${OWN_LINE} .plugins__signin-client-failed`);
+      expect(existsSync(clientEntry)).toBe(false);
+      return;
+    }
+    await page.waitForSelector(`${OWN_LINE}[data-client="set"]`);
+
+    // Kept as ciphertext, never shown again, never listed.
+    expect(existsSync(clientEntry)).toBe(true);
+    expect(readFileSync(clientEntry).toString('utf8')).not.toContain(PERSON_CLIENT_SECRET);
+    expect(await page.inputValue(`${OWN_LINE} .plugins__signin-client-id`)).toBe('');
+    expect(await page.inputValue(`${OWN_LINE} .plugins__signin-client-secret`)).toBe('');
+    const listed = JSON.stringify(await call<unknown>('signin:list', {}));
+    expect(listed).not.toContain(PERSON_CLIENT_ID);
+    expect(listed).not.toContain(PERSON_CLIENT_SECRET);
+    expect(listed).toContain('"client":"set"');
+    const html = await page.evaluate(() => document.documentElement.outerHTML);
+    expect(html).not.toContain(PERSON_CLIENT_ID);
+    expect(html).not.toContain(PERSON_CLIENT_SECRET);
+
+    await page.click(`${OWN_LINE} .plugins__signin-start`);
+    await expect.poll(async () => (await opened()).length, { timeout: 10_000 }).toBe(2);
+    const authorize = (await opened())[1]!;
+    expect(new URL(authorize).searchParams.get('client_id')).toBe(PERSON_CLIENT_ID);
+    const landed = await fetch(authorize);
+    expect(landed.status).toBe(200);
+    await page.waitForSelector(`${OWN_LINE}[data-signed-in="true"]`);
+
+    // The provider accepted the code only for the typed client and secret.
+    const last = provider.grants.at(-1)!;
+    expect(last.get('grant_type')).toBe('authorization_code');
+    expect(last.get('client_id')).toBe(PERSON_CLIENT_ID);
+    expect(last.get('client_secret')).toBe(PERSON_CLIENT_SECRET);
+    expect(await pluginSees('own-client', 'tokc')).toBe(
+      `${FAKE_ACCESS_TOKEN} refused:E_PERMISSION`,
+    );
+
+    // Clearing the client ends the sign-in made with it: both entries are gone.
+    await page.click(`${OWN_LINE} .plugins__signin-client-clear`);
+    await page.waitForSelector(`${OWN_LINE}[data-client="missing"][data-signed-in="false"]`);
+    expect(existsSync(clientEntry)).toBe(false);
+    expect(existsSync(tokenEntry)).toBe(false);
+    expect(await pluginSees('cleared', 'tokc')).toBe(
+      'refused:E_SIGNIN_REQUIRED refused:E_PERMISSION',
+    );
   });
 });
