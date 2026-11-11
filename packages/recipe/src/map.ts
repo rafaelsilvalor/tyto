@@ -13,7 +13,7 @@ const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const NAMES = ['using', 'also', 'into'] as const;
 
 /** A lookup table: each key's value, as the file writes both. */
-const LOOKUP = z.record(z.string(), z.string());
+export const LOOKUP = z.record(z.string(), z.string());
 
 type Lookup = z.infer<typeof LOOKUP>;
 

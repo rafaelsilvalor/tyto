@@ -229,6 +229,8 @@ non-zero.
 | `E_RECIPE_REWRITE` | error | no | A 'rewrite' list cannot be read, or a replacement names a group its pattern lacks or writes a '$' that means nothing. |
 | `E_RECIPE_TEMPLATE` | error | no | A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist. |
 | `E_RECIPE_FORM` | error | yes | A step's form names a verb without a form, misses a required field, or holds a value one recipe line cannot carry. |
+| `E_VOCABULARY_SYNTAX` | error | no | A vocabulary file is not JSON with comments, or is not an object of sections. |
+| `E_VOCABULARY_SHAPE` | error | no | A vocabulary file's rules, rewrites or lookups section holds an entry that is not what the verb reading it accepts. |
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 | `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
@@ -396,6 +398,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_REWRITE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_TEMPLATE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_FORM` | yes | No line is written, so the recipe keeps the text it had. |
+| `E_VOCABULARY_SYNTAX` | no | The sections read around the problem are still linted. |
+| `E_VOCABULARY_SHAPE` | no | The other entries are still linted, and a recipe reading that one fails its cell. |
 | `E_VIM_CONTRIBUTION` | no | Only that contribution is left out; vim and every other contribution keep working. |
 
 ## Errors
@@ -2429,6 +2433,34 @@ This step cannot be written as a recipe line: {problem}.
 ```
 
 Parameters: `problem`
+
+### `E_VOCABULARY_SYNTAX`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0176-a-recipe-and-its-vocabulary-are-authored-in-the-window-and-the-text-stays-the-source.md`
+
+A vocabulary file is not JSON with comments, or is not an object of sections.
+
+The sections read around the problem are still linted.
+
+```
+The vocabulary file cannot be read: {problem}.
+```
+
+Parameters: `problem`
+
+### `E_VOCABULARY_SHAPE`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0176-a-recipe-and-its-vocabulary-are-authored-in-the-window-and-the-text-stays-the-source.md`
+
+A vocabulary file's rules, rewrites or lookups section holds an entry that is not what the verb reading it accepts.
+
+The other entries are still linted, and a recipe reading that one fails its cell.
+
+```
+The vocabulary's '{pointer}' {problem}.
+```
+
+Parameters: `pointer`, `problem`
 
 ### `E_VIM_CONTRIBUTION`
 

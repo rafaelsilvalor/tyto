@@ -2142,6 +2142,24 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'No line is written, so the recipe keeps the text it had.',
   },
+  // ADR 0176: a `*.vocab.json` is linted where it is written, before any recipe reads it.
+  E_VOCABULARY_SYNTAX: {
+    severity: 'error',
+    summary: 'A vocabulary file is not JSON with comments, or is not an object of sections.',
+    template: 'The vocabulary file cannot be read: {problem}.',
+    spec: 'docs/adr/0176-a-recipe-and-its-vocabulary-are-authored-in-the-window-and-the-text-stays-the-source.md',
+    fatal: false,
+    fatality: 'The sections read around the problem are still linted.',
+  },
+  E_VOCABULARY_SHAPE: {
+    severity: 'error',
+    summary:
+      "A vocabulary file's rules, rewrites or lookups section holds an entry that is not what the verb reading it accepts.",
+    template: "The vocabulary's '{pointer}' {problem}.",
+    spec: 'docs/adr/0176-a-recipe-and-its-vocabulary-are-authored-in-the-window-and-the-text-stays-the-source.md',
+    fatal: false,
+    fatality: 'The other entries are still linted, and a recipe reading that one fails its cell.',
+  },
   // Zero rows is a legitimate answer, but it cannot be told from a misspelt value if it is silent.
   W_RECIPE_WHERE_EMPTY: {
     severity: 'warning',
