@@ -99,15 +99,38 @@ function plugin(state: Plugin): RecipeContributions {
       return ok({ operations: answers });
     },
   };
+  // TYTO-650: a sheet and a tracker that already agree on every row.
+  const agree: RecipeVerbContribution = {
+    id: 'acme.agree',
+    kind: 'source',
+    arguments: [],
+    page: () => Promise.resolve(ok({ table: AGREED })),
+  };
   return {
-    recipeVerbs: () => [pull, mark],
+    recipeVerbs: () => [pull, mark, agree],
     ownedRecipeVerbs: () => [
       { plugin: 'example', verb: pull },
       { plugin: 'example', verb: mark },
+      { plugin: 'example', verb: agree },
     ],
     recipeDerivations: () => [],
   };
 }
+
+const agreed = (key: string, status: string) => ({
+  key,
+  values: { key, sheet: status, tracker: status },
+  provenance: { source: 'acme', id: key, fetchedAt: '2026-11-07T09:00:00.000Z' },
+});
+
+const AGREED: Table = {
+  columns: [
+    { name: 'key', type: 'text', origin: 'acme' },
+    { name: 'sheet', type: 'text', origin: 'acme' },
+    { name: 'tracker', type: 'text', origin: 'acme' },
+  ],
+  rows: [agreed('EX-1', 'done'), agreed('EX-2', 'doing')],
+};
 
 const SYNC = [
   'recipe sync',
@@ -143,26 +166,36 @@ function harness(trust: RecipePlace['trust'] = 'trusted') {
     applying: 0,
     mostApplying: 0,
   };
+  /** TYTO-650: every state write, with how many applies were under way when it started. */
+  const writes: { readonly store: string; readonly applying: number }[] = [];
   const runner = createRecipeRunner({
     contributions: plugin(state),
     placeOf: () => Promise.resolve(trust === 'none' ? { trust } : { trust, folder: workspace }),
     sectionFor: () => undefined,
     home,
     clock: () => clock,
+    state: (options) => {
+      const real = recipeStateStore(options);
+      return {
+        ...real,
+        write: (store, puts, deletes) => {
+          writes.push({ store, applying: state.applying });
+          return real.write(store, puts, deletes);
+        },
+      };
+    },
   });
   const run = (text: string, more: Partial<RecipeRunInput> = {}) =>
     runner.run({ documentId: 'tab-1', text, path: recipePath, ...more });
   const apply = (index: number, planId: number) =>
     runner.apply({ documentId: 'tab-1', index, planId, path: recipePath });
-  /** What the recipe's `pushed` store holds, by key. */
-  const stored = async () => {
-    const entries = await recipeStateStore({ home, workspace, recipe: recipePath }).entries(
-      'pushed',
-    );
+  /** What the recipe's store holds, by key: `pushed` unless named. */
+  const stored = async (store = 'pushed') => {
+    const entries = await recipeStateStore({ home, workspace, recipe: recipePath }).entries(store);
     if (!entries.ok) throw new Error('the store did not read');
     return Object.fromEntries([...entries.value].map(([key, entry]) => [key, entry.values]));
   };
-  return { state, runner, run, apply, stored };
+  return { state, runner, run, apply, stored, writes };
 }
 
 const codes = (cell: { diagnostics: readonly { code: string }[] } | undefined) =>
@@ -377,5 +410,137 @@ describe('a scheduled run (TYTO-385, ADR 0175)', () => {
 
     expect(state.mostApplying).toBe(1);
     expect(state.applied).toBe(6);
+  });
+});
+
+/**
+ * TYTO-650, ADR 0170 note of 2026-11-11: a run whose plans hold no operation is never applied,
+ * so its `remember` writes are committed by the run itself, on an explicit Run in a trusted
+ * folder only, with an empty outcome and no `applied_at`.
+ */
+describe('a run that plans nothing to write', () => {
+  const AGREE = [
+    'recipe agree',
+    'acme.agree',
+    'last sync columns=status',
+    'decide status local=sheet remote=tracker last=last_status values=todo,doing,done',
+    'remember sync columns=status',
+    'where status_action = push',
+    'example.mark done',
+    '',
+  ].join('\n');
+  const REMEMBERED = { 'EX-1': { status: 'done' }, 'EX-2': { status: 'doing' } };
+
+  it('commits under apply auto today, through an Apply of the empty plan', async () => {
+    const { state, run, stored } = harness();
+
+    const answer = await run(AGREE.replace('recipe agree\n', 'recipe agree\napply auto\n'), {
+      explicit: true,
+    });
+
+    expect(answer.cells[5]?.plan?.count).toBe(0);
+    expect(answer.cells[5]?.applied?.operations).toEqual([]);
+    expect(state.applied).toBe(0);
+    expect(await stored('sync')).toEqual(REMEMBERED);
+  });
+
+  it('commits on an explicit Run, and the next run reads the values back through last', async () => {
+    const { state, run, stored } = harness();
+
+    const first = await run(AGREE, { explicit: true });
+
+    expect(first.diagnostics).toEqual([]);
+    expect(first.cells.map((cell) => cell.status)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok']);
+    expect(first.cells[5]?.plan?.count).toBe(0);
+    expect(first.cells[5]?.applicable).toBe(false);
+    expect(first.cells[5]?.applied).toBeUndefined();
+    expect(state.applied).toBe(0);
+    // Every write stored, none stamped `applied_at`: nothing was applied.
+    expect(await stored('sync')).toEqual(REMEMBERED);
+
+    const second = await run(AGREE, { explicit: true, from: 0 });
+    const last = second.cells[1]?.table?.rows.map((each) => each.values.last_status);
+    expect(last).toEqual(['done', 'doing']);
+  });
+
+  it('commits on a scheduled run in a trusted folder, which counts as Run', async () => {
+    const { run, stored } = harness();
+
+    await run(AGREE, { documentId: 'schedule:agree', scheduled: true, from: 0 });
+
+    expect(await stored('sync')).toEqual(REMEMBERED);
+  });
+
+  it('commits nothing on a save or a pause in typing, as tyto mcp runs with save', async () => {
+    const { run, stored, writes } = harness();
+
+    await run(AGREE, { saved: true });
+    await run(AGREE.replace('doing,done\n', 'doing,done \n'));
+
+    expect(writes).toEqual([]);
+    expect(await stored('sync')).toEqual({});
+  });
+
+  it('commits nothing in a folder not trusted, even on Run', async () => {
+    const { run, writes } = harness('restricted');
+
+    const answer = await run(AGREE, { explicit: true });
+
+    expect(answer.cells[5]?.plan?.count).toBe(0);
+    expect(writes).toEqual([]);
+  });
+
+  it('commits nothing when a cell failed', async () => {
+    const { run, writes } = harness();
+
+    const answer = await run(`${AGREE}select nothing_here\n`, { explicit: true });
+
+    expect(answer.cells[6]?.status).toBe('failed');
+    expect(writes).toEqual([]);
+  });
+
+  it('commits nothing for a recipe with no plan cell, which only reads', async () => {
+    const { run, writes } = harness();
+
+    const answer = await run(AGREE.replace('example.mark done\n', ''), { explicit: true });
+
+    expect(answer.cells.map((cell) => cell.status)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok']);
+    expect(writes).toEqual([]);
+  });
+
+  it('commits nothing while a plan holds operations nobody applied', async () => {
+    const { run, writes } = harness();
+
+    const answer = await run(AGREE.replace('where status_action = push\n', ''), {
+      explicit: true,
+    });
+
+    expect(answer.cells[4]?.plan?.count).toBe(2);
+    expect(writes).toEqual([]);
+  });
+
+  it("waits in the file's Apply queue, so it never commits beside a real Apply", async () => {
+    const { state, runner, run, apply, writes } = harness();
+    const tab = await run(SYNC, { explicit: true });
+    let release = (): void => {};
+    state.gate = new Promise((resolve) => {
+      release = resolve;
+    });
+
+    const clicked = apply(2, tab.cells[2]?.planId ?? -1);
+    while (state.applying === 0) await new Promise((resolve) => setTimeout(resolve, 5));
+    const other = runner.run({
+      documentId: 'tab-2',
+      text: AGREE,
+      path: recipePath,
+      explicit: true,
+    });
+    // The other tab's run has planned nothing; give its commit every chance to start.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    release();
+    await Promise.all([clicked, other]);
+
+    expect(writes.map((write) => write.store)).toEqual(['pushed', 'sync']);
+    expect(writes.every((write) => write.applying === 0)).toBe(true);
   });
 });
