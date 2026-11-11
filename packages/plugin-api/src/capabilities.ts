@@ -2,7 +2,7 @@ import { type Diagnostic, diagnostic } from '@tyto/core';
 
 import type { StartProcess } from './process.js';
 import type { OpenTerminal } from './terminal.js';
-import type { AgentServer } from './window.js';
+import type { AgentServer, WindowTool, WindowToolResult } from './window.js';
 
 /**
  * The runtime's own, read off `globalThis`: this package compiles against no platform's
@@ -193,6 +193,24 @@ export interface HostCapabilities {
    * `E_WINDOW_UNAVAILABLE`.
    */
   windowAgentServer?(plugin: string): Promise<AgentServer>;
+
+  /**
+   * The tools the window serves an agent now (ADR 0190), already allowed: the plugin declares
+   * `window:tools`. **The adapter refuses as {@link windowAgentServer} does** — a restricted
+   * folder `E_WINDOW_RESTRICTED`, `agentsListen` off `E_WINDOW_AGENTS_OFF` — read on every call.
+   * Absent on a host with no window — the CLI — which answers `E_WINDOW_UNAVAILABLE`.
+   */
+  windowTools?(plugin: string): Promise<readonly WindowTool[]>;
+  /**
+   * Calls one window tool for the plugin, in process, with the same refusals, the same trust and
+   * the same rules an agent connected to the window gets: edits are proposals (ADR 0180). A
+   * tool's own refusal is an answer with `isError: true`, never a throw.
+   */
+  callWindowTool?(
+    plugin: string,
+    name: string,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<WindowToolResult>;
 }
 
 /**

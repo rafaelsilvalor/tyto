@@ -15,7 +15,7 @@ import {
 import type { Disposable, HostEventListener, HostEvents, Logger, PluginHost } from '../host.js';
 import { hostProcess, processChannel } from '../process.js';
 import { hostTerminal } from '../terminal.js';
-import { type AgentServer, hostWindow } from '../window.js';
+import { type AgentServer, type WindowTool, type WindowToolResult, hostWindow } from '../window.js';
 import type { GuestChannel } from './channel.js';
 import { guestFaces } from './faces.js';
 import {
@@ -41,6 +41,8 @@ import {
   processStartedSchema,
   signinTokenSchema,
   windowAgentServerSchema,
+  windowToolResultSchema,
+  windowToolsSchema,
   workspaceBytesSchema,
 } from './protocol.js';
 
@@ -322,9 +324,17 @@ export function runGuest(
         },
       });
     }),
-    window: hostWindow(
-      async () => (await request('windowAgentServer', [], windowAgentServerSchema)) as AgentServer,
-    ),
+    window: hostWindow({
+      agentServer: async () =>
+        (await request('windowAgentServer', [], windowAgentServerSchema)) as AgentServer,
+      tools: async () => (await request('windowTools', [], windowToolsSchema)) as WindowTool[],
+      callTool: async (name, input) =>
+        (await request(
+          'windowCallTool',
+          [name, { ...input }],
+          windowToolResultSchema,
+        )) as WindowToolResult,
+    }),
     terminal: hostTerminal(async (name, args) => {
       await request('terminalOpen', [name, [...args]], storedSchema);
     }),

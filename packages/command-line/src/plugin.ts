@@ -8,6 +8,7 @@ import {
   type PluginProgramScripts,
   programScript,
   validatePluginManifest,
+  WINDOW_TOOLS_PERMISSION,
 } from '@tyto/plugin-api';
 
 import type { CliEnvironment } from './environment.js';
@@ -300,8 +301,17 @@ export function permissionPrompt(manifest: PluginManifest, source: string): stri
   );
 }
 
-/** One permission as the list shows it; `process:<name>` says what it does (ADR 0182, 0184). */
+/**
+ * One permission as the list shows it; `process:<name>` and `window:tools` say what they do (ADR
+ * 0182, 0184, 0190).
+ */
 function permissionLine(permission: string, scripts: PluginProgramScripts): string {
+  if (permission === WINDOW_TOOLS_PERMISSION) {
+    return (
+      `${permission}: use Tyto's tools in the open window: read what is open there and propose\n` +
+      '    edits you accept or reject, while Tyto lets agents connect (setting `agentsListen`)'
+    );
+  }
   if (!permission.startsWith(PROCESS_PERMISSION)) return permission;
   const program = permission.slice(PROCESS_PERMISSION.length);
   const script = programScript(scripts, program);

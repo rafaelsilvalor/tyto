@@ -11,7 +11,7 @@ import type { Disposable, Logger, Plugin, PluginHost } from '../host.js';
 import { validatePluginManifest } from '../manifest.js';
 import { type CheckedProcess, checkedProcesses } from '../process.js';
 import { checkedTerminal } from '../terminal.js';
-import { checkedWindowAgentServer } from '../window.js';
+import { checkedWindowAgentServer, checkedWindowTools } from '../window.js';
 import type { PluginChannel } from './channel.js';
 import { type CallableSpec, type PointSpec, pointSpecOf } from './points.js';
 import {
@@ -38,6 +38,8 @@ import {
   processWriteArgsSchema,
   terminalOpenArgsSchema,
   windowAgentServerArgsSchema,
+  windowCallToolArgsSchema,
+  windowToolsArgsSchema,
 } from './protocol.js';
 
 /**
@@ -189,6 +191,7 @@ export function connectIsolatedPlugin(
    */
   const processes = checkedProcesses(name, permissions, options.capabilities, scripts);
   const windowAgentServer = checkedWindowAgentServer(name, permissions, options.capabilities);
+  const windowTools = checkedWindowTools(name, permissions, options.capabilities);
   const openTerminal = checkedTerminal(name, permissions, options.capabilities, scripts);
   const programs = new Map<number, CheckedProcess>();
   let nextProgram = 0;
@@ -363,6 +366,19 @@ export function connectIsolatedPlugin(
           }
           // Checked by `checkedWindowAgentServer`: the schema's fields and the two variables only.
           reply({ ok: true, value: await windowAgentServer() });
+        } else if (message.capability === 'windowTools') {
+          const args = windowToolsArgsSchema.safeParse(message.args);
+          if (!args.success) {
+            throw new TypeError(`host.window.tools was given ${describeIssues(args.error)}`);
+          }
+          // Checked by `checkedWindowTools`: through the strict schema, field by field.
+          reply({ ok: true, value: await windowTools.tools() });
+        } else if (message.capability === 'windowCallTool') {
+          const args = windowCallToolArgsSchema.safeParse(message.args);
+          if (!args.success) {
+            throw new TypeError(`host.window.callTool was given ${describeIssues(args.error)}`);
+          }
+          reply({ ok: true, value: await windowTools.callTool(args.data[0], args.data[1]) });
         } else if (message.capability === 'terminalOpen') {
           const args = terminalOpenArgsSchema.safeParse(message.args);
           if (!args.success)
@@ -428,6 +444,8 @@ export function connectIsolatedPlugin(
         | 'processEnd'
         | 'processKill'
         | 'windowAgentServer'
+        | 'windowTools'
+        | 'windowCallTool'
         | 'terminalOpen'
       >,
       raw: readonly unknown[],

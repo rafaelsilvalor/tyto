@@ -1,7 +1,12 @@
 import { type Diagnostic, diagnosticCodeList } from '@tyto/core';
 import { z } from 'zod';
 
-import { agentServerSchema } from '../window.js';
+import {
+  agentServerSchema,
+  windowToolInputSchema,
+  windowToolResultSchema,
+  windowToolSchema,
+} from '../window.js';
 
 /**
  * The messages between the host and an isolated plugin (E11.2, ADR 0041).
@@ -53,9 +58,10 @@ import { agentServerSchema } from '../window.js';
  * folder the program runs in, a field the strict schema of a guest on 20 would refuse (ADR 0182,
  * note of 2026-11-09, TYTO-569); 22 since a plugin may ask for a terminal tab running a program
  * it declares, a request a host on 21 would refuse as an unknown capability (ADR 0184,
- * TYTO-657).
+ * TYTO-657); 23 since a plugin may list and call the window's tools in process, two requests a
+ * host on 22 would refuse as unknown capabilities (ADR 0190, TYTO-661).
  */
-export const RPC_PROTOCOL_VERSION = 22;
+export const RPC_PROTOCOL_VERSION = 23;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -237,6 +243,8 @@ const requestedCapabilitySchema = z.enum([
   'processEnd',
   'processKill',
   'windowAgentServer',
+  'windowTools',
+  'windowCallTool',
   'terminalOpen',
 ]);
 export type RequestedCapability = z.infer<typeof requestedCapabilitySchema>;
@@ -374,6 +382,16 @@ export function describeIssues(error: z.ZodError): string {
  */
 export const windowAgentServerArgsSchema = z.tuple([]);
 export const windowAgentServerSchema = agentServerSchema;
+
+/**
+ * `host.window.tools` and `host.window.callTool` (ADR 0190): the tools come back through the same
+ * strict schema the host's check used; a call sends a name and a JSON object, and its answer
+ * comes back the same way. Shape only: the permission is `checkedWindowTools`'s.
+ */
+export const windowToolsArgsSchema = z.tuple([]);
+export const windowToolsSchema = z.array(windowToolSchema);
+export const windowCallToolArgsSchema = z.tuple([z.string(), windowToolInputSchema]);
+export { windowToolResultSchema };
 
 /**
  * `host.terminal.open` (ADR 0184): the name and the arguments go out, nothing comes back but

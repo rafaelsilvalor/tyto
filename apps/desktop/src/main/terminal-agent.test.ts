@@ -292,7 +292,7 @@ describe('the window’s agent server a plugin hands its agent (TYTO-569, ADR 01
       (cause: PluginCapabilityError) => cause,
     );
     expect(refusal?.message).toBe(
-      "Plugin 'agente' asked for the window's agent server, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
+      "Plugin 'agente' asked to reach the window, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
     );
     expect(windowAgentServer(windows()).command).toBe(windows().relay.node);
   });

@@ -6,7 +6,10 @@ import { createPluginHost } from './host.js';
 import {
   type AgentServer,
   WINDOW_AGENT_SERVER_NAME,
+  WINDOW_TOOLS_PERMISSION,
+  type WindowToolResult,
   checkedWindowAgentServer,
+  checkedWindowTools,
   namesAProgram,
 } from './window.js';
 
@@ -95,7 +98,7 @@ describe('what the window’s agent server answers', () => {
     );
     expect(refusal?.code).toBe('E_WINDOW_UNAVAILABLE');
     expect(refusal?.message).toBe(
-      "Plugin 'agente' asked for the window's agent server, and tyto has no window.",
+      "Plugin 'agente' asked to reach the window, and tyto has no window.",
     );
   });
 
@@ -194,5 +197,99 @@ describe('host.window in process', () => {
     }
     await finished;
     expect(answers.sort()).toEqual(['agente: tyto TYTO_WINDOW,TYTO_HOME', 'outro: E_PERMISSION']);
+  });
+});
+
+describe('the checks in front of the window’s tools (ADR 0190)', () => {
+  const TOOL = { name: 'check_brief', description: 'Checks a brief.', inputSchema: {} };
+  const asked: string[] = [];
+  const TOOLS: HostCapabilities = {
+    ...BASE,
+    windowTools: () => {
+      asked.push('list');
+      return Promise.resolve([TOOL]);
+    },
+    callWindowTool: (_plugin, name) => {
+      asked.push(name);
+      return Promise.resolve({ content: [{ type: 'text', text: 'ok' }], isError: false });
+    },
+  };
+
+  it('refuses a plugin without window:tools before the adapter is asked', async () => {
+    asked.length = 0;
+    const tools = checkedWindowTools('agente', ['process:claude-agent-acp'], TOOLS);
+    expect(await codeOf(tools.tools())).toBe('E_PERMISSION');
+    expect(await codeOf(tools.callTool('check_brief', {}))).toBe('E_PERMISSION');
+    expect(asked).toEqual([]);
+  });
+
+  it('answers E_WINDOW_UNAVAILABLE on a host with no window', async () => {
+    const tools = checkedWindowTools('agente', [WINDOW_TOOLS_PERMISSION], BASE);
+    expect(await codeOf(tools.tools())).toBe('E_WINDOW_UNAVAILABLE');
+    expect(await codeOf(tools.callTool('check_brief', {}))).toBe('E_WINDOW_UNAVAILABLE');
+  });
+
+  it('refuses a name or an input no tool could have, before the adapter is asked', async () => {
+    asked.length = 0;
+    const tools = checkedWindowTools('agente', [WINDOW_TOOLS_PERMISSION], TOOLS);
+    expect(await codeOf(tools.callTool('', {}))).toMatch(/^thrown: TypeError/u);
+    expect(await codeOf(tools.callTool('../check', {}))).toMatch(/^thrown: TypeError/u);
+    expect(
+      await codeOf(tools.callTool('check_brief', ['a'] as unknown as Record<string, unknown>)),
+    ).toMatch(/^thrown: TypeError/u);
+    expect(asked).toEqual([]);
+  });
+
+  it('passes the adapter’s answer through a strict schema', async () => {
+    const tools = checkedWindowTools('agente', [WINDOW_TOOLS_PERMISSION], TOOLS);
+    expect(await tools.tools()).toEqual([TOOL]);
+    expect(await tools.callTool('check_brief', { path: 'a.brief' })).toEqual({
+      content: [{ type: 'text', text: 'ok' }],
+      isError: false,
+    });
+    const extra = checkedWindowTools('agente', [WINDOW_TOOLS_PERMISSION], {
+      ...TOOLS,
+      callWindowTool: () =>
+        Promise.resolve({ content: [], isError: false, cost: 3 } as unknown as WindowToolResult),
+    });
+    expect(await codeOf(extra.callTool('check_brief', {}))).toMatch(/^thrown: TypeError/u);
+  });
+
+  it('is the in-process host’s too', async () => {
+    const host = createPluginHost({ capabilities: TOOLS });
+    const answers: string[] = [];
+    let done: () => void = () => undefined;
+    const finished = new Promise<void>((resolve) => {
+      done = resolve;
+    });
+    for (const [id, permissions] of [
+      ['agente', [WINDOW_TOOLS_PERMISSION]],
+      ['outro', ['process:claude-agent-acp']],
+    ] as const) {
+      host.activate({
+        id,
+        manifest: {
+          name: id,
+          version: '1.0.0',
+          engine: '>=0.1',
+          contributes: ['panel'],
+          permissions: [...permissions],
+        },
+        activate: (plugin) => {
+          void plugin.window.tools().then(
+            (tools) => {
+              answers.push(`${id}: ${tools.map((tool) => tool.name).join(',')}`);
+              if (answers.length === 2) done();
+            },
+            (cause: PluginCapabilityError) => {
+              answers.push(`${id}: ${cause.code}`);
+              if (answers.length === 2) done();
+            },
+          );
+        },
+      });
+    }
+    await finished;
+    expect(answers.sort()).toEqual(['agente: check_brief', 'outro: E_PERMISSION']);
   });
 });

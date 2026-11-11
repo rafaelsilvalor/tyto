@@ -58,7 +58,49 @@ export const agentServerSchema = z.strictObject({
   env: z.array(z.strictObject({ name: z.string().min(1), value: z.string() })),
 });
 
-/** `host.window`: what a plugin's program needs to reach the open window. */
+/**
+ * The permission that lets a plugin call the window's tools itself, in process (ADR 0190): the
+ * tools `tyto mcp --window` serves an agent, under the same trust, with edits as proposals.
+ */
+export const WINDOW_TOOLS_PERMISSION = 'window:tools';
+
+/** A tool name as MCP's spec bounds it: 1 to 128 of these characters. */
+const toolNameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9_.-]+$/u, 'must be letters, digits, _, . or -');
+
+/** One tool the window serves, as `tools/list` describes it. */
+export const windowToolSchema = z.strictObject({
+  name: toolNameSchema,
+  description: z.string(),
+  /** A JSON Schema object, kept as the window wrote it, for the plugin to hand to a model. */
+  inputSchema: z.record(z.string(), z.unknown()),
+});
+export type WindowTool = z.infer<typeof windowToolSchema>;
+
+/** What a tool answers: text, or an image as base64 (a preview), as MCP's content says it. */
+export const windowToolContentSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('text'), text: z.string() }),
+  z.strictObject({ type: z.literal('image'), data: z.string(), mimeType: z.string().min(1) }),
+]);
+export type WindowToolContent = z.infer<typeof windowToolContentSchema>;
+
+/**
+ * A tool's answer. `isError` is the tool refusing (a brief that does not parse, a folder that is
+ * restricted): an answer for the model to read, not an exception for the plugin.
+ */
+export const windowToolResultSchema = z.strictObject({
+  content: z.array(windowToolContentSchema),
+  isError: z.boolean(),
+});
+export type WindowToolResult = z.infer<typeof windowToolResultSchema>;
+
+/** A tool's input: a JSON object, as a model writes it. */
+export const windowToolInputSchema = z.record(z.string(), z.unknown());
+
+/** `host.window`: what a plugin and its program need to reach the open window. */
 export interface HostWindow {
   /**
    * The window's MCP server, for the agent a plugin starts. A plugin with no `process:<name>`
@@ -67,11 +109,33 @@ export interface HostWindow {
    * Asked again each time: the setting and the folder's trust can change between two calls.
    */
   agentServer(): Promise<AgentServer>;
+  /**
+   * The tools the window serves an agent now (ADR 0190), behind `window:tools`. They depend on
+   * the open folder's trust, so a plugin asks again before each turn. The refusals are
+   * {@link agentServer}'s, but for the permission.
+   */
+  tools(): Promise<readonly WindowTool[]>;
+  /**
+   * Calls one of them, in process, with the same trust and the same rules an agent connected to
+   * the window gets: an edit to a document's text is a proposal the person accepts or rejects
+   * (ADR 0180). A tool's own refusal is an answer with `isError`; the window's are thrown.
+   */
+  callTool(name: string, input: Readonly<Record<string, unknown>>): Promise<WindowToolResult>;
+}
+
+/** What {@link hostWindow} is built from: the three checked calls. */
+export interface HostWindowCalls {
+  readonly agentServer: () => Promise<AgentServer>;
+  readonly tools: () => Promise<readonly WindowTool[]>;
+  readonly callTool: (
+    name: string,
+    input: Readonly<Record<string, unknown>>,
+  ) => Promise<WindowToolResult>;
 }
 
 /** The `host.window` both sides of the isolation boundary hand a plugin. */
-export function hostWindow(agentServer: () => Promise<AgentServer>): HostWindow {
-  return { agentServer };
+export function hostWindow(calls: HostWindowCalls): HostWindow {
+  return { agentServer: calls.agentServer, tools: calls.tools, callTool: calls.callTool };
 }
 
 /** Whether the manifest names a program, which is what makes the answer of any use. */
@@ -121,5 +185,59 @@ export function checkedWindowAgentServer(
       );
     }
     return parsed.data;
+  };
+}
+
+/**
+ * The checks in front of {@link HostCapabilities.windowTools} and
+ * {@link HostCapabilities.callWindowTool} (ADR 0190), on the host's side of the boundary: the
+ * permission, the port, and the adapter's answer through a strict schema, so a field the window
+ * one day adds never reaches a plugin unread. The adapter's own refusals (the setting, the
+ * folder's trust) reach the plugin as they are.
+ */
+export function checkedWindowTools(
+  plugin: string,
+  permissions: readonly string[],
+  capabilities: HostCapabilities | undefined,
+): Pick<HostWindowCalls, 'tools' | 'callTool'> {
+  const host = capabilities?.hostName ?? 'this host';
+  const allowed = (capability: string): void => {
+    if (!permissions.includes(WINDOW_TOOLS_PERMISSION)) {
+      throw new PluginCapabilityError(
+        diagnostic('E_PERMISSION', {
+          plugin,
+          capability: `${capability} (the ${WINDOW_TOOLS_PERMISSION} permission)`,
+        }),
+      );
+    }
+  };
+  const unavailable = (): PluginCapabilityError =>
+    new PluginCapabilityError(diagnostic('E_WINDOW_UNAVAILABLE', { plugin, host }));
+  return {
+    async tools() {
+      allowed('host.window.tools()');
+      if (capabilities?.windowTools === undefined) throw unavailable();
+      const answer: unknown = await capabilities.windowTools(plugin);
+      const parsed = z.array(windowToolSchema).safeParse(answer);
+      if (!parsed.success)
+        throw new TypeError(`${host} answered the window's tools with something else.`);
+      return parsed.data;
+    },
+    async callTool(name, input) {
+      allowed('host.window.callTool()');
+      const named = toolNameSchema.safeParse(name);
+      if (!named.success)
+        throw new TypeError(
+          `host.window.callTool was given the tool name ${JSON.stringify(name)}, which ${named.error.issues[0]?.message ?? 'is not one'}.`,
+        );
+      const given = windowToolInputSchema.safeParse(input);
+      if (!given.success) throw new TypeError('host.window.callTool takes a JSON object as input.');
+      if (capabilities?.callWindowTool === undefined) throw unavailable();
+      const answer: unknown = await capabilities.callWindowTool(plugin, named.data, given.data);
+      const parsed = windowToolResultSchema.safeParse(answer);
+      if (!parsed.success)
+        throw new TypeError(`${host} answered the tool ${named.data} with something else.`);
+      return parsed.data;
+    },
   };
 }

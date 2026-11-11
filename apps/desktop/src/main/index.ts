@@ -12,6 +12,7 @@ import {
 import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
+import type { Readable, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 
@@ -168,6 +169,7 @@ import {
   windowAgentServerPort,
 } from './terminal-agent.js';
 import { chooseShell, terminalEnvironment } from './terminal-shell.js';
+import { windowToolsPorts } from './window-tools.js';
 import { createLiveTextFile } from './live-text-file.js';
 import { type LiveSettings, createLiveSettings } from './settings-live.js';
 import { settingsOutline } from './settings-outline.js';
@@ -863,6 +865,26 @@ async function start(): Promise<void> {
   });
   // The agent endpoint (TYTO-566, ADR 0180). Built here, because a folder change writes its
   // record again; it listens below the command runner, whose environment serves each agent.
+  // The window's MCP tools on two streams (ADR 0180): for each connection to the endpoint, and
+  // for each call a plugin makes in process (ADR 0190). One function, so the two cannot differ.
+  const serveWindowAgent = (
+    stdio: { readonly input: Readable; readonly output: Writable },
+    signal: AbortSignal,
+    on: string,
+  ): Promise<void> =>
+    serveAgent(
+      {
+        ...cliEnvironment(),
+        console: {
+          out: (text) => log.info(text.trimEnd()),
+          err: (text) => log.info(text.trimEnd()),
+        },
+      },
+      stdio,
+      signal,
+      on,
+      agentWindow.port,
+    );
   const agentEndpoint: AgentEndpoint = createAgentEndpoint({
     home: pluginsHome,
     pid: process.pid,
@@ -871,19 +893,7 @@ async function start(): Promise<void> {
     tmp: tmpdir(),
     folder: () => workspace.state().folder,
     serve: (socket, signal) =>
-      serveAgent(
-        {
-          ...cliEnvironment(),
-          console: {
-            out: (text) => log.info(text.trimEnd()),
-            err: (text) => log.info(text.trimEnd()),
-          },
-        },
-        { input: socket, output: socket },
-        signal,
-        'the window',
-        agentWindow.port,
-      ),
+      serveWindowAgent({ input: socket, output: socket }, signal, 'the window'),
     onConnections: (count) => {
       log.info(`agents connected: ${String(count)}`);
       toWindow('agents:changed', { count });
@@ -1054,6 +1064,13 @@ async function start(): Promise<void> {
       home: pluginsHome,
       listening: () => agentsListening,
       workspace: () => workspace.state(),
+    }),
+    // The same tools, called by a plugin in process (ADR 0190): a session on the very server the
+    // endpoint runs, over in-memory streams, under the same two refusals.
+    ...windowToolsPorts({
+      listening: () => agentsListening,
+      workspace: () => workspace.state(),
+      serve: (stdio, signal, plugin) => serveWindowAgent(stdio, signal, `plugin ${plugin}`),
     }),
   };
 

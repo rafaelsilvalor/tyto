@@ -790,6 +790,25 @@ await agent.write(
 
 **No permission of its own: it answers a plugin that declares at least one `process:<name>`**, and is `E_PERMISSION` for any other. The answer carries no secret, it is of no use without a program to hand it to, and a program the plugin starts could reach the window anyway. The install prompt says so in the `process:` paragraph. Ask again for each conversation: **`agentsListen` off is `E_WINDOW_AGENTS_OFF`** and **a restricted folder is `E_WINDOW_RESTRICTED`**, both read at each call. A host with no window (the CLI) answers `E_WINDOW_UNAVAILABLE`. `env` holds `TYTO_WINDOW` and `TYTO_HOME` and nothing else (`AGENT_SERVER_VARIABLES`), checked on the host's side with a strict schema. The port is `HostCapabilities.windowAgentServer(plugin)`, optional; `checkedWindowAgentServer` stands in front of it. Across the isolation boundary the request is `windowAgentServer` (protocol 20). In `testPlugin`, pass `windowAgentServer` in `capabilities` to stand in for the window.
 
+### The window's tools, in process: `host.window.tools()` and `callTool()` (ADR 0190)
+
+**The tools the window serves an agent, called by the plugin's own code**, for a plugin that drives a model itself instead of starting an agent program (the agent panel's API-key driver, TYTO-661):
+
+```json
+{ "permissions": ["window:tools"] }
+```
+
+```ts
+const tools = await host.window.tools();
+// [{ name: 'check_brief', description: '…', inputSchema: { type: 'object', … } }, …]
+const answer = await host.window.callTool('check_brief', { path: 'post.brief' });
+// { content: [{ type: 'text', text: '…' }], isError: false }
+```
+
+**The same server and the same rules an agent connected to the window gets**: the desktop opens a session on the window's own MCP server for each call, so the tools offered follow the open folder's trust, and **an edit to a document's text is a proposal the person accepts or rejects** (ADR 0180). Ask `tools()` again before each turn: the list changes with the folder's trust. A tool's own refusal, an unknown tool and arguments the server refuses are answers with `isError: true`, for the model to read; `content` holds text and images (base64, as MCP's content), and any other block arrives as one line of text saying it was there.
+
+**Behind `window:tools`**, which the install prompt names in words; a `process:<name>` does not grant it. Undeclared is `E_PERMISSION`; then the refusals of `agentServer()`, read on every call: `agentsListen` off is `E_WINDOW_AGENTS_OFF`, a restricted folder is `E_WINDOW_RESTRICTED`, and a host with no window (the CLI) is `E_WINDOW_UNAVAILABLE`. A name that is not 1–128 of `A–Z a–z 0–9 _ . -` and an input that is not a JSON object are `TypeError`s before the window is asked. A listing gives up after 30 s and a call after 180 s. The ports are `HostCapabilities.windowTools(plugin)` and `HostCapabilities.callWindowTool(plugin, name, input)`, optional; `checkedWindowTools` stands in front of both and passes their answers through strict schemas. Across the isolation boundary the requests are `windowTools` and `windowCallTool` (protocol 23). In `testPlugin`, pass `windowTools` and `callWindowTool` in `capabilities` to stand in for the window.
+
 ### A plugin's own program and `host.terminal` (ADR 0184)
 
 **A declared program may be the plugin's own script**, run on Tyto's bundled Node instead of found on the `PATH`:

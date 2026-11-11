@@ -283,11 +283,20 @@ export {
   type AgentServer,
   type AgentServerVariable,
   type HostWindow,
+  type HostWindowCalls,
   WINDOW_AGENT_SERVER_NAME,
+  WINDOW_TOOLS_PERMISSION,
+  type WindowTool,
+  type WindowToolContent,
+  type WindowToolResult,
   agentServerSchema,
   checkedWindowAgentServer,
+  checkedWindowTools,
   hostWindow,
   namesAProgram,
+  windowToolInputSchema,
+  windowToolResultSchema,
+  windowToolSchema,
 } from './window.js';
 
 export {

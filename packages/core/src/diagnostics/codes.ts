@@ -572,30 +572,31 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
-  // The window's MCP server, handed to a plugin for the agent it starts (ADR 0183). Three codes,
-  // so a panel can tell "turn agentsListen on" and "trust the folder" from "not on this host".
+  // The window's MCP server, handed to a plugin for the agent it starts (ADR 0183), and the
+  // window's tools, called by a plugin in process (ADR 0190). Three codes, so a panel can tell
+  // "turn agentsListen on" and "trust the folder" from "not on this host".
   E_WINDOW_UNAVAILABLE: {
     severity: 'error',
-    summary: "A plugin asked for the window's agent server on a host that has no window.",
-    template: "Plugin '{plugin}' asked for the window's agent server, and {host} has no window.",
+    summary: 'A plugin asked to reach the window on a host that has no window.',
+    template: "Plugin '{plugin}' asked to reach the window, and {host} has no window.",
     spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
   E_WINDOW_AGENTS_OFF: {
     severity: 'error',
-    summary: "A plugin asked for the window's agent server while agentsListen is off.",
+    summary: 'A plugin asked to reach the window while agentsListen is off.',
     template:
-      "Plugin '{plugin}' asked for the window's agent server, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
+      "Plugin '{plugin}' asked to reach the window, and agentsListen is off in settings.json; turn it on to let agents reach the window.",
     spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
   },
   E_WINDOW_RESTRICTED: {
     severity: 'error',
-    summary: "A plugin asked for the window's agent server while the open folder is restricted.",
+    summary: 'A plugin asked to reach the window while the open folder is restricted.',
     template:
-      "Plugin '{plugin}' asked for the window's agent server, and the open folder is restricted; trust it to let agents reach the window.",
+      "Plugin '{plugin}' asked to reach the window, and the open folder is restricted; trust it to let agents reach the window.",
     spec: 'docs/adr/0183-a-plugin-gets-the-windows-agent-server-for-the-program-it-starts.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",
