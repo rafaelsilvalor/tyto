@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CliEnvironment } from '../environment.js';
 import { EXIT_INTERNAL, EXIT_OK } from '../exit.js';
 import { run } from '../program.js';
+import { workspaceOfFolder } from '../workspace.js';
 import { NO_STDIO } from './command.js';
 import { RECIPE_RUN_FIRST, openSession } from './session.js';
 import { recordPath } from './window-endpoint.js';
@@ -162,11 +163,16 @@ const textOf = (result: { content: { type: string; text?: string }[] }): string 
     .map((item) => item.text ?? '')
     .join('\n');
 
+/**
+ * A restricted folder with a plugin section holding {@link SECRET}, under `plugins`, the key the
+ * project file reads its sections from (ADR 0147). The loader withholds it there and says so with
+ * `W_PROJECT_SECTIONS_WITHHELD`, which a test asserts, so the secret is known to be in play.
+ */
 async function restrictedWorkspace(): Promise<void> {
   await mkdir(join(folder, '.tyto', 'plugin-files'), { recursive: true });
   await writeFile(
     join(folder, '.tyto', 'project.json'),
-    JSON.stringify({ sections: { someplugin: { token: SECRET } } }),
+    JSON.stringify({ plugins: { someplugin: { token: SECRET } } }),
   );
 }
 
@@ -192,9 +198,27 @@ describe('tyto mcp', () => {
     expect(names.sort()).toEqual(toolsFor('restricted').slice().sort());
     await client.call('list_templates');
     expect(await client.stop()).toBe(EXIT_OK);
+    // The secret is in play: the workspace `tyto mcp` loads read the section and withheld it.
+    // No tool reports project diagnostics, so the loader is asked directly.
+    const workspace = await workspaceOfFolder(
+      folder,
+      {},
+      {
+        console: { out: () => {}, err: () => {} },
+        version: '0.0.0-test',
+        cwd: folder,
+        rasterizer: () => fakeRasterizer(),
+      },
+      (path) => path,
+    );
+    expect(workspace?.loaded.trust).toBe('restricted');
+    expect(workspace?.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      'W_PROJECT_SECTIONS_WITHHELD',
+    );
 
     expect(errors.join('')).toContain('was not loaded: this folder is restricted');
     expect(errors.join('')).toContain('workspace restricted');
+    expect(errors.join('')).not.toContain(SECRET);
     // The console's `out` is stdout in a terminal: nothing may reach it while the protocol runs.
     expect(out).toEqual([]);
     expect(client.lines.join('\n')).not.toContain(SECRET);
@@ -1117,6 +1141,7 @@ describe('the guidance a template ships', () => {
     expect(text).toContain('Not served: this template comes from a restricted folder');
     expect(text).not.toContain('One slide per line');
     expect(client.lines.join('\n')).not.toContain('One slide per line');
+    expect(client.lines.join('\n')).not.toContain(SECRET);
     await client.stop();
   }, 30_000);
 
