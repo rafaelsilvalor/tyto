@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
@@ -175,6 +175,33 @@ async function run(commandId: string): Promise<void> {
   if (!ran) throw new Error(`the command bar refused '${commandId}'`);
 }
 
+/**
+ * A fixed interval, never Playwright's default `requestAnimationFrame` polling: this window is
+ * headless and its frames are throttled to about one a second, so a rAF-polled wait looks once a
+ * second (as `directives.desktop.test.ts` found). TYTO-669 counted 20 frames in 22 s here.
+ */
+const POLL_MS = 100;
+
+/**
+ * Opens `path` through the command bar and returns once its tab is the front one and its cells
+ * are drawn. `editor.open` is a round trip to main, and `recipe.run` runs whichever tab is in
+ * front when it is asked: waiting for a selector the previous recipe's tab already matched let a
+ * slow open send Run to that tab, and the new one never fetched (TYTO-669).
+ */
+async function open(path: string): Promise<void> {
+  await app?.evaluate(({ dialog }, chosen) => {
+    dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+  }, path);
+  await run('editor.open');
+  await page.waitForFunction(
+    (name) =>
+      document.querySelector('.tabs__tab--on .tabs__label')?.textContent === name &&
+      document.querySelector('#editor .recipe-cell') !== null,
+    basename(path),
+    { polling: POLL_MS, timeout: 10_000 },
+  );
+}
+
 const BOARD = '#editor .recipe-board';
 
 /** Each column the board draws: its name, main's count, the cards drawn and its "more" button. */
@@ -240,17 +267,13 @@ afterAll(async () => {
 
 describe('the Board view over 300 rows (TYTO-381)', () => {
   it('draws one column per status with the counts main made, fifty cards at a time', async () => {
-    await app?.evaluate(({ dialog }, chosen) => {
-      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
-    }, recipePath);
-    await run('editor.open');
-    await page.waitForSelector('#editor .recipe-cell');
+    await open(recipePath);
     await run('recipe.run');
     await page.waitForFunction(
       (selector) =>
         document.querySelectorAll(`${selector} .recipe-board__card`).length === 50 + 50 + 50 + 30,
       BOARD,
-      { timeout: 20_000 },
+      { polling: POLL_MS, timeout: 20_000 },
     );
 
     expect(await columns()).toEqual([
@@ -288,7 +311,7 @@ describe('the Board view over 300 rows (TYTO-381)', () => {
           .querySelectorAll(`${selector} .recipe-board__column`)[2]
           ?.querySelectorAll('.recipe-board__card').length === 90,
       BOARD,
-      { timeout: 10_000 },
+      { polling: POLL_MS, timeout: 10_000 },
     );
     expect((await columns())[2]).toEqual({ name: 'Done', tally: '90', cards: 90, more: '' });
 
@@ -300,7 +323,7 @@ describe('the Board view over 300 rows (TYTO-381)', () => {
         document.querySelector(`${selector} .recipe-table__count`)?.textContent ===
         'Rows: 12 of 300',
       BOARD,
-      { timeout: 10_000 },
+      { polling: POLL_MS, timeout: 10_000 },
     );
     expect((await columns()).map((column) => [column.name, column.tally])).toEqual([
       ['To Do', '9'],
@@ -331,18 +354,14 @@ const dayCell = (key: string) =>
 
 describe('the Calendar view over the same 300 rows (TYTO-383)', () => {
   it('places the dated rows on their days by time, and lists the undated apart', async () => {
-    await app?.evaluate(({ dialog }, chosen) => {
-      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
-    }, calendarPath);
-    await run('editor.open');
-    await page.waitForSelector(`${CALENDAR}, #editor .recipe-cell`);
+    await open(calendarPath);
     await run('recipe.run');
     await page.waitForFunction(
       (selector) =>
         document.querySelectorAll(`${selector} .recipe-calendar__day .recipe-calendar__row`)
           .length === 3,
       CALENDAR,
-      { timeout: 20_000 },
+      { polling: POLL_MS, timeout: 20_000 },
     );
 
     // The week holding today, with today's first three rows by time and main's count of the rest.
@@ -386,7 +405,7 @@ describe('the Calendar view over the same 300 rows (TYTO-383)', () => {
           `${selector} .recipe-calendar__day[data-day="${wanted}"] .recipe-calendar__row`,
         ).length === 2,
       [CALENDAR, localDay(7)] as const,
-      { timeout: 10_000 },
+      { polling: POLL_MS, timeout: 10_000 },
     );
     expect(await dayCell(localDay(7))).toEqual({ rows: ['C-6', 'C-7'], more: '' });
 
@@ -394,7 +413,7 @@ describe('the Calendar view over the same 300 rows (TYTO-383)', () => {
     await page.waitForFunction(
       (selector) => document.querySelectorAll(`${selector} .recipe-calendar__day`).length === 42,
       CALENDAR,
-      { timeout: 10_000 },
+      { polling: POLL_MS, timeout: 10_000 },
     );
   }, 30_000);
 });
@@ -403,16 +422,12 @@ const CARDS = '#editor .recipe-cards';
 
 describe('the Cards view over the same 300 rows (TYTO-384)', () => {
   it('draws cards with fields=, and opens one onto every column and its provenance', async () => {
-    await app?.evaluate(({ dialog }, chosen) => {
-      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
-    }, cardsPath);
-    await run('editor.open');
-    await page.waitForSelector(`${CARDS}, #editor .recipe-cell`);
+    await open(cardsPath);
     await run('recipe.run');
     await page.waitForFunction(
       (selector) => document.querySelectorAll(`${selector} .recipe-cards__card`).length === 48,
       CARDS,
-      { timeout: 20_000 },
+      { polling: POLL_MS, timeout: 20_000 },
     );
     const first = await page.evaluate(
       (selector) =>
@@ -473,6 +488,7 @@ describe('the Cards view over the same 300 rows (TYTO-384)', () => {
 
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => document.querySelector('.recipe-card-dialog') === null, null, {
+      polling: POLL_MS,
       timeout: 5_000,
     });
   }, 30_000);
