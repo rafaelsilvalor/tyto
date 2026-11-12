@@ -281,6 +281,7 @@ export const ptBR: Catalogue = {
   'problems.empty.vocabulary': 'Nada a relatar sobre este vocabulário',
   'command.explorer.newRecipe': 'Nova receita',
   'command.explorer.newVocabulary': 'Novo vocabulário',
+  'command.explorer.loadRecipe': 'Carregar receita…',
   'vocabulary.section.rules':
     'Tabelas que um passo rules lê: cada entrada é um filtro when e as colunas que ele define.',
   'vocabulary.section.rewrites':
@@ -624,6 +625,21 @@ export const ptBR: Catalogue = {
   'explorer.error.failed': 'Não deu para gravar a mudança: {reason}.',
   'explorer.error.recipeName':
     '“{name}” não é um nome de receita (E_RECIPE_FORM): comece com uma letra ou um dígito, depois letras, dígitos, - e _.',
+  'explorer.menu.loadRecipe': 'Carregar receita…',
+  'explorer.load.copied': 'Copiados para esta pasta: {names}.',
+  'explorer.load.skipped': 'Nada foi copiado, porque estes já existem aqui: {names}.',
+  'explorer.load.reported': 'Não copiado: “{name}” — {reason}.',
+  'explorer.load.unreadable': 'Não deu para ler essa receita. Nada foi copiado.',
+  'explorer.load.reason.leavesFolder': 'está fora da pasta da receita',
+  'explorer.load.reason.outside': 'leva para fora da pasta da receita',
+  'explorer.load.reason.refused': 'não é uma referência a arquivo que a receita possa usar',
+  'explorer.load.reason.reserved': 'está nas configurações .tyto da pasta',
+  'explorer.load.reason.missing': 'não foi encontrado',
+  'explorer.load.reason.tooLarge': 'é grande demais',
+  'explorer.load.reason.notParsed':
+    'não se lê como receita, então os arquivos que ela cita não foram procurados',
+  'explorer.load.reason.tooMany': 'cada carga copia no máximo 200 arquivos',
+  'explorer.load.reason.writeFailed': 'não deu para gravar aqui',
   'project.none': 'Nenhuma pasta aberta',
   'project.unset': 'não definido',
   'project.origin.folder': 'esta pasta',

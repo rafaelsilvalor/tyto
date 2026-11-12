@@ -53,6 +53,7 @@ import {
   PREVIEW_ZOOM_OUT,
   EXPLORER_NEW_RECIPE,
   EXPLORER_NEW_VOCABULARY,
+  EXPLORER_LOAD_RECIPE,
   RECIPE_RUN,
   RECIPE_ADD_STEP,
   RECIPE_EDIT_STEP,
@@ -151,6 +152,7 @@ const actions = () =>
     editRecipeStep: vi.fn<() => void>(),
     runRecipeFresh: vi.fn<() => void>(),
     newSeededFile: vi.fn<(seed: 'recipe' | 'vocabulary') => void>(),
+    loadRecipe: vi.fn<() => void>(),
     focusCommandPanel: vi.fn<() => void>(),
     newTerminal: vi.fn<() => void>(),
     openAgent: vi.fn<() => void>(),
@@ -343,6 +345,16 @@ describe('the ids the window registers', () => {
     expect(spies.newSeededFile.mock.calls).toEqual([['recipe'], ['vocabulary']]);
     expect(COMMAND_LABELS[EXPLORER_NEW_RECIPE]).toBe('command.explorer.newRecipe');
     expect(COMMAND_LABELS[EXPLORER_NEW_VOCABULARY]).toBe('command.explorer.newVocabulary');
+  });
+
+  it('loads a recipe through its own action (TYTO-402)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(EXPLORER_LOAD_RECIPE, NO_VIEW)).toBe(true);
+    expect(spies.loadRecipe).toHaveBeenCalledOnce();
+    expect(spies.newSeededFile).not.toHaveBeenCalled();
+    expect(COMMAND_LABELS[EXPLORER_LOAD_RECIPE]).toBe('command.explorer.loadRecipe');
   });
 
   it('opens the cursor cell in a tab through its own action, with no keystroke (TYTO-379)', () => {

@@ -166,6 +166,20 @@ function withEditingChecked(tree: ExplorerTree): ExplorerTree {
 }
 
 /**
+ * Where something new goes (TYTO-352): `parent` when it is given, otherwise the selected
+ * folder, the selected file's folder, or the root (`null`) with nothing selected. Load recipe
+ * copies into the same folder (TYTO-402).
+ */
+export function folderForNew(tree: ExplorerTree, parent?: string | null): string | null {
+  if (parent !== undefined) return parent;
+  const selected = rowsOf(tree).find(
+    (row) => row.type === 'entry' && row.entry.id === tree.selected,
+  );
+  if (selected?.type !== 'entry') return null;
+  return selected.entry.kind === 'folder' ? selected.entry.id : selected.parent;
+}
+
+/**
  * Opens the field of a new file or folder (TYTO-352): in `parent` when it is given, otherwise
  * in the selected folder, the selected file's folder, or the root with nothing selected. The
  * folder is opened, so the field shows under it; one never listed is the caller's to list.
@@ -176,17 +190,7 @@ export function startCreating(
   parent?: string | null,
   seed?: ExplorerSeed,
 ): ExplorerTree {
-  const selected = rowsOf(tree).find(
-    (row) => row.type === 'entry' && row.entry.id === tree.selected,
-  );
-  const parentId =
-    parent !== undefined
-      ? parent
-      : selected?.type !== 'entry'
-        ? null
-        : selected.entry.kind === 'folder'
-          ? selected.entry.id
-          : selected.parent;
+  const parentId = folderForNew(tree, parent);
   const opened = parentId === null ? tree : withExpanded(tree, parentId, true);
   return {
     ...opened,

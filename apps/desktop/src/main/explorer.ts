@@ -129,6 +129,11 @@ export interface ExplorerService {
    */
   pathOf(entryId: string): string | undefined;
   /**
+   * The folder `folderId` names (`null` is the root) while it is still a folder inside the
+   * open one, for main's own writes there: Load recipe's copy (TYTO-402). Never sent.
+   */
+  folderOf(folderId: string | null): Promise<string | undefined>;
+  /**
    * The ids from the top of the open folder down to `path`, a file main just wrote inside it,
    * so the window can expand to it and select it (TYTO-489). `undefined` outside the folder.
    */
@@ -656,6 +661,10 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
 
     pathOf(entryId) {
       return root === undefined ? undefined : entryOf.get(entryId)?.path;
+    },
+
+    folderOf(folderId) {
+      return root === undefined ? Promise.resolve(undefined) : folderToWriteIn(folderId, root.real);
     },
 
     folder() {

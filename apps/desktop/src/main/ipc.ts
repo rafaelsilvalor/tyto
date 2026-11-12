@@ -29,6 +29,7 @@ import {
   vocabularyLint,
 } from './recipe-authoring.js';
 import { vocabularyNames } from './vocabulary-names.js';
+import { loadRecipe } from './recipe-load.js';
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
@@ -309,7 +310,7 @@ export interface IpcDependencies {
    */
   readonly explorer: Pick<
     ExplorerService,
-    'list' | 'filePath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf' | 'idsTo'
+    'list' | 'filePath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf' | 'idsTo' | 'folderOf'
   >;
   /** A new delivery in the open folder (TYTO-489, ADR 0157): planned and written by main. */
   readonly delivery: DeliveryService;
@@ -442,6 +443,11 @@ export interface IpcDependencies {
     chooseParent: () => Promise<string | undefined>;
   };
   /**
+   * Load recipe's dialog (TYTO-402, ADR 0176): a `.recipe` anywhere on disk, or nothing when it
+   * is dismissed. Main's own dialog: the window never names the file.
+   */
+  readonly chooseRecipe: () => Promise<string | undefined>;
+  /**
    * The recipe notebook's runner (TYTO-377, ADR 0148): a document's cells, kept in main and
    * forgotten when its tab closes.
    */
@@ -550,6 +556,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     session,
     settings,
     templateDialogs,
+    chooseRecipe,
     templateEditor,
     templateFolder,
     templates,
@@ -827,6 +834,25 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
           ? await documents.openPath(documentId, made.path)
           : { document: null, documentId: null };
       return { ok: true, entry: made.entry, ...opened };
+    },
+
+    // TYTO-402, ADR 0176 decision 7: a recipe from anywhere is copied in, never opened in place.
+    // The folder is asked before the dialog, and again by the copy's own checks after it.
+    'recipe:load': async ({ documentId, parentId }) => {
+      if ((await explorer.folderOf(parentId)) === undefined) return { ok: false, reason: 'gone' };
+      const source = await chooseRecipe();
+      if (source === undefined) return { ok: false, reason: 'canceled' };
+      const folder = await explorer.folderOf(parentId);
+      if (folder === undefined) return { ok: false, reason: 'gone' };
+      const loaded = await loadRecipe(source, folder);
+      if (!loaded.ok) return loaded;
+      const { recipe, copied, skipped, reported } = loaded;
+      const lists = { copied: [...copied], skipped: [...skipped], reported: [...reported] };
+      if (recipe === undefined) {
+        return { ok: true, ...lists, document: null, documentId: null, reveal: [] };
+      }
+      const opened = await documents.openPath(documentId, recipe);
+      return { ok: true, ...lists, ...opened, reveal: [...(explorer.idsTo(recipe) ?? [])] };
     },
 
     // TYTO-489, ADR 0157 §5: the delivery is made by main, then opens like an explorer entry.

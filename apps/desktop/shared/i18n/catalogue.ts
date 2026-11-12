@@ -526,6 +526,8 @@ export interface Catalogue {
   /** TYTO-402: New recipe and New vocabulary as commands, the explorer's field opened for them. */
   readonly 'command.explorer.newRecipe': string;
   readonly 'command.explorer.newVocabulary': string;
+  /** TYTO-402: Load recipe as a command, into the explorer's selected folder. */
+  readonly 'command.explorer.loadRecipe': string;
   /** TYTO-402: the vocabulary tab's hover and completion, over a section's key or a table's name. */
   readonly 'vocabulary.section.rules': string;
   readonly 'vocabulary.section.rewrites': string;
@@ -1002,6 +1004,21 @@ export interface Catalogue {
   readonly 'explorer.menu.newRecipe': string;
   readonly 'explorer.menu.newVocabulary': string;
   readonly 'explorer.error.recipeName': string;
+  /** TYTO-402, ADR 0176: Load recipe in the explorer's menu, and its report above the tree. */
+  readonly 'explorer.menu.loadRecipe': string;
+  readonly 'explorer.load.copied': string;
+  readonly 'explorer.load.skipped': string;
+  readonly 'explorer.load.reported': string;
+  readonly 'explorer.load.unreadable': string;
+  readonly 'explorer.load.reason.leavesFolder': string;
+  readonly 'explorer.load.reason.outside': string;
+  readonly 'explorer.load.reason.refused': string;
+  readonly 'explorer.load.reason.reserved': string;
+  readonly 'explorer.load.reason.missing': string;
+  readonly 'explorer.load.reason.tooLarge': string;
+  readonly 'explorer.load.reason.notParsed': string;
+  readonly 'explorer.load.reason.tooMany': string;
+  readonly 'explorer.load.reason.writeFailed': string;
   readonly 'project.none': string;
   readonly 'project.unset': string;
   readonly 'project.origin.folder': string;
@@ -1382,6 +1399,7 @@ export const CATALOGUE_KEYS = [
   'problems.empty.vocabulary',
   'command.explorer.newRecipe',
   'command.explorer.newVocabulary',
+  'command.explorer.loadRecipe',
   'vocabulary.section.rules',
   'vocabulary.section.rewrites',
   'vocabulary.section.lookups',
@@ -1692,6 +1710,20 @@ export const CATALOGUE_KEYS = [
   'explorer.menu.newRecipe',
   'explorer.menu.newVocabulary',
   'explorer.error.recipeName',
+  'explorer.menu.loadRecipe',
+  'explorer.load.copied',
+  'explorer.load.skipped',
+  'explorer.load.reported',
+  'explorer.load.unreadable',
+  'explorer.load.reason.leavesFolder',
+  'explorer.load.reason.outside',
+  'explorer.load.reason.refused',
+  'explorer.load.reason.reserved',
+  'explorer.load.reason.missing',
+  'explorer.load.reason.tooLarge',
+  'explorer.load.reason.notParsed',
+  'explorer.load.reason.tooMany',
+  'explorer.load.reason.writeFailed',
   'project.none',
   'project.unset',
   'project.origin.folder',

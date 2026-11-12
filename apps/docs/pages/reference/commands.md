@@ -2,7 +2,7 @@
 
 # Commands
 
-Everything the window can be told to do, by title as the command bar shows it: 96. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
+Everything the window can be told to do, by title as the command bar shows it: 97. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
 
 The window adds more while it runs, which this list cannot show: a toggle for each panel, including a plugin's, an entry for each recently opened file, and one for each export preset of the open folder, `export.preset:<name>`.
 
@@ -66,6 +66,7 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Edit step | `recipe.editStep` |  |  |
 | New recipe | `explorer.newRecipe` |  |  |
 | New vocabulary | `explorer.newVocabulary` |  |  |
+| Load recipe… | `explorer.loadRecipe` |  |  |
 | Preferences: Color Theme | `theme.pick` |  |  |
 | Choose template folder… | `templates.chooseFolder` |  |  |
 | Back to the built-in templates | `templates.clearFolder` |  |  |

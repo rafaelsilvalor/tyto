@@ -101,6 +101,8 @@ describe('the IPC contract', () => {
       'recipe:apply',
       'recipe:copy',
       'recipe:facets',
+      // TYTO-402, ADR 0176: Load recipe, a copy into the folder an explorer id names.
+      'recipe:load',
       'recipe:row',
       'recipe:rows',
       'recipe:run',

@@ -261,6 +261,24 @@ describe('the brief a click opens', () => {
     );
     expect(await explorer.filePath(idOf('dados.json'), TAB_EXTENSIONS)).toBeUndefined();
   });
+
+  it('answers the folder Load recipe copies into: a listed folder or the root, never a file (TYTO-402)', async () => {
+    await mkdir(join(work, 'receitas'));
+    await writeFile(join(work, 'nota.md'), '');
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const root = await explorer.list(null);
+    const idOf = (name: string): string =>
+      root.entries.find((entry) => entry.name === name)?.id ?? '';
+
+    expect(await explorer.folderOf(null)).toBe(work);
+    expect(await explorer.folderOf(idOf('receitas'))).toBe(join(work, 'receitas'));
+    expect(await explorer.folderOf(idOf('nota.md'))).toBeUndefined();
+    expect(await explorer.folderOf('never-minted')).toBeUndefined();
+    explorer.close();
+    await explorer.setRoot(undefined);
+    expect(await explorer.folderOf(null)).toBeUndefined();
+  });
 });
 
 /** The first bytes of each format, padded so each is a file of some size. */

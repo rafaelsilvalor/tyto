@@ -279,6 +279,7 @@ export const en: Catalogue = {
   'problems.empty.vocabulary': 'Nothing to report about this vocabulary',
   'command.explorer.newRecipe': 'New recipe',
   'command.explorer.newVocabulary': 'New vocabulary',
+  'command.explorer.loadRecipe': 'Load recipe…',
   'vocabulary.section.rules':
     'Tables a rules step reads: each entry a when filter and the columns it sets.',
   'vocabulary.section.rewrites':
@@ -620,6 +621,21 @@ export const en: Catalogue = {
   'explorer.error.failed': "Couldn't save the change: {reason}.",
   'explorer.error.recipeName':
     '“{name}” is not a recipe name (E_RECIPE_FORM): start with a letter or a digit, then letters, digits, - and _.',
+  'explorer.menu.loadRecipe': 'Load Recipe…',
+  'explorer.load.copied': 'Copied into this folder: {names}.',
+  'explorer.load.skipped': 'Nothing was copied, because these are already here: {names}.',
+  'explorer.load.reported': 'Not copied: “{name}” — {reason}.',
+  'explorer.load.unreadable': "Couldn't read that recipe. Nothing was copied.",
+  'explorer.load.reason.leavesFolder': "it is outside the recipe's folder",
+  'explorer.load.reason.outside': "it leads outside the recipe's folder",
+  'explorer.load.reason.refused': 'it is not a file reference the recipe can use',
+  'explorer.load.reason.reserved': "it is in the folder's .tyto settings",
+  'explorer.load.reason.missing': 'it was not found',
+  'explorer.load.reason.tooLarge': 'it is too large',
+  'explorer.load.reason.notParsed':
+    'it does not read as a recipe, so the files it names were not looked for',
+  'explorer.load.reason.tooMany': 'one load copies at most 200 files',
+  'explorer.load.reason.writeFailed': "it couldn't be written here",
   'project.none': 'No folder open',
   'project.unset': 'not set',
   'project.origin.folder': 'this folder',

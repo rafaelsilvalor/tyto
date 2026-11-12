@@ -1,3 +1,7 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { type Layout, DEFAULT_LAYOUT } from '../../shared/layout.js';
 import { documentFormatOf } from '../../shared/file-icons.js';
 import { describe, expect, it, vi } from 'vitest';
@@ -116,6 +120,7 @@ const explorerFiles = () => {
   const asked: (string | null)[] = [];
   /** What each new file was written with (TYTO-402): a seeded one holds its skeleton. */
   const written: { name: string; text: string | undefined }[] = [];
+  const load: { into: string | undefined } = { into: undefined };
   return {
     asked,
     written,
@@ -205,6 +210,12 @@ const explorerFiles = () => {
           : undefined,
     idsTo: (path: string) =>
       path.startsWith('/work/promo/') ? ['e-mca', 'e-edit', 'e-brief'] : undefined,
+    /** TYTO-402: the folder Load recipe copies into, set by a test; none by default. */
+    load,
+    folderOf: (folderId: string | null): Promise<string | undefined> => {
+      asked.push(folderId);
+      return Promise.resolve(load.into);
+    },
   };
 };
 
@@ -1057,6 +1068,7 @@ const dependencies = () => {
     templates: catalogue(),
     templateEditor: templateEditor(),
     templateDialogs: templateDialogs(),
+    chooseRecipe: () => Promise.resolve(undefined),
     templateFolder: createTemplateFolder(),
     updates: updateNotice(),
     verification: () => ({ on: false }) as const,
@@ -3145,5 +3157,58 @@ describe('cli:run, cli:cancel and cli:commands', () => {
     await expect(
       guard('cli:run', handlers['cli:run'])({ argv: 'render a.brief' } as never),
     ).rejects.toThrow();
+  });
+});
+
+/** TYTO-402, ADR 0176 decision 7: Load recipe asks in main's dialog and copies by id. */
+describe('recipe:load', () => {
+  it('answers gone with no folder, canceled with no file, and copies then opens otherwise', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'tyto-ipc-recipe-load-'));
+    try {
+      const source = join(scratch, 'shared');
+      const work = join(scratch, 'work');
+      mkdirSync(source);
+      mkdirSync(work);
+      writeFileSync(join(source, 'weekly.recipe'), 'recipe weekly\n');
+      const deps = dependencies();
+      const dialog: { chosen: string | undefined } = { chosen: undefined };
+      const load = guard(
+        'recipe:load',
+        createHandlers({ ...deps, chooseRecipe: () => Promise.resolve(dialog.chosen) })[
+          'recipe:load'
+        ],
+      );
+
+      await expect(load({ documentId: 'd-1', parentId: null })).resolves.toEqual({
+        ok: false,
+        reason: 'gone',
+      });
+      deps.explorer.load.into = work;
+      await expect(load({ documentId: 'd-1', parentId: 'e-folder' })).resolves.toEqual({
+        ok: false,
+        reason: 'canceled',
+      });
+      dialog.chosen = join(source, 'weekly.recipe');
+      await expect(load({ documentId: 'd-2', parentId: 'e-folder' })).resolves.toMatchObject({
+        ok: true,
+        copied: ['weekly.recipe'],
+        skipped: [],
+        reported: [],
+        documentId: 'd-2',
+        document: { path: join(work, 'weekly.recipe'), format: 'recipe' },
+      });
+      // The same load again lands on the copy: nothing written, nothing opened.
+      await expect(load({ documentId: 'd-3', parentId: 'e-folder' })).resolves.toEqual({
+        ok: true,
+        copied: [],
+        skipped: ['weekly.recipe'],
+        reported: [],
+        document: null,
+        documentId: null,
+        reveal: [],
+      });
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
