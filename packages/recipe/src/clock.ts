@@ -9,6 +9,12 @@ export interface RunClock {
    * in summer. Asked per instant, so a zone with daylight saving answers each date its own.
    */
   offsetMinutes(at: Date): number;
+  /**
+   * The IANA zone the offsets come from, such as `America/Sao_Paulo`, when the host knows one
+   * (TYTO-675). `{column|local:…}` then reads a wall clock through `Intl.DateTimeFormat` in
+   * that zone; without it, through `offsetMinutes`.
+   */
+  readonly timeZone?: string | undefined;
 }
 
 /**

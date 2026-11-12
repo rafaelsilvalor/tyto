@@ -90,7 +90,13 @@ export type { Summary } from './summary.js';
 export { summarize } from './summary.js';
 export type { CellValue, Column, ColumnType, Provenance, Row, Table } from './table.js';
 export { COLUMN_TYPES, cellText, comparable, findColumn } from './table.js';
-export type { BoundTemplate, FillMode, Template, TemplateFilter } from './template.js';
+export type {
+  BoundTemplate,
+  FillMode,
+  PlaceholderFilter,
+  Template,
+  TemplateFilter,
+} from './template.js';
 export { TEMPLATE_FILTERS, bindTemplate, parseTemplate } from './template.js';
 export { compareCells } from './verbs.js';
 export type {

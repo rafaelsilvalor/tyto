@@ -14,6 +14,7 @@ import type { Verb, VerbContext, VerbResult } from './registry.js';
 import type { AppliedOperation, ApplyOutcome } from './state.js';
 import { type Problems, argumentsProblem, argumentsUpTo, locate, requireTable } from './support.js';
 import type { Row, Table } from './table.js';
+import { type LocalTime, localTime } from './local.js';
 import { type BoundTemplate, bindTemplate, parseTemplate, templateProblem } from './template.js';
 
 /**
@@ -213,7 +214,8 @@ async function planCalls(context: VerbContext, ports: CallPorts | undefined): Pr
 
   const template = await readBody(context, body);
   if (!template.ok) return template;
-  const bound = bindBody(template.value, table.value, context.aliases, at(body.range));
+  const time = localTime(context.clock);
+  const bound = bindBody(template.value, table.value, context.aliases, at(body.range), time);
   if (!bound.ok) return bound;
 
   const problems: Diagnostic[] = [];
@@ -264,7 +266,7 @@ async function planCalls(context: VerbContext, ports: CallPorts | undefined): Pr
   );
   if (!checked.ok) return checked;
   shownRequests.set(checked.value, requests);
-  return ok({ table: table.value, plan: checked.value });
+  return ok({ table: table.value, plan: checked.value }, time.warnings(at(body.range)));
 }
 
 /** `body=@./call.json#/routine` or `body={"key":"{key|}"}`, any JSON value. */
@@ -289,6 +291,7 @@ function bindBody(
   table: Table,
   aliases: ReadonlyMap<string, string>,
   range: SourceRange,
+  time: LocalTime,
 ): Result<(row: Row) => JsonBody, Problems> {
   if (typeof value === 'string') {
     const template = parseTemplate(value);
@@ -298,6 +301,8 @@ function bindBody(
       table,
       aliases,
       range,
+      {},
+      time,
     );
     if (!bound.ok) return bound;
     return ok((row) => bound.value.fill(row) ?? '');
@@ -305,7 +310,7 @@ function bindBody(
   if (Array.isArray(value)) {
     const items: ((row: Row) => JsonBody)[] = [];
     for (const item of value as unknown[]) {
-      const bound = bindBody(item, table, aliases, range);
+      const bound = bindBody(item, table, aliases, range, time);
       if (!bound.ok) return bound;
       items.push(bound.value);
     }
@@ -314,7 +319,7 @@ function bindBody(
   if (value !== null && typeof value === 'object') {
     const members: [string, (row: Row) => JsonBody][] = [];
     for (const [key, member] of Object.entries(value)) {
-      const bound = bindBody(member, table, aliases, range);
+      const bound = bindBody(member, table, aliases, range, time);
       if (!bound.ok) return bound;
       members.push([key, bound.value]);
     }

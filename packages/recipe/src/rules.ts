@@ -7,6 +7,7 @@ import { describeIssues, isDataReference, readDataArgument } from './data.js';
 import type { VerbContext, VerbResult } from './registry.js';
 import { type Problems, argumentsProblem, columnNames, locate, requireTable } from './support.js';
 import type { CellValue, Row, Table } from './table.js';
+import { type LocalTime, localTime } from './local.js';
 import { type BoundTemplate, bindTemplate, parseTemplate, templateProblem } from './template.js';
 import { type Predicate, parseWhere, satisfies } from './where.js';
 
@@ -86,7 +87,8 @@ export async function rules(context: VerbContext): Promise<VerbResult> {
     ? readInline(context.step.text, range)
     : await readDataArgument(context, using, RULES);
   if (!read.ok) return read;
-  const compiled = compileRules(read.value, into, table.value, context.aliases, range);
+  const time = localTime(context.clock);
+  const compiled = compileRules(read.value, into, table.value, context.aliases, range, time);
   if (!compiled.ok) return compiled;
 
   const result = withColumns(
@@ -100,7 +102,7 @@ export async function rules(context: VerbContext): Promise<VerbResult> {
       return values;
     },
   );
-  return ok({ table: result });
+  return ok({ table: result }, time.warnings(range));
 }
 
 /** The JSON after `using=`, read to the end of the line and checked as a file's would be. */
@@ -130,6 +132,7 @@ function compileRules(
   table: Table,
   aliases: ReadonlyMap<string, string>,
   range: SourceRange,
+  time: LocalTime,
 ): Result<readonly CompiledRule[], Problems> {
   const refuse = (problem: string) => err([diagnostic('E_RECIPE_RULES', { problem }, { range })]);
   const placed = (where: string, problems: readonly Diagnostic[]) =>
@@ -176,7 +179,7 @@ function compileRules(
       const template = parseTemplate(written);
       if (!template.ok)
         return err(templateProblem(written, `at '${where}' ${template.error}`, range));
-      const bound = bindTemplate(template.value, table, aliases, range);
+      const bound = bindTemplate(template.value, table, aliases, range, {}, time);
       if (!bound.ok) return placed(where, bound.error);
       set.set(name.toLowerCase(), bound.value);
     }

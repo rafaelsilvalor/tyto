@@ -1,6 +1,8 @@
 import { type Result, type SourceRange, diagnostic, err, ok } from '@tyto/core';
 
+import { checkWrittenFormat } from './age.js';
 import { resolveColumn } from './columns.js';
+import { type LocalTime, localTime } from './local.js';
 import type { Problems } from './support.js';
 import { type CellValue, type Column, type Row, type Table, cellText } from './table.js';
 
@@ -14,6 +16,10 @@ import { type CellValue, type Column, type Row, type Table, cellText } from './t
  * read from a data file is not filled with parameters and may write `{column}` too. A brace
  * has no escape: every `{` opens a placeholder and a `}` outside one is refused, because a
  * brace in a name or a key is something no recipe has needed yet.
+ *
+ * One filter takes an argument after a colon: `local:<format>` (TYTO-675) writes an ISO-8601
+ * instant as wall-clock time in the run's zone, with the tokens dd, MM, yyyy, HH and mm, as
+ * in `{due|local:dd/MM/yyyy HH:mm}`. See `local.ts`.
  */
 
 /** `slug` follows the private plugin's Python order: lower case first, then NFKD. */
@@ -30,16 +36,21 @@ const FILTERS = {
   lower: (text: string) => text.toLowerCase(),
 } as const satisfies Record<string, (text: string) => string>;
 
-export type TemplateFilter = keyof typeof FILTERS;
+/** The filters a placeholder may name; `local` is the one that takes an argument. */
+export type TemplateFilter = keyof typeof FILTERS | 'local';
 
-export const TEMPLATE_FILTERS = Object.keys(FILTERS) as readonly TemplateFilter[];
+export const TEMPLATE_FILTERS = [...Object.keys(FILTERS), 'local'] as readonly TemplateFilter[];
+
+/** One filter of a placeholder, with the format `local:` was written with. */
+export type PlaceholderFilter =
+  keyof typeof FILTERS | { readonly name: 'local'; readonly format: string };
 
 type Part =
   | { readonly kind: 'text'; readonly text: string }
   | {
       readonly kind: 'column';
       readonly column: string;
-      readonly filters: readonly TemplateFilter[];
+      readonly filters: readonly PlaceholderFilter[];
     };
 
 export interface Template {
@@ -47,7 +58,7 @@ export interface Template {
   readonly parts: readonly Part[];
 }
 
-const PLACEHOLDER_BODY = /^([A-Za-z_][\w-]*)((?:\|[a-z]*)*)$/u;
+const PLACEHOLDER_BODY = /^([A-Za-z_][\w-]*)((?:\|[a-z]*(?::[^|{]*)?)*)$/u;
 
 /** The template's parts, or why it is not one, as the end of a sentence about the template. */
 export function parseTemplate(text: string): Result<Template, string> {
@@ -73,15 +84,26 @@ export function parseTemplate(text: string): Result<Template, string> {
           '{column|filter|filter}',
       );
     }
-    const filters: TemplateFilter[] = [];
-    for (const name of (match[2] ?? '').split('|').slice(1)) {
-      if (name === '') continue;
+    const filters: PlaceholderFilter[] = [];
+    for (const written of (match[2] ?? '').split('|').slice(1)) {
+      const colon = written.indexOf(':');
+      const name = colon === -1 ? written : written.slice(0, colon);
+      if (name === '' && colon === -1) continue;
+      if (name === 'local') {
+        if (colon === -1)
+          return err("uses the filter 'local' without a format, as in local:yyyy-MM-dd");
+        const format = checkWrittenFormat(written.slice(colon + 1));
+        if (!format.ok) return err(`uses the filter 'local', which ${format.error}`);
+        filters.push({ name: 'local', format: format.value });
+        continue;
+      }
       if (!Object.hasOwn(FILTERS, name)) {
         return err(
           `uses the filter '${name}', which does not exist; the filters are ${TEMPLATE_FILTERS.join(', ')}`,
         );
       }
-      filters.push(name as TemplateFilter);
+      if (colon !== -1) return err(`gives the filter '${name}' an argument it does not take`);
+      filters.push(name as keyof typeof FILTERS);
     }
     parts.push({ kind: 'column', column: match[1], filters });
     index = close + 1;
@@ -102,13 +124,18 @@ export interface BoundTemplate {
   fill(row: Row): string | null;
 }
 
-/** Checks a parsed template's columns against the table; an unknown one lands at `range`. */
+/**
+ * Checks a parsed template's columns against the table; an unknown one lands at `range`.
+ * `local` writes through `time`, which holds the run's clock and counts what it could not
+ * read; a step binding several templates passes one and reports its warnings once.
+ */
 export function bindTemplate(
   template: Template,
   table: Table,
   aliases: ReadonlyMap<string, string>,
   range: SourceRange,
   mode: FillMode = {},
+  time: LocalTime = localTime(),
 ): Result<BoundTemplate, Problems> {
   const columns = new Map<string, Column>();
   for (const part of template.parts) {
@@ -119,8 +146,13 @@ export function bindTemplate(
   }
   const value = (part: Part, row: Row): string => {
     if (part.kind === 'text') return part.text;
-    const cell: CellValue | undefined = row.values[columns.get(part.column)?.name ?? ''];
-    return part.filters.reduce((text, filter) => FILTERS[filter](text), cellText(cell));
+    const name = columns.get(part.column)?.name ?? '';
+    const cell: CellValue | undefined = row.values[name];
+    return part.filters.reduce(
+      (text, filter) =>
+        typeof filter === 'string' ? FILTERS[filter](text) : time.write(text, filter.format, name),
+      cellText(cell),
+    );
   };
   return ok({ fill: (row) => fillParts(template.parts, (part) => value(part, row), mode) });
 }

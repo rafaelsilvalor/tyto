@@ -23,6 +23,11 @@ describe('a clock in a named zone', () => {
     expect(zoneClock('Asia/Kolkata').offsetMinutes(new Date('2026-10-27T12:00:00Z'))).toBe(330);
   });
 
+  it('names its zone, so a recipe template writes wall-clock time through it (TYTO-675)', () => {
+    expect(zoneClock('Europe/Lisbon').timeZone).toBe('Europe/Lisbon');
+    expect(recipeClock(null).timeZone).toBe(new Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
   it('reads now from what it is handed', () => {
     const fixed = new Date('2026-10-27T12:00:00.000Z');
     expect(zoneClock('UTC', () => fixed).now()).toBe(fixed);
