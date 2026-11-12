@@ -369,3 +369,17 @@ and chooses nothing: it never names a Chromium or Playwright, and it holds the `
 one file (`plugins/plugin-process.ts`, for its own tests and for `apps/cli` to choose) and starts
 it only through `environment.launch`. `git` and `npm` stay the commands' own, as decision 8 says.
 No pure package may import it. `eslint.config.js` enforces the last three.
+
+**Note, 2026-11-12 (TYTO-684): the panel only plans a recipe.** Decision 2's third list of
+refusals, the ones `windowRefusals` names in `apps/desktop/src/main/cli-refusals.ts` beside
+`--trust`, `mcp` and `watch` on the queue's folder, gains `tyto recipe run --apply`. That flag
+applies every plan and lets the `call` verb send with the credentials of the process's
+environment (ADR 0193 decision 5); in the window that would be the window's own environment,
+outside the notebook's Apply and its credential store. The maintainer chose plan only:
+`APPLY_REFUSED` names the notebook's Apply button and a terminal instead, and `recipe run`
+without `--apply` still runs and prints its plans. The rule reads the parsed option, so it
+covers every spelling the parser accepts; `--apply` is a plain flag with no short alias, no
+value and no `--no-apply`, and those words are unknown options to the parser. A recipe whose
+header says `apply auto` applies nothing without the flag: `recipe run` runs it as a save, not
+a Run (ADR 0170 decision 6), so the panel reads no header. No other command applies a recipe:
+`tyto mcp`'s `run_recipe` does, and `mcp` is already refused in the panel.

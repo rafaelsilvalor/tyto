@@ -282,6 +282,29 @@ describe('tyto recipe run', () => {
     expect(Object.keys(await stored('sync.recipe'))).toHaveLength(ROWS);
   });
 
+  it('plans an apply auto recipe without --apply in a trusted folder, and applies nothing', async () => {
+    // TYTO-684: the window's command panel refuses only `--apply`, because a plan-only run of
+    // an `apply auto` recipe is a save's, not a Run's, and so applies nothing (ADR 0170).
+    await trust();
+    await writeFile(
+      join(workspace, 'recipes', 'sync.recipe'),
+      SYNC.replace('recipe sync\n', 'recipe sync\napply auto\n'),
+    );
+    const sink = newSink();
+
+    const code = await recipeRunCommand('recipes/sync.recipe', { json: true }, environment(), {
+      contributions: verbs(sink),
+    });
+
+    expect(code).toBe(EXIT_OK);
+    expect(sink.pulls).toBe(1);
+    expect(sink.applied).toEqual([]);
+    const document = JSON.parse(out) as RecipeRunDocument;
+    expect(document.cells[2]?.plan?.operations).toHaveLength(ROWS);
+    expect(document.cells[2]?.applied).toBeUndefined();
+    expect(await stored('sync.recipe')).toEqual({});
+  });
+
   it('refuses --apply in a restricted folder before any cell runs', async () => {
     const sink = newSink();
 
