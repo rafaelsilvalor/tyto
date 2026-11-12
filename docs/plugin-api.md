@@ -434,7 +434,12 @@ interface RecipeVerbContribution {
     section?: unknown; // this plugin's project section (ADR 0147)
     refresh?: boolean; // true on a run without cache: skip your private cache (ADR 0148)
   }): Result<{ table; cursor?: string; truncated?: boolean }>;
-  transform?(request: { arguments; table; section? }): Result<Table>;
+  transform?(request: {
+    arguments;
+    table;
+    section?: unknown;
+    refresh?: boolean; // true on the same runs as `page`: skip your private cache (TYTO-681)
+  }): Result<Table>;
   writes?: string[]; // an action's or a sink's: a subset of the manifest's 'writes'
   plan?(request: { arguments; table; section? }): Result<Plan>; // an action's or a sink's
   // An action's or a sink's, optional: one batch of the plan as shown (ADR 0170).
@@ -493,6 +498,15 @@ section as what this folder chooses over them. **Never a secret**: the file is p
 team shares, and a token is a declared credential (ADR 0134).
 `tyto render --section <plugin>.<key>=<value>` sets a key for one run over the file's, and applies in a restricted
 folder too. Runnable commands (TYTO-261) will carry the same field.
+
+**A run without cache reaches a source and a transform** (ADR 0148, TYTO-681). Fetch again in
+the notebook, and every scheduled run (ADR 0175), build the registries with `refresh: true`:
+every `page` call, on every page, and every contributed `transform` call carry `refresh: true`,
+and an ordinary run carries no key. A verb that keeps what it read in its private cache
+(ADR 0138) — a source, or a lookup reading a sheet inside a transform — skips the cache and
+reads live; one that reads nothing remote ignores it. `plan` never carries it. Across the
+isolation boundary the field rides `transform` from protocol 25, which `@tyto/plugin-api` 0.21
+carries. In `testPlugin`, `runRecipe(text, { refresh: true })` runs as Fetch again does.
 
 **An action or a sink plans and writes nothing** (ADR 0129). It declares `writes`, the kinds of
 write its plans may hold, a subset of the manifest's `writes`, or the plugin is refused at load;

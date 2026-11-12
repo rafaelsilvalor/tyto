@@ -221,33 +221,58 @@ interface Arguments {
 }
 
 const NAME_BEFORE_EQUALS = /^([A-Za-z_][\w-]*)=/u;
+/** `"Última Sync"=`: a quoted name before `=`, how `compose` names a column with blanks. */
+const QUOTED_NAME_BEFORE_EQUALS = /^"([^"]*)"=/u;
+
+interface Token {
+  readonly value: string;
+  readonly end: number;
+  readonly quoted: boolean;
+}
 
 /**
  * Words and quoted strings, and `name=value` pairs. A quote has no escape: a value that
  * needs a double quote is not something a recipe has met yet.
+ *
+ * A word that is a list may hold quoted members, `key,"Última Sync"`: a quote that opens a
+ * word or follows a comma runs to its closing quote, so the list stays one word and keeps its
+ * quotes for `columnNames` to read. A word that is one quoted string loses its quotes and is
+ * marked quoted.
  */
 function tokenizeArguments(rest: string, offset: number): Result<Arguments, readonly Diagnostic[]> {
   const positional: Argument[] = [];
   const named: NamedArgument[] = [];
   let index = 0;
 
-  const readValue = (from: number): Result<{ value: string; end: number }, Diagnostic[]> => {
+  const unclosed = (from: number): Result<never, Diagnostic[]> =>
+    err([
+      diagnostic(
+        'E_RECIPE_SYNTAX',
+        { problem: 'a quoted value is not closed' },
+        { range: sourceRange(offset + from, offset + rest.length) },
+      ),
+    ]);
+
+  const readValue = (from: number): Result<Token, Diagnostic[]> => {
+    let end = from;
     if (rest[from] === '"') {
       const close = rest.indexOf('"', from + 1);
-      if (close === -1) {
-        return err([
-          diagnostic(
-            'E_RECIPE_SYNTAX',
-            { problem: 'a quoted value is not closed' },
-            { range: sourceRange(offset + from, offset + rest.length) },
-          ),
-        ]);
+      if (close === -1) return unclosed(from);
+      if (rest[close + 1] !== ',') {
+        return ok({ value: rest.slice(from + 1, close), end: close + 1, quoted: true });
       }
-      return ok({ value: rest.slice(from + 1, close), end: close + 1 });
+      end = close + 1;
     }
-    let end = from;
-    while (end < rest.length && !/\s/u.test(rest[end] ?? '')) end += 1;
-    return ok({ value: rest.slice(from, end), end });
+    while (end < rest.length && !/\s/u.test(rest[end] ?? '')) {
+      if (rest[end] === '"' && rest[end - 1] === ',') {
+        const close = rest.indexOf('"', end + 1);
+        if (close === -1) return unclosed(end);
+        end = close + 1;
+      } else {
+        end += 1;
+      }
+    }
+    return ok({ value: rest.slice(from, end), end, quoted: false });
   };
 
   while (index < rest.length) {
@@ -255,15 +280,18 @@ function tokenizeArguments(rest: string, offset: number): Result<Arguments, read
       index += 1;
       continue;
     }
-    const pair = NAME_BEFORE_EQUALS.exec(rest.slice(index));
+    const tail = rest.slice(index);
+    const pair = NAME_BEFORE_EQUALS.exec(tail) ?? QUOTED_NAME_BEFORE_EQUALS.exec(tail);
     const valueStart = pair?.[1] !== undefined ? index + pair[0].length : index;
     const read = readValue(valueStart);
     if (!read.ok) return read;
     const range = sourceRange(offset + index, offset + read.value.end);
+    const quoted = read.value.quoted ? { quoted: true as const } : {};
     if (pair?.[1] !== undefined) {
-      named.push({ name: pair[1], value: read.value.value, range });
+      const nameQuoted = pair[0].startsWith('"') ? { nameQuoted: true as const } : {};
+      named.push({ name: pair[1], value: read.value.value, range, ...quoted, ...nameQuoted });
     } else {
-      positional.push({ value: read.value.value, range });
+      positional.push({ value: read.value.value, range, ...quoted });
     }
     index = read.value.end;
   }

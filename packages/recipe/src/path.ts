@@ -2,7 +2,7 @@ import { type Result, diagnostic, err, ok } from '@tyto/core';
 import { z } from 'zod';
 
 import type { NamedArgument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import { isDataReference, readDataArgument, readInlineJson } from './data.js';
 import type { VerbContext, VerbResult } from './registry.js';
@@ -16,7 +16,6 @@ import {
 } from './support.js';
 import { type CellValue, cellText, comparable } from './table.js';
 
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const NAMES = ['from', 'to', 'graph', 'avoid', 'into'] as const;
 
 /** Each node and the nodes one arrow away from it, in the order the file lists them. */
@@ -145,7 +144,7 @@ export async function path(context: VerbContext): Promise<VerbResult> {
   ) {
     return argumentsProblem(context, `needs ${missing.map((name) => `${name}=`).join(', ')}`);
   }
-  if (!COLUMN_NAME.test(into.value)) {
+  if (!isWritableColumnName(into.value, into.quoted)) {
     return argumentsProblem(context, `cannot write a column named '${into.value}'`, at(into.range));
   }
 

@@ -1,7 +1,7 @@
 import { type Diagnostic, type Result, type SourceRange, diagnostic, err, ok } from '@tyto/core';
 import { z } from 'zod';
 
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import { describeIssues, isDataReference, readDataArgument } from './data.js';
 import type { VerbContext, VerbResult } from './registry.js';
@@ -19,8 +19,6 @@ const RULE = z.strictObject({
 export const RULES = z.array(RULE).min(1, 'a rules table holds at least one entry');
 
 type Rule = z.infer<typeof RULE>;
-
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 
 /** A rule ready to test a row and fill the columns it sets. */
 interface CompiledRule {
@@ -71,7 +69,7 @@ export async function rules(context: VerbContext): Promise<VerbResult> {
 
   const into: string[] = [];
   for (const name of columnNames(intoArguments)) {
-    if (!COLUMN_NAME.test(name.value)) {
+    if (!isWritableColumnName(name.value, name.quoted)) {
       return argumentsProblem(
         context,
         `cannot write a column named '${name.value}'`,

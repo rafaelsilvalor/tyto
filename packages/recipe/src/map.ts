@@ -2,14 +2,13 @@ import { type Result, ok } from '@tyto/core';
 import { z } from 'zod';
 
 import type { NamedArgument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import { isDataReference, readDataArgument, readInlineJson } from './data.js';
 import type { VerbContext, VerbResult } from './registry.js';
 import { type Problems, argumentsProblem, argumentsUpTo, locate, requireTable } from './support.js';
 import { type CellValue, comparable } from './table.js';
 
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const NAMES = ['using', 'also', 'into'] as const;
 
 /** A lookup table: each key's value, as the file writes both. */
@@ -108,7 +107,7 @@ export async function map(context: VerbContext): Promise<VerbResult> {
       stray === undefined ? undefined : at(stray.range),
     );
   }
-  if (!COLUMN_NAME.test(into.value)) {
+  if (!isWritableColumnName(into.value, into.quoted)) {
     return argumentsProblem(context, `cannot write a column named '${into.value}'`, at(into.range));
   }
   const alsoArgument = written.get('also');

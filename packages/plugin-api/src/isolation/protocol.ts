@@ -61,9 +61,11 @@ import {
  * TYTO-657); 23 since a plugin may list and call the window's tools in process, two requests a
  * host on 22 would refuse as unknown capabilities (ADR 0190, TYTO-661); 24 since `fetch` may
  * carry `credentialHeaders`, which the strict schema of a host on 23 would refuse, and a plugin
- * may keep durable records, three requests a host on 23 would refuse (ADR 0191, TYTO-661).
+ * may keep durable records, three requests a host on 23 would refuse (ADR 0191, TYTO-661); 25
+ * since a recipe `transform` call carries `refresh` on a run without cache, a field the strict
+ * `transform` schema of a guest on 24 would refuse (ADR 0148, TYTO-681).
  */
-export const RPC_PROTOCOL_VERSION = 24;
+export const RPC_PROTOCOL_VERSION = 25;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
