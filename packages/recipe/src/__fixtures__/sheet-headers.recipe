@@ -1,0 +1,9 @@
+# Invented tasks of a demo project, for quoted column names: no real project, team or person.
+recipe sheet-headers
+  | Names its columns the way a synced sheet's headers are written, accents and blanks kept.
+
+compose "Última Sync"={due|slug}
+group by=team,"Última Sync" into="Tarefas do Time"
+count "Tarefas do Time" into="Nº de Tarefas"
+select team, "Última Sync", "Nº de Tarefas"
+test.sheet

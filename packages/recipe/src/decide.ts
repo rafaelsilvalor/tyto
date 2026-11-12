@@ -2,7 +2,7 @@ import { type Result, ok } from '@tyto/core';
 import { z } from 'zod';
 
 import type { NamedArgument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { isDataReference, readDataArgument } from './data.js';
 import type { VerbContext, VerbResult } from './registry.js';
 import {
@@ -15,7 +15,6 @@ import {
 } from './support.js';
 import { type CellValue, type Column, type Row, cellText, comparable } from './table.js';
 
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const VALUES = z.array(z.string());
 
 const NAMES = [
@@ -200,7 +199,7 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
     return argumentsProblem(context, USAGE, extra === undefined ? undefined : at(extra.range));
   }
   const name = nameArgument.value;
-  if (!COLUMN_NAME.test(name)) {
+  if (!isWritableColumnName(name, nameArgument.quoted)) {
     return argumentsProblem(
       context,
       `names its columns with letters, digits, - and _, starting with a letter or _, not '${name}'`,
