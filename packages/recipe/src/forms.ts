@@ -460,3 +460,33 @@ export function formOfArguments(
   }));
   return { verb, kind, summary, example: '', fields };
 }
+
+/** One sentence a form shows, with the key a host translates it by (TYTO-685). */
+export interface FormText {
+  readonly key: string;
+  /** The English sentence, which is also what a host shows for a key it cannot translate. */
+  readonly text: string;
+}
+
+/** The key of a verb's summary: `recipe.verb.<verb>.summary`. */
+export const summaryKey = (verb: string): string => `recipe.verb.${verb}.summary`;
+
+/** The key of a field's help: `recipe.verb.<verb>.field.<field>.help`. */
+export const helpKey = (verb: string, field: string): string =>
+  `recipe.verb.${verb}.field.${field}.help`;
+
+/**
+ * Every sentence a form shows, keyed (TYTO-685). This package stays without a language of its
+ * own: the English above is the source, and the keys are derived from the verb's and the
+ * field's names rather than stored beside each sentence, so a host's table of another language
+ * is checked against this list and the English is written in one place only.
+ */
+export function formTexts(verbForm: VerbForm): FormText[] {
+  const texts: FormText[] = [];
+  const { verb, summary, fields } = verbForm;
+  if (summary !== '') texts.push({ key: summaryKey(verb), text: summary });
+  for (const field of fields) {
+    if (field.help !== '') texts.push({ key: helpKey(verb, field.name), text: field.help });
+  }
+  return texts;
+}

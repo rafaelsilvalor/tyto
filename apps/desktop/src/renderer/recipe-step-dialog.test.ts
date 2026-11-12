@@ -184,6 +184,49 @@ describe('the step dialog (TYTO-402)', () => {
     expect(await answer).toBe('where status != done');
   });
 
+  it("shows a generic verb's summary and help in the window's language (TYTO-685)", async () => {
+    const dialog = open();
+    void dialog.ask({ locale: 'pt-BR', catalog: CATALOG, columns: [] });
+    await settle(dialog);
+    const pickerSummary = dialog.querySelector(
+      '[data-verb="where"] .recipe-step__verb-summary',
+    )?.textContent;
+    click(dialog, '[data-verb="where"]');
+    await settle(dialog);
+
+    expect(pickerSummary).toBe('Mantém as linhas que satisfazem uma expressão.');
+    expect(dialog.querySelector('.recipe-step-form__summary')?.textContent).toBe(pickerSummary);
+    expect(
+      dialog.querySelector('[data-field="expression"] .recipe-step-form__help')?.textContent,
+    ).toBe('Predicados unidos por AND, como em status = done AND team = print.');
+  });
+
+  it("keeps the English of a sentence the locale has none for, and English in 'en'", async () => {
+    const dialog = open();
+    const described: VerbEntry = {
+      ...PLUGIN,
+      fields: PLUGIN.fields.map((field) => ({ ...field, help: 'The board to read.' })),
+    };
+    void dialog.ask({ locale: 'pt-BR', catalog: [described], columns: [] });
+    await settle(dialog);
+    click(dialog, '[data-verb="acme.pull"]');
+    await settle(dialog);
+    expect(dialog.querySelector('[data-field="board"] .recipe-step-form__help')?.textContent).toBe(
+      'The board to read.',
+    );
+
+    void dialog.ask({
+      locale: 'en',
+      catalog: CATALOG,
+      columns: [],
+      edit: { entry: entry('where'), values: {} },
+    });
+    await settle(dialog);
+    expect(
+      dialog.querySelector('[data-field="expression"] .recipe-step-form__help')?.textContent,
+    ).toBe('Predicates joined by AND, as in status = done AND team = print.');
+  });
+
   it('answers nothing when cancelled with Escape from the search field', async () => {
     const dialog = open();
     const answer = dialog.ask({ locale: 'en', catalog: CATALOG, columns: [] });
