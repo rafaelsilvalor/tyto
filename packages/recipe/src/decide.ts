@@ -179,9 +179,11 @@ function spelt(value: CellValue | undefined): CellValue {
  * default, pushes the local value; `remote` pulls the remote one. Either way the row says it
  * overrides, and which value it overwrote (TYTO-421).
  *
- * It writes six columns: `<column>`, the decided value; `<column>_action`, push, pull, same or
+ * It writes seven columns: `<column>`, the decided value; `<column>_action`, push, pull, same or
  * hold; `<column>_push`, the decided value on a push row and empty on every other, which is what
- * a write to the remote side reads; `<column>_overrides`, true where both sides changed and the
+ * a write to the remote side reads; `<column>_pushes`, true exactly on a push row whatever its
+ * value, so a write can tell a push of an empty value from no push at all, which `_push` alone
+ * cannot (TYTO-647); `<column>_overrides`, true where both sides changed and the
  * winner overwrites the other's change; `<column>_overwritten`, the losing side's value there,
  * and empty elsewhere; and `<column>_reason`, the rule that fired. `<column>` may be the `local=`
  * column itself, which is then rewritten in place, as `map` rewrites its `into=`, so a synced
@@ -248,6 +250,7 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
   const added: Column[] = [
     { name: `${name}_action`, type: 'text', origin },
     { name: `${name}_push`, type: 'text', origin },
+    { name: `${name}_pushes`, type: 'boolean', origin },
     { name: `${name}_overrides`, type: 'boolean', origin },
     { name: `${name}_overwritten`, type: 'text', origin },
     { name: `${name}_reason`, type: 'text', origin },
@@ -334,6 +337,7 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
       [decidedColumn.name]: decision.value,
       [`${name}_action`]: decision.action,
       [`${name}_push`]: decision.action === 'push' ? decision.value : null,
+      [`${name}_pushes`]: decision.action === 'push',
       [`${name}_overrides`]: decision.overrides,
       [`${name}_overwritten`]: decision.overwritten,
       [`${name}_reason`]: decision.reason,
