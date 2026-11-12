@@ -1,7 +1,7 @@
 import { type CellOutput, cellOutputLineStart, remeasureCellOutput } from '@tyto/editor';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
-import { type CellStatus, statusText } from './recipe-notebook.js';
+import { type CellStatus, type RecipeViewState, statusText } from './recipe-notebook.js';
 import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js';
 import type { FacetsAnswer, FacetsRequest } from './recipe-board-view.js';
 import type { RowAnswer, RowRequest } from './recipe-cards-view.js';
@@ -82,6 +82,15 @@ export interface CellViewContext {
   /** Milliseconds since the epoch; injected so a test fixes the clock. */
   readonly now: () => number;
   readonly actions: CellViewActions;
+  /**
+   * What each cell's view keeps across a rebuild of its element (TYTO-639), by the start of the
+   * cell's line, as folds are: read when the element is built, and handed each change with the
+   * line as it is then. Absent, a view keeps nothing.
+   */
+  readonly views?: {
+    readonly of: (at: number) => RecipeViewState;
+    readonly keep: (at: number, state: RecipeViewState) => void;
+  };
 }
 
 type WireCell = CellStatus['cell'];
@@ -203,12 +212,23 @@ function renderCell(
   // TYTO-379: a cell under `show` is drawn by its view (`recipe-views.ts`); one under none
   // keeps the preview. Only the body changes: the header and a plan's lines stay as they are.
   if (table !== undefined) {
+    const { views } = context;
     const view = viewBody(cell, table, {
       locale,
       rows: actions.rows,
       copy: actions.copy,
       facets: actions.facets,
       row: actions.row,
+      // TYTO-639: a new run or another language builds this element again; the filter stays.
+      memory:
+        views === undefined
+          ? undefined
+          : {
+              kept: views.of(status.at),
+              keep: (state) => {
+                views.keep(cellOutputLineStart(root) ?? status.at, state);
+              },
+            },
     });
     root.append(view ?? tableBody(table, locale));
   }

@@ -42,8 +42,9 @@ export interface EditorTab {
   readonly documentId: string;
   readonly view?: 'preview' | 'recipe-view';
   /**
-   * The cell a `recipe-view` tab draws full size (TYTO-379, ADR 0171), by its index in the
-   * recipe `documentId` names: the index `recipe:rows` pages by. Absent on every other tab.
+   * The cell a `recipe-view` tab was opened on (TYTO-379, ADR 0171), by its index in the recipe
+   * `documentId` names. The window follows that cell's line from then on (TYTO-642), so a step
+   * inserted above does not hand the tab another cell. Absent on every other tab.
    */
   readonly cell?: number;
   readonly locked?: boolean;
@@ -829,15 +830,18 @@ export function setPreviewMode(
  * "Open cell result in a tab" (TYTO-379, ADR 0171's dated note): the tab already drawing that
  * cell of that recipe, brought to the front of its group and focused, or a new one in the focused
  * group, in front. One tab per cell: a second ask is the first tab again, never a twin.
+ * `drawing` says which cell a tab draws now, when the host follows each tab's cell through edits
+ * (TYTO-642); absent, it is the index the tab was opened on.
  */
 export function openRecipeView(
   groups: EditorGroups,
   documentId: string,
   cell: number,
+  drawing: (tab: EditorTab) => number | undefined = (tab) => tab.cell,
 ): EditorGroups {
   const existing = groupList(groups)
     .flatMap((group) => group.tabs)
-    .find((tab) => isRecipeView(tab) && tab.documentId === documentId && tab.cell === cell);
+    .find((tab) => isRecipeView(tab) && tab.documentId === documentId && drawing(tab) === cell);
   if (existing !== undefined) return activateTab(groups, existing.id);
   const group = focusedGroup(groups);
   const [tabId, minted] = mint(groups, 'tab');
