@@ -359,4 +359,45 @@ describe('browser sign-in from the plugins screen', () => {
       'refused:E_SIGNIN_REQUIRED refused:E_PERMISSION',
     );
   });
+
+  it('cancels a sign-in left waiting, and Sign in works again at once (TYTO-646)', async () => {
+    await page.waitForSelector(`${LINE}[data-signed-in="false"]`);
+    const before = (await opened()).length;
+
+    await page.click(`${LINE} .plugins__signin-start`);
+    await expect.poll(async () => (await opened()).length, { timeout: 10_000 }).toBe(before + 1);
+    const abandoned = (await opened())[before]!;
+    // The person closed the browser tab: nothing comes back, and the line waits.
+    await page.waitForSelector(`${LINE} .plugins__signin-cancel`);
+    expect(await page.isDisabled(`${LINE} .plugins__signin-start`)).toBe(true);
+
+    await page.click(`${LINE} .plugins__signin-cancel`);
+    // No timer: the attempt ends as soon as main closed its listener.
+    await page.waitForSelector(`${LINE} .plugins__signin-start:not([disabled])`, {
+      timeout: 5_000,
+    });
+    expect(await page.$(`${LINE} .plugins__signin-waiting`)).toBeNull();
+    expect(await page.$(`${LINE} .plugins__signin-failed`)).toBeNull();
+    expect(existsSync(entry)).toBe(false);
+
+    // The browser coming back late finds no one listening on the loopback port.
+    const late = await fetch(abandoned).then(
+      () => 'answered',
+      () => 'refused',
+    );
+    expect(late).toBe('refused');
+    expect(existsSync(entry)).toBe(false);
+
+    // A new attempt starts at once and finishes.
+    await page.click(`${LINE} .plugins__signin-start`);
+    await expect.poll(async () => (await opened()).length, { timeout: 10_000 }).toBe(before + 2);
+    const landed = await fetch((await opened())[before + 1]!);
+    expect(landed.status).toBe(200);
+    if (!keychain) {
+      await page.waitForSelector(`${LINE} .plugins__signin-failed`);
+      return;
+    }
+    await page.waitForSelector(`${LINE}[data-signed-in="true"]`);
+    expect(existsSync(entry)).toBe(true);
+  });
 });

@@ -835,6 +835,7 @@ export interface Catalogue {
   readonly 'plugins.signin.start': string;
   readonly 'plugins.signin.out': string;
   readonly 'plugins.signin.waiting': string;
+  readonly 'plugins.signin.cancel': string;
   readonly 'plugins.signin.failed': string;
   readonly 'plugins.signin.kept': string;
   /**
@@ -1619,6 +1620,7 @@ export const CATALOGUE_KEYS = [
   'plugins.signin.start',
   'plugins.signin.out',
   'plugins.signin.waiting',
+  'plugins.signin.cancel',
   'plugins.signin.failed',
   'plugins.signin.kept',
   'plugins.signin.client.label',

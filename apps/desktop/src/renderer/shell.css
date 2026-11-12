@@ -4369,9 +4369,20 @@ tyto-recent-folders[open] {
   font-weight: var(--tyto-weight-strong);
 }
 
-.plugins__signin-waiting,
 .plugins__signin-failed {
   width: 100%;
+  margin: 0;
+}
+
+/* TYTO-646: the waiting line takes its own row, with Cancel beside its words. */
+.plugins__signin-wait {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--tyto-space-3);
+}
+
+.plugins__signin-waiting {
   margin: 0;
 }
 

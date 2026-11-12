@@ -415,7 +415,9 @@ describe('the bridge', () => {
       'settings:outline',
       'settings:validate',
       // TYTO-374: browser sign-in from the plugins screen, and the client a person supplies
-      // (ADR 0192). Exercised by `e2e/signin.desktop.test.ts`.
+      // (ADR 0192), and cancelling one still waiting (TYTO-646). Exercised by
+      // `e2e/signin.desktop.test.ts`.
+      'signin:cancel',
       'signin:client',
       'signin:client-clear',
       'signin:list',

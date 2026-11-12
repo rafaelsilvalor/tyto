@@ -69,6 +69,8 @@ Some plugins work with your own account somewhere else — a connector that crea
 2. Your browser opens on the provider's page. Sign in there and approve. The browser then shows a page from Tyto saying you are signed in; you can close that tab.
 3. Back in the dialog, the line says **Signed in as** and the account, or just **Signed in** when the provider does not say who.
 
+While the browser is open, the line says to finish signing in there and has **Cancel**. If you closed the browser tab or picked the wrong account, click **Cancel**: the attempt ends at once, nothing is kept, and you can click **Sign in** again.
+
 Click **Sign out** to end it. Nothing else starts a sign-in: a plugin that needs one when you are signed out stops and tells you to sign in from this dialog, and it never opens your browser by itself.
 
 Tyto keeps the sign-in in your system's keychain, and the plugin gets only a short-lived access token from Tyto, never what keeps you signed in. On a computer with no keychain to encrypt with, the sign-in does not finish and the line says why. The command line cannot sign in through a browser: a recipe that needs a sign-in works only in the window.

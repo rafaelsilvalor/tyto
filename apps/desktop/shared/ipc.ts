@@ -2251,6 +2251,17 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Ends a sign-in still waiting on the browser, when the person clicks Cancel (TYTO-646,
+   * ADR 0174 note of 2026-11-12): the loopback listener closes, `signin:start` answers
+   * `cancelled`, and nothing is stored. `cancelled` is false when no attempt was waiting.
+   * **Rejected** for a plugin or id nobody declares, as `signin:out` is.
+   */
+  'signin:cancel': channel(
+    z.strictObject({ plugin: z.string().min(1).max(214), id: z.string().min(1).max(64) }),
+    z.object({ cancelled: z.boolean() }),
+  ),
+
+  /**
    * Deletes a sign-in's keychain entry and forgets its access token (ADR 0174, decision 8).
    * `signedOut` is false when there was nothing to delete. **Rejected** for a plugin or id
    * nobody declares, so the window cannot name another account under `signin:`.

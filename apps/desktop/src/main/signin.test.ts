@@ -19,7 +19,7 @@ import {
   signinCapabilities,
   signinWindow,
 } from './signin.js';
-import type { CallbackPage } from './loopback.js';
+import { type CallbackPage, type ListenOptions, listenForCallback } from './loopback.js';
 import { translate } from '../../shared/i18n/index.js';
 
 /**
@@ -225,6 +225,106 @@ describe('start', () => {
       reason: 'undeclared',
     });
     expect(fake.challenge).toBeUndefined();
+  });
+});
+
+describe('cancel (TYTO-646)', () => {
+  /**
+   * A service whose "browser" opens and is left alone, as a person who closed the tab leaves
+   * it: `redirects` gets each attempt's callback address, and `timeoutMs` shortens the wait.
+   */
+  function waitingRig(timeoutMs?: number) {
+    const keys = keychain();
+    const fake = provider();
+    const redirects: string[] = [];
+    const service = createSigninService({
+      credentials: keys,
+      declarationOf: (plugin, id) =>
+        Promise.resolve(plugin === 'drive-plugin' && id === 'drive' ? declaration : undefined),
+      fetch: fake.fetch,
+      now: () => Date.parse('2026-11-12T12:00:00.000Z'),
+      openBrowser: (url) => {
+        redirects.push(new URL(url).searchParams.get('redirect_uri') ?? '');
+        return Promise.resolve();
+      },
+      listen: (options: ListenOptions) =>
+        listenForCallback(timeoutMs === undefined ? options : { ...options, timeoutMs }),
+    });
+    return { service, keys, provider: fake, redirects };
+  }
+
+  /** Waits until the attempt has opened the browser, so its listener is the waiting one. */
+  const opened = async (redirects: string[], count: number): Promise<void> => {
+    while (redirects.length < count) await new Promise((resolve) => setTimeout(resolve, 5));
+  };
+
+  /** What a browser following the redirect late meets: a page, or the socket's refusal. */
+  const lateCallback = (redirect: string): Promise<string> =>
+    new Promise((resolve) => {
+      const callback = new URL(redirect);
+      callback.searchParams.set('code', 'code-1');
+      get(callback, (response) => {
+        response.resume();
+        resolve(`answered ${String(response.statusCode)}`);
+      }).on('error', (cause: NodeJS.ErrnoException) => resolve(`refused ${cause.code ?? ''}`));
+    });
+
+  it('closes the listener: the attempt answers cancelled and stores nothing', async () => {
+    const { service, keys, provider: fake, redirects } = waitingRig();
+    const attempt = service.start('drive-plugin', 'drive');
+    await opened(redirects, 1);
+
+    expect(service.cancel('drive-plugin', 'drive')).toBe(true);
+
+    expect(await attempt).toEqual({
+      ok: false,
+      reason: 'cancelled',
+      message: 'the sign-in was cancelled',
+    });
+    expect(keys.entries.size).toBe(0);
+    expect(fake.grants).toEqual([]);
+    // The browser coming back afterwards finds no one listening: no page, no trade.
+    expect(await lateCallback(redirects[0]!)).toBe('refused ECONNREFUSED');
+    expect(fake.grants).toEqual([]);
+    expect(keys.entries.size).toBe(0);
+  });
+
+  it('answers false when nothing waits: before, after a cancel, a sign-in or a timeout', async () => {
+    const { service, redirects } = waitingRig();
+    expect(service.cancel('drive-plugin', 'drive')).toBe(false);
+    const attempt = service.start('drive-plugin', 'drive');
+    await opened(redirects, 1);
+    expect(service.cancel('drive-plugin', 'other')).toBe(false);
+    expect(service.cancel('drive-plugin', 'drive')).toBe(true);
+    await attempt;
+    expect(service.cancel('drive-plugin', 'drive')).toBe(false);
+
+    // Finished by the callback: the attempt is no longer one to cancel.
+    const signedIn = rig();
+    expect(await signedIn.service.start('drive-plugin', 'drive')).toMatchObject({ ok: true });
+    expect(signedIn.service.cancel('drive-plugin', 'drive')).toBe(false);
+
+    // Finished by the timeout, likewise.
+    const timed = waitingRig(20);
+    expect(await timed.service.start('drive-plugin', 'drive')).toMatchObject({
+      reason: 'timeout',
+    });
+    expect(timed.service.cancel('drive-plugin', 'drive')).toBe(false);
+  });
+
+  it('lets a new attempt start at once after a cancel, and cancels only that one', async () => {
+    const { service, redirects } = waitingRig();
+    const first = service.start('drive-plugin', 'drive');
+    await opened(redirects, 1);
+    service.cancel('drive-plugin', 'drive');
+    expect(await first).toMatchObject({ reason: 'cancelled' });
+
+    const second = service.start('drive-plugin', 'drive');
+    await opened(redirects, 2);
+    expect(redirects[1]).not.toBe(redirects[0]);
+    expect(await lateCallback(redirects[0]!)).toBe('refused ECONNREFUSED');
+    expect(service.cancel('drive-plugin', 'drive')).toBe(true);
+    expect(await second).toMatchObject({ reason: 'cancelled' });
   });
 });
 
@@ -439,6 +539,16 @@ describe('the window side (TYTO-374)', () => {
     );
     expect(fake.challenge).toBeUndefined();
     expect(keys.entries.get(signinAccount('plain', 'drive'))).toBe('kept');
+  });
+
+  it('cancels through the window, and rejects a sign-in nobody declares (TYTO-646)', async () => {
+    const { service } = rig();
+    const window = signinWindow(store, service);
+
+    await expect(window.cancel('plain', 'drive')).rejects.toThrow(
+      "No installed plugin 'plain' declares the sign-in 'drive'",
+    );
+    expect(await window.cancel('drive-plugin', 'drive')).toEqual({ cancelled: false });
   });
 
   it('signs in and out, and answers whether it worked with no token in the answer', async () => {

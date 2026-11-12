@@ -69,6 +69,8 @@ Alguns plugins trabalham com a sua própria conta em outro lugar — um conector
 2. O navegador abre na página do provedor. Entre lá e aprove. Depois o navegador mostra uma página do Tyto dizendo que o login foi feito; pode fechar essa aba.
 3. De volta à caixa, a linha diz **Conectado como** e a conta, ou só **Conectado** quando o provedor não diz quem é.
 
+Enquanto o navegador está aberto, a linha pede que você termine o login lá e tem **Cancelar**. Se você fechou a aba do navegador ou escolheu a conta errada, clique em **Cancelar**: a tentativa termina na hora, nada é guardado, e você pode clicar em **Entrar** de novo.
+
 Clique em **Sair** para encerrar. Nada mais começa um login: um plugin que precisa de um quando você está desconectado para e pede que você entre por esta caixa, e ele nunca abre o navegador sozinho.
 
 O Tyto guarda o login no chaveiro do sistema, e o plugin recebe do Tyto só um token de acesso de curta duração, nunca o que mantém você conectado. Num computador sem chaveiro para criptografar, o login não termina e a linha diz por quê. A linha de comando não faz login pelo navegador: uma receita que precisa de login só funciona na janela.
