@@ -1,8 +1,17 @@
 import { type Diagnostic } from '@tyto/core';
-import { type Step, type VerbField, type VerbForm, formatStep, valuesOfStep } from '@tyto/recipe';
+import {
+  type Step,
+  type VerbField,
+  type VerbForm,
+  formatStep,
+  helpKey,
+  summaryKey,
+  valuesOfStep,
+} from '@tyto/recipe';
 import { html, nothing } from 'lit';
 
-import type { CatalogueKey } from '../../shared/i18n/index.js';
+import type { CatalogueKey, Locale } from '../../shared/i18n/index.js';
+import { formText } from '../../shared/i18n/recipe-forms.js';
 import type { VerbEntry } from './recipe-step-picker.js';
 
 /**
@@ -34,6 +43,22 @@ export function formOfEntry(entry: VerbEntry): VerbForm {
       ...(field.default === undefined ? {} : { default: field.default }),
       ...(field.values === undefined ? {} : { values: field.values }),
       ...(field.inline === undefined ? {} : { inline: field.inline }),
+    })),
+  };
+}
+
+/**
+ * The catalog's entry with its summary and its fields' help in the window's language
+ * (TYTO-685). The catalog crosses from main in English, as `@tyto/recipe` writes it; a sentence
+ * the locale's table lacks, a plugin verb's among them, stays English.
+ */
+export function localizedEntry(entry: VerbEntry, locale: Locale): VerbEntry {
+  return {
+    ...entry,
+    summary: formText(locale, summaryKey(entry.name), entry.summary),
+    fields: entry.fields.map((field) => ({
+      ...field,
+      help: formText(locale, helpKey(entry.name, field.name), field.help),
     })),
   };
 }

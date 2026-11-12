@@ -11,6 +11,7 @@ import {
   type StepValues,
   type Written,
   formOfEntry,
+  localizedEntry,
   renderStepForm,
   writeStep,
 } from './recipe-step-form.js';
@@ -76,8 +77,17 @@ export class RecipeStepDialog extends LitElement {
   }
 
   /** Opens the dialog; a dialog already open is cancelled first. */
-  ask(request: StepRequest): Promise<string | undefined> {
+  ask(asked: StepRequest): Promise<string | undefined> {
     this.finish(undefined);
+    // Translated once here, so the picker searches and shows the same words the form does.
+    const localize = (entry: VerbEntry): VerbEntry => localizedEntry(entry, asked.locale);
+    const request: StepRequest = {
+      ...asked,
+      catalog: asked.catalog.map(localize),
+      ...(asked.edit === undefined
+        ? {}
+        : { edit: { ...asked.edit, entry: localize(asked.edit.entry) } }),
+    };
     this.request = request;
     this.query = '';
     this.choice = 0;
