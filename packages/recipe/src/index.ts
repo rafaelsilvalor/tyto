@@ -22,8 +22,8 @@ export { isDataReference, parseDataReference, readDataArgument, resolvePointer }
 export type { DecideAction, DecideRules, DecideSides, Decision } from './decide.js';
 export { decideValue } from './decide.js';
 export { resolveColumn } from './columns.js';
-export type { FieldKind, FieldPlacement, VerbField, VerbForm } from './forms.js';
-export { GENERIC_VERB_FORMS, formOfArguments } from './forms.js';
+export type { FieldKind, FieldPlacement, FormText, VerbField, VerbForm } from './forms.js';
+export { GENERIC_VERB_FORMS, formOfArguments, formTexts, helpKey, summaryKey } from './forms.js';
 export type { StepValues } from './format-step.js';
 export { formatStep, valuesOfStep } from './format-step.js';
 export type {
