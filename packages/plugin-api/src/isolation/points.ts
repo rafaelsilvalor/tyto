@@ -620,7 +620,13 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       },
       transform: {
         args: z.tuple([
-          z.strictObject({ arguments: argumentValuesSchema, table: tableSchema, ...verbSection }),
+          z.strictObject({
+            arguments: argumentValuesSchema,
+            table: tableSchema,
+            // A run without cache, as for `page` (TYTO-681): a transform may read remote data.
+            refresh: z.boolean().optional(),
+            ...verbSection,
+          }),
         ]),
         send: ([request]) => [request],
         result: resultSchema(tableSchema),

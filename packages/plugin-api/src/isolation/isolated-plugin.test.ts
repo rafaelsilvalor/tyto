@@ -2660,6 +2660,56 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     expect(heard).toEqual(['absent', 'absent', 'absent', 'absent', 'absent', 'absent']);
   });
 
+  // TYTO-681: the strict `transform` schema of protocol 24 refused the field, so a transform
+  // that reads remote data could not hear a run without cache.
+  it('hands a transform refresh across the wire on a run without cache, and a plan none', async () => {
+    const heard: unknown[] = [];
+    const said = (request: object) => ('refresh' in request ? request.refresh : 'absent');
+    const activate = (host: PluginHost) => {
+      host.registerRecipeVerb({
+        id: 'demo.pull',
+        kind: 'source',
+        arguments: [],
+        page: () => ok({ table: { columns: COLUMNS, rows: [rowOf(1)] } }),
+      });
+      host.registerRecipeVerb({
+        id: 'demo.tag',
+        kind: 'transform',
+        arguments: [],
+        transform: (request) => {
+          heard.push(['transform', said(request)]);
+          return ok(request.table);
+        },
+      });
+      host.registerRecipeVerb({
+        id: 'demo.mark',
+        kind: 'action',
+        arguments: [],
+        writes: ['mark'],
+        plan: (request) => {
+          heard.push(['plan', said(request)]);
+          return ok({ target: 'demo items', operations: [], count: 0 });
+        },
+      });
+    };
+    for (const options of [{ refresh: true }, {}]) {
+      const { problem } = await recipeUnder(
+        options,
+        activate,
+        'demo.pull',
+        'demo.tag',
+        'demo.mark',
+      );
+      expect(problem).toBeUndefined();
+    }
+    expect(heard).toEqual([
+      ['transform', true],
+      ['plan', 'absent'],
+      ['transform', 'absent'],
+      ['plan', 'absent'],
+    ]);
+  });
+
   it('refuses a malformed table: a value outside the columns, and a row with no provenance', async () => {
     const answering = (rows: unknown[]) => (host: PluginHost) =>
       host.registerRecipeVerb({

@@ -87,10 +87,17 @@ export interface TestRecipeOptions {
   readonly resolveData?: DataResolver;
   /** The recipes a `run` line may name, as their source text, by name. */
   readonly include?: Readonly<Record<string, string>>;
+  /**
+   * Runs as Fetch again or a scheduled run does (ADR 0148, ADR 0175): every source's `page` and
+   * every `transform` is handed `refresh: true`. Absent, the run is ordinary and they hear none.
+   */
+  readonly refresh?: boolean;
 }
 
-function withoutInclude(options: TestRecipeOptions): Omit<TestRecipeOptions, 'include'> {
-  const { include: _include, ...rest } = options;
+function withoutHarnessOptions(
+  options: TestRecipeOptions,
+): Omit<TestRecipeOptions, 'include' | 'refresh'> {
+  const { include: _include, refresh: _refresh, ...rest } = options;
   return rest;
 }
 
@@ -196,9 +203,8 @@ export async function testPlugin(
   const settings = resolveSettings(host.registry.configurations(), entries);
   host.configure(settings.config);
 
-  const recipes = recipeRegistriesOf(host.registry, {
-    sectionOf: (plugin) => (plugin === manifest.name ? options.section : undefined),
-  });
+  const sectionOf = (plugin: string) => (plugin === manifest.name ? options.section : undefined);
+  const recipes = recipeRegistriesOf(host.registry, { sectionOf });
 
   return ok({
     manifest,
@@ -210,8 +216,13 @@ export async function testPlugin(
       const text = /^\s*recipe\s/u.test(source) ? source : `recipe test\n${source}`;
       const parsed = parseRecipe(text);
       if (!parsed.ok) return err(parsed.error);
+      // The registries hold `refresh` for their life, as the app builds them per run.
+      const registries =
+        recipeOptions.refresh === true
+          ? recipeRegistriesOf(host.registry, { sectionOf, refresh: true })
+          : recipes;
       return runRecipe(parsed.value, {
-        ...recipes,
+        ...registries,
         resolveRecipe: (name) => {
           const included = recipeOptions.include?.[name];
           if (included === undefined) {
@@ -226,7 +237,7 @@ export async function testPlugin(
           }
           return Promise.resolve(parseRecipe(included));
         },
-        ...withoutInclude(recipeOptions),
+        ...withoutHarnessOptions(recipeOptions),
       });
     },
     secret: (key) => secrets.get(key),

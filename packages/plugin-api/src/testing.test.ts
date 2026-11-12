@@ -112,6 +112,32 @@ describe('testPlugin', () => {
     await harness.value.close();
   });
 
+  it('runs without cache when asked: a source and a transform both hear refresh (TYTO-681)', async () => {
+    const heard: unknown[] = [];
+    const said = (request: object) => ('refresh' in request ? request.refresh : 'absent');
+    const hearing = (host: PluginHost): void => {
+      demoPlugin(host);
+      host.registerRecipeVerb({
+        id: 'demo.lookup',
+        kind: 'transform',
+        arguments: [],
+        transform: (request) => {
+          heard.push(said(request));
+          return ok(request.table);
+        },
+      });
+    };
+    const harness = await testPlugin({ manifest: manifestText(), load: moduleOf(hearing) });
+    if (!harness.ok) throw new Error(harness.error[0]?.message);
+    for (const options of [{ refresh: true }, {}]) {
+      const run = await harness.value.runRecipe('demo.pull\ndemo.lookup', options);
+      if (!run.ok) throw new Error(run.error[0]?.message);
+      expect(run.value.cells.flatMap((cell) => cell.diagnostics)).toEqual([]);
+    }
+    expect(heard).toEqual([true, 'absent']);
+    await harness.value.close();
+  });
+
   it('includes a recipe by name, and names one the test did not include', async () => {
     const harness = await testPlugin({ manifest: manifestText(), load: moduleOf(demoPlugin) });
     if (!harness.ok) throw new Error(harness.error[0]?.message);

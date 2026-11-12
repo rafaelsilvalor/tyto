@@ -86,7 +86,8 @@ export interface RecipePlace {
 
 /**
  * What a run asks of the plugins' verbs. `refresh` is a run that asked for fresh data: every
- * source's `page` call carries it, so the source skips its private cache (ADR 0148).
+ * source's `page` call and every contributed `transform` call carries it, so the plugin skips
+ * its private cache (ADR 0148, TYTO-681).
  */
 export interface RecipeRegistryRequest {
   readonly sectionOf: (plugin: string) => unknown;
