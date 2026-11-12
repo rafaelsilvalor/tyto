@@ -90,16 +90,26 @@ describe('the panel service', () => {
     });
   });
 
-  it('gives a credential only for a declared key', async () => {
-    const service = createPanelService(contributed(['credentials:token']), network);
-    expect(await service.request('plugin:demo/contagem', 'credentials', ['token'])).toEqual({
-      ok: true,
-      value: 'segredo',
-    });
-    expect(await service.request('plugin:demo/contagem', 'credentials', ['other'])).toMatchObject({
-      ok: false,
-      code: 'E_PERMISSION',
-    });
+  it('never reads a credential back to the page, declared or not, and names call (TYTO-641)', async () => {
+    let reads = 0;
+    const keychain: HostCapabilities = {
+      ...network,
+      credential: () => {
+        reads += 1;
+        return Promise.resolve('segredo');
+      },
+    };
+    const service = createPanelService(contributed(['credentials:token']), keychain);
+    for (const key of ['token', 'other']) {
+      const answer = await service.request('plugin:demo/contagem', 'credentials', [key]);
+      expect(answer).toEqual({
+        ok: false,
+        code: 'E_PANEL_CREDENTIAL_READ',
+        message: `Panel 'contagem' cannot read credential '${key}': ask its plugin through 'call', which uses the secret without putting it in the page.`,
+      });
+      expect(JSON.stringify(answer)).not.toContain('segredo');
+    }
+    expect(reads).toBe(0);
   });
 
   it("stores and forgets its own plugin's declared key, and only that one (ADR 0134)", async () => {
@@ -121,10 +131,6 @@ describe('the panel service', () => {
       value: null,
     });
     expect([...stored]).toEqual([['demo/token', 'novo']]);
-    expect(await service.request(panel, 'credentials', ['token'])).toEqual({
-      ok: true,
-      value: 'novo',
-    });
     expect(await service.request(panel, 'deleteCredential', ['token'])).toEqual({
       ok: true,
       value: true,

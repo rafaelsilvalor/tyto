@@ -1,3 +1,4 @@
+import { formatDiagnosticMessage } from '@tyto/core';
 import {
   type HostCapabilities,
   type HostFetchInit,
@@ -19,7 +20,9 @@ import type { WindowPanel, WindowPlugins } from './window-plugins.js';
  * here in main by the same `checkedCapabilities`, against the manifest the host validated —
  * never in the renderer, which relays, and never in the page, which is somebody else's code.
  * A panel is its plugin: it gets no permission its plugin was not granted, and none of
- * another plugin's.
+ * another plugin's. **It may store and forget a credential and never read one back**
+ * (TYTO-641): a read is `E_PANEL_CREDENTIAL_READ`, and `call` is how a page gets a secret's
+ * effect without its value.
  *
  * **`call` reaches the panel's own plugin and no other** (ADR 0173). The panel is found from
  * the layout id the renderer read off the iframe's element — plugin and panel both, since two
@@ -112,10 +115,19 @@ export function createPanelService(
           const [method, params] = args;
           return answerOf(await callPanel(panel.panel, { method, params }, panel.plugin));
         }
+        // A page never reads a secret back (TYTO-641, ADR 0173): refused before any permission
+        // check or keychain read, so a declared key and an undeclared one hear the same no, and
+        // the answer names `call`, through which the plugin's process uses the secret instead.
         if (capability === 'credentials') {
-          const parsed = credentialArgs.safeParse(args);
-          if (!parsed.success) throw new TypeError('host.credentials takes one key.');
-          return { ok: true, value: await checked.credentials(parsed.data[0]) };
+          const [key] = args;
+          return {
+            ok: false,
+            code: 'E_PANEL_CREDENTIAL_READ',
+            message: formatDiagnosticMessage('E_PANEL_CREDENTIAL_READ', {
+              panel: panel.panel.id,
+              key: typeof key === 'string' ? key : String(key),
+            }),
+          };
         }
         // A panel stores and forgets its own plugin's declared keys, through the one check
         // the plugin's process goes through (ADR 0134); the size and the empty value are its.

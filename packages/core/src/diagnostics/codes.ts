@@ -442,6 +442,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'Only that call is refused; the panel stays open and its plugin keeps running.',
   },
+  // A panel's page is anybody's JavaScript, so a secret never enters it: the page asks its own
+  // plugin's process through `call`, and the process uses the credential (TYTO-641, ADR 0173).
+  E_PANEL_CREDENTIAL_READ: {
+    severity: 'error',
+    summary:
+      "A panel's page asked to read a credential, which the host never hands a page; it may still store and forget one.",
+    template:
+      "Panel '{panel}' cannot read credential '{key}': ask its plugin through 'call', which uses the secret without putting it in the page.",
+    spec: 'docs/adr/0173-a-panel-calls-its-own-plugin-process.md',
+    fatal: false,
+    fatality: 'Only that read is refused; the panel stays open and its plugin keeps running.',
+  },
   E_CREDENTIAL_MISSING: {
     severity: 'error',
     summary: 'A plugin asked for a credential it declared, and this host has no value for it.',

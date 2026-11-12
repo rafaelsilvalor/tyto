@@ -112,3 +112,15 @@ paths. This moves those answers out of decision 5's `E_PANEL_CALL` list; a reque
 refuses, a missing `call` and a throw from an in-process `call` stay `E_PANEL_CALL`.
 `callPanel` takes the plugin's name as a third argument, for that refusal. The wire contract
 does not change, so the isolation protocol stays where it is.
+
+## Note, 2026-11-12 — a panel no longer reads a credential (TYTO-641)
+
+Decision 7 is superseded. Read on 2026-11-12, the connector it waited for has no panel, and the
+one published panel that handles a secret stores it with `storeCredential` and reaches its
+plugin through `call`, never reading it back: nothing had to move first. The desktop now answers a panel's `credentials` request with
+`E_PANEL_CREDENTIAL_READ`, whose message names `call`, before any permission check or keychain
+read, so a declared key and an undeclared one hear the same refusal and nothing about whether a
+value is stored. No manifest opt-in brings the read back: a page is anybody's JavaScript, and the
+plugin's process is where a secret is used. `credentials` stays in `PANEL_CAPABILITIES` so the
+page hears that answer rather than a shape error that cannot point to `call`. `storeCredential`
+and `deleteCredential` are unchanged: a settings panel writes a secret it never reads back.
