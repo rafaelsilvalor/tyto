@@ -119,7 +119,7 @@ export async function compose(context: VerbContext): Promise<VerbResult> {
   return ok({ table: result }, time.warnings(range));
 }
 
-async function templateText(
+export async function templateText(
   context: VerbContext,
   argument: Argument,
 ): Promise<Result<string, Problems>> {
