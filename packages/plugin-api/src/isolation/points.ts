@@ -30,7 +30,7 @@ import { z } from 'zod';
 import { jsonValueSchema } from '../json.js';
 import type { ContributionPoint } from '../manifest.js';
 import { panelCallRequestSchema, panelCallResultSchema } from '../panels.js';
-import { RECIPE_VERB_KINDS } from '../recipes.js';
+import { RECIPE_VERB_KINDS, argumentDescriptionSchema } from '../recipes.js';
 import { settingFormSchema } from '../setting-form.js';
 import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
 import { THEME_KINDS, isThemePath } from '../theme.js';
@@ -348,6 +348,8 @@ const argumentSpecSchema = z.strictObject({
   positional: z.boolean().optional(),
   required: z.boolean().optional(),
   values: z.array(z.string()).max(200).optional(),
+  // The same schema an in-process verb's descriptions meet in `checkRecipeVerb` (TYTO-687).
+  description: argumentDescriptionSchema.optional(),
 });
 
 export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSpec>>> = {

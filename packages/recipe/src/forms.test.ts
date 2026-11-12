@@ -40,3 +40,21 @@ describe("the forms' keyed sentences (TYTO-685)", () => {
     expect(formTexts(form)).toEqual([]);
   });
 });
+
+/**
+ * TYTO-687: a contributed verb's argument may say what it is for, and the step form shows it as
+ * the field's help, as written; one that says nothing keeps no help.
+ */
+describe("a contributed verb's field help (TYTO-687)", () => {
+  it("shows a declared description as the field's help", () => {
+    const form = formOfArguments('acme.pull', 'source', [
+      { name: 'board', type: 'text', description: 'The board to read, by its key.' },
+      { name: 'limit', type: 'number' },
+    ]);
+
+    expect(form.fields.map((field) => [field.name, field.help])).toEqual([
+      ['board', 'The board to read, by its key.'],
+      ['limit', ''],
+    ]);
+  });
+});

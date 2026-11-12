@@ -5,7 +5,7 @@
  */
 
 export type { ArgumentSpec, ArgumentType, ArgumentValue, ArgumentValues } from './arguments.js';
-export { readArguments } from './arguments.js';
+export { ARGUMENT_DESCRIPTION_MAX_LENGTH, readArguments } from './arguments.js';
 export type {
   Argument,
   NamedArgument,

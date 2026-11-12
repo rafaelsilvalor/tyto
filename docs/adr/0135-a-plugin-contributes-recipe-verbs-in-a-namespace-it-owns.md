@@ -37,6 +37,13 @@ required?, values? }` with `type` one of `text`, `number`, `date`, `boolean`. Th
    checks a step against it before calling the plugin, so a misspelt argument is
    `E_RECIPE_ARGUMENTS` at its range, and the plugin is handed values already converted. No
    JSON Schema: a validator for it (ajv) would be a new dependency for four types.
+
+   > **Note of 2026-11-12 (TYTO-687).** An argument gains `description?`, the step form's help
+   > for its field (ADR 0176), in English and at most 1,000 characters
+   > (`ARGUMENT_DESCRIPTION_MAX_LENGTH`). The strict `recipe-verb` schema accepts it, so the
+   > protocol goes from 25 to 26, and an in-process verb's descriptions meet the same schema
+   > in `checkRecipeVerb`, refused with the same sentence.
+
 5. **A table crosses as JSON and is checked twice on the host.** A strict Zod schema in
    `isolation/points.ts` refuses a wrong shape as `E_PLUGIN_PROTOCOL`; `checkTable` in
    `@tyto/recipe` — pure, so it guards a built-in the same way — refuses what a schema cannot

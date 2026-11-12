@@ -43,6 +43,7 @@ import {
   windowCallToolArgsSchema,
   windowToolsArgsSchema,
   unmatchedAnswer,
+  unmatchedContribution,
 } from './protocol.js';
 
 /**
@@ -278,7 +279,7 @@ export function connectIsolatedPlugin(
       const shape = spec.data.extend(handles.shape);
       const parsed = shape.safeParse(registration.contribution);
       if (!parsed.success) {
-        return `its '${registration.point}' contribution does not match: ${describeIssues(parsed.error)}`;
+        return unmatchedContribution(registration.point, parsed.error);
       }
 
       const contribution: Record<string, unknown> = { ...parsed.data };

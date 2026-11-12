@@ -1,5 +1,6 @@
 import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
 import {
+  ARGUMENT_DESCRIPTION_MAX_LENGTH,
   type ArgumentSpec,
   type AppliedOperation,
   type ArgumentValues,
@@ -26,8 +27,10 @@ import {
   pagedSource,
   readArguments,
 } from '@tyto/recipe';
+import { z } from 'zod';
 
 import type { Contribution } from './contributions.js';
+import { unmatchedContribution } from './isolation/protocol.js';
 
 /**
  * `recipe-verb` and `recipe-derivation`: a plugin's share of the recipe vocabulary (ADR 0128,
@@ -209,11 +212,28 @@ function checkName(
 
 const CALLABLE = { source: 'page', transform: 'transform', action: 'plan', sink: 'plan' } as const;
 
+/**
+ * An argument's `description` (TYTO-687): **one schema for both paths**. The strict
+ * `recipe-verb` schema of `isolation/points.ts` holds an isolated plugin's to it on the wire,
+ * and `checkRecipeVerb` an in-process one, so a description the wire refuses is refused in
+ * process too, with the same sentence.
+ */
+export const argumentDescriptionSchema = z.string().max(ARGUMENT_DESCRIPTION_MAX_LENGTH);
+
+/** Only the descriptions: the rest of an in-process verb's arguments is checked by name below. */
+const argumentDescriptionsSchema = z.object({
+  arguments: z.array(z.object({ description: argumentDescriptionSchema.optional() })),
+});
+
 export function checkRecipeVerb(
   pluginId: string,
   declared: RecipeDeclarations,
   verb: RecipeVerbContribution,
 ): void {
+  // First, as the wire's schema runs before the host's checks for an isolated verb.
+  const described = argumentDescriptionsSchema.safeParse({ arguments: verb.arguments });
+  if (!described.success)
+    throw new TypeError(unmatchedContribution('recipe-verb', described.error));
   checkName(pluginId, 'verb', verb.id, declared.namespace);
   const refuse = (problem: string): never => {
     throw new TypeError(`Plugin '${pluginId}' registered the verb '${verb.id}' ${problem}`);

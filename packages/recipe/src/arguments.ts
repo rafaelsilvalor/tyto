@@ -19,7 +19,19 @@ export interface ArgumentSpec {
   readonly required?: boolean;
   /** The only values accepted, as written. */
   readonly values?: readonly string[];
+  /**
+   * What the argument is for, shown as its field's help in the step form (TYTO-687). English
+   * only, written as the person reads it: a plugin localises no other string either. At most
+   * {@link ARGUMENT_DESCRIPTION_MAX_LENGTH} characters.
+   */
+  readonly description?: string;
 }
+
+/**
+ * The longest `description`: a sentence or two of help, never a manual. One number, so an
+ * in-process plugin and an isolated one are held to the same bound (TYTO-687).
+ */
+export const ARGUMENT_DESCRIPTION_MAX_LENGTH = 1000;
 
 /** A date stays the text it was (`2026-10-24`); a number and a boolean are converted. */
 export type ArgumentValue = string | number | boolean;
