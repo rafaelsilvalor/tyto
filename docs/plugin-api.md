@@ -243,7 +243,8 @@ The page talks to the host through `postMessage` alone:
 
 ```js
 // ask: the same permissions as the plugin's host.fetch and host.credentials (ADR 0042);
-// capability is 'fetch', 'credentials', 'storeCredential' [key, value] or 'deleteCredential' [key]
+// capability is 'fetch', 'storeCredential' [key, value] or 'deleteCredential' [key];
+// 'credentials' [key] is always refused with E_PANEL_CREDENTIAL_READ (TYTO-641)
 parent.postMessage(
   { tyto: 'panel', type: 'request', id: 1, capability: 'fetch', args: [url] },
   '*',
@@ -265,8 +266,9 @@ and the plugins screen says so on that plugin's row. It also hears the window's 
 panel can speak it; an older Tyto sends neither `name`, `format` nor `language`, so a page falls
 back when they are absent. A panel's `fetch` answers with the body as text. **A panel may store
 and forget its own plugin's declared keys** (ADR 0134, extending ADR 0045), under the same check
-and ceiling as the plugin's process; it still reads only what `credentials` reads, and nothing of
-another plugin's.
+and ceiling as the plugin's process, and nothing of another plugin's. **A panel never reads a
+credential back** (TYTO-641): `credentials` is answered `E_PANEL_CREDENTIAL_READ`, declared key or
+not, before the keychain is touched, and the message names `call`.
 
 **A panel may ask its own plugin's process to do work** through `call` (ADR 0173): `method`
 matches `^[a-z][\w.-]{0,99}$`, `params` and the answer are JSON of at most 1 MiB each, and an
@@ -279,9 +281,8 @@ value }` without `diagnostics`, a value over the ceiling or not JSON — is refu
 `E_PLUGIN_PROTOCOL`, in process exactly as isolated, so a plugin tested in process behaves the
 same once isolated. `callPanel(panel, request, plugin)` and `panelCallerOf` are the host's half;
 `panelCallerOf(registry)` answers `(plugin, panelId, request)`, finding the panel by plugin and
-id together. `call` is the way forward for a panel that needs a secret's
-effect rather than its value, and the documented way for a new panel to reach its plugin; the
-`credentials` read stays for the panels that use it today. The desktop finds the panel from the
+id together. `call` is how a panel gets a secret's effect: the plugin's
+process reads the credential and answers with what the page needs, never the value. The desktop finds the panel from the
 iframe element the message came from, plugin and panel id together, and a request with a key the
 shape does not have — a `plugin`, a `panelId` — is answered `E_PANEL_CALL` by the bridge and never
 reaches main, so the page hears no instead of waiting. A plugin that

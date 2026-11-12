@@ -59,6 +59,7 @@ non-zero.
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
 | `E_PLUGIN_TIMEOUT` | error | no | An isolated plugin did not answer within its deadline, and its process was ended. |
 | `E_PANEL_CALL` | error | no | A panel's page asked its plugin something the host refused: no 'call', a bad method, params over 1 MiB of JSON, or a throw from an in-process 'call'. |
+| `E_PANEL_CREDENTIAL_READ` | error | no | A panel's page asked to read a credential, which the host never hands a page; it may still store and forget one. |
 | `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
 | `E_CREDENTIAL_HOST` | error | no | A plugin asked the host to send a credential to a host its manifest does not name in a net: permission of its own. |
 | `E_CREDENTIAL_TOO_LARGE` | error | no | A credential to store is larger than the ceiling every host keeps (ADR 0134). |
@@ -298,6 +299,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_PLUGIN_CALL` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
 | `E_PLUGIN_TIMEOUT` | no | It costs the one frame the call was for; the others are drawn (ADR 0025). |
 | `E_PANEL_CALL` | no | Only that call is refused; the panel stays open and its plugin keeps running. |
+| `E_PANEL_CREDENTIAL_READ` | no | Only that read is refused; the panel stays open and its plugin keeps running. |
 | `E_CREDENTIAL_MISSING` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_HOST` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
 | `E_CREDENTIAL_TOO_LARGE` | no | It is the plugin's call that is refused; what the plugin does with that is its own. |
@@ -995,6 +997,20 @@ Panel '{panel}' could not call its plugin: {problem}.
 ```
 
 Parameters: `panel`, `problem`
+
+### `E_PANEL_CREDENTIAL_READ`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0173-a-panel-calls-its-own-plugin-process.md`
+
+A panel's page asked to read a credential, which the host never hands a page; it may still store and forget one.
+
+Only that read is refused; the panel stays open and its plugin keeps running.
+
+```
+Panel '{panel}' cannot read credential '{key}': ask its plugin through 'call', which uses the secret without putting it in the page.
+```
+
+Parameters: `panel`, `key`
 
 ### `E_CREDENTIAL_MISSING`
 
