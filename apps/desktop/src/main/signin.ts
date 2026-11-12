@@ -14,6 +14,7 @@ import type { IpcResponse } from '../../shared/ipc.js';
 import type { Credentials } from './credentials.js';
 import {
   type CallbackListener,
+  type CallbackOutcome,
   type CallbackPage,
   type ListenOptions,
   listenForCallback,
@@ -143,6 +144,11 @@ export interface SigninService {
   accessToken(plugin: string, id: string): Promise<string | undefined>;
   /** Runs a sign-in in the system browser. Called from the window, never from a plugin. */
   start(plugin: string, id: string): Promise<SigninOutcome>;
+  /**
+   * Ends the sign-in of `start` still waiting on the browser (TYTO-646): its listener closes and
+   * `start` answers `cancelled` having stored nothing. `false` when none was waiting.
+   */
+  cancel(plugin: string, id: string): boolean;
   /** Who is signed in, or `undefined`. */
   status(plugin: string, id: string): Promise<SigninStatus | undefined>;
   /** Deletes the entry and forgets the access token; `true` when there was one. */
@@ -174,6 +180,9 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
   // One refresh per account at a time: two plugin calls at expiry would otherwise both spend
   // the refresh token, and a provider that rotates it refuses the second.
   const refreshing = new Map<string, Promise<string | undefined>>();
+  // The listener of each sign-in waiting on the browser, so Cancel can close it. Removed on
+  // every way an attempt ends, so a finished one is never cancelled and a new one starts clean.
+  const waiting = new Map<string, CallbackListener>();
 
   const hold = (account: string, tokens: TokenSet): void => {
     const lifetime = (tokens.expiresIn ?? ASSUMED_LIFETIME_SECONDS) * 1000;
@@ -308,20 +317,30 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
       const state = createState(options.random);
       const page = options.callbackPage?.();
       const listener = await listen(page === undefined ? { state } : { state, page });
+      const account = signinAccount(plugin, id);
+      // A second attempt on the same account replaces the first, whose listener is closed so it
+      // answers `cancelled` instead of waiting out its five minutes unreachable.
+      waiting.get(account)?.close();
+      waiting.set(account, listener);
+      let outcome: CallbackOutcome;
       try {
-        await options.openBrowser(
-          authorizeUrl({
-            declaration,
-            redirectUri: listener.redirectUri,
-            challenge: pkce.challenge,
-            state,
-          }),
-        );
-      } catch (cause) {
-        listener.close();
-        throw cause;
+        try {
+          await options.openBrowser(
+            authorizeUrl({
+              declaration,
+              redirectUri: listener.redirectUri,
+              challenge: pkce.challenge,
+              state,
+            }),
+          );
+        } catch (cause) {
+          listener.close();
+          throw cause;
+        }
+        outcome = await listener.outcome;
+      } finally {
+        if (waiting.get(account) === listener) waiting.delete(account);
       }
-      const outcome = await listener.outcome;
       switch (outcome.kind) {
         case 'error':
           return { ok: false, reason: 'denied', message: outcome.error };
@@ -371,11 +390,19 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
           message: `the provider's refresh token is larger than ${CREDENTIAL_VALUE_LIMIT_BYTES} bytes`,
         };
       }
-      const account = signinAccount(plugin, id);
       await credentials.set(account, plaintext);
       hold(account, answered.tokens);
       changed();
       return { ok: true, label: record.label, since: record.since };
+    },
+
+    cancel(plugin, id) {
+      const account = signinAccount(plugin, id);
+      const listener = waiting.get(account);
+      if (listener === undefined) return false;
+      waiting.delete(account);
+      listener.close();
+      return true;
     },
 
     async status(plugin, id) {
@@ -494,12 +521,14 @@ export async function listSignins(
 }
 
 /**
- * What the plugins screen reaches through `signin:list`, `signin:start`, `signin:out`,
+ * What the plugins screen reaches through `signin:list`, `signin:start`, `signin:cancel`,
+ * `signin:out`,
  * `signin:client` and `signin:client-clear`.
  */
 export interface SigninWindow {
   list(): Promise<IpcResponse<'signin:list'>>;
   start(plugin: string, id: string): Promise<IpcResponse<'signin:start'>>;
+  cancel(plugin: string, id: string): Promise<IpcResponse<'signin:cancel'>>;
   out(plugin: string, id: string): Promise<IpcResponse<'signin:out'>>;
   client(plugin: string, id: string, client: SigninClient): Promise<IpcResponse<'signin:client'>>;
   clearClient(plugin: string, id: string): Promise<IpcResponse<'signin:client-clear'>>;
@@ -516,7 +545,7 @@ export function signinWindow(
   store: Pick<PluginStore, 'list'>,
   service: Pick<
     SigninService,
-    'start' | 'status' | 'signOut' | 'setClient' | 'clearClient' | 'hasClient'
+    'start' | 'cancel' | 'status' | 'signOut' | 'setClient' | 'clearClient' | 'hasClient'
   >,
 ): SigninWindow {
   const declarationOf = installedSigninDeclarations(store);
@@ -542,6 +571,10 @@ export function signinWindow(
           message: cause instanceof Error ? cause.message : String(cause),
         };
       }
+    },
+    cancel: async (plugin, id) => {
+      await declared(plugin, id);
+      return { cancelled: service.cancel(plugin, id) };
     },
     out: async (plugin, id) => {
       await declared(plugin, id);

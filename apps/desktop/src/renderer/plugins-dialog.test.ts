@@ -630,6 +630,11 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
       asked.push(`start ${plugin} ${id}`);
       return start(plugin, id);
     };
+    element.onSigninCancel = (plugin, id) => {
+      if (id === 'refused') return Promise.reject(new Error('refused cancel'));
+      asked.push(`cancel ${plugin} ${id}`);
+      return Promise.resolve();
+    };
     element.onSigninOut = (plugin, id) => {
       asked.push(`out ${plugin} ${id}`);
       return Promise.resolve();
@@ -694,6 +699,56 @@ describe('browser sign-in on a plugin row (TYTO-374)', () => {
     await settle(element);
 
     expect(asked).toEqual(['start pdf sheets', 'out pdf drive']);
+  });
+
+  it('offers Cancel while waiting, and a cancelled answer frees Sign in with no failure (TYTO-646)', async () => {
+    let finish: (answer: Awaited<ReturnType<SigninStart>>) => void = () => undefined;
+    const element = await withSignins(
+      [
+        { plugin: 'pdf', id: 'sheets', signedIn: false, client: 'manifest' },
+        { plugin: 'pdf', id: 'mail', signedIn: false, client: 'manifest' },
+      ],
+      () => new Promise((resolve) => (finish = resolve)),
+    );
+    expect(element.querySelector('.plugins__signin-cancel')).toBeNull();
+
+    signin(element, 'sheets').querySelector<HTMLButtonElement>('.plugins__signin-start')!.click();
+    await element.updateComplete;
+    const cancel = signin(element, 'sheets').querySelector<HTMLButtonElement>(
+      '.plugins__signin-cancel',
+    )!;
+    expect(cancel.textContent?.trim()).toBe(translate('en', 'plugins.signin.cancel'));
+    expect(signin(element, 'mail').querySelector('.plugins__signin-cancel')).toBeNull();
+
+    cancel.click();
+    await settle(element);
+    expect(asked).toEqual(['start pdf sheets', 'cancel pdf sheets']);
+    // Main's answer to the start, once its listener closed.
+    finish({ ok: false, reason: 'cancelled', message: 'the sign-in was cancelled' });
+    await settle(element);
+
+    expect(signin(element, 'sheets').querySelector('.plugins__signin-waiting')).toBeNull();
+    expect(signin(element, 'sheets').querySelector('.plugins__signin-failed')).toBeNull();
+    expect(
+      signin(element, 'mail').querySelector<HTMLButtonElement>('.plugins__signin-start')!.disabled,
+    ).toBe(false);
+  });
+
+  it('says so when main refuses the cancel, and keeps waiting (TYTO-646)', async () => {
+    const element = await withSignins(
+      [{ plugin: 'pdf', id: 'refused', signedIn: false, client: 'manifest' }],
+      () => new Promise(() => undefined),
+    );
+    signin(element, 'refused').querySelector<HTMLButtonElement>('.plugins__signin-start')!.click();
+    await element.updateComplete;
+
+    signin(element, 'refused').querySelector<HTMLButtonElement>('.plugins__signin-cancel')!.click();
+    await settle(element);
+
+    expect(text(signin(element, 'refused'), '.plugins__signin-failed')).toBe(
+      'The sign-in did not finish: refused cancel',
+    );
+    expect(signin(element, 'refused').querySelector('.plugins__signin-waiting')).not.toBeNull();
   });
 
   it('waits on the browser with every Sign in disabled, and says why it did not finish', async () => {

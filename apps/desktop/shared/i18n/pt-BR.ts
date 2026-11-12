@@ -519,6 +519,7 @@ export const ptBR: Catalogue = {
   'plugins.signin.start': 'Entrar',
   'plugins.signin.out': 'Sair',
   'plugins.signin.waiting': 'Termine o login no navegador.',
+  'plugins.signin.cancel': 'Cancelar',
   'plugins.signin.failed': 'O login não terminou:',
   'plugins.signin.kept':
     'O Tyto guarda o login no chaveiro do sistema. O plugin recebe só um token de acesso de curta duração, nunca o que mantém você conectado.',

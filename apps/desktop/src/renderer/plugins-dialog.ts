@@ -35,7 +35,9 @@ import type { CredentialFileOutcome, IpcRequest, IpcResponse } from '../../share
  * is signed in — "Signed in as <label>" or "Not signed in" — and Sign in or Sign out, handed to
  * `onSigninStart` and `onSigninOut`. **Only a click here starts a sign-in**; a plugin's call
  * never does. The screen is handed `signins` and never a token: main keeps the refresh token in
- * the keychain and the access token in its memory.
+ * the keychain and the access token in its memory. While one waits on the browser, its line
+ * says so and has Cancel, handed to `onSigninCancel` (TYTO-646): the attempt ends at once, says
+ * nothing failed, and Sign in works again.
  *
  * **A sign-in's client, when the manifest leaves it to the person (ADR 0192).** Such a line
  * also has a Client ID field, an optional Client secret field, Save and Clear, handed to
@@ -108,6 +110,12 @@ type SigninRow = SigninRows[number];
 
 /** Signs in to one declared sign-in; resolves once the browser came back or gave up. */
 export type SigninStart = (plugin: string, id: string) => Promise<IpcResponse<'signin:start'>>;
+
+/**
+ * Ends the sign-in waiting on the browser (TYTO-646); its `SigninStart` then answers
+ * `cancelled`. Rejects when main refused the request.
+ */
+export type SigninCancel = (plugin: string, id: string) => Promise<void>;
 
 /** Signs out of one declared sign-in. Rejects when main refused the request. */
 export type SigninOut = (plugin: string, id: string) => Promise<void>;
@@ -193,6 +201,7 @@ export class PluginsDialog extends LitElement {
     onSettings: { attribute: false },
     signins: { attribute: false },
     onSigninStart: { attribute: false },
+    onSigninCancel: { attribute: false },
     onSigninOut: { attribute: false },
     onSigninClient: { attribute: false },
     recipeCredentials: { attribute: false },
@@ -230,6 +239,8 @@ export class PluginsDialog extends LitElement {
   declare signins: SigninRows | undefined;
   /** Where Sign in goes. No sign-in buttons while it is absent. */
   declare onSigninStart: SigninStart | undefined;
+  /** Where Cancel goes while a sign-in waits. No Cancel button while it is absent. */
+  declare onSigninCancel: SigninCancel | undefined;
   /** Where Sign out goes. */
   declare onSigninOut: SigninOut | undefined;
   /** Where a sign-in's client goes. No client fields while it is absent. */
@@ -263,6 +274,7 @@ export class PluginsDialog extends LitElement {
     this.busy = false;
     this.signins = undefined;
     this.onSigninStart = undefined;
+    this.onSigninCancel = undefined;
     this.onSigninOut = undefined;
     this.onSigninClient = undefined;
     this.failedSigninClient = undefined;
@@ -328,11 +340,28 @@ export class PluginsDialog extends LitElement {
     this.signinFailure = undefined;
     try {
       const answer = await start(plugin, id);
-      if (!answer.ok) this.signinFailure = { key, message: answer.message };
+      // A cancel is what the person asked for, not a failure to report back to them.
+      if (!answer.ok && answer.reason !== 'cancelled') {
+        this.signinFailure = { key, message: answer.message };
+      }
     } catch (cause) {
       this.signinFailure = { key, message: cause instanceof Error ? cause.message : String(cause) };
     } finally {
       this.signingIn = undefined;
+    }
+  }
+
+  /** Ends the waiting sign-in; `signIn`'s answer, `cancelled`, then clears `signingIn`. */
+  private async cancelSignin(plugin: string, id: string): Promise<void> {
+    const cancel = this.onSigninCancel;
+    if (cancel === undefined) return;
+    try {
+      await cancel(plugin, id);
+    } catch (cause) {
+      this.signinFailure = {
+        key: signinKey(plugin, id),
+        message: cause instanceof Error ? cause.message : String(cause),
+      };
     }
   }
 
@@ -491,7 +520,25 @@ export class PluginsDialog extends LitElement {
             : nothing
         }
         ${this.signinClient(say, row)}
-        ${waiting ? html`<p class="plugins__signin-waiting" role="status">${say('plugins.signin.waiting')}</p>` : nothing}
+        ${
+          waiting
+            ? html`<div class="plugins__signin-wait">
+                <p class="plugins__signin-waiting" role="status">
+                  ${say('plugins.signin.waiting')}
+                </p>
+                <button
+                  class="plugins__signin-cancel"
+                  type="button"
+                  ?hidden=${this.onSigninCancel === undefined}
+                  @click=${() => {
+                    void this.cancelSignin(row.plugin, row.id);
+                  }}
+                >
+                  ${say('plugins.signin.cancel')}
+                </button>
+              </div>`
+            : nothing
+        }
         ${
           this.signinFailure?.key === key
             ? html`<p class="plugins__signin-failed" role="alert">

@@ -121,3 +121,10 @@ then the plugins screen, the user manual and an end-to-end test against a fake p
   manifest that leaves it out signs in with a client the person types in the plugins screen,
   kept in the keychain under `signin-client:<plugin>:<id>`; a manifest that declares it still
   wins, and a `clientSecret` without a `clientId` is refused.
+- 2026-11-12 (TYTO-646): **Cancel ends decision 8's wait early.** While a sign-in waits on the
+  browser, its line in the plugins screen has Cancel, which reaches main through
+  `signin:cancel {plugin, id}`: the loopback listener closes at once, `signin:start` answers
+  `cancelled`, nothing is stored, and Sign in works again without waiting out the five minutes.
+  A callback arriving afterwards finds the port closed and gets no answer. `signin:cancel`
+  answers `cancelled: false` when no attempt was waiting, and is rejected for a sign-in nobody
+  declares, as `signin:out` is.

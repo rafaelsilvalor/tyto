@@ -1746,6 +1746,12 @@ function openPluginsDialog(): void {
     await relistSignins(bridge);
     return answer;
   };
+  // TYTO-646: Cancel closes main's listener; the `signin:start` above then answers `cancelled`.
+  dialog.onSigninCancel = async (plugin, id) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    await bridge['signin:cancel']({ plugin, id });
+  };
   dialog.onSigninOut = async (plugin, id) => {
     const bridge = window.tyto;
     if (bridge === undefined) throw new Error('no bridge');

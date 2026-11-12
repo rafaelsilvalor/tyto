@@ -515,6 +515,7 @@ export const en: Catalogue = {
   'plugins.signin.start': 'Sign in',
   'plugins.signin.out': 'Sign out',
   'plugins.signin.waiting': 'Finish signing in in your browser.',
+  'plugins.signin.cancel': 'Cancel',
   'plugins.signin.failed': 'The sign-in did not finish:',
   'plugins.signin.kept':
     'Tyto keeps the sign-in in the system keychain. The plugin gets only a short-lived access token, never what keeps you signed in.',

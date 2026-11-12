@@ -981,6 +981,8 @@ const dependencies = () => {
           reason: 'timeout' as const,
           message: `start ${plugin} ${id}`,
         }),
+      cancel: (plugin: string, id: string) =>
+        Promise.resolve({ cancelled: plugin === 'drive-plugin' && id === 'drive' }),
       out: (plugin: string, id: string) =>
         Promise.resolve({ signedOut: plugin === 'drive-plugin' && id === 'drive' }),
       client: (_plugin: string, _id: string, client: { clientId: string }) =>
@@ -2021,7 +2023,7 @@ describe('recipe-credential:list, :set and :forget (TYTO-671, ADR 0193)', () => 
   });
 });
 
-describe('signin:list, signin:start and signin:out (TYTO-374)', () => {
+describe('signin:list, signin:start, signin:cancel and signin:out (TYTO-374)', () => {
   it('hands each request to the sign-in window and answers in the validated shape', async () => {
     const handlers = createHandlers(dependencies());
 
@@ -2033,6 +2035,21 @@ describe('signin:list, signin:start and signin:out (TYTO-374)', () => {
     expect(await handlers['signin:out']({ plugin: 'drive-plugin', id: 'drive' })).toEqual({
       signedOut: true,
     });
+  });
+
+  it('hands a cancel to the sign-in window and accepts only a plugin and an id (TYTO-646)', async () => {
+    const handlers = createHandlers(dependencies());
+
+    const cancelled = await handlers['signin:cancel']({ plugin: 'drive-plugin', id: 'drive' });
+    expect(cancelled).toEqual({ cancelled: true });
+    expect(IPC_CHANNELS['signin:cancel'].response.safeParse(cancelled).success).toBe(true);
+    expect(await handlers['signin:cancel']({ plugin: 'drive-plugin', id: 'other' })).toEqual({
+      cancelled: false,
+    });
+    const request = IPC_CHANNELS['signin:cancel'].request;
+    expect(request.safeParse({ plugin: 'p', id: 'd' }).success).toBe(true);
+    expect(request.safeParse({ plugin: 'p', id: 'd', state: 'x' }).success).toBe(false);
+    expect(request.safeParse({ plugin: '', id: 'd' }).success).toBe(false);
   });
 
   it('stores and clears a supplied client, answering without it (ADR 0192)', async () => {
