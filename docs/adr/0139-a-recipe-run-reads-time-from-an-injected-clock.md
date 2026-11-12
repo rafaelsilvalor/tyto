@@ -52,3 +52,27 @@ São Paulo stamp three hours off.
 The desktop's notebook reads its clock from the `recipeTimeZone` setting (ADR 0148 decision 7):
 an IANA name, or `null` for the machine's zone, which is what every run used before. The offset
 is read per instant with `Intl.DateTimeFormat`. The CLI still runs on `systemClock`.
+
+## Note, 2026-11-12 — a template writes an instant in the run's zone (TYTO-675)
+
+A tracker returns datetimes in UTC. Converting the hour alone through a table left a delivery
+at 22:00 in São Paulo on the next day, since the date did not move back with it. A template
+filter, not a verb, reads such a column: `{due|local:yyyy-MM-dd}`, `{due|local:HH:mm}`,
+`{due|local:dd/MM/yyyy HH:mm}`, wherever a recipe template is filled (`compose`, a `rules`
+table's `set`, a `call` body). A filter keeps the conversion inside the one template that
+writes the cell, with no intermediate column.
+
+- **The format** uses the tokens `age format=` reads (dd, MM, yyyy, HH, mm, each at most once,
+  any other character literally); none is required, so `HH:mm` alone is a format. A letter
+  outside a token is refused with `E_RECIPE_TEMPLATE` at the template, before any row is read.
+- **The input** is an ISO-8601 instant with its date, its time to the minute and a zone: `Z`,
+  `±HH:mm` or `±HHmm`; seconds and fractions may follow the minutes. A date alone or a time
+  without a zone names no instant and is not guessed. A cell that is not one is written empty
+  and counted by one `W_RECIPE_LOCAL_UNREAD` warning per column and step; an empty cell stays
+  empty and is not counted.
+- **The zone.** `RunClock` gains an optional `timeZone`, an IANA name. When the host gives one,
+  the wall clock is read with `Intl.DateTimeFormat` in that zone, which carries its
+  daylight-saving rules; the desktop's clock names the zone of the `recipeTimeZone` setting, or
+  the machine's when the setting is `null`. When it gives none (`systemClock`, the CLI, a test
+  clock), the wall clock is the instant plus `offsetMinutes(at)` for that instant. A name the
+  runtime does not know falls back to the offsets, since the host checks the name first.

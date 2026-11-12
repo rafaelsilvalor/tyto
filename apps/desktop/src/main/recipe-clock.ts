@@ -31,6 +31,7 @@ export function zoneClock(zone: string, now: () => Date = () => new Date()): Run
   });
   return {
     now,
+    timeZone: zone,
     offsetMinutes(at) {
       const parts = new Map(format.formatToParts(at).map((part) => [part.type, part.value]));
       const field = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.get(type));

@@ -2136,7 +2136,7 @@ export const diagnosticCodes = {
   E_RECIPE_TEMPLATE: {
     severity: 'error',
     summary:
-      "A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist.",
+      "A 'compose' or 'rules' template has an unclosed placeholder, a stray brace, a filter that does not exist or a 'local' format with a letter outside a token.",
     template: "Template '{template}' {problem}.",
     spec: 'docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md',
     fatal: false,
@@ -2197,6 +2197,18 @@ export const diagnosticCodes = {
     severity: 'warning',
     summary: "An 'age' found cells that none of its formats reads, and left their age empty.",
     template: "{count} cell(s) of '{column}' match none of the formats '{format}' and have no age.",
+    spec: 'docs/adr/0139-a-recipe-run-reads-time-from-an-injected-clock.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // TYTO-675: a cell '|local' cannot read is written empty, which a sheet shows as a missing
+  // date; one count per column keeps the reason visible.
+  W_RECIPE_LOCAL_UNREAD: {
+    severity: 'warning',
+    summary:
+      "A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty.",
+    template:
+      "{count} cell(s) of '{column}' are not an ISO-8601 instant with Z or an offset, so 'local' wrote them empty.",
     spec: 'docs/adr/0139-a-recipe-run-reads-time-from-an-injected-clock.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',

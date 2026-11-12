@@ -228,13 +228,14 @@ non-zero.
 | `E_RECIPE_DATA_SHAPE` | error | no | A data reference's pointer reaches nothing, or the slice it reaches is not what the verb reads. |
 | `E_RECIPE_RULES` | error | no | A 'rules' table cannot be read, sets a column 'into=' does not name, or has an entry no row can reach. |
 | `E_RECIPE_REWRITE` | error | no | A 'rewrite' list cannot be read, or a replacement names a group its pattern lacks or writes a '$' that means nothing. |
-| `E_RECIPE_TEMPLATE` | error | no | A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist. |
+| `E_RECIPE_TEMPLATE` | error | no | A 'compose' or 'rules' template has an unclosed placeholder, a stray brace, a filter that does not exist or a 'local' format with a letter outside a token. |
 | `E_RECIPE_FORM` | error | yes | A step's form names a verb without a form, misses a required field, or holds a value one recipe line cannot carry. |
 | `E_VOCABULARY_SYNTAX` | error | no | A vocabulary file is not JSON with comments, or is not an object of sections. |
 | `E_VOCABULARY_SHAPE` | error | no | A vocabulary file's rules, rewrites or lookups section holds an entry that is not what the verb reading it accepts. |
 | `W_RECIPE_WHERE_EMPTY` | warning | no | A 'where' kept no row of a table that had rows. |
 | `W_RECIPE_JOIN_AMBIGUOUS` | warning | no | A 'join' left rows unpaired because their key answered to more than one row. |
 | `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
+| `W_RECIPE_LOCAL_UNREAD` | warning | no | A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty. |
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
 | `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
 | `E_VIM_CONTRIBUTION` | error | no | A vim contribution names an operation the editor does not have, or a bad mapping. |
@@ -2426,7 +2427,7 @@ Parameters: `problem`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0136-company-rules-are-configuration-read-by-generic-verbs.md`
 
-A 'compose' or 'rules' template has an unclosed placeholder, a stray brace or a filter that does not exist.
+A 'compose' or 'rules' template has an unclosed placeholder, a stray brace, a filter that does not exist or a 'local' format with a letter outside a token.
 
 That cell has no table and the cells after it do not run; earlier cells keep theirs.
 
@@ -3473,6 +3474,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `count`, `column`, `format`
+
+### `W_RECIPE_LOCAL_UNREAD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0139-a-recipe-run-reads-time-from-an-injected-clock.md`
+
+A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty.
+
+A warning never replaces a value (ADR 0013).
+
+```
+{count} cell(s) of '{column}' are not an ISO-8601 instant with Z or an offset, so 'local' wrote them empty.
+```
+
+Parameters: `count`, `column`
 
 ### `W_RECIPE_ROLLUP_ORPHANS`
 

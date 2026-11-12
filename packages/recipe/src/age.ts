@@ -80,6 +80,36 @@ export function compileFormat(text: string): Result<StampFormat, string> {
 }
 
 /**
+ * Checks a format that is only written, never read: the tokens dd, MM, yyyy, HH and mm, each
+ * at most once, and any other character literally except a letter outside a token, the same
+ * rule `compileFormat` applies. No field is required, so `HH:mm` alone is a format.
+ * `{column|local:…}` writes with it (TYTO-675).
+ */
+export function checkWrittenFormat(text: string): Result<string, string> {
+  if (text === '') return err('needs a format after local:, as in local:yyyy-MM-dd');
+  const fields: Field[] = [];
+  for (let index = 0; index < text.length;) {
+    const token = TOKENS.find(([written]) => text.startsWith(written, index));
+    if (token !== undefined) {
+      const [written, field] = token;
+      if (fields.includes(field)) return err(`format '${text}' has ${written} twice`);
+      fields.push(field);
+      index += written.length;
+      continue;
+    }
+    const character = text.charAt(index);
+    if (/[A-Za-z]/u.test(character)) {
+      return err(
+        `format '${text}' has '${character}' outside a token; the tokens are dd, MM, yyyy, HH ` +
+          'and mm',
+      );
+    }
+    index++;
+  }
+  return ok(text);
+}
+
+/**
  * The wall-clock time a text names in `format`, as a UTC timestamp of its fields, with `year`
  * when the format has none; none when it does not match or names a date the calendar lacks,
  * such as 29-02 in a common year. A missing time is midnight.
@@ -141,7 +171,7 @@ export function stampInstant(
  * digits, yyyy four, and every other character as written. `stamp` writes with it, so what it
  * writes is what `readStamp` reads back with the same format.
  */
-export function formatStamp(format: StampFormat, wall: Date): string {
+export function formatStamp(format: Pick<StampFormat, 'text'>, wall: Date): string {
   const two = (value: number) => String(value).padStart(2, '0');
   const fieldText: Record<Field, string> = {
     year: String(wall.getUTCFullYear()).padStart(4, '0'),

@@ -21,6 +21,7 @@ import {
   type Table,
   cellText,
 } from './table.js';
+import { localTime } from './local.js';
 import { bindTemplate, parseTemplate, templateProblem } from './template.js';
 
 /**
@@ -97,10 +98,15 @@ export async function compose(context: VerbContext): Promise<VerbResult> {
   if (!text.ok) return text;
   const template = parseTemplate(text.value);
   if (!template.ok) return err(templateProblem(text.value, template.error, range));
-  const bound = bindTemplate(template.value, table.value, context.aliases, range, {
-    skipEmpty: flagged.value.has('skip-empty'),
-    required: flagged.value.has('required'),
-  });
+  const time = localTime(context.clock);
+  const bound = bindTemplate(
+    template.value,
+    table.value,
+    context.aliases,
+    range,
+    { skipEmpty: flagged.value.has('skip-empty'), required: flagged.value.has('required') },
+    time,
+  );
   if (!bound.ok) return bound;
   const result = withColumns(
     table.value,
@@ -110,7 +116,7 @@ export async function compose(context: VerbContext): Promise<VerbResult> {
       [target.name]: bound.value.fill(row),
     }),
   );
-  return ok({ table: result });
+  return ok({ table: result }, time.warnings(range));
 }
 
 async function templateText(
