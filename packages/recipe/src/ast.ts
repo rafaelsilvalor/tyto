@@ -4,11 +4,21 @@ import type { SourceRange } from '@tyto/core';
 export interface Argument {
   readonly value: string;
   readonly range: SourceRange;
+  /**
+   * The value was written as one quoted string, so it may be a column name with accents or
+   * blanks (`into="Última Sync"`); a verb that writes a column reads a quoted name by the
+   * looser rule of `isWritableColumnName` in `columns.ts`. Absent for a bare word.
+   */
+  readonly quoted?: true;
 }
 
-/** `name=value`, where the value may be quoted: `left="issuetype = DESIGN"`. */
+/**
+ * `name=value`, where the value may be quoted: `left="issuetype = DESIGN"`. The name may be
+ * quoted too, `"Última Sync"="{now}"`, which is how `compose` names a column with blanks.
+ */
 export interface NamedArgument extends Argument {
   readonly name: string;
+  readonly nameQuoted?: true;
 }
 
 /** One line of the chain, and so one cell of the notebook. */

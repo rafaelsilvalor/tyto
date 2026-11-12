@@ -48,3 +48,22 @@ file make diffs unreadable.
   own ADR; this one does not forbid it.
 - Named tables (two pulls joined) are not in v1. Buraqueira's parity needs them for one step,
   and they make the chain a graph.
+
+## Note, 2026-11-12 — a written column may be named in quotes (TYTO-674)
+
+Decision 4 makes column names the contract, and a sink that syncs a sheet matches columns to
+the sheet's headers by name. Those headers are written for people (`Última Sync`), and every
+generic verb that writes a column read its name as a bare word of letters, digits, `-` and
+`_`, so such a column could never be written. A column a line writes or picks may now be
+named in double quotes: `into="Última Sync"`, the name side of `compose "Última
+Sync"={due|slug}`, and the members of a column list, `select key, "Última Sync"` or
+`without=key,"Última Sync"`. A quoted name may hold letters of any script, digits, single
+blanks between words, punctuation and symbols; never a double quote or a line break, since a
+line has no quote escape, nor a comma, since a list splits at it, nor a blank at either end.
+`isWritableColumnName` in `@tyto/recipe` holds the rule. A bare name keeps the old rule and
+its old diagnostics. Names still compare without case, so `"ÚLTIMA SYNC"` is the column
+`Última Sync`, and two names that differ only in case are still one column or a clash. No
+`rename` verb and no `select … as`: the column is written under the sheet's name from the
+start. The form library (ADR 0176) quotes a single column that would not read back bare, and
+keeps a list's quoted members, so `formatStep` and `valuesOfStep` round-trip these lines.
+`where` expressions still name columns bare.

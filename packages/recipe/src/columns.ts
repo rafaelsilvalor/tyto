@@ -10,6 +10,31 @@ import {
 
 import { type Column, type Table, findColumn } from './table.js';
 
+/** A column a recipe writes, named bare: `into=last_sync`. */
+const BARE_COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
+
+/**
+ * A column a recipe writes, named in quotes: letters of any script, digits, punctuation and
+ * symbols, with single blanks inside and none at either end, so `"Última Sync"` and
+ * `"Owner (team)"` are names and `" Sync"` is not. A double quote and a line break never are,
+ * because a recipe line has no quote escape, and a comma is not, because a list of columns
+ * splits at it.
+ */
+const QUOTED_COLUMN_NAME =
+  /^[\p{L}\p{M}\p{N}\p{P}\p{S}](?:[\p{L}\p{M}\p{N}\p{P}\p{S} ]*[\p{L}\p{M}\p{N}\p{P}\p{S}])?$/u;
+
+/**
+ * Whether a recipe may write a column of this name (TYTO-674). A bare name keeps the rule it
+ * always had, letters, digits, `-` and `_`; a quoted one may be what a person wrote as a
+ * spreadsheet header, `"Última Sync"`, since a sink matches columns to headers by name.
+ * Names still compare without case, so a quoted name that differs from a column only in case
+ * is that column.
+ */
+export function isWritableColumnName(name: string, quoted = false): boolean {
+  if (!quoted) return BARE_COLUMN_NAME.test(name);
+  return !/[",]/u.test(name) && QUOTED_COLUMN_NAME.test(name);
+}
+
 /**
  * The column a name written in a recipe means, ignoring case, through an alias if one exists.
  *

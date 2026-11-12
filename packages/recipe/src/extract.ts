@@ -2,7 +2,7 @@ import { type Result, type SourceRange, diagnostic, err, ok } from '@tyto/core';
 import { z } from 'zod';
 
 import type { Argument, NamedArgument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import { describeIssues, isDataReference, readDataArgument } from './data.js';
 import { type CompiledPattern, boundedInput, compilePattern } from './pattern.js';
@@ -18,8 +18,6 @@ import {
   requireTable,
 } from './support.js';
 import { type CellValue, cellText } from './table.js';
-
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 
 /**
  * The named groups of a compiled pattern, in the order they open. `RegExp` names them only on a
@@ -139,16 +137,17 @@ function targetNames(
   const refuse = (problem: string, range: SourceRange) =>
     argumentsProblem(context, problem, at(range)) as Result<never, Problems>;
 
-  let names: readonly string[];
+  // A group's own name is always bare; a prefix or a listed name may be quoted (TYTO-674).
+  let names: readonly { readonly value: string; readonly quoted?: true }[];
   let range = patternRange;
   if (into === undefined) {
-    names = groups;
+    names = groups.map((group) => ({ value: group }));
   } else if (into.value.endsWith('*') && !into.value.includes(',')) {
     const prefix = into.value.slice(0, -1);
-    names = groups.map((group) => `${prefix}${group}`);
+    names = groups.map((group) => ({ value: `${prefix}${group}`, ...quotedLike(into) }));
     range = into.range;
   } else {
-    names = columnNames([into]).map((name) => name.value);
+    names = columnNames([into]);
     range = into.range;
     if (names.length !== groups.length) {
       return refuse(
@@ -160,8 +159,8 @@ function targetNames(
     }
   }
   const seen = new Set<string>();
-  for (const name of names) {
-    if (!COLUMN_NAME.test(name)) {
+  for (const { value: name, quoted } of names) {
+    if (!isWritableColumnName(name, quoted)) {
       return refuse(`cannot write a column named '${name}'`, range);
     }
     if (seen.has(name.toLowerCase())) {
@@ -169,7 +168,11 @@ function targetNames(
     }
     seen.add(name.toLowerCase());
   }
-  return ok(names);
+  return ok(names.map((name) => name.value));
+}
+
+function quotedLike(argument: Argument): { readonly quoted?: true } {
+  return argument.quoted === true ? { quoted: true } : {};
 }
 
 /** One step of a rewrite list: every match of `pattern` becomes `replace`. */
@@ -231,7 +234,7 @@ export async function rewrite(context: VerbContext): Promise<VerbResult> {
     return argumentsProblem(context, usage);
   }
   if (extra !== undefined) return argumentsProblem(context, usage, at(extra.range));
-  if (!COLUMN_NAME.test(into.value)) {
+  if (!isWritableColumnName(into.value, into.quoted)) {
     return argumentsProblem(context, `cannot write a column named '${into.value}'`, at(into.range));
   }
 

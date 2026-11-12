@@ -1,7 +1,7 @@
 import { ok } from '@tyto/core';
 
 import type { NamedArgument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import type { VerbContext, VerbResult } from './registry.js';
 import { argumentsProblem, columnNames, locate, refuseNamed, requireTable } from './support.js';
@@ -13,8 +13,6 @@ import {
   comparable,
   findColumn,
 } from './table.js';
-
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 
 /**
  * `group by=a,b [into=rows]` collapses the table to one row per group of rows whose `by=`
@@ -66,7 +64,7 @@ export function group(context: VerbContext): VerbResult {
   const intoArgument = written.get('into');
   const into = intoArgument?.value ?? 'rows';
   const intoRange = intoArgument === undefined ? undefined : at(intoArgument.range);
-  if (!COLUMN_NAME.test(into)) {
+  if (!isWritableColumnName(into, intoArgument?.quoted)) {
     return argumentsProblem(context, `cannot write a column named '${into}'`, intoRange);
   }
   const taken = columns.find((column) => column.name.toLowerCase() === into.toLowerCase());
@@ -158,7 +156,7 @@ export function count(context: VerbContext): VerbResult {
   const [intoArgument] = intos;
   const into = intoArgument?.value ?? 'count';
   const intoRange = intoArgument === undefined ? undefined : at(intoArgument.range);
-  if (!COLUMN_NAME.test(into)) {
+  if (!isWritableColumnName(into, intoArgument?.quoted)) {
     return argumentsProblem(context, `cannot write a column named '${into}'`, intoRange);
   }
   const taken = findColumn(table.value, into);

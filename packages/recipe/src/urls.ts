@@ -2,7 +2,7 @@ import { type Result, ok } from '@tyto/core';
 import { z } from 'zod';
 
 import type { Argument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import { isDataReference, readDataArgument } from './data.js';
 import type { VerbContext, VerbResult } from './registry.js';
@@ -16,7 +16,6 @@ import {
 } from './support.js';
 import type { CellValue, Column } from './table.js';
 
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const HOST_SHAPE = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*$/u;
 const HOST_PROBLEM = 'a host is written as files.example.com, without a scheme, a port or a path';
 
@@ -93,7 +92,7 @@ export async function urls(context: VerbContext): Promise<VerbResult> {
     return argumentsProblem(context, `takes the word first, not '${stray.value}'`, at(stray.range));
   }
   const first = context.step.positional.length > 0;
-  if (!COLUMN_NAME.test(into.value)) {
+  if (!isWritableColumnName(into.value, into.quoted)) {
     return argumentsProblem(context, `cannot write a column named '${into.value}'`, at(into.range));
   }
 
