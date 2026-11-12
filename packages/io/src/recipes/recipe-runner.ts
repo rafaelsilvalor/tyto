@@ -64,7 +64,8 @@ import {
  * first step that changed and reads the table the cell before it kept. A change to the header
  * or a `param` line, or to where the recipe is and how far its folder is trusted, reruns them
  * all. Nothing is written to the recipe or to disk (ADR 0128 decision 6), and the cells are
- * forgotten when the document closes.
+ * forgotten when the document closes. A cell whose plan was applied is not reused: the next run
+ * plans it again, and the cells below it, so its plan says what the Apply changed (TYTO-643).
  *
  * **When cells run** (the maintainer's decision, ADR 0148):
  * - a pause in typing runs from the changed step down, and stops before the first `source`, which
@@ -263,6 +264,12 @@ type KeptCell = Omit<RunnerCell, 'index' | 'applicable'> & {
   readonly remembers?: readonly StateWrite[];
   /** Said by its last Apply: why it was not remembered. Shown after its own diagnostics. */
   readonly applyNotes?: readonly Diagnostic[];
+  /**
+   * TYTO-643, ADR 0170 note of 2026-11-12: its plan was applied and wrote, so what the plan read
+   * (a file that did not exist, a status a target had) may have changed; the next run plans it
+   * again instead of reusing it, as a stale cell is run again. The Apply itself plans nothing.
+   */
+  readonly replan?: true;
 };
 
 interface Kept {
@@ -553,13 +560,23 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       now,
     });
     const applied = answer.applied;
+    // TYTO-643: only an Apply that wrote something makes the plan out of date. One refused, or
+    // whose every operation failed, leaves the cell to be reused as it was.
+    const wrote = applied?.operations.some((operation) => operation.status === 'applied') === true;
     if (applied !== undefined) {
       const holding = kept.get(documentId);
       if (holding !== undefined) {
         kept.set(documentId, {
           ...holding,
           cells: holding.cells.map((each) =>
-            each.planId === planId ? { ...each, applied, applyNotes: answer.diagnostics } : each,
+            each.planId === planId
+              ? {
+                  ...each,
+                  applied,
+                  applyNotes: answer.diagnostics,
+                  ...(wrote ? { replan: true as const } : {}),
+                }
+              : each,
           ),
         });
       }
@@ -728,11 +745,14 @@ function headerSignature(
   ]);
 }
 
-/** The first step to run: one that changed, or one whose last answer was not a table. */
+/**
+ * The first step to run: one that changed, one whose last answer was not a table, or one whose
+ * plan was applied since it ran (TYTO-643), so the next plan says what the Apply changed.
+ */
 function firstChanged(signatures: readonly string[], kept: readonly KeptCell[]): number {
   const index = signatures.findIndex((signature, at) => {
     const before = kept[at];
-    return before?.status !== 'ok' || before.signature !== signature;
+    return before?.status !== 'ok' || before.replan === true || before.signature !== signature;
   });
   return index === -1 ? signatures.length : index;
 }
@@ -769,6 +789,7 @@ function shown(cell: KeptCell, index: number, registries?: RecipeRegistries): Ru
     signature: _signature,
     verb,
     remembers: _remembers,
+    replan: _replan,
     applyNotes,
     diagnostics,
     ...rest
