@@ -37,6 +37,15 @@ export const MCP_REFUSED =
   'tyto mcp is not available in the window: it serves an agent over stdin and stdout (ADR 0179). ' +
   'Register tyto mcp with the agent, which starts it, or run it in a terminal.';
 
+/**
+ * `tyto recipe run --apply` applies plans and lends `call` a `send` with the window process's
+ * environment (TYTO-684, ADR 0159 note of 2026-11-12). The panel only plans: Apply in the
+ * notebook is the window's one way to apply, under its own trust and credential rules.
+ */
+export const APPLY_REFUSED =
+  '--apply is not available in the window: the command panel only plans a recipe (ADR 0159). ' +
+  "Apply its plan with the notebook's Apply button, or run the command in a terminal.";
+
 export interface WindowRefusalOptions {
   readonly platform: NodeJS.Platform;
   /** The queue panel's folder and whether it runs what arrives on its own. */
@@ -61,6 +70,17 @@ export function windowRefusals(
     const [first] = invocation.args;
 
     if (command === 'mcp') return MCP_REFUSED;
+
+    // Read off the parsed options, so every spelling commander accepts is one value here. Only
+    // the flag applies: without it the run is a save's and `apply auto` stays a plan
+    // (`recipe-run.ts` in `@tyto/command-line`, ADR 0170 decision 6).
+    if (
+      command === 'recipe' &&
+      invocation.path[1] === 'run' &&
+      invocation.options['apply'] === true
+    ) {
+      return APPLY_REFUSED;
+    }
 
     if (command === 'watch' && first !== undefined) {
       const queue = await options.queue();

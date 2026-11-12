@@ -1,7 +1,7 @@
 # Commands
 
 ::: info How this page was checked
-Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them.
+Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them. The refusals of `tyto mcp`, `watch` and `recipe run --apply` were added to this list on 2026-11-12 from the window's code and its unit tests, the last one through the command line's own parser, not in the window.
 :::
 
 The **Commands** tab of the bottom area runs `tyto` commands, the same ones as the [command line](../command-line/index.md), inside the window. Nothing else runs there: not a shell and not another program. For a shell, use the [Terminal](terminal.md) tab.
@@ -21,7 +21,12 @@ Type after `tyto ›` and press **Enter**. Writing `tyto` first is optional.
 - Words are split on spaces. Put a path with spaces in quotes: `render "Meus briefs/cartaz.brief"`. A quote left open is refused and nothing runs.
 - `|`, `>`, `&&`, `$HOME` and `*` mean nothing here. They reach the command as words.
 - The command runs in the open [workspace folder](workspace-folder.md), so a path can be written from there. With no folder open, it runs in your Tyto folder (`~/.tyto`).
-- Two things are refused, with a line saying why: `--trust`, because the window trusts a folder with **Workspace: Manage Trust**, and installing an npm package with `plugin install` on Windows, because that would start a shell.
+- Some commands are refused, with a line saying why:
+  - `--trust`, because the window trusts a folder with **Workspace: Manage Trust**;
+  - installing an npm package with `plugin install` on Windows, because that would start a shell;
+  - `tyto mcp`, because it talks to an agent over its input and output, which the panel does not have;
+  - `watch` on the [queue folder](../export/queue-folder.md) while **Render automatically** is on, because that folder already has a consumer;
+  - `recipe run` with `--apply`, because the panel only plans a recipe: apply the plan with **Apply** in the recipe's notebook, or run the command in a terminal. `recipe run` without `--apply` runs and prints the plans.
 - A command that needs an answer, such as approving a plugin's permissions, asks in a box of the window's own.
 
 Each command you run is a block. Its header shows the command, with its paths cut to the file name (the whole line is the tooltip), the time it started and how it ended: **✓ 0** when it went well, **✗ 1** when the brief has errors, **✗ 2** when Tyto itself failed, **✗** alone for a line refused before it ran, `–` when stopped and `•` while it runs. What the command printed is under the header. Whether the newest run comes last or first, and whether older runs fold to their header, are two settings, described in [Panels](panels.md#commands).

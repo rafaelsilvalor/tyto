@@ -82,9 +82,9 @@ export interface CliEnvironment {
    * it is printed as `error: <sentence>` and the command line exits 1, as a command line the
    * parser refused does, and the command never starts.
    *
-   * Absent in a terminal, which refuses nothing. The window refuses `--trust` and `watch` on
-   * the auto-run queue's folder (ADR 0159 decision 2), and those rules are the window's, so they
-   * live in `apps/desktop` and not here. An npm install on Windows is refused where the shell
+   * Absent in a terminal, which refuses nothing. The window refuses `--trust`, `mcp`, `watch`
+   * on the auto-run queue's folder and `recipe run --apply` (ADR 0159 decision 2 and its notes),
+   * and those rules are the window's, so they live in `apps/desktop` and not here. An npm install on Windows is refused where the shell
    * would start instead (`shellRefusal`), so no command has to be named for it.
    */
   readonly refuse?: (invocation: CommandInvocation) => Promise<string | undefined>;
