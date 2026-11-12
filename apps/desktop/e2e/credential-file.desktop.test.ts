@@ -245,11 +245,17 @@ describe('a multi-line credential from the plugins screen (TYTO-649)', () => {
         `${String(typed.split('\n').length - 1)} LF, ${String(typed.split('\r').length - 1)} CR\n`,
     );
     await page.click(`${LINE} .plugins__credential-save`);
-    await page.waitForFunction((selector) => {
-      const element = document.querySelector<HTMLTextAreaElement>(selector);
-      return element !== null && element.value === '';
-    }, field);
-    if (await page.$(`${LINE} .plugins__credential-failed`)) return; // no keychain, as above
+    // Emptied once stored; with no keychain (a Linux runner) the line says it failed instead.
+    await page.waitForFunction(
+      ([selector, line]) =>
+        document.querySelector<HTMLTextAreaElement>(selector)?.value === '' ||
+        document.querySelector(`${line} .plugins__credential-failed`) !== null,
+      [field, LINE] as const,
+    );
+    if (await page.$(`${LINE} .plugins__credential-failed`)) {
+      expect(await markup()).not.toContain(EMAIL);
+      return;
+    }
 
     const read = await pluginRead('pasted');
     process.stdout.write(`[TYTO-649] pasted: plugin read ${read}\n`);
