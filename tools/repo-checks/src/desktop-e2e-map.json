@@ -627,6 +627,14 @@
     },
     {
       "paths": [
+        "apps/desktop/src/main/credential-file.ts",
+        "apps/desktop/e2e/credential-file.desktop.test.ts"
+      ],
+      "e2e": ["credential-file.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: a credential imported from a file (TYTO-649), picked and read in main, and a multi-line one pasted; window.desktop's channel list reaches credentials:import and recipe-credential:import, and the credential-file suite imports a fake key file, pastes it, has a plugin parse both, and reads the page for the value. The logic is in credential-file.test.ts and ipc.test.ts"
+    },
+    {
+      "paths": [
         "apps/desktop/src/main/recipe-credentials.ts",
         "apps/desktop/e2e/recipe-credentials.desktop.test.ts"
       ],
@@ -1557,6 +1565,7 @@
     {
       "paths": ["apps/desktop/src/renderer/plugins-dialog.ts"],
       "e2e": [
+        "credential-file.desktop.test.ts",
         "installed-plugins.desktop.test.ts",
         "plugins.desktop.test.ts",
         "recipe-credentials.desktop.test.ts",

@@ -785,6 +785,9 @@ export interface Catalogue {
   readonly 'plugins.credential.clear': string;
   readonly 'plugins.credential.kept': string;
   readonly 'plugins.credential.failed': string;
+  readonly 'plugins.credential.import': string;
+  readonly 'plugins.credential.tooLarge': string;
+  readonly 'plugins.credential.notText': string;
   /**
    * TYTO-373: installing from a folder or a `.tgz` archive, and removing, disabling and enabling
    * an installed plugin, from the screen. `restart` is beside a row whose change applies at the
@@ -1577,6 +1580,9 @@ export const CATALOGUE_KEYS = [
   'plugins.credential.clear',
   'plugins.credential.kept',
   'plugins.credential.failed',
+  'plugins.credential.import',
+  'plugins.credential.tooLarge',
+  'plugins.credential.notText',
   'plugins.recipeCredentials.heading',
   'plugins.recipeCredentials.intro',
   'plugins.recipeCredentials.none',

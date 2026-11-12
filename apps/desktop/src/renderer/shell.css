@@ -4319,9 +4319,24 @@ tyto-recent-folders[open] {
 }
 
 .plugins__credential-field {
-  width: 14ch;
+  width: 20ch;
   min-width: 0;
   font: inherit;
+}
+
+/* TYTO-649: a secret field is a textarea, so a key file's line breaks survive a paste, and
+   masked as a password field is. One line tall while empty, growing with what is pasted up to
+   four lines, so a pasted key shows that it arrived without showing what it says. */
+.plugins__secret {
+  box-sizing: border-box;
+  min-height: calc(1lh + 2 * var(--tyto-space-1) + 2 * var(--tyto-hairline-width));
+  max-height: calc(4lh + 2 * var(--tyto-space-1) + 2 * var(--tyto-hairline-width));
+  padding: var(--tyto-space-1);
+  resize: vertical;
+  overflow: hidden auto;
+  white-space: pre;
+  field-sizing: content;
+  -webkit-text-security: disc;
 }
 
 .plugins__credential-failed {

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { translate } from '../../shared/i18n/index.js';
+import type { CredentialFileOutcome } from '../../shared/ipc.js';
 import {
   type PluginInstall,
   type PluginsDialog,
@@ -268,6 +269,17 @@ describe('the plugins screen', () => {
   });
 });
 
+/** A fake service-account key with the real one's shape, CRLF as Windows saves it (TYTO-649). */
+const MULTI_LINE_KEY = `${JSON.stringify(
+  {
+    type: 'service_account',
+    project_id: 'fake-649',
+    private_key: '-----BEGIN PRIVATE KEY-----\nZmFrZS02NDk=\n-----END PRIVATE KEY-----\n',
+  },
+  null,
+  2,
+).replaceAll('\n', '\r\n')}\r\n`;
+
 describe('a plugin’s credentials on the screen (TYTO-187)', () => {
   const ROW = {
     ...VIEW.plugins[1]!,
@@ -302,14 +314,17 @@ describe('a plugin’s credentials on the screen (TYTO-187)', () => {
     expect(line(element, 'api-token').querySelector('.plugins__credential-clear')).toBeNull();
     expect(line(element, 'conta').querySelector('.plugins__credential-clear')).not.toBeNull();
     expect(element.querySelector('[data-plugin="svg"] .plugins__credentials')).toBeNull();
-    // A password field, so what is typed is not on screen even while it is typed.
-    expect(line(element, 'api-token').querySelector('input')?.type).toBe('password');
+    // A secret field (TYTO-649): a textarea, so a key file's line breaks survive, masked by
+    // `.plugins__secret` (shell.css; the real window measures the mask).
+    const field = line(element, 'api-token').querySelector('textarea');
+    expect(field?.classList.contains('plugins__secret')).toBe(true);
+    expect(line(element, 'api-token').querySelector('input')).toBeNull();
   });
 
   it('hands the typed value over once, and empties the field after', async () => {
     const element = await withCredentials();
     const form = line(element, 'api-token');
-    const field = form.querySelector('input')!;
+    const field = form.querySelector('textarea')!;
     field.value = 'dummy-value';
 
     form.requestSubmit();
@@ -318,6 +333,38 @@ describe('a plugin’s credentials on the screen (TYTO-187)', () => {
 
     expect(changes).toEqual([{ plugin: 'gerador', key: 'api-token', secret: 'dummy-value' }]);
     expect(field.value).toBe('');
+  });
+
+  it('hands a pasted multi-line key over with every line break (TYTO-649)', async () => {
+    const element = await withCredentials();
+    const form = line(element, 'api-token');
+    const field = form.querySelector('textarea')!;
+    field.value = MULTI_LINE_KEY;
+
+    form.requestSubmit();
+    await Promise.resolve();
+    await element.updateComplete;
+
+    // A textarea's value normalises CRLF to LF; nothing else changes.
+    const sent = changes[0]?.secret ?? '';
+    expect(sent).toBe(MULTI_LINE_KEY.replaceAll('\r\n', '\n'));
+    expect(sent.split('\n')).toHaveLength(MULTI_LINE_KEY.split('\r\n').length);
+    expect(() => JSON.parse(sent) as unknown).not.toThrow();
+    expect(field.value).toBe('');
+    expect(element.innerHTML).not.toContain('fake-649');
+  });
+
+  it('saves on Ctrl+Enter, since Enter is a new line in the field', async () => {
+    const element = await withCredentials();
+    const field = line(element, 'api-token').querySelector('textarea')!;
+    field.value = 'dummy-value';
+
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(changes).toEqual([]);
+    field.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+    );
+    expect(changes).toEqual([{ plugin: 'gerador', key: 'api-token', secret: 'dummy-value' }]);
   });
 
   it('sends nothing for an empty field', async () => {
@@ -344,6 +391,65 @@ describe('a plugin’s credentials on the screen (TYTO-187)', () => {
       translate('en', 'plugins.credential.failed'),
     );
     expect(line(element, 'api-token').querySelector('.plugins__credential-failed')).toBeNull();
+  });
+});
+
+describe('a credential imported from a file (TYTO-649)', () => {
+  const ROW = {
+    ...VIEW.plugins[1]!,
+    name: 'gerador',
+    permissions: ['credentials:service-account'],
+    credentials: [{ key: 'service-account', set: false }],
+  };
+
+  async function importing(answer: () => Promise<CredentialFileOutcome>) {
+    const element = await dialog({ folder: VIEW.folder, plugins: [ROW] });
+    const asked: { plugin: string; key: string }[] = [];
+    element.onCredential = () => Promise.resolve();
+    element.onCredentialImport = (plugin, key) => {
+      asked.push({ plugin, key });
+      return answer();
+    };
+    await element.updateComplete;
+    const form = element.querySelector<HTMLFormElement>('[data-key="service-account"]')!;
+    return { element, asked, form };
+  }
+
+  const click = async (element: PluginsDialog, form: HTMLFormElement): Promise<void> => {
+    form.querySelector<HTMLButtonElement>('.plugins__credential-import')!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await element.updateComplete;
+  };
+
+  it('draws Import from file… only where there is somewhere to send it', async () => {
+    const without = await dialog({ folder: VIEW.folder, plugins: [ROW] });
+    without.onCredential = () => Promise.resolve();
+    await without.updateComplete;
+    expect(without.querySelector('.plugins__credential-import')).toBeNull();
+
+    const { form } = await importing(() => Promise.resolve('stored'));
+    expect(text(form, '.plugins__credential-import')).toBe('Import from file…');
+  });
+
+  it('hands over the key and nothing else, and says nothing once stored or canceled', async () => {
+    for (const outcome of ['stored', 'canceled'] as const) {
+      const { element, asked, form } = await importing(() => Promise.resolve(outcome));
+      await click(element, form);
+      expect(asked).toEqual([{ plugin: 'gerador', key: 'service-account' }]);
+      expect(form.querySelector('.plugins__credential-failed')).toBeNull();
+    }
+  });
+
+  it('says why when the file was too large, not text, or refused', async () => {
+    for (const [answer, key] of [
+      [() => Promise.resolve('too-large' as const), 'plugins.credential.tooLarge'],
+      [() => Promise.resolve('not-text' as const), 'plugins.credential.notText'],
+      [() => Promise.reject(new Error('refused')), 'plugins.credential.failed'],
+    ] as const) {
+      const { element, form } = await importing(answer);
+      await click(element, form);
+      expect(text(form, '.plugins__credential-failed')).toBe(translate('en', key));
+    }
   });
 });
 
@@ -740,9 +846,55 @@ describe("the plugins screen's recipe credentials (TYTO-671, ADR 0193)", () => {
 
     const empty = await withRecipeCredentials([]);
     expect(text(empty.section, '.plugins__recipe-credentials-none')).toBe('None stored.');
-    expect(
-      empty.section.querySelector<HTMLInputElement>('.plugins__recipe-credential-value')?.type,
-    ).toBe('password');
+    const value = empty.section.querySelector('.plugins__recipe-credential-value');
+    expect(value?.tagName).toBe('TEXTAREA');
+    expect(value?.classList.contains('plugins__secret')).toBe(true);
+  });
+
+  it('keeps a pasted multi-line value whole (TYTO-649)', async () => {
+    const { element, changes, form } = await withRecipeCredentials([]);
+    fill(form, 'routine', MULTI_LINE_KEY);
+
+    form.requestSubmit();
+    await settled(element);
+
+    expect(changes).toEqual([{ name: 'routine', value: MULTI_LINE_KEY.replaceAll('\r\n', '\n') }]);
+  });
+
+  it('imports a value from a file under the typed name, and says why when it did not', async () => {
+    const { element, form } = await withRecipeCredentials([]);
+    const asked: string[] = [];
+    let answer: CredentialFileOutcome = 'too-large';
+    element.onRecipeCredentialImport = (name) => {
+      asked.push(name);
+      return Promise.resolve(answer);
+    };
+    await element.updateComplete;
+    const importButton = () =>
+      element.querySelector<HTMLButtonElement>('.plugins__recipe-credential-import')!;
+
+    importButton().click();
+    await settled(element);
+    expect(asked).toEqual([]);
+    expect(text(element, '.plugins__recipe-credential-failed')).toBe(
+      translate('en', 'plugins.recipeCredentials.badName'),
+    );
+
+    form.querySelector<HTMLInputElement>('.plugins__recipe-credential-name')!.value = 'routine';
+    importButton().click();
+    await settled(element);
+    expect(asked).toEqual(['routine']);
+    expect(text(element, '.plugins__recipe-credential-failed')).toBe(
+      translate('en', 'plugins.credential.tooLarge'),
+    );
+
+    answer = 'stored';
+    importButton().click();
+    await settled(element);
+    expect(element.querySelector('.plugins__recipe-credential-failed')).toBeNull();
+    expect(form.querySelector<HTMLInputElement>('.plugins__recipe-credential-name')!.value).toBe(
+      '',
+    );
   });
 
   it('hands the value over once, empties the form, and never draws it', async () => {

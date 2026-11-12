@@ -53,6 +53,7 @@ export interface OpenedByAgent {
 import { declaredCredentialKeys } from './plugin-list.js';
 import { type PluginManager } from './plugin-manage.js';
 import { type RecipeCredentialStore } from './recipe-credentials.js';
+import { type CredentialFileSource, importCredentialFile } from './credential-file.js';
 import { type SigninWindow } from './signin.js';
 import { type DeliveryService } from './delivery.js';
 import { type DesktopLog } from './log.js';
@@ -410,6 +411,11 @@ export interface IpcDependencies {
   readonly signin: SigninWindow;
   /** A recipe's `call` credentials (TYTO-671, ADR 0193): names listed, values never read back. */
   readonly recipeCredentials: RecipeCredentialStore;
+  /**
+   * The picker and the disk a credential is imported from (TYTO-649). The path it picks stays
+   * in main: `credentials:import` and `recipe-credential:import` answer only an outcome.
+   */
+  readonly credentialFile: CredentialFileSource;
   /** The installed plugins' panels and their bridge (ADR 0045). */
   readonly panels: PanelService;
   /** The installed plugins' keymaps, once they have started (TYTO-207). */
@@ -991,6 +997,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       deleted: await credentials.delete(await declaredAccount(plugins, plugin, key)),
     }),
 
+    // TYTO-649: refused before the picker opens, so no file is read for a key nobody declares.
+    'credentials:import': async ({ plugin, key }) => {
+      const account = await declaredAccount(plugins, plugin, key);
+      return importCredentialFile(dependencies.credentialFile, (text) =>
+        credentials.set(account, text),
+      );
+    },
+
     'export:start': ({ documentId, brief, directory, outputs, formats }) => {
       // The text is the request's and the folder is main's, which is `brief:preview`'s
       // split exactly: the editor's buffer is the only place an unsaved brief exists, and
@@ -1118,6 +1132,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'recipe-credential:list': () => dependencies.recipeCredentials.list(),
     'recipe-credential:set': ({ name, value }) => dependencies.recipeCredentials.set(name, value),
     'recipe-credential:forget': ({ name }) => dependencies.recipeCredentials.forget(name),
+    'recipe-credential:import': ({ name }) =>
+      importCredentialFile(dependencies.credentialFile, (text) =>
+        dependencies.recipeCredentials.set(name, text),
+      ),
 
     'plugins:panels': async () => ({ panels: [...(await dependencies.panels.list())] }),
     'plugins:keymaps': async () => ({ keymaps: await dependencies.keymaps() }),

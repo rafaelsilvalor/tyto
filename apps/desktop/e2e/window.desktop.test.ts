@@ -279,6 +279,9 @@ describe('the bridge', () => {
       'cli:open-diagnostic',
       'cli:run',
       'credentials:delete',
+      // TYTO-649: a key file stored from the plugins screen; main picks and reads it, and the
+      // answer is an outcome. Exercised by `e2e/credential-file.desktop.test.ts`.
+      'credentials:import',
       // No `credentials:get` since TYTO-187: nothing in the renderer may read a secret back.
       'credentials:set',
       // TYTO-490, ADR 0157 §6: a delivery's export and whether a tab has one. Exercised by
@@ -371,6 +374,8 @@ describe('the bridge', () => {
       // TYTO-671, ADR 0193: a recipe's call credentials from the plugins screen, written,
       // listed by name and forgotten. Exercised by `e2e/recipe-credentials.desktop.test.ts`.
       'recipe-credential:forget',
+      // TYTO-649: the same, imported from a file. Exercised by `credential-file.desktop.test.ts`.
+      'recipe-credential:import',
       'recipe-credential:list',
       'recipe-credential:set',
       // TYTO-377, ADR 0148: the recipe notebook's runner in main, which a `.recipe` tab runs
