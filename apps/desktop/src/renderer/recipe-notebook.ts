@@ -24,7 +24,10 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  * It keeps, per document, the last answer shown with its text, so a change of language shows it
  * again ({@link RecipeNotebook.reshow}), and which tables the person folded, by their line and
  * following it through each edit, for as long as the tab is open: none of it outlives the tab,
- * and none of it is written anywhere.
+ * and none of it is written anywhere. A view's quick filter and the Calendar's span are kept the
+ * same way (TYTO-639), so a cell's element built again for a new run or another language draws
+ * them as the person left them; and so is the cell a full-size tab draws (TYTO-642), which
+ * follows its step's line rather than its index, and draws nothing once that line is deleted.
  *
  * Nothing here touches the DOM or the editor: `recipe-cell-view.ts` builds what goes under each
  * cell, and `main.ts` hands each answer to the tab.
@@ -35,6 +38,40 @@ export type RecipeRunAnswer = IpcResponse<'recipe:run'>;
 export type RecipeApplyRequest = IpcRequest<'recipe:apply'>;
 export type RecipeApplyAnswer = IpcResponse<'recipe:apply'>;
 type WireCell = RecipeRunAnswer['cells'][number];
+
+/**
+ * What a cell's view keeps across a rebuild of its element (TYTO-639): the quick filter's text,
+ * the Calendar's span and the loose card opened. Per tab while it is open, never written.
+ */
+export interface RecipeViewState {
+  readonly filter?: string | undefined;
+  readonly span?: 'week' | 'month' | undefined;
+  readonly opened?: { readonly key: string; readonly title: string } | undefined;
+}
+
+/** What a view is handed to keep its state with: what it kept, and where a change goes. */
+export interface ViewMemory {
+  readonly kept: RecipeViewState;
+  readonly keep: (state: RecipeViewState) => void;
+}
+
+/** A view's own copy of what it keeps: each change merged into it and handed on whole. */
+export function viewKeeper(memory: ViewMemory | undefined): {
+  readonly kept: () => RecipeViewState;
+  readonly keep: (change: RecipeViewState) => void;
+} {
+  let kept: RecipeViewState = memory?.kept ?? {};
+  return {
+    kept: () => kept,
+    keep: (change) => {
+      kept = { ...kept, ...change };
+      memory?.keep(kept);
+    },
+  };
+}
+
+/** Where a line start went through an edit, or `undefined` when its line is gone (TYTO-451). */
+export type LineMap = (at: number) => number | undefined;
 
 /** How a run was asked for: a pause in typing, a save, or Run recipe. */
 export type RecipeTrigger = 'typed' | 'saved' | 'explicit';
@@ -103,7 +140,26 @@ export interface RecipeNotebook {
    * `map`, which answers where a line start went, or `undefined` when its line is gone, and
    * then it is gone too (TYTO-451).
    */
-  edited(documentId: string, map: (at: number) => number | undefined): void;
+  edited(documentId: string, map: LineMap): void;
+  /**
+   * What the view of the cell on the line starting at `at` keeps (TYTO-639), keyed and moved as
+   * folds are; an empty state for a cell whose view kept nothing.
+   */
+  viewOf(documentId: string, at: number): RecipeViewState;
+  keepView(documentId: string, at: number, state: RecipeViewState): void;
+  /**
+   * A full-size tab drawing cell `index` of the last answer (TYTO-642): from now on it follows
+   * that cell's line, not its index. A tab already following a cell keeps it.
+   */
+  followCell(tabId: string, documentId: string, index: number): void;
+  /**
+   * The index, in the last answer, of the cell a tab follows: the cell now on its line, or
+   * `undefined` once that line was deleted, or when no cell of the answer is on it.
+   */
+  cellOfTab(tabId: string): number | undefined;
+  /** What a full-size tab's view keeps across a rebuild (TYTO-639), apart from its cell's. */
+  tabViewOf(tabId: string): RecipeViewState;
+  keepTabView(tabId: string, state: RecipeViewState): void;
   /** The tab closed: nothing waits for it, an answer on its way is dropped, and all is forgotten. */
   close(documentId: string): void;
 }
@@ -123,6 +179,18 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const expanded = new Map<string, Set<number>>();
   const applying = new Map<string, Set<number>>();
   const refusals = new Map<string, Map<number, string>>();
+  const views = new Map<string, Map<number, RecipeViewState>>();
+  /**
+   * Where each cell of the last answer starts its line in the text as it is now (TYTO-642): the
+   * answer's own line, moved through every edit since its request took its text.
+   */
+  const places = new Map<string, Map<number, number | undefined>>();
+  /** The edits since the newest request took its text, to move its answer's lines through. */
+  const since = new Map<string, LineMap[]>();
+  const tabs = new Map<
+    string,
+    { readonly documentId: string; at: number | undefined; view: RecipeViewState }
+  >();
   let requests = 0;
 
   const reshowOne = (documentId: string): void => {
@@ -148,6 +216,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     requests += 1;
     const requestId = requests;
     newest.set(documentId, requestId);
+    since.set(documentId, []);
     const answer = await options.run({
       requestId,
       documentId,
@@ -159,6 +228,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     });
     if (!isNewest(newest, documentId, answer.requestId)) return;
     last.set(documentId, { text, answer });
+    places.set(documentId, placesOf(text, answer, since.get(documentId) ?? []));
     // A refusal is said once: the run that follows it has the cell's own word.
     refusals.delete(documentId);
     options.show(documentId, text, answer);
@@ -241,6 +311,46 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
         }
         marks.set(documentId, moved);
       }
+      const kept = views.get(documentId);
+      if (kept !== undefined && kept.size > 0) {
+        const moved = new Map<number, RecipeViewState>();
+        for (const [at, state] of kept) {
+          const now = map(at);
+          if (now !== undefined) moved.set(now, state);
+        }
+        views.set(documentId, moved);
+      }
+      const placed = places.get(documentId);
+      if (placed !== undefined) {
+        for (const [index, at] of placed) placed.set(index, at === undefined ? at : map(at));
+      }
+      for (const tab of tabs.values()) {
+        if (tab.documentId === documentId && tab.at !== undefined) tab.at = map(tab.at);
+      }
+      since.get(documentId)?.push(map);
+    },
+    viewOf: (documentId, at) => views.get(documentId)?.get(at) ?? {},
+    keepView(documentId, at, state) {
+      const kept = views.get(documentId) ?? new Map<number, RecipeViewState>();
+      kept.set(at, state);
+      views.set(documentId, kept);
+    },
+    followCell(tabId, documentId, index) {
+      if (tabs.has(tabId)) return;
+      tabs.set(tabId, { documentId, at: places.get(documentId)?.get(index), view: {} });
+    },
+    cellOfTab(tabId) {
+      const tab = tabs.get(tabId);
+      if (tab?.at === undefined) return undefined;
+      for (const [index, at] of places.get(tab.documentId) ?? []) {
+        if (at === tab.at) return index;
+      }
+      return undefined;
+    },
+    tabViewOf: (tabId) => tabs.get(tabId)?.view ?? {},
+    keepTabView(tabId, state) {
+      const tab = tabs.get(tabId);
+      if (tab !== undefined) tab.view = state;
     },
     close(documentId) {
       cancel(documentId);
@@ -250,8 +360,32 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       expanded.delete(documentId);
       applying.delete(documentId);
       refusals.delete(documentId);
+      views.delete(documentId);
+      places.delete(documentId);
+      since.delete(documentId);
+      // A cell's full-size tabs close with their recipe (TYTO-379).
+      for (const [tabId, tab] of tabs) if (tab.documentId === documentId) tabs.delete(tabId);
     },
   };
+}
+
+/**
+ * Where each cell of an answer starts its line now: in the text its request carried, then moved
+ * through the edits made since, so a line deleted meanwhile places its cell nowhere.
+ */
+function placesOf(
+  text: string,
+  answer: Pick<RecipeRunAnswer, 'cells'>,
+  edits: readonly LineMap[],
+): Map<number, number | undefined> {
+  const starts = lineStarts(text);
+  const placed = new Map<number, number | undefined>();
+  for (const cell of answer.cells) {
+    let at: number | undefined = starts[Math.min(cell.line, starts.length) - 1] ?? 0;
+    for (const map of edits) at = at === undefined ? undefined : map(at);
+    placed.set(cell.index, at);
+  }
+  return placed;
 }
 
 /** Adds or drops one line start in a document's set of them. */

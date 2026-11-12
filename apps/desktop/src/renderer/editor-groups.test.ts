@@ -708,6 +708,15 @@ describe('a recipe cell drawn full size (TYTO-379)', () => {
     expect(recipeTabs(openRecipeView(again, 'b', 2))).toHaveLength(2);
   });
 
+  // TYTO-642: a step inserted above makes the tab opened on cell 2 draw cell 3.
+  it('finds the tab drawing a cell by the cell it draws now, when the host says it', () => {
+    const once = openRecipeView(twoDocuments(), 'a', 2);
+    const moved = (tab: EditorTab) => (tab.cell === 2 ? 3 : tab.cell);
+
+    expect(recipeTabs(openRecipeView(once, 'a', 3, moved))).toHaveLength(1);
+    expect(recipeTabs(openRecipeView(once, 'a', 2, moved))).toHaveLength(2);
+  });
+
   it('closes with its recipe, and stays when another document closes', () => {
     const groups = openRecipeView(openRecipeView(twoDocuments(), 'a', 0), 'a', 1);
 

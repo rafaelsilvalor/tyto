@@ -111,6 +111,7 @@ import { type SettingOutline, settingsAssist } from './settings-assist.js';
 import { readSnippetsText } from './snippets-file.js';
 import {
   type RecipeRunAnswer,
+  type RecipeViewState,
   answerDiagnostics,
   cellAtOrAbove,
   cellStatuses,
@@ -948,7 +949,13 @@ function recipeViewContext(documentId: string): ViewContext {
  */
 function openRecipeCell(documentId: string, index: number): void {
   if (editor === undefined || !sessionRead) return;
-  groups = openRecipeView(groups, documentId, index);
+  groups = openRecipeView(groups, documentId, index, (tab) => recipeNotebook.cellOfTab(tab.id));
+  // TYTO-642: the tab follows its cell's line from here, not its index. A tab already drawing
+  // the cell keeps the line it follows.
+  const opened = activeTabOf(focusedGroup(groups));
+  if (opened !== undefined && isRecipeView(opened) && opened.documentId === documentId) {
+    recipeNotebook.followCell(opened.id, documentId, index);
+  }
   showGroups();
 }
 
@@ -969,11 +976,17 @@ function paintRecipeViews(): void {
       paintedRecipeViews.delete(group.id);
       continue;
     }
-    const cell = recipeNotebook
-      .lastOf(tab.documentId)
-      ?.answer.cells.find((each) => each.index === tab.cell);
+    // TYTO-642: the cell now on the line the tab follows; none once that line was deleted, and
+    // then the tab says it has no result rather than drawing whichever cell took the index.
+    const index = recipeNotebook.cellOfTab(tab.id);
+    const cell =
+      index === undefined
+        ? undefined
+        : recipeNotebook.lastOf(tab.documentId)?.answer.cells.find((each) => each.index === index);
     const key = [
       tab.id,
+      // The index the view pages its rows by: a step inserted above moves it.
+      index ?? '',
       cell?.status ?? '',
       cell?.ranAt ?? '',
       cell?.view?.name ?? '',
@@ -982,8 +995,17 @@ function paintRecipeViews(): void {
     ].join('\u0000');
     if (paintedRecipeViews.get(group.id) === key) continue;
     paintedRecipeViews.set(group.id, key);
+    // TYTO-639: the tab's own filter, span and opened card survive a new run and a language.
+    const memory = {
+      kept: recipeNotebook.tabViewOf(tab.id),
+      keep: (kept: RecipeViewState) => {
+        recipeNotebook.keepTabView(tab.id, kept);
+      },
+    };
     const body =
-      cell === undefined ? undefined : fullSizeBody(cell, recipeViewContext(tab.documentId));
+      cell === undefined
+        ? undefined
+        : fullSizeBody(cell, { ...recipeViewContext(tab.documentId), memory });
     if (body !== undefined) {
       element.recipeView.replaceChildren(body);
       continue;
@@ -1021,6 +1043,13 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
     applying: recipeNotebook.applyingOf(documentId),
     refusals: recipeNotebook.refusalsOf(documentId),
     now: Date.now,
+    // TYTO-639: a view's filter, span and opened card, kept by line as folds are.
+    views: {
+      of: (at) => recipeNotebook.viewOf(documentId, at),
+      keep: (at, kept) => {
+        recipeNotebook.keepView(documentId, at, kept);
+      },
+    },
     actions: {
       runFrom: (index) => void recipeNotebook.runFrom(documentId, index),
       fetchAgain: () => void recipeNotebook.fetchAgain(documentId),
@@ -1384,7 +1413,8 @@ const tabIconOf = (document_: DocumentState): IconName =>
 function recipeViewEntry(tab: EditorTab, recipe: DocumentState): TabEntry {
   const label = translate(state.locale, 'recipe.view.tab')
     .replace('{name}', labelOf(recipe))
-    .replace('{cell}', String((tab.cell ?? 0) + 1));
+    // TYTO-642: the number of the cell it follows now, which a step inserted above moves on.
+    .replace('{cell}', String((recipeNotebook.cellOfTab(tab.id) ?? tab.cell ?? 0) + 1));
   return { id: tab.id, label, ...whereOf(recipe), dirty: false, icon: 'file' };
 }
 
@@ -7057,6 +7087,8 @@ async function load(): Promise<void> {
             documentId,
             (at) => mapLineStarts([at], edit.before, edit.changes, edit.after)[0],
           );
+          // A full-size tab whose step's line went says so now, not on the next answer.
+          paintRecipeViews();
           recipeNotebook.typed(documentId);
         }
         // Typing changes no tab but the draft, and a draft is what a crash would cost.

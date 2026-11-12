@@ -10,6 +10,7 @@ import {
   nextPage,
   notDrawn,
 } from './recipe-board-model.js';
+import { type ViewMemory, viewKeeper } from './recipe-notebook.js';
 import { type WireValue, showValue } from './recipe-table-model.js';
 import type { RowsAnswer, RowsRequest } from './recipe-table-view.js';
 
@@ -38,6 +39,11 @@ export interface BoardViewOptions {
   readonly board: BoardOptions;
   readonly facets: (request: FacetsRequest) => Promise<FacetsAnswer>;
   readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
+  /**
+   * What the view keeps across a rebuild of its element (TYTO-639): the quick filter it opens
+   * with, and where each change to it goes.
+   */
+  readonly memory?: ViewMemory | undefined;
 }
 
 interface Lane {
@@ -55,7 +61,8 @@ export function boardView(options: BoardViewOptions): HTMLElement {
   const types = new Map(options.columns.map((column) => [column.name, column.type]));
   const asked = askedColumns(board);
 
-  let filter = '';
+  const memory = viewKeeper(options.memory);
+  let filter = memory.kept().filter ?? '';
   let total = options.total;
   let matched = options.total;
   let more = 0;
@@ -68,6 +75,7 @@ export function boardView(options: BoardViewOptions): HTMLElement {
   const bar = element('div', 'recipe-table__bar');
   const search = element('input', 'recipe-table__filter');
   search.type = 'search';
+  search.value = filter;
   search.placeholder = say('recipe.table.filter');
   search.setAttribute('aria-label', say('recipe.table.filter'));
   const counter = element('span', 'recipe-table__count');
@@ -208,6 +216,7 @@ export function boardView(options: BoardViewOptions): HTMLElement {
 
   search.addEventListener('input', () => {
     filter = search.value;
+    memory.keep({ filter });
     load();
   });
 
