@@ -361,6 +361,10 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           values: ['local', 'remote'],
           default: 'local',
         }),
+        named('clear', 'choice', false, 'Whether a value cleared since the last run pushes.', {
+          values: ['push', 'pull'],
+          default: 'pull',
+        }),
       ],
     ),
     form(
