@@ -75,7 +75,7 @@ While the browser is open, the line says to finish signing in there and has **Ca
 
 Click **Sign out** to end it. Nothing else starts a sign-in: a plugin that needs one when you are signed out stops and tells you to sign in from this dialog, and it never opens your browser by itself.
 
-Tyto keeps the sign-in in your system's keychain, and the plugin gets only a short-lived access token from Tyto, never what keeps you signed in. On a computer with no keychain to encrypt with, the sign-in does not finish and the line says why. The command line cannot sign in through a browser: a recipe that needs a sign-in works only in the window.
+Tyto keeps the sign-in in your system's keychain, and the plugin gets only a short-lived access token from Tyto, never what keeps you signed in. On a computer with no keychain to encrypt with, the sign-in does not finish and the line says why. The command line signs in on its own with `tyto signin`, kept apart from the window's sign-ins; see [the command line reference](../reference/command-line.md).
 
 ### A sign-in that asks for your own client
 

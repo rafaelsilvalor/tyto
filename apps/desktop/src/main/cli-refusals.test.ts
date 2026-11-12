@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APPLY_REFUSED,
   MCP_REFUSED,
+  SIGNIN_REFUSED,
   TRUST_REFUSED,
   WATCH_REFUSED,
   type WindowRefusalOptions,
@@ -61,6 +62,20 @@ describe('mcp', () => {
 
   it('leaves a command named after it alone', async () => {
     expect(await refusals()(invocation(['render'], ['mcp']), 'C:\\w')).toBeUndefined();
+  });
+});
+
+describe('signin and signout (ADR 0194)', () => {
+  it('are refused, and say where the window signs in', async () => {
+    expect(await refusals()(invocation(['signin'], ['google']), 'C:\\w')).toBe(SIGNIN_REFUSED);
+    expect(await refusals()(invocation(['signout'], ['google', 'drive']), 'C:\\w')).toBe(
+      SIGNIN_REFUSED,
+    );
+    expect(SIGNIN_REFUSED).toContain('plugins screen');
+  });
+
+  it('leave a command whose argument is called signin alone', async () => {
+    expect(await refusals()(invocation(['plugin', 'remove'], ['signin']), 'C:\\w')).toBeUndefined();
   });
 });
 
@@ -173,6 +188,18 @@ describe('recipe run --apply through the command line parser', () => {
 
     expect(asked).toEqual([undefined]);
     expect(err).not.toContain(APPLY_REFUSED);
+  });
+
+  it.each([
+    [['signin', 'google']],
+    [['signin', 'google', 'drive', '--client']],
+    [['signout', 'google']],
+  ])('refuses %j through the parser before it reaches a keychain', async (argv) => {
+    const { code, err, asked } = await typed(argv);
+
+    expect(asked).toEqual([SIGNIN_REFUSED]);
+    expect(code).toBe(1);
+    expect(err).toContain(SIGNIN_REFUSED);
   });
 
   it.each([

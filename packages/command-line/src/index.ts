@@ -12,6 +12,8 @@ export { type ValueDescription, type ValueKind, BUILT_IN_TYPES } from './value-k
 export type {
   CliConsole,
   CliEnvironment,
+  CliSignin,
+  CliSigninSecrets,
   CliRasterizer,
   CliStdio,
   CommandInvocation,

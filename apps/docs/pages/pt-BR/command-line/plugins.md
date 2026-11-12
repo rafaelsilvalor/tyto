@@ -63,7 +63,7 @@ Um plugin desligado continua instalado e fica fora de toda renderização e da j
 ```
 $ tyto plugin remove my-pack
 Removed my-pack.
-Saved credentials and sign-ins, if any, stay in the desktop app's keychain; to forget them, remove the plugin from the desktop app instead.
+Sign-ins made with tyto signin stay in the system keychain; tyto signout forgets one. Credentials and sign-ins saved in the desktop app stay in its keychain; to forget them, remove the plugin from the desktop app instead.
 ```
 
 A linha de comando nunca lê nem apaga o que o app de mesa guarda no chaveiro do sistema para um plugin. Para esquecer, remova o plugin pela tela de plugins do app de mesa e marque a caixa que oferece isso; veja [Plugins](../customize/plugins.md).

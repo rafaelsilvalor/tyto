@@ -84,3 +84,10 @@ remove**.
   secrets with no screen that lists them; deleting the files under the desktop's
   `credentials/` folder by hand is the way out today.
 - Recipe credentials (`recipe:<name>`, ADR 0193) belong to no plugin and are not touched.
+
+## Note of 2026-11-12 — the CLI keeps sign-ins of its own (TYTO-683)
+
+**Amended by ADR 0194.** The CLI stays read-only for a plugin's credentials, which are still
+environment variables, but it now keeps browser sign-ins and the clients a person types for them
+(`signin:` and `signin-client:` accounts) in the system keychain, apart from the desktop's.
+`tyto plugin remove` says so, and `tyto signout` forgets one.

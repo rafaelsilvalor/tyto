@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 21. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 23. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -386,6 +386,48 @@ tyto recipe run [options] <recipe>
 | `--apply` | apply every plan once, as a click on Apply does, and commit the recipe's state; refused outside a trusted folder |  |
 | `--param <name=value>` | give one of the recipe's param lines a value for this run; repeatable |  |
 | `--section <plugin.key=value>` | set a key of a plugin's project section for this run, over .tyto/project.json; repeatable, value read as JSON or else as text |  |
+
+## tyto signin
+
+sign in to a plugin's provider in the system browser and keep the sign-in in the system keychain (ADR 0194)
+
+```sh
+tyto signin [options] <plugin> [id]
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<plugin>` | the plugin's name, as tyto plugin list prints it |
+| `[id]` | which of its sign-ins; needed only when it declares more than one |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--client` | type the OAuth client first, for a sign-in whose plugin names none; asked on the terminal, never read from the command line |  |
+
+## tyto signout
+
+forget a plugin's sign-in that tyto signin kept in the system keychain
+
+```sh
+tyto signout [options] <plugin> [id]
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<plugin>` | the plugin's name, as tyto plugin list prints it |
+| `[id]` | which of its sign-ins; needed only when it declares more than one |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--client` | also forget the OAuth client typed with tyto signin --client |  |
 
 ## tyto mcp
 

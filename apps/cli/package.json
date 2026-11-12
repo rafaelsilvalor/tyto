@@ -16,6 +16,7 @@
     "tyto": "./dist/index.js"
   },
   "dependencies": {
+    "@napi-rs/keyring": "2.1.2",
     "@tyto/command-line": "workspace:*",
     "@tyto/raster": "workspace:*",
     "playwright": "^1.63.0"

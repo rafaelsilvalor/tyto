@@ -75,7 +75,7 @@ Enquanto o navegador está aberto, a linha pede que você termine o login lá e 
 
 Clique em **Sair** para encerrar. Nada mais começa um login: um plugin que precisa de um quando você está desconectado para e pede que você entre por esta caixa, e ele nunca abre o navegador sozinho.
 
-O Tyto guarda o login no chaveiro do sistema, e o plugin recebe do Tyto só um token de acesso de curta duração, nunca o que mantém você conectado. Num computador sem chaveiro para criptografar, o login não termina e a linha diz por quê. A linha de comando não faz login pelo navegador: uma receita que precisa de login só funciona na janela.
+O Tyto guarda o login no chaveiro do sistema, e o plugin recebe do Tyto só um token de acesso de curta duração, nunca o que mantém você conectado. Num computador sem chaveiro para criptografar, o login não termina e a linha diz por quê. A linha de comando faz o próprio login com `tyto signin`, separado dos logins da janela; veja [a referência da linha de comando](../reference/command-line.md).
 
 ### Um login que pede o seu próprio cliente
 

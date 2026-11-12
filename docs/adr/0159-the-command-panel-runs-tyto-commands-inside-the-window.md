@@ -383,3 +383,9 @@ value and no `--no-apply`, and those words are unknown options to the parser. A 
 header says `apply auto` applies nothing without the flag: `recipe run` runs it as a save, not
 a Run (ADR 0170 decision 6), so the panel reads no header. No other command applies a recipe:
 `tyto mcp`'s `run_recipe` does, and `mcp` is already refused in the panel.
+
+## Note of 2026-11-12 — `signin` and `signout` are refused (TYTO-683)
+
+The panel refuses `tyto signin` and `tyto signout` (`SIGNIN_REFUSED` in
+`apps/desktop/src/main/cli-refusals.ts`): the window signs in from its plugins screen (ADR 0174),
+and the terminal's sign-ins live in a system keychain the window composes no port for (ADR 0194).

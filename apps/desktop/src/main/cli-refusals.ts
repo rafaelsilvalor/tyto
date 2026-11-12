@@ -46,6 +46,15 @@ export const APPLY_REFUSED =
   '--apply is not available in the window: the command panel only plans a recipe (ADR 0159). ' +
   "Apply its plan with the notebook's Apply button, or run the command in a terminal.";
 
+/**
+ * `tyto signin` and `tyto signout` keep a terminal's sign-ins in the system keychain (ADR 0194),
+ * apart from the window's, and the window composes no keychain for the command panel. The
+ * plugins screen is where the window signs in and out (ADR 0174).
+ */
+export const SIGNIN_REFUSED =
+  'tyto signin and tyto signout are not available in the window: the window signs in from the ' +
+  'plugins screen (ADR 0194). Sign in there, or run the command in a terminal.';
+
 export interface WindowRefusalOptions {
   readonly platform: NodeJS.Platform;
   /** The queue panel's folder and whether it runs what arrives on its own. */
@@ -70,6 +79,7 @@ export function windowRefusals(
     const [first] = invocation.args;
 
     if (command === 'mcp') return MCP_REFUSED;
+    if (command === 'signin' || command === 'signout') return SIGNIN_REFUSED;
 
     // Read off the parsed options, so every spelling commander accepts is one value here. Only
     // the flag applies: without it the run is a save's and `apply auto` stays a plan

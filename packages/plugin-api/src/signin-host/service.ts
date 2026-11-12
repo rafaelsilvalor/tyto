@@ -323,7 +323,9 @@ export function createSigninService(options: SigninServiceOptions): SigninServic
         return {
           ok: false,
           reason: 'no-client',
-          message: `no client is set for the sign-in '${id}' of ${plugin}; set one in the plugins screen`,
+          // Host-neutral (TYTO-683): the window says where in its own words, and the CLI's
+          // `tyto signin --client` asks for one before it starts.
+          message: `no client is set for the sign-in '${id}' of ${plugin}`,
         };
       }
       const pkce = await createPkce(options.random);

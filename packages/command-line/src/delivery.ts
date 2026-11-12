@@ -19,6 +19,7 @@ import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
 import { NO_PLUGIN_FILES, syncPluginFiles } from './plugin-files.js';
 import { loadInstalledPlugins, pluginCapabilities } from './plugins/index.js';
+import { cliSigninCapabilities } from './signin.js';
 import { type RenderContext, loadRenderContext } from './render-context.js';
 import { displayPath, installedOption } from './render.js';
 import { formatDiagnostics, registerUnplaced } from './report.js';
@@ -121,6 +122,7 @@ async function skeletonOf(
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto delivery new',
+      signin: cliSigninCapabilities(environment),
       ...(environment.home === undefined ? {} : { home: environment.home }),
       workspace:
         workspace === undefined

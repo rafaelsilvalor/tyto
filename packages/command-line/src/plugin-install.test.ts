@@ -328,7 +328,7 @@ describe('disable, enable and remove', () => {
     expect(await run(['plugin', 'remove', 'texto'], environment())).toBe(EXIT_OK);
     // TYTO-682: the CLI never touches the desktop's keychain, and says so in one line.
     expect(stdout()).toBe(
-      "Removed texto.\nSaved credentials and sign-ins, if any, stay in the desktop app's keychain; to forget them, remove the plugin from the desktop app instead.\n",
+      'Removed texto.\nSign-ins made with tyto signin stay in the system keychain; tyto signout forgets one. Credentials and sign-ins saved in the desktop app stay in its keychain; to forget them, remove the plugin from the desktop app instead.\n',
     );
 
     expect((await listed()).map((plugin) => plugin.name)).not.toContain('texto');

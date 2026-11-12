@@ -136,3 +136,8 @@ then the plugins screen, the user manual and an end-to-end test against a fake p
   them with `safeStorage`, `net.fetch` and `shell.openExternal` as before, and keeps the
   plugins screen's channels and the callback page's words. The CLI's sign-in, and what it
   amends here and in ADR 0134, is for ADR 0194, reserved.
+- 2026-11-12 (TYTO-683, second pull request): **decision 5 is amended by ADR 0194.** The CLI
+  signs in through the browser with `tyto signin`, keeps the refresh token in the system
+  keychain, and composes `signinAccessToken`; `E_SIGNIN_UNAVAILABLE` remains for a command line
+  composed without a keychain. `E_SIGNIN_REQUIRED` now says how to sign in on the host that
+  answers it (`describeSignin`): the plugins screen in the desktop, `tyto signin` in a terminal.

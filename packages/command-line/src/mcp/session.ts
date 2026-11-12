@@ -31,6 +31,7 @@ import {
   reachableExporters,
   withoutRefused,
 } from '../plugins/index.js';
+import { cliSigninCapabilities } from '../signin.js';
 import { environmentRecipeCredentials } from '../recipe-credentials.js';
 import { type RenderContext, loadRenderContext } from '../render-context.js';
 import {
@@ -291,6 +292,7 @@ export async function openSession(
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto mcp',
+      signin: cliSigninCapabilities(environment),
       ...(environment.home === undefined ? {} : { home: environment.home }),
       workspace:
         workspace === undefined

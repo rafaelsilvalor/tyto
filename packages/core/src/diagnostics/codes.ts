@@ -500,7 +500,7 @@ export const diagnosticCodes = {
     severity: 'error',
     summary: 'A plugin asked for an access token of a sign-in it declared, and nobody signed in.',
     template:
-      "Plugin '{plugin}' needs sign-in '{id}', and nobody has signed in to it on {host}; sign in from the plugins screen.",
+      "Plugin '{plugin}' needs sign-in '{id}', and nobody has signed in to it on {host}; {how}.",
     spec: 'docs/adr/0174-a-plugin-signs-in-through-the-host-with-pkce-on-loopback.md',
     fatal: false,
     fatality: "It is the plugin's call that is refused; what the plugin does with that is its own.",

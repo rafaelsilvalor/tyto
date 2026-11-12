@@ -26,6 +26,7 @@ import {
   reachableExporters,
   withoutRefused,
 } from './plugins/index.js';
+import { cliSigninCapabilities } from './signin.js';
 import { type RenderContextOptions, loadRenderContext, readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { googleFontsOption } from './google-fonts.js';
@@ -245,6 +246,7 @@ export async function renderCommand(
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto render',
+      signin: cliSigninCapabilities(environment),
       ...(environment.home === undefined ? {} : { home: environment.home }),
       workspace:
         workspace === undefined

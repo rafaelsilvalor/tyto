@@ -172,11 +172,18 @@ export interface HostCapabilities {
   /**
    * A current access token for the plugin's sign-in `id`, already allowed (ADR 0174), or
    * `undefined` when nobody has signed in to it. **The adapter never opens a browser here**:
-   * only a person starts a sign-in, from the host's own screen. It refreshes an expired token
-   * itself, and the refresh token never leaves it. Absent on a host that cannot sign in
-   * through a browser — the CLI — which answers `E_SIGNIN_UNAVAILABLE`.
+   * only a person starts a sign-in, from the host's own screen or command. It refreshes an
+   * expired token itself, and the refresh token never leaves it. Absent on a host that cannot
+   * sign in through a browser — a terminal with no system keychain (ADR 0194) — which answers
+   * `E_SIGNIN_UNAVAILABLE`.
    */
   signinAccessToken?(plugin: string, id: string): Promise<string | undefined>;
+  /**
+   * How a person signs in to `id` on this host, for the `E_SIGNIN_REQUIRED` message: the CLI
+   * names `tyto signin` (ADR 0194). Absent, the message says to sign in from the plugins
+   * screen, which is the desktop's way.
+   */
+  describeSignin?(plugin: string, id: string): string;
 
   /**
    * Starts `program`, already allowed by `process:<program>` and within the plugin's limit
@@ -350,7 +357,7 @@ export interface HostSignin {
   /**
    * A current access token for the sign-in the manifest declares as `signin.<id>`. Undeclared
    * is `E_PERMISSION`, nobody signed in is `E_SIGNIN_REQUIRED`, and a host that cannot sign in
-   * through a browser (the CLI) is `E_SIGNIN_UNAVAILABLE`.
+   * through a browser (a terminal with no system keychain, ADR 0194) is `E_SIGNIN_UNAVAILABLE`.
    */
   accessToken(id: string): Promise<string>;
 }
@@ -797,7 +804,10 @@ export function checkedCapabilities(
       }
       // Read as `unknown`: the adapter is typed, but this is the check that does not trust it.
       const token: unknown = await capabilities.signinAccessToken(plugin, id);
-      if (token === undefined) return refuse(diagnostic('E_SIGNIN_REQUIRED', { plugin, id, host }));
+      if (token === undefined) {
+        const how = capabilities.describeSignin?.(plugin, id) ?? 'sign in from the plugins screen';
+        return refuse(diagnostic('E_SIGNIN_REQUIRED', { plugin, id, host, how }));
+      }
       // An adapter that answered its whole token record would hand the plugin the refresh
       // token; only a non-empty string crosses, and anything else is the adapter's bug.
       if (typeof token !== 'string' || token === '') {
