@@ -17,6 +17,7 @@ import {
   shiftAnchor,
   spanDays,
 } from './recipe-calendar-model.js';
+import { type ViewMemory, viewKeeper } from './recipe-notebook.js';
 import { type WireValue, showValue } from './recipe-table-model.js';
 import type { RowsAnswer, RowsRequest } from './recipe-table-view.js';
 
@@ -47,6 +48,11 @@ export interface CalendarViewOptions {
   readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
   /** This machine's today, until main says the zone's; injected so a test fixes it. */
   readonly today?: string;
+  /**
+   * What the view keeps across a rebuild of its element (TYTO-639): the quick filter and the span
+   * it opens with, and where each change to it goes.
+   */
+  readonly memory?: ViewMemory | undefined;
 }
 
 interface Undated {
@@ -67,9 +73,10 @@ export function calendarView(options: CalendarViewOptions): HTMLElement {
 
   let today = options.today ?? localToday();
   let anchor = today;
-  let span: CalendarSpan = calendar.span;
+  const memory = viewKeeper(options.memory);
+  let span: CalendarSpan = memory.kept().span ?? calendar.span;
   let anchored = false;
-  let filter = '';
+  let filter = memory.kept().filter ?? '';
   let total = options.total;
   let matched = options.total;
   let earlier = 0;
@@ -87,6 +94,7 @@ export function calendarView(options: CalendarViewOptions): HTMLElement {
   const bar = element('div', 'recipe-table__bar');
   const search = element('input', 'recipe-table__filter');
   search.type = 'search';
+  search.value = filter;
   search.placeholder = say('recipe.table.filter');
   search.setAttribute('aria-label', say('recipe.table.filter'));
   const counter = element('span', 'recipe-table__count');
@@ -389,11 +397,13 @@ export function calendarView(options: CalendarViewOptions): HTMLElement {
       const wanted = toggle.dataset['span'] === 'week' ? 'week' : 'month';
       if (wanted === span) return;
       span = wanted;
+      memory.keep({ span });
       load();
     });
   }
   search.addEventListener('input', () => {
     filter = search.value;
+    memory.keep({ filter });
     load();
   });
 

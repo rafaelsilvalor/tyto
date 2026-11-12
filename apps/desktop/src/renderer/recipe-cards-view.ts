@@ -3,6 +3,7 @@ import { remeasureCellOutput } from '@tyto/editor';
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 import { CARDS_PAGE, nextCards, rowLink } from './recipe-cards-model.js';
+import { type ViewMemory, viewKeeper } from './recipe-notebook.js';
 import { type WireValue, showValue } from './recipe-table-model.js';
 import type { RowsAnswer, RowsRequest } from './recipe-table-view.js';
 
@@ -33,6 +34,12 @@ export interface CardsViewOptions {
   readonly fields: readonly string[];
   readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
   readonly row: (request: RowRequest) => Promise<RowAnswer>;
+  /**
+   * What the view keeps across a rebuild of its element (TYTO-639): the quick filter it opens
+   * with and the card it had open, which it opens again from this run, and where each change to
+   * them goes.
+   */
+  readonly memory?: ViewMemory | undefined;
 }
 
 export function cardsView(options: CardsViewOptions): HTMLElement {
@@ -41,7 +48,8 @@ export function cardsView(options: CardsViewOptions): HTMLElement {
   const count = (value: number): string => new Intl.NumberFormat(locale).format(value);
   const types = new Map(options.columns.map((column) => [column.name, column.type]));
 
-  let filter = '';
+  const memory = viewKeeper(options.memory);
+  let filter = memory.kept().filter ?? '';
   let total = options.total;
   let matched = options.total;
   let note = '';
@@ -55,6 +63,7 @@ export function cardsView(options: CardsViewOptions): HTMLElement {
   const bar = element('div', 'recipe-table__bar');
   const search = element('input', 'recipe-table__filter');
   search.type = 'search';
+  search.value = filter;
   search.placeholder = say('recipe.table.filter');
   search.setAttribute('aria-label', say('recipe.table.filter'));
   const counter = element('span', 'recipe-table__count');
@@ -150,7 +159,7 @@ export function cardsView(options: CardsViewOptions): HTMLElement {
       card.append(line);
     });
     const open = (): void => {
-      openCard(row.key, title, card);
+      openCard(row.key, title);
     };
     card.addEventListener('click', open);
     card.addEventListener('keydown', (event) => {
@@ -161,21 +170,52 @@ export function cardsView(options: CardsViewOptions): HTMLElement {
     return card;
   }
 
-  function openCard(key: string, title: string, from: HTMLElement): void {
+  function openCard(key: string, title: string): void {
+    memory.keep({ opened: { key, title } });
     void options.row({ index: options.index, ranAt: options.ranAt, key }).then((answer) => {
       if ('stale' in answer) {
         note = say('recipe.table.stale');
         draw();
         return;
       }
-      showOpened(answer, title, from);
+      showOpened(answer, key, title);
     });
   }
 
+  /**
+   * TYTO-639: the card this cell had open when its element was built again, opened again from
+   * this run, while its dialog is still over the window; a row this run no longer holds closes it.
+   */
+  function reopenCard(opened: { readonly key: string; readonly title: string }): void {
+    const shown = openDialog();
+    if (shown?.dataset['key'] !== opened.key) {
+      memory.keep({ opened: undefined });
+      return;
+    }
+    void options
+      .row({ index: options.index, ranAt: options.ranAt, key: opened.key })
+      .then((answer) => {
+        if (openDialog() !== shown) return;
+        if ('stale' in answer) {
+          shown.remove();
+          memory.keep({ opened: undefined });
+          return;
+        }
+        showOpened(answer, opened.key, opened.title);
+      });
+  }
+
+  /** The drawn card with this key, to give the focus back to once its dialog closes. */
+  const cardOf = (key: string): HTMLElement | undefined =>
+    [...grid.children].find(
+      (card): card is HTMLElement => card instanceof HTMLElement && card.dataset['key'] === key,
+    );
+
   /** The whole row over the window, in the dialog frame the window's other dialogs use. */
-  function showOpened(opened: OpenedRow, title: string, from: HTMLElement): void {
-    document.querySelector('.recipe-card-dialog')?.remove();
+  function showOpened(opened: OpenedRow, key: string, title: string): void {
+    openDialog()?.remove();
     const scrim = element('div', 'recipe-card-dialog');
+    scrim.dataset['key'] = key;
     const panel = element('div', 'recipe-card-dialog__panel');
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
@@ -212,7 +252,8 @@ export function cardsView(options: CardsViewOptions): HTMLElement {
 
     const dismiss = (): void => {
       scrim.remove();
-      if (from.isConnected) from.focus();
+      memory.keep({ opened: undefined });
+      cardOf(key)?.focus();
     };
     close.addEventListener('click', dismiss);
     scrim.addEventListener('click', (event) => {
@@ -257,13 +298,19 @@ export function cardsView(options: CardsViewOptions): HTMLElement {
 
   search.addEventListener('input', () => {
     filter = search.value;
+    memory.keep({ filter });
     load();
   });
 
   draw();
   load();
+  const opened = memory.kept().opened;
+  if (opened !== undefined) reopenCard(opened);
   return root;
 }
+
+/** The card opened over the window, if one is: there is only ever one. */
+const openDialog = (): HTMLElement | null => document.querySelector('.recipe-card-dialog');
 
 function element<Tag extends keyof HTMLElementTagNameMap>(
   tag: Tag,

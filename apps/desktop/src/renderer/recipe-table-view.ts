@@ -2,6 +2,7 @@ import { remeasureCellOutput } from '@tyto/editor';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import { type IpcRequest, type IpcResponse, RECIPE_WIRE_LIMITS } from '../../shared/ipc.js';
+import { type ViewMemory, viewKeeper } from './recipe-notebook.js';
 import {
   COLUMN_WIDTH,
   type CellPlace,
@@ -34,7 +35,8 @@ import {
  * the clipboard (`recipe:copy`). An answer to a query since replaced is dropped, by generation.
  *
  * The element lives as long as its cell's key (`recipe-cell-view.ts`): a new run, another
- * language or a fold built again draws a new one, with the recipe's order and no selection.
+ * language or a fold built again draws a new one, with the recipe's order and no selection, but
+ * with the quick filter the person typed, which the notebook keeps by the cell's line (TYTO-639).
  */
 
 export type RowsRequest = Omit<IpcRequest<'recipe:rows'>, 'documentId'>;
@@ -61,6 +63,11 @@ export interface TableViewOptions {
    * on every draw and drawn again when it changes, instead of a fixed number of rows.
    */
   readonly fullSize?: boolean;
+  /**
+   * What the view keeps across a rebuild of its element (TYTO-639): the quick filter it opens
+   * with, and where each change to it goes.
+   */
+  readonly memory?: ViewMemory | undefined;
 }
 
 export function tableView(options: TableViewOptions): HTMLElement {
@@ -70,8 +77,9 @@ export function tableView(options: TableViewOptions): HTMLElement {
   const types = new Map(options.columns.map((column) => [column.name, column.type]));
   const all = options.columns.map((column) => column.name);
 
+  const memory = viewKeeper(options.memory);
   let sort: SortState | undefined;
-  let filter = '';
+  let filter = memory.kept().filter ?? '';
   let hidden: ReadonlySet<string> = new Set();
   let selection: Selection | undefined;
   let total = options.total;
@@ -92,6 +100,7 @@ export function tableView(options: TableViewOptions): HTMLElement {
   const bar = element('div', 'recipe-table__bar');
   const search = element('input', 'recipe-table__filter');
   search.type = 'search';
+  search.value = filter;
   search.placeholder = say('recipe.table.filter');
   search.setAttribute('aria-label', say('recipe.table.filter'));
   const pick = barButton(say('recipe.table.columns'), 'columns');
@@ -320,6 +329,7 @@ export function tableView(options: TableViewOptions): HTMLElement {
 
   search.addEventListener('input', () => {
     filter = search.value;
+    memory.keep({ filter });
     requery();
   });
   pick.addEventListener('click', () => {

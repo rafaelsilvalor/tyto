@@ -9,7 +9,15 @@ import {
   relativeTime,
   tickAges,
 } from './recipe-cell-view.js';
-import { type CellStatus, type RecipeRunAnswer, cellStatuses } from './recipe-notebook.js';
+import type { FacetsAnswer, FacetsRequest } from './recipe-board-view.js';
+import type { RowAnswer, RowRequest } from './recipe-cards-view.js';
+import {
+  type CellStatus,
+  type RecipeRunAnswer,
+  cellStatuses,
+  createRecipeNotebook,
+} from './recipe-notebook.js';
+import type { RowsAnswer, RowsRequest } from './recipe-table-view.js';
 
 /**
  * What goes under a recipe's cell (TYTO-377): its header and its table, built from a wire cell.
@@ -455,5 +463,203 @@ describe("a cell's key", () => {
     expect(element.querySelector('.recipe-cell-status .recipe-cell-summary')?.textContent).toBe(
       '120 linhas · 2 colunas',
     );
+  });
+});
+
+// TYTO-639: a view's quick filter, the Calendar's span and an opened card, kept by the
+// notebook by the cell's line, so the element a new run or another language builds keeps them.
+describe("a view's state across a rebuild of its cell", () => {
+  const RUNS = ['2026-10-28T11:58:00.000Z', '2026-10-28T11:59:00.000Z'] as const;
+  /** 120 rows, every other one titled odd: the filter `odd` keeps 60 of them. */
+  const titleOf = (n: number): string => (n % 2 === 0 ? `even ${String(n)}` : `odd ${String(n)}`);
+  const matching = (filter: string | undefined): number[] =>
+    Array.from({ length: 120 }, (_, n) => n).filter(
+      (n) => filter === undefined || titleOf(n).includes(filter),
+    );
+
+  /** Main's stand-in: it filters and counts, and answers the run it was asked about. */
+  function fakeMain() {
+    const rows = vi.fn((request: RowsRequest): Promise<RowsAnswer> => {
+      const kept = matching(request.filter);
+      const columns = request.columns ?? ['key', 'title'];
+      return Promise.resolve({
+        columns,
+        rows: kept.slice(request.offset, request.offset + request.limit).map((n) => ({
+          key: `T-${String(n)}`,
+          values: columns.map((column) => (column === 'key' ? `T-${String(n)}` : titleOf(n))),
+        })),
+        total: 120,
+        matched: kept.length,
+      });
+    });
+    const facets = vi.fn((request: FacetsRequest): Promise<FacetsAnswer> =>
+      Promise.resolve({
+        facets: [{ key: 'all', label: 'all', count: matching(request.filter).length }],
+        total: 120,
+        matched: matching(request.filter).length,
+        more: 0,
+      }),
+    );
+    const row = vi.fn((request: RowRequest): Promise<RowAnswer> =>
+      Promise.resolve({
+        columns: [
+          { name: 'key', type: 'text' },
+          { name: 'title', type: 'text' },
+        ],
+        values: [request.key, `${request.key} in ${request.ranAt}`],
+        provenance: { source: 'acme', id: request.key, fetchedAt: request.ranAt },
+      }),
+    );
+    return { rows, facets, row };
+  }
+
+  /** A tab's notebook and the cell views it builds, as `main.ts` wires them. */
+  function harness() {
+    const notebook = createRecipeNotebook({
+      run: () => new Promise(() => undefined),
+      apply: () => new Promise(() => undefined),
+      refusedWithoutReason: () => '',
+      textOf: () => TEXT,
+      show: () => undefined,
+      delay: 0,
+    });
+    const main = fakeMain();
+    // The editor's stand-in: a card opened sits over the window, outside it, as in the app.
+    const editor = document.createElement('div');
+    document.body.replaceChildren(editor);
+    const build = (cell: Cell, locale: Locale = 'en', text = TEXT): HTMLElement => {
+      const { context } = contextOf({
+        locale,
+        views: {
+          of: (at) => notebook.viewOf('tab-1', at),
+          keep: (at, state) => {
+            notebook.keepView('tab-1', at, state);
+          },
+        },
+      });
+      const actions = { ...context.actions, ...main };
+      const answer = { requestId: 1, cells: [cell], diagnostics: [], ranAt: '' };
+      const [status] = cellStatuses(text, answer, locale);
+      if (status === undefined) throw new Error('no status');
+      const element = cellOutputOf(status, { ...context, actions }).render();
+      editor.replaceChildren(element);
+      return element;
+    };
+    return { notebook, main, build };
+  }
+
+  const shown = (name: string, options: Record<string, string> = {}, more: Partial<Cell> = {}) =>
+    cellOf({ view: { name, options }, ...more });
+  const typeFilter = (element: HTMLElement, value: string): void => {
+    const search = element.querySelector<HTMLInputElement>('.recipe-table__filter');
+    if (search === null) throw new Error('no filter');
+    search.value = value;
+    search.dispatchEvent(new Event('input'));
+  };
+  const filterOf = (element: HTMLElement): string | undefined =>
+    element.querySelector<HTMLInputElement>('.recipe-table__filter')?.value;
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+  /** What the view last asked main, through whichever channel it reads its rows by. */
+  const lastAsked = (
+    calls: readonly (readonly [{ ranAt: string; filter?: string | undefined }])[],
+  ) => {
+    const request = calls.at(-1)?.[0];
+    return { ranAt: request?.ranAt, filter: request?.filter };
+  };
+
+  const VIEWS = [
+    { name: 'table', options: {}, channel: 'rows' },
+    { name: 'board', options: { by: 'title' }, channel: 'facets' },
+    { name: 'calendar', options: { date: 'title' }, channel: 'facets' },
+    { name: 'cards', options: {}, channel: 'rows' },
+  ] as const;
+
+  for (const view of VIEWS) {
+    it(`keeps the ${view.name}'s quick filter through a new run and a language change`, async () => {
+      const { main, build } = harness();
+      typeFilter(build(shown(view.name, view.options)), 'odd');
+      await settle();
+
+      // A new run: a new element, the filter in its box and in what it asks main.
+      const rerun = build(shown(view.name, view.options, { ranAt: RUNS[1] }));
+      await settle();
+      expect(filterOf(rerun)).toBe('odd');
+      expect(lastAsked(main[view.channel].mock.calls)).toEqual({ ranAt: RUNS[1], filter: 'odd' });
+      // The count is main's for the new run, under the filter.
+      expect(rerun.querySelector('.recipe-table__count')?.textContent).toBe('Rows: 60 of 120');
+
+      const translated = build(shown(view.name, view.options, { ranAt: RUNS[1] }), 'pt-BR');
+      await settle();
+      expect(filterOf(translated)).toBe('odd');
+      expect(lastAsked(main[view.channel].mock.calls)).toEqual({ ranAt: RUNS[1], filter: 'odd' });
+      expect(translated.querySelector('.recipe-table__count')?.textContent).toBe(
+        'Linhas: 60 de 120',
+      );
+    });
+  }
+
+  it("keeps the calendar's span through a new run and a language change", async () => {
+    const { main, build } = harness();
+    const calendar = (ranAt: string) => shown('calendar', { date: 'title' }, { ranAt });
+    const pressed = (element: HTMLElement) =>
+      element
+        .querySelector('.recipe-calendar__span[aria-pressed="true"]')
+        ?.getAttribute('data-span');
+    const first = build(calendar(RUNS[0]));
+    expect(pressed(first)).toBe('month');
+    first.querySelector<HTMLElement>('.recipe-calendar__span[data-span="week"]')?.click();
+    await settle();
+
+    const rerun = build(calendar(RUNS[1]));
+    await settle();
+    expect(pressed(rerun)).toBe('week');
+    const days = main.facets.mock.calls.at(-1)?.[0].days;
+    expect(Date.parse(days?.to ?? '') - Date.parse(days?.from ?? '')).toBe(6 * 86_400_000);
+    expect(pressed(build(calendar(RUNS[1]), 'pt-BR'))).toBe('week');
+  });
+
+  it('opens the loose card again from the new run, and not once it was closed', async () => {
+    const { main, build } = harness();
+    const first = build(shown('cards', {}, { ranAt: RUNS[0] }));
+    await settle();
+    first.querySelector<HTMLElement>('.recipe-cards__card[data-key="T-3"]')?.click();
+    await settle();
+    const dialog = () => document.querySelector<HTMLElement>('.recipe-card-dialog');
+    expect(dialog()?.dataset['key']).toBe('T-3');
+
+    build(shown('cards', {}, { ranAt: RUNS[1] }));
+    await settle();
+    expect(main.row.mock.calls.at(-1)?.[0]).toEqual({ index: 0, ranAt: RUNS[1], key: 'T-3' });
+    expect(dialog()?.querySelector('[data-field="title"]')?.textContent).toBe(`T-3 in ${RUNS[1]}`);
+
+    dialog()?.querySelector<HTMLElement>('.recipe-card-dialog__close')?.click();
+    const asked = main.row.mock.calls.length;
+    build(shown('cards', {}, { ranAt: RUNS[0] }));
+    await settle();
+    expect(dialog()).toBeNull();
+    expect(main.row.mock.calls).toHaveLength(asked);
+  });
+
+  it('follows its line when a step is inserted above, and never lands on another cell', async () => {
+    const { notebook, main, build } = harness();
+    typeFilter(build(shown('table')), 'odd');
+    await settle();
+
+    // `acme.x` typed at the very start of line 2, so above it: the cell moves down a line and
+    // an index on, and the new step takes its old line and index.
+    const inserted = 'acme.x\n';
+    const from = TEXT.indexOf('acme.pull');
+    notebook.edited('tab-1', (at) => (at >= from ? at + inserted.length : at));
+    const text = TEXT.slice(0, from) + inserted + TEXT.slice(from);
+
+    const moved = build(shown('table', {}, { index: 1, line: 3, ranAt: RUNS[1] }), 'en', text);
+    await settle();
+    expect(filterOf(moved)).toBe('odd');
+    expect(main.rows.mock.calls.at(-1)?.[0]).toMatchObject({ index: 1, filter: 'odd' });
+
+    const newcomer = build(shown('table', {}, { index: 0, line: 2, ranAt: RUNS[1] }), 'en', text);
+    await settle();
+    expect(filterOf(newcomer)).toBe('');
+    expect(main.rows.mock.calls.at(-1)?.[0].filter).toBeUndefined();
   });
 });
