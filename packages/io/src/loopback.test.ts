@@ -2,7 +2,9 @@ import { get } from 'node:http';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { CALLBACK_TIMEOUT_MS, type CallbackListener, listenForCallback } from './loopback.js';
+import { CALLBACK_TIMEOUT_MS, type CallbackListener } from '@tyto/plugin-api';
+
+import { listenForCallback } from './loopback.js';
 
 /**
  * The redirect listener, on a real socket: binding, answering and closing are what is under

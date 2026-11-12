@@ -259,3 +259,5 @@ export {
   readGallery,
   updateGalleryEntry,
 } from './gallery-operations.js';
+// The loopback listener of browser sign-in, behind plugin-api's CallbackListen (TYTO-683).
+export { listenForCallback } from './loopback.js';

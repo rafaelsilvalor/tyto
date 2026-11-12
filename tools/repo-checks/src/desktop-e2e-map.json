@@ -157,8 +157,6 @@
     },
     {
       "paths": [
-        "apps/desktop/src/main/loopback.ts",
-        "apps/desktop/src/main/oauth.ts",
         "apps/desktop/src/main/signin.ts",
         "apps/desktop/e2e/signin.desktop.test.ts",
         "apps/desktop/e2e/fake-authorization-server.ts"
