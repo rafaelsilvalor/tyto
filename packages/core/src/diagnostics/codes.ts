@@ -2225,6 +2225,17 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // TYTO-437: a recipe that reports to a person writes a warning, not a column a later 'where'
+  // can drop. One per matching row up to WARN_ROW_LIMIT, then one that counts the rest.
+  W_RECIPE_WARN: {
+    severity: 'warning',
+    summary:
+      "A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed.",
+    template: '{subject}: {message}',
+    spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // An Apply wrote, but the recipe's state was not committed (TYTO-378, ADR 0170 decision 4):
   // another cell was stale or failed, or the state store refused the write. The next run sees
   // the rows as changed and plans them again, so the person has to know.

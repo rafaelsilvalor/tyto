@@ -237,6 +237,7 @@ non-zero.
 | `W_RECIPE_AGE_UNREAD` | warning | no | An 'age' found cells that none of its formats reads, and left their age empty. |
 | `W_RECIPE_LOCAL_UNREAD` | warning | no | A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty. |
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
+| `W_RECIPE_WARN` | warning | no | A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed. |
 | `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
 | `E_VIM_CONTRIBUTION` | error | no | A vim contribution names an operation the editor does not have, or a bad mapping. |
 
@@ -3502,6 +3503,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `count`, `column`, `parents`
+
+### `W_RECIPE_WARN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
+
+A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed.
+
+A warning never replaces a value (ADR 0013).
+
+```
+{subject}: {message}
+```
+
+Parameters: `subject`, `message`
 
 ### `W_RECIPE_NOT_REMEMBERED`
 

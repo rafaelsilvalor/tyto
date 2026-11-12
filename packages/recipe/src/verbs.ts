@@ -20,6 +20,7 @@ import { stamp } from './stamp.js';
 import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
 import { type CellValue, type Column, type Row, type Table, comparable } from './table.js';
 import { urls } from './urls.js';
+import { warn } from './warn.js';
 import { readView } from './views.js';
 
 /**
@@ -53,6 +54,7 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   stamp: { kind: 'transform', run: stamp },
   group: { kind: 'transform', run: group },
   count: { kind: 'transform', run: count },
+  warn: { kind: 'transform', run: warn },
 };
 
 /** `where <expression>`: keeps the rows that satisfy every predicate. */
