@@ -17,7 +17,7 @@ describe('artifactName', () => {
     ['a space', 'grid quadrado', 'grid-quadrado-01.png'],
     ['a slash', 'a/b', 'a-b-01.png'],
     ['a backslash', 'a\\b', 'a-b-01.png'],
-    ['an accent', 'miniatura-vídeo', 'miniatura-v-deo-01.png'],
+    ['an accent to its letter', 'miniatura-vídeo', 'miniatura-video-01.png'],
     ['a colon', 'grid:4x5', 'grid-4x5-01.png'],
   ])('collapses %s, because a project names its formats', (_label, format, expected) => {
     expect(artifactName(format, '01', 'png')).toBe(expected);
