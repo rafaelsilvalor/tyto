@@ -115,9 +115,10 @@ export function artifactEncoding(
  * program maps a file back to its slide, and leaves the name a person reads in a folder.
  *
  * Format ids are the project's, and a project's `formats.yaml` can hold anything its id rule
- * allows, so anything a filesystem or a URL would argue about is collapsed to `-` by core's
- * `fileSafeName`. It is done here, once, rather than in each sink: two sinks that sanitized
- * differently would answer "which file is slide 2?" two ways.
+ * allows, so core's `fileSafeName` makes it safe: an accent keeps its base letter, anything
+ * else a filesystem or a URL would argue about is collapsed to `-`, and a Windows device name
+ * gets a `_` (ADR 0053, note of 2026-11-12). It is done here, once, rather than in each sink:
+ * two sinks that sanitized differently would answer "which file is slide 2?" two ways.
  */
 export function artifactName(format: string, number: string, extension: string): string {
   return `${fileSafeName(format)}-${number}.${extension}`;
