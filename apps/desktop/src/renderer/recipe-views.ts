@@ -6,7 +6,7 @@ import { calendarOptions } from './recipe-calendar-model.js';
 import { calendarView } from './recipe-calendar-view.js';
 import { cardFields } from './recipe-cards-model.js';
 import { type RowAnswer, type RowRequest, cardsView } from './recipe-cards-view.js';
-import type { RecipeRunAnswer } from './recipe-notebook.js';
+import type { RecipeRunAnswer, ViewMemory } from './recipe-notebook.js';
 import {
   type CopyAnswer,
   type CopyRequest,
@@ -39,6 +39,11 @@ export interface ViewContext {
    * of it, since the stylesheet lifts their in-cell height caps inside the tab.
    */
   readonly fullSize?: boolean;
+  /**
+   * What the view keeps across a rebuild of its element (TYTO-639): its quick filter, the
+   * Calendar's span, the loose card opened. Absent, it keeps nothing.
+   */
+  readonly memory?: ViewMemory | undefined;
 }
 
 /** What a view draws from: a cell that ran, with its table and the run main keeps. */
@@ -65,6 +70,7 @@ const tableOf =
       rows: context.rows,
       copy: context.copy,
       fullSize: context.fullSize === true,
+      memory: context.memory,
     });
 
 /** TYTO-381: a board `show` did not give `by=` (no notebook checked it) keeps the table. */
@@ -83,6 +89,7 @@ const board: ViewRenderer = (cell, context) => {
     board: options,
     facets: context.facets,
     rows: context.rows,
+    memory: context.memory,
   });
 };
 
@@ -102,6 +109,7 @@ const calendar: ViewRenderer = (cell, context) => {
     calendar: options,
     facets: context.facets,
     rows: context.rows,
+    memory: context.memory,
   });
 };
 
@@ -119,6 +127,7 @@ const cards: ViewRenderer = (cell, context) =>
     ),
     rows: context.rows,
     row: context.row,
+    memory: context.memory,
   });
 
 export const VIEW_RENDERERS: Readonly<Record<RecipeViewName, ViewRenderer>> = {

@@ -214,6 +214,29 @@ describe('to-brief', () => {
     expect(shown?.count).toBe(3);
   });
 
+  it('names a brief readably after an accented row, and off a Windows device name', async () => {
+    // TYTO-640: a Portuguese row named `Matemática` was planned as `Matem-tica.brief`, and a
+    // row named `CON` or ending in a dot asked Windows for a file it cannot create.
+    const { plan: shown, problems } = await plan(
+      'to-brief template=aula into=../briefs name=title slots=subtitulo:summary',
+      new FakeWorkspace(),
+      tasks(
+        ['title', 'summary'],
+        [
+          ['Matemática', 'Ao vivo'],
+          ['CON', 'Gravada'],
+          ['Aula 4.', 'Ao vivo'],
+        ],
+      ),
+    );
+    expect(problems).toEqual([]);
+    expect(shown?.operations.map((operation) => operation.description)).toEqual([
+      'briefs/Matematica.brief: new',
+      'briefs/CON_.brief: new',
+      'briefs/Aula-4.brief: new',
+    ]);
+  });
+
   it('refuses two rows that would write one file, naming both', async () => {
     const input = tasks(
       ['title', 'file'],

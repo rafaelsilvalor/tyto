@@ -88,7 +88,7 @@ The table is a preview: the step still works on every row. To see all of them, s
 A `show table` line draws every step from it down in the **Table view** instead of the preview: all of the table's rows, however many, in a box of twelve rows that scrolls. Only the rows in sight are drawn, so a table of thousands scrolls as quickly as one of ten. `show summary` draws the same view with a **Grand total** line under it, summing each number column.
 
 - **Sort**: click a column's name to sort by it, again to reverse it, a third time to go back to the recipe's order. The sort is the view's: the next step still reads the rows in the order the recipe made them.
-- **Filter**: type in _Filter rows_ to keep the rows that hold the text in any column shown, without minding case or accents. _Rows: 111 of 5,000_ says how many it kept. A Summary's totals add up the rows the filter keeps.
+- **Filter**: type in _Filter rows_ to keep the rows that hold the text in any column shown, without minding case or accents. _Rows: 111 of 5,000_ says how many it kept. A Summary's totals add up the rows the filter keeps. The filter stays while the tab is open, through a new run (it counts the new rows) and a change of language, in every view that has one; the Calendar keeps its week or month too, and loose cards the card you had open. Quitting Tyto clears them.
 - **Columns**: the **Columns** button lists the columns with a box each; clear one to hide it. A hidden column is not searched by the filter. The last column shown stays.
 - **Select and copy**: click a cell, then Shift-click another to select the rectangle between them; Ctrl+A (⌘A on macOS) in the table selects every row. **Copy**, or Ctrl+C, puts the selection on the clipboard as tab-separated text that pastes into a spreadsheet as cells, whole values included, up to 50,000 rows.
 
@@ -124,7 +124,7 @@ The grid draws 48 cards; **252 more** draws the next ones. _Filter rows_ works a
 
 **Open in a tab**, on the line of a step whose table the last run kept, draws that step's result full size in a tab of its own, beside the recipe's: the same view the step has, a Table, Summary, Board, Calendar or loose cards, with the whole height of the window to use. A step under no `show` opens in the Table view, since the tab has room for every row. The command **Open cell result in a tab** does the same for the step at or above the cursor. The tab is named after the recipe and the step's number, counted from the top (_weekly.recipe · cell 2_).
 
-The tab follows the recipe: a new run draws it again with the new rows, and it closes when the recipe's tab closes. Its sort, filter and columns are its own, apart from the step's. It is not brought back when Tyto opens again: open it again from the step. A step from a recipe opened by `run` has no button; open that recipe to draw its steps in a tab.
+The tab follows the recipe: a new run draws it again with the new rows, and it closes when the recipe's tab closes. Its sort, filter and columns are its own, apart from the step's. It keeps to its step: a step added or deleted above it does not hand it another one, and its number in the tab's name follows. When the step's own line is deleted, the tab says it has no result. It is not brought back when Tyto opens again: open it again from the step. A step from a recipe opened by `run` has no button; open that recipe to draw its steps in a tab.
 
 ## Fold a table
 

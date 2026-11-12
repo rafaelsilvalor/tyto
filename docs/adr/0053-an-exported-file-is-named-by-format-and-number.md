@@ -44,3 +44,15 @@ into one folder holds `grid-01.png`, `grid-02.png`, `lamina-1-grid.png`, `lamina
 into its own folder overwrote every file. This is TYTO-127's "a re-export leaves older files",
 made to happen once per folder across the upgrade; the cleanup rule is TYTO-127's to decide, and
 this decision does not change it.
+
+## Note, 2026-11-12 — accents keep their letter, and Windows device names are avoided (TYTO-640)
+
+The format part of a file name is sanitised by core's `fileSafeName`, which `to-brief` shares
+(ADR 0172). It now keeps the base letter of an accented Latin letter instead of collapsing it to
+`-`, drops a trailing dot or space, and gives a Windows device name (`CON`, `NUL`, `COM1`…, any
+case, with or without an extension) a `_` on its stem. **Delivery names change with it**: a
+format named `miniatura-vídeo` is delivered as `miniatura-video-01.png`, where it was
+`miniatura-v-deo-01.png`. One rule for both callers was kept on purpose, so a format and a row
+spelled alike name their files alike. A format id that was already ASCII-safe is delivered
+under the same name, byte for byte. As in the Consequences above, a re-export into a folder
+from before the change leaves the old accented-format files beside the new ones.

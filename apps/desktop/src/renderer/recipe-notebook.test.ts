@@ -277,6 +277,113 @@ describe('when a recipe runs', () => {
   });
 });
 
+// TYTO-642: a full-size tab follows its step's line, not its index.
+describe('the cell a full-size tab draws', () => {
+  let editor: EditorHandle | undefined;
+  afterEach(() => {
+    editor?.destroy();
+    editor = undefined;
+  });
+
+  /** An editor on TEXT whose edits reach the notebook, and the harness's text, as in `main.ts`. */
+  function typing() {
+    const run = harness();
+    const parent = document.createElement('div');
+    document.body.append(parent);
+    editor = createEditor(parent, { doc: TEXT });
+    const on = editor;
+    on.onChange((_value, _view, edit) => {
+      run.texts.set('tab-1', on.getValue());
+      run.notebook.edited(
+        'tab-1',
+        (at) => mapLineStarts([at], edit.before, edit.changes, edit.after)[0],
+      );
+    });
+    return { ...run, on };
+  }
+  const cell = (index: number, line: number): Cell => ({
+    index,
+    line,
+    status: 'ok',
+    diagnostics: [],
+    table: table(2, 2),
+  });
+  /** One cell per line from `first` down, as main answers a recipe with that many steps. */
+  const steps = (first: number, count: number): Cell[] =>
+    Array.from({ length: count }, (_, index) => cell(index, first + index));
+  async function answered(
+    run: ReturnType<typeof harness>,
+    cells: Cell[],
+    before?: () => void,
+  ): Promise<void> {
+    const running = run.notebook.runNow('tab-1', 'explicit');
+    before?.();
+    run.replies.at(-1)?.(answer(run.asked.length, cells));
+    await running;
+  }
+  const insertAbove = (on: EditorHandle, line: number): void => {
+    on.view.dispatch({ changes: { from: on.view.state.doc.line(line).from, insert: 'acme.x\n' } });
+  };
+
+  it('keeps drawing its step when a step is inserted above, before and after the next run', async () => {
+    const run = typing();
+    // `# the team`, `acme.pull` and `where …` are lines 2 to 4: cells 0, 1 and 2.
+    await answered(run, steps(2, 3));
+    run.notebook.followCell('view-1', 'tab-1', 2);
+    expect(run.notebook.cellOfTab('view-1')).toBe(2);
+
+    insertAbove(run.on, 3);
+    // Until the next answer the tab draws the last one's cell 2, which is still its step.
+    expect(run.notebook.cellOfTab('view-1')).toBe(2);
+
+    await answered(run, steps(2, 4));
+    // Its step is cell 3 now; cell 2 is `acme.pull`, which took no index from it.
+    expect(run.notebook.cellOfTab('view-1')).toBe(3);
+  });
+
+  it('follows its step through an edit made while the run was on its way', async () => {
+    const run = typing();
+    await answered(run, steps(2, 3));
+    run.notebook.followCell('view-1', 'tab-1', 2);
+
+    // The answer is for the text before the insert: its cell 2 is the tab's step all the same.
+    await answered(run, steps(2, 3), () => {
+      insertAbove(run.on, 3);
+    });
+    expect(run.notebook.cellOfTab('view-1')).toBe(2);
+  });
+
+  it('draws no cell once its line is deleted, not the neighbour that took its place', async () => {
+    const run = typing();
+    await answered(run, steps(2, 3));
+    run.notebook.followCell('view-1', 'tab-1', 1);
+
+    const line = run.on.view.state.doc.line(3);
+    run.on.view.dispatch({ changes: { from: line.from, to: line.to + 1 } });
+    expect(run.notebook.cellOfTab('view-1')).toBeUndefined();
+
+    // The next run's cell 1 sits where the deleted step was: it is not the tab's.
+    await answered(run, steps(2, 2));
+    expect(run.notebook.cellOfTab('view-1')).toBeUndefined();
+  });
+
+  it("keeps a tab's view state apart from its cell's, and forgets both with the recipe", async () => {
+    const run = typing();
+    await answered(run, steps(2, 3));
+    run.notebook.followCell('view-1', 'tab-1', 2);
+    run.notebook.followCell('view-1', 'tab-1', 0);
+    expect(run.notebook.cellOfTab('view-1')).toBe(2);
+    run.notebook.keepTabView('view-1', { filter: 'odd' });
+    run.notebook.keepView('tab-1', 0, { filter: 'even' });
+
+    expect(run.notebook.tabViewOf('view-1')).toEqual({ filter: 'odd' });
+    run.notebook.close('tab-1');
+    expect(run.notebook.cellOfTab('view-1')).toBeUndefined();
+    expect(run.notebook.tabViewOf('view-1')).toEqual({});
+    expect(run.notebook.viewOf('tab-1', 0)).toEqual({});
+  });
+});
+
 // TYTO-449: an included cell's lines are in another file; the `run` line already says its error.
 describe('the diagnostics an answer marks in the editor', () => {
   it("are the file's and each cell's, never an included cell's", () => {
