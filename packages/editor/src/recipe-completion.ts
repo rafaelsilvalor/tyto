@@ -39,12 +39,73 @@ export function completeRecipeVerb(
   return { from: context.pos - typed.length, options, validFor: /^[\w.-]*$/u };
 }
 
-/** Mount beside `recipe()`; `verbs` is read at each completion, so it may change. */
-export function recipeCompletion(verbs: RecipeVerbSource): Extension {
+/**
+ * What a `@./<file>.vocab.json#/<pointer>` may name (TYTO-402, ADR 0176), as the host answers
+ * it: without `file`, the vocabulary files beside the recipe; with it, the pointers of that
+ * file's tables. Only the host reads files, and only inside the recipe's folder.
+ */
+export type RecipeReferenceSource = (
+  file: string | undefined,
+) => Promise<{ readonly files: readonly string[]; readonly pointers: readonly string[] }>;
+
+/** A data reference being typed at the end of the text before the cursor, after a blank or `=`. */
+const REFERENCE_BEFORE = /(?:^|[\s=])@\.\/([^\s#"]*)(?:#([^\s"]*))?$/u;
+
+/**
+ * The completion answer for a data reference at `context.pos` (TYTO-402): the vocabulary files
+ * after `@./`, and the pointers of the file named after its `#`. `null` anywhere else, so the
+ * verb completion keeps the start of the line.
+ */
+export async function completeRecipeReference(
+  context: CompletionContext,
+  names: RecipeReferenceSource,
+): Promise<CompletionResult | null> {
+  const line = context.state.doc.lineAt(context.pos);
+  const before = line.text.slice(0, context.pos - line.from);
+  const typed = REFERENCE_BEFORE.exec(before);
+  if (typed === null) return null;
+  const file = typed[1] ?? '';
+  const pointer = typed[2];
+  if (pointer === undefined) {
+    const { files } = await names(undefined);
+    if (files.length === 0) return null;
+    return {
+      from: context.pos - file.length,
+      // The file and its `#/`, so the pointer is what the person types next.
+      options: files.map((name) => ({ label: name, apply: `${name}#/`, type: 'variable' })),
+      validFor: /^[^\s#"]*$/u,
+    };
+  }
+  if (file === '') return null;
+  const { pointers } = await names(file);
+  if (pointers.length === 0) return null;
+  return {
+    from: context.pos - pointer.length,
+    options: pointers.map((name) => ({ label: name, type: 'property' })),
+    validFor: /^[^\s"]*$/u,
+  };
+}
+
+/**
+ * Mount beside `recipe()`; `verbs` is read at each completion, so it may change. `references`,
+ * when given, completes `@./<file>.vocab.json#/<pointer>` from what the host answers.
+ */
+export function recipeCompletion(
+  verbs: RecipeVerbSource,
+  references?: RecipeReferenceSource,
+): Extension {
   return [
     autocompletion(),
     recipeLanguage.data.of({
       autocomplete: (context: CompletionContext) => completeRecipeVerb(context, verbs),
     }),
+    ...(references === undefined
+      ? []
+      : [
+          recipeLanguage.data.of({
+            autocomplete: (context: CompletionContext) =>
+              completeRecipeReference(context, references),
+          }),
+        ]),
   ];
 }

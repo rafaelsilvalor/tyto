@@ -10,6 +10,8 @@ import {
   PREVIEW_OPEN,
   PREVIEW_OPEN_TO_SIDE,
   PREVIEW_TOGGLE_LOCK,
+  RECIPE_ADD_STEP,
+  RECIPE_EDIT_STEP,
   RECIPE_OPEN_CELL_VIEW,
   RECIPE_RUN,
   RECIPE_RUN_FRESH,
@@ -131,13 +133,15 @@ const MARKDOWN_PREVIEW_COMMANDS: ReadonlySet<string> = new Set([
 
 /**
  * Run recipe, Run from the cursor's cell and Run fetching again (TYTO-377), and opening the
- * cursor's cell in a tab of its own (TYTO-379).
+ * cursor's cell in a tab of its own (TYTO-379), and Add step and Edit step (TYTO-402).
  */
 const RECIPE_COMMANDS: ReadonlySet<string> = new Set([
   RECIPE_RUN,
   RECIPE_RUN_FROM_CELL,
   RECIPE_RUN_FRESH,
   RECIPE_OPEN_CELL_VIEW,
+  RECIPE_ADD_STEP,
+  RECIPE_EDIT_STEP,
 ]);
 
 const isMarkdownKind = (kind: Kind): boolean => kind === 'markdown' || kind === 'markdown-preview';

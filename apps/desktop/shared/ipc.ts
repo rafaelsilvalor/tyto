@@ -504,6 +504,59 @@ export const VOCABULARY_TEXT_MAX = 1_000_000;
 /** The most problems one vocabulary check carries: Problems shows them all, never thousands. */
 export const VOCABULARY_WIRE_DIAGNOSTICS = 500;
 
+/** The most vocabulary files, or pointers of one, `recipe:vocabulary-names` answers (TYTO-402). */
+export const VOCABULARY_NAMES_MAX = 500;
+
+/**
+ * One field of a step's form on the wire (TYTO-402, ADR 0176), `@tyto/recipe`'s `VerbField`:
+ * what it holds, where it sits on the line, and what the form shows beside it.
+ */
+const recipeVerbField = z.object({
+  name: z.string().max(200),
+  kind: z.enum([
+    'column',
+    'columns',
+    'words',
+    'name',
+    'recipe',
+    'choice',
+    'expression',
+    'pattern',
+    'template',
+    'formats',
+    'number',
+    'date',
+    'boolean',
+    'text',
+    'list',
+    'data',
+    'pairs',
+    'flag',
+  ]),
+  placement: z.enum([
+    'positional',
+    'named',
+    'flag',
+    'rest',
+    'assignment-name',
+    'assignment-value',
+    'pairs',
+  ]),
+  required: z.boolean(),
+  default: z.string().max(1000).optional(),
+  values: z.array(z.string().max(200)).max(200).optional(),
+  inline: z.boolean().optional(),
+  help: z.string().max(1000),
+});
+
+/** A verb of the step picker (TYTO-402): its name, its kind and its form's fields. */
+const recipeVerbEntry = z.object({
+  name: z.string().max(200),
+  kind: z.enum(['source', 'transform', 'action', 'sink']),
+  summary: z.string().max(1000),
+  fields: z.array(recipeVerbField).max(100),
+});
+
 /** What a file opens as in a tab (TYTO-247, ADR 0132): `DocumentFormat` in `file-icons.ts`. */
 const documentFormat = z.enum(['brief', 'text', 'markdown', 'recipe', 'vocabulary']);
 
@@ -3037,7 +3090,31 @@ export const IPC_CHANNELS = {
    */
   'recipe:verbs': channel(
     z.object({}),
-    z.object({ verbs: z.array(z.string().max(200)).max(5000) }),
+    z.object({
+      verbs: z.array(z.string().max(200)).max(5000),
+      /**
+       * TYTO-402, ADR 0176: the same verbs with their kind and their form's fields, which the
+       * step picker groups and the step form draws. A generic verb's fields are
+       * `GENERIC_VERB_FORMS`'; a plugin's, `formOfArguments` over the schema it declared.
+       * Additive: a reader of `verbs` alone keeps working.
+       */
+      catalog: z.array(recipeVerbEntry).max(5000),
+    }),
+  ),
+
+  /**
+   * TYTO-402: what a `@./<file>.vocab.json#/<pointer>` in a recipe may name, for completion.
+   * Without `file`, the vocabulary files beside the recipe; with it, the pointers of that
+   * file's tables, read from its tree so a file with a problem elsewhere still answers. The file
+   * is the one main holds for `documentId`; a `file` that leaves its folder answers nothing
+   * (ADR 0112), and none is read for it.
+   */
+  'recipe:vocabulary-names': channel(
+    z.strictObject({ documentId, file: z.string().min(1).max(500).optional() }),
+    z.object({
+      files: z.array(z.string().max(500)).max(VOCABULARY_NAMES_MAX),
+      pointers: z.array(z.string().max(1000)).max(VOCABULARY_NAMES_MAX),
+    }),
   ),
 
   /**

@@ -1,3 +1,5 @@
+import { type Step, parseRecipe } from '@tyto/recipe';
+
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 
@@ -288,6 +290,90 @@ export function cellAtOrAbove(answer: RecipeRunAnswer, line: number): number | u
     if (cell.line <= line && (found === undefined || cell.line > found.line)) found = cell;
   }
   return (found ?? answer.cells[0])?.index;
+}
+
+/**
+ * Where Add step writes its line (TYTO-402): below the step at or above the cursor's line, or
+ * at the end of the text when the cursor is above every step, the recipe has none, or it does
+ * not parse. `before` is the new step's index among the steps, which the form's column offers
+ * are read before; `undefined` when the text does not parse, and every cell counts.
+ */
+export interface StepSlot {
+  readonly at: number;
+  /** What goes before and after the line, so it lands on a line of its own. */
+  readonly prefix: string;
+  readonly suffix: string;
+  readonly before: number | undefined;
+}
+
+export function stepSlot(text: string, cursorLine: number): StepSlot {
+  const parsed = parseRecipe(text);
+  const steps = parsed.ok ? parsed.value.steps : [];
+  const starts = lineStarts(text);
+  let above: number | undefined;
+  steps.forEach((step, index) => {
+    if (lineOf(starts, step.range.start) <= cursorLine) above = index;
+  });
+  const step = above === undefined ? undefined : steps[above];
+  if (step === undefined || above === undefined) {
+    const ended = text === '' || text.endsWith('\n');
+    return {
+      at: text.length,
+      prefix: ended ? '' : '\n',
+      suffix: ended ? '\n' : '',
+      before: parsed.ok ? steps.length : undefined,
+    };
+  }
+  const lineEnd = text.indexOf('\n', step.range.start);
+  return {
+    at: lineEnd === -1 ? text.length : lineEnd,
+    prefix: '\n',
+    suffix: '',
+    before: above + 1,
+  };
+}
+
+/**
+ * The step on the cursor's line, for Edit step (TYTO-402): its index among the steps and its
+ * line's range, or `undefined` when that line is no step or the text does not parse.
+ */
+export function stepOnLine(
+  text: string,
+  cursorLine: number,
+): { readonly index: number; readonly step: Step } | undefined {
+  const parsed = parseRecipe(text);
+  if (!parsed.ok) return undefined;
+  const starts = lineStarts(text);
+  const index = parsed.value.steps.findIndex(
+    (step) => lineOf(starts, step.range.start) === cursorLine,
+  );
+  const step = parsed.value.steps[index];
+  return step === undefined ? undefined : { index, step };
+}
+
+/**
+ * The columns a step's form offers (TYTO-402): the table of the nearest cell before step
+ * `before` that has one, from the last answer shown. A cell that did not run this time still
+ * shows the table it had, and so does its offer.
+ */
+export function columnsBefore(
+  answer: Pick<RecipeRunAnswer, 'cells'> | undefined,
+  before: number | undefined,
+): readonly string[] {
+  let found: WireCell | undefined;
+  for (const cell of answer?.cells ?? []) {
+    if (cell.table === undefined) continue;
+    if (before !== undefined && cell.index >= before) continue;
+    if (found === undefined || cell.index > found.index) found = cell;
+  }
+  return found?.table?.columns.map((column) => column.name) ?? [];
+}
+
+/** The one-based line a character offset is on, by the starts of the lines. */
+function lineOf(starts: readonly number[], offset: number): number {
+  let line = 1;
+  while (line < starts.length && (starts[line] ?? Infinity) <= offset) line += 1;
+  return line;
 }
 
 /** One cell's line: where it goes, what it says, and whether it is a failure. */

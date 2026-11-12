@@ -1,7 +1,12 @@
 import {
+  type ArgumentSpec,
+  GENERIC_VERB_FORMS,
   VOCABULARY_EXTENSION,
   VOCABULARY_SECTIONS,
+  type VerbForm,
+  type VerbKind,
   type VocabularySection,
+  formOfArguments,
   lintVocabulary,
   recipeSkeleton,
   vocabularySkeleton,
@@ -190,4 +195,78 @@ export function vocabularyHover(text: string, position: number): IpcResponse<'vo
       ...(entries === undefined ? {} : { entries }),
     },
   };
+}
+
+/** What main knows of a plugin's verb: its kind and the argument schema it declared (ADR 0135). */
+export interface ContributedVerb {
+  readonly kind: VerbKind;
+  readonly arguments: readonly ArgumentSpec[];
+}
+
+type CatalogEntry = IpcResponse<'recipe:verbs'>['catalog'][number];
+
+/**
+ * The step picker's verbs (TYTO-402, ADR 0176 decision 2): each name `recipe:verbs` lists, with
+ * its kind and its form's fields. A generic verb's form is `GENERIC_VERB_FORMS`'; a plugin's is
+ * `formOfArguments` over the schema it declared. A name with neither (`param`, a header word)
+ * is no step a form writes, and is left out.
+ */
+export function verbCatalog(
+  names: readonly string[],
+  contributed: (name: string) => ContributedVerb | undefined,
+): CatalogEntry[] {
+  const catalog: CatalogEntry[] = [];
+  for (const name of names) {
+    const generic = GENERIC_VERB_FORMS[name];
+    const plugin = generic === undefined ? contributed(name) : undefined;
+    const form: VerbForm | undefined =
+      generic ??
+      (plugin === undefined ? undefined : formOfArguments(name, plugin.kind, plugin.arguments));
+    if (form === undefined) continue;
+    catalog.push({
+      name: form.verb,
+      kind: form.kind,
+      summary: form.summary,
+      fields: form.fields.map((field) => ({
+        name: field.name,
+        kind: field.kind,
+        placement: field.placement,
+        required: field.required,
+        help: field.help,
+        ...(field.default === undefined ? {} : { default: field.default }),
+        ...(field.values === undefined ? {} : { values: [...field.values] }),
+        ...(field.inline === undefined ? {} : { inline: field.inline }),
+      })),
+    });
+  }
+  return catalog;
+}
+
+/** A JSON pointer's segment, `~` and `/` escaped as RFC 6901 says. */
+const pointerSegment = (key: string): string => key.replaceAll('~', '~0').replaceAll('/', '~1');
+
+/**
+ * The pointers a recipe may read from a vocabulary's text (TYTO-402): `/rules/<name>`,
+ * `/rewrites/<name>` and `/lookups/<name>` for each named table of a known section, and
+ * `/<key>` for each of the team's own top-level keys. Read from the tree, as the hover reads
+ * it, so a file with a problem elsewhere still names what it holds.
+ */
+export function vocabularyPointers(text: string): string[] {
+  const tree = parseTree(text);
+  if (tree?.type !== 'object') return [];
+  const pointers: string[] = [];
+  for (const property of tree.children ?? []) {
+    const key = property.children?.[0]?.value as unknown;
+    if (typeof key !== 'string') continue;
+    if (!isSection(key)) {
+      pointers.push(`/${pointerSegment(key)}`);
+      continue;
+    }
+    const value = property.children?.[1];
+    for (const table of value?.type === 'object' ? (value.children ?? []) : []) {
+      const name = table.children?.[0]?.value as unknown;
+      if (typeof name === 'string') pointers.push(`/${key}/${pointerSegment(name)}`);
+    }
+  }
+  return pointers;
 }

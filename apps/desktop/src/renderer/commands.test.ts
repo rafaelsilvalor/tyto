@@ -54,6 +54,8 @@ import {
   EXPLORER_NEW_RECIPE,
   EXPLORER_NEW_VOCABULARY,
   RECIPE_RUN,
+  RECIPE_ADD_STEP,
+  RECIPE_EDIT_STEP,
   RECIPE_OPEN_CELL_VIEW,
   RECIPE_RUN_FRESH,
   RECIPE_RUN_FROM_CELL,
@@ -145,6 +147,8 @@ const actions = () =>
     runRecipe: vi.fn<() => void>(),
     runRecipeFromCell: vi.fn<() => void>(),
     openRecipeCellView: vi.fn<() => void>(),
+    addRecipeStep: vi.fn<() => void>(),
+    editRecipeStep: vi.fn<() => void>(),
     runRecipeFresh: vi.fn<() => void>(),
     newSeededFile: vi.fn<(seed: 'recipe' | 'vocabulary') => void>(),
     focusCommandPanel: vi.fn<() => void>(),
@@ -350,6 +354,20 @@ describe('the ids the window registers', () => {
     expect(spies.runRecipeFromCell).not.toHaveBeenCalled();
     expect(COMMAND_LABELS[RECIPE_OPEN_CELL_VIEW]).toBe('command.recipe.openCellView');
     expect(bindingsOf(keymapSetFor(false), 'linux')[RECIPE_OPEN_CELL_VIEW]).toBeUndefined();
+  });
+
+  it('opens Add step and Edit step each through its own action, with no keystroke (TYTO-402)', () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+
+    expect(registry.run(RECIPE_ADD_STEP, NO_VIEW)).toBe(true);
+    expect(spies.addRecipeStep).toHaveBeenCalledOnce();
+    expect(spies.editRecipeStep).not.toHaveBeenCalled();
+    expect(registry.run(RECIPE_EDIT_STEP, NO_VIEW)).toBe(true);
+    expect(spies.editRecipeStep).toHaveBeenCalledOnce();
+    expect(COMMAND_LABELS[RECIPE_ADD_STEP]).toBe('command.recipe.addStep');
+    expect(COMMAND_LABELS[RECIPE_EDIT_STEP]).toBe('command.recipe.editStep');
+    expect(bindingsOf(keymapSetFor(false), 'linux')[RECIPE_ADD_STEP]).toBeUndefined();
   });
 
   it('runs the two template mode commands, each to its own action (TYTO-44)', () => {

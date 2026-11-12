@@ -20,7 +20,15 @@ import {
   parseIpc,
 } from '../../shared/ipc.js';
 import { TAB_EXTENSIONS, isTextFile, opensInTab } from '../../shared/file-icons.js';
-import { seedOf, vocabularyComplete, vocabularyHover, vocabularyLint } from './recipe-authoring.js';
+import {
+  type ContributedVerb,
+  seedOf,
+  verbCatalog,
+  vocabularyComplete,
+  vocabularyHover,
+  vocabularyLint,
+} from './recipe-authoring.js';
+import { vocabularyNames } from './vocabulary-names.js';
 import { type StatusBarColors } from '../../shared/status-bar-colors.js';
 import { type StatusBarItemId } from '../../shared/status-bar-items.js';
 import { type VimModeStyle } from '../../shared/vim-mode-style.js';
@@ -439,6 +447,11 @@ export interface IpcDependencies {
    */
   readonly recipes: RecipeRunner;
   /**
+   * TYTO-402, ADR 0176: a plugin's recipe verb, its kind and its declared argument schema, which
+   * the step picker's form is drawn from. Without it the picker offers the generic verbs only.
+   */
+  readonly contributedVerb?: (name: string) => ContributedVerb | undefined;
+  /**
    * TYTO-385, ADR 0175: the recipes main runs on an interval in the open workspace, named by
    * the ids it gave them.
    */
@@ -603,7 +616,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return { requestId, ...recipeAnswerToWire(answer) };
     },
 
-    'recipe:verbs': () => Promise.resolve({ verbs: [...recipes.verbs()] }),
+    'recipe:verbs': () => {
+      const verbs = [...recipes.verbs()];
+      const contributed = dependencies.contributedVerb ?? (() => undefined);
+      return Promise.resolve({ verbs, catalog: verbCatalog(verbs, contributed) });
+    },
+    // TYTO-402: what a `@./….vocab.json#/…` may name, beside the file main holds for the tab.
+    'recipe:vocabulary-names': ({ documentId, file }) =>
+      vocabularyNames(documents.pathOf(documentId), file),
 
     // TYTO-402, ADR 0176: the vocabulary tab's help, from `@tyto/recipe`'s own lint.
     'vocabulary:lint': ({ text }) => Promise.resolve(vocabularyLint(text)),

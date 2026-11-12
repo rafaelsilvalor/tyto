@@ -105,6 +105,8 @@ describe('the IPC contract', () => {
       'recipe:rows',
       'recipe:run',
       'recipe:verbs',
+      // TYTO-402: what a recipe's `@./….vocab.json#/…` may name, read beside the tab's file.
+      'recipe:vocabulary-names',
       // TYTO-385, ADR 0175: the recipes run on an interval, by main's ids.
       'schedule:list',
       'schedule:open',
