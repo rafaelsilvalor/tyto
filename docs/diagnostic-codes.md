@@ -55,10 +55,10 @@ non-zero.
 | `E_PLUGIN_LINK` | error | yes | A plugin folder holds a link that leads outside it, or nowhere. |
 | `E_PLUGIN_SANDBOX` | error | yes | An installed plugin's process is not confined to its own folder, so it was not run. |
 | `E_PLUGIN_CRASHED` | error | no | An isolated plugin's process stopped while the host was waiting for it. |
-| `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol. |
+| `E_PLUGIN_PROTOCOL` | error | no | An isolated plugin sent the host a message that does not match the RPC protocol, or an in-process panel call answered a shape that protocol refuses. |
 | `E_PLUGIN_CALL` | error | no | A function an isolated plugin registered threw when the host called it. |
 | `E_PLUGIN_TIMEOUT` | error | no | An isolated plugin did not answer within its deadline, and its process was ended. |
-| `E_PANEL_CALL` | error | no | A panel's page asked its plugin something the host refused: no 'call', a bad method, over 1 MiB of JSON, or an answer that is not JSON. |
+| `E_PANEL_CALL` | error | no | A panel's page asked its plugin something the host refused: no 'call', a bad method, params over 1 MiB of JSON, or a throw from an in-process 'call'. |
 | `E_CREDENTIAL_MISSING` | error | no | A plugin asked for a credential it declared, and this host has no value for it. |
 | `E_CREDENTIAL_HOST` | error | no | A plugin asked the host to send a credential to a host its manifest does not name in a net: permission of its own. |
 | `E_CREDENTIAL_TOO_LARGE` | error | no | A credential to store is larger than the ceiling every host keeps (ADR 0134). |
@@ -944,7 +944,7 @@ Parameters: `plugin`, `reason`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/plugin-api.md`
 
-An isolated plugin sent the host a message that does not match the RPC protocol.
+An isolated plugin sent the host a message that does not match the RPC protocol, or an in-process panel call answered a shape that protocol refuses.
 
 It costs the one frame whose answer it was; the others are drawn (ADR 0025).
 
@@ -986,7 +986,7 @@ Parameters: `plugin`, `seconds`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0173-a-panel-calls-its-own-plugin-process.md`
 
-A panel's page asked its plugin something the host refused: no 'call', a bad method, over 1 MiB of JSON, or an answer that is not JSON.
+A panel's page asked its plugin something the host refused: no 'call', a bad method, params over 1 MiB of JSON, or a throw from an in-process 'call'.
 
 Only that call is refused; the panel stays open and its plugin keeps running.
 

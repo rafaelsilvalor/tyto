@@ -110,7 +110,7 @@ export function createPanelService(
         // to refuse, as E_PANEL_CALL, before the plugin sees anything.
         if (capability === 'call') {
           const [method, params] = args;
-          return answerOf(await callPanel(panel.panel, { method, params }));
+          return answerOf(await callPanel(panel.panel, { method, params }, panel.plugin));
         }
         if (capability === 'credentials') {
           const parsed = credentialArgs.safeParse(args);

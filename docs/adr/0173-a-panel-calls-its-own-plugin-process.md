@@ -94,3 +94,21 @@ panel `settings` and `panelCallerOf`'s bare-id lookup would answer with the firs
 request with a key its strict shape does not have — a `plugin`, a `panelId` — with `E_PANEL_CALL`
 (`E_PLUGIN_CALL` for the other capabilities) instead of dropping it in silence, so a page that
 tries to name another plugin hears no rather than waiting for an answer.
+
+## Note, 2026-11-12 — lookup by plugin and id; one answer shape on both paths (TYTO-644)
+
+Decision 2: `panelCallerOf(registry)` now answers `(plugin, panelId, request)` and finds the
+panel by the contributing plugin's name and the panel id together, read from the registry's
+`ownedPanels()`; a pair nobody registered is `E_PANEL_CALL` naming both. One host refuses a
+second panel id, but a host composing several registries may hold two `settings`, and the id
+alone would answer with the first — the gap the note above worked around on the desktop.
+
+Decision 3: the in-process path checks the plugin's answer with `panelCallResultSchema`, the
+same schema object the `panel` point's `call` holds an isolated answer to on the wire, and an
+answer it refuses is `E_PLUGIN_PROTOCOL` naming the plugin, built by the same function the
+isolated path uses. It refuses, never normalises: `{ ok: true, value }` without `diagnostics`,
+an answer that is not a result, a value over the ceiling or not JSON are refused alike on both
+paths. This moves those answers out of decision 5's `E_PANEL_CALL` list; a request the host
+refuses, a missing `call` and a throw from an in-process `call` stay `E_PANEL_CALL`.
+`callPanel` takes the plugin's name as a third argument, for that refusal. The wire contract
+does not change, so the isolation protocol stays where it is.

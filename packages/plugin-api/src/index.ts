@@ -47,6 +47,7 @@ export {
 export { directiveNamesOf, directiveResolverOf } from './directives.js';
 
 export {
+  type OwnedPanel,
   type PanelContributions,
   PANEL_CALL_MAX_BYTES,
   PANEL_CALL_METHOD,

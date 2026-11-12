@@ -1578,7 +1578,10 @@ describe('an isolated panel’s call (TYTO-372, ADR 0173)', () => {
       const activated = host.tryActivate(isolated.plugin);
       if (!activated.ok) throw new Error(activated.error[0]?.message);
     }
-    return { registry: host.registry, call: panelCallerOf(host.registry) };
+    const caller = panelCallerOf(host.registry);
+    // Each helper plugin's panel is named as its plugin is.
+    const call = (panelId: string, request: unknown) => caller(panelId, panelId, request);
+    return { registry: host.registry, call };
   }
 
   it('crosses to the plugin’s process and back as JSON', async () => {
@@ -1651,6 +1654,33 @@ describe('an isolated panel’s call (TYTO-372, ADR 0173)', () => {
       'the host called call with arguments its schema refuses',
     );
     expect(heard).toEqual([]);
+  });
+
+  it('answers an in-process call without `diagnostics` exactly as the isolated one', async () => {
+    const bare = () => ({ ok: true, value: 'pronto' });
+    const isolated = await panelPlugin('contagem', bare);
+    const { call: isolatedCall } = hostOf(isolated);
+    const inProcess = createPluginHost();
+    const activated = inProcess.tryActivate({
+      id: 'contagem',
+      manifest: {
+        name: 'contagem',
+        version: '0.1.0',
+        engine: '>=0.1',
+        contributes: ['panel'],
+        permissions: [],
+      },
+      activate: (host) => host.registerPanel({ ...PANEL, id: 'contagem', call: bare as never }),
+    });
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+
+    const acrossTheWire = await isolatedCall('contagem', { method: 'words.count' });
+    const inTheHost = await panelCallerOf(inProcess.registry)('contagem', 'contagem', {
+      method: 'words.count',
+    });
+
+    expect(acrossTheWire.ok ? '' : acrossTheWire.error[0]?.code).toBe('E_PLUGIN_PROTOCOL');
+    expect(inTheHost).toEqual(acrossTheWire);
   });
 
   it('refuses an answer over 1 MiB of JSON from the plugin’s process', async () => {

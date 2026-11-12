@@ -408,7 +408,8 @@ export const diagnosticCodes = {
   },
   E_PLUGIN_PROTOCOL: {
     severity: 'error',
-    summary: 'An isolated plugin sent the host a message that does not match the RPC protocol.',
+    summary:
+      'An isolated plugin sent the host a message that does not match the RPC protocol, or an in-process panel call answered a shape that protocol refuses.',
     template: "Plugin '{plugin}' sent a message the host cannot read: {problem}.",
     spec: 'docs/plugin-api.md',
     fatal: false,
@@ -435,7 +436,7 @@ export const diagnosticCodes = {
   E_PANEL_CALL: {
     severity: 'error',
     summary:
-      "A panel's page asked its plugin something the host refused: no 'call', a bad method, over 1 MiB of JSON, or an answer that is not JSON.",
+      "A panel's page asked its plugin something the host refused: no 'call', a bad method, params over 1 MiB of JSON, or a throw from an in-process 'call'.",
     template: "Panel '{panel}' could not call its plugin: {problem}.",
     spec: 'docs/adr/0173-a-panel-calls-its-own-plugin-process.md',
     fatal: false,
