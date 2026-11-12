@@ -12,6 +12,9 @@ import {
 } from '@tyto/command-line';
 import { createPlaywrightRasterizer } from '@tyto/raster';
 
+import { openSystemBrowser } from './system-browser.js';
+import { systemKeychain } from './system-keychain.js';
+
 /**
  * The terminal's environment for `@tyto/command-line`'s commands (ADR 0159).
  *
@@ -68,6 +71,37 @@ async function askOnTerminal(question: string): Promise<boolean> {
   }
 }
 
+/**
+ * A line typed on the terminal. With `secret`, nothing typed is echoed: readline writes the echo
+ * to an output that drops it, and the question goes to stderr itself.
+ */
+async function askLineOnTerminal(
+  question: string,
+  options?: { readonly secret?: boolean },
+): Promise<string> {
+  if (options?.secret !== true) {
+    const terminal = createInterface({ input: process.stdin, output: process.stderr });
+    try {
+      return await terminal.question(question);
+    } finally {
+      terminal.close();
+    }
+  }
+  process.stderr.write(question);
+  const silent = new Writable({
+    write(_chunk, _encoding, done) {
+      done();
+    },
+  });
+  const terminal = createInterface({ input: process.stdin, output: silent, terminal: true });
+  try {
+    return await terminal.question('');
+  } finally {
+    terminal.close();
+    process.stderr.write('\n');
+  }
+}
+
 /** The three standard streams, injectable so a test claims its own and not Vitest's. */
 export interface StandardStreams {
   readonly stdin: Readable;
@@ -102,7 +136,9 @@ export function defaultEnvironment(): CliEnvironment {
   return {
     home: tytoHome(),
     variables: process.env,
-    ...(process.stdin.isTTY ? { confirm: askOnTerminal } : {}),
+    ...(process.stdin.isTTY ? { confirm: askOnTerminal, ask: askLineOnTerminal } : {}),
+    // Browser sign-in (ADR 0194): the system keychain, loaded only when a sign-in is read.
+    signin: { secrets: systemKeychain(), openBrowser: (url) => openSystemBrowser(url) },
     console: {
       out: (text) => {
         process.stdout.write(text);

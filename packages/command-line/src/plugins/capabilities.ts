@@ -1,6 +1,11 @@
 import type { Trust } from '@tyto/core';
 import { pluginCache, pluginStorage, workspaceFiles } from '@tyto/io';
-import type { FetchedResponse, HostCapabilities, HostFetchInit } from '@tyto/plugin-api';
+import type {
+  FetchedResponse,
+  HostCapabilities,
+  HostFetchInit,
+  TokenFetch,
+} from '@tyto/plugin-api';
 
 /**
  * The network and the secrets an installed plugin reaches through `host.fetch` and
@@ -51,6 +56,13 @@ async function fetchWithoutRedirects(url: string, init: HostFetchInit): Promise<
   };
 }
 
+/**
+ * The token endpoint's network for `tyto signin` (ADR 0194), here because this is the one file
+ * of the CLI that may reach for `fetch`. The sign-in service already asks for no redirect.
+ */
+export const tokenFetch: TokenFetch = (url, init) =>
+  fetch(url, { ...init, headers: { ...init.headers } });
+
 /** What a command adds to the network and the secrets (ADR 0138). */
 export interface CommandCapabilities {
   /** The name a refusal gives the command: `tyto render`, `tyto watch`. */
@@ -62,6 +74,8 @@ export interface CommandCapabilities {
    * folder is open. Absent altogether, the command gives plugins no workspace files.
    */
   readonly workspace?: { readonly folder?: string; readonly trust: Trust };
+  /** The terminal's sign-ins (ADR 0194); absent, a plugin's call is `E_SIGNIN_UNAVAILABLE`. */
+  readonly signin?: Pick<HostCapabilities, 'signinAccessToken' | 'describeSignin'> | undefined;
 }
 
 export function pluginCapabilities(
@@ -76,6 +90,7 @@ export function pluginCapabilities(
     ...(workspace === undefined
       ? {}
       : workspaceFiles({ folder: () => workspace.folder, trust: () => workspace.trust })),
+    ...command.signin,
     fetch: fetchWithoutRedirects,
     credential: (plugin, key) => {
       const value = variables[credentialVariable(plugin, key)];

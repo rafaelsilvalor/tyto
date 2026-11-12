@@ -19,6 +19,7 @@ import { pluginNewCommand } from './plugin-new.js';
 import { pluginInstallCommand, pluginListCommand, pluginStateCommand } from './plugin.js';
 import { recipeRunCommand } from './recipe-run.js';
 import { renderCommand } from './render.js';
+import { signinCommand, signoutCommand } from './signin.js';
 import { withDiagnosticsSink } from './report.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
 import { trustAddCommand, trustListCommand, trustRemoveCommand } from './trust.js';
@@ -504,6 +505,36 @@ export function createProgram(
       captured.code = await recipeRunCommand(file, recipeRun.opts(), environment);
     });
   valuesOf(recipeRun, { '<recipe>': { kind: 'file' } });
+
+  /* -------------------------------------------------------------------------- sign-in -- */
+
+  const signin = program
+    .command('signin')
+    .description(
+      "sign in to a plugin's provider in the system browser and keep the sign-in in the system keychain (ADR 0194)",
+    )
+    .argument('<plugin>', "the plugin's name, as tyto plugin list prints it")
+    .argument('[id]', 'which of its sign-ins; needed only when it declares more than one')
+    .option(
+      '--client',
+      'type the OAuth client first, for a sign-in whose plugin names none; asked on the terminal, never read from the command line',
+      false,
+    )
+    .action(async (name: string, id: string | undefined) => {
+      captured.code = await signinCommand(name, id, signin.opts(), environment);
+    });
+  valuesOf(signin, { '<plugin>': { kind: 'plugin' } });
+
+  const signout = program
+    .command('signout')
+    .description("forget a plugin's sign-in that tyto signin kept in the system keychain")
+    .argument('<plugin>', "the plugin's name, as tyto plugin list prints it")
+    .argument('[id]', 'which of its sign-ins; needed only when it declares more than one')
+    .option('--client', 'also forget the OAuth client typed with tyto signin --client', false)
+    .action(async (name: string, id: string | undefined) => {
+      captured.code = await signoutCommand(name, id, signout.opts(), environment);
+    });
+  valuesOf(signout, { '<plugin>': { kind: 'plugin' } });
 
   /* ------------------------------------------------------------------------------ mcp -- */
 

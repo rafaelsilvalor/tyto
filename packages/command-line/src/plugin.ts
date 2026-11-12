@@ -456,11 +456,13 @@ const DONE: Record<PluginStateChange, string> = {
 
 /**
  * What `tyto plugin remove` says about the plugin's secrets (TYTO-682, ADR 0134 note of
- * 2026-11-12). The CLI never reads, writes or deletes the desktop's keychain, so it says the
- * entries stay and where they are forgotten, rather than leave a person to assume either.
+ * 2026-11-12). The CLI never reads, writes or deletes the desktop's keychain, and keeps its own
+ * sign-ins apart from it (ADR 0194), so it says both stay and how each is forgotten, rather than
+ * leave a person to assume either. `tyto signout <plugin> <id>` needs no installed manifest.
  */
 export const REMOVE_KEEPS_SECRETS =
-  "Saved credentials and sign-ins, if any, stay in the desktop app's keychain; to forget them, remove the plugin from the desktop app instead.\n";
+  'Sign-ins made with tyto signin stay in the system keychain; tyto signout forgets one. ' +
+  'Credentials and sign-ins saved in the desktop app stay in its keychain; to forget them, remove the plugin from the desktop app instead.\n';
 
 /** `remove`, `disable` and `enable`: one entry of the state, and for `remove` its folder. */
 export async function pluginStateCommand(

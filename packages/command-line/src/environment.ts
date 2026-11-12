@@ -1,6 +1,6 @@
 import type { Readable, Writable } from 'node:stream';
 
-import type { PluginProcessLauncher } from '@tyto/plugin-api';
+import type { CallbackListen, PluginProcessLauncher, SigninSecrets } from '@tyto/plugin-api';
 
 import type { CloseableRasterizer } from './plugins/rasterizer.js';
 import type { LocatedDiagnostic } from './report.js';
@@ -70,6 +70,19 @@ export interface CliEnvironment {
    */
   readonly confirm?: (question: string) => Promise<boolean>;
   /**
+   * Asks for a line of text on the terminal; with `secret`, what is typed is not echoed. Absent
+   * when nobody is there to answer, like {@link confirm}. `tyto signin --client` reads the
+   * OAuth client through it, never from the command line, where a shell's history keeps it.
+   */
+  readonly ask?: (question: string, options?: { readonly secret?: boolean }) => Promise<string>;
+  /**
+   * What `tyto signin` needs that only an app has (ADR 0194): the system keychain and the
+   * system browser. Absent, the commands refuse and a plugin's `host.signin.accessToken` is
+   * `E_SIGNIN_UNAVAILABLE`, as before ADR 0194: a test never reaches a real keychain, and the
+   * window, which signs in from its plugins screen, refuses the commands first.
+   */
+  readonly signin?: CliSignin;
+  /**
    * The environment an installed plugin's `host.credentials` reads, as
    * `TYTO_PLUGIN_<NAME>_<KEY>` (ADR 0042).
    *
@@ -113,6 +126,26 @@ export interface CliEnvironment {
    * internal failure (exit 2) and says why.
    */
   readonly stdio?: () => CliStdio;
+}
+
+/**
+ * The keychain port `apps/cli` fills, named here so the app needs no `@tyto/plugin-api` of its
+ * own. A local alias rather than a re-export: tsup drops the `type` of a re-exported one.
+ */
+export type CliSigninSecrets = SigninSecrets;
+
+/** The terminal's side of browser sign-in (ADR 0194). */
+export interface CliSignin {
+  /**
+   * Sign-ins and the clients a person typed, under the same accounts the desktop uses
+   * (`signin:<plugin>:<id>`, `signin-client:<plugin>:<id>`) but in a store of the CLI's own:
+   * the terminal never reads or writes the desktop's keychain.
+   */
+  readonly secrets: SigninSecrets;
+  /** Opens the system browser on the provider's page. */
+  openBrowser(url: string): Promise<void>;
+  /** The loopback listener; `listenForCallback` from `@tyto/io` when absent. */
+  readonly listen?: CallbackListen;
 }
 
 /** The two streams `tyto mcp` speaks on (ADR 0179). */

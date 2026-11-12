@@ -11,6 +11,7 @@ import {
   reachableExporters,
   withoutRefused,
 } from './plugins/index.js';
+import { cliSigninCapabilities } from './signin.js';
 import { loadRenderContext } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { NO_PLUGIN_FILES, syncPluginFiles } from './plugin-files.js';
@@ -91,6 +92,7 @@ export async function watchCommand(
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto watch',
+      signin: cliSigninCapabilities(environment),
       ...(environment.home === undefined ? {} : { home: environment.home }),
     }),
   });

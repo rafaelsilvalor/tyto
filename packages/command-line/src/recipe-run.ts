@@ -23,6 +23,7 @@ import {
   pluginCapabilities,
   withoutRefused,
 } from './plugins/index.js';
+import { cliSigninCapabilities } from './signin.js';
 import { environmentRecipeCredentials } from './recipe-credentials.js';
 import { loadRenderContext } from './render-context.js';
 import { displayPath, installedOption } from './render.js';
@@ -200,6 +201,7 @@ export async function recipeRunCommand(
     copies: pluginFiles.copies,
     capabilities: pluginCapabilities(environment.variables, {
       hostName: 'tyto recipe run',
+      signin: cliSigninCapabilities(environment),
       home,
       workspace:
         workspace === undefined

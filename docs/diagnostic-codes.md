@@ -1077,10 +1077,10 @@ A plugin asked for an access token of a sign-in it declared, and nobody signed i
 It is the plugin's call that is refused; what the plugin does with that is its own.
 
 ```
-Plugin '{plugin}' needs sign-in '{id}', and nobody has signed in to it on {host}; sign in from the plugins screen.
+Plugin '{plugin}' needs sign-in '{id}', and nobody has signed in to it on {host}; {how}.
 ```
 
-Parameters: `plugin`, `id`, `host`
+Parameters: `plugin`, `id`, `host`, `how`
 
 ### `E_SIGNIN_UNAVAILABLE`
 

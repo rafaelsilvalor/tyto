@@ -63,7 +63,7 @@ A disabled plugin stays installed and is left out of every render and of the win
 ```
 $ tyto plugin remove my-pack
 Removed my-pack.
-Saved credentials and sign-ins, if any, stay in the desktop app's keychain; to forget them, remove the plugin from the desktop app instead.
+Sign-ins made with tyto signin stay in the system keychain; tyto signout forgets one. Credentials and sign-ins saved in the desktop app stay in its keychain; to forget them, remove the plugin from the desktop app instead.
 ```
 
 The command line never reads or deletes what the desktop app keeps in the system keychain for a plugin. To forget it, remove the plugin from the desktop app's plugins screen and tick the box that offers it; see [Plugins](../customize/plugins.md).
