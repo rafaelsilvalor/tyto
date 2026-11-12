@@ -33,6 +33,8 @@ Na linha de um plugin instalado:
 
 Um plugin que vem com o Tyto não tem botões. Os plugins instalados pela galeria se gerenciam na galeria.
 
+A caixa de remover tem uma caixinha, **Também esquecer as credenciais e os logins salvos deste plugin**, que vem desmarcada. Desmarcada, o que você salvou para o plugin no chaveiro do sistema fica — as credenciais, os logins e o cliente de login que você tiver informado — e instalar o plugin de novo encontra tudo. Marcada, tudo isso é apagado junto com a pasta, e não tem volta: uma reinstalação não encontra nada, e você faz login de novo. Nada de outro plugin é tocado. `tyto plugin remove` nunca esquece essas informações; ele avisa isso quando termina.
+
 A janela inicia os plugins quando abre, então toda mudança vale na próxima vez que você abrir o Tyto: até lá a linha diz _reinicie para aplicar_. Um plugin desligado aparece como _desativado_, e o que ele acrescentou — os templates, os temas — some da janela quando o Tyto abrir de novo.
 
 As mesmas mudanças se fazem pelo terminal, com os comandos de [Plugins](../command-line/plugins.md):

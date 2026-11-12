@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -164,17 +164,31 @@ describe('the plugins screen', () => {
 
     // The picker and the boxes are the OS's: stubbed in main, each box recorded, and each
     // answered with whatever `answer` holds when it opens.
+    // The box's checkbox is answered ticked (TYTO-682), so the last remove also forgets.
     await app.evaluate(({ dialog }, folder) => {
       const state = globalThis as unknown as { shown: string[]; answer: number };
       state.shown = [];
       state.answer = 0;
       dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
       dialog.showMessageBox = ((...given: unknown[]) => {
-        const box = given.at(-1) as { message: string; detail?: string };
-        state.shown.push(`${box.message}\n${box.detail ?? ''}`);
-        return Promise.resolve({ response: state.answer, checkboxChecked: false });
+        const box = given.at(-1) as { message: string; detail?: string; checkboxLabel?: string };
+        state.shown.push(`${box.message}\n${box.detail ?? ''}\n${box.checkboxLabel ?? ''}`);
+        return Promise.resolve({ response: state.answer, checkboxChecked: true });
       }) as typeof dialog.showMessageBox;
     }, source);
+    // `novo`'s keychain entries and a neighbour's, written as main's store names its files:
+    // ciphertext is opaque to a delete, so any bytes stand for it.
+    const keychain = join(scratch, 'user-data', 'credentials');
+    mkdirSync(keychain, { recursive: true });
+    const accounts = ['plugin:novo:api.token', 'signin:novo:conta', 'signin-client:novo:conta'];
+    const neighbour = 'plugin:novo-extra:api.token';
+    for (const account of [...accounts, neighbour]) {
+      writeFileSync(join(keychain, `${encodeURIComponent(account)}.bin`), 'sealed');
+    }
+    const keychainFiles = (): string[] =>
+      readdirSync(keychain)
+        .map((file) => decodeURIComponent(file.replace(/\.bin$/u, '')))
+        .sort();
     const shown = (): Promise<string[]> =>
       app.evaluate(() => (globalThis as unknown as { shown: string[] }).shown);
 
@@ -195,7 +209,10 @@ describe('the plugins screen', () => {
     expect((await shown())[1]).toContain(
       translate(locale, 'plugins.remove.message').replace('{plugin}', 'novo'),
     );
+    expect((await shown())[1]).toContain(translate(locale, 'plugins.remove.forget'));
     expect(existsSync(join(home, 'plugins', 'novo'))).toBe(true);
+    // Ticked and dismissed: nothing forgotten either.
+    expect(keychainFiles()).toEqual([...accounts, neighbour].sort());
 
     await app.evaluate(() => {
       (globalThis as unknown as { answer: number }).answer = 0;
@@ -203,6 +220,8 @@ describe('the plugins screen', () => {
     await page.click('.plugins__row[data-plugin="novo"] [data-action="remove"]');
     await page.waitForSelector('.plugins__row[data-plugin="novo"]', { state: 'detached' });
     expect(existsSync(join(home, 'plugins', 'novo'))).toBe(false);
+    // Ticked and Remove: main's own keychain folder lost `novo`'s three, and only those.
+    expect(keychainFiles()).toEqual([neighbour]);
   });
 
   it('closes with its button', async () => {

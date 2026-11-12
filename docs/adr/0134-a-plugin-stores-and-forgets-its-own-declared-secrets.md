@@ -63,3 +63,24 @@ it here.
   set.
 - A value over 16 KiB needs a new ADR, not a bigger constant: the ceiling is what keeps a secret
   store from becoming a plugin's general storage, which is ADR 0130's private cache.
+
+## Note of 2026-11-12 — removing a plugin asks whether to forget its secrets (TYTO-682)
+
+Until now neither the desktop's remove nor `tyto plugin remove` deleted a keychain entry, and a
+reinstall found every one again; nobody had decided it. Decided by the maintainer: **ask on
+remove**.
+
+- The desktop's remove box carries one checkbox, "Also forget this plugin's saved credentials and
+  sign-ins", **unticked by default**: forgetting cannot be undone, and keeping is what a remove
+  always did. Ticked, and only after the plugin's folder and entry were removed, every account
+  beginning `plugin:<name>:`, `signin:<name>:` or `signin-client:<name>:` is deleted
+  (`forgetPluginSecrets` in `apps/desktop/src/main/plugin-manage.ts`). The trailing colon keeps
+  `foo` from reaching `foo-bar`, whose names hold no colon. The ciphertext is deleted, never
+  decrypted, so a locked keyring does not stop it. A dismissed box, or a refused remove, forgets
+  nothing.
+- **The CLI still never touches a secret.** `tyto plugin remove` has no flag for it: it prints one
+  line saying saved credentials and sign-ins stay in the desktop app's keychain and that removing
+  from the desktop is how to forget them. A plugin removed by the CLI therefore leaves its desktop
+  secrets with no screen that lists them; deleting the files under the desktop's
+  `credentials/` folder by hand is the way out today.
+- Recipe credentials (`recipe:<name>`, ADR 0193) belong to no plugin and are not touched.

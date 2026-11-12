@@ -7,13 +7,18 @@ import { PLUGIN_API_VERSION, type PluginManifest } from '@tyto/plugin-api';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { translate } from '../../shared/i18n/index.js';
+import { fileCredentialStore } from './credential-store.js';
+import { type Credentials, createCredentials } from './credentials.js';
+import { credentialAccount } from './installed-plugins.js';
 import {
   type ManageBox,
   type PluginManagerOptions,
   approveInstallInABox,
   confirmRemoveInABox,
   createPluginManager,
+  forgetPluginSecrets,
 } from './plugin-manage.js';
+import { signinAccount, signinClientAccount } from './signin.js';
 
 /**
  * The plugins screen's install and changes (TYTO-373), against a real `TYTO_HOME` in the temp
@@ -64,16 +69,19 @@ const say = (key: Parameters<Parameters<typeof approveInstallInABox>[1]>[0]): st
   translate('en', key);
 
 /** A box that records what it was shown and answers with `response`. */
-function box(response: number): {
+function box(
+  response: number,
+  checkboxChecked = false,
+): {
   shown: ManageBox[];
-  show: (shown: ManageBox) => Promise<{ response: number }>;
+  show: (shown: ManageBox) => Promise<{ response: number; checkboxChecked: boolean }>;
 } {
   const shown: ManageBox[] = [];
   return {
     shown,
     show: (item) => {
       shown.push(item);
-      return Promise.resolve({ response });
+      return Promise.resolve({ response, checkboxChecked });
     },
   };
 }
@@ -95,7 +103,11 @@ function manager(overrides: Partial<PluginManagerOptions> & { picked?: string })
     },
     confirmRemove: (name) => {
       asked.push(`remove ${name}`);
-      return Promise.resolve(true);
+      return Promise.resolve({ remove: true, forget: false });
+    },
+    forgetSecrets: (name) => {
+      asked.push(`forget ${name}`);
+      return Promise.resolve([]);
     },
     ...overrides,
   };
@@ -136,7 +148,10 @@ describe('the install box', () => {
 describe('the remove box', () => {
   it('names the plugin, defaults to Cancel, and removes only on Remove', async () => {
     const dismissed = box(1);
-    expect(await confirmRemoveInABox(dismissed.show, say)('pdf')).toBe(false);
+    expect(await confirmRemoveInABox(dismissed.show, say)('pdf')).toEqual({
+      remove: false,
+      forget: false,
+    });
     expect(dismissed.shown[0]).toMatchObject({
       type: 'warning',
       message: "Remove 'pdf'?",
@@ -144,7 +159,37 @@ describe('the remove box', () => {
       defaultId: 1,
       cancelId: 1,
     });
-    expect(await confirmRemoveInABox(box(0).show, say)('pdf')).toBe(true);
+    expect(await confirmRemoveInABox(box(0).show, say)('pdf')).toEqual({
+      remove: true,
+      forget: false,
+    });
+  });
+
+  it('offers to forget the secrets in an unticked checkbox, in both languages (TYTO-682)', async () => {
+    const shown = box(0);
+    await confirmRemoveInABox(shown.show, say)('pdf');
+    expect(shown.shown[0]).toMatchObject({
+      checkboxLabel: "Also forget this plugin's saved credentials and sign-ins",
+      checkboxChecked: false,
+    });
+
+    const portuguese = box(0);
+    await confirmRemoveInABox(portuguese.show, (key) => translate('pt-BR', key))('pdf');
+    expect(portuguese.shown[0]?.checkboxLabel).toBe(
+      'Também esquecer as credenciais e os logins salvos deste plugin',
+    );
+  });
+
+  it('forgets only when the box was ticked and Remove pressed', async () => {
+    expect(await confirmRemoveInABox(box(0, true).show, say)('pdf')).toEqual({
+      remove: true,
+      forget: true,
+    });
+    // Ticked, then Cancel or Escape: a no to both.
+    expect(await confirmRemoveInABox(box(1, true).show, say)('pdf')).toEqual({
+      remove: false,
+      forget: false,
+    });
   });
 });
 
@@ -243,6 +288,15 @@ describe('changing an installed plugin from the window', () => {
     expect(await state()).toEqual({});
   });
 
+  it('forgets nothing when the remove was refused, even with the box ticked', async () => {
+    const { asked, plugins } = manager({
+      confirmRemove: () => Promise.resolve({ remove: true, forget: true }),
+    });
+
+    expect((await plugins.change('nenhum', 'remove')).status).toBe('refused');
+    expect(asked).not.toContain('forget nenhum');
+  });
+
   it('disables and enables without asking, in plugins.json', async () => {
     await installedTexto();
     const { asked, plugins } = manager({});
@@ -263,5 +317,110 @@ describe('changing an installed plugin from the window', () => {
 
   it("rejects a built-in's name, which the screen never offers", async () => {
     await expect(manager({}).plugins.change('svg', 'remove')).rejects.toThrow(/built into Tyto/u);
+  });
+});
+
+/**
+ * TYTO-682: the keychain a remove forgets, as the files main writes — `fileCredentialStore` over
+ * a folder in the temp space, and `credentials.ts` with a stand-in cipher, since deleting never
+ * decrypts. Every assertion reads the folder on disk, not the store's own answer.
+ */
+describe("forgetting a removed plugin's secrets", () => {
+  let keychain: string;
+  let credentials: Credentials;
+
+  beforeEach(() => {
+    keychain = join(scratch, 'userData', 'credentials');
+    credentials = createCredentials({
+      store: fileCredentialStore(keychain),
+      encryption: {
+        isEncryptionAvailable: () => true,
+        encryptString: (text) => Buffer.from(`sealed:${text}`),
+        decryptString: (sealed) => sealed.toString().replace(/^sealed:/u, ''),
+      },
+    });
+  });
+
+  /** The keychain folder's files, decoded back to their account names. */
+  const onDisk = async (): Promise<readonly string[]> =>
+    (await readdir(keychain).catch(() => []))
+      .map((file) => decodeURIComponent(file.replace(/\.bin$/u, '')))
+      .sort();
+
+  // `texto`'s three kinds of secret, and the neighbours a prefix match would wrongly reach:
+  // `texto-extra` begins with `texto`, `textos` too, and `recipe:texto` is a recipe's.
+  const TEXTO = [
+    credentialAccount('texto', 'api.token'),
+    signinAccount('texto', 'conta'),
+    signinClientAccount('texto', 'conta'),
+  ];
+  const NEIGHBOURS = [
+    credentialAccount('texto-extra', 'api.token'),
+    signinAccount('texto-extra', 'conta'),
+    signinClientAccount('texto-extra', 'conta'),
+    credentialAccount('textos', 'k'),
+    signinAccount('outro', 'texto'),
+    'recipe:texto',
+  ];
+
+  async function seed(): Promise<void> {
+    for (const account of [...TEXTO, ...NEIGHBOURS]) await credentials.set(account, 'segredo');
+  }
+
+  async function installedTexto(): Promise<void> {
+    await manager({ picked: await pluginFolder() }).plugins.install('folder');
+  }
+
+  function removing(forget: boolean) {
+    return manager({
+      confirmRemove: () => Promise.resolve({ remove: true, forget }),
+      forgetSecrets: (name) => forgetPluginSecrets(credentials, name),
+    }).plugins;
+  }
+
+  it("deletes the plugin's three kinds of entry and nothing of a plugin whose name begins the same", async () => {
+    await seed();
+    expect(await onDisk()).toEqual([...TEXTO, ...NEIGHBOURS].sort());
+
+    expect(await forgetPluginSecrets(credentials, 'texto')).toEqual([...TEXTO].sort());
+
+    expect(await onDisk()).toEqual([...NEIGHBOURS].sort());
+    // And again: nothing left to forget is not an error.
+    expect(await forgetPluginSecrets(credentials, 'texto')).toEqual([]);
+  });
+
+  it('a ticked remove leaves a reinstall nothing to find', async () => {
+    await installedTexto();
+    await seed();
+
+    expect((await removing(true).change('texto', 'remove')).status).toBe('changed');
+    expect(await installedFolders()).toEqual([]);
+    expect(await onDisk()).toEqual([...NEIGHBOURS].sort());
+
+    await installedTexto();
+    for (const account of TEXTO) expect(await credentials.has(account), account).toBe(false);
+  });
+
+  it('an unticked remove leaves a reinstall everything, byte for byte', async () => {
+    await installedTexto();
+    await seed();
+    const before = await Promise.all(
+      TEXTO.map((account) =>
+        readFile(join(keychain, `${encodeURIComponent(account)}.bin`), 'utf8'),
+      ),
+    );
+
+    expect((await removing(false).change('texto', 'remove')).status).toBe('changed');
+    expect(await installedFolders()).toEqual([]);
+    expect(await onDisk()).toEqual([...TEXTO, ...NEIGHBOURS].sort());
+
+    await installedTexto();
+    for (const account of TEXTO) expect(await credentials.get(account), account).toBe('segredo');
+    const after = await Promise.all(
+      TEXTO.map((account) =>
+        readFile(join(keychain, `${encodeURIComponent(account)}.bin`), 'utf8'),
+      ),
+    );
+    expect(after).toEqual(before);
   });
 });

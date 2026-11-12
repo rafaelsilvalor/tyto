@@ -454,6 +454,14 @@ const DONE: Record<PluginStateChange, string> = {
   enable: 'Enabled',
 };
 
+/**
+ * What `tyto plugin remove` says about the plugin's secrets (TYTO-682, ADR 0134 note of
+ * 2026-11-12). The CLI never reads, writes or deletes the desktop's keychain, so it says the
+ * entries stay and where they are forgotten, rather than leave a person to assume either.
+ */
+export const REMOVE_KEEPS_SECRETS =
+  "Saved credentials and sign-ins, if any, stay in the desktop app's keychain; to forget them, remove the plugin from the desktop app instead.\n";
+
 /** `remove`, `disable` and `enable`: one entry of the state, and for `remove` its folder. */
 export async function pluginStateCommand(
   change: PluginStateChange,
@@ -463,5 +471,6 @@ export async function pluginStateCommand(
   const changed = await changePluginState(change, name, { home: homeOf(environment) });
   if (!changed.ok) return fail(changed.error, environment);
   environment.console.out(`${DONE[change]} ${name}.\n`);
+  if (change === 'remove') environment.console.out(REMOVE_KEEPS_SECRETS);
   return EXIT_OK;
 }

@@ -5,9 +5,10 @@ import {
   permissionPrompt,
 } from '@tyto/command-line';
 import { diagnostic } from '@tyto/core';
-import type { PluginManifest } from '@tyto/plugin-api';
+import { type PluginManifest, SIGNIN_CLIENT_KEY_PREFIX } from '@tyto/plugin-api';
 
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
+import type { Credentials } from './credentials.js';
 
 /**
  * Installing, removing, disabling and enabling a plugin from the plugins screen (TYTO-373).
@@ -22,6 +23,10 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  * default to Cancel, which is also what Escape and closing the box answer; only the first
  * button, strictly, goes ahead. Nothing here stops or starts a plugin: the window starts its
  * installed plugins once, when it opens (ADR 0044), so every change applies the next time.
+ *
+ * **A remove keeps the plugin's secrets unless the person ticks the box** (TYTO-682, ADR 0134
+ * note of 2026-11-12). Forgetting cannot be undone, and keeping is what a remove always did, so
+ * the box's checkbox starts unticked. The CLI never offers it: it never touches a secret.
  */
 
 export type InstallFrom = IpcRequest<'plugins:install'>['from'];
@@ -36,9 +41,14 @@ export interface ManageBox {
   readonly buttons: readonly [proceed: string, cancel: string];
   readonly defaultId: 1;
   readonly cancelId: 1;
+  /** The remove box's one checkbox, which always starts unticked. */
+  readonly checkboxLabel?: string;
+  readonly checkboxChecked?: false;
 }
 
-export type ShowBox = (box: ManageBox) => Promise<{ readonly response: number }>;
+export type ShowBox = (
+  box: ManageBox,
+) => Promise<{ readonly response: number; readonly checkboxChecked?: boolean }>;
 
 /** The window's words for the two boxes, in its language. */
 export type ManageText = (
@@ -49,7 +59,8 @@ export type ManageText = (
     | 'plugins.remove.message'
     | 'plugins.remove.detail'
     | 'plugins.remove.confirm'
-    | 'plugins.remove.cancel',
+    | 'plugins.remove.cancel'
+    | 'plugins.remove.forget',
 ) => string;
 
 /**
@@ -74,11 +85,23 @@ export function approveInstallInABox(
   };
 }
 
-/** The remove question, Cancel first in focus: removing deletes the plugin's folder. */
+/**
+ * What the remove box answered: whether to remove, and whether to forget the plugin's secrets
+ * too. `forget` is never true without `remove`: a ticked box dismissed is a no to both.
+ */
+export interface RemoveAnswer {
+  readonly remove: boolean;
+  readonly forget: boolean;
+}
+
+/**
+ * The remove question, Cancel first in focus: removing deletes the plugin's folder. Its
+ * checkbox, unticked, asks whether to forget the plugin's saved credentials and sign-ins too.
+ */
 export function confirmRemoveInABox(
   show: ShowBox,
   text: ManageText,
-): (name: string) => Promise<boolean> {
+): (name: string) => Promise<RemoveAnswer> {
   return async (name) => {
     const answer = await show({
       type: 'warning',
@@ -87,9 +110,44 @@ export function confirmRemoveInABox(
       buttons: [text('plugins.remove.confirm'), text('plugins.remove.cancel')],
       defaultId: 1,
       cancelId: 1,
+      checkboxLabel: text('plugins.remove.forget'),
+      checkboxChecked: false,
     });
-    return answer.response === 0;
+    const remove = answer.response === 0;
+    return { remove, forget: remove && answer.checkboxChecked === true };
   };
+}
+
+/**
+ * The beginnings of every keychain account a plugin's secrets live under: its credentials
+ * (`plugin:<name>:<key>`, `credentialAccount`), its sign-ins' refresh tokens
+ * (`signin:<name>:<id>`, `signinAccount`, ADR 0134) and the clients a person supplied for them
+ * (`signin-client:<name>:<id>`, ADR 0192).
+ *
+ * **The trailing colon is the whole of the safety.** A name is `[a-z0-9-]` (the manifest's
+ * rule), so it never holds a colon, and `plugin:foo:` cannot begin `plugin:foo-bar:x`.
+ * `plugin-manage.test.ts` builds each account with its own function, so a change to an
+ * account's shape fails there instead of silently moving what a remove forgets.
+ */
+export function pluginSecretPrefixes(name: string): readonly string[] {
+  return [`plugin:${name}:`, `signin:${name}:`, `${SIGNIN_CLIENT_KEY_PREFIX}${name}:`];
+}
+
+/**
+ * Forgets every keychain account of `name` (TYTO-682): deletes the ciphertext and never
+ * decrypts, so a locked keyring does not stop it. Answers the accounts it deleted, sorted.
+ */
+export async function forgetPluginSecrets(
+  credentials: Pick<Credentials, 'accounts' | 'delete'>,
+  name: string,
+): Promise<readonly string[]> {
+  const forgotten: string[] = [];
+  for (const prefix of pluginSecretPrefixes(name)) {
+    for (const account of await credentials.accounts(prefix)) {
+      if (await credentials.delete(account)) forgotten.push(account);
+    }
+  }
+  return forgotten.sort();
 }
 
 export interface PluginManagerOptions {
@@ -104,7 +162,9 @@ export interface PluginManagerOptions {
   /** The native picker: a folder, or one `.tgz` file. `undefined` when nothing was chosen. */
   readonly choose: (from: InstallFrom) => Promise<string | undefined>;
   readonly approve: (manifest: PluginManifest, source: string) => Promise<boolean>;
-  readonly confirmRemove: (name: string) => Promise<boolean>;
+  readonly confirmRemove: (name: string) => Promise<RemoveAnswer>;
+  /** Called only after a remove succeeded with its box ticked: `forgetPluginSecrets`. */
+  readonly forgetSecrets: (name: string) => Promise<unknown>;
 }
 
 export interface PluginManager {
@@ -158,13 +218,18 @@ export function createPluginManager(options: PluginManagerOptions): PluginManage
       if (options.builtInNames().has(name)) {
         throw new Error(`'${name}' is built into Tyto; it cannot be removed, disabled or enabled.`);
       }
-      if (change === 'remove' && (await options.confirmRemove(name)) !== true) {
-        return { status: 'cancelled', problems: [] };
+      let forget = false;
+      if (change === 'remove') {
+        const asked = await options.confirmRemove(name);
+        if (!asked.remove) return { status: 'cancelled', problems: [] };
+        forget = asked.forget;
       }
       const answer = await changePluginState(change, name, { home: options.home });
       if (!answer.ok) {
+        // A refused remove forgets nothing: the plugin is still there to use them.
         return { status: 'refused', problems: answer.error.map((item) => item.message) };
       }
+      if (forget) await options.forgetSecrets(name);
       return { status: 'changed', problems: [] };
     },
   };

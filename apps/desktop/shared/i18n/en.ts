@@ -507,6 +507,7 @@ export const en: Catalogue = {
     'Its folder and the permissions approved for it are deleted. It stops the next time Tyto starts.',
   'plugins.remove.confirm': 'Remove',
   'plugins.remove.cancel': 'Cancel',
+  'plugins.remove.forget': "Also forget this plugin's saved credentials and sign-ins",
   'plugins.picker.archive': 'Plugin archive',
   'plugins.signin.label': 'Sign-in',
   'plugins.signin.as': 'Signed in as {label}',
