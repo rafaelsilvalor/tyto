@@ -196,10 +196,11 @@ describe('decide', () => {
   it('writes the decided value, the action, whether it overrides and why', async () => {
     const { table, problem } = await run([`${DECIDE} first-run-wins=done`]);
     expect(problem).toBeUndefined();
-    expect(table?.columns.slice(-6).map(({ name, type }) => [name, type])).toEqual([
+    expect(table?.columns.slice(-7).map(({ name, type }) => [name, type])).toEqual([
       ['status', 'text'],
       ['status_action', 'text'],
       ['status_push', 'text'],
+      ['status_pushes', 'boolean'],
       ['status_overrides', 'boolean'],
       ['status_overwritten', 'text'],
       ['status_reason', 'text'],
@@ -288,6 +289,13 @@ describe('decide', () => {
         tie === 'local' ? 'done' : null,
         null,
       ]);
+      expect(Object.values(columnOf(table, 'status_pushes'))).toEqual([
+        true,
+        false,
+        false,
+        tie === 'local',
+        false,
+      ]);
       expect(Object.values(columnOf(table, 'status_overrides'))).toEqual([
         false,
         false,
@@ -328,6 +336,7 @@ describe('decide', () => {
         'last_status',
         'status_action',
         'status_push',
+        'status_pushes',
         'status_overrides',
         'status_overwritten',
         'status_reason',
@@ -345,6 +354,47 @@ describe('decide', () => {
         null,
       ]);
     });
+  });
+
+  it('writes _pushes true on every push row and false on every other action', async () => {
+    // TYTO-647: an owner, any name recognised and no first-run winner. One row per action:
+    // T-0 pushes, T-1 pulls, T-2 is the same, T-3 holds, T-4 had its owner cleared.
+    const owners = tasks(
+      ['sheet', 'tracker', 'last_owner', 'found'],
+      [
+        ['bia', 'caio', 'caio', 'T-0'],
+        ['caio', 'ana', 'caio', 'T-1'],
+        ['ana', 'ana', 'ana', 'T-2'],
+        ['bia', null, 'caio', ''],
+        [null, 'ana', 'ana', 'T-4'],
+      ],
+    );
+    const { table, problem } = await runOverShop(
+      ['decide owner local=sheet remote=tracker last=last_owner hold-when-empty=found'],
+      {},
+      owners,
+    );
+    expect(problem).toBeUndefined();
+    expect(table?.columns.find(({ name }) => name === 'owner_pushes')?.type).toBe('boolean');
+    expect(Object.values(columnOf(table, 'owner_action'))).toEqual([
+      'push',
+      'pull',
+      'same',
+      'hold',
+      'pull',
+    ]);
+    expect(Object.values(columnOf(table, 'owner_pushes'))).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(Object.values(columnOf(table, 'owner_push'))).toEqual(['bia', null, null, null, null]);
+    // A cleared local value is not a push today: decideValue never pushes an empty local value
+    // (decidir_responsavel's rule), so the row pulls the tracker's value back. Letting a clear
+    // push is left open in TYTO-647's pull request.
+    expect(columnOf(table, 'owner_reason')['T-4']).toBe('local value not recognised');
   });
 
   describe('refuses', () => {
