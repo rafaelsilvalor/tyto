@@ -118,3 +118,27 @@ value of the last run that applied something to that row, or reads empty.
 
 `apply auto` already committed in this case, through an Apply of the empty plan; that path is
 unchanged, and its plan cell carries an applied record with no operations.
+
+## Note, 2026-11-12 — an applied cell plans again on the next run (TYTO-643)
+
+The notebook reuses a cell whose step did not change, so after an Apply the next Run of the
+unchanged recipe showed the plan that was applied (`briefs/x.brief: new`) although its files
+now exist and the next Apply would overwrite them. A person reads the plan shown as the truth.
+
+The coordinator chose to **mark the cell, not to plan it again**: when an Apply writes, the
+runner (`@tyto/io`, ADR 0188) marks the applied cell's kept entry, and the next run, of any
+kind, plans that cell again and runs the cells below it, as it runs a stale one. The Apply
+itself plans nothing: planning calls the verb, which may reach a plugin or the network, and
+only a run does that. Until the next run the cell keeps showing the plan it applied, with each
+operation's mark.
+
+- It holds for **every verb with a plan**, `to-brief` and a plugin's action alike, and for an
+  `apply auto` run's Apply. An explicit Run of an `apply auto` recipe therefore plans the
+  applied cell again and applies that new plan, where it used to reuse the applied one and
+  apply nothing; a scheduled run already planned every cell again (`from: 0`).
+- **An Apply that wrote nothing marks nothing**: one refused, one whose every operation
+  answered `failed` (a batch that failed as a whole included), and one of an empty plan. The
+  cell is reused as it was, with its applied record when it has one.
+- The mark is on the kept cell that holds the applied plan when the Apply ends, found by its
+  plan id, as the outcome already is; a cell planned again meanwhile holds another id and is
+  left alone.
