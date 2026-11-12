@@ -84,6 +84,18 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
    > remote write's row filter reads, and `_push` stays the value written. Today an empty local
    > value still never pushes (`decideValue`, ported from `decidir_responsavel`), so the boolean
    > and a non-empty `_push` agree until a clear is allowed to push.
+   >
+   > **Amended by TYTO-647 (2026-11-12), clear.** A clear may now push, when the recipe asks:
+   > `decide` takes `clear=push|pull`, `pull` when not given, which keeps the rule above byte
+   > for byte. With `clear=push`, an empty local value where `last` was not is a local change,
+   > cleared since the last run: it pushes the empty value (`_push` empty, `_pushes` true,
+   > reason `local cleared`) when the remote side still holds `last`, is the same when the
+   > remote side is empty too, and goes to `tie=` when the remote side changed as well. With no
+   > `last` (a first run or a lost state) an empty value still never pushes, since the cell may
+   > never have been filled; a value `values=` does not list never pushes; `hold-when-empty=`
+   > still holds. It is opt-in because the rule above is right for a status flow: a status
+   > cell cleared by mistake, or by a sheet filter, must not clear the tracker's status, while
+   > a shared field such as an owner is one a person clears on purpose.
 
 6. **A host without state is an error, never an empty store.** `last` and `remember` fail with
    `E_RECIPE_STATE` there. If `last` read null instead, every run would be a first run, and the

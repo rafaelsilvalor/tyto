@@ -120,6 +120,77 @@ describe('decideValue without first-run-wins, ported from decidir_responsavel', 
   });
 });
 
+/** TYTO-647: a value cleared in the sheet since the last run, with clear=push. */
+describe('decideValue with clear=push', () => {
+  const CLEAR: DecideRules = { ...OWNER, clear: 'push' };
+  const full = (local: CellValue, remote: CellValue, last: CellValue, rules: DecideRules) =>
+    decideValue({ local, remote, last }, rules);
+
+  it('a value cleared since the last run, the remote one unchanged: pushes empty', () => {
+    expect(full(null, 'ana', 'ana', CLEAR)).toEqual({
+      action: 'push',
+      value: null,
+      overrides: false,
+      overwritten: null,
+      reason: 'local cleared',
+    });
+    expect(full('  ', 'Ána', 'ana', CLEAR).action).toBe('push');
+  });
+
+  it('cleared, and the remote side empty too: both already agree', () => {
+    expect(full(null, null, 'ana', CLEAR)).toMatchObject({
+      action: 'same',
+      reason: 'both already agree',
+    });
+  });
+
+  it('cleared while the remote side changed: tie=local pushes over it', () => {
+    expect(full(null, 'caio', 'ana', CLEAR)).toEqual({
+      action: 'push',
+      value: null,
+      overrides: true,
+      overwritten: 'caio',
+      reason: 'both changed, local cleared and wins',
+    });
+  });
+
+  it('cleared while the remote side changed: tie=remote pulls', () => {
+    expect(full(null, 'caio', 'ana', { ...CLEAR, tie: 'remote' })).toMatchObject({
+      action: 'pull',
+      value: 'caio',
+      reason: 'both changed, remote wins',
+    });
+  });
+
+  it('never pushes an empty value without a last one', () => {
+    expect(full(null, 'ana', null, CLEAR)).toEqual(full(null, 'ana', null, OWNER));
+    expect(full(null, null, null, CLEAR).action).toBe('same');
+  });
+
+  it('never pushes a value it does not recognise', () => {
+    const statuses = { ...STATUS, clear: 'push' as const };
+    expect(full('finished', 'doing', 'doing', statuses).action).toBe('pull');
+  });
+
+  it('decides every non-empty value as without it', () => {
+    for (const [local, remote, last] of [
+      ['bia', 'caio', 'caio'],
+      ['bia', 'ana', 'caio'],
+      ['caio', 'ana', 'caio'],
+      ['ana', 'ana', 'ana'],
+      ['bia', null, 'ana'],
+    ] as const) {
+      expect(full(local, remote, last, CLEAR)).toEqual(full(local, remote, last, OWNER));
+    }
+  });
+
+  it('pulls a cleared value with clear=pull, as without clear', () => {
+    const pullRules: DecideRules = { ...OWNER, clear: 'pull' };
+    expect(full(null, 'ana', 'ana', pullRules)).toEqual(full(null, 'ana', 'ana', OWNER));
+    expect(full(null, 'ana', 'ana', OWNER).action).toBe('pull');
+  });
+});
+
 /** TYTO-421: each case of a shared field under both tie rules. */
 describe.each<DecideTie>(['local', 'remote'])('decideValue with tie=%s', (tie) => {
   const rules: DecideRules = { ...STATUS, tie };
@@ -391,10 +462,65 @@ describe('decide', () => {
       false,
     ]);
     expect(Object.values(columnOf(table, 'owner_push'))).toEqual(['bia', null, null, null, null]);
-    // A cleared local value is not a push today: decideValue never pushes an empty local value
-    // (decidir_responsavel's rule), so the row pulls the tracker's value back. Letting a clear
-    // push is left open in TYTO-647's pull request.
+    // Without clear=push a cleared local value is not a push: decideValue never pushes an
+    // empty local value (decidir_responsavel's rule), so the row pulls the tracker's value back.
     expect(columnOf(table, 'owner_reason')['T-4']).toBe('local value not recognised');
+  });
+
+  describe('with clear=push', () => {
+    // TYTO-647: T-0 was cleared and the tracker did not move; T-1 was cleared and the tracker
+    // moved too; T-2 is a first run with an empty cell; T-3 was cleared on a row the tracker
+    // did not return; T-4 was cleared where the tracker is empty already.
+    const owners = tasks(
+      ['sheet', 'tracker', 'last_owner', 'found'],
+      [
+        [null, 'ana', 'ana', 'T-0'],
+        [null, 'caio', 'ana', 'T-1'],
+        [null, 'ana', null, 'T-2'],
+        [null, 'ana', 'ana', ''],
+        [null, null, 'ana', 'T-4'],
+      ],
+    );
+    const line = 'decide owner local=sheet remote=tracker last=last_owner hold-when-empty=found';
+    const columns = ['owner_action', 'owner_push', 'owner_pushes', 'owner_reason'] as const;
+    async function rows(arguments_: string) {
+      const { table, problem } = await runOverShop([`${line} ${arguments_}`], {}, owners);
+      expect(problem).toBeUndefined();
+      return Object.fromEntries(
+        Object.keys(columnOf(table, 'owner_action')).map((key) => [
+          key,
+          columns.map((name) => columnOf(table, name)[key]),
+        ]),
+      );
+    }
+
+    it('pushes an empty value on a row cleared since the last run, and only there', async () => {
+      expect(await rows('clear=push')).toEqual({
+        'T-0': ['push', null, true, 'local cleared'],
+        'T-1': ['push', null, true, 'both changed, local cleared and wins'],
+        'T-2': ['pull', null, false, 'no state, local value not recognised'],
+        'T-3': ['hold', null, false, 'remote did not return the row'],
+        'T-4': ['same', null, false, 'both already agree'],
+      });
+    });
+
+    it('lets tie=remote pull a cleared row the tracker changed too', async () => {
+      const byRow = await rows('clear=push tie=remote');
+      expect(byRow['T-0']).toEqual(['push', null, true, 'local cleared']);
+      expect(byRow['T-1']).toEqual(['pull', null, false, 'both changed, remote wins']);
+    });
+
+    it('pulls every cleared row without clear=, or with clear=pull, as before', async () => {
+      const pulled = {
+        'T-0': ['pull', null, false, 'local value not recognised'],
+        'T-1': ['pull', null, false, 'remote changed'],
+        'T-2': ['pull', null, false, 'no state, local value not recognised'],
+        'T-3': ['pull', null, false, 'local value not recognised'],
+        'T-4': ['pull', null, false, 'local value not recognised'],
+      };
+      expect(await rows('')).toEqual(pulled);
+      expect(await rows('clear=pull')).toEqual(pulled);
+    });
   });
 
   describe('refuses', () => {
@@ -402,6 +528,12 @@ describe('decide', () => {
       const { problem, at } = await run([`${DECIDE} tie=sheet`]);
       expect([problem?.code, at]).toEqual(['E_RECIPE_ARGUMENTS', 'tie=sheet']);
       expect(problem?.message).toContain('tie=local or tie=remote');
+    });
+
+    it('a clear that is neither push nor pull', async () => {
+      const { problem, at } = await run([`${DECIDE} clear=bogus`]);
+      expect([problem?.code, at]).toEqual(['E_RECIPE_ARGUMENTS', 'clear=bogus']);
+      expect(problem?.message).toContain('takes clear=push or clear=pull, not clear=bogus');
     });
 
     it('a name that is a column other than local=', async () => {

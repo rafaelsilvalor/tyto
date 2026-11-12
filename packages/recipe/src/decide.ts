@@ -25,12 +25,15 @@ const NAMES = [
   'first-run-wins',
   'hold-when-empty',
   'tie',
+  'clear',
 ] as const;
 const TIES = ['local', 'remote'] as const;
+const CLEARS = ['push', 'pull'] as const;
 const REQUIRED = ['local', 'remote', 'last'] as const;
 const USAGE =
   'takes one column and local=, remote= and last=, as in decide status local=sheet ' +
-  'remote=tracker last=last_status values=todo,doing,done first-run-wins=done';
+  'remote=tracker last=last_status values=todo,doing,done first-run-wins=done; ' +
+  'it also takes hold-when-empty=<column>, tie=local|remote and clear=push|pull';
 
 /**
  * What a sync does with a row: write the local value to the remote side (`push`), write the
@@ -41,6 +44,9 @@ export type DecideAction = 'push' | 'pull' | 'same' | 'hold';
 
 /** The side that wins a row both sides changed since the last run. */
 export type DecideTie = (typeof TIES)[number];
+
+/** What a local value cleared since the last run does: reach the remote side, or not. */
+export type DecideClear = (typeof CLEARS)[number];
 
 export interface Decision {
   readonly action: DecideAction;
@@ -70,6 +76,11 @@ export interface DecideRules {
   readonly firstRunWins?: string;
   /** The side that wins when both changed since the last run; `local` when not given. */
   readonly tie?: DecideTie;
+  /**
+   * `push` makes a local value cleared since the last run a local change that pushes the
+   * empty value; `pull`, the default, lets the remote or the last value refill it.
+   */
+  readonly clear?: DecideClear;
 }
 
 /**
@@ -83,7 +94,9 @@ export interface DecideRules {
  * remote side fills every row it has a value for, as `decidir_responsavel` did. An empty remote
  * value is an intermediate status: it never wins, and a local change still pushes over it. A
  * local value that is empty or not recognised never pushes; it is replaced by the remote
- * value, or by the last one.
+ * value, or by the last one. The one exception is `clear: 'push'`: an empty local value where
+ * the last one was not is a local change, cleared since the last run, and pushes the empty
+ * value as any local change pushes (TYTO-647). It never applies without a last value.
  */
 export function decideValue(sides: DecideSides, rules: DecideRules): Decision {
   const local = comparable(sides.local);
@@ -136,8 +149,15 @@ export function decideValue(sides: DecideSides, rules: DecideRules): Decision {
     );
   }
 
-  const localChanged = valid && local !== last;
   const remoteChanged = hasRemote && remote !== last;
+  if (local === '' && rules.clear === 'push') {
+    if (!hasRemote) return same('both already agree');
+    if (!remoteChanged) return push('local cleared');
+    return (rules.tie ?? 'local') === 'local'
+      ? push('both changed, local cleared and wins', sides.remote ?? null)
+      : pull(sides.remote, 'both changed, remote wins', sides.local ?? null);
+  }
+  const localChanged = valid && local !== last;
   if (localChanged) {
     if (local === remote) return same('both already agree');
     if (!remoteChanged) return push('local changed');
@@ -160,7 +180,8 @@ function spelt(value: CellValue | undefined): CellValue {
 
 /**
  * `decide <column> local=<column> remote=<column> last=<column> [values=a,b|@ref]
- * [first-run-wins=<value>] [hold-when-empty=<column>] [tie=local|remote]` decides, for each row, which side of a
+ * [first-run-wins=<value>] [hold-when-empty=<column>] [tie=local|remote] [clear=push|pull]`
+ * decides, for each row, which side of a
  * sync wins (ADR 0140), as in `decide status local=sheet remote=tracker last=last_status
  * values=@./flows.json#/statuses first-run-wins=done hold-when-empty=tracker_key`.
  *
@@ -178,6 +199,11 @@ function spelt(value: CellValue | undefined): CellValue {
  * `tie=` names the side that wins a row both sides changed since the last run: `local`, the
  * default, pushes the local value; `remote` pulls the remote one. Either way the row says it
  * overrides, and which value it overwrote (TYTO-421).
+ *
+ * `clear=` says what a local value cleared since the last run does: `pull`, the default, lets
+ * the remote value (or the last one) fill it again, so clearing a cell never reaches the remote
+ * side; `push` pushes the empty value, a change like any other, which `tie=` settles when the
+ * remote side changed too. With no last value an empty local value never pushes (TYTO-647).
  *
  * It writes seven columns: `<column>`, the decided value; `<column>_action`, push, pull, same or
  * hold; `<column>_push`, the decided value on a push row and empty on every other, which is what
@@ -241,6 +267,16 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
       context,
       `takes tie=local or tie=remote, not tie=${tie}`,
       tieArgument === undefined ? undefined : at(tieArgument.range),
+    );
+  }
+
+  const clearArgument = written.get('clear');
+  const clear = clearArgument === undefined ? 'pull' : clearArgument.value;
+  if (!isClear(clear)) {
+    return argumentsProblem(
+      context,
+      `takes clear=push or clear=pull, not clear=${clear}`,
+      clearArgument === undefined ? undefined : at(clearArgument.range),
     );
   }
 
@@ -310,6 +346,7 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
     isValid: (folded) => recognised === undefined || recognised.has(folded),
     ...(firstRunWins === undefined ? {} : { firstRunWins }),
     tie,
+    clear,
   };
   const rows = table.value.rows.map((row): Row => {
     let decision = decideValue(
@@ -354,6 +391,10 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
 
 function isTie(value: string): value is DecideTie {
   return (TIES as readonly string[]).includes(value);
+}
+
+function isClear(value: string): value is DecideClear {
+  return (CLEARS as readonly string[]).includes(value);
 }
 
 async function readValues(
