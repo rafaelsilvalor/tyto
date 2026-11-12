@@ -326,9 +326,13 @@ describe('apply auto', () => {
     expect(answer.cells[2]?.applicable).toBe(false);
     expect(Object.keys(await stored())).toEqual(['EX-1', 'EX-2', 'EX-3']);
 
-    // Run again with nothing changed: no cell plans again, and a reused plan is never applied.
-    await run(AUTO, { explicit: true });
-    expect(state.applied).toBe(3);
+    // Run again with nothing changed: the applied cell plans again (TYTO-643), and only that new
+    // plan is applied; the source above it is reused, not fetched again.
+    const again = await run(AUTO, { explicit: true });
+    expect(state.pulls).toBe(1);
+    expect(state.plans).toBe(2);
+    expect(again.cells[2]?.planId).not.toBe(answer.cells[2]?.planId);
+    expect(state.applied).toBe(6);
   });
 
   it('stops at the plan in a restricted folder and outside any folder', async () => {
