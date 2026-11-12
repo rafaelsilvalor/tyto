@@ -68,6 +68,42 @@ Sign-ins made with tyto signin stay in the system keychain; tyto signout forgets
 
 A linha de comando nunca lê nem apaga o que o app de mesa guarda no chaveiro do sistema para um plugin. Para esquecer, remova o plugin pela tela de plugins do app de mesa e marque a caixa que oferece isso; veja [Plugins](../customize/plugins.md).
 
+## Fazer login para um plugin
+
+<!-- As saídas desta seção são o próprio texto dos comandos como o confere packages/command-line/src/signin.test.ts (TYTO-683), contra um provedor de teste nesta máquina e com nomes neutros; não foram executadas contra um provedor real. -->
+
+Um plugin que trabalha com a sua conta em outro lugar declara um **login**, e a janela faz o login pela tela de plugins ([Plugins](../customize/plugins.md)). No terminal, quem faz é o `tyto signin`. Diga o plugin, e o login quando ele declara mais de um:
+
+```
+$ tyto signin my-connector
+Opening your browser to sign in to 'drive' of my-connector. Finish there within five minutes, or press Ctrl+C to give up.
+If your browser did not open, open this address in it:
+https://accounts.example.com/authorize?response_type=code&client_id=...
+Signed in to 'drive' of my-connector as you@example.com.
+```
+
+O navegador abre na página do provedor; entre e aprove lá, e o comando termina. O Tyto guarda o login no chaveiro do sistema (o Gerenciador de Credenciais no Windows, o Keychain no macOS, o Secret Service no Linux) e entrega ao plugin só tokens de acesso de curta duração, então um `tyto recipe run` ou `tyto render` depois disso funciona com a sua conta. Um plugin nunca abre o navegador sozinho: sem ninguém conectado, ele para e diz para rodar `tyto signin`.
+
+**Os logins do terminal são só dele.** Entrar pela janela não conecta o terminal, nem o contrário: entre uma vez em cada um.
+
+Alguns plugins deixam o **cliente OAuth** com você, para que uma equipe use o próprio cliente sem escrevê-lo no plugin. Acrescente `--client` e digite quando ele pedir; o segredo é opcional e não aparece enquanto você digita. Ele nunca é lido da linha de comando, onde o histórico do shell o guardaria:
+
+```
+$ tyto signin my-connector drive --client
+OAuth client ID: 1234-example.apps.example.com
+OAuth client secret (leave empty if there is none):
+OAuth client stored.
+```
+
+O `tyto signout` esquece o login, e `--client` esquece também o cliente. Com o nome do login digitado inteiro, funciona até depois de o plugin ter sido removido:
+
+```
+$ tyto signout my-connector drive
+Signed out of 'drive' of my-connector.
+```
+
+Um computador sem chaveiro — um servidor Linux sem sessão de desktop, uma máquina de CI — não consegue fazer login assim: o comando diz que o chaveiro recusou, e nada é gravado em outro lugar. O painel de comandos da janela recusa `tyto signin` e `tyto signout`; lá, entre pela tela de plugins.
+
 ## Buscar templates nos seus próprios repositórios
 
 Um **arquivo de plugin** diz de que repositório buscar um plugin ou os seus templates, e qual versão. Os da máquina ficam em `~/.tyto/plugin-files`; os de um projeto ficam em `.tyto/plugin-files` ao lado dos briefs, e só contam depois que a pasta é de confiança. A entrada de um template no projeto vence a da máquina.

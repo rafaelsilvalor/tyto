@@ -27,6 +27,7 @@ Type after `tyto ›` and press **Enter**. Writing `tyto` first is optional.
   - `tyto mcp`, because it talks to an agent over its input and output, which the panel does not have;
   - `watch` on the [queue folder](../export/queue-folder.md) while **Render automatically** is on, because that folder already has a consumer;
   - `recipe run` with `--apply`, because the panel only plans a recipe: apply the plan with **Apply** in the recipe's notebook, or run the command in a terminal. `recipe run` without `--apply` runs and prints the plans.
+  - `signin` and `signout`, because the window signs in from the [plugins screen](../customize/plugins.md); the terminal keeps sign-ins of its own.
 - A command that needs an answer, such as approving a plugin's permissions, asks in a box of the window's own.
 
 Each command you run is a block. Its header shows the command, with its paths cut to the file name (the whole line is the tooltip), the time it started and how it ended: **✓ 0** when it went well, **✗ 1** when the brief has errors, **✗ 2** when Tyto itself failed, **✗** alone for a line refused before it ran, `–` when stopped and `•` while it runs. What the command printed is under the header. Whether the newest run comes last or first, and whether older runs fold to their header, are two settings, described in [Panels](panels.md#commands).
