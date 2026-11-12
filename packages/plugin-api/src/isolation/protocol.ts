@@ -1,4 +1,4 @@
-import { type Diagnostic, diagnosticCodeList } from '@tyto/core';
+import { type Diagnostic, diagnostic, diagnosticCodeList } from '@tyto/core';
 import { z } from 'zod';
 
 import {
@@ -394,6 +394,19 @@ export function describeIssues(error: z.ZodError): string {
   return error.issues
     .map((issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`)
     .join('; ');
+}
+
+/**
+ * What a callable's answer that its result schema refuses becomes: `E_PLUGIN_PROTOCOL`, naming
+ * the plugin and what did not match. An isolated plugin's answer meets it on the wire; an
+ * in-process panel `call` meets the same one in `callPanel` (TYTO-644), so a plugin answers
+ * alike on both paths.
+ */
+export function unmatchedAnswer(plugin: string, error: z.ZodError): Diagnostic {
+  return diagnostic('E_PLUGIN_PROTOCOL', {
+    plugin,
+    problem: `its answer does not match: ${describeIssues(error)}`,
+  });
 }
 
 /**

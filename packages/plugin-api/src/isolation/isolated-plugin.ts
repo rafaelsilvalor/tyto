@@ -42,6 +42,7 @@ import {
   storageSetArgsSchema,
   windowCallToolArgsSchema,
   windowToolsArgsSchema,
+  unmatchedAnswer,
 } from './protocol.js';
 
 /**
@@ -544,12 +545,7 @@ export function connectIsolatedPlugin(
             pending.resolve(
               checked.success
                 ? checked.data
-                : pending.spec.failed([
-                    diagnostic('E_PLUGIN_PROTOCOL', {
-                      plugin: name,
-                      problem: `its answer does not match: ${describeIssues(checked.error)}`,
-                    }),
-                  ]),
+                : pending.spec.failed([unmatchedAnswer(name, checked.error)]),
             );
           }
           keepAlive();

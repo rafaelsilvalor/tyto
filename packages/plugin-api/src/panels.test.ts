@@ -4,7 +4,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { PanelCallRequest, PanelContribution } from './contributions.js';
 import { type Plugin, createPluginHost } from './host.js';
-import { PANEL_CALL_MAX_BYTES, callPanel, panelCallerOf } from './panels.js';
+import { unmatchedAnswer } from './isolation/protocol.js';
+import {
+  type OwnedPanel,
+  PANEL_CALL_MAX_BYTES,
+  callPanel,
+  panelCallResultSchema,
+  panelCallerOf,
+} from './panels.js';
 
 /**
  * A panel's call in process (TYTO-372, ADR 0173): what the host checks before the plugin sees
@@ -47,7 +54,12 @@ function echoing(answer?: (request: PanelCallRequest) => unknown) {
     ]),
   );
   if (!activated.ok) throw new Error(activated.error[0]?.message);
-  return { call: panelCallerOf(host.registry), heard };
+  const caller = panelCallerOf(host.registry);
+  return {
+    call: (panelId: string, request: unknown) => caller('conta', panelId, request),
+    caller,
+    heard,
+  };
 }
 
 const problemOf = (answer: Result<JsonValue, readonly { code: string; message: string }[]>) =>
@@ -67,7 +79,7 @@ describe('a panel calling its own plugin', () => {
     const host = createPluginHost();
     host.tryActivate(pluginWith('conta', [{ ...PANEL, id: 'conta' }]));
 
-    const answer = await panelCallerOf(host.registry)('conta', { method: 'token.test' });
+    const answer = await panelCallerOf(host.registry)('conta', 'conta', { method: 'token.test' });
 
     expect(problemOf(answer)).toEqual({
       code: 'E_PANEL_CALL',
@@ -75,14 +87,24 @@ describe('a panel calling its own plugin', () => {
     });
   });
 
-  it('is E_PANEL_CALL for a panel id nobody registered', async () => {
-    const { call, heard } = echoing();
+  it('is E_PANEL_CALL for a plugin and panel id pair nobody registered, naming both', async () => {
+    const { caller: call, heard } = echoing();
 
-    const answer = await call('outra', { method: 'token.test' });
+    const unknownPanel = await call('conta', 'outra', { method: 'token.test' });
+    const unknownPlugin = await call('outro', 'conta', { method: 'token.test' });
 
-    expect(problemOf(answer)?.message).toBe(
-      "Panel 'outra' could not call its plugin: no panel with that id is registered.",
-    );
+    expect(problemOf(unknownPanel)).toEqual({
+      code: 'E_PANEL_CALL',
+      message:
+        "Panel 'outra' could not call its plugin: no panel with that id is registered by " +
+        "plugin 'conta'.",
+    });
+    expect(problemOf(unknownPlugin)).toEqual({
+      code: 'E_PANEL_CALL',
+      message:
+        "Panel 'conta' could not call its plugin: no panel with that id is registered by " +
+        "plugin 'outro'.",
+    });
     expect(heard).toEqual([]);
   });
 
@@ -150,9 +172,18 @@ describe('a panel calling its own plugin', () => {
     const notJson = await echoing(() => ok({ run: () => 1 })).call('conta', { method: 'get' });
     const notResult = await echoing(() => 'raw').call('conta', { method: 'get' });
 
-    expect(problemOf(big)?.message).toContain("its plugin's answer is refused");
-    expect(problemOf(notJson)?.message).toContain("its plugin's answer is refused");
-    expect(problemOf(notResult)?.message).toContain('something other than a result');
+    // The wire's schema refuses each of them, so in process they are refused as isolated:
+    // E_PLUGIN_PROTOCOL naming the plugin (TYTO-644).
+    expect(problemOf(big)).toEqual({
+      code: 'E_PLUGIN_PROTOCOL',
+      message: expect.stringContaining(
+        `its answer does not match: value must be at most ${String(PANEL_CALL_MAX_BYTES)} bytes`,
+      ),
+    });
+    expect(problemOf(notJson)?.code).toBe('E_PLUGIN_PROTOCOL');
+    expect(problemOf(notResult)?.message).toContain(
+      "Plugin 'conta' sent a message the host cannot read: its answer does not match",
+    );
   });
 
   it("passes the plugin's own refusal through, and turns a throw into E_PANEL_CALL", async () => {
@@ -170,6 +201,48 @@ describe('a panel calling its own plugin', () => {
     );
   });
 
+  it('reaches the caller’s own plugin when two plugins each have a `settings` panel', async () => {
+    const heard: string[] = [];
+    const settingsOf = (owner: string): OwnedPanel => ({
+      plugin: owner,
+      panel: {
+        ...PANEL,
+        id: 'settings',
+        call: () => {
+          heard.push(owner);
+          return ok(owner);
+        },
+      },
+    });
+    // One host refuses a second `settings`; a host composing two registries holds both, in
+    // either order, and the id alone would answer with whichever comes first.
+    for (const order of [
+      ['primeiro', 'segundo'],
+      ['segundo', 'primeiro'],
+    ]) {
+      heard.length = 0;
+      const call = panelCallerOf({ ownedPanels: () => order.map(settingsOf) });
+
+      expect(await call('primeiro', 'settings', { method: 'whoami' })).toEqual(ok('primeiro'));
+      expect(await call('segundo', 'settings', { method: 'whoami' })).toEqual(ok('segundo'));
+      expect(heard).toEqual(['primeiro', 'segundo']);
+    }
+  });
+
+  it('refuses in process an answer without `diagnostics`, as the wire does', async () => {
+    const bare = { ok: true, value: 'pronto' };
+    const answer = await echoing(() => bare).call('conta', { method: 'token.test' });
+    const wire = panelCallResultSchema.safeParse(bare);
+
+    expect(wire.success).toBe(false);
+    if (wire.success) return;
+    expect(answer).toEqual(err([unmatchedAnswer('conta', wire.error)]));
+    expect(problemOf(answer)).toEqual({
+      code: 'E_PLUGIN_PROTOCOL',
+      message: expect.stringContaining("Plugin 'conta' sent a message the host cannot read"),
+    });
+  });
+
   it('reaches only the panel it was asked for, whatever plugin owns another one', async () => {
     const heard: string[] = [];
     const panelOf = (owner: string): PanelContribution => ({
@@ -185,8 +258,9 @@ describe('a panel calling its own plugin', () => {
     host.tryActivate(pluginWith('segundo', [panelOf('segundo')]));
     const call = panelCallerOf(host.registry);
 
-    expect(await call('primeiro', { method: 'whoami' })).toEqual(ok('primeiro'));
-    expect(await call('segundo', { method: 'whoami' })).toEqual(ok('segundo'));
+    expect(await call('primeiro', 'primeiro', { method: 'whoami' })).toEqual(ok('primeiro'));
+    expect(await call('segundo', 'segundo', { method: 'whoami' })).toEqual(ok('segundo'));
+    expect(await call('segundo', 'primeiro', { method: 'whoami' })).toMatchObject({ ok: false });
     expect(heard).toEqual(['primeiro', 'segundo']);
   });
 
@@ -200,6 +274,6 @@ describe('a panel calling its own plugin', () => {
       },
     };
 
-    expect(await callPanel(panel, { method: 'hello' })).toEqual(ok('oi'));
+    expect(await callPanel(panel, { method: 'hello' }, 'conta')).toEqual(ok('oi'));
   });
 });

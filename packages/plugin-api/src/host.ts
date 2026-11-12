@@ -61,6 +61,7 @@ import {
   type OwnedSource,
   SOURCE_SCHEME,
 } from './sources.js';
+import type { OwnedPanel } from './panels.js';
 import { type HostStorage, hostStorage } from './storage.js';
 import { type ThemeContribution, checkThemeContribution } from './theme.js';
 import { type HostTerminal, checkedTerminal, hostTerminal } from './terminal.js';
@@ -281,6 +282,8 @@ export interface PluginRegistry extends RecipeContributions {
   /** Every vim contribution, in registration order: built-ins first (ADR 0141). */
   vim(): readonly EditorVimContribution[];
   panels(): readonly PanelContribution[];
+  /** The same panels with the plugin that registered each, for a lookup by plugin and id. */
+  ownedPanels(): readonly OwnedPanel[];
   /** Every declared setting, in registration order, by the key a settings file uses. */
   configurations(): readonly DeclaredSetting[];
   /** Every colour theme, in registration order: built-ins first (ADR 0077). */
@@ -605,6 +608,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     keymaps: () => keymaps.list(),
     vim: () => vims.list(),
     panels: () => panels.list(),
+    ownedPanels: () =>
+      panels.owned().map((entry) => ({ plugin: entry.plugin, panel: entry.value })),
     configurations: () => configurations.list().map((entry) => entry.setting),
     themes: () => themes.list(),
     assetSources: () =>

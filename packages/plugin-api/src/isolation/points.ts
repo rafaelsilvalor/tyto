@@ -29,7 +29,7 @@ import { z } from 'zod';
 
 import { jsonValueSchema } from '../json.js';
 import type { ContributionPoint } from '../manifest.js';
-import { panelCallAnswerSchema, panelCallRequestSchema } from '../panels.js';
+import { panelCallRequestSchema, panelCallResultSchema } from '../panels.js';
 import { RECIPE_VERB_KINDS } from '../recipes.js';
 import { settingFormSchema } from '../setting-form.js';
 import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
@@ -508,7 +508,7 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
       call: {
         args: z.tuple([panelCallRequestSchema]),
         send: ([request]) => [request],
-        result: resultSchema(panelCallAnswerSchema),
+        result: panelCallResultSchema,
         failed: (problems) => err(problems),
         optional: true,
       },

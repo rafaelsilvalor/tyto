@@ -272,11 +272,14 @@ another plugin's.
 matches `^[a-z][\w.-]{0,99}$`, `params` and the answer are JSON of at most 1 MiB each, and an
 isolated plugin's call has the 30 s deadline of every call. The host finds the panel from the
 frame the page runs in, never from the request, which is strict: a `plugin` or `panel` key is
-refused. A panel without `call` is refused with `E_PANEL_CALL`, as is a bad method or an answer
-over the ceiling; the plugin's own refusal reaches the page as it is. Answer with `ok(value)`
-from `@tyto/core`, or write its `diagnostics: []` yourself: an isolated plugin's
-`{ ok: true, value }` without it is refused as `E_PLUGIN_PROTOCOL`. `callPanel` and
-`panelCallerOf` are the host's half. `call` is the way forward for a panel that needs a secret's
+refused. A panel without `call` is refused with `E_PANEL_CALL`, as is a bad method; the plugin's
+own refusal reaches the page as it is. Answer with `ok(value)` from `@tyto/core`, or write its
+`diagnostics: []` yourself: an answer the isolation protocol's schema refuses — `{ ok: true,
+value }` without `diagnostics`, a value over the ceiling or not JSON — is refused as
+`E_PLUGIN_PROTOCOL`, in process exactly as isolated, so a plugin tested in process behaves the
+same once isolated. `callPanel(panel, request, plugin)` and `panelCallerOf` are the host's half;
+`panelCallerOf(registry)` answers `(plugin, panelId, request)`, finding the panel by plugin and
+id together. `call` is the way forward for a panel that needs a secret's
 effect rather than its value, and the documented way for a new panel to reach its plugin; the
 `credentials` read stays for the panels that use it today. The desktop finds the panel from the
 iframe element the message came from, plugin and panel id together, and a request with a key the

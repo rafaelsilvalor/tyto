@@ -3,6 +3,7 @@ import type { JsonValue } from '@tyto/recipe';
 import { z } from 'zod';
 
 import type { PanelCallRequest, PanelContribution } from './contributions.js';
+import { resultSchema, unmatchedAnswer } from './isolation/protocol.js';
 import { jsonByteLength, jsonValueSchema } from './json.js';
 
 /**
@@ -11,8 +12,8 @@ import { jsonByteLength, jsonValueSchema } from './json.js';
  * The page is sandboxed (ADR 0045) and anybody's JavaScript, so everything it sends is checked
  * here, on the host, before the plugin sees it — and checked again in an isolated plugin's
  * process by the `call` callable of the `panel` point, which shares these schemas. What the
- * plugin answers is checked here too, so an in-process plugin is held to the ceiling an
- * isolated one meets on the wire.
+ * plugin answers is checked here too, with the schema an isolated answer meets on the wire,
+ * so an in-process plugin answers exactly as the same plugin would isolated (TYTO-644).
  */
 
 /**
@@ -48,6 +49,14 @@ export const panelCallAnswerSchema: z.ZodType<JsonValue> = jsonValueSchema.refin
   CEILING,
 );
 
+/**
+ * The whole answer, `Result<JsonValue, Diagnostics>` as it crosses the wire: `{ ok: true,
+ * value, diagnostics }` or `{ ok: false, error }`, strictly. **One schema for both paths**: the
+ * `panel` point's `call` checks an isolated plugin's answer with it, and `callPanel` an
+ * in-process one, so an answer the wire refuses is refused in process too (TYTO-644).
+ */
+export const panelCallResultSchema: z.ZodType = resultSchema(panelCallAnswerSchema);
+
 type PanelCallResult = Result<JsonValue, Diagnostics>;
 
 function refused(panel: string, problem: string): PanelCallResult {
@@ -65,17 +74,22 @@ function messageOf(thrown: unknown): string {
 }
 
 /**
- * Calls `panel`'s own plugin with what its page sent. `panel` is the contribution the caller
- * found from what it trusts — the frame the message came from — and **never** from anything the
- * page wrote, so a page reaches its own plugin and no other.
+ * Calls `panel`'s own plugin, named `plugin`, with what its page sent. `panel` is the
+ * contribution the caller found from what it trusts — the frame the message came from — and
+ * **never** from anything the page wrote, so a page reaches its own plugin and no other.
  *
- * Every refusal is `E_PANEL_CALL`; the plugin's own refusal, and what isolation answers for a
- * call it could not finish (`E_PLUGIN_TIMEOUT` past the 30 s deadline, `E_PLUGIN_CRASHED`),
- * arrive as they are.
+ * A refusal of the request, a missing `call` and a throw from an in-process `call` are
+ * `E_PANEL_CALL`. The answer is checked with {@link panelCallResultSchema}, the schema the
+ * wire holds an isolated answer to, and one it refuses is `E_PLUGIN_PROTOCOL` naming `plugin`,
+ * as the isolated path answers it — so `{ ok: true, value }` without `diagnostics` is refused
+ * here exactly as it is across a process boundary. The plugin's own refusal, and what isolation
+ * answers for a call it could not finish (`E_PLUGIN_TIMEOUT` past the 30 s deadline,
+ * `E_PLUGIN_CRASHED`), arrive as they are.
  */
 export async function callPanel(
   panel: PanelContribution,
   request: unknown,
+  plugin: string,
 ): Promise<PanelCallResult> {
   if (panel.call === undefined) return refused(panel.id, "its plugin registered no 'call'");
   let checked: z.ZodSafeParseResult<PanelCallRequest>;
@@ -94,42 +108,49 @@ export async function callPanel(
   } catch (thrown) {
     return refused(panel.id, `its plugin threw: ${messageOf(thrown)}`);
   }
-  return checkedAnswer(panel.id, answer);
+  return checkedAnswer(panel.id, plugin, answer);
 }
 
-function checkedAnswer(panel: string, answer: unknown): PanelCallResult {
-  if (typeof answer !== 'object' || answer === null || !('ok' in answer)) {
-    return refused(panel, 'its plugin answered something other than a result');
-  }
-  const result = answer as PanelCallResult;
-  if (!result.ok) return result;
+/** Refuse, never normalise: an answer the wire would refuse is not repaired in process. */
+function checkedAnswer(panel: string, plugin: string, answer: unknown): PanelCallResult {
+  let checked: z.ZodSafeParseResult<unknown>;
   try {
-    const value = panelCallAnswerSchema.safeParse(result.value);
-    if (!value.success) {
-      return refused(panel, `its plugin's answer is refused: ${issuesOf(value.error, 'answer')}`);
-    }
+    checked = panelCallResultSchema.safeParse(answer);
   } catch (thrown) {
     return refused(panel, `its plugin's answer could not be read: ${messageOf(thrown)}`);
   }
-  return result;
+  if (!checked.success) return err([unmatchedAnswer(plugin, checked.error)]);
+  return checked.data as PanelCallResult;
 }
 
-/** What {@link panelCallerOf} reads: the registry's panels, as `PluginRegistry` has them. */
+/** A panel with the plugin that contributed it, as the registry recorded it. */
+export interface OwnedPanel {
+  readonly plugin: string;
+  readonly panel: PanelContribution;
+}
+
+/** What {@link panelCallerOf} reads: the registry's panels with their plugins. */
 export interface PanelContributions {
-  panels(): readonly PanelContribution[];
+  ownedPanels(): readonly OwnedPanel[];
 }
 
 /**
- * Calls by panel id: the panel is looked up in the registry, read per call, so a plugin
- * withdrawn from the host stops answering. The id is the caller's — the frame's — and the
- * request carries no name the lookup reads.
+ * Calls by plugin and panel id together: the panel is looked up in the registry, read per
+ * call, so a plugin withdrawn from the host stops answering. Both names are the caller's — the
+ * frame's — and the request carries no name the lookup reads. Two plugins may each contribute a
+ * panel called `settings` (one host refuses the second, but a host composing several registries
+ * may hold both), so the id alone could reach another plugin's panel (TYTO-644).
  */
 export function panelCallerOf(
   contributions: PanelContributions,
-): (panelId: string, request: unknown) => Promise<PanelCallResult> {
-  return async (panelId, request) => {
-    const panel = contributions.panels().find((candidate) => candidate.id === panelId);
-    if (panel === undefined) return refused(panelId, 'no panel with that id is registered');
-    return callPanel(panel, request);
+): (plugin: string, panelId: string, request: unknown) => Promise<PanelCallResult> {
+  return async (plugin, panelId, request) => {
+    const owned = contributions
+      .ownedPanels()
+      .find((candidate) => candidate.plugin === plugin && candidate.panel.id === panelId);
+    if (owned === undefined) {
+      return refused(panelId, `no panel with that id is registered by plugin '${plugin}'`);
+    }
+    return callPanel(owned.panel, request, owned.plugin);
   };
 }
