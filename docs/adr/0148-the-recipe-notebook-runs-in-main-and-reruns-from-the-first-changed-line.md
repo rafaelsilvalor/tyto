@@ -107,6 +107,12 @@ Three things have to be settled before a renderer can show anything:
     and the command `recipe.runFresh`. Which cells fetch crosses the wire as each cell's
     `source`, which main decides with the policy's own test (a source verb, or a `run` whose
     recipe holds one), since the window knows verbs by name and not by kind.
+    _Amended 2026-11-12 (TYTO-681):_ a transform may read remote data too — a lookup that reads
+    a sheet inside a transform and keeps it in its cache — so every contributed `transform` call
+    of a run without cache also carries `refresh: true`, set from the same flag, and an ordinary
+    run carries no key. `plan` still carries nothing. The field crosses over isolation protocol
+    25, so a plugin process on 24 is refused at `hello`; Tyto's own transforms read no cache and
+    are not handed it.
 
 ## Consequences
 

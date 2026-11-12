@@ -74,13 +74,22 @@ export interface PageRequest extends VerbRequest {
   readonly refresh?: boolean;
 }
 
-export interface TransformRequest extends VerbRequest {
+/** What an action's or a sink's `plan` is handed: the table it would write from. */
+export interface PlanRequest extends VerbRequest {
   readonly arguments: ArgumentValues;
   readonly table: Table;
 }
 
-/** What an action's or a sink's `plan` is handed: the table it would write from. */
-export type PlanRequest = TransformRequest;
+/** What `transform` is handed: the step's arguments, checked, and the table before it. */
+export interface TransformRequest extends PlanRequest {
+  /**
+   * `true` on the same runs a source's `page` is (TYTO-681, ADR 0148): a run without cache, which
+   * every scheduled run is (ADR 0175). A transform that reads remote data into its private cache
+   * (ADR 0138) skips it and reads live; one that reads nothing ignores it. Absent on an ordinary
+   * run, never `false`.
+   */
+  readonly refresh?: boolean;
+}
 
 /**
  * What an action's or a sink's `apply` is handed (ADR 0170): one batch of the plan a person was
@@ -295,8 +304,9 @@ export interface RecipeRegistryOptions {
    */
   readonly sectionOf?: (plugin: string) => unknown;
   /**
-   * The run asked for fresh data, so every source's `page` is handed `refresh: true` and skips
-   * its private cache (ADR 0148). Fixed for the registries' life: a caller builds them per run.
+   * The run asked for fresh data, so every source's `page` and every contributed `transform` is
+   * handed `refresh: true` and skips its private cache (ADR 0148, TYTO-681). Fixed for the
+   * registries' life: a caller builds them per run.
    */
   readonly refresh?: boolean;
   readonly limits?: PageLimits;
@@ -467,13 +477,18 @@ function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Ver
           ),
         ]);
       }
-      const request = {
+      const request: PlanRequest = {
         arguments: values.value,
         table: context.table,
         ...withSection(sectionOfOwner()),
       };
       if (contribution.kind === 'transform' && transform !== undefined) {
-        const answer = await transform.call(contribution, request);
+        // TYTO-681: a transform may read remote data, so it hears a run without cache as a
+        // source does, and only `true` rides. `plan` is not handed it: it reads no cache.
+        const answer = await transform.call(contribution, {
+          ...request,
+          ...(refresh ? { refresh: true } : {}),
+        });
         return placed(context, checkedAnswer(answer, contribution.id, limits));
       }
       if (plan !== undefined && (contribution.kind === 'action' || contribution.kind === 'sink')) {

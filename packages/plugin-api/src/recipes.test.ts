@@ -408,3 +408,71 @@ describe("a verb's project section (TYTO-428, ADR 0147)", () => {
     expect(await sectionSeen(registries, 'demo.section')).toBe('{"site":"acme.example"}');
   });
 });
+
+describe('refresh on a run without cache (ADR 0148, TYTO-681)', () => {
+  /** A source, a transform and an action, each writing down what its request said of it. */
+  function hearing(heard: [string, unknown][]): ReturnType<typeof createPluginHost> {
+    const said = (request: object) => ('refresh' in request ? request.refresh : 'absent');
+    const host = createPluginHost();
+    const activated = host.tryActivate(
+      pluginOf(
+        'demo-plugin',
+        (plugin) => {
+          plugin.registerRecipeVerb({
+            id: 'demo.pull',
+            kind: 'source',
+            arguments: [],
+            page: (request) => {
+              heard.push(['page', said(request)]);
+              return ok({ table: ROWS });
+            },
+          });
+          plugin.registerRecipeVerb({
+            id: 'demo.lookup',
+            kind: 'transform',
+            arguments: [],
+            transform: (request) => {
+              heard.push(['transform', said(request)]);
+              return ok(request.table);
+            },
+          });
+          plugin.registerRecipeVerb({
+            id: 'demo.mark',
+            kind: 'action',
+            arguments: [],
+            writes: ['mark'],
+            plan: (request) => {
+              heard.push(['plan', said(request)]);
+              return ok({ target: 'demo', operations: [], count: 0 });
+            },
+          });
+        },
+        { writes: ['mark'] },
+      ),
+    );
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    return host;
+  }
+
+  it('hands a transform refresh as it hands a source, and never a plan', async () => {
+    const heard: [string, unknown][] = [];
+    const registries = recipeRegistriesOf(hearing(heard).registry, { refresh: true });
+    const { problem } = await run(registries, 'demo.pull', 'demo.lookup', 'demo.mark');
+    expect(problem).toBeUndefined();
+    expect(heard).toEqual([
+      ['page', true],
+      ['transform', true],
+      ['plan', 'absent'],
+    ]);
+  });
+
+  it('hands no refresh key to any of them on an ordinary run', async () => {
+    const heard: [string, unknown][] = [];
+    for (const options of [{}, { refresh: false }]) {
+      const registries = recipeRegistriesOf(hearing(heard).registry, options);
+      const { problem } = await run(registries, 'demo.pull', 'demo.lookup', 'demo.mark');
+      expect(problem).toBeUndefined();
+    }
+    expect(heard.map(([, said]) => said)).toEqual(Array.from({ length: 6 }, () => 'absent'));
+  });
+});
