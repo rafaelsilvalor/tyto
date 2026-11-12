@@ -27,6 +27,7 @@ Digite depois de `tyto ›` e tecle **Enter**. Escrever `tyto` antes é opcional
   - `tyto mcp`, porque ele conversa com um agente pela entrada e pela saída, que o painel não tem;
   - `watch` na [pasta de fila](../export/queue-folder.md) enquanto **Renderizar automaticamente** está ligado, porque essa pasta já tem quem a consuma;
   - `recipe run` com `--apply`, porque o painel só planeja uma receita: aplique o plano com **Aplicar** no caderno da receita, ou rode o comando num terminal. `recipe run` sem `--apply` roda e imprime os planos.
+  - `signin` e `signout`, porque a janela faz login pela [tela de plugins](../customize/plugins.md); o terminal guarda logins só dele.
 - Um comando que precisa de resposta, como aprovar as permissões de um plugin, pergunta numa caixa da própria janela.
 
 Cada comando que você roda é um bloco. O cabeçalho mostra o comando, com os caminhos cortados para o nome do arquivo (a linha inteira aparece na dica), a hora em que começou e como terminou: **✓ 0** quando deu certo, **✗ 1** quando o brief tem erros, **✗ 2** quando o próprio Tyto falhou, **✗** sozinho para uma linha recusada antes de rodar, `–` quando foi parado e `•` enquanto roda. O que o comando imprimiu fica sob o cabeçalho. Se o mais novo vem por último ou primeiro, e se os anteriores se dobram até o cabeçalho, são duas configurações, descritas em [Painéis](panels.md#comandos).

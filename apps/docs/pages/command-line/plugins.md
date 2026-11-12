@@ -68,6 +68,42 @@ Sign-ins made with tyto signin stay in the system keychain; tyto signout forgets
 
 The command line never reads or deletes what the desktop app keeps in the system keychain for a plugin. To forget it, remove the plugin from the desktop app's plugins screen and tick the box that offers it; see [Plugins](../customize/plugins.md).
 
+## Sign in for a plugin
+
+<!-- The outputs in this section are the commands' own text as checked by packages/command-line/src/signin.test.ts (TYTO-683) against a test provider on this machine, with neutral names; they were not run against a real provider. -->
+
+A plugin that works with your own account somewhere else declares a **sign-in**, and the window signs in from its plugins screen ([Plugins](../customize/plugins.md)). In a terminal, `tyto signin` does it. Name the plugin, and the sign-in when it declares more than one:
+
+```
+$ tyto signin my-connector
+Opening your browser to sign in to 'drive' of my-connector. Finish there within five minutes, or press Ctrl+C to give up.
+If your browser did not open, open this address in it:
+https://accounts.example.com/authorize?response_type=code&client_id=...
+Signed in to 'drive' of my-connector as you@example.com.
+```
+
+Your browser opens on the provider's page; sign in and approve there, and the command finishes. Tyto keeps the sign-in in your system's keychain (Credential Manager on Windows, Keychain on macOS, the Secret Service on Linux) and gives the plugin only short-lived access tokens, so a `tyto recipe run` or `tyto render` afterwards works with your account. A plugin never opens the browser by itself: when nobody has signed in, it stops and says to run `tyto signin`.
+
+**The terminal's sign-ins are its own.** Signing in in the window does not sign the terminal in, and the other way round: sign in once in each.
+
+Some plugins leave the **OAuth client** to you, so a team uses its own client without writing it into the plugin. Add `--client` and type it when asked; the secret is optional and is not shown as you type. It is never read from the command line, where your shell's history would keep it:
+
+```
+$ tyto signin my-connector drive --client
+OAuth client ID: 1234-example.apps.example.com
+OAuth client secret (leave empty if there is none):
+OAuth client stored.
+```
+
+`tyto signout` forgets the sign-in, and `--client` forgets the client too. With the sign-in's name typed whole, it works even after the plugin was removed:
+
+```
+$ tyto signout my-connector drive
+Signed out of 'drive' of my-connector.
+```
+
+A computer with no keychain — a Linux server with no desktop session, a CI runner — cannot sign in this way: the command says the keychain refused, and nothing is written anywhere else. The window's command panel refuses `tyto signin` and `tyto signout`; sign in from the plugins screen there.
+
 ## Fetch templates from their own repositories
 
 A **plugin file** names a repository to fetch a plugin or its templates from, and the version to fetch. The machine's are in `~/.tyto/plugin-files`; a project's are in `.tyto/plugin-files` beside its briefs, and count only once the folder is trusted. A project's entry for a template wins over the machine's.
