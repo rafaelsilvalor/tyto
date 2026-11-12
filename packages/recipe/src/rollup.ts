@@ -1,7 +1,7 @@
 import { type Diagnostic, diagnostic, ok } from '@tyto/core';
 
 import type { NamedArgument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import type { VerbContext, VerbResult } from './registry.js';
 import {
@@ -14,7 +14,6 @@ import {
 } from './support.js';
 import { type Row, cellText } from './table.js';
 
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const NAMED_IN_WARNING = 5;
 
 /**
@@ -55,7 +54,7 @@ export function rollup(context: VerbContext): VerbResult {
     return argumentsProblem(context, usage);
   }
   if (extra !== undefined) return argumentsProblem(context, usage, at(extra.range));
-  if (!COLUMN_NAME.test(target.value)) {
+  if (!isWritableColumnName(target.value, target.quoted)) {
     return argumentsProblem(
       context,
       `cannot write a column named '${target.value}'`,

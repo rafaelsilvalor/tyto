@@ -8,7 +8,8 @@ import {
   sourceRange,
 } from '@tyto/core';
 
-import type { Step } from './ast.js';
+import type { Argument, Step } from './ast.js';
+import { isWritableColumnName } from './columns.js';
 import { isDataReference } from './data.js';
 import { GENERIC_VERB_FORMS, type VerbField, type VerbForm } from './forms.js';
 import { parseRecipe } from './parse.js';
@@ -22,7 +23,8 @@ export type StepValues = Readonly<Record<string, string>>;
 // A pattern's `\p{Lu}` and `\u{FF}` are the pattern's own braces, as `parse.ts` reads them.
 const PLACEHOLDER = /(?<!\\[pPu])\{([A-Za-z_][\w-]*)\}/gu;
 const NAME_BEFORE_EQUALS = /^[A-Za-z_][\w-]*=/u;
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
+/** A column written bare reads back as itself; any other is written in quotes (TYTO-674). */
+const BARE_COLUMN = /^[\w{}-]+$/u;
 
 /**
  * Writes the one recipe line a form describes (ADR 0176): the text stays the source of truth,
@@ -60,6 +62,8 @@ export function formatStep(
       case 'named':
         if (field.inline === true && !isDataReference(value)) {
           tail = `${field.name}=${value}`;
+        } else if (field.kind === 'columns') {
+          words.push(`${field.name}=${value}`);
         } else {
           const quoted = quotedValue(field, value, false);
           if (!quoted.ok) return quoted;
@@ -70,7 +74,7 @@ export function formatStep(
         const column = assignmentName === undefined ? undefined : wanted.value[assignmentName.name];
         const quoted = quotedValue(field, value, false);
         if (!quoted.ok) return quoted;
-        if (column !== undefined) words.push(`${column}=${quoted.value}`);
+        if (column !== undefined) words.push(`${columnWord(column)}=${quoted.value}`);
         break;
       }
       case 'pairs':
@@ -156,7 +160,8 @@ export function valuesOfStep(
       return refuse(`'${form.verb}' takes no bare word '${argument.value}'`, argument.range);
     }
     const existing = values[field.name];
-    values[field.name] = existing === undefined ? argument.value : `${existing} ${argument.value}`;
+    const word = collects(field) ? asWritten(argument) : argument.value;
+    values[field.name] = existing === undefined ? word : `${existing} ${word}`;
     if (positionalFields[bare.length] !== undefined) bare.push(field.name);
   }
 
@@ -173,7 +178,7 @@ export function valuesOfStep(
       if (values[field.name] !== undefined) {
         return refuse(`${field.name}= is written twice`, argument.range);
       }
-      values[field.name] = argument.value;
+      values[field.name] = field.kind === 'columns' ? asWritten(argument) : argument.value;
     } else if (
       assignmentName !== undefined &&
       assignmentValue !== undefined &&
@@ -192,6 +197,16 @@ export function valuesOfStep(
   }
   if (pairs !== undefined && pairWords.length > 0) values[pairs.name] = pairWords.join(' ');
   return ok(values);
+}
+
+/** A word as the line wrote it: a quoted column keeps its quotes, so a list reads back whole. */
+function asWritten(argument: Argument): string {
+  return argument.quoted === true ? `"${argument.value}"` : argument.value;
+}
+
+/** A column name as one word: bare when it reads back as itself, otherwise in quotes. */
+function columnWord(name: string): string {
+  return BARE_COLUMN.test(name) ? name : `"${name}"`;
 }
 
 function formOf(verb: string | VerbForm): VerbForm | undefined {
@@ -238,10 +253,21 @@ function canonicalValues(
     if (field.values !== undefined && !field.values.includes(value)) {
       return refuse(`${field.name} is '${value}', and may be ${field.values.join(', ')}`);
     }
-    if (field.placement === 'assignment-name' && !COLUMN_NAME.test(value)) {
-      return refuse(`${field.name} '${value}' is not a column name of letters, digits, - and _`);
+    if (
+      field.placement === 'assignment-name' &&
+      !isWritableColumnName(value) &&
+      !isWritableColumnName(value, true)
+    ) {
+      return refuse(
+        `${field.name} '${value}' is not a column name: letters, digits, - and _, or in ` +
+          'quotes also blanks and punctuation but no double quote',
+      );
     }
-    if (field.placement === 'positional' && collects(field)) {
+    if (field.kind === 'columns') {
+      const list = columnList(field, value);
+      if (!list.ok) return list;
+      canonical[field.name] = list.value;
+    } else if (field.placement === 'positional' && collects(field)) {
       canonical[field.name] = value.split(/\s+/u).join(' ');
     } else if (field.placement === 'pairs') {
       const pairs = canonicalPairs(field, value);
@@ -279,8 +305,59 @@ function canonicalPairs(field: VerbField, value: string): Result<string, readonl
   return ok(words.join(' '));
 }
 
+/**
+ * A list of columns as the line writes it. A named list, `without=`, has no blank, since a
+ * blank ends the word: its members are split at commas outside quotes, and a member is kept in
+ * the quotes it was typed in or quoted when it would not read back bare, `key,"Última Sync"`.
+ * A positional list, `select`, is kept as typed with its blanks single, because a blank
+ * separates its bare names (`select key, title status`) and a name with one is typed in quotes.
+ */
+function columnList(field: VerbField, value: string): Result<string, readonly Diagnostic[]> {
+  if ((value.match(/"/gu) ?? []).length % 2 !== 0) {
+    return refuse(`${field.name} opens a quote it does not close`);
+  }
+  const pieces = value.split(/("[^"]*")/u);
+  if (field.placement === 'positional') {
+    return ok(
+      pieces
+        .map((piece, index) => (index % 2 === 1 ? piece : piece.replace(/\s+/gu, ' ')))
+        .join(''),
+    );
+  }
+  const members: string[] = [];
+  let current = '';
+  const flush = (): Result<undefined, readonly Diagnostic[]> => {
+    const member = current.trim();
+    current = '';
+    if (member === '') return ok(undefined);
+    if (/^"[^"]*"$/u.test(member)) members.push(member);
+    else if (member.includes('"')) {
+      return refuse(`${field.name} holds '${member}', which mixes a quote into a name`);
+    } else members.push(columnWord(member));
+    return ok(undefined);
+  };
+  for (const [index, piece] of pieces.entries()) {
+    if (index % 2 === 1) {
+      current += piece;
+      continue;
+    }
+    const parts = piece.split(',');
+    for (const [at, part] of parts.entries()) {
+      current += part;
+      if (at < parts.length - 1) {
+        const flushed = flush();
+        if (!flushed.ok) return flushed;
+      }
+    }
+  }
+  const flushed = flush();
+  if (!flushed.ok) return flushed;
+  return ok(members.join(','));
+}
+
 function positionalWords(field: VerbField, value: string): Result<string, readonly Diagnostic[]> {
   if (!collects(field)) return quotedValue(field, value, true);
+  if (field.kind === 'columns') return ok(value);
   for (const word of value.split(' ')) {
     if (word.startsWith('"') || NAME_BEFORE_EQUALS.test(word)) {
       return refuse(`${field.name} holds '${word}', which would not read back as a name`);
@@ -300,7 +377,10 @@ function quotedValue(
   positional: boolean,
 ): Result<string, readonly Diagnostic[]> {
   const needsQuotes =
-    /\s/u.test(value) || value.startsWith('"') || (positional && NAME_BEFORE_EQUALS.test(value));
+    /\s/u.test(value) ||
+    value.startsWith('"') ||
+    (positional && NAME_BEFORE_EQUALS.test(value)) ||
+    (field.kind === 'column' && !BARE_COLUMN.test(value));
   if (!needsQuotes) return ok(value);
   if (value.includes('"')) {
     return refuse(

@@ -62,15 +62,47 @@ export function relocated(problems: Problems, at: (range: SourceRange) => Source
   );
 }
 
-/** Splits `key,status` and `key, status` alike into names, each with its argument's range. */
+/**
+ * Splits `key,status` and `key, status` alike into names, each with its argument's range. A
+ * name written in quotes is marked quoted, so a verb that writes it reads it by the looser
+ * rule (TYTO-674): `select key, "Última Sync"` and `without=key,"Última Sync"` each name two
+ * columns. A whole quoted argument still splits at its commas, as `order="To Do,Done"` always
+ * has, so a quoted name cannot hold a comma.
+ */
 export function columnNames(argumentsWritten: readonly Argument[]): readonly Argument[] {
-  return argumentsWritten.flatMap((argument) =>
-    argument.value
-      .split(',')
-      .map((name) => name.trim())
-      .filter((name) => name !== '')
-      .map((name) => ({ value: name, range: argument.range })),
-  );
+  return argumentsWritten.flatMap((argument): Argument[] => {
+    if (argument.quoted === true) {
+      return argument.value
+        .split(',')
+        .map((name) => name.trim())
+        .filter((name) => name !== '')
+        .map((name) => ({ value: name, range: argument.range, quoted: true }));
+    }
+    return listMembers(argument.value).map((member) => {
+      const quoted = /^"([^"]*)"$/u.exec(member);
+      return quoted?.[1] === undefined
+        ? { value: member, range: argument.range }
+        : { value: quoted[1], range: argument.range, quoted: true };
+    });
+  });
+}
+
+/** The members of a comma list, trimmed, a quoted member kept whole with its quotes. */
+function listMembers(text: string): readonly string[] {
+  const members: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (const character of text) {
+    if (character === '"') inQuotes = !inQuotes;
+    if (character === ',' && !inQuotes) {
+      members.push(current);
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  members.push(current);
+  return members.map((member) => member.trim()).filter((member) => member !== '');
 }
 
 /**
@@ -92,12 +124,11 @@ export function argumentsUpTo(
 
 /**
  * Where a named argument's value starts in the file: after `name=` and, when it was quoted,
- * after the quote. A quoted value is two characters longer in the file than its value.
+ * after the quote. A quoted value or name is two characters longer in the file than it is.
  */
 export function namedValueOffset(argument: NamedArgument): number {
-  const written = argument.range.end - argument.range.start;
-  const quoted = written === argument.name.length + 1 + argument.value.length + 2;
-  return argument.range.start + argument.name.length + 1 + (quoted ? 1 : 0);
+  const name = argument.name.length + (argument.nameQuoted === true ? 2 : 0);
+  return argument.range.start + name + 1 + (argument.quoted === true ? 1 : 0);
 }
 
 /**

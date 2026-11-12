@@ -157,7 +157,7 @@ describe('formatStep', () => {
     [
       'a column that is no name',
       'compose',
-      { column: 'two words', template: 'x' },
+      { column: 'say "hi"', template: 'x' },
       'not a column name',
     ],
   ])('refuses %s', (_case, verb, values, message) => {

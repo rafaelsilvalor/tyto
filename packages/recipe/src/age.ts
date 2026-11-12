@@ -2,13 +2,12 @@ import { type Result, diagnostic, err, ok } from '@tyto/core';
 
 import type { NamedArgument } from './ast.js';
 import { type RunClock, instantOf, systemClock, wallClock } from './clock.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { withColumns } from './compose.js';
 import type { VerbContext, VerbResult } from './registry.js';
 import { argumentsProblem, locate, requireTable } from './support.js';
 import { type CellValue, cellText } from './table.js';
 
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 const NAMES = ['format', 'year', 'into', 'month-into'] as const;
 const MINUTE = 60_000;
 /** How far ahead of now an inferred year may put a stamp: a clock a day off still reads. */
@@ -222,11 +221,11 @@ export function age(context: VerbContext): VerbResult {
     return argumentsProblem(context, usage);
   }
   if (extra !== undefined) return argumentsProblem(context, usage, at(extra.range));
-  if (!COLUMN_NAME.test(into.value)) {
+  if (!isWritableColumnName(into.value, into.quoted)) {
     return argumentsProblem(context, `cannot write a column named '${into.value}'`, at(into.range));
   }
   const monthInto = written.get('month-into');
-  if (monthInto !== undefined && !COLUMN_NAME.test(monthInto.value)) {
+  if (monthInto !== undefined && !isWritableColumnName(monthInto.value, monthInto.quoted)) {
     return argumentsProblem(
       context,
       `cannot write a column named '${monthInto.value}'`,

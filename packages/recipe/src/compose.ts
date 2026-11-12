@@ -2,7 +2,7 @@ import { type Result, err, ok } from '@tyto/core';
 import { z } from 'zod';
 
 import type { Argument } from './ast.js';
-import { resolveColumn } from './columns.js';
+import { isWritableColumnName, resolveColumn } from './columns.js';
 import { isDataReference, readDataArgument } from './data.js';
 import type { VerbContext, VerbResult } from './registry.js';
 import {
@@ -22,8 +22,6 @@ import {
   cellText,
 } from './table.js';
 import { bindTemplate, parseTemplate, templateProblem } from './template.js';
-
-const COLUMN_NAME = /^[A-Za-z_][\w-]*$/u;
 
 /**
  * The table with `values` written into the columns named, each added at the end, or recomputed
@@ -92,6 +90,9 @@ export async function compose(context: VerbContext): Promise<VerbResult> {
   if (!flagged.ok) return flagged;
 
   const range = locate(context)(target.range);
+  if (!isWritableColumnName(target.name, target.nameQuoted)) {
+    return argumentsProblem(context, `cannot write a column named '${target.name}'`, range);
+  }
   const text = await templateText(context, target);
   if (!text.ok) return text;
   const template = parseTemplate(text.value);
@@ -135,7 +136,11 @@ export function collect(context: VerbContext): VerbResult {
 
   const [target, ...words] = context.step.positional;
   const sources = context.step.named.filter((argument) => argument.name === 'from');
-  if (target === undefined || sources.length !== 1 || !COLUMN_NAME.test(target.value)) {
+  if (
+    target === undefined ||
+    sources.length !== 1 ||
+    !isWritableColumnName(target.value, target.quoted)
+  ) {
     return argumentsProblem(
       context,
       'takes one column to write and from= the columns to read, as in collect keys ' +
