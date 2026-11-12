@@ -228,6 +228,17 @@ const forgetDropped = ViewPlugin.fromClass(
   },
 );
 
+/**
+ * The element of the output under the line starting at `lineStart` in this pane, or
+ * `undefined` when none is there or it was never drawn (TYTO-676): a block's toolbar acts on
+ * its result's own controls rather than keeping a second copy of their state.
+ */
+export function cellOutputAt(view: EditorView, lineStart: number): HTMLElement | undefined {
+  const value = view.state.field(outputsField, false);
+  const output = value?.placed.find((placed) => placed.lineStart === lineStart);
+  return output === undefined ? undefined : elementsOf(view).get(output.key);
+}
+
 /** Mount once; the host then dispatches `setCellOutputs` to say what goes where. */
 export function cellOutputs(): Extension {
   return [outputsField, forgetDropped];

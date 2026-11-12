@@ -123,3 +123,10 @@ one, and a key that works in the editor and not in a panel is worse than none.
   diagnostics past the plugins' and shows them at each entry's range. The previous version's
   `keybindings.json` is offered on a new version's first run with the other records (ADR 0036,
   TYTO-257).
+
+## Note, 2026-11-12 — a seventh context is decided (TYTO-676)
+
+ADR 0195 decision 7 amends decisions 2 and 6: a `notebook` context, focus on a recipe block's
+frame, outside the text, where a key with no modifier is valid as under `vim.*`, since nothing is
+typed there. It lands with the notebook's command mode, TYTO-676's third pull request; until then
+the six contexts above are the whole list.

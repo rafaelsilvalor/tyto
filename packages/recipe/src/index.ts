@@ -14,6 +14,15 @@ export type {
   RecipeParam,
   Step,
 } from './ast.js';
+export type { BlockEdit, RecipeBlock, RecipeBlockKind, TextChange } from './blocks.js';
+export {
+  applyChanges,
+  blockAtLine,
+  deleteBlock,
+  isMovable,
+  moveBlock,
+  recipeBlocks,
+} from './blocks.js';
 export { checkTable } from './check-table.js';
 export type { RunClock } from './clock.js';
 export { systemClock } from './clock.js';

@@ -235,6 +235,31 @@ describe('running a recipe cell by cell', () => {
     expect(calls).toMatchObject({ pull: 2, tag: 3 });
   });
 
+  // TYTO-676, ADR 0195: Run this block runs from the first changed cell to that block, and no
+  // further; the cells below it keep what they had, stale, and run when a run reaches them.
+  it('runs one block on request: from the first changed cell to it, and no further', async () => {
+    const { run, calls } = harness();
+    await run(RECIPE, { saved: true });
+    const edited = RECIPE.replace('acme.pull team={team}', 'acme.pull team=print');
+
+    const block = await run(edited, { explicit: true, from: 1, until: 1 });
+    expect(statuses(block)).toEqual(['ok', 'ok', 'stale', 'stale']);
+    expect(block.held).toBeUndefined();
+    expect(calls).toMatchObject({ pull: 2, tag: 2 });
+    // A stale cell below shows the table it had.
+    expect(block.cells[3]?.table?.rows.length).toBe(1);
+
+    // The block reruns though nothing changed above it, as a notebook's cell does.
+    const again = await run(edited, { explicit: true, from: 1, until: 1 });
+    expect(statuses(again)).toEqual(['ok', 'ok', 'stale', 'stale']);
+    expect(calls).toMatchObject({ pull: 2, tag: 3 });
+
+    // The next run reaches the stale cells and runs them.
+    const typed = await run(edited);
+    expect(statuses(typed)).toEqual(['ok', 'ok', 'ok', 'ok']);
+    expect(calls).toMatchObject({ pull: 2, tag: 3 });
+  });
+
   // The seam of ADR 0148 decision 10, through the default registries rather than a test's own:
   // a run asked to start fresh is the one that tells the source to skip its cache.
   it('tells the source to skip its cache only on a run asked to start fresh', async () => {

@@ -590,6 +590,16 @@ export interface Catalogue {
   readonly 'recipe.cell.included.show': string;
   readonly 'recipe.cell.included.hide': string;
   /**
+   * TYTO-676, a block's toolbar: its buttons' names, said as each one's title and to a screen
+   * reader; the buttons show a glyph. Folding uses `recipe.cell.collapse` and `expand`.
+   */
+  readonly 'recipe.block.run': string;
+  /** What a cell below the block the person ran says: it was not reached, nothing failed. */
+  readonly 'recipe.cell.held.block': string;
+  readonly 'recipe.block.up': string;
+  readonly 'recipe.block.down': string;
+  readonly 'recipe.block.delete': string;
+  /**
    * TYTO-379, a cell drawn full size in a tab of its own: the command, the cell's button, the
    * tab's label (`{name}` is the recipe's tab label, `{cell}` the cell's number from one) and
    * what the tab says while its cell has no result to draw.
@@ -1450,6 +1460,11 @@ export const CATALOGUE_KEYS = [
   'recipe.cell.expand',
   'recipe.cell.included.show',
   'recipe.cell.included.hide',
+  'recipe.block.run',
+  'recipe.cell.held.block',
+  'recipe.block.up',
+  'recipe.block.down',
+  'recipe.block.delete',
   'command.recipe.openCellView',
   'recipe.cell.openTab',
   'recipe.view.tab',

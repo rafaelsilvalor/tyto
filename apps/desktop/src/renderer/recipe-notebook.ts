@@ -76,10 +76,21 @@ export type LineMap = (at: number) => number | undefined;
 /** How a run was asked for: a pause in typing, a save, or Run recipe. */
 export type RecipeTrigger = 'typed' | 'saved' | 'explicit';
 
-/** Where a run starts: from a cell down (Run from here), or forgetting every kept cell. */
+/**
+ * Where a run starts: from a cell down (Run from here), or forgetting every kept cell; and,
+ * for Run this block (TYTO-676), the cell it stops after.
+ */
 export interface RecipeRunScope {
   readonly from?: number;
+  readonly until?: number;
   readonly fresh?: boolean;
+}
+
+/** The last answer shown for a document: its request's text, and its stop for Run this block. */
+export interface Shown {
+  readonly text: string;
+  readonly answer: RecipeRunAnswer;
+  readonly until?: number;
 }
 
 export interface RecipeNotebookOptions {
@@ -91,8 +102,17 @@ export interface RecipeNotebookOptions {
   readonly refusedWithoutReason: () => string;
   /** The document's text now, or `undefined` once its tab is gone. */
   readonly textOf: (documentId: string) => string | undefined;
-  /** The newest answer for a document, with the text its request carried. */
-  readonly show: (documentId: string, text: string, answer: RecipeRunAnswer) => void;
+  /**
+   * The newest answer for a document, with the text its request carried, and the cell its
+   * request stopped after when it was Run this block (TYTO-676): the cells below it are stale
+   * because the person ran a block, not because anything failed.
+   */
+  readonly show: (
+    documentId: string,
+    text: string,
+    answer: RecipeRunAnswer,
+    until?: number,
+  ) => void;
   /** The pause, in milliseconds; the brief's compile waits as long. */
   readonly delay: number;
   /** Injected so a test drives time itself. */
@@ -109,6 +129,11 @@ export interface RecipeNotebook {
   runNow(documentId: string, trigger: RecipeTrigger, scope?: RecipeRunScope): Promise<void>;
   /** Run from here: Run, from this cell down whatever changed. */
   runFrom(documentId: string, index: number): Promise<void>;
+  /**
+   * Run this block (TYTO-676, ADR 0195): Run, from the first changed cell to cell `index` and no
+   * further. The cell itself runs even when nothing above it changed, as a notebook's does.
+   */
+  runBlock(documentId: string, index: number): Promise<void>;
   /** Fetch again: Run, the whole document, every source skipping its cache. */
   fetchAgain(documentId: string): Promise<void>;
   /** Apply: the plan main stamped `planId` on cell `index`, shown again once main answers. */
@@ -120,9 +145,7 @@ export interface RecipeNotebook {
   /** Shows every open recipe's last answer again: the window's language changed. */
   reshow(): void;
   /** The last answer shown for a document, with the text its request carried. */
-  lastOf(
-    documentId: string,
-  ): { readonly text: string; readonly answer: RecipeRunAnswer } | undefined;
+  lastOf(documentId: string): Shown | undefined;
   /**
    * The cells whose table the person folded, while the tab is open, by the start of the cell's
    * line ({@link CellStatus.at}): an index names another cell once a step is inserted above.
@@ -160,6 +183,11 @@ export interface RecipeNotebook {
   /** What a full-size tab's view keeps across a rebuild (TYTO-639), apart from its cell's. */
   tabViewOf(tabId: string): RecipeViewState;
   keepTabView(tabId: string, state: RecipeViewState): void;
+  /**
+   * The cell of the last answer whose line starts at `at` in the text as it is now (TYTO-676),
+   * as a full-size tab finds its cell; `undefined` when no cell of the answer is on that line.
+   */
+  cellAt(documentId: string, at: number): WireCell | undefined;
   /** The tab closed: nothing waits for it, an answer on its way is dropped, and all is forgotten. */
   close(documentId: string): void;
 }
@@ -174,7 +202,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const waiting = new Map<string, unknown>();
   /** The newest request per document: every other answer is dropped. */
   const newest = new Map<string, number>();
-  const last = new Map<string, { readonly text: string; readonly answer: RecipeRunAnswer }>();
+  const last = new Map<string, Shown>();
   const collapsed = new Map<string, Set<number>>();
   const expanded = new Map<string, Set<number>>();
   const applying = new Map<string, Set<number>>();
@@ -195,7 +223,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
 
   const reshowOne = (documentId: string): void => {
     const shown = last.get(documentId);
-    if (shown !== undefined) options.show(documentId, shown.text, shown.answer);
+    if (shown !== undefined) options.show(documentId, shown.text, shown.answer, shown.until);
   };
 
   const cancel = (documentId: string): void => {
@@ -224,14 +252,19 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       ...(trigger === 'saved' ? { saved: true } : {}),
       ...(trigger === 'explicit' ? { explicit: true } : {}),
       ...(scope.from === undefined ? {} : { from: scope.from }),
+      ...(scope.until === undefined ? {} : { until: scope.until }),
       ...(scope.fresh === true ? { fresh: true } : {}),
     });
     if (!isNewest(newest, documentId, answer.requestId)) return;
-    last.set(documentId, { text, answer });
+    last.set(documentId, {
+      text,
+      answer,
+      ...(scope.until === undefined ? {} : { until: scope.until }),
+    });
     places.set(documentId, placesOf(text, answer, since.get(documentId) ?? []));
     // A refusal is said once: the run that follows it has the cell's own word.
     refusals.delete(documentId);
-    options.show(documentId, text, answer);
+    options.show(documentId, text, answer, scope.until);
   };
 
   const apply = async (documentId: string, index: number, planId: number): Promise<void> => {
@@ -255,7 +288,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       // Only onto the cell still showing this plan: a run since may have planned it again.
       if (before?.plan?.planId === planId) {
         const cellsNow = shown.answer.cells.map((cell) => (cell.index === index ? after : cell));
-        last.set(documentId, { text: shown.text, answer: { ...shown.answer, cells: cellsNow } });
+        last.set(documentId, { ...shown, answer: { ...shown.answer, cells: cellsNow } });
       }
       refusals.get(documentId)?.delete(index);
     } else {
@@ -284,12 +317,15 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     runNow,
     // Both are Run, the person's approval: they fetch, and they run in a folder not trusted.
     runFrom: (documentId, index) => runNow(documentId, 'explicit', { from: index }),
+    runBlock: (documentId, index) => runNow(documentId, 'explicit', { from: index, until: index }),
     fetchAgain: (documentId) => runNow(documentId, 'explicit', { fresh: true }),
     apply,
     applyingOf: (documentId) => applying.get(documentId) ?? new Set(),
     refusalsOf: (documentId) => refusals.get(documentId) ?? new Map(),
     reshow() {
-      for (const [documentId, shown] of last) options.show(documentId, shown.text, shown.answer);
+      for (const [documentId, shown] of last) {
+        options.show(documentId, shown.text, shown.answer, shown.until);
+      }
     },
     lastOf: (documentId) => last.get(documentId),
     collapsedOf: (documentId) => collapsed.get(documentId) ?? new Set(),
@@ -344,6 +380,13 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       if (tab?.at === undefined) return undefined;
       for (const [index, at] of places.get(tab.documentId) ?? []) {
         if (at === tab.at) return index;
+      }
+      return undefined;
+    },
+    cellAt(documentId, at) {
+      for (const [index, place] of places.get(documentId) ?? []) {
+        if (place !== at) continue;
+        return last.get(documentId)?.answer.cells.find((cell) => cell.index === index);
       }
       return undefined;
     },
@@ -531,11 +574,14 @@ export function cellStatuses(
   text: string,
   answer: Pick<RecipeRunAnswer, 'cells' | 'held'>,
   locale: Locale,
+  until?: number,
 ): readonly CellStatus[] {
   const starts = lineStarts(text);
   const statuses: CellStatus[] = [];
   for (const cell of answer.cells) {
-    const said = statusText(cell, answer.held, locale);
+    // TYTO-676: a cell below the block the person ran was not reached, and nothing failed.
+    const below = until !== undefined && cell.index > until;
+    const said = statusText(cell, answer.held, locale, below);
     if (said === undefined) continue;
     const at = starts[Math.min(cell.line, starts.length) - 1] ?? 0;
     statuses.push({
@@ -559,6 +605,7 @@ export function statusText(
   },
   held: RecipeRunAnswer['held'],
   locale: Locale,
+  belowBlock = false,
 ): string | undefined {
   const say = (key: CatalogueKey): string => translate(locale, key);
   switch (cell.status) {
@@ -569,6 +616,7 @@ export function statusText(
     case 'stale':
       if (held === 'source') return say('recipe.cell.held.source');
       if (held === 'restricted') return say('recipe.cell.held.restricted');
+      if (belowBlock) return say('recipe.cell.held.block');
       // `apply` holds no cell stale (it stops after the plans): the plan view says it.
       return say('recipe.cell.stale');
     case 'ok':

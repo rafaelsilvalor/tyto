@@ -2919,6 +2919,8 @@ export const IPC_CHANNELS = {
       documentId,
       text: z.string().max(1_000_000),
       from: z.number().int().nonnegative().optional(),
+      /** TYTO-676, ADR 0195: Run this block stops after this cell; those below stay stale. */
+      until: z.number().int().nonnegative().optional(),
       explicit: z.boolean().optional(),
       saved: z.boolean().optional(),
       fresh: z.boolean().optional(),

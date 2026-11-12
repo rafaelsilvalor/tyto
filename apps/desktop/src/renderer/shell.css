@@ -1002,6 +1002,67 @@ tyto-preview-pane[hidden] {
   height: 100%;
 }
 
+/* A recipe's blocks (TYTO-676, ADR 0195): each block's lines on a quiet band with an accent bar
+   at the left, brighter on the block holding the caret, so the eye reads blocks and the text
+   stays text. The toolbar sits at the right of the block's first line, out of the text's way,
+   always shown (TYTO-377: a person sees what a block offers before reaching for it). */
+.cm-notebook-frame {
+  position: relative;
+  border-left: var(--tyto-focus-width) solid var(--tyto-border);
+  background: var(--tyto-surface-raised);
+}
+
+.cm-notebook-frame--active {
+  border-left-color: var(--tyto-accent);
+}
+
+.cm-notebook-frame--first {
+  padding-right: 9rem;
+  /* A hairline over each block's first line parts two blocks with no blank line between them.
+     A shadow, not a border: it adds no height, so CodeMirror's line measures stay true. */
+  box-shadow: inset 0 var(--tyto-hairline-width) 0 var(--tyto-border);
+}
+
+.cm-notebook-frame--note {
+  font-style: italic;
+}
+
+.cm-notebook-frame--header {
+  background: none;
+}
+
+.recipe-block-toolbar {
+  position: absolute;
+  top: 0;
+  right: var(--tyto-space-2);
+  display: inline-flex;
+  gap: var(--tyto-space-1);
+  font-style: normal;
+  user-select: none;
+}
+
+.recipe-block-toolbar__button {
+  min-width: 1.6em;
+  padding: 0 var(--tyto-space-1);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm);
+  background: var(--tyto-surface);
+  color: var(--tyto-text-muted);
+  font: inherit;
+  font-size: var(--tyto-text-sm);
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.recipe-block-toolbar__button:hover:not(:disabled) {
+  color: var(--tyto-text);
+}
+
+.recipe-block-toolbar__button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* The line under a recipe's cell (TYTO-377): muted and smaller than the text, so it reads as
    the cell's result and not as a line of the recipe. A failure is muted too (Rafael): its
    marker and its Problems row are what draw the eye. */
@@ -1046,7 +1107,9 @@ tyto-preview-pane[hidden] {
   font-size: var(--tyto-text-sm);
 }
 
-.recipe-cell--collapsed > .recipe-cell__body {
+/* A folded result keeps only its header (TYTO-676): a table, a view, a plan's lines and a run
+   cell's included cells all fold with it. */
+.recipe-cell--collapsed > :not(.recipe-cell-status) {
   display: none;
 }
 

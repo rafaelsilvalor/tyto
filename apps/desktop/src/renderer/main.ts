@@ -19,8 +19,10 @@ import {
   directiveLabel,
   formatBriefInView,
   mapLineStarts,
+  notebookFrames,
   previewBlock,
   recipeCompletion,
+  refreshNotebookFrames,
   setCellOutputs,
   briefCompletion,
   briefLint,
@@ -124,7 +126,14 @@ import { type RecipeStepDialog, RECIPE_STEP_TAG } from './recipe-step-dialog.js'
 import { formOfEntry, valuesOfLine } from './recipe-step-form.js';
 import type { VerbEntry } from './recipe-step-picker.js';
 import { vocabularyAssist } from './vocabulary-assist.js';
-import { AGE_TICK, type CellViewContext, cellOutputOf, tickAges } from './recipe-cell-view.js';
+import {
+  AGE_TICK,
+  type CellViewContext,
+  cellOutputOf,
+  hasFoldableResult,
+  tickAges,
+} from './recipe-cell-view.js';
+import { type BlockHost, recipeFrames } from './recipe-blocks-view.js';
 import { type ViewContext, fullSizeBody } from './recipe-views.js';
 import {
   type Diagnostic,
@@ -806,6 +815,8 @@ const appFileAssists: AppFileAssists = {
         }) ?? Promise.resolve({ files: [], pointers: [] }),
     ),
     cellOutputs(),
+    // TYTO-676, ADR 0195: each block framed, with its toolbar, over the one editor.
+    notebookFrames({ framesOf: (view) => recipeFrames(view, recipeBlockHost) }),
   ],
   // A vocabulary's (TYTO-402, ADR 0176): its sections and fields, and what a key is, from main.
   vocabulary: [
@@ -915,6 +926,32 @@ const recipeNotebook = createRecipeNotebook({
   show: showRecipeAnswer,
   delay: PREVIEW_DELAY,
 });
+
+/**
+ * What a recipe's block toolbars ask of the window (TYTO-676, `recipe-blocks-view.ts`): which
+ * document a pane shows, whether a block's result folds and is folded, and Run this block.
+ */
+const recipeBlockHost: BlockHost = {
+  locale: () => state.locale,
+  documentOf: (view) => {
+    for (const [groupId, pane] of panes) if (pane.view === view) return shownIn.get(groupId);
+    return undefined;
+  },
+  foldable: (documentId, at) => {
+    const cell = recipeNotebook.cellAt(documentId, at);
+    return cell !== undefined && hasFoldableResult(cell);
+  },
+  collapsed: (documentId, at) => recipeNotebook.collapsedOf(documentId).has(at),
+  runBlock: (documentId, step) => void recipeNotebook.runBlock(documentId, step),
+};
+
+/** Every pane showing a document reads its blocks' frames again: a toolbar's state changed. */
+function refreshRecipeFrames(documentId: string): void {
+  for (const [groupId, shown] of shownIn) {
+    if (shown === documentId)
+      panes.get(groupId)?.view.dispatch({ effects: refreshNotebookFrames.of(null) });
+  }
+}
 
 // Every age under a recipe's cells, rewritten in place: the elements and their keys stay.
 setInterval(() => {
@@ -1029,7 +1066,12 @@ function openedRecipe(documentId: string): void {
  * given the lines, as `setFileDiagnostics` gives the markers; a tab not shown keeps them in its
  * state for when it is.
  */
-function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAnswer): void {
+function showRecipeAnswer(
+  documentId: string,
+  text: string,
+  answer: RecipeRunAnswer,
+  until?: number,
+): void {
   setFileDiagnostics(documentId, text, answerDiagnostics(answer));
   // A cell drawn full size follows the newest answer too, typed past or not (TYTO-379).
   paintRecipeViews();
@@ -1056,6 +1098,8 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
       apply: (index, planId) => void recipeNotebook.apply(documentId, index, planId),
       toggled: (at, collapsed) => {
         recipeNotebook.setCollapsed(documentId, at, collapsed);
+        // TYTO-676: the block's toolbar says folded or open as the result's own toggle does.
+        refreshRecipeFrames(documentId);
       },
       // TYTO-449: opening a `run` cell draws what the answer carried; it asks main for nothing.
       expandedIncluded: (at, open) => {
@@ -1071,8 +1115,12 @@ function showRecipeAnswer(documentId: string, text: string, answer: RecipeRunAns
       },
     },
   };
-  const statuses = cellStatuses(text, answer, state.locale);
-  const effects = setCellOutputs.of(statuses.map((status) => cellOutputOf(status, context)));
+  const statuses = cellStatuses(text, answer, state.locale, until);
+  // TYTO-676: the block toolbars read the new answer too (which results fold).
+  const effects = [
+    setCellOutputs.of(statuses.map((status) => cellOutputOf(status, context))),
+    refreshNotebookFrames.of(null),
+  ];
   const showing = [...shownIn]
     .filter(([, shown]) => shown === documentId)
     .flatMap(([groupId]) => panes.get(groupId) ?? []);

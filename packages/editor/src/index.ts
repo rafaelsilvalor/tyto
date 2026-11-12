@@ -236,6 +236,7 @@ export {
 
 export {
   type CellOutput,
+  cellOutputAt,
   cellOutputLineStart,
   cellOutputs,
   cellOutputsOf,
@@ -244,6 +245,12 @@ export {
   remeasureCellOutput,
   setCellOutputs,
 } from './cell-outputs.js';
+export {
+  type NotebookFrame,
+  type NotebookFramesOptions,
+  notebookFrames,
+  refreshNotebookFrames,
+} from './notebook-frames.js';
 export {
   type Proposal,
   type ProposalLabels,
