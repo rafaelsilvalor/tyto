@@ -511,6 +511,7 @@ export const ptBR: Catalogue = {
     'A pasta dele e as permissões aprovadas para ele são apagadas. Ele para na próxima vez que o Tyto abrir.',
   'plugins.remove.confirm': 'Remover',
   'plugins.remove.cancel': 'Cancelar',
+  'plugins.remove.forget': 'Também esquecer as credenciais e os logins salvos deste plugin',
   'plugins.picker.archive': 'Arquivo de plugin',
   'plugins.signin.label': 'Login',
   'plugins.signin.as': 'Conectado como {label}',

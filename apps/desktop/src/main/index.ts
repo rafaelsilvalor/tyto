@@ -120,6 +120,7 @@ import {
   type ShowBox,
   approveInstallInABox,
   confirmRemoveInABox,
+  forgetPluginSecrets,
   createPluginManager,
 } from './plugin-manage.js';
 import desktopManifest from './desktop.tyto-plugin.json';
@@ -2160,6 +2161,7 @@ async function start(): Promise<void> {
         },
         approve: approveInstallInABox(showManageBox, (key) => translate(uiLocale, key)),
         confirmRemove: confirmRemoveInABox(showManageBox, (key) => translate(uiLocale, key)),
+        forgetSecrets: (name) => forgetPluginSecrets(credentials, name),
       }),
     },
     panels,

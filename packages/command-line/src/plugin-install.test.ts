@@ -314,14 +314,22 @@ describe('disable, enable and remove', () => {
     expect((await listed()).at(-1)).toMatchObject({ name: 'texto', status: 'disabled' });
     expect((await listed('--active')).map((plugin) => plugin.name)).not.toContain('texto');
 
+    out = [];
     expect(await run(['plugin', 'enable', 'texto'], environment())).toBe(EXIT_OK);
+    // Only a remove speaks of secrets.
+    expect(stdout()).toBe('Enabled texto.\n');
     expect((await listed('--active')).map((plugin) => plugin.name)).toContain('texto');
   });
 
   it('removes the folder and the approval together', async () => {
     await run(['plugin', 'install', await pluginFolder(), '--yes'], environment());
 
+    out = [];
     expect(await run(['plugin', 'remove', 'texto'], environment())).toBe(EXIT_OK);
+    // TYTO-682: the CLI never touches the desktop's keychain, and says so in one line.
+    expect(stdout()).toBe(
+      "Removed texto.\nSaved credentials and sign-ins, if any, stay in the desktop app's keychain; to forget them, remove the plugin from the desktop app instead.\n",
+    );
 
     expect((await listed()).map((plugin) => plugin.name)).not.toContain('texto');
     expect(JSON.parse(await readFile(join(home, 'plugins.json'), 'utf8'))).toEqual({ plugins: {} });

@@ -822,6 +822,7 @@ export interface Catalogue {
   readonly 'plugins.remove.detail': string;
   readonly 'plugins.remove.confirm': string;
   readonly 'plugins.remove.cancel': string;
+  readonly 'plugins.remove.forget': string;
   readonly 'plugins.picker.archive': string;
   /**
    * TYTO-374, ADR 0174: a plugin's browser sign-ins on its row, who is signed in and the two
@@ -1612,6 +1613,7 @@ export const CATALOGUE_KEYS = [
   'plugins.remove.detail',
   'plugins.remove.confirm',
   'plugins.remove.cancel',
+  'plugins.remove.forget',
   'plugins.picker.archive',
   'plugins.signin.label',
   'plugins.signin.as',

@@ -33,6 +33,8 @@ On an installed plugin's row:
 
 A plugin that comes with Tyto has no buttons. Plugins installed from the gallery are managed in the gallery.
 
+The remove box has a checkbox, **Also forget this plugin's saved credentials and sign-ins**, which starts unticked. Unticked, what you saved for the plugin in the system keychain stays — its credentials, its sign-ins and any sign-in client you entered — and installing the plugin again finds all of it. Ticked, all of it is deleted along with the folder, and that cannot be undone: a reinstall finds nothing, and you sign in again. Nothing of any other plugin is touched. `tyto plugin remove` never forgets them; it says so when it finishes.
+
 The window starts plugins when it opens, so every change takes effect the next time you open Tyto: until then the row says _restart to apply_. A plugin switched off is shown as _disabled_, and what it added — its templates, its themes — is gone from the window once Tyto starts again.
 
 The same changes can be made from a terminal, with the commands in [Plugins](../command-line/plugins.md):
