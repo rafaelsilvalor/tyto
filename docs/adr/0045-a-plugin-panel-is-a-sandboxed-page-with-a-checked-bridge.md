@@ -98,3 +98,11 @@ or format comes to the front, not only on a pause in typing. A second event,
 window's language changes, so a panel can follow it as the rest of the window does. Both are
 additive: a page written for the first shape keeps working, and a page for the new one falls
 back when a field is absent. The plugins screen's disclosure names the name and format too.
+
+## Note, 2026-11-12 — the bridge no longer reads a credential (TYTO-641)
+
+The bridge above lists `credentials` among a page's requests. Since TYTO-641 main answers it with
+`E_PANEL_CREDENTIAL_READ`, before any permission check, and the page reaches a secret's effect
+through its plugin's `call` (ADR 0173, note of the same date). A panel still stores and forgets
+its plugin's declared keys (ADR 0134), so the bridge carries the plugin's `credentials:`
+permissions for writing only.
