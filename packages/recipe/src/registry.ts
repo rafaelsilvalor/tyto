@@ -138,6 +138,7 @@ export const GENERIC_VERBS = [
   'stamp',
   'group',
   'count',
+  'warn',
   'to-brief',
   'call',
 ] as const;

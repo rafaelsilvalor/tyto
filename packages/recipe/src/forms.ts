@@ -399,6 +399,20 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       named('into', 'column', false, 'The number column to write.', { default: 'count' }),
     ]),
     form(
+      'warn',
+      'Reports each row an expression keeps as a warning of the run.',
+      'warn when="status = blocked" message="{key|} is blocked"',
+      [
+        named('when', 'expression', true, 'The rows reported.'),
+        named(
+          'message',
+          'template',
+          true,
+          'What the warning says of each row, or a data reference.',
+        ),
+      ],
+    ),
+    form(
       'to-brief',
       'Plans one brief per row in a template, written on Apply.',
       'to-brief template=poster into=briefs name=key slots=title:title',

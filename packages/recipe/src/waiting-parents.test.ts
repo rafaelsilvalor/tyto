@@ -134,11 +134,22 @@ async function pushArtwork(
   }
 }
 
+/** Buraqueira's `avisar` when a design it had sent comes back: the person moves the parent. */
+const REOPENED_WARNING =
+  'warn when="last_status = done AND status != done" ' +
+  'message="{key|} was reopened; its parent {parent|} does not move back on its own"';
+
+/** The run report's line for a parent that waited too long, which the table alone loses. */
+const EXPIRED_WARNING =
+  'warn when="still_waiting = expired" ' +
+  'message="{parent|} waited {waited|} hours for its animation and is no longer waited for"';
+
 const WAITING_PARENTS = [
-  'last pushed columns=applied_at',
+  'last pushed columns=status,applied_at',
+  REOPENED_WARNING,
   'where status = done AND last_applied_at is not empty',
   // EXPIRY's own `last` adds `last_stored_at` again.
-  'select without=last_applied_at,last_stored_at',
+  'select without=last_status,last_applied_at,last_stored_at',
   'recall waiting by=parent mark=recalled',
   'test.refetch',
   'rules into=decision using=@./parents.json#/decision',
@@ -146,6 +157,7 @@ const WAITING_PARENTS = [
   'map decision using=@./parents.json#/target into=target',
   'path from=parent_status to=target graph=@./parents.json#/graph avoid=@./parents.json#/avoid into=move',
   ...EXPIRY.slice(1),
+  EXPIRED_WARNING,
 ];
 
 /** The artwork task `T-0` in `status`, under the parent `P-100`. */
@@ -166,9 +178,20 @@ function after(hours: number): RunClock {
 /**
  * One run at `hours` after the first, committing what it remembers as an applied plan would, or
  * nothing at all when `dryRun` stands for a run whose plan was never applied. The input's
- * artwork tasks were pushed before it, and that push `applied` or `failed`.
+ * artwork tasks were pushed before it, and that push `applied` or `failed`; `skipped` stands for
+ * a run that reads what an earlier run pushed before it pushes again.
  */
 async function runOnce(
+  state: ReturnType<typeof memoryState>,
+  tracker: Tracker,
+  input: Table,
+  options: Parameters<typeof runReported>[3] = {},
+) {
+  return (await runReported(state, tracker, input, options)).table;
+}
+
+/** `runOnce`, answering the warnings the run reported beside its table. */
+async function runReported(
   state: ReturnType<typeof memoryState>,
   tracker: Tracker,
   input: Table,
@@ -176,10 +199,10 @@ async function runOnce(
     hours = 0,
     dryRun = false,
     lines = WAITING_PARENTS,
-    pushed = 'applied' as 'applied' | 'failed',
+    pushed = 'applied' as 'applied' | 'failed' | 'skipped',
   } = {},
 ) {
-  await pushArtwork(state, input, pushed);
+  if (pushed !== 'skipped') await pushArtwork(state, input, pushed);
   const ran = await run(
     lines,
     input,
@@ -192,7 +215,11 @@ async function runOnce(
   for (const commit of stateToCommit(ran.run.remembers, outcome)) {
     await state.write(commit.store, commit.puts, commit.deletes);
   }
-  return ran.table;
+  const warnings = ran.run.cells
+    .flatMap((cell) => cell.diagnostics)
+    .filter(({ code }) => code === 'W_RECIPE_WARN')
+    .map(({ message }) => message);
+  return { table: ran.table, warnings };
 }
 
 const stored = (state: ReturnType<typeof memoryState>, store: string) =>
@@ -243,7 +270,14 @@ describe('waiting parents, ported from processar_pais', () => {
     const state = memoryState({
       waiting: { 'P-100': { since: '2026-09-01 08:00', decision: 'wait-animation' } },
     });
-    const table = await runOnce(state, parentWithAnimation('doing', false), EMPTY_SHEET);
+    const { table, warnings } = await runReported(
+      state,
+      parentWithAnimation('doing', false),
+      EMPTY_SHEET,
+    );
+    expect(warnings).toEqual([
+      "Row 'P-100': P-100 waited 721 hours for its animation and is no longer waited for",
+    ]);
     expect(column(table, 'waited')).toEqual([721]);
     expect(column(table, 'still_waiting')).toEqual(['expired']);
     expect(column(table, 'move')).toEqual([null]);
@@ -278,12 +312,40 @@ describe('waiting parents, ported from processar_pais', () => {
     }
   });
 
-  it.todo(
-    'design_reaberto_avisa: warns that the parent does not move back on its own — needs a ' +
-      'verb that raises a warning diagnostic for each row a where keeps (for example ' +
-      'warn when="last_status = done AND status != done"), since a rules column is dropped by ' +
-      'the where after it and never reaches the run report',
-  );
+  it('design_reaberto_avisa: a reopened artwork warns that its parent does not move back', async () => {
+    // The artwork reached the tracker done in an earlier run, and is back in review now.
+    const state = memoryState({
+      pushed: { 'T-0': { status: 'done', applied_at: '2026-09-30T18:00:00.000Z' } },
+    });
+    const { table, warnings } = await runReported(
+      state,
+      parentWithAnimation('to-post', true),
+      artwork('review'),
+      { pushed: 'skipped' },
+    );
+    expect(warnings).toEqual([
+      "Row 'T-0': T-0 was reopened; its parent P-100 does not move back on its own",
+    ]);
+    // The warning outlives the where that drops the row: the table is empty.
+    expect(column(table, 'key')).toEqual([]);
+    expect(stored(state, 'waiting')).toEqual({});
+  });
+
+  it('design_reaberto_avisa: an artwork still done, or never pushed, warns of nothing', async () => {
+    const state = memoryState({
+      pushed: { 'T-0': { status: 'done', applied_at: '2026-09-30T18:00:00.000Z' } },
+    });
+    const still = await runReported(state, parentWithAnimation('doing', false), artwork('done'), {
+      pushed: 'skipped',
+    });
+    expect(still.warnings).toEqual([]);
+    const never = await runReported(
+      memoryState(),
+      parentWithAnimation('doing', true),
+      artwork('review'),
+    );
+    expect(never.warnings).toEqual([]);
+  });
 
   it('estado_guarda_as_pais_esperando: the waiting parents live in a store of their own', async () => {
     const state = memoryState();
