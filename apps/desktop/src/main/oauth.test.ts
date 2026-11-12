@@ -10,7 +10,7 @@ import {
   parseTokenAnswer,
   pkceChallenge,
   refreshTokens,
-} from './oauth.js';
+} from '@tyto/plugin-api';
 
 /** RFC 7636 appendix B: the 32 octets, the verifier they make, and its S256 challenge. */
 const RFC_OCTETS = [

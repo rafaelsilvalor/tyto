@@ -128,3 +128,11 @@ then the plugins screen, the user manual and an end-to-end test against a fake p
   A callback arriving afterwards finds the port closed and gets no answer. `signin:cancel`
   answers `cancelled: false` when no attempt was waiting, and is rejected for a sign-in nobody
   declares, as `signin:out` is.
+- 2026-11-12 (TYTO-683, first pull request): **decision 8's flow is no longer the desktop's
+  own.** The PKCE and token-endpoint code and the sign-in service moved from
+  `apps/desktop/src/main` to `@tyto/plugin-api` (`src/signin-host/`), with the loopback
+  listener as a port, `CallbackListen`, whose adapter `listenForCallback` is in `@tyto/io`, so
+  a second host can compose the same flow. Nothing decided here changes: the desktop composes
+  them with `safeStorage`, `net.fetch` and `shell.openExternal` as before, and keeps the
+  plugins screen's channels and the callback page's words. The CLI's sign-in, and what it
+  amends here and in ADR 0134, is for ADR 0194, reserved.

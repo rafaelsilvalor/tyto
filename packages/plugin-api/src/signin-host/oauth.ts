@@ -1,5 +1,6 @@
-import type { ResolvedSigninDeclaration } from '@tyto/plugin-api';
 import { z } from 'zod';
+
+import type { ResolvedSigninDeclaration } from '../manifest.js';
 
 /**
  * OAuth 2.0 with PKCE as a protocol, for a browser sign-in the host runs (ADR 0174).
@@ -9,27 +10,89 @@ import { z } from 'zod';
  * and its challenge, how to spell the authorize URL, how to trade a code and a refresh token at
  * a token endpoint — and nothing about who answers.
  *
- * The network is an argument, never imported: main binds it to `net.fetch`, so the system's
- * proxy applies, and a test binds it to a function that answers what the test needs.
+ * The network is an argument, never imported: the desktop binds it to `net.fetch`, so the
+ * system's proxy applies, and a test binds it to a function that answers what the test needs.
+ *
+ * It moved here from the desktop's main (TYTO-683) so a second host can run the same flow, and
+ * this package compiles against no platform's types (ADR 0010): what it needs of the runtime is
+ * read off `globalThis` below, and base64url is spelled out instead of borrowed from `Buffer`.
  */
+
+const { URL, URLSearchParams, TextEncoder, TextDecoder, crypto } = globalThis as unknown as {
+  URL: new (input: string) => {
+    readonly searchParams: {
+      set(name: string, value: string): void;
+      delete(name: string): void;
+    };
+    toString(): string;
+  };
+  URLSearchParams: new (init: Record<string, string>) => {
+    set(name: string, value: string): void;
+    toString(): string;
+  };
+  TextEncoder: new () => { encode(text: string): Uint8Array };
+  TextDecoder: new (
+    label: string,
+    options: { fatal: boolean },
+  ) => {
+    decode(bytes: Uint8Array): string;
+  };
+  crypto: {
+    getRandomValues(bytes: Uint8Array): Uint8Array;
+    readonly subtle: { digest(algorithm: string, data: Uint8Array): Promise<ArrayBuffer> };
+  };
+};
+
+const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 /** Random bytes, from WebCrypto unless a test hands over its own. */
 export type RandomBytes = (length: number) => Uint8Array;
 
-const webCryptoRandom: RandomBytes = (length) =>
-  globalThis.crypto.getRandomValues(new Uint8Array(length));
+const webCryptoRandom: RandomBytes = (length) => crypto.getRandomValues(new Uint8Array(length));
 
 /** Base64url without padding (RFC 7636 appendix A), what both the verifier and state use. */
 export function base64Url(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString('base64url');
+  let text = '';
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index] ?? 0;
+    const second = bytes[index + 1];
+    const third = bytes[index + 2];
+    const triple = (first << 16) | ((second ?? 0) << 8) | (third ?? 0);
+    text += BASE64URL_ALPHABET.charAt((triple >> 18) & 63);
+    text += BASE64URL_ALPHABET.charAt((triple >> 12) & 63);
+    if (second !== undefined) text += BASE64URL_ALPHABET.charAt((triple >> 6) & 63);
+    if (third !== undefined) text += BASE64URL_ALPHABET.charAt(triple & 63);
+  }
+  return text;
+}
+
+/**
+ * The text a base64url segment holds, as UTF-8, read the way `Buffer.from(…, 'base64url')`
+ * read it before the move: padding tolerated, trailing bits that make no byte dropped, and a
+ * sequence that is not UTF-8 decoded as U+FFFD. A character outside the alphabet is
+ * `undefined`, which the one caller already answered for anything it could not parse.
+ */
+function fromBase64Url(segment: string): string | undefined {
+  const unpadded = segment.replace(/=+$/, '');
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const character of unpadded) {
+    const value = BASE64URL_ALPHABET.indexOf(character);
+    if (value === -1) return undefined;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 255);
+    }
+  }
+  return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes));
 }
 
 /** The challenge for a verifier, `S256`: base64url of its SHA-256 (RFC 7636 section 4.2). */
 export async function pkceChallenge(verifier: string): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(verifier),
-  );
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   return base64Url(new Uint8Array(digest));
 }
 
@@ -81,7 +144,7 @@ export function authorizeUrl(request: AuthorizeRequest): string {
   return url.toString();
 }
 
-/** `net.fetch`, as far as a token request calls it. */
+/** `net.fetch` or the global `fetch`, as far as a token request calls it. */
 export type TokenFetch = (
   url: string,
   init: {
@@ -248,10 +311,10 @@ export function labelFromIdToken(idToken: string | undefined): string | undefine
   if (idToken === undefined) return undefined;
   const payload = idToken.split('.')[1];
   if (payload === undefined) return undefined;
+  const json = fromBase64Url(payload);
+  if (json === undefined) return undefined;
   try {
-    const claims = idTokenClaimsSchema.safeParse(
-      JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')),
-    );
+    const claims = idTokenClaimsSchema.safeParse(JSON.parse(json));
     if (!claims.success) return undefined;
     return claims.data.email ?? claims.data.name;
   } catch {

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Credentials } from './credentials.js';
 import { desktopCapabilities } from './installed-plugins.js';
-import type { TokenFetch } from './oauth.js';
+import type { TokenFetch } from '@tyto/plugin-api';
 import {
   DEFAULT_SIGNIN_LABEL,
   type SigninService,
@@ -19,7 +19,8 @@ import {
   signinCapabilities,
   signinWindow,
 } from './signin.js';
-import { type CallbackPage, type ListenOptions, listenForCallback } from './loopback.js';
+import { type CallbackPage, type ListenOptions } from '@tyto/plugin-api';
+import { listenForCallback } from '@tyto/io';
 import { translate } from '../../shared/i18n/index.js';
 
 /**
