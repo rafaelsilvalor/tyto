@@ -76,6 +76,14 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
    > in place as `map` rewrites its `into=`, so a synced sheet's column keeps its header. A
    > failed write still leaves that row's state as it was (decision 4), now covered end to end
    > by `last`, `decide`, `remember` and `stateToCommit` in one test.
+   >
+   > **Amended by TYTO-647 (2026-11-12).** `decide` also writes `<column>_pushes`, a boolean
+   > true exactly on push rows whatever the decided value, and false on every other row.
+   > `<column>_push` is empty both where nothing is pushed and where an empty value would be, so
+   > a write that chose its rows by it could not push a cleared field; the boolean is what a
+   > remote write's row filter reads, and `_push` stays the value written. Today an empty local
+   > value still never pushes (`decideValue`, ported from `decidir_responsavel`), so the boolean
+   > and a non-empty `_push` agree until a clear is allowed to push.
 
 6. **A host without state is an error, never an empty store.** `last` and `remember` fail with
    `E_RECIPE_STATE` there. If `last` read null instead, every run would be a first run, and the
