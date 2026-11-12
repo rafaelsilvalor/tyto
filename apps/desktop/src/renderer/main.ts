@@ -2194,6 +2194,15 @@ const registry: CommandRegistry = withCommandGate(
         elements.explorerPanel?.startNew('file', undefined, seed);
       })();
     },
+    loadRecipe: () => {
+      // TYTO-402, ADR 0176: into the folder New File would use; the explorer shows the report.
+      void (async () => {
+        if (!panelShown(EXPLORER_PANEL)) {
+          await changeLayout(withPanelOpen(layout, EXPLORER_PANEL, true));
+        }
+        await elements.explorerPanel?.loadRecipe();
+      })();
+    },
     openDocumentation: () => {
       // TYTO-318. Names nothing: main opens one of its two literals, by the menu's language.
       void withBridge(async (bridge) => {
@@ -4086,6 +4095,18 @@ function wireExplorerPanel(): void {
       const bridge = window.tyto;
       if (bridge === undefined) return null;
       return (await bridge['menu:context']({ x, y, items })).chosen;
+    },
+    // TYTO-402, ADR 0176: the copied recipe opens like a picked file and is revealed.
+    load: async (parentId) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+      const wanted = nextDocumentId();
+      const loaded = await bridge['recipe:load']({ documentId: wanted, parentId });
+      if (loaded.ok && loaded.document !== null) {
+        adopt(loaded.document, loaded.documentId, wanted);
+        explorer.reveal(loaded.reveal);
+      }
+      return loaded;
     },
   };
   // A new element lists from the top, whatever folder the last one had.

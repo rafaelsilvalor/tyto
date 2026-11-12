@@ -276,8 +276,14 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
     const offered = await app!.evaluate(
       () => (globalThis as { offered?: string[][] }).offered ?? [],
     );
-    // TYTO-402: New Recipe and New Vocabulary follow the two New items.
-    expect(offered.at(-1)).toEqual(['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…']);
+    // TYTO-402: New Recipe, New Vocabulary and Load Recipe follow the two New items.
+    expect(offered.at(-1)).toEqual([
+      'New File…',
+      'New Folder…',
+      'New Recipe…',
+      'New Vocabulary…',
+      'Load Recipe…',
+    ]);
   }, 30_000);
 
   it('opens the menu from the keyboard under the row, once per key (TYTO-364)', async () => {
@@ -322,6 +328,7 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
       'New Folder…',
       'New Recipe…',
       'New Vocabulary…',
+      'Load Recipe…',
       'Rename…',
       'Delete',
     ];
@@ -417,8 +424,8 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
     await expect.poll(tabs, { timeout: 10_000 }).toContain('velho.brief');
     const before = (await tabs()).length;
 
-    // Delete, after the four New items and Rename (TYTO-402).
-    await pickFromMenu('5');
+    // Delete, after the four New items, Load Recipe and Rename (TYTO-402).
+    await pickFromMenu('6');
     await row('velho').click({ button: 'right' });
 
     await expect.poll(rows, { timeout: 10_000 }).not.toContain('velho');
@@ -436,6 +443,7 @@ describe('new, rename and delete from the explorer (TYTO-352)', () => {
       'New Folder…',
       'New Recipe…',
       'New Vocabulary…',
+      'Load Recipe…',
       'Rename…',
       'Delete',
     ]);

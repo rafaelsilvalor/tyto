@@ -508,6 +508,12 @@ export const VOCABULARY_WIRE_DIAGNOSTICS = 500;
 export const VOCABULARY_NAMES_MAX = 500;
 
 /**
+ * The most names each list of a `recipe:load` answer carries (TYTO-402): main copies at most
+ * 200 files, and reports at most one line per reference a recipe writes.
+ */
+export const RECIPE_LOAD_NAMES_MAX = 2000;
+
+/**
  * One field of a step's form on the wire (TYTO-402, ADR 0176), `@tyto/recipe`'s `VerbField`:
  * what it holds, where it sits on the line, and what the form shows beside it.
  */
@@ -3115,6 +3121,49 @@ export const IPC_CHANNELS = {
       files: z.array(z.string().max(500)).max(VOCABULARY_NAMES_MAX),
       pointers: z.array(z.string().max(1000)).max(VOCABULARY_NAMES_MAX),
     }),
+  ),
+
+  /**
+   * Load recipe (TYTO-402, ADR 0176 decision 7): main asks for a `.recipe` anywhere on disk in
+   * its own dialog and **copies** it, the recipes its `run` lines include and the data files it
+   * names into the folder `parentId` names (`null` is the open folder). **Strict, an id and
+   * never a path**, as the explorer's other writes (ADR 0086). Nothing is overwritten: when any
+   * file is already there, nothing is written and `skipped` names each one. A reference that
+   * leaves the source folder, does not parse or names nothing is in `reported`, never read.
+   * The copied recipe opens in `documentId`; `reveal` is the explorer's way down to it. Names
+   * are relative to the source folder, as the recipe writes them.
+   */
+  'recipe:load': channel(
+    z.strictObject({ documentId, parentId: explorerEntryId.nullable() }),
+    z.discriminatedUnion('ok', [
+      z.object({
+        ok: z.literal(true),
+        copied: z.array(z.string().max(1000)).max(RECIPE_LOAD_NAMES_MAX),
+        skipped: z.array(z.string().max(1000)).max(RECIPE_LOAD_NAMES_MAX),
+        reported: z
+          .array(
+            z.object({
+              name: z.string().max(1000),
+              reason: z.enum([
+                'leaves-folder',
+                'outside',
+                'refused',
+                'reserved',
+                'missing',
+                'too-large',
+                'not-parsed',
+                'too-many',
+                'write-failed',
+              ]),
+            }),
+          )
+          .max(RECIPE_LOAD_NAMES_MAX),
+        document: openDocument.nullable(),
+        documentId: documentId.nullable(),
+        reveal: z.array(explorerEntryId),
+      }),
+      z.object({ ok: z.literal(false), reason: z.enum(['canceled', 'gone', 'unreadable']) }),
+    ]),
   ),
 
   /**

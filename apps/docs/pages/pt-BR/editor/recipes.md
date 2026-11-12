@@ -18,6 +18,25 @@ Clique com o botão direito no Explorador e escolha **Nova receita…**, ou rode
 
 O nome de uma receita é como uma linha `run` a chama, então ele começa com uma letra ou um dígito e só tem letras, dígitos, `-` e `_`. Qualquer outro nome é recusado embaixo do campo com o código `E_RECIPE_FORM`, e nada é gravado. Um arquivo que já existe nunca é substituído.
 
+## Carregar uma receita compartilhada
+
+A receita de um colega pode estar em qualquer lugar do disco. Clique com o botão direito numa pasta do Explorador e escolha **Carregar receita…**, ou rode **Carregar receita…** pela barra de comandos, e escolha o arquivo `.recipe`. O Tyto **copia** a receita para essa pasta (a pasta selecionada, a pasta do arquivo selecionado, ou a pasta aberta quando nada está selecionado), junto com o que ela precisa para rodar ali:
+
+- as receitas que as linhas `run` dela incluem, `<nome>.recipe` ao lado dela;
+- os arquivos de dados e de vocabulário que os passos citam, como `@./company.vocab.json#/rules/kinds`, nas mesmas pastas relativas a ela.
+
+A cópia é sua: roda neste espaço de trabalho, com os arquivos ao lado e o estado aqui. O original nunca é alterado.
+
+**Nada é sobrescrito.** Se algum desses arquivos já estiver na pasta, nada é copiado, e o Explorador lista cada um que já existe, para que uma receita nunca fique carregada pela metade. Renomeie ou mova esses arquivos e carregue de novo.
+
+Algumas referências não são seguidas, e o Explorador diz quais e por quê, acima da árvore:
+
+- um arquivo fora da pasta da receita, como `@../shared.json`, ou um atalho que leva para fora dela, nunca é lido;
+- uma referência que não é válida, um arquivo que não existe, um que está nas configurações `.tyto` da pasta, ou um maior do que uma receita pode ler fica de fora;
+- uma receita incluída que não se lê como receita é copiada, mas os arquivos que ela cita não são procurados.
+
+Clique nas linhas para fechá-las.
+
 ## Adicionar e editar passos
 
 Rode **Adicionar passo** pela barra de comandos com uma receita na frente. Abre uma lista de todos os verbos, agrupados em **Fontes**, **Transformações**, **Ações** e **Destinos**: os genéricos e todos os que os seus plugins instalados acrescentam. Digite para filtrar, ande com as setas e aperte Enter, ou clique num verbo.

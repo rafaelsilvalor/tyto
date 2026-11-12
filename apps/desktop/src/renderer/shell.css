@@ -3554,6 +3554,24 @@ tyto-gallery-dialog[open] {
   margin: var(--tyto-space-2) var(--tyto-space-5);
 }
 
+/* Load recipe's report (TYTO-402): what was copied and what was not, above the tree. */
+.explorer__report {
+  margin: 0 var(--tyto-space-3) var(--tyto-space-2);
+  padding: var(--tyto-space-2) var(--tyto-space-3);
+  border-inline-start: 2px solid var(--tyto-border);
+  color: var(--tyto-text-muted);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.explorer__report-line {
+  margin: 0;
+}
+
+.explorer__report-line + .explorer__report-line {
+  margin-top: var(--tyto-space-1);
+}
+
 .explorer__tree {
   margin: 0;
   padding: 0;

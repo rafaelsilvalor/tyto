@@ -2279,6 +2279,14 @@ async function start(): Promise<void> {
         return documents.openPath(documentId, path);
       },
     },
+    // TYTO-402, ADR 0176: Load recipe's file, anywhere on disk; main copies it in.
+    chooseRecipe: async () => {
+      const answer = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{ name: 'Recipe', extensions: ['recipe'] }],
+      });
+      return answer.canceled ? undefined : answer.filePaths[0];
+    },
     templateDialogs: {
       // No `createDirectory`: a template to edit is a folder that already has one in it.
       chooseTemplate: async () => {

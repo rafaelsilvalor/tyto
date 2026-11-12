@@ -154,6 +154,11 @@ export const RECIPE_EDIT_STEP = 'recipe.editStep';
 export const EXPLORER_NEW_RECIPE = 'explorer.newRecipe';
 export const EXPLORER_NEW_VOCABULARY = 'explorer.newVocabulary';
 /**
+ * TYTO-402 (ADR 0176 decision 7). Load recipe: main's dialog for a `.recipe` anywhere, copied
+ * with what it names into the explorer's selected folder. With no folder open it does nothing.
+ */
+export const EXPLORER_LOAD_RECIPE = 'explorer.loadRecipe';
+/**
  * TYTO-208. "Preferences: Color Theme": the themes in the bar, previewed as the selection
  * moves, written to the `theme` setting on Enter. No key by default (ADR 0074): a person
  * binds one in `keybindings.json` if they switch often.
@@ -395,6 +400,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [RECIPE_EDIT_STEP]: 'command.recipe.editStep',
   [EXPLORER_NEW_RECIPE]: 'command.explorer.newRecipe',
   [EXPLORER_NEW_VOCABULARY]: 'command.explorer.newVocabulary',
+  [EXPLORER_LOAD_RECIPE]: 'command.explorer.loadRecipe',
   [THEME_PICK]: 'command.theme.pick',
   [TEMPLATES_CHOOSE_FOLDER]: 'command.templates.chooseFolder',
   [TEMPLATES_CLEAR_FOLDER]: 'command.templates.clearFolder',
@@ -533,6 +539,8 @@ export interface DesktopActions {
   editRecipeStep(): void;
   /** TYTO-402. Opens the explorer's name field for a new recipe or vocabulary. */
   newSeededFile(seed: 'recipe' | 'vocabulary'): void;
+  /** TYTO-402. Load recipe into the explorer's selected folder. */
+  loadRecipe(): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
   pickTheme(): void;
   /**
@@ -732,6 +740,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(EXPLORER_NEW_VOCABULARY, () => {
     actions.newSeededFile('vocabulary');
+  });
+  add(EXPLORER_LOAD_RECIPE, () => {
+    actions.loadRecipe();
   });
   add(THEME_PICK, () => {
     actions.pickTheme();

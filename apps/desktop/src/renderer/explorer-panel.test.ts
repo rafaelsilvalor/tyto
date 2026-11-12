@@ -8,6 +8,7 @@ import {
   EXPLORER_MENU,
   EXPLORER_PANEL_TAG,
   deleteQuestion,
+  loadReport,
 } from './explorer-panel.js';
 
 /**
@@ -42,6 +43,9 @@ function source(disk: Disk) {
     menus: [] as string[][],
     points: [] as [number, number][],
     trash: 'ok' as 'ok' | 'trash-failed',
+    /** TYTO-402: what Load recipe answers, and each folder it was asked to copy into. */
+    loaded: { ok: false, reason: 'canceled' } as Awaited<ReturnType<ExplorerSource['load']>>,
+    loadedInto: [] as (string | null)[],
   };
   const value: ExplorerSource = {
     create: (parentId, name, kind, seed) => {
@@ -103,6 +107,10 @@ function source(disk: Disk) {
     },
     openFolder: () => {
       folders.push(1);
+    },
+    load: (parentId) => {
+      control.loadedInto.push(parentId);
+      return Promise.resolve(control.loaded);
     },
   };
   return { value, asked, opened, shown, folders, wrote, questions, control };
@@ -452,7 +460,7 @@ describe('new, rename and delete', () => {
     expect(rows(element)).toContain('logo.png');
   });
 
-  it('offers six items on a row and the four New items on the empty space', async () => {
+  it('offers seven items on a row and the five New items on the empty space', async () => {
     const { element, control } = await mount(disk());
     control.chosen = 'explorer.menu.rename';
     row(element, 'logo.png').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
@@ -468,8 +476,16 @@ describe('new, rename and delete', () => {
     await settle(element);
 
     expect(control.menus).toEqual([
-      ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…', 'Rename…', 'Delete'],
-      ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…'],
+      [
+        'New File…',
+        'New Folder…',
+        'New Recipe…',
+        'New Vocabulary…',
+        'Load Recipe…',
+        'Rename…',
+        'Delete',
+      ],
+      ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…', 'Load Recipe…'],
     ]);
     expect(rows(element)[0]).toBe('slides');
     expect(field(element)).not.toBeNull();
@@ -496,7 +512,7 @@ describe('the context menu from the keyboard (TYTO-364)', () => {
         ({ left: 12, top: 100 + index * 22, bottom: 122 + index * 22 }) as DOMRect;
     });
   };
-  const NEW_ITEMS = ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…'];
+  const NEW_ITEMS = ['New File…', 'New Folder…', 'New Recipe…', 'New Vocabulary…', 'Load Recipe…'];
   const ROW_ITEMS = [...NEW_ITEMS, 'Rename…', 'Delete'];
 
   it('opens a row’s menu with Shift+F10, under the selected row’s left edge', async () => {
@@ -524,7 +540,7 @@ describe('the context menu from the keyboard (TYTO-364)', () => {
     expect(control.points).toEqual([[12, 144]]);
   });
 
-  it('offers only the four New items while no row is selected, the empty space’s menu', async () => {
+  it('offers only the New items while no row is selected, the empty space’s menu', async () => {
     const { element, control } = await mount(disk());
     layOut(element);
     await press(element, 'ContextMenu');
@@ -570,6 +586,38 @@ describe('the context menu from the keyboard (TYTO-364)', () => {
     await settle(element);
     expect(wrote).toEqual([['create', null, 'my recipe', 'file', 'recipe']]);
     expect(element.querySelector('.explorer__error')?.textContent).toContain('E_RECIPE_FORM');
+  });
+
+  it('loads a recipe into the selected file’s folder and says what it did (TYTO-402)', async () => {
+    const { element, control, asked } = await mount(disk());
+    row(element, 'logo.png').click();
+    await settle(element);
+    control.loaded = {
+      ok: true,
+      copied: ['weekly.recipe', 'company.vocab.json'],
+      skipped: [],
+      reported: [{ name: '../shared.json', reason: 'leaves-folder' }],
+      document: null,
+      documentId: null,
+      reveal: [],
+    };
+    control.chosen = EXPLORER_MENU.loadRecipe;
+    const before = asked.length;
+    await press(element, 'F10', { shiftKey: true });
+
+    expect(control.loadedInto).toEqual([null]);
+    expect(
+      [...element.querySelectorAll('.explorer__report-line')].map((line) => line.textContent),
+    ).toEqual([
+      'Copied into this folder: weekly.recipe, company.vocab.json.',
+      "Not copied: “../shared.json” — it is outside the recipe's folder.",
+    ]);
+    // The folder copied into is listed again, so the new files show.
+    expect(asked.slice(before)).toContain(null);
+
+    element.querySelector<HTMLElement>('.explorer__report')!.click();
+    await settle(element);
+    expect(element.querySelector('.explorer__report')).toBeNull();
   });
 
   it('asks for no second menu while one is open, nor from a key typed in the field', async () => {
@@ -745,5 +793,25 @@ describe('the delete question (TYTO-352)', () => {
       cancel: 'Cancelar',
     });
     expect(deleteQuestion('en', 'win32', file, 3).detail).toContain('3 open tabs have');
+  });
+});
+
+describe('what Load recipe says (TYTO-402, ADR 0176)', () => {
+  it('names what it would not write over, and says nothing for a dialog dismissed', () => {
+    expect(
+      loadReport('en', {
+        ok: true,
+        copied: [],
+        skipped: ['weekly.recipe'],
+        reported: [],
+        document: null,
+        documentId: null,
+        reveal: [],
+      }),
+    ).toEqual(['Nothing was copied, because these are already here: weekly.recipe.']);
+    expect(loadReport('en', { ok: false, reason: 'canceled' })).toEqual([]);
+    expect(loadReport('pt-BR', { ok: false, reason: 'unreadable' })).toEqual([
+      'Não deu para ler essa receita. Nada foi copiado.',
+    ]);
   });
 });

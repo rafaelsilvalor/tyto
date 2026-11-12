@@ -198,11 +198,12 @@
         "explorer-write.desktop.test.ts",
         "explorer.desktop.test.ts",
         "recipe-authoring.desktop.test.ts",
+        "recipe-load.desktop.test.ts",
         "text-tabs.desktop.test.ts",
         "window.desktop.test.ts",
         "workspace.desktop.test.ts"
       ],
-      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, its new, rename and delete (TYTO-352), New recipe and New vocabulary (TYTO-402), and the image a click shows in the preview (TYTO-366); its channels are in the bridge's list"
+      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, its new, rename and delete (TYTO-352), New recipe, New vocabulary and Load recipe (TYTO-402), and the image a click shows in the preview (TYTO-366); its channels are in the bridge's list"
     },
     {
       "paths": ["apps/desktop/src/main/export.ts"],
@@ -661,6 +662,14 @@
       ],
       "e2e": ["recipe-steps.desktop.test.ts", "window.desktop.test.ts"],
       "why": "reviewed: Add step and Edit step, the step picker and the step forms (TYTO-402, ADR 0176); the steps suite builds a recipe from an empty trusted folder through them and checks the saved text equals the lines the forms showed, and window.desktop's language switch leaves out their strings. The grouping, the keyboard, the round trip and the refusals are in recipe-step-dialog.test.ts"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/recipe-load.ts",
+        "apps/desktop/e2e/recipe-load.desktop.test.ts"
+      ],
+      "e2e": ["recipe-load.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: Load recipe (TYTO-402, ADR 0176 decision 7); window.desktop's channel list reaches recipe:load, and the load suite copies a recipe from outside the folder with the recipe it runs and its files, reports a ../ reference, opens the copy and copies nothing the second time. The plan, the clashes, the confinement and the caps are in recipe-load.test.ts over real folders"
     },
     {
       "paths": ["apps/desktop/src/main/vocabulary-names.ts"],

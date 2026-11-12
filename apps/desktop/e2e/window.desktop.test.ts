@@ -384,6 +384,9 @@ describe('the bridge', () => {
       'recipe:copy',
       // TYTO-381, ADR 0177: a Board's columns, which `recipe-views.desktop.test.ts` draws.
       'recipe:facets',
+      // TYTO-402, ADR 0176: Load recipe, a copy into the explorer's folder. Exercised by
+      // `e2e/recipe-load.desktop.test.ts`.
+      'recipe:load',
       // TYTO-384: a card opened, which `recipe-views.desktop.test.ts` opens in the Cards view.
       'recipe:row',
       'recipe:rows',
@@ -1019,6 +1022,8 @@ describe('switching the language', () => {
     'problems.empty.vocabulary',
     'command.explorer.newRecipe',
     'command.explorer.newVocabulary',
+    // TYTO-402: Load recipe as a command; `recipe-load.desktop.test.ts` runs it.
+    'command.explorer.loadRecipe',
     'vocabulary.section.rules',
     'vocabulary.section.rewrites',
     'vocabulary.section.lookups',

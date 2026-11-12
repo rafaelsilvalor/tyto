@@ -18,6 +18,25 @@ Right-click in the Explorer and choose **New Recipe…**, or run **New recipe** 
 
 A recipe's name is how a `run` line names it, so it starts with a letter or a digit and holds only letters, digits, `-` and `_`. Any other name is refused under the field with the code `E_RECIPE_FORM`, and nothing is written. A file already there is never replaced.
 
+## Load a shared recipe
+
+A colleague's recipe can sit anywhere on disk. Right-click a folder in the Explorer and choose **Load Recipe…**, or run **Load recipe…** from the command bar, and pick the `.recipe` file. Tyto **copies** it into that folder (the selected folder, the selected file's folder, or the open folder with nothing selected), together with what it needs to run there:
+
+- the recipes its `run` lines include, `<name>.recipe` beside it;
+- the data and vocabulary files its steps name, such as `@./company.vocab.json#/rules/kinds`, in the same folders relative to it.
+
+The copy is yours: it runs in this workspace, with its files beside it and its state here. The original is never changed.
+
+**Nothing is overwritten.** If any of those files is already in the folder, nothing is copied at all, and the Explorer lists each one that is there, so a recipe is never half loaded. Rename or move them, and load again.
+
+Some references are not followed, and the Explorer says which and why, above the tree:
+
+- a file outside the recipe's folder, such as `@../shared.json`, or a link that leads out of it, is never read;
+- a reference that is not one, a file that is not there, one in the folder's `.tyto` settings, or one larger than a recipe may read is left out;
+- an included recipe that does not read as a recipe is copied, but the files it names are not looked for.
+
+Click the lines to put them away.
+
 ## Add and edit steps
 
 Run **Add step** from the command bar with a recipe in front. A list of every verb opens, grouped into **Sources**, **Transforms**, **Actions** and **Sinks**: the generic ones and every verb your installed plugins add. Type to narrow it, move with the arrow keys and press Enter, or click a verb.

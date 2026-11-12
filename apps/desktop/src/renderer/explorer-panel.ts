@@ -11,6 +11,7 @@ import {
   type ExplorerTree,
   EMPTY_TREE,
   collapseAll,
+  folderForNew,
   foldersToRelist,
   isMenuKey,
   moveFor,
@@ -82,6 +83,11 @@ export interface ExplorerSource {
   readonly remove: (entryId: string) => Promise<IpcResponse<'explorer:delete'>>;
   /** The system's context menu at a point, answering the id picked or `null`. */
   readonly menu: (x: number, y: number, items: MenuItems) => Promise<string | null>;
+  /**
+   * Load recipe (TYTO-402, ADR 0176): main's dialog, then a copy into `parentId`'s folder; the
+   * window opens the copied recipe and reveals it.
+   */
+  readonly load: (parentId: string | null) => Promise<IpcResponse<'recipe:load'>>;
 }
 
 const refused = { ok: false, reason: 'gone' } as const;
@@ -97,6 +103,7 @@ const idle: ExplorerSource = {
   confirm: () => Promise.resolve(false),
   remove: () => Promise.resolve(refused),
   menu: () => Promise.resolve(null),
+  load: () => Promise.resolve(refused),
 };
 
 /** Pixels each level indents, the width of a chevron, so a file lines up under its folder's. */
@@ -109,6 +116,8 @@ export const EXPLORER_MENU = {
   // TYTO-402, ADR 0176: a new file written from its skeleton.
   newRecipe: 'explorer.menu.newRecipe',
   newVocabulary: 'explorer.menu.newVocabulary',
+  // TYTO-402, ADR 0176 decision 7: a recipe from anywhere, copied into the folder.
+  loadRecipe: 'explorer.menu.loadRecipe',
   rename: 'explorer.menu.rename',
   delete: 'explorer.menu.delete',
 } as const satisfies Record<string, CatalogueKey>;
@@ -121,6 +130,7 @@ const NEW_ITEMS: readonly MenuId[] = [
   EXPLORER_MENU.newFolder,
   EXPLORER_MENU.newRecipe,
   EXPLORER_MENU.newVocabulary,
+  EXPLORER_MENU.loadRecipe,
 ];
 
 const fill = (text: string, values: Record<string, string | number>): string =>
@@ -170,6 +180,50 @@ const REFUSALS: Partial<Record<string, CatalogueKey>> = {
   'recipe-name': 'explorer.error.recipeName',
 };
 
+/** Why a file a recipe names was not copied, as Load recipe says it (TYTO-402). */
+type LoadReason = Extract<IpcResponse<'recipe:load'>, { ok: true }>['reported'][number]['reason'];
+const LOAD_REASONS: Record<LoadReason, CatalogueKey> = {
+  'leaves-folder': 'explorer.load.reason.leavesFolder',
+  outside: 'explorer.load.reason.outside',
+  refused: 'explorer.load.reason.refused',
+  reserved: 'explorer.load.reason.reserved',
+  missing: 'explorer.load.reason.missing',
+  'too-large': 'explorer.load.reason.tooLarge',
+  'not-parsed': 'explorer.load.reason.notParsed',
+  'too-many': 'explorer.load.reason.tooMany',
+  'write-failed': 'explorer.load.reason.writeFailed',
+};
+
+/**
+ * What Load recipe says it did (TYTO-402): what it copied, what it would not write over, and
+ * each file it did not copy with why. Nothing for a dialog dismissed or a folder gone.
+ */
+export function loadReport(locale: Locale, answer: IpcResponse<'recipe:load'>): readonly string[] {
+  const say = (key: CatalogueKey, values: Record<string, string | number>): string =>
+    fill(translate(locale, key), values);
+  if (!answer.ok) {
+    return answer.reason === 'unreadable' ? [say('explorer.load.unreadable', {})] : [];
+  }
+  const lines: string[] = [];
+  if (answer.copied.length > 0) {
+    lines.push(
+      say('explorer.load.copied', {
+        count: answer.copied.length,
+        names: answer.copied.join(', '),
+      }),
+    );
+  }
+  if (answer.skipped.length > 0) {
+    lines.push(say('explorer.load.skipped', { names: answer.skipped.join(', ') }));
+  }
+  for (const { name, reason } of answer.reported) {
+    lines.push(
+      say('explorer.load.reported', { name, reason: translate(locale, LOAD_REASONS[reason]) }),
+    );
+  }
+  return lines;
+}
+
 /** What the name field of a new entry is called, by what it makes. */
 function newFieldLabel(
   kind: 'file' | 'folder',
@@ -201,6 +255,7 @@ export class ExplorerPanel extends DockedPanel {
     platform: { attribute: false },
     tree: { state: true },
     notice: { state: true },
+    report: { state: true },
   };
 
   /** The open folder's name, `null` with none open, nothing while main is asked. */
@@ -211,6 +266,8 @@ export class ExplorerPanel extends DockedPanel {
   declare tree: ExplorerTree;
   /** A delete the trash refused: the line under that row, until the next act. */
   declare notice: { readonly id: string; readonly text: string } | undefined;
+  /** What the last Load recipe did (TYTO-402), above the tree until the next act. */
+  declare report: readonly string[];
 
   /** Bumped by `reset`, so an answer for a folder that has since closed is not drawn. */
   private generation = 0;
@@ -232,6 +289,7 @@ export class ExplorerPanel extends DockedPanel {
     this.platform = '';
     this.tree = EMPTY_TREE;
     this.notice = undefined;
+    this.report = [];
   }
 
   /** Forgets the tree and lists the open folder from the top: another folder was opened. */
@@ -239,6 +297,7 @@ export class ExplorerPanel extends DockedPanel {
     this.generation += 1;
     this.tree = EMPTY_TREE;
     this.notice = undefined;
+    this.report = [];
     if (this.folderName !== null && this.folderName !== undefined) void this.relist([null]);
   }
 
@@ -341,6 +400,24 @@ export class ExplorerPanel extends DockedPanel {
       if (row.type === 'entry' && row.entry.id === id) return row.entry;
     }
     return undefined;
+  }
+
+  /**
+   * Load recipe (TYTO-402, ADR 0176): into `parent` when given, otherwise where New File would
+   * put a file. The folder is listed again, so what was copied shows; the report stays above
+   * the tree.
+   */
+  async loadRecipe(parent?: string | null): Promise<void> {
+    if (this.folderName === null || this.folderName === undefined) return;
+    if (this.tree.editing !== undefined) return;
+    this.notice = undefined;
+    this.report = [];
+    const folder = folderForNew(this.tree, parent);
+    const mine = this.generation;
+    const answer = await this.source.load(folder);
+    if (mine !== this.generation) return;
+    this.report = loadReport(this.locale, answer);
+    if (answer.ok && answer.copied.length > 0) await this.relist([folder]);
   }
 
   /** Asks first, always, and only then moves the entry to the trash (ADR 0121). */
@@ -459,7 +536,7 @@ export class ExplorerPanel extends DockedPanel {
     await this.openMenu(box?.left ?? 0, box?.bottom ?? 0, row);
   }
 
-  /** The context menu at a point: four items on a row, the two New items on the empty space. */
+  /** The context menu at a point: the New items and Load recipe, and on a row Rename and Delete. */
   private async openMenu(
     x: number,
     y: number,
@@ -487,6 +564,7 @@ export class ExplorerPanel extends DockedPanel {
     else if (chosen === EXPLORER_MENU.newFolder) this.startNew('folder', parent);
     else if (chosen === EXPLORER_MENU.newRecipe) this.startNew('file', parent, 'recipe');
     else if (chosen === EXPLORER_MENU.newVocabulary) this.startNew('file', parent, 'vocabulary');
+    else if (chosen === EXPLORER_MENU.loadRecipe) await this.loadRecipe(parent);
     else if (chosen === EXPLORER_MENU.rename && row !== undefined) {
       this.tree = startRenaming(this.tree, row.entry.id);
     } else if (chosen === EXPLORER_MENU.delete && row !== undefined) {
@@ -565,8 +643,22 @@ export class ExplorerPanel extends DockedPanel {
           this.onContextMenu(event);
         }}
       >
-        ${this.body()}
+        ${this.reportLines()}${this.body()}
       </div>`;
+  }
+
+  /** Load recipe's report; a click on it puts it away. */
+  private reportLines(): unknown {
+    if (this.report.length === 0) return nothing;
+    return html`<div
+      class="explorer__report"
+      role="status"
+      @click=${() => {
+        this.report = [];
+      }}
+    >
+      ${this.report.map((line) => html`<p class="explorer__report-line">${line}</p>`)}
+    </div>`;
   }
 
   private body(): unknown {
