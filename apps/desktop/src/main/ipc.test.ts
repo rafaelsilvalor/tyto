@@ -1069,6 +1069,11 @@ const dependencies = () => {
     templateEditor: templateEditor(),
     templateDialogs: templateDialogs(),
     chooseRecipe: () => Promise.resolve(undefined),
+    credentialFile: {
+      choose: () => Promise.resolve(undefined),
+      size: () => Promise.resolve(0),
+      read: () => Promise.resolve(new Uint8Array()),
+    },
     templateFolder: createTemplateFolder(),
     updates: updateNotice(),
     verification: () => ({ on: false }) as const,
@@ -1168,6 +1173,83 @@ describe('the handlers', () => {
     // … and no answer the renderer received carries its value, in any field.
     for (const reply of replies) expect(JSON.stringify(reply)).not.toContain(SECRET);
     expect(Object.keys(handlers)).not.toContain('credentials:get');
+  });
+
+  describe('credentials:import and recipe-credential:import (TYTO-649)', () => {
+    const PATH = 'C:/Users/ana/Downloads/fake-key-649.json';
+    const KEY_FILE =
+      '{\r\n  "type": "service_account",\r\n  "private_key": "-----\\nZmFrZQ==\\n"\r\n}\r\n';
+
+    /** A picker that answers `PATH` and counts how often it was opened. */
+    function picking(text: string, size = new TextEncoder().encode(text).byteLength) {
+      const opened = { count: 0 };
+      const credentialFile = {
+        choose: () => {
+          opened.count += 1;
+          return Promise.resolve(PATH);
+        },
+        size: () => Promise.resolve(size),
+        read: () => Promise.resolve(new TextEncoder().encode(text)),
+      };
+      return { opened, credentialFile };
+    }
+
+    it("stores the file's exact text under the plugin's account, and answers only the outcome", async () => {
+      const { credentialFile } = picking(KEY_FILE);
+      const deps = { ...dependencies(), credentialFile };
+      const handlers = createHandlers(deps);
+
+      const answer = await handlers['credentials:import']({ plugin: 'pdf', key: 'api-token' });
+
+      expect(answer).toEqual({ outcome: 'stored' });
+      expect(await deps.credentials.get('plugin:pdf:api-token')).toBe(KEY_FILE);
+      expect(JSON.stringify(answer)).not.toContain('fake-key-649');
+      expect(JSON.stringify(answer)).not.toContain('service_account');
+      // The channel's answer is strict: a path or a text added to it would not cross the bridge.
+      const response = IPC_CHANNELS['credentials:import'].response;
+      expect(response.safeParse({ outcome: 'stored', path: PATH }).success).toBe(false);
+      expect(response.safeParse({ outcome: 'stored', text: KEY_FILE }).success).toBe(false);
+    });
+
+    it('refuses a key no plugin declares before the picker opens', async () => {
+      const { opened, credentialFile } = picking(KEY_FILE);
+      const handlers = createHandlers({ ...dependencies(), credentialFile });
+
+      await expect(
+        handlers['credentials:import']({ plugin: 'texto', key: 'api-token' }),
+      ).rejects.toThrow("No installed plugin 'texto' declares credentials:api-token");
+      expect(opened.count).toBe(0);
+    });
+
+    it('answers too-large for a file over 16 KiB, and stores nothing', async () => {
+      const { credentialFile } = picking('a'.repeat(16_385));
+      const deps = { ...dependencies(), credentialFile };
+      const handlers = createHandlers(deps);
+
+      expect(await handlers['credentials:import']({ plugin: 'pdf', key: 'api-token' })).toEqual({
+        outcome: 'too-large',
+      });
+      expect(await deps.credentials.has('plugin:pdf:api-token')).toBe(false);
+      expect(await handlers['recipe-credential:import']({ name: 'routine' })).toEqual({
+        outcome: 'too-large',
+      });
+      expect(await deps.credentials.has('recipe:routine')).toBe(false);
+    });
+
+    it('stores a recipe credential from a file under recipe:<name>', async () => {
+      const { credentialFile } = picking(KEY_FILE);
+      const deps = { ...dependencies(), credentialFile };
+      const handlers = createHandlers(deps);
+
+      expect(await handlers['recipe-credential:import']({ name: 'routine' })).toEqual({
+        outcome: 'stored',
+      });
+      expect(await deps.credentials.get('recipe:routine')).toBe(KEY_FILE);
+      expect(
+        IPC_CHANNELS['recipe-credential:import'].request.safeParse({ name: 'routine', path: PATH })
+          .success,
+      ).toBe(false);
+    });
   });
 
   it('answers app:info from what the composition root injected', async () => {

@@ -156,6 +156,15 @@ const pluginCredential = {
 };
 
 /**
+ * What importing a credential from a file came to (TYTO-649). **Never the path, never the text**:
+ * main opens the picker, reads the file and stores it, and the window learns only which of
+ * these it was, to say so on the line.
+ */
+export const CREDENTIAL_FILE_OUTCOMES = ['stored', 'canceled', 'too-large', 'not-text'] as const;
+export type CredentialFileOutcome = (typeof CREDENTIAL_FILE_OUTCOMES)[number];
+const credentialFileAnswer = z.strictObject({ outcome: z.enum(CREDENTIAL_FILE_OUTCOMES) });
+
+/**
  * A diagnostic, flattened to what survives a structured clone.
  *
  * Declared here rather than imported from `@tyto/core`, and the difference matters: the
@@ -1991,6 +2000,15 @@ export const IPC_CHANNELS = {
   'credentials:delete': channel(z.object(pluginCredential), z.object({ deleted: z.boolean() })),
 
   /**
+   * Stores a file's text as a plugin's secret (TYTO-649): a key file such as a service account's
+   * JSON, whose line breaks a typed field would lose. **Main opens the picker and reads the
+   * file**; the request names only the credential, and the answer only the outcome, so the path
+   * and the text never reach the renderer. Refused, before any picker opens, on the terms of
+   * `credentials:set`; a file over the same 16 KiB is `too-large` and nothing is stored.
+   */
+  'credentials:import': channel(z.strictObject(pluginCredential), credentialFileAnswer),
+
+  /**
    * Starts an export and answers with its id — not with its result (E9.4, TYTO-43).
    *
    * A render is seconds, not milliseconds, and a channel that answered with the finished
@@ -2294,6 +2312,15 @@ export const IPC_CHANNELS = {
         }),
     }),
     z.object({ stored: z.literal(true) }),
+  ),
+
+  /**
+   * Stores a file's text as a recipe credential under `recipe:<name>` (TYTO-649), on the terms
+   * of `credentials:import`: main picks and reads, and only the outcome comes back.
+   */
+  'recipe-credential:import': channel(
+    z.strictObject({ name: z.string().regex(CALL_CREDENTIAL_NAME) }),
+    credentialFileAnswer,
   ),
 
   /** Forgets one; `forgotten` is false when nothing was stored under that name. */

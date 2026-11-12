@@ -1670,6 +1670,15 @@ function openPluginsDialog(): void {
     else await bridge['credentials:set']({ plugin, key, secret });
     dialog.view = await bridge['plugins:list']({});
   };
+  // TYTO-649: main opens the picker and reads the file; the window names the key and hears an
+  // outcome back, never the path or the text. The list is asked again for whether it is set.
+  dialog.onCredentialImport = async (plugin, key) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    const { outcome } = await bridge['credentials:import']({ plugin, key });
+    dialog.view = await bridge['plugins:list']({});
+    return outcome;
+  };
   // TYTO-373: main opens the picker and the native boxes and runs the CLI's steps; the list is
   // asked again after any answer, since a declined install can still have changed nothing
   // and a refused one may have left a folder behind for the list to name.
@@ -1732,6 +1741,13 @@ function openPluginsDialog(): void {
     if (value === undefined) await bridge['recipe-credential:forget']({ name });
     else await bridge['recipe-credential:set']({ name, value });
     await relistRecipeCredentials(bridge);
+  };
+  dialog.onRecipeCredentialImport = async (name) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) throw new Error('no bridge');
+    const { outcome } = await bridge['recipe-credential:import']({ name });
+    await relistRecipeCredentials(bridge);
+    return outcome;
   };
   void withBridge(async (bridge) => {
     try {

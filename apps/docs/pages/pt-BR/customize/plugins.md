@@ -44,6 +44,19 @@ As mesmas mudanças se fazem pelo terminal, com os comandos de [Plugins](../comm
 | religá-lo                                                              | `tyto plugin enable <nome>`    |
 | remover um                                                             | `tyto plugin remove <nome>`    |
 
+## Dar a um plugin a sua chave
+
+::: info Conferida de outro jeito
+Esta seção entrou em 2026-11-12 e foi conferida pelo teste de ponta a ponta do app, com um arquivo de chave inventado, no formato do de uma conta de serviço. Ninguém a seguiu à mão com uma chave de verdade ainda.
+:::
+
+Um plugin que trabalha com um serviço seu pode pedir uma chave — um token de API, ou o arquivo de chave de uma conta de serviço — com uma permissão `credentials:`. A linha dele mostra uma linha por chave: o nome da chave, se está **preenchida** ou **não preenchida**, um campo, **Salvar**, **Importar de arquivo…** e, quando há algo guardado, **Apagar**.
+
+- **Um arquivo de chave**, como a chave JSON que um console de nuvem baixa: clique em **Importar de arquivo…** e escolha o arquivo. O Tyto o lê e guarda o texto exatamente como está, com as quebras de linha. Um arquivo acima de 16 KiB, vazio ou que não é texto é recusado, e a linha diz por quê.
+- **Uma chave que você copiou**: cole no campo e clique em **Salvar**, ou aperte Ctrl+Enter. O campo mantém as quebras de linha, então uma chave de várias linhas chega inteira; Enter começa uma linha nova.
+
+Nos dois casos a chave vai para o cofre do sistema. O Tyto não a mostra de novo — o campo fica mascarado enquanto você digita e vazio depois de salvar, e a linha só diz **preenchida**. Para trocar, guarde outra; **Apagar** a esquece.
+
 ## Entrar numa conta para um plugin
 
 ::: info Conferida de outro jeito

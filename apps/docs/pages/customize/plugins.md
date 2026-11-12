@@ -44,6 +44,19 @@ The same changes can be made from a terminal, with the commands in [Plugins](../
 | switch it back on                                        | `tyto plugin enable <name>`    |
 | remove one                                               | `tyto plugin remove <name>`    |
 
+## Give a plugin its key
+
+::: info Checked differently
+This section was added on 2026-11-12 and checked by the app's end-to-end test, with a made-up key file shaped like a service account's. Nobody has followed it by hand with a real key yet.
+:::
+
+A plugin that works with a service of yours may ask for a key — an API token, or a service account's key file — with a `credentials:` permission. Its row shows one line per key: the key's name, whether it is **set** or **not set**, a field, **Save**, **Import from file…**, and **Clear** once something is stored.
+
+- **A key file**, such as the JSON key a cloud console downloads: click **Import from file…** and pick the file. Tyto reads it and stores its text exactly as it is, line breaks included. A file over 16 KiB, empty, or not text is refused, and the line says why.
+- **A key you copied**: paste it in the field and click **Save**, or press Ctrl+Enter. The field keeps line breaks, so a key of several lines arrives whole; Enter starts a new line.
+
+Either way the key goes to your system's keychain. Tyto never shows it again — the field is masked while you type and empty once saved, and the line only says **set**. To replace it, store a new one; **Clear** forgets it.
+
 ## Sign in for a plugin
 
 ::: info Checked differently

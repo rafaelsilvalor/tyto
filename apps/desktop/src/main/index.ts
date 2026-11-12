@@ -2105,6 +2105,16 @@ async function start(): Promise<void> {
     // TYTO-374: who is signed in, and signing in and out, only when the person clicks.
     signin: signinWindow(pluginStore, signin),
     recipeCredentials,
+    // TYTO-649: a key file, picked and read here; the path never leaves main. No filter: a key
+    // is a .json, a .pem or a file with no extension at all.
+    credentialFile: {
+      choose: async () => {
+        const answer = await dialog.showOpenDialog({ properties: ['openFile'] });
+        return answer.canceled ? undefined : answer.filePaths[0];
+      },
+      size: async (path) => (await stat(path)).size,
+      read: (path) => readFile(path),
+    },
     // Read on every ask, not held: `tyto plugin install` in a terminal beside the window is
     // the ordinary way a plugin arrives, and a list cached at startup would never show it.
     plugins: {

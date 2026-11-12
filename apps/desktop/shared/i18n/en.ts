@@ -473,6 +473,9 @@ export const en: Catalogue = {
   'plugins.credential.kept':
     'Kept in the system keychain. Tyto never shows it again; type a new one to replace it.',
   'plugins.credential.failed': 'The credential could not be saved or cleared.',
+  'plugins.credential.import': 'Import from file…',
+  'plugins.credential.tooLarge': 'The file is over 16 KiB, so nothing was stored.',
+  'plugins.credential.notText': 'The file is empty or is not UTF-8 text, so nothing was stored.',
   'plugins.recipeCredentials.heading': 'Recipe credentials',
   'plugins.recipeCredentials.intro':
     "A recipe's call line names one with token=<name>, and sends it only to a host the workspace's project allows. Kept in the system keychain, for every folder on this computer. Tyto never shows it again; save the same name again to replace it.",

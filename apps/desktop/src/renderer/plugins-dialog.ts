@@ -6,7 +6,7 @@ import {
   DEFAULT_LOCALE,
   translate,
 } from '../../shared/i18n/index.js';
-import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
+import type { CredentialFileOutcome, IpcRequest, IpcResponse } from '../../shared/ipc.js';
 
 /**
  * The plugins screen (TYTO-47): the list `tyto plugin list` prints, in the window.
@@ -24,6 +24,12 @@ import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
  * a plugin declares, a field to set it and a button to clear it, handed to `onCredential`
  * — whoever opened the screen owns the bridge and asks the list again afterwards. The value
  * leaves through that call once and never comes back: the row knows only whether a key is set.
+ *
+ * **A credential may be several lines (TYTO-649).** A service account's key is a JSON file, and a
+ * single-line field turns its line breaks into spaces. So the field is a masked textarea that
+ * keeps them (Ctrl+Enter saves), and Import from file… beside it hands `onCredentialImport` the
+ * key's name only: main opens the picker, reads the file and stores its text, and the row hears
+ * back an outcome — never the path, never the text.
  *
  * **Browser sign-in (TYTO-374, ADR 0174).** Beside each `signin.<id>` a plugin declares, who
  * is signed in — "Signed in as <label>" or "Not signed in" — and Sign in or Sign out, handed to
@@ -59,6 +65,31 @@ export type CredentialChange = (change: {
   readonly key: string;
   readonly secret?: string;
 }) => Promise<void>;
+
+/**
+ * Imports a file's text as a credential; main opens the picker and reads it (TYTO-649). Resolves
+ * to what happened, never to the path or the text. Rejects when main refused the request.
+ */
+export type CredentialImport = (plugin: string, key: string) => Promise<CredentialFileOutcome>;
+
+/** The same, for a recipe credential stored under `name`. */
+export type RecipeCredentialImport = (name: string) => Promise<CredentialFileOutcome>;
+
+/** What a line says when an import stored nothing, by why. */
+const CREDENTIAL_FILE_PROBLEM: Partial<Record<CredentialFileOutcome, CatalogueKey>> = {
+  'too-large': 'plugins.credential.tooLarge',
+  'not-text': 'plugins.credential.notText',
+};
+
+/**
+ * The secret fields keep line breaks (TYTO-649), so Enter is a new line there and Ctrl+Enter
+ * (Cmd+Enter) saves.
+ */
+const submitOnModEnter = (event: KeyboardEvent): void => {
+  if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
+  event.preventDefault();
+  (event.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
+};
 
 /** Install from a folder or an archive; main picks the file and asks. Rejects on failure. */
 export type PluginInstall = (
@@ -156,6 +187,7 @@ export class PluginsDialog extends LitElement {
     locale: { attribute: false },
     view: { attribute: false },
     onCredential: { attribute: false },
+    onCredentialImport: { attribute: false },
     onInstall: { attribute: false },
     onChange: { attribute: false },
     onSettings: { attribute: false },
@@ -165,6 +197,7 @@ export class PluginsDialog extends LitElement {
     onSigninClient: { attribute: false },
     recipeCredentials: { attribute: false },
     onRecipeCredential: { attribute: false },
+    onRecipeCredentialImport: { attribute: false },
     failedRecipeCredential: { state: true },
     failedSigninClient: { state: true },
     signingIn: { state: true },
@@ -180,8 +213,10 @@ export class PluginsDialog extends LitElement {
   declare view: PluginsView | 'failed' | undefined;
   /** Where a set or a clear goes. Nothing is offered while it is absent. */
   declare onCredential: CredentialChange | undefined;
-  /** `plugin:key` of the change main refused last, so its row can say so. */
-  declare failedCredential: string | undefined;
+  /** Where Import from file… goes (TYTO-649). The button is not drawn while it is absent. */
+  declare onCredentialImport: CredentialImport | undefined;
+  /** The line whose last change did not happen, `plugin:key`, and what it says about it. */
+  declare failedCredential: { readonly id: string; readonly say: CatalogueKey } | undefined;
   /** Where an install goes. The install buttons are not drawn while it is absent. */
   declare onInstall: PluginInstall | undefined;
   /** Where a remove, disable or enable goes. No row buttons while it is absent. */
@@ -208,8 +243,10 @@ export class PluginsDialog extends LitElement {
   declare recipeCredentials: readonly string[] | undefined;
   /** Where storing and forgetting a recipe credential goes. No section while it is absent. */
   declare onRecipeCredential: RecipeCredentialChange | undefined;
-  /** Why the last store or forget did not happen: a name `token=` refuses, or main's refusal. */
-  declare failedRecipeCredential: 'name' | 'refused' | undefined;
+  /** Where Import from file… goes for a recipe credential (TYTO-649). */
+  declare onRecipeCredentialImport: RecipeCredentialImport | undefined;
+  /** What the section says about the last store or forget that did not happen. */
+  declare failedRecipeCredential: CatalogueKey | undefined;
 
   constructor() {
     super();
@@ -217,6 +254,7 @@ export class PluginsDialog extends LitElement {
     this.locale = DEFAULT_LOCALE;
     this.view = undefined;
     this.onCredential = undefined;
+    this.onCredentialImport = undefined;
     this.onInstall = undefined;
     this.onChange = undefined;
     this.onSettings = undefined;
@@ -232,6 +270,7 @@ export class PluginsDialog extends LitElement {
     this.signinFailure = undefined;
     this.recipeCredentials = undefined;
     this.onRecipeCredential = undefined;
+    this.onRecipeCredentialImport = undefined;
     this.failedRecipeCredential = undefined;
   }
 
@@ -636,22 +675,35 @@ export class PluginsDialog extends LitElement {
   }
 
   /**
-   * One line per declared key: its name, whether it is set, a field and Save, and Clear when
-   * there is something to clear. The field is a password field and is emptied once saved,
-   * so the value is on screen only while it is being typed.
+   * One line per declared key: its name, whether it is set, a field and Save, Import from file…,
+   * and Clear when there is something to clear. The field is masked and emptied once saved, so
+   * the value is on screen only while it is being typed, and an imported one never is.
    */
   private credentials(say: (key: CatalogueKey) => string, plugin: PluginRow): unknown {
     const change = this.onCredential;
     if (plugin.credentials.length === 0 || change === undefined) return nothing;
+    const importFile = this.onCredentialImport;
 
+    const settle = (id: string, problem: CatalogueKey | undefined): void => {
+      if (problem !== undefined) this.failedCredential = { id, say: problem };
+      else if (this.failedCredential?.id === id) this.failedCredential = undefined;
+    };
     const run = async (key: string, secret?: string, form?: HTMLFormElement): Promise<void> => {
       const id = `${plugin.name}:${key}`;
       try {
         await change({ plugin: plugin.name, key, ...(secret === undefined ? {} : { secret }) });
-        if (this.failedCredential === id) this.failedCredential = undefined;
+        settle(id, undefined);
         form?.reset();
       } catch {
-        this.failedCredential = id;
+        settle(id, 'plugins.credential.failed');
+      }
+    };
+    const runImport = async (key: string, chosen: CredentialImport): Promise<void> => {
+      const id = `${plugin.name}:${key}`;
+      try {
+        settle(id, CREDENTIAL_FILE_PROBLEM[await chosen(plugin.name, key)]);
+      } catch {
+        settle(id, 'plugins.credential.failed');
       }
     };
 
@@ -665,7 +717,7 @@ export class PluginsDialog extends LitElement {
             @submit=${(event: SubmitEvent) => {
               event.preventDefault();
               const form = event.currentTarget as HTMLFormElement;
-              const field = form.querySelector('input');
+              const field = form.querySelector('textarea');
               const secret = field?.value ?? '';
               if (secret === '') return;
               void run(key, secret, form);
@@ -677,17 +729,31 @@ export class PluginsDialog extends LitElement {
             <span class="plugins__credential-state"
               >${say(set ? 'plugins.credential.set' : 'plugins.credential.notSet')}</span
             >
-            <input
-              class="plugins__credential-field"
-              type="password"
+            <textarea
+              class="plugins__credential-field plugins__secret"
+              rows="1"
               autocomplete="off"
               spellcheck="false"
               placeholder=${say('plugins.credential.placeholder')}
               aria-label=${`${say('plugins.credential.label')} ${key}`}
-            />
+              @keydown=${submitOnModEnter}
+            ></textarea>
             <button class="plugins__credential-save" type="submit">
               ${say('plugins.credential.save')}
             </button>
+            ${
+              importFile === undefined
+                ? nothing
+                : html`<button
+                    class="plugins__credential-import"
+                    type="button"
+                    @click=${() => {
+                      void runImport(key, importFile);
+                    }}
+                  >
+                    ${say('plugins.credential.import')}
+                  </button>`
+            }
             ${
               set
                 ? html`<button
@@ -702,9 +768,9 @@ export class PluginsDialog extends LitElement {
                 : nothing
             }
             ${
-              this.failedCredential === `${plugin.name}:${key}`
+              this.failedCredential?.id === `${plugin.name}:${key}`
                 ? html`<p class="plugins__credential-failed" role="alert">
-                    ${say('plugins.credential.failed')}
+                    ${say(this.failedCredential.say)}
                   </p>`
                 : nothing
             }
@@ -727,13 +793,37 @@ export class PluginsDialog extends LitElement {
     const change = this.onRecipeCredential;
     if (change === undefined) return nothing;
     const names = this.recipeCredentials;
+    const importFile = this.onRecipeCredentialImport;
     const run = async (name: string, value?: string, form?: HTMLFormElement): Promise<void> => {
       try {
         await change(name, value);
         this.failedRecipeCredential = undefined;
         form?.reset();
       } catch {
-        this.failedRecipeCredential = 'refused';
+        this.failedRecipeCredential = 'plugins.recipeCredentials.failed';
+      }
+    };
+    /** The name typed, or nothing (and the section says why) when `token=` would refuse it. */
+    const nameIn = (form: HTMLFormElement): string | undefined => {
+      const name =
+        form.querySelector<HTMLInputElement>('.plugins__recipe-credential-name')?.value.trim() ??
+        '';
+      if (RECIPE_CREDENTIAL_NAME.test(name)) return name;
+      this.failedRecipeCredential = 'plugins.recipeCredentials.badName';
+      return undefined;
+    };
+    const runImport = async (
+      form: HTMLFormElement,
+      chosen: RecipeCredentialImport,
+    ): Promise<void> => {
+      const name = nameIn(form);
+      if (name === undefined) return;
+      try {
+        const outcome = await chosen(name);
+        this.failedRecipeCredential = CREDENTIAL_FILE_PROBLEM[outcome];
+        if (outcome === 'stored') form.reset();
+      } catch {
+        this.failedRecipeCredential = 'plugins.recipeCredentials.failed';
       }
     };
     return html`<section
@@ -773,17 +863,11 @@ export class PluginsDialog extends LitElement {
         @submit=${(event: SubmitEvent) => {
           event.preventDefault();
           const form = event.currentTarget as HTMLFormElement;
-          const name =
-            form
-              .querySelector<HTMLInputElement>('.plugins__recipe-credential-name')
-              ?.value.trim() ?? '';
+          const name = nameIn(form);
           const value =
-            form.querySelector<HTMLInputElement>('.plugins__recipe-credential-value')?.value ?? '';
-          if (!RECIPE_CREDENTIAL_NAME.test(name)) {
-            this.failedRecipeCredential = 'name';
-            return;
-          }
-          if (value === '') return;
+            form.querySelector<HTMLTextAreaElement>('.plugins__recipe-credential-value')?.value ??
+            '';
+          if (name === undefined || value === '') return;
           void run(name, value, form);
         }}
       >
@@ -796,27 +880,38 @@ export class PluginsDialog extends LitElement {
           placeholder=${say('plugins.recipeCredentials.name')}
           aria-label=${say('plugins.recipeCredentials.name')}
         />
-        <input
-          class="plugins__recipe-credential-value"
-          type="password"
+        <textarea
+          class="plugins__recipe-credential-value plugins__secret"
+          rows="1"
           autocomplete="off"
           spellcheck="false"
           placeholder=${say('plugins.recipeCredentials.value')}
           aria-label=${say('plugins.recipeCredentials.value')}
-        />
+          @keydown=${submitOnModEnter}
+        ></textarea>
         <button class="plugins__recipe-credential-save" type="submit">
           ${say('plugins.recipeCredentials.save')}
         </button>
+        ${
+          importFile === undefined
+            ? nothing
+            : html`<button
+                class="plugins__recipe-credential-import"
+                type="button"
+                @click=${(event: MouseEvent) => {
+                  const form = (event.currentTarget as HTMLButtonElement).form;
+                  if (form !== null) void runImport(form, importFile);
+                }}
+              >
+                ${say('plugins.credential.import')}
+              </button>`
+        }
       </form>
       ${
         this.failedRecipeCredential === undefined
           ? nothing
           : html`<p class="plugins__recipe-credential-failed" role="alert">
-              ${say(
-                this.failedRecipeCredential === 'name'
-                  ? 'plugins.recipeCredentials.badName'
-                  : 'plugins.recipeCredentials.failed',
-              )}
+              ${say(this.failedRecipeCredential)}
             </p>`
       }
     </section>`;

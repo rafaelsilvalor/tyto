@@ -34,6 +34,8 @@ describe('the IPC contract', () => {
       'cli:open-diagnostic',
       'cli:run',
       'credentials:delete',
+      // TYTO-649: a key file stored from the plugins screen; main picks and reads it.
+      'credentials:import',
       'credentials:set',
       // TYTO-490, ADR 0157 §6: a delivery's export; the window sends a text, main the folders.
       'delivery:export',
@@ -96,6 +98,7 @@ describe('the IPC contract', () => {
       'queue:set-kinds',
       // TYTO-671, ADR 0193: a recipe's call credentials, stored, listed by name and forgotten.
       'recipe-credential:forget',
+      'recipe-credential:import',
       'recipe-credential:list',
       'recipe-credential:set',
       'recipe:apply',
