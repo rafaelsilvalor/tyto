@@ -1,8 +1,15 @@
-import { recipeSkeleton, vocabularySkeleton } from '@tyto/recipe';
+import { GENERIC_VERB_FORMS, recipeSkeleton, vocabularySkeleton } from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 
 import { parseIpc } from '../../shared/ipc.js';
-import { seedOf, vocabularyComplete, vocabularyHover, vocabularyLint } from './recipe-authoring.js';
+import {
+  seedOf,
+  verbCatalog,
+  vocabularyComplete,
+  vocabularyHover,
+  vocabularyLint,
+  vocabularyPointers,
+} from './recipe-authoring.js';
 
 /**
  * TYTO-402, ADR 0176: what New recipe and New vocabulary write, and the vocabulary tab's lint,
@@ -126,5 +133,59 @@ describe('the vocabulary hover', () => {
     expect(vocabularyHover(text, text.indexOf('"when"') + 2).answer).toBeNull();
     const own = vocabulary({ stopwords: ['a'] });
     expect(vocabularyHover(own, own.indexOf('stopwords')).answer).toBeNull();
+  });
+});
+
+describe("the step picker's catalog (TYTO-402)", () => {
+  const acme = { kind: 'source' as const, arguments: [{ name: 'board', type: 'text' as const }] };
+
+  it('lists generic verbs by their form and plugin verbs by their declared schema', () => {
+    const catalog = verbCatalog(['acme.pull', 'param', 'select', 'where'], (name) =>
+      name === 'acme.pull' ? acme : undefined,
+    );
+
+    expect(catalog.map((entry) => [entry.name, entry.kind])).toEqual([
+      ['acme.pull', 'source'],
+      ['select', 'transform'],
+      ['where', 'transform'],
+    ]);
+    expect(catalog[0]?.fields).toEqual([
+      { name: 'board', kind: 'text', placement: 'named', required: false, help: '' },
+    ]);
+    expect(catalog[1]?.fields.map((field) => [field.name, field.kind])).toEqual([
+      ['columns', 'columns'],
+      ['without', 'columns'],
+    ]);
+    // Every generic verb's form fits the wire.
+    const generic = verbCatalog(Object.keys(GENERIC_VERB_FORMS), () => undefined);
+    expect(generic).toHaveLength(Object.keys(GENERIC_VERB_FORMS).length);
+    expect(() =>
+      parseIpc('recipe:verbs', 'response', { verbs: [], catalog: generic }),
+    ).not.toThrow();
+  });
+});
+
+describe('the pointers a recipe may read from a vocabulary (TYTO-402)', () => {
+  it("names each section's tables and the team's own keys", () => {
+    const text = vocabulary({
+      rules: { kinds: [], 'a/b': [] },
+      lookups: { status: {} },
+      stopwords: ['a'],
+    });
+
+    expect(vocabularyPointers(text)).toEqual([
+      '/rules/kinds',
+      '/rules/a~1b',
+      '/lookups/status',
+      '/stopwords',
+    ]);
+  });
+
+  it('still names them in a file with a problem elsewhere', () => {
+    expect(vocabularyPointers('{ "rules": { "kinds": [ ] }, "lookups": { "status": ')).toEqual([
+      '/rules/kinds',
+      '/lookups/status',
+    ]);
+    expect(vocabularyPointers('not json')).toEqual([]);
   });
 });

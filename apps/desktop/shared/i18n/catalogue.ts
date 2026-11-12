@@ -532,6 +532,28 @@ export interface Catalogue {
   readonly 'vocabulary.section.lookups': string;
   readonly 'vocabulary.hover.entries': string;
   readonly 'vocabulary.hover.pointer': string;
+  /**
+   * TYTO-402, ADR 0176: Add step and Edit step, and their dialog: the picker's title, search
+   * field, empty line and kinds; the form's markers (`{value}` is the field's default), the
+   * columns offered, the line it writes, its buttons and a choice left unset.
+   */
+  readonly 'command.recipe.addStep': string;
+  readonly 'command.recipe.editStep': string;
+  readonly 'recipe.step.title': string;
+  readonly 'recipe.step.search': string;
+  readonly 'recipe.step.none': string;
+  readonly 'recipe.step.kind.source': string;
+  readonly 'recipe.step.kind.transform': string;
+  readonly 'recipe.step.kind.action': string;
+  readonly 'recipe.step.kind.sink': string;
+  readonly 'recipe.step.noFields': string;
+  readonly 'recipe.step.required': string;
+  readonly 'recipe.step.default': string;
+  readonly 'recipe.step.columns': string;
+  readonly 'recipe.step.line': string;
+  readonly 'recipe.step.unset': string;
+  readonly 'recipe.step.cancel': string;
+  readonly 'recipe.step.write': string;
   /** TYTO-377: the one command that runs a whole recipe, the person's approval (ADR 0148). */
   readonly 'command.recipe.run': string;
   /**
@@ -1365,6 +1387,23 @@ export const CATALOGUE_KEYS = [
   'vocabulary.section.lookups',
   'vocabulary.hover.entries',
   'vocabulary.hover.pointer',
+  'command.recipe.addStep',
+  'command.recipe.editStep',
+  'recipe.step.title',
+  'recipe.step.search',
+  'recipe.step.none',
+  'recipe.step.kind.source',
+  'recipe.step.kind.transform',
+  'recipe.step.kind.action',
+  'recipe.step.kind.sink',
+  'recipe.step.noFields',
+  'recipe.step.required',
+  'recipe.step.default',
+  'recipe.step.columns',
+  'recipe.step.line',
+  'recipe.step.unset',
+  'recipe.step.cancel',
+  'recipe.step.write',
   'command.recipe.run',
   'recipe.cell.rows',
   'recipe.cell.rows.one',

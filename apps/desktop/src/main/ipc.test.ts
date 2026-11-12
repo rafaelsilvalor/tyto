@@ -7,6 +7,7 @@ import {
   IPC_CHANNEL_NAMES,
   IpcContractError,
   type UpdateStatus,
+  parseIpc,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { recipeCredentialStore } from './recipe-credentials.js';
@@ -1217,7 +1218,33 @@ describe('the tab a message is about (E9.11)', () => {
       ['document-2', undefined],
     ]);
     expect(injected.recipes.asked[0]?.explicit).toBe(true);
-    expect(await handlers['recipe:verbs']({})).toEqual({ verbs: ['acme.pull', 'where'] });
+    // TYTO-402: the catalog beside the names; `acme.pull` has no plugin behind it here.
+    const verbs = await handlers['recipe:verbs']({});
+    expect(verbs.verbs).toEqual(['acme.pull', 'where']);
+    expect(verbs.catalog.map((entry) => [entry.name, entry.kind])).toEqual([
+      ['where', 'transform'],
+    ]);
+  });
+
+  // TYTO-402: a plugin verb's form comes from the schema main holds for it.
+  it("lists a plugin verb's kind and declared arguments in the step picker's catalog", async () => {
+    const handlers = createHandlers({
+      ...dependencies(),
+      contributedVerb: (name) =>
+        name === 'acme.pull'
+          ? { kind: 'source', arguments: [{ name: 'board', type: 'text', required: true }] }
+          : undefined,
+    });
+
+    const { catalog } = await handlers['recipe:verbs']({});
+
+    expect(catalog[0]).toEqual({
+      name: 'acme.pull',
+      kind: 'source',
+      summary: '',
+      fields: [{ name: 'board', kind: 'text', placement: 'named', required: true, help: '' }],
+    });
+    expect(() => parseIpc('recipe:verbs', 'response', { verbs: [], catalog })).not.toThrow();
   });
 
   // TYTO-385, ADR 0175: the window names a schedule by main's id, never by a path.

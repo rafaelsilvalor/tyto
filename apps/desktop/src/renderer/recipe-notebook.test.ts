@@ -11,7 +11,10 @@ import {
   answerDiagnostics,
   cellAtOrAbove,
   cellStatuses,
+  columnsBefore,
   createRecipeNotebook,
+  stepOnLine,
+  stepSlot,
 } from './recipe-notebook.js';
 
 /**
@@ -461,5 +464,74 @@ describe('Apply (TYTO-378)', () => {
     await settle();
 
     expect(notebook.refusalsOf('tab-1').get(0)).toBe('Not applied: run the recipe again');
+  });
+});
+
+describe('where Add step writes and what its form offers (TYTO-402)', () => {
+  const RECIPE = [
+    'recipe weekly',
+    'param project = demo',
+    'acme.pull',
+    '# keep the open ones',
+    'where status != done',
+    '',
+  ].join('\n');
+
+  const cellWith = (index: number, columns: readonly string[] | undefined): Cell => ({
+    index,
+    line: index + 3,
+    status: 'ok',
+    diagnostics: [],
+    ...(columns === undefined
+      ? {}
+      : {
+          table: {
+            columns: columns.map((name) => ({ name, type: 'text' })),
+            rows: [],
+            total: 0,
+          },
+        }),
+  });
+
+  it("writes below the step at or above the cursor's line, as its own line", () => {
+    const slot = stepSlot(RECIPE, 4);
+    const lineEnd = RECIPE.indexOf('\n', RECIPE.indexOf('acme.pull'));
+
+    expect(slot).toEqual({ at: lineEnd, prefix: '\n', suffix: '', before: 1 });
+    const written = `${RECIPE.slice(0, slot.at)}${slot.prefix}select key${slot.suffix}${RECIPE.slice(slot.at)}`;
+    expect(written.split('\n').slice(2, 5)).toEqual([
+      'acme.pull',
+      'select key',
+      '# keep the open ones',
+    ]);
+  });
+
+  it('writes at the end above every step, with no step, and in a text that does not parse', () => {
+    expect(stepSlot(RECIPE, 1)).toEqual({ at: RECIPE.length, prefix: '', suffix: '\n', before: 2 });
+    expect(stepSlot('recipe empty', 1)).toEqual({
+      at: 'recipe empty'.length,
+      prefix: '\n',
+      suffix: '',
+      before: 0,
+    });
+    expect(stepSlot('not a recipe\n', 1).before).toBeUndefined();
+  });
+
+  it("finds the step on the cursor's line, and none on a comment", () => {
+    expect(stepOnLine(RECIPE, 5)?.index).toBe(1);
+    expect(stepOnLine(RECIPE, 5)?.step.verb).toBe('where');
+    expect(stepOnLine(RECIPE, 4)).toBeUndefined();
+  });
+
+  it('offers the columns of the nearest cell before the step that has a table', () => {
+    const cells = {
+      cells: [cellWith(0, ['key', 'status']), cellWith(1, undefined), cellWith(2, ['key'])],
+    };
+
+    expect(columnsBefore(cells, 2)).toEqual(['key', 'status']);
+    expect(columnsBefore(cells, 1)).toEqual(['key', 'status']);
+    expect(columnsBefore(cells, 0)).toEqual([]);
+    expect(columnsBefore(cells, undefined)).toEqual(['key']);
+    expect(columnsBefore(undefined, 3)).toEqual([]);
   });
 });

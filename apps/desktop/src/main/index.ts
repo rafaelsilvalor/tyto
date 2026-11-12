@@ -2248,6 +2248,12 @@ async function start(): Promise<void> {
     },
     preview,
     recipes,
+    // TYTO-402, ADR 0176: a plugin verb's kind and declared arguments, for the step picker.
+    contributedVerb: (name) =>
+      contributed
+        .recipeContributions()
+        .ownedRecipeVerbs()
+        .find((owned) => owned.verb.id === name)?.verb,
     // TYTO-385, ADR 0175: the Schedules panel's list, Run now and Open, by main's ids.
     schedule,
     // TYTO-379, ADR 0171: `recipe:copy` writes the text it built in main.

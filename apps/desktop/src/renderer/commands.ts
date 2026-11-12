@@ -139,6 +139,14 @@ export const RECIPE_RUN_FRESH = 'recipe.runFresh';
  */
 export const RECIPE_OPEN_CELL_VIEW = 'recipe.openCellView';
 /**
+ * TYTO-402 (ADR 0176). Add step opens the step picker and writes the chosen verb's line below
+ * the cursor's step, or at the end; Edit step opens the form of the step on the cursor's line,
+ * filled from it, and writes the line back. The text stays the source of truth. Offered only
+ * with a recipe in front.
+ */
+export const RECIPE_ADD_STEP = 'recipe.addStep';
+export const RECIPE_EDIT_STEP = 'recipe.editStep';
+/**
  * TYTO-402 (ADR 0176). New recipe and New vocabulary: the explorer's name field, opened in the
  * selected folder, makes `<name>.recipe` or `<name>.vocab.json` from its skeleton. Offered with
  * any tab in front; with no folder open they do nothing, as New File does.
@@ -383,6 +391,8 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [RECIPE_RUN_FROM_CELL]: 'command.recipe.runFromCell',
   [RECIPE_RUN_FRESH]: 'command.recipe.runFresh',
   [RECIPE_OPEN_CELL_VIEW]: 'command.recipe.openCellView',
+  [RECIPE_ADD_STEP]: 'command.recipe.addStep',
+  [RECIPE_EDIT_STEP]: 'command.recipe.editStep',
   [EXPLORER_NEW_RECIPE]: 'command.explorer.newRecipe',
   [EXPLORER_NEW_VOCABULARY]: 'command.explorer.newVocabulary',
   [THEME_PICK]: 'command.theme.pick',
@@ -518,6 +528,9 @@ export interface DesktopActions {
   runRecipeFresh(): void;
   /** TYTO-379. Opens the recipe in front's cursor cell full size, in a tab of its own. */
   openRecipeCellView(): void;
+  /** TYTO-402. Opens the step picker, or the cursor step's form, over the recipe in front. */
+  addRecipeStep(): void;
+  editRecipeStep(): void;
   /** TYTO-402. Opens the explorer's name field for a new recipe or vocabulary. */
   newSeededFile(seed: 'recipe' | 'vocabulary'): void;
   /** TYTO-208. Lists the colour themes in the bar; the list and the choice are main's. */
@@ -707,6 +720,12 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(RECIPE_OPEN_CELL_VIEW, () => {
     actions.openRecipeCellView();
+  });
+  add(RECIPE_ADD_STEP, () => {
+    actions.addRecipeStep();
+  });
+  add(RECIPE_EDIT_STEP, () => {
+    actions.editRecipeStep();
   });
   add(EXPLORER_NEW_RECIPE, () => {
     actions.newSeededFile('recipe');

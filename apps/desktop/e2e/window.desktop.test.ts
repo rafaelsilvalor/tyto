@@ -389,6 +389,9 @@ describe('the bridge', () => {
       'recipe:rows',
       'recipe:run',
       'recipe:verbs',
+      // TYTO-402: a recipe's vocabulary-reference completion, from what main reads beside the
+      // tab's file. `src/main/vocabulary-names.test.ts` holds what it reads and refuses.
+      'recipe:vocabulary-names',
       // TYTO-385, ADR 0175: the recipes run on an interval. The Schedules panel that calls
       // them is the card's third pull request; `src/main/ipc.test.ts` holds what they do.
       'schedule:list',
@@ -1021,6 +1024,11 @@ describe('switching the language', () => {
     'vocabulary.section.lookups',
     'vocabulary.hover.entries',
     'vocabulary.hover.pointer',
+    // TYTO-402: Add step and Edit step, in the bar only, and their dialog, drawn only while
+    // open; `recipe-step-dialog.test.ts` paints it, and `recipe-steps.desktop.test.ts` opens it.
+    'command.recipe.addStep',
+    'command.recipe.editStep',
+    ...CATALOGUE_KEYS.filter((key) => key.startsWith('recipe.step.')),
     'recipe.cell.rows',
     'recipe.cell.rows.one',
     'recipe.cell.columns',

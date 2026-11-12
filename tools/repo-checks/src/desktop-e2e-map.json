@@ -646,13 +646,35 @@
         "apps/desktop/src/main/recipe-authoring.ts",
         "apps/desktop/src/renderer/vocabulary-assist.ts"
       ],
-      "e2e": ["recipe-authoring.desktop.test.ts", "window.desktop.test.ts"],
-      "why": "reviewed: New recipe and New vocabulary, and the vocabulary tab's lint, completion and hover (TYTO-402, ADR 0176); window.desktop's channel list reaches vocabulary:lint, vocabulary:complete and vocabulary:hover, and the authoring suite makes both files in an empty trusted folder and marks a refused rule at its character. The seeds, the escape mapping and the answers are in recipe-authoring.test.ts, the wording in vocabulary-assist.test.ts"
+      "e2e": [
+        "recipe-authoring.desktop.test.ts",
+        "recipe-steps.desktop.test.ts",
+        "window.desktop.test.ts"
+      ],
+      "why": "reviewed: New recipe and New vocabulary, and the vocabulary tab's lint, completion and hover (TYTO-402, ADR 0176); window.desktop's channel list reaches vocabulary:lint, vocabulary:complete and vocabulary:hover, and the authoring suite makes both files in an empty trusted folder and marks a refused rule at its character. The step picker's catalog (recipe:verbs) is built here too, and the steps suite picks a plugin source from it. The seeds, the escape mapping, the catalog and the answers are in recipe-authoring.test.ts, the wording in vocabulary-assist.test.ts"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/renderer/recipe-step-dialog.ts",
+        "apps/desktop/src/renderer/recipe-step-form.ts",
+        "apps/desktop/src/renderer/recipe-step-picker.ts"
+      ],
+      "e2e": ["recipe-steps.desktop.test.ts", "window.desktop.test.ts"],
+      "why": "reviewed: Add step and Edit step, the step picker and the step forms (TYTO-402, ADR 0176); the steps suite builds a recipe from an empty trusted folder through them and checks the saved text equals the lines the forms showed, and window.desktop's language switch leaves out their strings. The grouping, the keyboard, the round trip and the refusals are in recipe-step-dialog.test.ts"
+    },
+    {
+      "paths": ["apps/desktop/src/main/vocabulary-names.ts"],
+      "e2e": ["window.desktop.test.ts"],
+      "why": "reviewed: what a recipe's @./….vocab.json#/… completion may name (TYTO-402, ADR 0112); window.desktop's channel list reaches recipe:vocabulary-names, and what it reads and refuses outside the folder is in vocabulary-names.test.ts over real files"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
-      "e2e": ["recipe-notebook.desktop.test.ts", "recipe-tab.desktop.test.ts"],
-      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables"
+      "e2e": [
+        "recipe-notebook.desktop.test.ts",
+        "recipe-steps.desktop.test.ts",
+        "recipe-tab.desktop.test.ts"
+      ],
+      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377), and where Add step writes and which columns its form offers (TYTO-402); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-cell-view.ts"],

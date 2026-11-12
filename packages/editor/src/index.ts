@@ -227,7 +227,9 @@ export { markdown, markdownLanguage } from './markdown-language.js';
 export { recipe, recipeLanguage } from './recipe-language.js';
 
 export {
+  type RecipeReferenceSource,
   type RecipeVerbSource,
+  completeRecipeReference,
   completeRecipeVerb,
   recipeCompletion,
 } from './recipe-completion.js';

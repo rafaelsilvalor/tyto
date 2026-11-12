@@ -114,8 +114,14 @@ import {
   answerDiagnostics,
   cellAtOrAbove,
   cellStatuses,
+  columnsBefore,
   createRecipeNotebook,
+  stepOnLine,
+  stepSlot,
 } from './recipe-notebook.js';
+import { type RecipeStepDialog, RECIPE_STEP_TAG } from './recipe-step-dialog.js';
+import { formOfEntry, valuesOfLine } from './recipe-step-form.js';
+import type { VerbEntry } from './recipe-step-picker.js';
 import { vocabularyAssist } from './vocabulary-assist.js';
 import { AGE_TICK, type CellViewContext, cellOutputOf, tickAges } from './recipe-cell-view.js';
 import { type ViewContext, fullSizeBody } from './recipe-views.js';
@@ -787,7 +793,19 @@ const appFileAssists: AppFileAssists = {
     ),
   ],
   // A recipe's (TYTO-377): its verbs at the start of a line, and the lines under its cells.
-  recipe: [tabThroughCompletions(), recipeCompletion(() => recipeVerbs), cellOutputs()],
+  // TYTO-402: and `@./<file>.vocab.json#/<pointer>`, from the files beside the one main holds.
+  recipe: [
+    tabThroughCompletions(),
+    recipeCompletion(
+      () => recipeVerbs,
+      (file) =>
+        window.tyto?.['recipe:vocabulary-names']({
+          documentId: active().id,
+          ...(file === undefined ? {} : { file }),
+        }) ?? Promise.resolve({ files: [], pointers: [] }),
+    ),
+    cellOutputs(),
+  ],
   // A vocabulary's (TYTO-402, ADR 0176): its sections and fields, and what a key is, from main.
   vocabulary: [
     tabThroughCompletions(),
@@ -811,11 +829,69 @@ const appFileAssists: AppFileAssists = {
  * a plugin installed since is offered (TYTO-377). Empty until main answers.
  */
 let recipeVerbs: readonly string[] = [];
+/** The same verbs with their kind and form (TYTO-402), which the step picker lists. */
+let recipeCatalog: readonly VerbEntry[] = [];
 
-function refreshRecipeVerbs(): void {
-  void withBridge(async (bridge) => {
-    recipeVerbs = (await bridge['recipe:verbs']({})).verbs;
+function refreshRecipeVerbs(): Promise<void> {
+  return withBridge(async (bridge) => {
+    const answer = await bridge['recipe:verbs']({});
+    recipeVerbs = answer.verbs;
+    recipeCatalog = answer.catalog;
   });
+}
+
+/**
+ * Add step and Edit step over the recipe in front (TYTO-402, ADR 0176): the dialog answers one
+ * line, written into the pane's text as an edit, so it saves, undoes and reruns as typing does.
+ * The verbs are asked for again first, so a plugin that started since is listed.
+ */
+function recipeStep(mode: 'add' | 'edit'): void {
+  const front = active();
+  const pane = focusedPane() ?? primaryPaneOf(front.id);
+  const dialog = document.querySelector<RecipeStepDialog>(RECIPE_STEP_TAG);
+  if (!isRecipe(front.kind) || pane === undefined || dialog === null) return;
+  void (async () => {
+    await refreshRecipeVerbs();
+    const text = pane.state().doc.toString();
+    const line = cursorOf(pane.state()).line;
+    const shown = recipeNotebook.lastOf(front.id)?.answer;
+    if (mode === 'add') {
+      const slot = stepSlot(text, line);
+      const written = await dialog.ask({
+        locale: state.locale,
+        catalog: recipeCatalog,
+        columns: columnsBefore(shown, slot.before),
+      });
+      if (written === undefined) return;
+      const insert = `${slot.prefix}${written}${slot.suffix}`;
+      pane.view.dispatch({
+        changes: { from: slot.at, insert },
+        selection: { anchor: slot.at + slot.prefix.length + written.length },
+        userEvent: 'input',
+      });
+      pane.view.focus();
+      return;
+    }
+    const found = stepOnLine(text, line);
+    const entry = recipeCatalog.find((candidate) => candidate.name === found?.step.verb);
+    const values =
+      found === undefined || entry === undefined
+        ? undefined
+        : valuesOfLine(formOfEntry(entry), found.step);
+    if (found === undefined || entry === undefined || values === undefined) return;
+    const written = await dialog.ask({
+      locale: state.locale,
+      catalog: recipeCatalog,
+      columns: columnsBefore(shown, found.index),
+      edit: { entry, values },
+    });
+    // The text may have moved while the form was open: the line is written only where it was.
+    const now = pane.state().doc.toString();
+    const { start, end } = found.step.range;
+    if (written === undefined || now.slice(start, end) !== text.slice(start, end)) return;
+    pane.view.dispatch({ changes: { from: start, to: end, insert: written }, userEvent: 'input' });
+    pane.view.focus();
+  })();
 }
 
 /** When each recipe tab runs, and only its newest answer shown (TYTO-377, `recipe-notebook.ts`). */
@@ -921,7 +997,7 @@ function paintRecipeViews(): void {
 
 /** A recipe came into a tab, opened or restored: its verbs are read again, and it runs once. */
 function openedRecipe(documentId: string): void {
-  refreshRecipeVerbs();
+  void refreshRecipeVerbs();
   void recipeNotebook.runNow(documentId, 'typed');
 }
 
@@ -2092,6 +2168,12 @@ const registry: CommandRegistry = withCommandGate(
     runRecipeFresh: () => {
       const front = active();
       if (isRecipe(front.kind)) void recipeNotebook.fetchAgain(front.id);
+    },
+    addRecipeStep: () => {
+      recipeStep('add');
+    },
+    editRecipeStep: () => {
+      recipeStep('edit');
     },
     openRecipeCellView: () => {
       // TYTO-379: the cell at or above the cursor, as Run from here finds it.

@@ -3836,6 +3836,141 @@ tyto-trust-dialog[open] {
   gap: var(--tyto-space-3);
 }
 
+/* Add step and Edit step (TYTO-402): the trust dialog's frame, at the middle width. */
+tyto-recipe-step {
+  display: contents;
+}
+
+tyto-recipe-step[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tyto-scrim);
+}
+
+.recipe-step__panel {
+  display: flex;
+  width: min(var(--tyto-dialog-width-md), calc(100vw - 2 * var(--tyto-space-6)));
+  max-height: calc(100vh - 2 * var(--tyto-space-6));
+  flex-direction: column;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  gap: var(--tyto-space-4);
+}
+
+.recipe-step__title,
+.recipe-step-form__verb {
+  margin: 0;
+  font-size: var(--tyto-text-lg);
+}
+
+.recipe-step__picker,
+.recipe-step-form {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--tyto-space-3);
+}
+
+.recipe-step__list,
+.recipe-step-form {
+  overflow-y: auto;
+}
+
+.recipe-step__kind {
+  margin: var(--tyto-space-2) 0 var(--tyto-space-1);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+  font-weight: var(--tyto-weight-strong);
+}
+
+.recipe-step__verb {
+  display: flex;
+  width: 100%;
+  padding: var(--tyto-space-1) var(--tyto-space-2);
+  border: none;
+  border-radius: var(--tyto-radius-sm);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  gap: var(--tyto-space-3);
+  text-align: left;
+}
+
+.recipe-step__verb[aria-selected='true'] {
+  background: var(--tyto-selection);
+}
+
+.recipe-step__verb-name,
+.recipe-step-form__name,
+.recipe-step-form__line {
+  font-family: var(--tyto-font-mono);
+}
+
+.recipe-step__verb-summary,
+.recipe-step__none,
+.recipe-step-form__summary,
+.recipe-step-form__help,
+.recipe-step-form__default,
+.recipe-step-form__empty,
+.recipe-step-form__line-label {
+  margin: 0;
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-step-form__label {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--tyto-space-2);
+}
+
+.recipe-step-form__input[type='text'] {
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.recipe-step-form__required {
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-step-form__columns {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: var(--tyto-space-1);
+  gap: var(--tyto-space-1);
+}
+
+.recipe-step-form__column {
+  font-family: var(--tyto-font-mono);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-step-form__problem {
+  margin: var(--tyto-space-1) 0 0;
+  color: var(--tyto-error);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-step-form__line {
+  min-height: 1.5em;
+  overflow-wrap: anywhere;
+}
+
+.recipe-step__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tyto-space-3);
+}
+
 /*
  * The recent folders popover (TYTO-487): under the title bar's folder button, at the `left` the
  * window writes inline from it, with no scrim — a menu, not a dialog over the work. macOS draws
