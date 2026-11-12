@@ -63,9 +63,11 @@ import {
  * carry `credentialHeaders`, which the strict schema of a host on 23 would refuse, and a plugin
  * may keep durable records, three requests a host on 23 would refuse (ADR 0191, TYTO-661); 25
  * since a recipe `transform` call carries `refresh` on a run without cache, a field the strict
- * `transform` schema of a guest on 24 would refuse (ADR 0148, TYTO-681).
+ * `transform` schema of a guest on 24 would refuse (ADR 0148, TYTO-681); 26 since a recipe
+ * verb's argument may carry `description`, a field the strict `recipe-verb` schema of a host on
+ * 25 would refuse (ADR 0135, note of 2026-11-12, TYTO-687).
  */
-export const RPC_PROTOCOL_VERSION = 25;
+export const RPC_PROTOCOL_VERSION = 26;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -394,6 +396,16 @@ export function describeIssues(error: z.ZodError): string {
   return error.issues
     .map((issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`)
     .join('; ');
+}
+
+/**
+ * Why a contribution its point's schema refuses is refused: an isolated plugin's registration
+ * meets it on the wire, and an in-process recipe verb whose argument descriptions the same
+ * schema refuses meets the same sentence in `checkRecipeVerb` (TYTO-687), so a plugin is
+ * refused alike on both paths.
+ */
+export function unmatchedContribution(point: string, error: z.ZodError): string {
+  return `its '${point}' contribution does not match: ${describeIssues(error)}`;
 }
 
 /**

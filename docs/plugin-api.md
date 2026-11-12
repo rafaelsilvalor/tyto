@@ -431,6 +431,7 @@ interface RecipeVerbContribution {
     positional?;
     required?;
     values?;
+    description?: string; // the step form's help for the field; English, at most 1,000 characters
   }[];
   page?(request: {
     arguments;
@@ -478,7 +479,13 @@ manifest declares and owns** (ADR 0135): a second plugin declaring a namespace a
 owns is refused whole with `E_PLUGIN_NAMESPACE_TAKEN`, and a name outside the plugin's own
 namespace refuses the plugin at load. The host checks a step's arguments against `arguments`
 before the plugin is called (`E_RECIPE_ARGUMENTS`), and hands over values converted to their
-types. **A source answers one page per call and the host loops** (`pagedSource` in
+types. **An argument's `description` is its field's help in the step form** (TYTO-687), shown
+as written: in English, since a plugin localises no other string either, and the window's
+Portuguese table holds no key for it. At most 1,000 characters
+(`ARGUMENT_DESCRIPTION_MAX_LENGTH` in `@tyto/recipe`); one over the bound refuses the plugin at
+load with `E_PLUGIN_ACTIVATE`, the same sentence in process as isolated, because both paths
+meet one schema. An argument without one shows no help. Across the isolation boundary the field
+rides `recipe-verb` from protocol 26, which `@tyto/plugin-api` 0.21 carries. **A source answers one page per call and the host loops** (`pagedSource` in
 `@tyto/recipe`), so each call fits its own 30 s deadline; no `cursor` is the last page. A table
 crosses as JSON, is held to a strict schema (`E_PLUGIN_PROTOCOL`) and then to `checkTable`
 (`E_RECIPE_TABLE`: a repeated column or key, a value under no column or of the wrong type).

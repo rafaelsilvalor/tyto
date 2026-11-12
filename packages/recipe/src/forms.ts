@@ -443,6 +443,7 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
 /**
  * The form of a contributed verb, from the closed argument schema it declared (ADR 0135): a
  * positional argument is a bare value, every other one `name=value`, and its `values` a choice.
+ * A declared `description` is the field's help, as written (TYTO-687); without one, no help.
  */
 export function formOfArguments(
   verb: string,
@@ -456,7 +457,7 @@ export function formOfArguments(
     placement: spec.positional === true ? 'positional' : 'named',
     required: spec.required === true,
     ...(spec.values === undefined ? {} : { values: spec.values }),
-    help: '',
+    help: spec.description ?? '',
   }));
   return { verb, kind, summary, example: '', fields };
 }

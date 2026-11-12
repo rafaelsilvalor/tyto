@@ -17,7 +17,15 @@ import {
   sourceRange,
 } from '@tyto/core';
 import { colorValue, faceValue, imageValue, numberValue } from '@tyto/core/template';
-import { type Plan, type Table, parseRecipe, runRecipe } from '@tyto/recipe';
+import {
+  ARGUMENT_DESCRIPTION_MAX_LENGTH,
+  type ArgumentSpec,
+  type Plan,
+  type Table,
+  formOfArguments,
+  parseRecipe,
+  runRecipe,
+} from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -2973,6 +2981,91 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     ]);
     expect(new Set(statuses.slice(100, 200)).size).toBe(1);
     expect(new Set(statuses.slice(200)).size).toBe(1);
+  });
+});
+
+/**
+ * TYTO-687: an argument's `description` is the step form's help for its field, and an isolated
+ * plugin's reaches the form exactly as an in-process one's does; one over the bound is refused
+ * alike on both paths, by the one schema.
+ */
+describe("a recipe verb's argument descriptions, isolated and in process (TYTO-687)", () => {
+  const RECIPE_MANIFEST = {
+    ...MANIFEST,
+    contributes: ['recipe-verb'],
+    namespace: 'demo',
+  };
+
+  const verbWith = (specs: readonly ArgumentSpec[]) => (host: PluginHost) =>
+    host.registerRecipeVerb({
+      id: 'demo.pull',
+      kind: 'source',
+      arguments: specs,
+      page: () => ok({ table: { columns: [], rows: [] } }),
+    });
+
+  async function bothWays(specs: readonly ArgumentSpec[]) {
+    const { connected } = await isolate(verbWith(specs), {
+      contributes: ['recipe-verb'],
+      namespace: 'demo',
+    });
+    const inProcess = createPluginHost();
+    const activated = inProcess.tryActivate({
+      id: 'texto',
+      manifest: RECIPE_MANIFEST,
+      activate: verbWith(specs),
+    });
+    return { connected, activated, inProcess };
+  }
+
+  /** Each field's name and help in the step form, for every verb the host holds. */
+  const fieldsOf = (host: ReturnType<typeof createPluginHost>) =>
+    host.registry
+      .recipeVerbs()
+      .map((verb) => formOfArguments(verb.id, verb.kind, verb.arguments))
+      .flatMap((form) => form.fields.map((field) => [field.name, field.help]));
+
+  it('shows a declared description as the field’s help, the same both ways', async () => {
+    const { connected, activated, inProcess } = await bothWays([
+      { name: 'board', type: 'text', positional: true, description: 'The board to read.' },
+      { name: 'limit', type: 'number' },
+    ]);
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const isolatedHost = createPluginHost();
+    const replayed = isolatedHost.tryActivate(connected.value.plugin);
+    if (!replayed.ok) throw new Error(replayed.error[0]?.message);
+
+    const expected = [
+      ['board', 'The board to read.'],
+      ['limit', ''],
+    ];
+    expect(fieldsOf(isolatedHost)).toEqual(expected);
+    expect(fieldsOf(inProcess)).toEqual(expected);
+  });
+
+  it('refuses a description over the bound with the same diagnostic both ways', async () => {
+    const { connected, activated } = await bothWays([
+      { name: 'board', type: 'text', description: 'x'.repeat(ARGUMENT_DESCRIPTION_MAX_LENGTH + 1) },
+    ]);
+
+    expect(connected.ok ? '' : connected.error[0]?.code).toBe('E_PLUGIN_ACTIVATE');
+    expect(connected.ok ? '' : connected.error[0]?.message).toContain(
+      "its 'recipe-verb' contribution does not match: arguments.0.description",
+    );
+    expect(activated.ok ? 'activated' : activated.error).toEqual(
+      connected.ok ? 'connected' : connected.error,
+    );
+  });
+
+  it('keeps a description at the bound both ways', async () => {
+    const atTheBound = 'x'.repeat(ARGUMENT_DESCRIPTION_MAX_LENGTH);
+    const { connected, activated } = await bothWays([
+      { name: 'board', type: 'text', description: atTheBound },
+    ]);
+
+    expect(connected.ok).toBe(true);
+    expect(activated.ok).toBe(true);
   });
 });
 
