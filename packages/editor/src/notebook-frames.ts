@@ -642,6 +642,30 @@ function dropPlaces(view: EditorView): readonly NotebookDropPlace[] {
   return places;
 }
 
+/** How deep the band at each edge of the pane is where a drag scrolls it, at most, in px. */
+const EDGE_BAND = 48;
+/** How fast a drag scrolls the pane with the pointer at its edge or past it, in px a second. */
+const EDGE_SPEED = 1200;
+/** How often a drag in the band scrolls, in ms. */
+const EDGE_TICK = 16;
+/** The longest step one tick may take, in ms: a throttled timer jumps no further than this. */
+const EDGE_STEP_LIMIT = 200;
+
+/**
+ * How fast a drag with the pointer at `y` scrolls a pane whose visible top and bottom are
+ * `top` and `bottom` (TYTO-710), in px a second: negative up, positive down, 0 outside the
+ * bands. A band is 48 px deep, or a quarter of a short pane; the speed grows from nothing at
+ * its inner edge to {@link EDGE_SPEED} at the pane's edge, and stays there past it, since the
+ * captured pointer may leave the pane.
+ */
+export function edgeScrollSpeed(y: number, top: number, bottom: number): number {
+  const band = Math.min(EDGE_BAND, (bottom - top) / 4);
+  if (!(band > 0)) return 0;
+  if (y < top + band) return -EDGE_SPEED * Math.min(1, (top + band - y) / band);
+  if (y > bottom - band) return EDGE_SPEED * Math.min(1, (y - (bottom - band)) / band);
+  return 0;
+}
+
 /** One drag on its way per view: how to end it. */
 const sessions = new WeakMap<EditorView, { readonly end: (drop: boolean) => void }>();
 
@@ -649,16 +673,67 @@ const sessions = new WeakMap<EditorView, { readonly end: (drop: boolean) => void
  * Starts dragging frame `index` from its grip: the pointer is captured on the grip, so every
  * move and the release reach it wherever the pointer goes. Escape and the window losing focus
  * cancel; an edit of the text cancels too ({@link dragCanceller}).
+ *
+ * **The moves and the release are heard on the window, not the grip** (TYTO-710). A drag that
+ * scrolls far takes the grip's line out of CodeMirror's viewport, which unmounts the grip and
+ * its capture with it; the events then reach whatever is under the pointer, and bubble up to
+ * the window still. What the drag is — the frame dragged, its dimming — lives in the state, so
+ * it outlives its grip.
+ *
+ * With the pointer in a band at the top or bottom of the pane, a timer scrolls it, faster
+ * nearer the edge ({@link edgeScrollSpeed}), and the drop place is picked again under the
+ * pointer, as it is on any scroll, the wheel's included. A timer and not an animation frame:
+ * a hidden window, as the desktop suite's is, runs no frames (measured on 2026-11-12), and each
+ * step is scaled by the time that passed, so a throttled timer scrolls as far. The timer stops
+ * at the end of the scroll, outside the bands and with the drag, and a move starts it again.
  */
 function startDrag(view: EditorView, index: number, grip: HTMLElement, down: MouseEvent): void {
   sessions.get(view)?.end(false);
   const pointerId = 'pointerId' in down ? (down as PointerEvent).pointerId : undefined;
   if (pointerId !== undefined) grip.setPointerCapture?.(pointerId);
   const window = view.dom.ownerDocument.defaultView;
+  const scroller = view.scrollDOM;
+  let pointerY: number | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let lastTick = 0;
+  const repick = (): void => {
+    if (pointerY === undefined || notebookDragOf(view) === null) return;
+    const before = nearestDrop(dropPlaces(view), pointerY)?.before ?? null;
+    if (notebookDragOf(view)?.before === before) return;
+    view.dispatch({ effects: setNotebookDrag.of({ from: index, before }) });
+  };
+  const speed = (): number => {
+    if (pointerY === undefined) return 0;
+    const box = scroller.getBoundingClientRect();
+    return edgeScrollSpeed(pointerY, box.top, box.bottom);
+  };
+  const tick = (): void => {
+    timer = undefined;
+    const now = Date.now();
+    const elapsed = Math.min(EDGE_STEP_LIMIT, now - lastTick);
+    lastTick = now;
+    const pace = speed();
+    if (pace === 0) return;
+    const from = scroller.scrollTop;
+    // At least a pixel a step: a pane rounds a smaller step away, which would read as its end.
+    const step = (pace * elapsed) / 1000;
+    scroller.scrollTop = from + Math.sign(step) * Math.max(1, Math.abs(step));
+    // The end of the scroll: the timer rests until the pointer moves again.
+    if (scroller.scrollTop === from) return;
+    repick();
+    timer = setTimeout(tick, EDGE_TICK);
+  };
+  const startTicker = (): void => {
+    if (timer === undefined && speed() !== 0) {
+      lastTick = Date.now();
+      timer = setTimeout(tick, EDGE_TICK);
+    }
+  };
   const move = (event: Event): void => {
     if (!(event instanceof MouseEvent)) return;
-    const place = nearestDrop(dropPlaces(view), event.clientY);
-    view.dispatch({ effects: setNotebookDrag.of({ from: index, before: place?.before ?? null }) });
+    pointerY = event.clientY;
+    repick();
+    startTicker();
   };
   const up = (): void => {
     end(true);
@@ -675,11 +750,14 @@ function startDrag(view: EditorView, index: number, grip: HTMLElement, down: Mou
   const end = (drop: boolean): void => {
     if (sessions.get(view)?.end !== end) return;
     sessions.delete(view);
-    grip.removeEventListener('pointermove', move);
-    grip.removeEventListener('pointerup', up);
-    grip.removeEventListener('pointercancel', cancel);
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+    window?.removeEventListener('pointermove', move);
+    window?.removeEventListener('pointerup', up);
+    window?.removeEventListener('pointercancel', cancel);
     window?.removeEventListener('keydown', key, true);
     window?.removeEventListener('blur', cancel);
+    scroller.removeEventListener('scroll', repick);
     if (pointerId !== undefined && grip.hasPointerCapture?.(pointerId) === true) {
       grip.releasePointerCapture(pointerId);
     }
@@ -691,11 +769,12 @@ function startDrag(view: EditorView, index: number, grip: HTMLElement, down: Mou
       view.state.facet(framesOptions)?.move?.(view, drag.from, drag.before);
   };
   sessions.set(view, { end });
-  grip.addEventListener('pointermove', move);
-  grip.addEventListener('pointerup', up);
-  grip.addEventListener('pointercancel', cancel);
+  window?.addEventListener('pointermove', move);
+  window?.addEventListener('pointerup', up);
+  window?.addEventListener('pointercancel', cancel);
   window?.addEventListener('keydown', key, true);
   window?.addEventListener('blur', cancel);
+  scroller.addEventListener('scroll', repick);
   view.dispatch({ effects: setNotebookDrag.of({ from: index, before: null }) });
 }
 

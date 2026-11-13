@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type NotebookFrame,
+  edgeScrollSpeed,
   enterNotebookCommand,
   isNotebookCommandTarget,
   leaveNotebookCommand,
@@ -414,6 +415,17 @@ describe('dragging a block by its grip', () => {
     expect(move).not.toHaveBeenCalled();
   });
 
+  // TYTO-710: the window, not the grip, hears the release, since a far scroll unmounts the grip.
+  // Here the release lands on the page's body, as it does once the grip is gone.
+  it('drops on a release the window hears off the grip', () => {
+    const { on, move, press } = openDraggable();
+    press(1);
+    on.dispatch({ effects: setNotebookDrag.of({ from: 1, before: 'end' }) });
+    document.body.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    expect(move).toHaveBeenCalledWith(on, 1, 'end');
+    expect(notebookDragOf(on)).toBeNull();
+  });
+
   // A run can rewrite the text under a drag: the frames it counted are gone, so the drag ends.
   it('cancels when the text changes mid-drag, freeing the pointer, and drops nothing', async () => {
     const { on, move, press } = openDraggable();
@@ -425,5 +437,141 @@ describe('dragging a block by its grip', () => {
     expect(release).toHaveBeenCalledWith(7);
     grip.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
     expect(move).not.toHaveBeenCalled();
+  });
+});
+
+// TYTO-710: a drag near the top or bottom of the pane scrolls it.
+describe('scrolling the pane while a block is dragged near its edge', () => {
+  it('scrolls nowhere outside the bands, faster nearer the edge, and at full speed past it', () => {
+    // A pane from 100 to 500: bands 48 px deep.
+    expect(edgeScrollSpeed(300, 100, 500)).toBe(0);
+    expect(edgeScrollSpeed(148, 100, 500)).toBe(0);
+    expect(edgeScrollSpeed(452, 100, 500)).toBe(0);
+    expect(edgeScrollSpeed(124, 100, 500)).toBe(-600);
+    expect(edgeScrollSpeed(476, 100, 500)).toBe(600);
+    expect(edgeScrollSpeed(500, 100, 500)).toBe(1200);
+    expect(edgeScrollSpeed(900, 100, 500)).toBe(1200);
+    expect(edgeScrollSpeed(-50, 100, 500)).toBe(-1200);
+    // A short pane, 100 px: bands of a quarter, 25 px.
+    expect(edgeScrollSpeed(170, 100, 200)).toBe(0);
+    expect(edgeScrollSpeed(187.5, 100, 200)).toBe(600);
+    // No pane: no scroll.
+    expect(edgeScrollSpeed(10, 100, 100)).toBe(0);
+  });
+
+  const PANE_TOP = 100;
+  const PANE_BOTTOM = 200;
+  const LINE = 20;
+  const SCROLL_LIMIT = 50;
+
+  /**
+   * DOC in a pane from 100 to 200 px, each line 20 px, scrolled by a stubbed `scrollTop` that
+   * stops at 50: jsdom lays nothing out, so the boxes are computed from it.
+   */
+  function openScrolling() {
+    const move = vi.fn<(view: EditorView, from: number, before: number | 'end') => void>();
+    view = new EditorView({
+      state: EditorState.create({
+        doc: DOC,
+        extensions: [
+          notebookFrames({
+            framesOf: (on) =>
+              framesOf(on, () => 'tools').map((frame, index) => ({
+                ...frame,
+                movable: index > 0,
+              })),
+            move,
+          }),
+        ],
+      }),
+      parent: document.body,
+    });
+    const on = view;
+    let scrolled = 0;
+    Object.defineProperty(on.scrollDOM, 'scrollTop', {
+      configurable: true,
+      get: () => scrolled,
+      set: (value: number) => {
+        scrolled = Math.max(0, Math.min(SCROLL_LIMIT, value));
+      },
+    });
+    const box = (top: number, bottom: number) =>
+      ({ top, bottom, left: 0, right: 100, width: 100, height: bottom - top }) as DOMRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      if (this === on.scrollDOM) return box(PANE_TOP, PANE_BOTTOM);
+      const index = [...on.contentDOM.querySelectorAll('.cm-line')].indexOf(this);
+      if (index === -1) return box(0, 0);
+      const top = PANE_TOP + index * LINE - scrolled;
+      return box(top, top + LINE);
+    });
+    const grip = [...on.dom.querySelectorAll<HTMLElement>('.cm-notebook-grip')].find(
+      (each) => each.dataset['notebookGrip'] === '1',
+    );
+    if (grip === undefined) throw new Error('no grip');
+    Object.assign(grip, {
+      setPointerCapture: () => undefined,
+      hasPointerCapture: () => false,
+      releasePointerCapture: () => undefined,
+    });
+    grip.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+    const pointerAt = (clientY: number) => {
+      window.dispatchEvent(new MouseEvent('pointermove', { clientY, bubbles: true }));
+    };
+    return { on, move, pointerAt, scrolled: () => scrolled };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('scrolls down in the bottom band, rests at the end, and starts again back in a band', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const { on, pointerAt, scrolled } = openScrolling();
+    pointerAt(199);
+    vi.advanceTimersByTime(16);
+    // 1,152 px a second at 24 px into a 25 px band: 18 px in 16 ms.
+    expect(scrolled()).toBeCloseTo(18.4, 1);
+    vi.advanceTimersByTime(500);
+    expect(scrolled()).toBe(SCROLL_LIMIT);
+    // At the end of the scroll no timer spins while the pointer rests past the edge.
+    expect(vi.getTimerCount()).toBe(0);
+
+    pointerAt(150);
+    expect(vi.getTimerCount()).toBe(0);
+    pointerAt(PANE_TOP - 10);
+    vi.advanceTimersByTime(16);
+    expect(scrolled()).toBeLessThan(SCROLL_LIMIT);
+    vi.advanceTimersByTime(500);
+    expect(scrolled()).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(notebookDragOf(on)).not.toBeNull();
+  });
+
+  it('stops scrolling when the drag is cancelled', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const { on, move, pointerAt, scrolled } = openScrolling();
+    pointerAt(199);
+    vi.advanceTimersByTime(16);
+    const before = scrolled();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    vi.advanceTimersByTime(500);
+    expect(scrolled()).toBe(before);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(notebookDragOf(on)).toBeNull();
+    expect(move).not.toHaveBeenCalled();
+  });
+
+  it('picks the drop place again under a still pointer when the pane scrolls, as by the wheel', () => {
+    const { on, pointerAt } = openScrolling();
+    // Line 3 (acme.pull) starts at 140: the place above frame 1.
+    pointerAt(150);
+    expect(notebookDragOf(on)?.before).toBe(1);
+    // Scrolled 40 px, line 5 (where …) starts at 140: the place above frame 2.
+    on.scrollDOM.scrollTop = 40;
+    on.scrollDOM.dispatchEvent(new Event('scroll'));
+    expect(notebookDragOf(on)?.before).toBe(2);
   });
 });

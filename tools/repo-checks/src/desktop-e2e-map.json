@@ -708,6 +708,11 @@
       "why": "reviewed: a recipe's blocks framed over the one editor and each block's toolbar (TYTO-676, ADR 0195); the block model and its edits are in @tyto/recipe's blocks.test.ts, the frames in @tyto/editor's notebook-frames.test.ts, and only the real window lays the toolbar over the line and moves the caret"
     },
     {
+      "paths": ["apps/desktop/e2e/recipe-drag-scroll.desktop.test.ts"],
+      "e2e": ["recipe-drag-scroll.desktop.test.ts"],
+      "why": "reviewed: a block dragged past the edge of its pane scrolls it (TYTO-710); the speed, the stop at the end of the scroll, the cancels and the drop place following any scroll are in @tyto/editor's notebook-frames.test.ts, and only the real window scrolls under a held pointer and unmounts the dragged block's grip on the way"
+    },
+    {
       "paths": ["apps/desktop/src/renderer/recipe-cell-view.ts"],
       "e2e": [
         "recipe-notebook.desktop.test.ts",
