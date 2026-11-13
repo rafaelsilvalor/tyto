@@ -136,6 +136,23 @@ const summaries = (): Promise<Record<string, string>> =>
   );
 
 /**
+ * Runs CodeMirror's pending measure now. The toolbars and the "+" are drawn on its measure,
+ * which waits for an animation frame, and **this suite's window is never shown**
+ * (`TYTO_HEADLESS`): measured on 2026-11-12, a `requestAnimationFrame` there did not fire in
+ * 500 ms, so a layer drew only when something else read the layout (a click does). A shown
+ * window draws them on the next frame. `coordsAtPos` reads the layout, which runs the measure
+ * first, as `block-enter.desktop.test.ts` reaches the view.
+ */
+async function measured(): Promise<void> {
+  await page.evaluate(() => {
+    const content = document.querySelector('#editor .cm-content') as unknown as {
+      cmTile?: { root?: { view?: { coordsAtPos(at: number): unknown } } };
+    };
+    content.cmTile?.root?.view?.coordsAtPos(0);
+  });
+}
+
+/**
  * The toolbar drawn over the line whose text is `text`: toolbars sit in a layer beside the
  * text, so a toolbar is matched to its line by where it is drawn.
  */
@@ -162,7 +179,8 @@ async function toolbar(text: string) {
 }
 
 /** The index of the toolbar drawn over the line whose text is `text`, or -1. */
-function overLine(text: string): Promise<number> {
+async function overLine(text: string): Promise<number> {
+  await measured();
   return page.evaluate((wanted) => {
     const line = [...document.querySelectorAll('#editor .cm-line')].find(
       (each) => each.textContent === wanted,
@@ -230,6 +248,7 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
       )
       .toContain('blocks.recipe');
     await page.waitForSelector('#editor .recipe-block-toolbar');
+    await measured();
     const laid = await page.evaluate(() => {
       const tools = [...document.querySelectorAll<HTMLElement>('#editor .recipe-block-toolbar')];
       const scroller = document.querySelector<HTMLElement>('#editor .cm-scroller');
@@ -263,6 +282,28 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
       return scroller === null ? -1 : scroller.scrollWidth - scroller.clientWidth;
     });
     expect(overflow).toBe(0);
+    // A "+" sits on its boundary and touches neither a toolbar nor a button of a result.
+    const crossings = await page.evaluate(() => {
+      const boxes = (selector: string) =>
+        [...document.querySelectorAll(selector)].map((each) => each.getBoundingClientRect());
+      const meets = (one: DOMRect, other: DOMRect) =>
+        one.left < other.right &&
+        other.left < one.right &&
+        one.top < other.bottom &&
+        other.top < one.bottom;
+      const plus = boxes('#editor .recipe-block-insert');
+      const others = [
+        ...boxes('#editor .recipe-block-toolbar'),
+        ...boxes('#editor .recipe-cell-status button'),
+        ...boxes('#editor .recipe-cell-status span'),
+      ];
+      return {
+        count: plus.length,
+        crossing: plus.filter((one) => others.some((other) => meets(one, other))).length,
+      };
+    });
+    // Above each of the five blocks under the header, and one below the last.
+    expect(crossings).toEqual({ count: 6, crossing: 0 });
     // A line's text is its own: no toolbar glyph is in it.
     expect(laid.map((line) => line.text)).toEqual(RECIPE.split('\n'));
     // Header, blank, source, note, three steps, and the empty last line.
@@ -277,7 +318,8 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
       false,
     ]);
     expect(laid.filter((line) => line.toolbar !== undefined).map((line) => line.toolbar)).toEqual(
-      Array.from({ length: 5 }, () => ({
+      // The header's (Run all) and one per step and note.
+      Array.from({ length: 6 }, () => ({
         inLine: true,
         right: true,
         clear: true,
@@ -346,5 +388,126 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
           '\n',
         ),
       );
+  }, 30_000);
+});
+
+/**
+ * The "+" drawn on the boundary right above the line whose text is `text`: matched by where it
+ * is drawn, its centre within a few pixels of that line's top.
+ */
+async function plusAbove(text: string) {
+  await measured();
+  const index = await page.evaluate((wanted) => {
+    const line = [...document.querySelectorAll('#editor .cm-line')].find(
+      (each) => each.textContent === wanted,
+    );
+    const top = line?.getBoundingClientRect().top;
+    if (top === undefined) return -1;
+    return [...document.querySelectorAll('#editor .recipe-block-insert')].findIndex((each) => {
+      const box = each.getBoundingClientRect();
+      return Math.abs((box.top + box.bottom) / 2 - top) < 3;
+    });
+  }, text);
+  if (index === -1) {
+    const drawn = await page.evaluate(() =>
+      [...document.querySelectorAll('#editor .recipe-block-insert')].map((each) => {
+        const box = each.getBoundingClientRect();
+        return Math.round((box.top + box.bottom) / 2);
+      }),
+    );
+    throw new Error(`no + above '${text}': + centres ${JSON.stringify(drawn)}`);
+  }
+  return page.locator('#editor .recipe-block-insert').nth(index);
+}
+
+/** The gutter's counter on the line whose text is `text`, and whether it is marked stale. */
+const counterOn = async (text: string): Promise<{ text: string; stale: boolean } | undefined> => {
+  await measured();
+  return page.evaluate((wanted) => {
+    const line = [...document.querySelectorAll('#editor .cm-line')].find(
+      (each) => each.textContent === wanted,
+    );
+    const top = line?.getBoundingClientRect().top;
+    const mark = [...document.querySelectorAll('#editor .recipe-block-count')].find(
+      (each) => top !== undefined && Math.abs(each.getBoundingClientRect().top - top) < 4,
+    );
+    return mark === undefined
+      ? undefined
+      : {
+          text: mark.textContent ?? '',
+          stale: mark.classList.contains('recipe-block-count--stale'),
+        };
+  }, text);
+};
+
+// TYTO-676's acceptance (second pull request): insert a block between two others with "+",
+// pick a verb, run only that block, move it up, and the saved text is the blocks' order.
+describe("the card's acceptance (TYTO-676)", () => {
+  it('inserts a step between two blocks with "+" and the step picker', async () => {
+    const plus = await plusAbove('where status = open');
+    await plus.locator('[data-action="insert"]').click();
+    if (shots !== undefined) {
+      await page.screenshot({ path: join(shots, 'recipe-blocks-insert-menu.png') });
+    }
+    await plus.locator('[data-action="step"]').click();
+    const option = page.locator('tyto-recipe-step .recipe-step__verb[data-verb="where"]');
+    await option.waitFor({ timeout: 10_000 });
+    await option.click();
+    await page.waitForSelector('tyto-recipe-step .recipe-step-form[data-verb="where"]');
+    // The form offers the columns of the step above the "+": `select title` keeps one.
+    await page.click('tyto-recipe-step [data-field="expression"] [data-column="title"]');
+    await page.locator('tyto-recipe-step [data-field="expression"] input').press('End');
+    await page.keyboard.type(' != Second');
+    await page.click('tyto-recipe-step .recipe-step__write');
+    await page.waitForSelector('tyto-recipe-step .recipe-step__panel', { state: 'detached' });
+    const lines = await page.evaluate(() =>
+      [...document.querySelectorAll('#editor .cm-line')].map((line) => line.textContent ?? ''),
+    );
+    expect(lines.slice(2, 7)).toEqual([
+      VERB,
+      'select title',
+      'where title != Second',
+      'where status = open',
+      'sort title',
+    ]);
+  }, 30_000);
+
+  it('runs only that block: it gets the newest number, and the blocks below go stale', async () => {
+    await (await toolbar('where title != Second')).locator('[data-action="run"]').click();
+    await expect.poll(summaries, { timeout: 15_000 }).toMatchObject({
+      'where title != Second': '1 row · 1 column',
+      'where status = open': 'Below the block run: runs on the next run',
+      'sort title': 'Below the block run: runs on the next run',
+    });
+    const above = await counterOn('select title');
+    const own = await counterOn('where title != Second');
+    expect(own?.stale).toBe(false);
+    expect(Number(own?.text.slice(1, -1))).toBeGreaterThan(Number(above?.text.slice(1, -1)));
+    // `where status = open` ran before, and is stale now. `sort title` never ran: since `select
+    // title` moved above it, `status` is gone, the `where` fails and the `sort` is skipped.
+    expect(await counterOn('where status = open')).toMatchObject({ stale: true });
+    expect(await counterOn('sort title')).toEqual({ text: '[ ]', stale: false });
+  }, 30_000);
+
+  it('moves it up, and saves the blocks in their new order', async () => {
+    await (await toolbar('where title != Second')).locator('[data-action="up"]').click();
+    await page.keyboard.press('Control+s');
+    await expect
+      .poll(() => readFileSync(recipePath, 'utf8'), { timeout: 10_000 })
+      .toBe(
+        [
+          'recipe blocks',
+          '',
+          VERB,
+          'where title != Second',
+          'select title',
+          'where status = open',
+          'sort title',
+          '',
+        ].join('\n'),
+      );
+    if (shots !== undefined) {
+      await page.screenshot({ path: join(shots, 'recipe-blocks-acceptance.png') });
+    }
   }, 30_000);
 });

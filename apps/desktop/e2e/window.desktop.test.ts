@@ -1067,6 +1067,14 @@ describe('switching the language', () => {
     // TYTO-676: a block's toolbar, drawn only with a recipe open; `recipe-blocks.desktop.test.ts`
     // clicks it in the real window, and reads what a cell below a block run says.
     'recipe.cell.held.block',
+    'recipe.block.runFrom',
+    'recipe.block.runAll',
+    'recipe.block.insert',
+    'recipe.block.insertStep',
+    'recipe.block.insertNote',
+    'recipe.block.running',
+    'recipe.block.never',
+    'recipe.block.stale',
     'recipe.block.run',
     'recipe.block.up',
     'recipe.block.down',

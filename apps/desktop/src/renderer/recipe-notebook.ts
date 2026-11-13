@@ -1,4 +1,4 @@
-import { type Step, parseRecipe } from '@tyto/recipe';
+import { type RecipeBlock, type Step, parseRecipe, recipeBlocks } from '@tyto/recipe';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
@@ -115,6 +115,11 @@ export interface RecipeNotebookOptions {
   ) => void;
   /** The pause, in milliseconds; the brief's compile waits as long. */
   readonly delay: number;
+  /**
+   * A run was asked for and is on its way (TYTO-676): the window marks the blocks it runs
+   * `[*]` until its answer is shown.
+   */
+  readonly running?: (documentId: string) => void;
   /** Injected so a test drives time itself. */
   readonly timers?: {
     readonly set: (run: () => void, delay: number) => unknown;
@@ -188,6 +193,13 @@ export interface RecipeNotebook {
    * as a full-size tab finds its cell; `undefined` when no cell of the answer is on that line.
    */
   cellAt(documentId: string, at: number): WireCell | undefined;
+  /**
+   * Each step's execution counter and state as the text is now (TYTO-676, ADR 0195 decision 8):
+   * `[n]` the run that last ran it, numbered in the order runs ran cells, whether a pause in
+   * typing or a button asked for it; `[*]` while a run that reaches it is on its way; never ran;
+   * or stale, when it or a step above changed since, or its cell came back stale.
+   */
+  executionOf(documentId: string, text: string): readonly ExecutionMark[];
   /** The tab closed: nothing waits for it, an answer on its way is dropped, and all is forgotten. */
   close(documentId: string): void;
 }
@@ -208,6 +220,11 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const applying = new Map<string, Set<number>>();
   const refusals = new Map<string, Map<number, string>>();
   const views = new Map<string, Map<number, RecipeViewState>>();
+  /** Each step's last number, by the start of its line (TYTO-676), and the last number given. */
+  const counts = new Map<string, Map<number, number>>();
+  const counters = new Map<string, number>();
+  /** The run on its way per document, with its scope, until its answer is shown or dropped. */
+  const inFlight = new Map<string, RecipeRunScope>();
   /**
    * Where each cell of the last answer starts its line in the text as it is now (TYTO-642): the
    * answer's own line, moved through every edit since its request took its text.
@@ -245,6 +262,8 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     const requestId = requests;
     newest.set(documentId, requestId);
     since.set(documentId, []);
+    inFlight.set(documentId, scope);
+    options.running?.(documentId);
     const answer = await options.run({
       requestId,
       documentId,
@@ -256,15 +275,36 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       ...(scope.fresh === true ? { fresh: true } : {}),
     });
     if (!isNewest(newest, documentId, answer.requestId)) return;
+    inFlight.delete(documentId);
     last.set(documentId, {
       text,
       answer,
       ...(scope.until === undefined ? {} : { until: scope.until }),
     });
     places.set(documentId, placesOf(text, answer, since.get(documentId) ?? []));
+    numberRun(documentId, answer);
     // A refusal is said once: the run that follows it has the cell's own word.
     refusals.delete(documentId);
     options.show(documentId, text, answer, scope.until);
+  };
+
+  /**
+   * Numbers the cells this answer ran, in cell order, after the last number this tab gave: a
+   * cell main reused keeps the `ranAt` of the run that made it, so it keeps its number.
+   */
+  const numberRun = (documentId: string, answer: RecipeRunAnswer): void => {
+    const placed = places.get(documentId);
+    const kept = counts.get(documentId) ?? new Map<number, number>();
+    let count = counters.get(documentId) ?? 0;
+    for (const cell of [...answer.cells].sort((left, right) => left.index - right.index)) {
+      if (!ranIn(cell, answer.ranAt)) continue;
+      const at = placed?.get(cell.index);
+      if (at === undefined) continue;
+      count += 1;
+      kept.set(at, count);
+    }
+    counters.set(documentId, count);
+    counts.set(documentId, kept);
   };
 
   const apply = async (documentId: string, index: number, planId: number): Promise<void> => {
@@ -347,6 +387,15 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
         }
         marks.set(documentId, moved);
       }
+      const numbered = counts.get(documentId);
+      if (numbered !== undefined && numbered.size > 0) {
+        const moved = new Map<number, number>();
+        for (const [at, count] of numbered) {
+          const now = map(at);
+          if (now !== undefined) moved.set(now, count);
+        }
+        counts.set(documentId, moved);
+      }
       const kept = views.get(documentId);
       if (kept !== undefined && kept.size > 0) {
         const moved = new Map<number, RecipeViewState>();
@@ -390,6 +439,13 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       }
       return undefined;
     },
+    executionOf: (documentId, text) =>
+      executionMarks({
+        text,
+        shown: last.get(documentId),
+        countAt: (at) => counts.get(documentId)?.get(at),
+        running: inFlight.get(documentId),
+      }),
     tabViewOf: (tabId) => tabs.get(tabId)?.view ?? {},
     keepTabView(tabId, state) {
       const tab = tabs.get(tabId);
@@ -404,6 +460,9 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       applying.delete(documentId);
       refusals.delete(documentId);
       views.delete(documentId);
+      counts.delete(documentId);
+      counters.delete(documentId);
+      inFlight.delete(documentId);
       places.delete(documentId);
       since.delete(documentId);
       // A cell's full-size tabs close with their recipe (TYTO-379).
@@ -429,6 +488,88 @@ function placesOf(
     placed.set(cell.index, at);
   }
   return placed;
+}
+
+/** Whether a cell of an answer ran in that run: main stamps the run's `ranAt` on what it ran. */
+function ranIn(cell: WireCell, ranAt: string): boolean {
+  return cell.ranAt === ranAt && cell.status !== 'stale' && cell.status !== 'skipped';
+}
+
+/** A step's execution counter, as its block's gutter shows it (TYTO-676). */
+export interface ExecutionMark {
+  readonly state: 'ran' | 'stale' | 'running' | 'never';
+  /** The number of the run that last ran it, when one did. */
+  readonly count?: number;
+}
+
+/**
+ * Each step's mark, by its index among the text's steps. **Stale** is the first step whose
+ * text differs from what the last answer ran, and every step after it (a header or `param`
+ * change, every step), or a step whose cell came back stale or skipped: what main would run
+ * again. **Running**, while a run is on its way, is that same reach from where the run starts
+ * (`from`, or the first stale step) to where it stops (`until`, or the end): the window cannot
+ * know where main stops for a source before its answer, and the answer settles it.
+ */
+export function executionMarks(input: {
+  readonly text: string;
+  readonly shown: Shown | undefined;
+  readonly countAt: (at: number) => number | undefined;
+  readonly running: RecipeRunScope | undefined;
+}): readonly ExecutionMark[] {
+  const now = recipeBlocks(input.text);
+  const steps = now.filter((block) => block.kind === 'step');
+  const changed = firstStale(input.text, now, input.shown);
+  const start = Math.min(changed, input.running?.from ?? Infinity);
+  const end = input.running?.until ?? Infinity;
+  return steps.map((block, index) => {
+    const count = input.countAt(block.from);
+    if (input.running !== undefined && index >= start && index <= end) return { state: 'running' };
+    if (count === undefined) return { state: 'never' };
+    return { state: index >= changed ? 'stale' : 'ran', count };
+  });
+}
+
+/** The first step main would run again: a changed step or header, or a cell not `ok`. */
+function firstStale(text: string, now: readonly RecipeBlock[], shown: Shown | undefined): number {
+  const steps = now.filter((block) => block.kind === 'step');
+  if (shown === undefined) return 0;
+  const before = recipeBlocks(shown.text);
+  const header = (blocks: readonly RecipeBlock[], source: string): string =>
+    blocks
+      .filter((block) => block.kind === 'header')
+      .map((block) => source.slice(block.from, block.to))
+      .join('\n');
+  if (header(now, text) !== header(before, shown.text)) return 0;
+  const ran = before.filter((block) => block.kind === 'step');
+  const differs = steps.findIndex((block, index) => {
+    const then = ran[index];
+    return (
+      then === undefined ||
+      text.slice(block.from, block.to) !== shown.text.slice(then.from, then.to)
+    );
+  });
+  const notOk = shown.answer.cells
+    .filter((cell) => cell.status !== 'ok')
+    .reduce((first, cell) => Math.min(first, cell.index), Infinity);
+  return Math.min(differs === -1 ? steps.length : differs, notOk);
+}
+
+/**
+ * Where a step or a note goes when a block's "+" is pressed (TYTO-676): above block `place`
+ * (its index among the text's blocks), or below the last block with `'end'`, on a line of its
+ * own. `before` counts the steps above it, for the form's column offers.
+ */
+export function blockSlot(text: string, place: number | 'end'): StepSlot {
+  const blocks = recipeBlocks(text);
+  const stepsAbove = (count: number): number =>
+    blocks.slice(0, count).filter((block) => block.kind === 'step').length;
+  const block = place === 'end' ? undefined : blocks[place];
+  if (block !== undefined && place !== 'end') {
+    return { at: block.from, prefix: '', suffix: '\n', before: stepsAbove(place) };
+  }
+  const last = blocks.at(-1);
+  if (last === undefined) return stepSlot(text, 0);
+  return { at: last.to, prefix: '\n', suffix: '', before: stepsAbove(blocks.length) };
 }
 
 /** Adds or drops one line start in a document's set of them. */

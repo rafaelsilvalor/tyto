@@ -7,6 +7,7 @@ import {
   type NotebookFrame,
   notebookFrameOf,
   notebookFrames,
+  notebookInsertOf,
   refreshNotebookFrames,
 } from './notebook-frames.js';
 
@@ -167,5 +168,74 @@ describe('a notebook framed over the editor (TYTO-676)', () => {
     const drawn = await toolbars(on);
     expect(builds).toBe(before + 3);
     expect(drawn.map((toolbar) => toolbar.textContent)).toEqual(['folded', 'folded', 'folded']);
+  });
+});
+
+// TYTO-676, second pull request: a "+" on each boundary, and the counter in a gutter.
+describe('inserting between blocks and the counter', () => {
+  const STEPS = ['acme.pull', 'acme.tag', 'where status = done'].join('\n');
+  let mark = 'ran';
+
+  const openSteps = (): EditorView => {
+    const stepFrames = (on: EditorView): readonly NotebookFrame[] =>
+      [1, 2, 3].map((number) => {
+        const line = on.state.doc.line(number);
+        return {
+          from: line.from,
+          to: line.to,
+          kind: 'step',
+          key: line.text,
+          insertable: number > 1,
+          marker: { text: number === 1 ? `[${mark}]` : '[ ]', className: 'mark', title: 'why' },
+        };
+      });
+    view = new EditorView({
+      state: EditorState.create({
+        doc: STEPS,
+        extensions: [
+          notebookFrames({
+            framesOf: stepFrames,
+            insert: () => {
+              const control = document.createElement('button');
+              control.textContent = '+';
+              return control;
+            },
+          }),
+        ],
+      }),
+      parent: document.body,
+    });
+    return view;
+  };
+
+  it('draws a "+" above each insertable block and one below the last, outside the text', async () => {
+    const on = openSteps();
+    await new Promise((done) => setTimeout(done, 50));
+    const controls = [...on.dom.querySelectorAll<HTMLElement>('.cm-notebook-insert')];
+    expect(controls.every((control) => !on.contentDOM.contains(control))).toBe(true);
+    expect(
+      controls.map((control) => {
+        const place = notebookInsertOf(on, control);
+        return place === 'end' || place === undefined
+          ? place
+          : on.state.doc.lineAt(place.from).text;
+      }),
+    ).toEqual(['acme.tag', 'where status = done', 'end']);
+    expect(on.contentDOM.textContent).not.toContain('+');
+  });
+
+  it("shows each block's marker in the gutter on its first line, and follows a refresh", () => {
+    mark = 'ran';
+    const on = openSteps();
+    const gutterText = () =>
+      [...on.dom.querySelectorAll('.cm-notebook-gutter .cm-gutterElement .mark')].map(
+        (each) => each.textContent,
+      );
+    expect(gutterText()).toEqual(['[ran]', '[ ]', '[ ]']);
+    expect(on.dom.querySelector('.cm-notebook-gutter .mark')?.getAttribute('title')).toBe('why');
+
+    mark = '7';
+    on.dispatch({ effects: refreshNotebookFrames.of(null) });
+    expect(gutterText()).toEqual(['[7]', '[ ]', '[ ]']);
   });
 });

@@ -248,7 +248,9 @@ export {
 export {
   type NotebookFrame,
   type NotebookFramesOptions,
+  type NotebookMarker,
   notebookFrameOf,
+  notebookInsertOf,
   notebookFrames,
   refreshNotebookFrames,
 } from './notebook-frames.js';

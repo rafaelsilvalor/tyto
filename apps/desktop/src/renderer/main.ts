@@ -114,6 +114,7 @@ import { readSnippetsText } from './snippets-file.js';
 import {
   type RecipeRunAnswer,
   type RecipeViewState,
+  type StepSlot,
   answerDiagnostics,
   cellAtOrAbove,
   cellStatuses,
@@ -133,7 +134,7 @@ import {
   hasFoldableResult,
   tickAges,
 } from './recipe-cell-view.js';
-import { type BlockHost, recipeFrames } from './recipe-blocks-view.js';
+import { type BlockHost, insertControl, recipeFrames } from './recipe-blocks-view.js';
 import { type ViewContext, fullSizeBody } from './recipe-views.js';
 import {
   type Diagnostic,
@@ -816,7 +817,10 @@ const appFileAssists: AppFileAssists = {
     ),
     cellOutputs(),
     // TYTO-676, ADR 0195: each block framed, with its toolbar, over the one editor.
-    notebookFrames({ framesOf: (view) => recipeFrames(view, recipeBlockHost) }),
+    notebookFrames({
+      framesOf: (view) => recipeFrames(view, recipeBlockHost),
+      insert: (view) => insertControl(view, recipeBlockHost, state.locale),
+    }),
   ],
   // A vocabulary's (TYTO-402, ADR 0176): its sections and fields, and what a key is, from main.
   vocabulary: [
@@ -874,14 +878,7 @@ function recipeStep(mode: 'add' | 'edit'): void {
         catalog: recipeCatalog,
         columns: columnsBefore(shown, slot.before),
       });
-      if (written === undefined) return;
-      const insert = `${slot.prefix}${written}${slot.suffix}`;
-      pane.view.dispatch({
-        changes: { from: slot.at, insert },
-        selection: { anchor: slot.at + slot.prefix.length + written.length },
-        userEvent: 'input',
-      });
-      pane.view.focus();
+      if (written !== undefined) writeStepAt(pane.view, slot, written);
       return;
     }
     const found = stepOnLine(text, line);
@@ -906,6 +903,36 @@ function recipeStep(mode: 'add' | 'edit'): void {
   })();
 }
 
+/** Writes the line a step form answered at its slot, on a line of its own, caret after it. */
+function writeStepAt(view: EditorPane['view'], slot: StepSlot, written: string): void {
+  const insert = `${slot.prefix}${written}${slot.suffix}`;
+  view.dispatch({
+    changes: { from: slot.at, insert },
+    selection: { anchor: slot.at + slot.prefix.length + written.length },
+    userEvent: 'input',
+  });
+  view.focus();
+}
+
+/**
+ * A block's "+" chose Step… (TYTO-676): the step picker and form of Add step (TYTO-402),
+ * offered the columns of the step above the slot, and the line written there.
+ */
+function addRecipeStepAt(view: EditorPane['view'], slot: StepSlot): void {
+  const documentId = recipeBlockHost.documentOf(view);
+  const dialog = document.querySelector<RecipeStepDialog>(RECIPE_STEP_TAG);
+  if (documentId === undefined || dialog === null) return;
+  void (async () => {
+    await refreshRecipeVerbs();
+    const written = await dialog.ask({
+      locale: state.locale,
+      catalog: recipeCatalog,
+      columns: columnsBefore(recipeNotebook.lastOf(documentId)?.answer, slot.before),
+    });
+    if (written !== undefined) writeStepAt(view, slot, written);
+  })();
+}
+
 /** When each recipe tab runs, and only its newest answer shown (TYTO-377, `recipe-notebook.ts`). */
 const recipeNotebook = createRecipeNotebook({
   run: async (request) => {
@@ -919,6 +946,10 @@ const recipeNotebook = createRecipeNotebook({
     return bridge['recipe:apply'](request);
   },
   refusedWithoutReason: () => translate(state.locale, 'recipe.plan.refused'),
+  // TYTO-676: the blocks a run reaches show `[*]` until its answer.
+  running: (documentId) => {
+    refreshRecipeFrames(documentId);
+  },
   textOf: (documentId) => {
     const document_ = documentOf(workspace, documentId);
     return document_ === undefined ? undefined : contentOf(document_);
@@ -929,7 +960,8 @@ const recipeNotebook = createRecipeNotebook({
 
 /**
  * What a recipe's block toolbars ask of the window (TYTO-676, `recipe-blocks-view.ts`): which
- * document a pane shows, whether a block's result folds and is folded, and Run this block.
+ * document a pane shows, whether a block's result folds and is folded, the runs its buttons
+ * ask for, each step's execution counter, and the step picker a "+" opens.
  */
 const recipeBlockHost: BlockHost = {
   locale: () => state.locale,
@@ -943,6 +975,12 @@ const recipeBlockHost: BlockHost = {
   },
   collapsed: (documentId, at) => recipeNotebook.collapsedOf(documentId).has(at),
   runBlock: (documentId, step) => void recipeNotebook.runBlock(documentId, step),
+  runFrom: (documentId, step) => void recipeNotebook.runFrom(documentId, step),
+  runAll: (documentId) => void recipeNotebook.runNow(documentId, 'explicit'),
+  execution: (documentId, text) => recipeNotebook.executionOf(documentId, text),
+  addStep: (view, slot) => {
+    addRecipeStepAt(view, slot);
+  },
 };
 
 /** Every pane showing a document reads its blocks' frames again: a toolbar's state changed. */

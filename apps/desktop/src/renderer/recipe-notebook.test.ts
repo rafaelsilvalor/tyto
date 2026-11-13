@@ -9,6 +9,7 @@ import {
   type RecipeRunAnswer,
   type RecipeRunRequest,
   answerDiagnostics,
+  blockSlot,
   cellAtOrAbove,
   cellStatuses,
   columnsBefore,
@@ -698,5 +699,113 @@ describe('where Add step writes and what its form offers (TYTO-402)', () => {
     expect(columnsBefore(cells, 0)).toEqual([]);
     expect(columnsBefore(cells, undefined)).toEqual(['key']);
     expect(columnsBefore(undefined, 3)).toEqual([]);
+  });
+});
+
+// TYTO-676, second pull request: the execution counter a block's gutter shows, and where its
+// "+" writes. TEXT's steps are `acme.pull` (cell 0, line 3) and `where status = done` (1, 4).
+describe('the execution counter (TYTO-676)', () => {
+  const FIRST = '2026-11-12T10:00:00.000Z';
+  const SECOND = '2026-11-12T11:00:00.000Z';
+  const ran = (index: number, line: number, ranAt: string): Cell => ({
+    index,
+    line,
+    status: 'ok',
+    diagnostics: [],
+    table: table(1, 1),
+    ranAt,
+  });
+  const reply = (requestId: number, cells: Cell[], ranAt: string): RecipeRunAnswer => ({
+    requestId,
+    cells,
+    diagnostics: [],
+    ranAt,
+  });
+  async function ranOnce(run: ReturnType<typeof harness>): Promise<void> {
+    const running = run.notebook.runNow('tab-1', 'typed');
+    run.replies.at(-1)?.(reply(run.asked.length, [ran(0, 3, FIRST), ran(1, 4, FIRST)], FIRST));
+    await running;
+  }
+
+  it('numbers what each run ran, a pause or a button alike, and a reused cell keeps its number', async () => {
+    const run = harness();
+    const typed = run.notebook.runNow('tab-1', 'typed');
+    expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
+      { state: 'running' },
+      { state: 'running' },
+    ]);
+    run.replies[0]?.(reply(1, [ran(0, 3, FIRST), ran(1, 4, FIRST)], FIRST));
+    await typed;
+    expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
+      { state: 'ran', count: 1 },
+      { state: 'ran', count: 2 },
+    ]);
+
+    // Run this block on the second: main reuses the first, which keeps the run that made it.
+    const block = run.notebook.runBlock('tab-1', 1);
+    expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
+      { state: 'ran', count: 1 },
+      { state: 'running' },
+    ]);
+    run.replies[1]?.(reply(2, [ran(0, 3, FIRST), ran(1, 4, SECOND)], SECOND));
+    await block;
+    expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
+      { state: 'ran', count: 1 },
+      { state: 'ran', count: 3 },
+    ]);
+  });
+
+  it('marks stale what changed and every step below it, and never a note or a run not reached', async () => {
+    const run = harness();
+    await ranOnce(run);
+    // Each text below has its lines where TEXT has them: a number is kept by its line's start.
+    const marks = (text: string) =>
+      run.notebook.executionOf('tab-1', text).map((mark) => mark.state);
+    expect(marks(TEXT.replace('acme.pull', 'acme.pall'))).toEqual(['stale', 'stale']);
+    expect(marks(TEXT.replace('status = done', 'status = open'))).toEqual(['ran', 'stale']);
+    expect(marks(TEXT.replace('recipe weekly', 'recipe weakly'))).toEqual(['stale', 'stale']);
+    // A note does not run: editing it leaves every step as it ran.
+    expect(marks(TEXT.replace('# the team', '# the tame'))).toEqual(['ran', 'ran']);
+    // A step typed below has no number yet.
+    expect(marks(`${TEXT}select key\n`)).toEqual(['ran', 'ran', 'never']);
+  });
+
+  it('marks stale a cell main answered stale, and follows a step to its new line', async () => {
+    const run = harness();
+    const first = run.notebook.runNow('tab-1', 'typed');
+    run.replies[0]?.(reply(1, [ran(0, 3, FIRST), { ...ran(1, 4, FIRST), status: 'stale' }], FIRST));
+    await first;
+    expect(run.notebook.executionOf('tab-1', TEXT).map((mark) => mark.state)).toEqual([
+      'ran',
+      'never',
+    ]);
+
+    // Its number is kept by its line: a line inserted above moves it with the step.
+    run.notebook.edited('tab-1', (at) => (at === 0 ? 0 : at + '# more\n'.length));
+    const moved = TEXT.replace('# the team\n', '# the team\n# more\n');
+    expect(run.notebook.executionOf('tab-1', moved)[0]).toEqual({ state: 'ran', count: 1 });
+  });
+});
+
+describe('where a block\'s "+" writes (TYTO-676)', () => {
+  it('goes above the block it stands over, on a line of its own, counting the steps above', () => {
+    // Blocks: the header, the note, `acme.pull`, `where status = done`.
+    expect(blockSlot(TEXT, 2)).toEqual({
+      at: TEXT.indexOf('acme.pull'),
+      prefix: '',
+      suffix: '\n',
+      before: 0,
+    });
+    expect(blockSlot(TEXT, 1).before).toBe(0);
+  });
+
+  it('goes below the last block, keeping the blank lines after it where they were', () => {
+    const text = `${TEXT}\n\n`;
+    expect(blockSlot(text, 'end')).toEqual({
+      at: text.indexOf('done') + 'done'.length,
+      prefix: '\n',
+      suffix: '',
+      before: 2,
+    });
   });
 });

@@ -1,4 +1,11 @@
-import { type EditorPane, type NotebookFrame, cellOutputAt, notebookFrameOf } from '@tyto/editor';
+import {
+  type EditorPane,
+  type NotebookFrame,
+  type NotebookMarker,
+  cellOutputAt,
+  notebookFrameOf,
+  notebookInsertOf,
+} from '@tyto/editor';
 import {
   type BlockEdit,
   type RecipeBlock,
@@ -9,6 +16,7 @@ import {
 } from '@tyto/recipe';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
+import { type ExecutionMark, type StepSlot, blockSlot } from './recipe-notebook.js';
 
 /**
  * A recipe's blocks in its tab (TYTO-676, ADR 0195): which frames the editor draws, and what
@@ -25,6 +33,11 @@ import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/ind
  *   moved nor passed. **Delete** takes its lines; undo brings them back.
  * - **Collapse** presses the fold toggle of the block's own result, so the result's header and
  *   the toolbar are one control with one state, kept by line in the notebook (TYTO-451).
+ * - **Run from here down** is Run from here; the header's **Run all** is Run recipe.
+ *
+ * Its second pull request adds a **"+"** on every boundary between blocks and below the last:
+ * it offers **Step…**, TYTO-402's picker writing its line there, and **Note**, a `# ` line with
+ * the caret after it. Each step's gutter shows its execution counter (`executionOf`).
  *
  * A toolbar finds its block on the click, from the frames as the editor read them after the
  * last edit (`notebookFrameOf`), not from the block it was built for: an edit since may have
@@ -44,6 +57,14 @@ export interface BlockHost {
   readonly collapsed: (documentId: string, at: number) => boolean;
   /** Run this block: cell `step` and the changed cells above it. */
   readonly runBlock: (documentId: string, step: number) => void;
+  /** Run from here down: cell `step` and every cell below it. */
+  readonly runFrom: (documentId: string, step: number) => void;
+  /** Run all: Run recipe. */
+  readonly runAll: (documentId: string) => void;
+  /** Each step's execution counter, as the text is now. */
+  readonly execution: (documentId: string, text: string) => readonly ExecutionMark[];
+  /** Opens the step picker and form (TYTO-402) and writes the line it answers at `slot`. */
+  readonly addStep: (view: EditorView, slot: StepSlot) => void;
 }
 
 /** The frames a recipe's pane draws: one per block, the header's with no toolbar. */
@@ -52,10 +73,18 @@ export function recipeFrames(view: EditorView, host: BlockHost): readonly Notebo
   const blocks = recipeBlocks(text);
   const documentId = host.documentOf(view);
   const locale = host.locale();
+  const marks = documentId === undefined ? [] : host.execution(documentId, text);
   return blocks.map((block, index) => {
     if (block.kind === 'header') {
-      return { from: block.from, to: block.to, kind: block.kind, key: 'header' };
+      return {
+        from: block.from,
+        to: block.to,
+        kind: block.kind,
+        key: ['header', locale].join('\u0000'),
+        toolbar: () => headerToolbar(view, host, locale),
+      };
     }
+    const mark = block.step === undefined ? undefined : marks[block.step];
     const result =
       block.kind === 'step' && documentId !== undefined && host.foldable(documentId, block.from);
     const folded = result && documentId !== undefined && host.collapsed(documentId, block.from);
@@ -68,14 +97,139 @@ export function recipeFrames(view: EditorView, host: BlockHost): readonly Notebo
       kind: block.kind,
       key: [block.kind, result, folded, up, down, locale].join('\u0000'),
       toolbar: () => toolbarOf(view, host, shape, locale),
+      insertable: true,
+      ...(mark === undefined ? {} : { marker: markerOf(mark, locale) }),
     };
   });
+}
+
+/** What a step's gutter says: `[n]`, `[*]` while it runs, `[ ]` before it ever ran. */
+export function markerOf(mark: ExecutionMark, locale: Locale): NotebookMarker {
+  const say = (key: CatalogueKey): string => translate(locale, key);
+  switch (mark.state) {
+    case 'running':
+      return { text: '[*]', className: 'recipe-block-count', title: say('recipe.block.running') };
+    case 'never':
+      return { text: '[ ]', className: 'recipe-block-count', title: say('recipe.block.never') };
+    case 'ran':
+    case 'stale': {
+      const text = `[${String(mark.count ?? '')}]`;
+      if (mark.state === 'ran') return { text, className: 'recipe-block-count' };
+      return {
+        text,
+        className: 'recipe-block-count recipe-block-count--stale',
+        title: say('recipe.block.stale'),
+      };
+    }
+  }
+}
+
+/** The header's toolbar: Run all. */
+function headerToolbar(view: EditorView, host: BlockHost, locale: Locale): HTMLElement {
+  const toolbar = document.createElement('span');
+  toolbar.className = 'recipe-block-toolbar';
+  toolbar.setAttribute('role', 'toolbar');
+  const label = translate(locale, 'recipe.block.runAll');
+  const made = toolbarButton('runAll', label, label);
+  made.classList.add('recipe-block-toolbar__button--text');
+  made.addEventListener('click', () => {
+    const documentId = host.documentOf(view);
+    if (documentId !== undefined) host.runAll(documentId);
+  });
+  toolbar.append(made);
+  return toolbar;
+}
+
+/** A toolbar button: its glyph or words, and its name said on hover and to a screen reader. */
+function toolbarButton(action: string, shown: string, label: string): HTMLButtonElement {
+  const made = document.createElement('button');
+  made.type = 'button';
+  made.className = 'recipe-block-toolbar__button';
+  made.dataset['action'] = action;
+  made.textContent = shown;
+  made.title = label;
+  made.setAttribute('aria-label', label);
+  // The caret stays where it was: a toolbar is not a click in the text.
+  made.addEventListener('mousedown', (event) => {
+    event.preventDefault();
+  });
+  return made;
+}
+
+/**
+ * A "+" on a boundary: pressed, it offers Step… and Note, written at the boundary it sits on
+ * when chosen (`notebookInsertOf`), not where it was built.
+ */
+export function insertControl(view: EditorView, host: BlockHost, locale: Locale): HTMLElement {
+  const control = document.createElement('span');
+  control.className = 'recipe-block-insert';
+  const plus = toolbarButton('insert', '+', translate(locale, 'recipe.block.insert'));
+  plus.classList.add('recipe-block-insert__plus');
+  plus.setAttribute('aria-expanded', 'false');
+  const menu = document.createElement('span');
+  menu.className = 'recipe-block-insert__menu';
+  menu.setAttribute('role', 'menu');
+  const close = (): void => {
+    control.classList.remove('recipe-block-insert--open');
+    plus.setAttribute('aria-expanded', 'false');
+  };
+  const choice = (action: 'step' | 'note', key: CatalogueKey): void => {
+    const made = toolbarButton(action, translate(locale, key), translate(locale, key));
+    made.setAttribute('role', 'menuitem');
+    made.addEventListener('click', () => {
+      close();
+      insertAt(view, host, control, action);
+    });
+    menu.append(made);
+  };
+  choice('step', 'recipe.block.insertStep');
+  choice('note', 'recipe.block.insertNote');
+  plus.addEventListener('click', () => {
+    const open = !control.classList.contains('recipe-block-insert--open');
+    control.classList.toggle('recipe-block-insert--open', open);
+    plus.setAttribute('aria-expanded', String(open));
+  });
+  control.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close();
+  });
+  control.addEventListener('focusout', (event) => {
+    if (!(event.relatedTarget instanceof Node) || !control.contains(event.relatedTarget)) close();
+  });
+  control.append(plus, menu);
+  return control;
+}
+
+/** Writes a step (through the picker) or a note at the boundary a "+" sits on now. */
+function insertAt(
+  view: EditorView,
+  host: BlockHost,
+  control: HTMLElement,
+  what: 'step' | 'note',
+): void {
+  const place = notebookInsertOf(view, control);
+  if (place === undefined) return;
+  const text = view.state.doc.toString();
+  const index =
+    place === 'end' ? -1 : recipeBlocks(text).findIndex((block) => block.from === place.from);
+  const slot = blockSlot(text, index === -1 ? 'end' : index);
+  if (what === 'step') {
+    host.addStep(view, slot);
+    return;
+  }
+  const insert = `${slot.prefix}# ${slot.suffix}`;
+  view.dispatch({
+    changes: { from: slot.at, insert },
+    selection: { anchor: slot.at + slot.prefix.length + 2 },
+    scrollIntoView: true,
+    userEvent: 'input',
+  });
+  view.focus();
 }
 
 /** The fold toggle of a cell's result: its table's, its plan's or its view's, not `run`'s. */
 const FOLD = '.recipe-cell__toggle:not(.recipe-cell__included-toggle)';
 
-type BlockAction = 'run' | 'up' | 'down' | 'delete' | 'collapse';
+type BlockAction = 'run' | 'runFrom' | 'up' | 'down' | 'delete' | 'collapse';
 
 interface ToolbarShape {
   readonly kind: RecipeBlock['kind'];
@@ -95,25 +249,17 @@ function toolbarOf(
   toolbar.className = 'recipe-block-toolbar';
   toolbar.setAttribute('role', 'toolbar');
   const add = (action: BlockAction, glyph: string, key: CatalogueKey, enabled = true): void => {
-    const made = document.createElement('button');
-    made.type = 'button';
-    made.className = 'recipe-block-toolbar__button';
-    made.dataset['action'] = action;
-    made.textContent = glyph;
-    const label = translate(locale, key);
-    made.title = label;
-    made.setAttribute('aria-label', label);
+    const made = toolbarButton(action, glyph, translate(locale, key));
     made.disabled = !enabled;
-    // The caret stays where it was: a toolbar is not a click in the text.
-    made.addEventListener('mousedown', (event) => {
-      event.preventDefault();
-    });
     made.addEventListener('click', () => {
       blockAction(view, host, toolbar, action);
     });
     toolbar.append(made);
   };
-  if (shape.kind === 'step') add('run', '▶', 'recipe.block.run');
+  if (shape.kind === 'step') {
+    add('run', '▶', 'recipe.block.run');
+    add('runFrom', '▶▶', 'recipe.block.runFrom');
+  }
   add('up', '↑', 'recipe.block.up', shape.up);
   add('down', '↓', 'recipe.block.down', shape.down);
   add('delete', '✕', 'recipe.block.delete');
@@ -147,6 +293,13 @@ function blockAction(
       const documentId = host.documentOf(view);
       if (documentId !== undefined && block.step !== undefined) {
         host.runBlock(documentId, block.step);
+      }
+      return;
+    }
+    case 'runFrom': {
+      const documentId = host.documentOf(view);
+      if (documentId !== undefined && block.step !== undefined) {
+        host.runFrom(documentId, block.step);
       }
       return;
     }

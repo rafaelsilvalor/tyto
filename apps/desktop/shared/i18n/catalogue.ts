@@ -596,6 +596,19 @@ export interface Catalogue {
   readonly 'recipe.block.run': string;
   /** What a cell below the block the person ran says: it was not reached, nothing failed. */
   readonly 'recipe.cell.held.block': string;
+  /**
+   * TYTO-676, second pull request: Run from here down on a step's toolbar and Run all on the
+   * header's; the "+" between blocks and its two choices; what a step's counter says on hover
+   * while it runs, before it ever ran, and when it is out of date.
+   */
+  readonly 'recipe.block.runFrom': string;
+  readonly 'recipe.block.runAll': string;
+  readonly 'recipe.block.insert': string;
+  readonly 'recipe.block.insertStep': string;
+  readonly 'recipe.block.insertNote': string;
+  readonly 'recipe.block.running': string;
+  readonly 'recipe.block.never': string;
+  readonly 'recipe.block.stale': string;
   readonly 'recipe.block.up': string;
   readonly 'recipe.block.down': string;
   readonly 'recipe.block.delete': string;
@@ -1462,6 +1475,14 @@ export const CATALOGUE_KEYS = [
   'recipe.cell.included.hide',
   'recipe.block.run',
   'recipe.cell.held.block',
+  'recipe.block.runFrom',
+  'recipe.block.runAll',
+  'recipe.block.insert',
+  'recipe.block.insertStep',
+  'recipe.block.insertNote',
+  'recipe.block.running',
+  'recipe.block.never',
+  'recipe.block.stale',
   'recipe.block.up',
   'recipe.block.down',
   'recipe.block.delete',
