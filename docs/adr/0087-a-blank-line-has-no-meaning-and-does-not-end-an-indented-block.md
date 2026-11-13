@@ -71,3 +71,9 @@ default Enter put every new line of a brief at column 0, because the syntax tree
 rule and answers 0. Shift+Enter, Tab and Shift+Tab are unchanged, an open completion list still
 takes Enter, and JSON tabs and template buffers keep CodeMirror's Enter: a template is markup
 and CSS, whose nesting the second-blank-line rule does not describe.
+
+## Note, 2026-11-13 — indentation is visual (ADR 0197)
+
+ADR 0197 goes one step further: not only the width of an indent but its presence stops
+meaning anything (a text line at column 0 is a body line too), and nesting comes from the
+manifest. Every rule above about blank lines stands.
