@@ -173,31 +173,55 @@ export function moveBlock(
   index: number,
   direction: 'up' | 'down',
 ): BlockEdit | undefined {
+  return moveBlockTo(text, index, direction === 'up' ? index - 1 : index + 2);
+}
+
+/**
+ * Moves block `index` to just before block `before`, or below the last block with `'end'`, as
+ * a drag drops it (TYTO-676). The blocks it passes and every one of them must be movable: a
+ * header is never moved nor crossed. `undefined` when the block would not move (`before` is the
+ * block itself or the one after it) or may not.
+ *
+ * **The blocks passed over are what the edit moves**, as in {@link moveBlock}: they and the gap
+ * that set the block apart change sides, and the block keeps its lines, so its result and its
+ * fold stay with it. The blank lines between blocks stay as they were: the block takes the
+ * place, and the separator, of the first block it passes.
+ */
+export function moveBlockTo(
+  text: string,
+  index: number,
+  before: number | 'end',
+): BlockEdit | undefined {
   const blocks = recipeBlocks(text);
+  const target = before === 'end' ? blocks.length : before;
   const block = blocks[index];
-  const other = blocks[direction === 'up' ? index - 1 : index + 1];
-  if (block === undefined || other === undefined) return undefined;
-  if (!isMovable(block) || !isMovable(other)) return undefined;
-  if (direction === 'up') {
-    // `other gap block` becomes `block gap other`: `other` and the gap go below `block`.
-    const gap = text.slice(other.to, block.from);
+  if (block === undefined || !isMovable(block)) return undefined;
+  if (!Number.isInteger(target) || target < 0 || target > blocks.length) return undefined;
+  // Dropped on the block itself or just below it, nothing is passed: nothing moves.
+  const passed = target < index ? blocks.slice(target, index) : blocks.slice(index + 1, target);
+  const first = passed[0];
+  const last = passed.at(-1);
+  if (first === undefined || last === undefined || !passed.every(isMovable)) return undefined;
+  const others = text.slice(first.from, last.to);
+  if (target < index) {
+    // `others gap block` becomes `block gap others`: the others and the gap go below the block.
+    const gap = text.slice(last.to, block.from);
     return {
       changes: [
-        { from: other.from, to: block.from, insert: '' },
-        { from: block.to, to: block.to, insert: gap + text.slice(other.from, other.to) },
+        { from: first.from, to: block.from, insert: '' },
+        { from: block.to, to: block.to, insert: gap + others },
       ],
-      at: other.from,
+      at: first.from,
     };
   }
-  // `block gap other` becomes `other gap block`: `other` and the gap go above `block`.
-  const gap = text.slice(block.to, other.from);
-  const moved = text.slice(other.from, other.to);
+  // `block gap others` becomes `others gap block`: the others and the gap go above the block.
+  const gap = text.slice(block.to, first.from);
   return {
     changes: [
-      { from: block.from, to: block.from, insert: moved + gap },
-      { from: block.to, to: other.to, insert: '' },
+      { from: block.from, to: block.from, insert: others + gap },
+      { from: block.to, to: last.to, insert: '' },
     ],
-    at: block.from + moved.length + gap.length,
+    at: block.from + others.length + gap.length,
   };
 }
 

@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type BlockHost,
   blockMark,
+  dropBlock,
   insertControl,
   markerOf,
   recipeFrames,
@@ -72,6 +73,7 @@ function open(more: Partial<BlockHost> = {}) {
       notebookFrames({
         framesOf: (view) => recipeFrames(view, host),
         insert: (view) => insertControl(view, host, 'en'),
+        move: dropBlock,
       }),
     ],
   });
@@ -310,5 +312,44 @@ describe("a block's counter", () => {
     expect(blockMark([ran, ran, { state: 'never' }], steps)).toEqual({ state: 'stale', count: 7 });
     const never = { state: 'never' } as const;
     expect(blockMark([never, never, never], steps)).toEqual({ state: 'never' });
+  });
+});
+
+// TYTO-676, fourth pull request: a block dropped by a drag.
+describe('dropping a dragged block', () => {
+  it('moves the whole block to the place, as one edit one Ctrl+Z takes back', () => {
+    const { on } = open();
+    // Blocks: the header (0), the note (1), the two steps (2), `where` (3).
+    dropBlock(on.view, 3, 1);
+    expect(on.getValue()).toBe(
+      TEXT.replace(
+        '# Pull, then tag.\n\nacme.pull team={team}\nacme.tag\n\nwhere status = done',
+        'where status = done\n\n# Pull, then tag.\n\nacme.pull team={team}\nacme.tag',
+      ),
+    );
+    const caret = on.view.state.selection.main.head;
+    expect(on.view.state.doc.lineAt(caret).text).toBe('where status = done');
+    on.view.contentDOM.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    expect(on.getValue()).toBe(TEXT);
+  });
+
+  it('leaves the text alone where the block already is, and never above the header', () => {
+    const { on } = open();
+    dropBlock(on.view, 2, 3);
+    dropBlock(on.view, 2, 0);
+    expect(on.getValue()).toBe(TEXT);
+  });
+
+  it('gives every block a grip but the header', () => {
+    const { on } = open();
+    const frames = on.view.dom.querySelectorAll('.cm-notebook-frame--first');
+    expect(frames).toHaveLength(4);
+    expect(
+      [...on.view.dom.querySelectorAll<HTMLElement>('.cm-notebook-grip')].map(
+        (grip) => grip.dataset['notebookGrip'],
+      ),
+    ).toEqual(['1', '2', '3']);
   });
 });

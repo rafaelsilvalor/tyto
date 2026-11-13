@@ -5,6 +5,7 @@ import {
   blockAtLine,
   deleteBlock,
   moveBlock,
+  moveBlockTo,
   recipeBlocks,
   recipeLines,
 } from './blocks.js';
@@ -197,5 +198,78 @@ describe('deleting a block', () => {
 
   it('never deletes the header', () => {
     expect(deleteBlock(RECIPE, 0)).toBeUndefined();
+  });
+});
+
+// TYTO-676, fourth pull request: a block dragged to any place among the others.
+describe('moving a block to a place (a drag)', () => {
+  const kept = (text: string, index: number) => {
+    const block = recipeBlocks(text)[index];
+    return text.slice(block?.from, block?.to);
+  };
+
+  it('moves the last block above the second, the blank lines where they were', () => {
+    const edit = moveBlockTo(RECIPE, 3, 2);
+    const after = applyChanges(RECIPE, edit?.changes ?? []);
+    expect(recipeBlocks(after).map((block) => after.slice(block.from, block.to))).toEqual([
+      kept(RECIPE, 0),
+      kept(RECIPE, 1),
+      kept(RECIPE, 3),
+      kept(RECIPE, 2),
+    ]);
+    expect(after.slice(edit?.at ?? 0).startsWith('# keep the done ones\n')).toBe(true);
+  });
+
+  it("moves a block below the last with 'end'", () => {
+    const edit = moveBlockTo(RECIPE, 1, 'end');
+    const after = applyChanges(RECIPE, edit?.changes ?? []);
+    expect(recipeBlocks(after).map((block) => after.slice(block.from, block.to))).toEqual([
+      kept(RECIPE, 0),
+      kept(RECIPE, 2),
+      kept(RECIPE, 3),
+      kept(RECIPE, 1),
+    ]);
+    expect(after.slice(edit?.at ?? 0).startsWith('# Pull the team, then tag.\n')).toBe(true);
+  });
+
+  it('does nothing where the block already is, and never moves or crosses a header', () => {
+    expect(moveBlockTo(RECIPE, 2, 2)).toBeUndefined();
+    expect(moveBlockTo(RECIPE, 2, 3)).toBeUndefined();
+    expect(moveBlockTo(RECIPE, 0, 'end')).toBeUndefined();
+    expect(moveBlockTo(RECIPE, 3, 0)).toBeUndefined();
+    expect(moveBlockTo(RECIPE, 3, 9)).toBeUndefined();
+    const text = 'recipe x\n\nacme.pull\n\nparam b = 2\n\nacme.tag\n';
+    expect(moveBlockTo(text, 3, 1)).toBeUndefined();
+    expect(moveBlockTo(text, 1, 'end')).toBeUndefined();
+  });
+
+  // The property a drag rests on: whatever the place, the text is the same blocks in the new
+  // order, every byte around them kept, and the moved block's own lines never rewritten.
+  it('keeps every block and every byte, for every block and every place', () => {
+    for (const text of [RECIPE, RECIPE.replaceAll('\n', '\r\n'), RECIPE.trimEnd()]) {
+      const blocks = recipeBlocks(text);
+      const texts = blocks.map((block) => text.slice(block.from, block.to));
+      for (let index = 0; index < blocks.length; index += 1) {
+        for (let target = 0; target <= blocks.length; target += 1) {
+          const edit = moveBlockTo(text, index, target === blocks.length ? 'end' : target);
+          if (edit === undefined) continue;
+          const after = applyChanges(text, edit.changes);
+          const order = texts.map((_, at) => at).filter((at) => at !== index);
+          order.splice(target > index ? target - 1 : target, 0, index);
+          expect(recipeBlocks(after).map((block) => after.slice(block.from, block.to))).toEqual(
+            order.map((at) => texts[at]),
+          );
+          expect(after.length).toBe(text.length);
+          const first = Math.min(...edit.changes.map((change) => change.from));
+          const last = Math.max(...edit.changes.map((change) => change.to));
+          expect(after.slice(0, first)).toBe(text.slice(0, first));
+          expect(after.slice(last + (after.length - text.length))).toBe(text.slice(last));
+          const moved = blocks[index];
+          for (const change of edit.changes) {
+            expect(change.to <= (moved?.from ?? 0) || change.from >= (moved?.to ?? 0)).toBe(true);
+          }
+        }
+      }
+    }
   });
 });

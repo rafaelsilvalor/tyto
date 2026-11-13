@@ -21,6 +21,7 @@ export {
   deleteBlock,
   isMovable,
   moveBlock,
+  moveBlockTo,
   recipeBlocks,
   recipeLines,
 } from './blocks.js';
