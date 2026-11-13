@@ -868,3 +868,64 @@ describe("a block's result", () => {
     ).toEqual(['Skipped: a cell above failed']);
   });
 });
+
+describe('a line that chains steps with | (TYTO-706)', () => {
+  const CHAINED = [
+    'recipe weekly',
+    '',
+    'acme.pull | where status = done',
+    '',
+    'select key',
+    '',
+  ].join('\n');
+  const RAN_AT = '2026-11-13T10:00:00.000Z';
+  const ran = (index: number, line: number): Cell => ({
+    index,
+    line,
+    status: 'ok',
+    diagnostics: [],
+    table: table(1, 1),
+    ranAt: RAN_AT,
+  });
+  const cells = [ran(0, 3), ran(1, 3), ran(2, 5)];
+
+  async function ranOnce(): Promise<ReturnType<typeof harness>> {
+    const run = harness();
+    run.texts.set('tab-1', CHAINED);
+    const running = run.notebook.runNow('tab-1', 'typed');
+    run.replies.at(-1)?.({ requestId: run.asked.length, cells, diagnostics: [], ranAt: RAN_AT });
+    await running;
+    return run;
+  }
+
+  it('gives each step of the line its own mark, and marks stale from the step that changed', async () => {
+    const run = await ranOnce();
+    expect(run.notebook.executionOf('tab-1', CHAINED)).toEqual([
+      { state: 'ran', count: 1 },
+      { state: 'ran', count: 1 },
+      { state: 'ran', count: 2 },
+    ]);
+    const marks = (text: string) =>
+      run.notebook.executionOf('tab-1', text).map((mark) => mark.state);
+    expect(marks(CHAINED.replace('status = done', 'status = open'))).toEqual([
+      'ran',
+      'stale',
+      'stale',
+    ]);
+  });
+
+  it("answers the line's last cell, the one its result is drawn from", async () => {
+    const run = await ranOnce();
+    expect(run.notebook.cellAt('tab-1', CHAINED.indexOf('acme'))?.index).toBe(1);
+    expect(run.notebook.cellAt('tab-1', CHAINED.indexOf('select'))?.index).toBe(2);
+  });
+
+  it("draws the block's result under the line, its last step's", () => {
+    const statuses = cellStatuses(CHAINED, answer(1, cells), 'en');
+    const drawn = blockResults(CHAINED, statuses);
+    expect(drawn.map((status) => [status.index, status.at])).toEqual([
+      [1, CHAINED.indexOf('acme')],
+      [2, CHAINED.indexOf('select')],
+    ]);
+  });
+});

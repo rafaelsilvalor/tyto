@@ -5,6 +5,7 @@ import {
   parseRecipe,
   recipeBlocks,
   recipeLines,
+  recipeSteps,
 } from '@tyto/recipe';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
@@ -448,11 +449,14 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       return undefined;
     },
     cellAt(documentId, at) {
+      // A line that chains steps with `|` holds several cells; its result is its last one's
+      // (TYTO-706, ADR 0196 decision 2), so the last cell placed on the line answers.
+      let found: number | undefined;
       for (const [index, place] of places.get(documentId) ?? []) {
-        if (place !== at) continue;
-        return last.get(documentId)?.answer.cells.find((cell) => cell.index === index);
+        if (place === at && (found === undefined || index > found)) found = index;
       }
-      return undefined;
+      if (found === undefined) return undefined;
+      return last.get(documentId)?.answer.cells.find((cell) => cell.index === found);
     },
     executionOf: (documentId, text) =>
       executionMarks({
@@ -531,12 +535,14 @@ export function executionMarks(input: {
   readonly countAt: (at: number) => number | undefined;
   readonly running: RecipeRunScope | undefined;
 }): readonly ExecutionMark[] {
-  const steps = recipeLines(input.text, 'step');
+  // One mark per step, a line chaining steps with `|` giving several (TYTO-706); a run's number
+  // is kept by the step's line, so it is read there.
+  const steps = recipeSteps(input.text);
   const changed = firstStale(input.text, input.shown);
   const start = Math.min(changed, input.running?.from ?? Infinity);
   const end = input.running?.until ?? Infinity;
-  return steps.map((block, index) => {
-    const count = input.countAt(block.from);
+  return steps.map((step, index) => {
+    const count = input.countAt(step.line);
     if (input.running !== undefined && index >= start && index <= end) return { state: 'running' };
     if (count === undefined) return { state: 'never' };
     return { state: index >= changed ? 'stale' : 'ran', count };
@@ -548,19 +554,18 @@ export function executionMarks(input: {
  * (wherever its block is, every step), or a cell not `ok`.
  */
 function firstStale(text: string, shown: Shown | undefined): number {
-  const steps = recipeLines(text, 'step');
+  const steps = recipeSteps(text);
   if (shown === undefined) return 0;
   const header = (source: string): string =>
     recipeLines(source, 'header')
       .map((line) => source.slice(line.from, line.to))
       .join('\n');
   if (header(text) !== header(shown.text)) return 0;
-  const ran = recipeLines(shown.text, 'step');
-  const differs = steps.findIndex((block, index) => {
+  const ran = recipeSteps(shown.text);
+  const differs = steps.findIndex((step, index) => {
     const then = ran[index];
     return (
-      then === undefined ||
-      text.slice(block.from, block.to) !== shown.text.slice(then.from, then.to)
+      then === undefined || text.slice(step.from, step.to) !== shown.text.slice(then.from, then.to)
     );
   });
   const notOk = shown.answer.cells
