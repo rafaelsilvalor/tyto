@@ -263,6 +263,51 @@ templates:
     expect(read.value?.templates).toEqual([]);
   });
 
+  it('reads an archive source, an https URL or a .zip on the machine (ADR 0197)', () => {
+    const read = parsePluginFile(
+      [
+        'version: 1',
+        'templates:',
+        '  a:',
+        '    source:',
+        '      archive: https://example.test/a/archive/{ref}.zip',
+        '      ref: v1.2.0',
+        '  b:',
+        '    source: { archive: ./b.zip, ref: v1 }',
+        '',
+      ].join('\n'),
+      'a.yaml',
+    );
+
+    expect(codes(read)).toEqual([]);
+    expect(read.value?.templates.map((entry) => entry.source)).toEqual([
+      { archive: 'https://example.test/a/archive/{ref}.zip', ref: 'v1.2.0' },
+      { archive: './b.zip', ref: 'v1' },
+    ]);
+  });
+
+  it.each([
+    ['in clear over the network', '{ archive: "http://example.test/a.zip", ref: v1 }'],
+    ['not a .zip', '{ archive: https://example.test/a.tar.gz, ref: v1 }'],
+    ['a ref that climbs out of the folder', '{ archive: "./{ref}.zip", ref: ../../x }'],
+    ['both kinds at once', '{ git: ./a, archive: ./a.zip, ref: v1 }'],
+    ['neither kind', '{ ref: v1 }'],
+  ])('refuses an archive source that is %s', (_, source) => {
+    const read = parsePluginFile(`version: 1\ntemplates:\n  a:\n    source: ${source}\n`, 'a.yaml');
+
+    expect(codes(read)).toEqual(['E_PLUGIN_FILE_ENTRY']);
+    expect(read.value?.templates).toEqual([]);
+  });
+
+  it('keeps a git and an archive of one ref apart: they are two sources', () => {
+    const read = parsePluginFile(
+      'version: 1\ntemplates:\n  a:\n    source: { git: ./a, ref: v1 }\n  b:\n    source: { archive: ./a.zip, ref: v1 }\n',
+      'a.yaml',
+    );
+
+    expect(folderSources(read.value === undefined ? [] : [read.value]).sources).toHaveLength(2);
+  });
+
   it('refuses a default that names no configuration of the entry', () => {
     const read = parsePluginFile(
       'version: 1\ntemplates:\n  a:\n    source: { git: ./a, ref: v1 }\n    default: roxo\n',
@@ -301,6 +346,34 @@ describe('the lock', () => {
 
     expect(read.ok && read.value.sources.map((entry) => entry.git)).toEqual(['a', 'b']);
     expect(serializePluginFilesLock(read.ok ? read.value : lock)).toBe(text);
+  });
+
+  it('pins an archive by its sha256, beside git entries written as before (ADR 0197)', () => {
+    const sha256 = 'b'.repeat(64);
+    const lock = {
+      sources: [
+        { archive: 'https://example.test/{ref}.zip', ref: 'v1', sha256, plugin: 'z' },
+        { git: 'a', ref: 'main', commit, plugin: 'a' },
+      ],
+    };
+    const text = serializePluginFilesLock(lock);
+    const read = parsePluginFilesLock(text, 'plugin-files.lock.json');
+
+    expect(read.ok && read.value.sources).toEqual([lock.sources[1], lock.sources[0]]);
+    expect(text).toContain('"git": "a",\n      "ref": "main",\n      "commit"');
+  });
+
+  it.each([
+    ['an archive without its sha256', { archive: 'a.zip', ref: 'v1', plugin: 'a' }],
+    ['an archive with a commit', { archive: 'a.zip', ref: 'v1', commit, plugin: 'a' }],
+    ['a sha256 in capitals', { archive: 'a.zip', ref: 'v1', sha256: 'B'.repeat(64), plugin: 'a' }],
+  ])('refuses %s', (_, entry) => {
+    const read = parsePluginFilesLock(
+      JSON.stringify({ version: 1, sources: [entry] }),
+      'plugin-files.lock.json',
+    );
+
+    expect(read.ok).toBe(false);
   });
 
   it('refuses a commit that is not a full hash', () => {
@@ -381,9 +454,9 @@ describe('the project and the machine', () => {
   const copy = (fields: Partial<PluginFilesCopy>): PluginFilesCopy => ({
     plugin: 'p',
     file: 'f.yaml',
-    git: './p',
+    location: './p',
     ref: 'v1',
-    commit: 'a'.repeat(40),
+    pin: 'a'.repeat(40),
     templates: [],
     wholePlugin: false,
     ...fields,
@@ -391,7 +464,7 @@ describe('the project and the machine', () => {
 
   it("lets the project's plugin win, and says which files", () => {
     const chosen = chooseCopies(
-      [copy({ file: 'project.yaml', commit: 'b'.repeat(40), templates: ['x'] })],
+      [copy({ file: 'project.yaml', pin: 'b'.repeat(40), templates: ['x'] })],
       [copy({ file: 'machine.yaml', templates: ['x'] })],
     );
 
@@ -403,7 +476,7 @@ describe('the project and the machine', () => {
 
   it('drops a template the project names from a machine copy, and the copy when nothing is left', () => {
     const chosen = chooseCopies(
-      [copy({ plugin: 'q', git: './q', file: 'project.yaml', templates: ['x'] })],
+      [copy({ plugin: 'q', location: './q', file: 'project.yaml', templates: ['x'] })],
       [copy({ file: 'machine.yaml', templates: ['x'] })],
     );
 
@@ -414,7 +487,7 @@ describe('the project and the machine', () => {
   it('supplies a plugin two sources of one folder turn out to be from neither', () => {
     const chosen = chooseCopies(
       [],
-      [copy({ git: './a', file: 'a.yaml' }), copy({ git: './b', file: 'b.yaml' })],
+      [copy({ location: './a', file: 'a.yaml' }), copy({ location: './b', file: 'b.yaml' })],
     );
 
     expect(chosen.copies).toEqual([]);

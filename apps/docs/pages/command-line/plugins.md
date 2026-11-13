@@ -129,6 +129,29 @@ example-pack  ../../my-pack  v1.0.0  c50a1231d0be  home\plugin-files\avisos.yaml
 
 **`tyto render` does the same before it renders**, so a render reaches the network only when a copy is missing, the first time, and otherwise uses what is already on this computer. It never moves what the lock pinned: a branch somebody pushed to stays where the lock says until you run `tyto plugin sync --update`. A project's lock belongs in its version control, so everybody renders the same commit. `tyto watch` never fetches.
 
+### A `.zip` instead of git
+
+A source can also be a `.zip`, downloaded over https or read from this computer. **It needs no Git installed.** `{ref}` in the address is replaced by the `ref`, so moving to a new version changes one line:
+
+<!-- Run on 2026-11-04 on a build of the branch feat/TYTO-562-https-archive-sources, on Windows 11, with TYTO_HOME set to an empty folder and git removed from PATH. -->
+
+```yaml
+# ~/.tyto/plugin-files/gallery-https.yaml
+version: 1
+templates:
+  tabela:
+    source:
+      archive: https://github.com/rafaelsilvalor/tyto-template-tabela/archive/refs/tags/{ref}.zip
+      ref: v1.1.1
+```
+
+```
+$ tyto plugin sync --yes
+tabela  https://github.com/rafaelsilvalor/tyto-template-tabela/archive/refs/tags/{ref}.zip  v1.1.1  d37e473b3e39  home\plugin-files\gallery-https.yaml
+```
+
+Over the network only `https://` is read. A path such as `./packs/tabela-{ref}.zip` is read from the plugin file's own folder. The lock pins the sha256 of the `.zip`'s bytes in place of a commit: if the file at that address later changes without a new `ref`, the next fetch refuses it and the copy you had keeps loading, until `tyto plugin sync --update` takes the new bytes. A private plugin is not fetched this way: no password or token goes in the address.
+
 Without a network, the copy fetched before is used, and the run says so:
 
 ```
