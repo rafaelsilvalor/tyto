@@ -101,6 +101,14 @@ type WireIncluded = NonNullable<WireCell['included']>[number];
 const tableOf = (cell: WireCell): WireTable | undefined =>
   cell.status === 'ok' || cell.status === 'stale' ? cell.table : undefined;
 
+/**
+ * Whether a cell's result can be folded (TYTO-676): a table, or a plan's lines. Folding hides
+ * everything under the cell's header, its view and its included cells too, and keeps the
+ * header with its summary and buttons.
+ */
+export const hasFoldableResult = (cell: WireCell): boolean =>
+  tableOf(cell) !== undefined || cell.plan !== undefined;
+
 export function cellOutputOf(status: CellStatus, context: CellViewContext): CellOutput {
   const collapsed = context.collapsed.has(status.at);
   const expanded = context.expanded.has(status.at);
@@ -150,7 +158,7 @@ function renderCell(
   root.append(header);
 
   const table = tableOf(cell);
-  if (table !== undefined) {
+  if (hasFoldableResult(cell)) {
     const toggle = element('button', 'recipe-cell__toggle');
     toggle.type = 'button';
     const label = (folded: boolean): void => {

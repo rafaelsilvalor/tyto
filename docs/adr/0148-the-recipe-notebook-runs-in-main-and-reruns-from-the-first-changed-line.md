@@ -48,6 +48,11 @@ Three things have to be settled before a renderer can show anything:
    the 50 rows the wire carries under each cell, then how many it leaves out. Which tables the
    person folded is the renderer's alone, per open tab: never sent to main, never written, and
    forgotten when the tab closes or the app restarts.
+   _Amended 2026-11-12 (TYTO-676, ADR 0195):_ `recipe:run` carries `until`, the cell a run
+   stops after (Run this block, sent with `from` on the same cell): the runner stops at
+   `min(stop, until + 1)`, and the cells after it are `stale` with no `held`, which the window
+   says as "below the block run" because it knows the request it sent. A fold covers every
+   result a cell has, a plan's lines and a `run` cell's included cells too.
    _Amended 2026-11-07 (TYTO-451):_ a fold is kept by the start of its cell's line, not by the
    cell's index, and follows that line through each edit the person types, as the output
    under it does (`mapLineStarts` in `@tyto/editor`): a step inserted above a folded table

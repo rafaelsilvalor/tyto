@@ -1064,6 +1064,13 @@ describe('switching the language', () => {
     'recipe.cell.fetchAgain',
     'recipe.cell.collapse',
     'recipe.cell.expand',
+    // TYTO-676: a block's toolbar, drawn only with a recipe open; `recipe-blocks.desktop.test.ts`
+    // clicks it in the real window, and reads what a cell below a block run says.
+    'recipe.cell.held.block',
+    'recipe.block.run',
+    'recipe.block.up',
+    'recipe.block.down',
+    'recipe.block.delete',
     // TYTO-449: drawn only on a `run` cell; `recipe-cell-view.test.ts` paints both, and
     // `recipe-notebook.desktop.test.ts` opens one in the real window.
     'recipe.cell.included.show',

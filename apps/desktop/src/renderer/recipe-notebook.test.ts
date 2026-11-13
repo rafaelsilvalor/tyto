@@ -44,7 +44,7 @@ const answer = (requestId: number, cells: Cell[], held?: 'source' | 'restricted'
 function harness() {
   const asked: RecipeRunRequest[] = [];
   const replies: ((reply: RecipeRunAnswer) => void)[] = [];
-  const shown: { documentId: string; text: string; requestId: number }[] = [];
+  const shown: { documentId: string; text: string; requestId: number; until?: number }[] = [];
   const applies: RecipeApplyRequest[] = [];
   const applied: ((reply: RecipeApplyAnswer) => void)[] = [];
   const lastShown: { answer?: RecipeRunAnswer } = {};
@@ -61,8 +61,13 @@ function harness() {
     },
     refusedWithoutReason: () => 'Not applied: run the recipe again',
     textOf: (documentId) => texts.get(documentId),
-    show: (documentId, text, reply) => {
-      shown.push({ documentId, text, requestId: reply.requestId });
+    show: (documentId, text, reply, until) => {
+      shown.push({
+        documentId,
+        text,
+        requestId: reply.requestId,
+        ...(until === undefined ? {} : { until }),
+      });
       lastShown.answer = reply;
     },
     delay: 200,
@@ -132,6 +137,31 @@ describe('when a recipe runs', () => {
       { explicit: true, from: undefined, fresh: true },
       { explicit: undefined, from: undefined, fresh: undefined },
     ]);
+  });
+
+  // TYTO-676, ADR 0195: Run this block is Run from that cell, stopping after it.
+  it('runs one block as Run, from that cell and until it', async () => {
+    const { notebook, asked } = harness();
+    void notebook.runBlock('tab-1', 3);
+    void notebook.runFrom('tab-1', 3);
+    await settle();
+
+    expect(asked.map(({ explicit, from, until }) => ({ explicit, from, until }))).toEqual([
+      { explicit: true, from: 3, until: 3 },
+      { explicit: true, from: 3, until: undefined },
+    ]);
+  });
+
+  // The window says why the cells below a block run are stale: it hands the stop with the answer,
+  // and again when it shows that answer again (a change of language).
+  it('shows the answer of a block run with its stop, and again on reshow', async () => {
+    const { notebook, replies, shown } = harness();
+    const running = notebook.runBlock('tab-1', 1);
+    replies[0]?.(answer(1, []));
+    await running;
+    notebook.reshow();
+    expect(shown.map(({ until }) => until)).toEqual([1, 1]);
+    expect(notebook.lastOf('tab-1')?.until).toBe(1);
   });
 
   it('shows every open recipe again with its last answer, and forgets a closed one', async () => {
@@ -341,6 +371,18 @@ describe('the cell a full-size tab draws', () => {
     expect(run.notebook.cellOfTab('view-1')).toBe(3);
   });
 
+  // TYTO-676: a block's toolbar asks for the cell on its line, as the text is now.
+  it("finds a block's cell by its line through an edit, and none on a line no cell is on", async () => {
+    const run = typing();
+    await answered(run, steps(2, 3));
+    const third = run.on.view.state.doc.line(4).from;
+    expect(run.notebook.cellAt('tab-1', third)?.index).toBe(2);
+
+    insertAbove(run.on, 3);
+    expect(run.notebook.cellAt('tab-1', run.on.view.state.doc.line(5).from)?.index).toBe(2);
+    expect(run.notebook.cellAt('tab-1', run.on.view.state.doc.line(3).from)).toBeUndefined();
+  });
+
   it('follows its step through an edit made while the run was on its way', async () => {
     const run = typing();
     await answered(run, steps(2, 3));
@@ -482,6 +524,22 @@ describe('the line under each cell', () => {
     ).toBe('Plan: 3 to write to sheet');
     // A cell that answered neither a table nor a plan has no line.
     expect(said({})).toBeUndefined();
+  });
+  // TYTO-676: Run this block stops after its cell; nothing failed below it.
+  it('says a cell below the block run was not reached, and the block itself as any cell', () => {
+    const stale = cell({ index: 2, status: 'stale', table: table(1, 1) });
+    const ran = cell({ index: 1, table: table(2, 1) });
+    const shown = cellStatuses(TEXT, answer(1, [ran, stale]), 'en', 1);
+    expect(shown.map((each) => each.text)).toEqual([
+      '2 rows · 1 column',
+      'Below the block run: runs on the next run',
+    ]);
+    const portuguese = cellStatuses(TEXT, answer(1, [stale]), 'pt-BR', 1)[0]?.text;
+    expect(portuguese).toBe('Abaixo do bloco executado: roda na próxima execução');
+    // Without a stop, a stale cell with no reason is still the error's.
+    expect(cellStatuses(TEXT, answer(1, [stale]), 'en')[0]?.text).toBe(
+      'Not run: the recipe has an error',
+    );
   });
 });
 

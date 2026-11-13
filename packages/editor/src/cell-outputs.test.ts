@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   type CellOutput,
+  cellOutputAt,
   cellOutputLineStart,
   cellOutputs,
   cellOutputsOf,
@@ -280,5 +281,19 @@ describe('mapLineStarts (TYTO-451)', () => {
     expect(mapped[0]).toBeUndefined();
     expect(mapped[1]).toBe(after.line(2).from);
     expect(mapped[2]).toBeUndefined();
+  });
+});
+
+describe("a line's output, for its block's toolbar (TYTO-676)", () => {
+  it('finds the element under a line, following it through an edit, and none elsewhere', () => {
+    const on = open();
+    on.dispatch({ effects: setCellOutputs.of([output(3, 'select', on)]) });
+    const under = on.state.doc.line(3).from;
+    expect(cellOutputAt(on, under)?.textContent).toBe('output select');
+    expect(cellOutputAt(on, on.state.doc.line(2).from)).toBeUndefined();
+
+    on.dispatch({ changes: { from: 0, insert: '# a note\n' } });
+    expect(cellOutputAt(on, on.state.doc.line(4).from)?.textContent).toBe('output select');
+    expect(cellOutputAt(on, under)).toBeUndefined();
   });
 });

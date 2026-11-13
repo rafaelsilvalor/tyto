@@ -311,7 +311,7 @@ describe('folding a table', () => {
 
     toggle.click();
     expect(element.classList.contains('recipe-cell--collapsed')).toBe(true);
-    expect(toggle.getAttribute('aria-label')).toBe('Show table');
+    expect(toggle.getAttribute('aria-label')).toBe('Show result');
     toggle.click();
     expect(actions.toggled.mock.calls).toEqual([
       [24, true],
@@ -337,14 +337,19 @@ describe('folding a table', () => {
     );
   });
 
-  it('has no toggle on a cell with no table', () => {
+  // TYTO-676: a block's result folds whatever it is, a plan's lines as a table.
+  it('folds a plan too, and offers no toggle on a cell with no result', () => {
     const { element } = render(
       cellOf({
         table: undefined,
         plan: { target: 'sheet', count: 1, operations: [], applicable: false },
       }),
     );
-    expect(element.querySelector('.recipe-cell__toggle')).toBeNull();
+    const toggle = element.querySelector('.recipe-cell__toggle') as HTMLButtonElement;
+    toggle.click();
+    expect(element.classList.contains('recipe-cell--collapsed')).toBe(true);
+    const failed = render(cellOf({ status: 'failed', table: undefined }));
+    expect(failed.element.querySelector('.recipe-cell__toggle')).toBeNull();
   });
 });
 

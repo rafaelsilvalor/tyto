@@ -614,7 +614,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     'workspace:folder': () => Promise.resolve(workspace.state()),
 
-    'recipe:run': async ({ requestId, documentId, text, from, explicit, saved, fresh }) => {
+    'recipe:run': async ({ requestId, documentId, text, from, until, explicit, saved, fresh }) => {
       // The file is the one main holds for this tab, never a path the window sent (ADR 0086).
       // The id goes back untouched, as `brief:preview`'s does: the renderer drops a stale one.
       const answer = await recipes.run({
@@ -622,6 +622,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         text,
         path: documents.pathOf(documentId),
         from,
+        until,
         explicit,
         saved,
         fresh,

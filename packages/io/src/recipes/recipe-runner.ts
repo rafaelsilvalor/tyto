@@ -151,6 +151,11 @@ export interface RecipeRunInput {
   readonly path: string | undefined;
   /** Rerun from this cell down, whatever changed. */
   readonly from?: number | undefined;
+  /**
+   * TYTO-676, ADR 0195: stop after this cell (Run this block). The cells below it are left
+   * `stale`, with no `held`, and run on the next run that reaches them.
+   */
+  readonly until?: number | undefined;
   /** Run: the person's approval, in a restricted folder and for sources. */
   readonly explicit?: boolean | undefined;
   /** The run after a save, which runs sources (ADR 0119). */
@@ -359,7 +364,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       const signatures = await Promise.all(steps.map((step) => signatureOf(step, read)));
       const changed = firstChanged(signatures, reusable);
       const start = request.from === undefined ? changed : Math.min(changed, request.from);
-      const { stop, held } = await runPolicy(
+      const policy = await runPolicy(
         steps,
         start,
         place,
@@ -367,6 +372,9 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         registries,
         read,
       );
+      const { held } = policy;
+      const stop =
+        request.until === undefined ? policy.stop : Math.min(policy.stop, request.until + 1);
 
       const lines = createLineIndex(request.text);
       const lineOf = (step: Step): number => lineColumnAtIndex(lines, step.range.start).line;
