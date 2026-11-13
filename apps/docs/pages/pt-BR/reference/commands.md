@@ -66,8 +66,8 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Editar passo | `recipe.editStep` |  |  |
 | Receita: Selecionar blocos (modo comando) | `recipe.block.commandMode` | `Escape`, `Shift+Escape`, `Ctrl+m` | `Escape`, `⇧Escape`, `Ctrlm` |
 | Receita: Editar o bloco selecionado | `recipe.block.edit` | `Enter` | `Enter` |
-| Receita: Inserir um passo acima | `recipe.block.insertAbove` | `a` | `a` |
-| Receita: Inserir um passo abaixo | `recipe.block.insertBelow` | `b` | `b` |
+| Receita: Inserir um bloco acima | `recipe.block.insertAbove` | `a` | `a` |
+| Receita: Inserir um bloco abaixo | `recipe.block.insertBelow` | `b` | `b` |
 | Receita: Apagar o bloco | `recipe.block.delete` | `d` | `d` |
 | Receita: Executar o bloco e ir para o próximo | `recipe.block.runAndAdvance` | `Shift+Enter` | `⇧Enter` |
 | Receita: Selecionar o próximo bloco | `recipe.block.next` | `j`, `ArrowDown` | `j`, `ArrowDown` |

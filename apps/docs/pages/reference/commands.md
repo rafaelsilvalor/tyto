@@ -66,8 +66,8 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Edit step | `recipe.editStep` |  |  |
 | Recipe: Select blocks (command mode) | `recipe.block.commandMode` | `Escape`, `Shift+Escape`, `Ctrl+m` | `Escape`, `⇧Escape`, `Ctrlm` |
 | Recipe: Edit the selected block | `recipe.block.edit` | `Enter` | `Enter` |
-| Recipe: Insert a step above | `recipe.block.insertAbove` | `a` | `a` |
-| Recipe: Insert a step below | `recipe.block.insertBelow` | `b` | `b` |
+| Recipe: Insert a block above | `recipe.block.insertAbove` | `a` | `a` |
+| Recipe: Insert a block below | `recipe.block.insertBelow` | `b` | `b` |
 | Recipe: Delete the block | `recipe.block.delete` | `d` | `d` |
 | Recipe: Run the block and go to the next | `recipe.block.runAndAdvance` | `Shift+Enter` | `⇧Enter` |
 | Recipe: Select the next block | `recipe.block.next` | `j`, `ArrowDown` | `j`, `ArrowDown` |

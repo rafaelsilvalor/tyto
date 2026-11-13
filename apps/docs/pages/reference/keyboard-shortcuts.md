@@ -87,8 +87,8 @@ A recipe is in command mode: focus is on its blocks, not in their text.
 
 | Windows and Linux | macOS | Command | Id |
 | --- | --- | --- | --- |
-| `a` | `a` | Recipe: Insert a step above | `recipe.block.insertAbove` |
-| `b` | `b` | Recipe: Insert a step below | `recipe.block.insertBelow` |
+| `a` | `a` | Recipe: Insert a block above | `recipe.block.insertAbove` |
+| `b` | `b` | Recipe: Insert a block below | `recipe.block.insertBelow` |
 | `d` | `d` | Recipe: Delete the block | `recipe.block.delete` |
 | `Enter` | `Enter` | Recipe: Edit the selected block | `recipe.block.edit` |
 | `Shift+Enter` | `⇧Enter` | Recipe: Run the block and go to the next | `recipe.block.runAndAdvance` |
