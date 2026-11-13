@@ -169,3 +169,12 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   release to the grip wherever it goes. Escape, the window losing focus, and an edit of the text
   while dragging (a run rewriting it, say) cancel the drag and release the pointer. The keyboard
   path stays the toolbar's Up and Down; no key was added.
+- 2026-11-13 (TYTO-703): **the height map now follows a fold**, which closes the first open
+  point above. CodeMirror re-reads the heights of the lines in view only when asked to or when
+  the content box changed height, and a recipe shorter than its pane sits in a box held at
+  `min-height: 100%`, so a fold left the box, and the map, as they were. Measured in the window
+  at the same wait: with the recipe shorter than the pane the map stayed 74 px off after a fold;
+  with one taller than the pane the box shrank and the map was right without the fix.
+  `remeasureCellOutput` now asks for the heights through CodeMirror's internal flag, the door
+  ADR 0099 already uses. The toolbars and the drop line keep reading their lines' elements, as a
+  guard for any block that changes height without saying so.

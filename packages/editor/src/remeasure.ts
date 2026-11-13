@@ -8,6 +8,21 @@ import type { EditorView, ViewUpdate } from '@codemirror/view';
  */
 export const textRemeasured = StateEffect.define<null>();
 
+/**
+ * Makes the view's next measure read the heights of the lines in view again (`true`), or that
+ * and the text's size too (`'refresh'`). CodeMirror's own flag for it, `mustMeasureContent`, is
+ * internal, so it is set only where it exists, and `remeasure.test.ts` fails the day an upgrade
+ * renames it. Without it, a measure reads the heights only when the content box changed height,
+ * which a block that shrinks inside a box held at `min-height: 100%` never does (TYTO-703).
+ */
+export function markContentForMeasure(view: EditorView, value: true | 'refresh'): void {
+  const internal = view as unknown as { viewState?: { mustMeasureContent?: boolean | 'refresh' } };
+  const viewState = internal.viewState;
+  if (viewState !== undefined && 'mustMeasureContent' in viewState) {
+    viewState.mustMeasureContent = value;
+  }
+}
+
 /** Whether `update` carries {@link textRemeasured}. */
 export function wasRemeasured(update: ViewUpdate): boolean {
   return update.transactions.some((transaction) =>
@@ -33,11 +48,7 @@ export function wasRemeasured(update: ViewUpdate): boolean {
  * when a dispatch is allowed again.
  */
 export function remeasureText(view: EditorView): void {
-  const internal = view as unknown as { viewState?: { mustMeasureContent?: boolean | 'refresh' } };
-  const viewState = internal.viewState;
-  if (viewState !== undefined && 'mustMeasureContent' in viewState) {
-    viewState.mustMeasureContent = 'refresh';
-  }
+  markContentForMeasure(view, 'refresh');
   view.requestMeasure({
     read: () => null,
     write: () => {
