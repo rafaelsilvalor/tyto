@@ -1129,6 +1129,27 @@ tyto-preview-pane[hidden] {
   font-style: italic;
 }
 
+/* Dragging a block by its grip (TYTO-676, fourth pull request): the grip muted until pointed
+   at, the block dragged dimmed where it was, and the line it will drop on in the accent colour,
+   across the visible width, on the boundary between two blocks. */
+.cm-notebook-grips .cm-notebook-grip {
+  padding: 0 var(--tyto-space-1);
+  color: var(--tyto-text-disabled);
+}
+
+.cm-notebook-grips .cm-notebook-grip:hover {
+  color: var(--tyto-text-muted);
+}
+
+.cm-editor .cm-line.cm-notebook-frame--dragged {
+  opacity: 0.45;
+}
+
+.cm-notebook-drops > .cm-notebook-drop {
+  height: var(--tyto-focus-width);
+  background: var(--tyto-accent);
+}
+
 /* The line under a recipe's cell (TYTO-377): muted and smaller than the text, so it reads as
    the cell's result and not as a line of the recipe. A failure is muted too (Rafael): its
    marker and its Problems row are what draw the eye. */

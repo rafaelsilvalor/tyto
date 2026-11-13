@@ -156,3 +156,16 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   block and moves the caret to the next one, on a recipe only; on any other tab the command is
   not offered and the key is a new line. Measured in the window with vim on: Escape twice and
   `dd` delete one line of a two-line note, as vim does, and focus stays in the text.
+- 2026-11-13 (fourth pull request): **behaviour 3, drag to reorder, is built** on the blocks of
+  ADR 0196. A grip in a gutter of its own on each movable block's first line (never the
+  header's) starts the drag; a line in a layer of its own marks the nearest boundary the block
+  may drop on, read from the lines' elements as the toolbars are; the dragged block's lines are
+  dimmed. On release the block moves in one edit, one undo, with its separating blank line, by
+  `moveBlockTo` in `@tyto/recipe`, which, as decision 2's move does, rewrites the blocks passed
+  over and never the block moved, so it keeps its result and its fold. **The drag is pointer
+  events with the pointer captured on the grip, not HTML5 drag and drop**: CodeMirror reads a
+  native `dragstart` in the editor as a text drag and would move text, and a native drag gives a
+  script or a test no pointer to drive, while a captured pointer delivers every move and the
+  release to the grip wherever it goes. Escape, the window losing focus, and an edit of the text
+  while dragging (a run rewriting it, say) cancel the drag and release the pointer. The keyboard
+  path stays the toolbar's Up and Down; no key was added.

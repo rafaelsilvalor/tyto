@@ -1,18 +1,21 @@
 // @vitest-environment jsdom
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type NotebookFrame,
   enterNotebookCommand,
   isNotebookCommandTarget,
   leaveNotebookCommand,
+  nearestDrop,
+  notebookDragOf,
   notebookFrameOf,
   notebookFrames,
   notebookInsertOf,
   refreshNotebookFrames,
   selectedNotebookFrame,
+  setNotebookDrag,
   stepNotebookSelection,
 } from './notebook-frames.js';
 
@@ -307,5 +310,120 @@ describe('command mode', () => {
     expect(selectedNotebookFrame(on)).toBeUndefined();
     expect(on.state.selection.main.head).toBe(at);
     expect(on.hasFocus).toBe(true);
+  });
+});
+
+// TYTO-676, fourth pull request: a block dragged by its grip, with pointer events.
+describe('dragging a block by its grip', () => {
+  /** DOC's frames, every one movable but the first, which stands for a header. */
+  function openDraggable() {
+    const move = vi.fn<(view: EditorView, from: number, before: number | 'end') => void>();
+    view = new EditorView({
+      state: EditorState.create({
+        doc: DOC,
+        extensions: [
+          notebookFrames({
+            framesOf: (on) =>
+              framesOf(on, () => 'tools').map((frame, index) => ({
+                ...frame,
+                movable: index > 0,
+              })),
+            move,
+            gripLabel: () => 'Drag to move',
+          }),
+        ],
+      }),
+      parent: document.body,
+    });
+    const on = view;
+    const grips = () => [...on.dom.querySelectorAll<HTMLElement>('.cm-notebook-grip')];
+    /** Presses frame `index`'s grip, its pointer capture stubbed: jsdom has none. */
+    const press = (index: number) => {
+      const grip = grips().find((each) => each.dataset['notebookGrip'] === String(index));
+      if (grip === undefined) throw new Error(`no grip for frame ${String(index)}`);
+      let captured = false;
+      const release = vi.fn(() => {
+        captured = false;
+      });
+      Object.assign(grip, {
+        setPointerCapture: () => {
+          captured = true;
+        },
+        hasPointerCapture: () => captured,
+        releasePointerCapture: release,
+      });
+      const down = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+      Object.defineProperty(down, 'pointerId', { value: 7 });
+      grip.dispatchEvent(down);
+      return { grip, release };
+    };
+    const dragged = () =>
+      [...on.contentDOM.querySelectorAll('.cm-notebook-frame--dragged')].map(
+        (line) => line.textContent,
+      );
+    return { on, move, grips, press, dragged };
+  }
+
+  it('puts a grip on each movable frame, none on the first, saying what it does', () => {
+    const { grips } = openDraggable();
+    expect(grips().map((grip) => grip.dataset['notebookGrip'])).toEqual(['1', '2']);
+    expect(grips().map((grip) => grip.getAttribute('aria-label'))).toEqual([
+      'Drag to move',
+      'Drag to move',
+    ]);
+  });
+
+  it('picks the drop place nearest the pointer', () => {
+    const places = [
+      { before: 1, top: 100 },
+      { before: 2, top: 140 },
+      { before: 'end' as const, top: 200 },
+    ];
+    expect(nearestDrop(places, 90)?.before).toBe(1);
+    expect(nearestDrop(places, 125)?.before).toBe(2);
+    expect(nearestDrop(places, 999)?.before).toBe('end');
+    expect(nearestDrop([], 10)).toBeUndefined();
+  });
+
+  it('drags: dims the block, and on release hands the host the move and frees the pointer', () => {
+    const { on, move, press, dragged } = openDraggable();
+    const { grip, release } = press(1);
+    expect(notebookDragOf(on)).toEqual({ from: 1, before: null });
+    expect(dragged()).toEqual(['acme.pull']);
+    on.dispatch({ effects: setNotebookDrag.of({ from: 1, before: 'end' }) });
+    grip.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    expect(move).toHaveBeenCalledWith(on, 1, 'end');
+    expect(release).toHaveBeenCalledWith(7);
+    expect(notebookDragOf(on)).toBeNull();
+    expect(dragged()).toEqual([]);
+  });
+
+  it('cancels on Escape and when the window loses focus, freeing the pointer, moving nothing', () => {
+    const { on, move, press } = openDraggable();
+    const first = press(2);
+    on.dispatch({ effects: setNotebookDrag.of({ from: 2, before: 1 }) });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(first.release).toHaveBeenCalledWith(7);
+    expect(notebookDragOf(on)).toBeNull();
+
+    const second = press(2);
+    window.dispatchEvent(new Event('blur'));
+    expect(second.release).toHaveBeenCalledWith(7);
+    expect(notebookDragOf(on)).toBeNull();
+    second.grip.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    expect(move).not.toHaveBeenCalled();
+  });
+
+  // A run can rewrite the text under a drag: the frames it counted are gone, so the drag ends.
+  it('cancels when the text changes mid-drag, freeing the pointer, and drops nothing', async () => {
+    const { on, move, press } = openDraggable();
+    const { grip, release } = press(1);
+    on.dispatch({ effects: setNotebookDrag.of({ from: 1, before: 'end' }) });
+    on.dispatch({ changes: { from: 0, insert: '# new\n' } });
+    expect(notebookDragOf(on)).toBeNull();
+    await Promise.resolve();
+    expect(release).toHaveBeenCalledWith(7);
+    grip.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    expect(move).not.toHaveBeenCalled();
   });
 });

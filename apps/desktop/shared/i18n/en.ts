@@ -349,6 +349,7 @@ export const en: Catalogue = {
   'recipe.block.run': 'Run this block',
   'recipe.block.up': 'Move up',
   'recipe.block.down': 'Move down',
+  'recipe.block.drag': 'Drag to move the block',
   'recipe.block.delete': 'Delete block',
   'command.recipe.openCellView': 'Open cell result in a tab',
   'recipe.cell.openTab': 'Open in a tab',

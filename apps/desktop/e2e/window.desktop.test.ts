@@ -1078,6 +1078,7 @@ describe('switching the language', () => {
     'recipe.block.run',
     'recipe.block.up',
     'recipe.block.down',
+    'recipe.block.drag',
     'recipe.block.delete',
     // TYTO-676: command mode's commands, whose titles the command bar shows, never an element on
     // load; `commands.test.ts` lists them, `recipe-command-mode.desktop.test.ts` runs their keys.

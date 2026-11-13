@@ -352,6 +352,7 @@ export const ptBR: Catalogue = {
   'recipe.block.run': 'Executar este bloco',
   'recipe.block.up': 'Mover para cima',
   'recipe.block.down': 'Mover para baixo',
+  'recipe.block.drag': 'Arraste para mover o bloco',
   'recipe.block.delete': 'Apagar bloco',
   'command.recipe.openCellView': 'Abrir o resultado da célula numa aba',
   'recipe.cell.openTab': 'Abrir numa aba',

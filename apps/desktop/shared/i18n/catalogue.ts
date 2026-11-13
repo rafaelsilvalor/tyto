@@ -622,6 +622,7 @@ export interface Catalogue {
   readonly 'recipe.block.stale': string;
   readonly 'recipe.block.up': string;
   readonly 'recipe.block.down': string;
+  readonly 'recipe.block.drag': string;
   readonly 'recipe.block.delete': string;
   /**
    * TYTO-379, a cell drawn full size in a tab of its own: the command, the cell's button, the
@@ -1506,6 +1507,7 @@ export const CATALOGUE_KEYS = [
   'recipe.block.stale',
   'recipe.block.up',
   'recipe.block.down',
+  'recipe.block.drag',
   'recipe.block.delete',
   'command.recipe.openCellView',
   'recipe.cell.openTab',

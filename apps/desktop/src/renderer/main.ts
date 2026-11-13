@@ -136,7 +136,13 @@ import {
   hasFoldableResult,
   tickAges,
 } from './recipe-cell-view.js';
-import { type BlockHost, insertControl, recipeFrames } from './recipe-blocks-view.js';
+import {
+  type BlockHost,
+  dropBlock,
+  gripLabel,
+  insertControl,
+  recipeFrames,
+} from './recipe-blocks-view.js';
 import { type CommandModeHost, runBlockAction } from './recipe-command-mode.js';
 import { type ViewContext, fullSizeBody } from './recipe-views.js';
 import {
@@ -824,6 +830,8 @@ const appFileAssists: AppFileAssists = {
     notebookFrames({
       framesOf: (view) => recipeFrames(view, recipeBlockHost),
       insert: (view) => insertControl(view, recipeBlockHost, state.locale),
+      move: dropBlock,
+      gripLabel: () => gripLabel(state.locale),
     }),
   ],
   // A vocabulary's (TYTO-402, ADR 0176): its sections and fields, and what a key is, from main.

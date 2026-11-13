@@ -594,3 +594,134 @@ describe('a block of several steps (TYTO-676, ADR 0196)', () => {
     }
   }, 30_000);
 });
+
+// TYTO-676, fourth pull request: a block dragged by its grip, with the real mouse.
+describe('dragging a block (TYTO-676)', () => {
+  const BEFORE = [
+    'recipe blocks',
+    '',
+    VERB,
+    '',
+    '# a note',
+    '',
+    'where status = open',
+    'select title',
+    '',
+    'sort title',
+    '',
+  ].join('\n');
+
+  /** The top of the line whose text is `text`, in the window's coordinates. */
+  const lineTop = (text: string): Promise<number> =>
+    page.evaluate((wanted) => {
+      const line = [...document.querySelectorAll('#editor .cm-line')].find(
+        (each) => each.textContent === wanted,
+      );
+      return line?.getBoundingClientRect().top ?? Number.NaN;
+    }, text);
+
+  /** The grips drawn, by the frame each drags, with the centre of each. */
+  const grips = async (): Promise<Record<string, { x: number; y: number }>> => {
+    await measured();
+    return page.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll<HTMLElement>('#editor .cm-notebook-grip')].map((grip) => {
+          const box = grip.getBoundingClientRect();
+          return [
+            grip.dataset['notebookGrip'] ?? '',
+            { x: box.left + box.width / 2, y: box.top + box.height / 2 },
+          ];
+        }),
+      ),
+    );
+  };
+
+  const dropTop = (): Promise<number | undefined> =>
+    page.evaluate(() => {
+      const line = document.querySelector('#editor .cm-notebook-drop');
+      if (line === null) return undefined;
+      const box = line.getBoundingClientRect();
+      return (box.top + box.bottom) / 2;
+    });
+
+  it('has a grip on every block but the header, at the left of its first line', async () => {
+    await retype(BEFORE);
+    // The pause in typing runs the recipe: its results move every line below them, so the
+    // grips are read once they are drawn.
+    await expect.poll(summaries, { timeout: 15_000 }).toMatchObject({
+      'select title': expect.stringMatching(/row/u),
+      'sort title': expect.stringMatching(/row/u),
+    });
+    const drawn = await grips();
+    // Blocks: the header (0), the source (1), the note (2), `where`/`select` (3), `sort` (4).
+    expect(Object.keys(drawn).sort()).toEqual(['1', '2', '3', '4']);
+    // Centred on the block's first line: within its line's height of that line's top.
+    const offset = (drawn['4']?.y ?? 0) - (await lineTop('sort title'));
+    expect(offset).toBeGreaterThan(0);
+    expect(offset).toBeLessThan(30);
+  }, 30_000);
+
+  it('drags the last block above the block of two steps, one undo taking it back', async () => {
+    if (shots !== undefined) {
+      await page.waitForTimeout(200);
+      await measured();
+      await page.screenshot({ path: join(shots, 'recipe-blocks-drag-control.png') });
+    }
+    // Read right before the press: anything drawn since moves the lines.
+    const grip = (await grips())['4'];
+    if (grip === undefined) throw new Error('no grip on the last block');
+    await page.mouse.move(grip.x, grip.y);
+    await page.mouse.down();
+    const target = await lineTop('where status = open');
+    await page.mouse.move(grip.x, target + 3, { steps: 8 });
+    await measured();
+    // The drop line on the boundary above `where`, and the dragged block's lines dimmed.
+    await expect.poll(dropTop, { timeout: 5_000 }).toBeDefined();
+    expect(Math.abs(((await dropTop()) ?? 0) - target)).toBeLessThan(4);
+    expect(
+      await page.evaluate(() =>
+        [...document.querySelectorAll('#editor .cm-notebook-frame--dragged')].map(
+          (line) => line.textContent,
+        ),
+      ),
+    ).toEqual(['sort title']);
+    if (shots !== undefined) {
+      // The same wait as the control's, and a measure: this window draws layers on a read.
+      await page.waitForTimeout(200);
+      await measured();
+      await page.screenshot({ path: join(shots, 'recipe-blocks-drag.png') });
+    }
+    await page.mouse.up();
+
+    const after = [
+      'recipe blocks',
+      '',
+      VERB,
+      '',
+      '# a note',
+      '',
+      'sort title',
+      '',
+      'where status = open',
+      'select title',
+      '',
+    ].join('\n');
+    const text = (): Promise<string> =>
+      page.evaluate(() => {
+        const content = document.querySelector('#editor .cm-content') as unknown as {
+          cmTile?: { root?: { view?: { state: { doc: { toString(): string } } } } };
+        };
+        return content.cmTile?.root?.view?.state.doc.toString() ?? '';
+      });
+    await expect.poll(text, { timeout: 5_000 }).toBe(after);
+    // The layer redraws on the editor's measure, which this window runs only on a layout read.
+    await measured();
+    expect(await dropTop()).toBeUndefined();
+    await page.keyboard.press('Control+s');
+    await expect.poll(() => readFileSync(recipePath, 'utf8'), { timeout: 10_000 }).toBe(after);
+
+    // One Ctrl+Z takes the whole drag back: it was one edit.
+    await page.keyboard.press('Control+z');
+    await expect.poll(text, { timeout: 5_000 }).toBe(BEFORE);
+  }, 30_000);
+});
