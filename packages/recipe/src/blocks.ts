@@ -12,7 +12,8 @@
  *   step written right under `recipe x` is a block of its own. A run elsewhere made only of such
  *   lines is a header block too. A header block is never moved, deleted or crossed by a move:
  *   `apply` and `every` belong before the first step, and every step reads the `param` lines.
- * - A **step** block holds one step or more: `steps` are their cells' indices, first and last.
+ * - A **step** block holds one step or more, on one line chained with `|` (TYTO-706) or on
+ *   several: `steps` are their cells' indices, first and last.
  *   Its result is its last step's (ADR 0196).
  * - A **note** block is made only of `#` lines, which the parser skips.
  * - A blank line belongs to no block and stays where it is.
@@ -21,6 +22,8 @@
  * so undo, the marks kept by line and the saved file follow as they follow typing. The text is
  * the source (ADR 0176): the blocks are a reading of it, never a second copy.
  */
+
+import { chainSegments } from './chain.js';
 
 export type RecipeBlockKind = 'header' | 'step' | 'note';
 
@@ -66,6 +69,8 @@ interface Line {
   /** Past the text, before `\r\n` or `\n`. */
   readonly to: number;
   readonly kind: RecipeBlockKind | 'blank';
+  /** A step line's steps, more than one when it chains them with `|` (TYTO-706). */
+  readonly steps: readonly { readonly from: number; readonly to: number }[];
 }
 
 function kindOf(content: string): Line['kind'] {
@@ -82,11 +87,32 @@ function linesOf(text: string): readonly Line[] {
   let number = 1;
   for (const raw of text.split('\n')) {
     const body = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
-    lines.push({ number, from, to: from + body.length, kind: kindOf(body.trim()) });
+    const kind = kindOf(body.trim());
+    const steps =
+      kind === 'step'
+        ? chainSegments(body).map((segment) => ({
+            from: from + segment.from,
+            to: from + segment.to,
+          }))
+        : [];
+    lines.push({ number, from, to: from + body.length, kind, steps });
     from += raw.length + 1;
     number += 1;
   }
   return lines;
+}
+
+/**
+ * Each step of a recipe's text, in order, so a step's place in the list is its cell's index:
+ * where its text starts and ends, and where its line starts. A line that chains steps with `|`
+ * gives one entry per step, all with the same `line` (TYTO-706).
+ */
+export function recipeSteps(
+  text: string,
+): readonly { readonly from: number; readonly to: number; readonly line: number }[] {
+  return linesOf(text).flatMap((line) =>
+    line.steps.map((step) => ({ from: step.from, to: step.to, line: line.from })),
+  );
 }
 
 /** The blocks of a recipe's text, in order. */
@@ -99,7 +125,7 @@ export function recipeBlocks(text: string): readonly RecipeBlock[] {
     const head = lines[0];
     const tail = lines.at(-1);
     if (head === undefined || tail === undefined) return;
-    const steps = lines.filter((line) => line.kind === 'step');
+    const steps = lines.flatMap((line) => line.steps.map(() => line));
     const header = lines.some((line) => line.kind === 'header');
     const kind: RecipeBlockKind = steps.length > 0 ? 'step' : header ? 'header' : 'note';
     const last = steps.at(-1);
@@ -139,7 +165,8 @@ export function recipeBlocks(text: string): readonly RecipeBlock[] {
 
 /**
  * The lines of one kind, in order, read as `recipeBlocks` reads them: where each starts and
- * ends. A step's place in the list of `'step'` lines is its cell's index; the `'header'` lines
+ * ends. A step line may chain several steps with `|`, so a cell's index is its place in
+ * {@link recipeSteps}, not in the `'step'` lines (TYTO-706); the `'header'` lines
  * are every `recipe`, `|`, `apply`, `every` and `param` line, wherever its block is.
  */
 export function recipeLines(

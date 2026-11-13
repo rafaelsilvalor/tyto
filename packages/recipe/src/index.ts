@@ -24,6 +24,7 @@ export {
   moveBlockTo,
   recipeBlocks,
   recipeLines,
+  recipeSteps,
 } from './blocks.js';
 export { checkTable } from './check-table.js';
 export type { RunClock } from './clock.js';

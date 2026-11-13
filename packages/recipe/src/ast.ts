@@ -21,7 +21,10 @@ export interface NamedArgument extends Argument {
   readonly nameQuoted?: true;
 }
 
-/** One line of the chain, and so one cell of the notebook. */
+/**
+ * One step of the chain, and so one cell of the notebook: a line, or one of the steps a line
+ * chains with `|` (TYTO-706).
+ */
 export interface Step {
   readonly verb: string;
   readonly verbRange: SourceRange;
@@ -34,7 +37,7 @@ export interface Step {
    */
   readonly text: string;
   readonly textRange: SourceRange;
-  /** The whole line. */
+  /** The whole step: its line, or its segment of a chained line. */
   readonly range: SourceRange;
 }
 
