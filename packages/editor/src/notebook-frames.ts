@@ -3,9 +3,11 @@ import {
   Decoration,
   type DecorationSet,
   EditorView,
+  GutterMarker,
   type LayerMarker,
   ViewPlugin,
   type ViewUpdate,
+  gutter,
   layer,
 } from '@codemirror/view';
 
@@ -26,6 +28,11 @@ import {
  * A toolbar is built anew only when its block's place among the frames or its key changes; a
  * move of its line only moves it. A host whose own state changes what a toolbar shows (a result
  * folded) dispatches {@link refreshNotebookFrames}.
+ *
+ * The same layer draws a **"+"** on the boundary above every frame the host marks insertable
+ * and one below the last frame, each built by the host ({@link NotebookFramesOptions.insert});
+ * and a gutter at the left shows each frame's marker on its first line, a notebook's execution
+ * counter (TYTO-676, second pull request).
  */
 
 export interface NotebookFrame {
@@ -39,11 +46,24 @@ export interface NotebookFrame {
   readonly key: string;
   /** Builds the toolbar; `undefined` draws the frame with none. */
   readonly toolbar?: () => HTMLElement;
+  /** Whether a "+" sits on the boundary above this block, to insert before it. */
+  readonly insertable?: boolean;
+  /** What the gutter shows on the block's first line, as the text says it. */
+  readonly marker?: NotebookMarker;
+}
+
+/** A frame's gutter mark: its text, a class for how it looks, and what it says on hover. */
+export interface NotebookMarker {
+  readonly text: string;
+  readonly className?: string;
+  readonly title?: string;
 }
 
 export interface NotebookFramesOptions {
   /** The frames of the text this view shows now, in order. */
   readonly framesOf: (view: EditorView) => readonly NotebookFrame[];
+  /** Builds a "+" control; absent, none is drawn. Its place is read with `notebookInsertOf`. */
+  readonly insert?: (view: EditorView) => HTMLElement;
 }
 
 /** Reads the frames again: the host's own state changed what a toolbar shows. */
@@ -166,15 +186,95 @@ function toolbarMarkers(view: EditorView): readonly LayerMarker[] {
   return markers;
 }
 
-/** The top of the line holding `at`, in client coordinates: its element's, where drawn. */
-function lineTop(view: EditorView, at: number): number {
+/** The element of the line holding `at`, where drawn. */
+function lineElement(view: EditorView, at: number): Element | undefined {
   const { node } = view.domAtPos(at);
   const element = node instanceof Element ? node : node.parentElement;
   const line = element?.closest('.cm-line');
-  if (line !== null && line !== undefined && view.contentDOM.contains(line)) {
-    return line.getBoundingClientRect().top;
+  return line !== null && line !== undefined && view.contentDOM.contains(line) ? line : undefined;
+}
+
+/** The top of the line holding `at`, in client coordinates: its element's, where drawn. */
+function lineTop(view: EditorView, at: number): number {
+  return (
+    lineElement(view, at)?.getBoundingClientRect().top ??
+    view.documentTop + view.lineBlockAt(at).top
+  );
+}
+
+/**
+ * Where the boundary below the line holding `at` is drawn, in client coordinates: the top of
+ * the next line, past the result under it, or the bottom of what is drawn there when no line
+ * follows.
+ */
+function boundaryBelow(view: EditorView, at: number): number {
+  const line = lineElement(view, at);
+  if (line === undefined) return view.documentTop + view.lineBlockAt(at).bottom;
+  let last: Element = line;
+  for (let next = line.nextElementSibling; next !== null; next = next.nextElementSibling) {
+    if (next.classList.contains('cm-line')) return next.getBoundingClientRect().top;
+    last = next;
   }
-  return view.documentTop + view.lineBlockAt(at).top;
+  return last.getBoundingClientRect().bottom;
+}
+
+/**
+ * One "+" in the layer: the frame it inserts above (-1 below the last), and how far down it
+ * goes; across, the host's CSS places it (`right`), since where it is out of the way depends
+ * on the host's toolbars and results.
+ */
+class InsertMarker implements LayerMarker {
+  constructor(
+    readonly index: number,
+    readonly top: number,
+    readonly build: () => HTMLElement,
+  ) {}
+
+  eq(other: InsertMarker): boolean {
+    return other.index === this.index && other.top === this.top;
+  }
+
+  draw(): HTMLElement {
+    const control = this.build();
+    control.classList.add('cm-notebook-insert');
+    control.dataset['notebookInsert'] = this.index === -1 ? 'end' : String(this.index);
+    this.place(control);
+    return control;
+  }
+
+  update(dom: HTMLElement, previous: LayerMarker): boolean {
+    if (!(previous instanceof InsertMarker) || previous.index !== this.index) return false;
+    this.place(dom);
+    return true;
+  }
+
+  private place(control: HTMLElement): void {
+    control.style.top = `${String(this.top)}px`;
+  }
+}
+
+/** The "+" controls in view: above each insertable frame, and below the last frame. */
+function insertMarkers(view: EditorView): readonly LayerMarker[] {
+  const insert = view.state.facet(framesOptions)?.insert;
+  const frames = view.plugin(framesPlugin)?.frames ?? [];
+  if (insert === undefined) return [];
+  const build = (): HTMLElement => insert(view);
+  const scroller = view.scrollDOM;
+  const box = scroller.getBoundingClientRect();
+  const baseTop = box.top - scroller.scrollTop;
+  const { from, to } = view.viewport;
+  const length = view.state.doc.length;
+  const markers: LayerMarker[] = [];
+  frames.forEach((frame, index) => {
+    if (frame.insertable !== true || !fits(frame, length)) return;
+    if (frame.from < from || frame.from > to) return;
+    markers.push(new InsertMarker(index, lineTop(view, frame.from) - baseTop, build));
+  });
+  const last = frames.at(-1);
+  if (last !== undefined && fits(last, length) && last.to >= from && last.to <= to) {
+    markers.push(new InsertMarker(-1, boundaryBelow(view, last.to) - baseTop, build));
+  }
+  return markers;
 }
 
 const toolbarLayer = layer({
@@ -191,13 +291,85 @@ const toolbarLayer = layer({
 });
 
 /**
+ * The "+" controls, in a layer of their own: one kind of marker per layer, so a redraw matches
+ * each marker with one drawn like it.
+ */
+const insertLayer = layer({
+  above: true,
+  class: 'cm-notebook-inserts',
+  markers: insertMarkers,
+  update: (update) =>
+    update.docChanged || update.viewportChanged || update.heightChanged || refreshed(update),
+  mount: (dom) => {
+    dom.removeAttribute('aria-hidden');
+  },
+});
+
+/**
  * The layer spans the visible width and lets a click through to the text, but not on a toolbar,
  * which sits at its right edge.
  */
 const toolbarTheme = EditorView.baseTheme({
   '.cm-notebook-toolbars': { pointerEvents: 'none', width: '100%' },
   '.cm-notebook-toolbars > .cm-notebook-toolbar': { pointerEvents: 'auto', right: 0 },
+  '.cm-notebook-inserts': { pointerEvents: 'none', width: '100%' },
+  // A "+" is centred, top to bottom, on the boundary it inserts at.
+  '.cm-notebook-inserts > .cm-notebook-insert': {
+    pointerEvents: 'auto',
+    transform: 'translateY(-50%)',
+  },
 });
+
+/** A frame's gutter mark, as the host said it. */
+class FrameMarker extends GutterMarker {
+  constructor(readonly marker: NotebookMarker) {
+    super();
+  }
+
+  override eq(other: FrameMarker): boolean {
+    return (
+      other.marker.text === this.marker.text &&
+      other.marker.className === this.marker.className &&
+      other.marker.title === this.marker.title
+    );
+  }
+
+  override toDOM(): Node {
+    const mark = document.createElement('span');
+    mark.textContent = this.marker.text;
+    if (this.marker.className !== undefined) mark.className = this.marker.className;
+    if (this.marker.title !== undefined) mark.title = this.marker.title;
+    return mark;
+  }
+}
+
+/** Each frame's marker on its first line, in a gutter of its own at the left. */
+const markerGutter = gutter({
+  class: 'cm-notebook-gutter',
+  lineMarker: (view, line) => {
+    const frame = view.plugin(framesPlugin)?.frames.find((each) => each.from === line.from);
+    return frame?.marker === undefined ? null : new FrameMarker(frame.marker);
+  },
+  lineMarkerChange: (update) => update.docChanged || refreshed(update),
+  // Wide enough for a counter in the hundreds before it ever grows.
+  initialSpacer: () => new FrameMarker({ text: '[000]' }),
+});
+
+/**
+ * Where a "+" control inserts, as the frames are now: before the frame it stands above, or
+ * `'end'` below the last; `undefined` for an element in no "+".
+ */
+export function notebookInsertOf(
+  view: EditorView,
+  element: Element,
+): NotebookFrame | 'end' | undefined {
+  const control = element.closest<HTMLElement>('[data-notebook-insert]');
+  const place = control?.dataset['notebookInsert'];
+  if (place === 'end') return 'end';
+  const index = Number(place);
+  if (place === undefined || !Number.isInteger(index)) return undefined;
+  return view.plugin(framesPlugin)?.frames[index];
+}
 
 /**
  * The frame a toolbar stands for, as the frames are now, or `undefined` for an element in no
@@ -213,5 +385,12 @@ export function notebookFrameOf(view: EditorView, element: Element): NotebookFra
 
 /** Mount once per editor that shows a notebook. */
 export function notebookFrames(options: NotebookFramesOptions): Extension {
-  return [framesOptions.of(options), framesPlugin, toolbarLayer, toolbarTheme];
+  return [
+    framesOptions.of(options),
+    framesPlugin,
+    markerGutter,
+    toolbarLayer,
+    insertLayer,
+    toolbarTheme,
+  ];
 }

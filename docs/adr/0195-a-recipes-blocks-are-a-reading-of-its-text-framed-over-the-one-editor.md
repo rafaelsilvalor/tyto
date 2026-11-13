@@ -111,3 +111,29 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   measured.
 - Open: the result of the neighbour a move rewrites disappears until the next answer, which the
   move itself triggers, since it changes the chain.
+
+## Notes from the build
+
+- 2026-11-12 (second pull request): **the "+" between blocks** is drawn in a layer of its own,
+  as the toolbars are, above every block but the header and below the last; it offers Step…,
+  TYTO-402's picker and form writing their line on a line of its own at that boundary, and
+  Note, a `# ` line with the caret after it. It sits just left of the toolbars' column, not in
+  the middle, where it sat on a result's buttons in the window. A note reads as prose: the
+  window's font, in the comment colour, on no band.
+- 2026-11-12 (second pull request): decision 8 is built as **a gutter at the left** showing
+  `[n]`, `[*]`, `[ ]` and a stale `[n]` (dimmed, italic, with its reason on hover). The cells an
+  answer ran are those carrying the answer's own `ranAt`: they take the next numbers in cell
+  order, and a cell main reused keeps its number. **A run a pause in typing started numbers
+  the cells it ran as a button's does**, so the counter holds whichever way the open question
+  of running while typing is answered (ADR 0148 decision 3 is unchanged). Stale is what main
+  would run again: from the first step whose text changed (every step on a header or `param`
+  change), or from the first cell not `ok`. `[*]` covers that same reach, from `from` to
+  `until`, while a run is on its way; the window cannot know where main stops for a source
+  until the answer, which settles it.
+- 2026-11-12 (second pull request): **Run from here down** joins a step's toolbar and **Run
+  all** the header's; they are Run from here and Run recipe.
+- 2026-11-12 (second pull request): measured in the end-to-end suite's window, which is never
+  shown (`TYTO_HEADLESS`): a `requestAnimationFrame` there did not fire in 500 ms, so the layers,
+  drawn on CodeMirror's measure, drew only when something read the layout. The suite runs that
+  measure before it reads where a toolbar or a "+" is; a shown window draws them on the next
+  frame.

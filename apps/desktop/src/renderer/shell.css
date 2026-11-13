@@ -1023,8 +1023,12 @@ tyto-preview-pane[hidden] {
   box-shadow: inset 0 var(--tyto-hairline-width) 0 var(--tyto-border);
 }
 
+/* A note reads as prose, not as a step (TYTO-676, second pull request): the window's own font,
+   in the comment colour, on no band. */
 .cm-notebook-frame--note {
-  font-style: italic;
+  background: none;
+  color: var(--tyto-syntax-comment);
+  font-family: var(--tyto-font-ui);
 }
 
 .cm-notebook-frame--header {
@@ -1061,6 +1065,53 @@ tyto-preview-pane[hidden] {
 .recipe-block-toolbar__button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Run all on the header's toolbar says its name: there is no glyph for a whole recipe. */
+.recipe-block-toolbar__button--text {
+  padding: 0 var(--tyto-space-3);
+}
+
+/* The "+" on a boundary between blocks: a small round button sitting on the hairline, just left
+   of the toolbars' column, where a block's line is padded clear and a result rarely reaches
+   (in the middle it sat on a result's buttons). Its two choices open to its left, away from
+   the toolbars. */
+.recipe-block-insert {
+  right: calc(var(--tyto-space-6) * 12);
+  display: inline-flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: var(--tyto-space-1);
+  font-family: var(--tyto-font-ui);
+  font-style: normal;
+  user-select: none;
+}
+
+.recipe-block-insert__plus {
+  border-radius: var(--tyto-radius-full);
+  font-size: var(--tyto-text-xs);
+}
+
+.recipe-block-insert__menu {
+  display: none;
+  gap: var(--tyto-space-1);
+}
+
+.recipe-block-insert--open .recipe-block-insert__menu {
+  display: inline-flex;
+}
+
+/* A step's execution counter in the gutter: muted, and dimmer still with a hover reason when it
+   is out of date, as Jupyter's would be if it said so. */
+.cm-notebook-gutter .recipe-block-count {
+  padding: 0 var(--tyto-space-2);
+  color: var(--tyto-text-muted);
+  font-size: var(--tyto-text-sm);
+}
+
+.cm-notebook-gutter .recipe-block-count--stale {
+  color: var(--tyto-text-disabled);
+  font-style: italic;
 }
 
 /* The line under a recipe's cell (TYTO-377): muted and smaller than the text, so it reads as
