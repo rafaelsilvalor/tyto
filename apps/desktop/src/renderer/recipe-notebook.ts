@@ -1,4 +1,11 @@
-import { type RecipeBlock, type Step, parseRecipe, recipeBlocks } from '@tyto/recipe';
+import {
+  type RecipeBlock,
+  type Step,
+  blockAtLine,
+  parseRecipe,
+  recipeBlocks,
+  recipeLines,
+} from '@tyto/recipe';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
@@ -135,10 +142,11 @@ export interface RecipeNotebook {
   /** Run from here: Run, from this cell down whatever changed. */
   runFrom(documentId: string, index: number): Promise<void>;
   /**
-   * Run this block (TYTO-676, ADR 0195): Run, from the first changed cell to cell `index` and no
-   * further. The cell itself runs even when nothing above it changed, as a notebook's does.
+   * Run this block (TYTO-676, ADR 0195, ADR 0196): Run, from the first changed cell through the
+   * block's last cell, `last`, and no further. Every cell of the block runs from `first` even
+   * when nothing above it changed, as a notebook's cell does.
    */
-  runBlock(documentId: string, index: number): Promise<void>;
+  runBlock(documentId: string, first: number, last: number): Promise<void>;
   /** Fetch again: Run, the whole document, every source skipping its cache. */
   fetchAgain(documentId: string): Promise<void>;
   /** Apply: the plan main stamped `planId` on cell `index`, shown again once main answers. */
@@ -282,7 +290,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       ...(scope.until === undefined ? {} : { until: scope.until }),
     });
     places.set(documentId, placesOf(text, answer, since.get(documentId) ?? []));
-    numberRun(documentId, answer);
+    numberRun(documentId, text, answer);
     // A refusal is said once: the run that follows it has the cell's own word.
     refusals.delete(documentId);
     options.show(documentId, text, answer, scope.until);
@@ -292,16 +300,23 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
    * Numbers the cells this answer ran, in cell order, after the last number this tab gave: a
    * cell main reused keeps the `ranAt` of the run that made it, so it keeps its number.
    */
-  const numberRun = (documentId: string, answer: RecipeRunAnswer): void => {
+  const numberRun = (documentId: string, text: string, answer: RecipeRunAnswer): void => {
     const placed = places.get(documentId);
     const kept = counts.get(documentId) ?? new Map<number, number>();
     let count = counters.get(documentId) ?? 0;
-    for (const cell of [...answer.cells].sort((left, right) => left.index - right.index)) {
-      if (!ranIn(cell, answer.ranAt)) continue;
-      const at = placed?.get(cell.index);
-      if (at === undefined) continue;
+    // One number per block a run reached, shared by the cells of it that ran (ADR 0196): a block
+    // runs as a Jupyter cell does, however many steps it holds.
+    const ran = answer.cells.filter((cell) => ranIn(cell, answer.ranAt));
+    for (const block of recipeBlocks(text)) {
+      const steps = block.steps;
+      if (steps === undefined) continue;
+      const own = ran.filter((cell) => cell.index >= steps.first && cell.index <= steps.last);
+      if (own.length === 0) continue;
       count += 1;
-      kept.set(at, count);
+      for (const cell of own) {
+        const at = placed?.get(cell.index);
+        if (at !== undefined) kept.set(at, count);
+      }
     }
     counters.set(documentId, count);
     counts.set(documentId, kept);
@@ -357,7 +372,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     runNow,
     // Both are Run, the person's approval: they fetch, and they run in a folder not trusted.
     runFrom: (documentId, index) => runNow(documentId, 'explicit', { from: index }),
-    runBlock: (documentId, index) => runNow(documentId, 'explicit', { from: index, until: index }),
+    runBlock: (documentId, first, until) => runNow(documentId, 'explicit', { from: first, until }),
     fetchAgain: (documentId) => runNow(documentId, 'explicit', { fresh: true }),
     apply,
     applyingOf: (documentId) => applying.get(documentId) ?? new Set(),
@@ -516,9 +531,8 @@ export function executionMarks(input: {
   readonly countAt: (at: number) => number | undefined;
   readonly running: RecipeRunScope | undefined;
 }): readonly ExecutionMark[] {
-  const now = recipeBlocks(input.text);
-  const steps = now.filter((block) => block.kind === 'step');
-  const changed = firstStale(input.text, now, input.shown);
+  const steps = recipeLines(input.text, 'step');
+  const changed = firstStale(input.text, input.shown);
   const start = Math.min(changed, input.running?.from ?? Infinity);
   const end = input.running?.until ?? Infinity;
   return steps.map((block, index) => {
@@ -529,18 +543,19 @@ export function executionMarks(input: {
   });
 }
 
-/** The first step main would run again: a changed step or header, or a cell not `ok`. */
-function firstStale(text: string, now: readonly RecipeBlock[], shown: Shown | undefined): number {
-  const steps = now.filter((block) => block.kind === 'step');
+/**
+ * The first step main would run again: a changed step, a changed header or `param` line
+ * (wherever its block is, every step), or a cell not `ok`.
+ */
+function firstStale(text: string, shown: Shown | undefined): number {
+  const steps = recipeLines(text, 'step');
   if (shown === undefined) return 0;
-  const before = recipeBlocks(shown.text);
-  const header = (blocks: readonly RecipeBlock[], source: string): string =>
-    blocks
-      .filter((block) => block.kind === 'header')
-      .map((block) => source.slice(block.from, block.to))
+  const header = (source: string): string =>
+    recipeLines(source, 'header')
+      .map((line) => source.slice(line.from, line.to))
       .join('\n');
-  if (header(now, text) !== header(before, shown.text)) return 0;
-  const ran = before.filter((block) => block.kind === 'step');
+  if (header(text) !== header(shown.text)) return 0;
+  const ran = recipeLines(shown.text, 'step');
   const differs = steps.findIndex((block, index) => {
     const then = ran[index];
     return (
@@ -554,22 +569,36 @@ function firstStale(text: string, now: readonly RecipeBlock[], shown: Shown | un
   return Math.min(differs === -1 ? steps.length : differs, notOk);
 }
 
+/** How many steps the first `count` blocks hold: the index the next step takes. */
+function stepsThrough(blocks: readonly RecipeBlock[], count: number): number {
+  let steps = 0;
+  for (const block of blocks.slice(0, count)) {
+    if (block.steps !== undefined) steps = block.steps.last + 1;
+  }
+  return steps;
+}
+
 /**
- * Where a step or a note goes when a block's "+" is pressed (TYTO-676): above block `place`
- * (its index among the text's blocks), or below the last block with `'end'`, on a line of its
- * own. `before` counts the steps above it, for the form's column offers.
+ * Where a step or a note goes when a block's "+" is pressed (TYTO-676, ADR 0196): **a new
+ * block**, set apart by a blank line, above block `place` (its index among the text's blocks)
+ * or below the last block with `'end'`. `before` counts the steps above it, for the form's
+ * column offers.
  */
 export function blockSlot(text: string, place: number | 'end'): StepSlot {
   const blocks = recipeBlocks(text);
-  const stepsAbove = (count: number): number =>
-    blocks.slice(0, count).filter((block) => block.kind === 'step').length;
   const block = place === 'end' ? undefined : blocks[place];
   if (block !== undefined && place !== 'end') {
-    return { at: block.from, prefix: '', suffix: '\n', before: stepsAbove(place) };
+    return { at: block.from, prefix: '', suffix: '\n\n', before: stepsThrough(blocks, place) };
   }
   const last = blocks.at(-1);
-  if (last === undefined) return stepSlot(text, 0);
-  return { at: last.to, prefix: '\n', suffix: '', before: stepsAbove(blocks.length) };
+  if (last === undefined) return endOfText(text, 0);
+  return { at: last.to, prefix: '\n\n', suffix: '', before: stepsThrough(blocks, blocks.length) };
+}
+
+/** The end of the text, on a line of its own. */
+function endOfText(text: string, before: number): StepSlot {
+  const ended = text === '' || text.endsWith('\n');
+  return { at: text.length, prefix: ended ? '' : '\n', suffix: ended ? '\n' : '', before };
 }
 
 /** Adds or drops one line start in a document's set of them. */
@@ -611,10 +640,14 @@ export function cellAtOrAbove(answer: RecipeRunAnswer, line: number): number | u
 }
 
 /**
- * Where Add step writes its line (TYTO-402): below the step at or above the cursor's line, or
- * at the end of the text when the cursor is above every step, the recipe has none, or it does
- * not parse. `before` is the new step's index among the steps, which the form's column offers
- * are read before; `undefined` when the text does not parse, and every cell counts.
+ * Where Add step writes its line (TYTO-402, ADR 0176 as ADR 0196 amends it). **With the cursor
+ * in a block, at the block's end**: the block grows by a step, as a Jupyter cell grows by a line,
+ * and its result is then the new step's. With the cursor on a blank line, **a new block** after
+ * the block above it. With the cursor in the header, above every block, or with none, a new
+ * block at the end of the text, as Add step always wrote there from above every step: a new
+ * recipe opens with its cursor in the header, and its skeleton's note ("Each line below is one
+ * step") is to stay above the steps added. `before` is the new step's index among the steps,
+ * which the form's column offers are read before.
  */
 export interface StepSlot {
   readonly at: number;
@@ -625,30 +658,27 @@ export interface StepSlot {
 }
 
 export function stepSlot(text: string, cursorLine: number): StepSlot {
-  const parsed = parseRecipe(text);
-  const steps = parsed.ok ? parsed.value.steps : [];
-  const starts = lineStarts(text);
-  let above: number | undefined;
-  steps.forEach((step, index) => {
-    if (lineOf(starts, step.range.start) <= cursorLine) above = index;
-  });
-  const step = above === undefined ? undefined : steps[above];
-  if (step === undefined || above === undefined) {
-    const ended = text === '' || text.endsWith('\n');
-    return {
-      at: text.length,
-      prefix: ended ? '' : '\n',
-      suffix: ended ? '\n' : '',
-      before: parsed.ok ? steps.length : undefined,
-    };
+  const blocks = recipeBlocks(text);
+  const block = blockAtLine(blocks, cursorLine);
+  if (block !== undefined && block.kind !== 'header') {
+    const index = blocks.indexOf(block);
+    const before = block.steps === undefined ? stepsThrough(blocks, index) : block.steps.last + 1;
+    return { at: block.to, prefix: '\n', suffix: '', before };
   }
-  const lineEnd = text.indexOf('\n', step.range.start);
-  return {
-    at: lineEnd === -1 ? text.length : lineEnd,
-    prefix: '\n',
-    suffix: '',
-    before: above + 1,
-  };
+  // On a blank line, after the block above; in the header, or above every block, at the end.
+  let above = -1;
+  if (block === undefined) {
+    blocks.forEach((each, index) => {
+      if (each.lastLine <= cursorLine) above = index;
+    });
+  }
+  const after = blocks[above];
+  if (after === undefined) {
+    const last = blocks.at(-1);
+    if (last === undefined) return endOfText(text, 0);
+    return { at: last.to, prefix: '\n\n', suffix: '', before: stepsThrough(blocks, blocks.length) };
+  }
+  return { at: after.to, prefix: '\n\n', suffix: '', before: stepsThrough(blocks, above + 1) };
 }
 
 /**
@@ -782,6 +812,18 @@ function counted(
 ): string {
   const one = key === 'recipe.cell.rows' ? 'recipe.cell.rows.one' : 'recipe.cell.columns.one';
   return translate(locale, count === 1 ? one : key).replace('{count}', String(count));
+}
+
+/**
+ * The lines a block's result is drawn under (TYTO-676, ADR 0196): only each block's last step's.
+ * The other steps run and are kept, and their problems are marked at their lines, but nothing is
+ * drawn under them. Applied to `cellStatuses`' lines by the window.
+ */
+export function blockResults(text: string, statuses: readonly CellStatus[]): readonly CellStatus[] {
+  const drawn = new Set(
+    recipeBlocks(text).flatMap((block) => (block.steps === undefined ? [] : [block.steps.last])),
+  );
+  return statuses.filter((status) => drawn.has(status.index));
 }
 
 /** Each line's start, by index: `starts[n - 1]` is line `n`'s. */

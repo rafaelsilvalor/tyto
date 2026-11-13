@@ -34,7 +34,8 @@ let recipePath: string;
 let app: ElectronApplication | undefined;
 let window: Page;
 
-const RECIPE = ['recipe weekly', 'where status = done', 'select key', ''].join('\n');
+// Two blocks, a blank line apart, so each step draws its own line (ADR 0196).
+const RECIPE = ['recipe weekly', 'where status = done', '', 'select key', ''].join('\n');
 
 const launch = async (): Promise<void> => {
   app = await _electron.launch({
@@ -165,10 +166,11 @@ describe('a recipe in a tab (TYTO-377)', () => {
     );
     expect(offered.some((label) => label.startsWith('sort'))).toBe(true);
     await window.keyboard.press('Escape');
-    // The line typed is a cell too: after the pause it is skipped like the one above it.
+    // The line typed right under `select key` is a step of its block (ADR 0196): after the pause
+    // the block draws its last step's line, the typed one's, and none under `select key`.
     await expect
       .poll(async () => (await cellLines()).map((line) => line.above), { timeout: 15_000 })
-      .toEqual(['where status = done', 'select key', 'sor']);
+      .toEqual(['where status = done', 'sor']);
   }, 60_000);
 
   it('brings the tab back as a recipe after a quit and a second launch, and runs it', async () => {
@@ -182,10 +184,6 @@ describe('a recipe in a tab (TYTO-377)', () => {
     await expect.poll(kindText, { timeout: 10_000 }).toBe('Recipe');
     await expect
       .poll(async () => (await cellLines()).map((line) => line.text), { timeout: 15_000 })
-      .toEqual([
-        'Failed: see Problems',
-        'Skipped: a cell above failed',
-        'Skipped: a cell above failed',
-      ]);
+      .toEqual(['Failed: see Problems', 'Skipped: a cell above failed']);
   }, 180_000);
 });

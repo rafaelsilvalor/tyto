@@ -41,7 +41,7 @@ Click the lines to put them away.
 
 Run **Add step** from the command bar with a recipe in front. A list of every verb opens, grouped into **Sources**, **Transforms**, **Actions** and **Sinks**: the generic ones and every verb your installed plugins add. Type to narrow it, move with the arrow keys and press Enter, or click a verb.
 
-The verb's form follows, one field per argument. A required field says so; a field left blank shows the value the verb assumes; a field with a fixed set of values is a list. A field that names a column, a list of columns or a `where` expression offers the columns of the step before it, from its last run: click one to put it in. Under the fields, the form shows the line it will write. **Write step** puts that one line below the step the cursor is on, or at the end when the cursor is above every step.
+The verb's form follows, one field per argument. A required field says so; a field left blank shows the value the verb assumes; a field with a fixed set of values is a list. A field that names a column, a list of columns or a `where` expression offers the columns of the step before it, from its last run: click one to put it in. Under the fields, the form shows the line it will write. **Write step** puts that one line at the end of the block the cursor is in, so the block grows by one step and shows that step's result. With the cursor on a blank line, the line starts a new block there, set apart by a blank line; with the cursor in the header or above every block, it starts a new block at the end. See [Work in blocks](#work-in-blocks).
 
 To change a step, put the cursor on its line and run **Edit step**: the form opens filled from the line, and **Write step** writes the line back in its place.
 
@@ -75,7 +75,7 @@ Only the steps that changed run again: a step whose line did not change keeps it
   alt="A recipe after Run recipe: under its source step, the line 30 rows · 5 columns with its age and the Run from here and Fetch again buttons, a table of the first 20 rows and 10 more rows below it; the where step under it shows its own line and table."
 />
 
-Under each step is one line, then its table:
+Under each block's last step is one line, then its table. A block of several steps shows only its last step's result (see [Work in blocks](#work-in-blocks)):
 
 - **The line** says what the step answered: _12 rows · 4 columns_, a plan (_Plan: 3 to write to Pauta_), _Failed: see Problems_, or why it did not run.
 - **Its age**: when the step ran and how old its data is, such as _ran 2 min. ago · data fetched 3 hr. ago_. The data's age is when the source fetched it, which can be long before the step ran. The ages count up while the tab is open.
@@ -122,30 +122,32 @@ The grid draws 48 cards; **252 more** draws the next ones. _Filter rows_ works a
 
 ## Open a step in a tab
 
-**Open in a tab**, on the line of a step whose table the last run kept, draws that step's result full size in a tab of its own, beside the recipe's: the same view the step has, a Table, Summary, Board, Calendar or loose cards, with the whole height of the window to use. A step under no `show` opens in the Table view, since the tab has room for every row. The command **Open cell result in a tab** does the same for the step at or above the cursor. The tab is named after the recipe and the step's number, counted from the top (_weekly.recipe · cell 2_).
+**Open in a tab**, on the line of a step whose table the last run kept, draws that step's result full size in a tab of its own, beside the recipe's: the same view the step has, a Table, Summary, Board, Calendar or loose cards, with the whole height of the window to use. A step under no `show` opens in the Table view, since the tab has room for every row. The command **Open cell result in a tab** does the same for the step at or above the cursor, a step in the middle of a block included, whose result the block does not draw. The tab is named after the recipe and the step's number, counted from the top (_weekly.recipe · cell 2_).
 
 The tab follows the recipe: a new run draws it again with the new rows, and it closes when the recipe's tab closes. Its sort, filter and columns are its own, apart from the step's. It keeps to its step: a step added or deleted above it does not hand it another one, and its number in the tab's name follows. When the step's own line is deleted, the tab says it has no result. It is not brought back when Tyto opens again: open it again from the step. A step from a recipe opened by `run` has no button; open that recipe to draw its steps in a tab.
 
 ## Work in blocks
 
-A recipe reads as blocks, the way a notebook does. Each step is a block of its own, a run of `#` comment lines is a **note** block, and the header (the `recipe` line, its `|` description and the `apply`, `every` and `param` lines) is one block at the top. A blank line belongs to no block. The block your cursor is in has a coloured bar at its left.
+A recipe reads as blocks, the way a notebook reads as cells. **A blank line separates one block from the next**: a block is the lines between two blank lines, and it can hold several steps and `#` comment lines. A block of comment lines only is a **note** block. The header (the `recipe` line, its `|` description and the `apply`, `every` and `param` lines at the top) is a block of its own, even with no blank line under it. A blank line belongs to no block. The block your cursor is in has a coloured bar at its left.
+
+**A block shows only its last step's result**, under that step's line. Every step of the block still runs, and a step's problem is still marked on its own line and listed in Problems; when a step in the middle fails, the block's line says _Skipped: a cell above failed_. To see the result of a step in the middle, put a blank line under it, which splits the block in two, or put the cursor on it and run **Open cell result in a tab**.
 
 On the first line of every block but the header, at the right, a small toolbar:
 
-- **▶ Run this block**, on a step: runs that step, and the steps above it that changed since the last run, and stops there. The steps below it keep their last tables and say _Below the block run: runs on the next run_. It is **Run recipe** for that much of the recipe: it fetches, and it runs in a folder not trusted.
-- **↑ Move up** and **↓ Move down**: swap the block with the one next to it. The blank lines between them stay where they were. A block never moves above the header.
-- **✕ Delete block**: removes its lines. It asks nothing; **Ctrl+Z** brings the block back, as it undoes a move.
-- **▶▶ Run from here down**, on a step: runs that step and every step below it, as **Run from here** does.
-- **▾ Hide result** (**▸ Show result** when folded), on a step with a result: the same as the arrow on its result's line.
+- **▶ Run this block**, on a block with steps: runs every step of the block, and the steps above it that changed since the last run, and stops there. The steps below it keep their last tables and say _Below the block run: runs on the next run_. It is **Run recipe** for that much of the recipe: it fetches, and it runs in a folder not trusted.
+- **↑ Move up** and **↓ Move down**: swap the whole block with the one next to it. The blank lines between them stay where they were. A block never moves above the header.
+- **✕ Delete block**: removes all its lines and the blank line that set it apart. It asks nothing; **Ctrl+Z** brings the block back, as it undoes a move.
+- **▶▶ Run from here down**, on a block with steps: runs from its first step down to the end, as **Run from here** does.
+- **▾ Hide result** (**▸ Show result** when folded), on a block with a result: the same as the arrow on its result's line.
 
 The header's toolbar has **Run all**, which is **Run recipe**.
 
 A small **+** sits on the boundary above every block but the header, and one below the last block, just left of the toolbars. Press it and choose:
 
-- **Step…**: the step picker and form of **Add step** (see [Add and edit steps](#add-and-edit-steps)), offered the columns of the step above, and the line it writes goes there, on a line of its own.
-- **Note**: a `# ` line there, with the cursor after it. Write the note; it is a comment, so it never runs. A note is drawn in the window's own font.
+- **Step…**: the step picker and form of **Add step** (see [Add and edit steps](#add-and-edit-steps)), offered the columns of the step above, and the line it writes goes there as a new block, with a blank line either side.
+- **Note**: a `# ` line there, as a new block, with the cursor after it. Write the note; it is a comment, so it never runs. A note is drawn in the window's own font.
 
-At the left of each step, its **counter** says when it last ran: `[3]` is the third run that ran a step in this tab, counted whether a pause in typing or a button started it. `[*]` is a step a run is reaching now, and `[ ]` one that has not run since the tab opened. A counter drawn dimmer, in italics, is **out of date**: that step, or one above it, changed since it ran, or the last run stopped above it; hover it to read why. The counters are the tab's own: they start again when the tab closes.
+At the left of each block with steps, its **counter** says when it last ran: `[3]` is the third block a run ran in this tab, counted whether a pause in typing or a button started it, and a block counts once however many steps it holds. `[*]` is a block a run is reaching now, and `[ ]` one that has not run since the tab opened. A counter drawn dimmer, in italics, is **out of date**: a step of the block, or one above it, changed since it ran, a step of it was skipped, or the last run stopped above it; hover it to read why. The counters are the tab's own: they start again when the tab closes.
 
 The blocks are only a way of reading the text: moving or deleting one edits the recipe's lines, and saving writes them in the order you see. The file stays the text you can edit by hand.
 

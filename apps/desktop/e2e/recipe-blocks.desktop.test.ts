@@ -12,10 +12,12 @@ import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 
 /**
- * A recipe's blocks in the real window (TYTO-676, ADR 0195, first pull request): each block
+ * A recipe's blocks in the real window (TYTO-676, ADR 0195 and ADR 0196): each block
  * framed over the one editor with its toolbar on its first line; Run this block runs from the
  * first changed cell to it and leaves the cells below stale; the toolbar folds a result; Up
  * moves a block and Delete takes one, and **the saved file is the blocks in their new order**.
+ * A block of several steps runs them all and shows its last step's result only, and a middle
+ * step's error is still marked at its line (ADR 0196).
  *
  * What it asserts is what jsdom cannot: where the toolbar sits on the line, that a click on it
  * leaves the text and its caret to the editor, and the run in main. The edits themselves are
@@ -68,13 +70,18 @@ export function activate(host) {
 }
 `;
 
+// One step per block, a blank line apart (ADR 0196), and a note block of its own.
 const RECIPE = [
   'recipe blocks',
   '',
   VERB,
+  '',
   '# keep the open ones',
+  '',
   'where status = open',
+  '',
   'select title',
+  '',
   'sort title',
   '',
 ].join('\n');
@@ -306,14 +313,19 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
     expect(crossings).toEqual({ count: 6, crossing: 0 });
     // A line's text is its own: no toolbar glyph is in it.
     expect(laid.map((line) => line.text)).toEqual(RECIPE.split('\n'));
-    // Header, blank, source, note, three steps, and the empty last line.
+    // Header, then the source, the note and three steps, each after a blank line, and the
+    // empty last line.
     expect(laid.map((line) => line.classes)).toEqual([
       true,
       false,
       true,
+      false,
       true,
+      false,
       true,
+      false,
       true,
+      false,
       true,
       false,
     ]);
@@ -384,9 +396,18 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
     await expect
       .poll(() => readFileSync(recipePath, 'utf8'), { timeout: 10_000 })
       .toBe(
-        ['recipe blocks', '', VERB, 'select title', 'where status = open', 'sort title', ''].join(
-          '\n',
-        ),
+        [
+          'recipe blocks',
+          '',
+          VERB,
+          '',
+          'select title',
+          '',
+          'where status = open',
+          '',
+          'sort title',
+          '',
+        ].join('\n'),
       );
   }, 30_000);
 });
@@ -463,11 +484,16 @@ describe("the card's acceptance (TYTO-676)", () => {
     const lines = await page.evaluate(() =>
       [...document.querySelectorAll('#editor .cm-line')].map((line) => line.textContent ?? ''),
     );
-    expect(lines.slice(2, 7)).toEqual([
+    // A block of its own, a blank line either side (ADR 0196).
+    expect(lines.slice(2, 11)).toEqual([
       VERB,
+      '',
       'select title',
+      '',
       'where title != Second',
+      '',
       'where status = open',
+      '',
       'sort title',
     ]);
   }, 30_000);
@@ -499,15 +525,72 @@ describe("the card's acceptance (TYTO-676)", () => {
           'recipe blocks',
           '',
           VERB,
+          '',
           'where title != Second',
+          '',
           'select title',
+          '',
           'where status = open',
+          '',
           'sort title',
           '',
         ].join('\n'),
       );
     if (shots !== undefined) {
       await page.screenshot({ path: join(shots, 'recipe-blocks-acceptance.png') });
+    }
+  }, 30_000);
+});
+
+/** Replaces the whole text of the recipe in front, as typing it would. */
+async function retype(text: string): Promise<void> {
+  await page.click('#editor .cm-content');
+  await page.keyboard.press('Control+a');
+  await page.keyboard.insertText(text);
+}
+
+/** The text of every line an error squiggle sits on. */
+const markedLines = (): Promise<string[]> =>
+  page.evaluate(() => [
+    ...new Set(
+      [...document.querySelectorAll('#editor .cm-lintRange-error')].map(
+        (mark) => mark.closest('.cm-line')?.textContent ?? '',
+      ),
+    ),
+  ]);
+
+// ADR 0196: a block is a run of lines between blank lines, like a Jupyter cell, and shows only
+// its last step's result. Every step still runs and keeps its result, and its problems.
+describe('a block of several steps (TYTO-676, ADR 0196)', () => {
+  const steps = (where: string): string =>
+    ['recipe blocks', '', VERB, where, 'select title', '', 'sort title', ''].join('\n');
+
+  it("runs every step of the block and draws only its last step's result", async () => {
+    await retype(steps('where status = open'));
+    await (await toolbar(VERB)).locator('[data-action="run"]').click();
+    // One result for the block of three steps, under its last line; the block below is stale.
+    await expect.poll(summaries, { timeout: 15_000 }).toEqual({
+      'select title': '1 row · 1 column',
+      'sort title': 'Below the block run: runs on the next run',
+    });
+    // The counter sits on the block's first line, and carries the last step's number.
+    expect(await counterOn(VERB)).toMatchObject({ text: expect.stringMatching(/^\[\d+\]$/u) });
+    expect(await counterOn('where status = open')).toBeUndefined();
+    if (shots !== undefined) {
+      await page.screenshot({ path: join(shots, 'recipe-blocks-several-steps.png') });
+    }
+  }, 30_000);
+
+  it("marks a middle step's error at its line, and the block's result says it was skipped", async () => {
+    await retype(steps('where nothing = open'));
+    await (await toolbar(VERB)).locator('[data-action="run"]').click();
+    await expect.poll(summaries, { timeout: 15_000 }).toMatchObject({
+      'select title': expect.stringContaining('Skipped'),
+    });
+    expect(Object.keys(await summaries())).not.toContain('where nothing = open');
+    await expect.poll(markedLines, { timeout: 10_000 }).toContain('where nothing = open');
+    if (shots !== undefined) {
+      await page.screenshot({ path: join(shots, 'recipe-blocks-middle-error.png') });
     }
   }, 30_000);
 });

@@ -20,7 +20,8 @@ import { switchingFolder } from './folder-switch.js';
  * picker's Sources; Add step `where` and `select` through their forms, each offered the columns
  * of the cell before it; New vocabulary with one rule, typed in the vocabulary tab; Add step
  * `rules` reading it; Run, every cell ok. **The saved text is the skeleton and exactly the lines
- * the forms showed**: the form is a way of typing the line, and the text stays the source.
+ * the forms showed**: the form is a way of typing the line, and the text stays the source. The
+ * steps make one block, each written at the end of the block the cursor is in (ADR 0196).
  *
  * The source is a plugin with no permissions and a static table, installed by the real `tyto
  * plugin install`; the folder is trusted through `tyto trust add` before launch. Its own
@@ -244,7 +245,8 @@ describe('a recipe built with the step picker and the forms (TYTO-402)', () => {
     await expression.press('End');
     await page.keyboard.type(' != done');
     await write();
-    await runCells(2);
+    // The cursor is on the line just written: `where` joins its block, which shows one result.
+    expect(await runCells(1)).toHaveLength(1);
 
     await pick('select');
     expect(await offered('columns')).toEqual(['title', 'status']);
@@ -292,12 +294,15 @@ describe('a recipe built with the step picker and the forms (TYTO-402)', () => {
     await page.waitForSelector('tyto-recipe-step .recipe-step__panel', { state: 'detached' });
     await command('editor.save');
 
-    const cells = await runCells(4);
+    // One block of four steps, which shows its last step's result only (ADR 0196).
+    const cells = await runCells(1);
     expect(cells.at(-1)).toContain('1 row · 3 columns');
+    // The first step, picked with the cursor in the header, started a block at the end, under
+    // the skeleton's note; each one after joined that block, the cursor still in it.
     const skeleton = recipeSkeleton('weekly');
     await expect
       .poll(() => readFileSync(join(work, 'weekly.recipe'), 'utf8'), { timeout: 10_000 })
-      .toBe(`${skeleton.ok ? skeleton.value : 'no skeleton'}${shown.join('\n')}\n`);
+      .toBe(`${skeleton.ok ? skeleton.value : 'no skeleton'}\n${shown.join('\n')}\n`);
     expect(shown.at(-1)).toBe('rules into=kind using=@./company.vocab.json#/rules/kinds');
   }, 30_000);
 });

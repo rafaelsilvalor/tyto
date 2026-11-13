@@ -119,7 +119,9 @@ function rowsTable(): string {
 
 const RECIPE = [
   'recipe board',
+  // A blank line between the steps: each is a block of its own, and draws its result (ADR 0196).
   VERB,
+  '',
   'show board by=status order="To Do,In Progress,Done" fields=title,owner',
   '',
 ].join('\n');
@@ -127,11 +129,12 @@ const RECIPE = [
 const CALENDAR_RECIPE = [
   'recipe calendar',
   VERB,
+  '',
   'show calendar date=due time=at span=week',
   '',
 ].join('\n');
 
-const CARDS_RECIPE = ['recipe cards', VERB, 'show cards fields=title,owner', ''].join('\n');
+const CARDS_RECIPE = ['recipe cards', VERB, '', 'show cards fields=title,owner', ''].join('\n');
 
 let scratch: string;
 let home: string;

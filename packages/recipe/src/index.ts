@@ -22,6 +22,7 @@ export {
   isMovable,
   moveBlock,
   recipeBlocks,
+  recipeLines,
 } from './blocks.js';
 export { checkTable } from './check-table.js';
 export type { RunClock } from './clock.js';
