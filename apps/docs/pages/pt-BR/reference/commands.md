@@ -2,7 +2,7 @@
 
 # Comandos
 
-Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 97. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
+Tudo o que a janela sabe fazer, pelo título que a barra de comandos mostra: 107. Abra a barra com **`Ctrl+k` / `⌘k`** e digite parte de um título. O id é o que o `keybindings.json` usa para pôr um comando numa tecla.
 
 A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: um para abrir e fechar cada painel, inclusive os de plugins, um para cada arquivo aberto recentemente, e um para cada predefinição de exportação da pasta aberta, `export.preset:<nome>`.
 
@@ -64,6 +64,16 @@ A janela acrescenta outros enquanto roda, que esta lista não tem como mostrar: 
 | Abrir o resultado da célula numa aba | `recipe.openCellView` |  |  |
 | Adicionar passo | `recipe.addStep` |  |  |
 | Editar passo | `recipe.editStep` |  |  |
+| Receita: Selecionar blocos (modo comando) | `recipe.block.commandMode` | `Escape`, `Shift+Escape`, `Ctrl+m` | `Escape`, `⇧Escape`, `Ctrlm` |
+| Receita: Editar o bloco selecionado | `recipe.block.edit` | `Enter` | `Enter` |
+| Receita: Inserir um bloco acima | `recipe.block.insertAbove` | `a` | `a` |
+| Receita: Inserir um bloco abaixo | `recipe.block.insertBelow` | `b` | `b` |
+| Receita: Apagar o bloco | `recipe.block.delete` | `d` | `d` |
+| Receita: Executar o bloco e ir para o próximo | `recipe.block.runAndAdvance` | `Shift+Enter` | `⇧Enter` |
+| Receita: Selecionar o próximo bloco | `recipe.block.next` | `j`, `ArrowDown` | `j`, `ArrowDown` |
+| Receita: Selecionar o bloco anterior | `recipe.block.previous` | `k`, `ArrowUp` | `k`, `ArrowUp` |
+| Receita: Ocultar ou mostrar o resultado do bloco | `recipe.block.toggleResult` | `o` | `o` |
+| Receita: Desfazer, no modo comando | `recipe.block.undo` | `z`, `Ctrl+z` | `z`, `⌘z` |
 | Nova receita | `explorer.newRecipe` |  |  |
 | Novo vocabulário | `explorer.newVocabulary` |  |  |
 | Carregar receita… | `explorer.loadRecipe` |  |  |

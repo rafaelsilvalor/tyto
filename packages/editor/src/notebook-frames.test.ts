@@ -5,10 +5,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   type NotebookFrame,
+  enterNotebookCommand,
+  isNotebookCommandTarget,
+  leaveNotebookCommand,
   notebookFrameOf,
   notebookFrames,
   notebookInsertOf,
   refreshNotebookFrames,
+  selectedNotebookFrame,
+  stepNotebookSelection,
 } from './notebook-frames.js';
 
 /**
@@ -237,5 +242,70 @@ describe('inserting between blocks and the counter', () => {
     mark = '7';
     on.dispatch({ effects: refreshNotebookFrames.of(null) });
     expect(gutterText()).toEqual(['[7]', '[ ]', '[ ]']);
+  });
+});
+
+// TYTO-676, third pull request: command mode is focus on the toolbars' layer, a block selected.
+describe('command mode', () => {
+  const openNotebook = (): EditorView => {
+    view = new EditorView({
+      state: EditorState.create({
+        doc: DOC,
+        extensions: [notebookFrames({ framesOf: (on) => framesOf(on, () => 'tools') })],
+      }),
+      parent: document.body,
+    });
+    return view;
+  };
+  const selectedText = (on: EditorView): string | undefined => {
+    const frame = selectedNotebookFrame(on);
+    return frame === undefined ? undefined : on.state.doc.lineAt(frame.from).text;
+  };
+
+  it('selects the block at the caret and moves focus off the text, onto its target', () => {
+    const on = openNotebook();
+    on.focus();
+    on.dispatch({ selection: EditorSelection.cursor(on.state.doc.line(5).from + 3) });
+    expect(enterNotebookCommand(on)).toBe(true);
+    expect(selectedText(on)).toBe('where status = done');
+    expect(isNotebookCommandTarget(document.activeElement)).toBe(true);
+    expect(on.contentDOM.contains(document.activeElement)).toBe(false);
+    expect(lines(on).map(([, classes]) => classes.includes('--selected'))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  it('steps between blocks, stops at the ends, and follows its block through an edit', () => {
+    const on = openNotebook();
+    enterNotebookCommand(on, 0);
+    expect(selectedText(on)).toBe('# a note');
+    expect(stepNotebookSelection(on, 1)).toBe(true);
+    expect(selectedText(on)).toBe('acme.pull');
+    expect(stepNotebookSelection(on, -1)).toBe(true);
+    expect(stepNotebookSelection(on, -1)).toBe(false);
+    stepNotebookSelection(on, 1);
+    on.dispatch({ changes: { from: 0, insert: 'acme.first\n' } });
+    expect(selectedText(on)).toBe('acme.pull');
+  });
+
+  it('leaves when focus goes back into the text, as a click there puts it', () => {
+    const on = openNotebook();
+    enterNotebookCommand(on, 0);
+    on.focus();
+    expect(selectedNotebookFrame(on)).toBeUndefined();
+  });
+
+  it('leaves for the text with the caret where it is asked, and nothing selected', () => {
+    const on = openNotebook();
+    enterNotebookCommand(on, 0);
+    const at = on.state.doc.line(3).to;
+    leaveNotebookCommand(on, at);
+    expect(selectedNotebookFrame(on)).toBeUndefined();
+    expect(on.state.selection.main.head).toBe(at);
+    expect(on.hasFocus).toBe(true);
   });
 });

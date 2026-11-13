@@ -76,3 +76,13 @@ Read in the code on `origin/main` (`cdaabe01`) before deciding:
   recipe built with the picker alone is one block until a blank line is typed.
 - PR C of TYTO-676 (command mode) is rebased on this record: its block actions act on whole
   blocks and its fixtures need the blank lines.
+
+## Notes from the build
+
+- 2026-11-13 (TYTO-676, command mode, ADR 0195 decision 7): **command mode selects a whole
+  block**, all its lines marked. A and B write a new block above or below it, a blank line
+  apart; D D deletes all its lines and the blank line that set it apart; Enter puts the caret at
+  the end of its first line; Shift+Enter runs every step of it, first to last, and selects the
+  next block, or, in the text, moves the caret to the end of the next block's first line; O
+  folds its result, its last step's. Measured in the window with vim on: Escape twice and `dd`
+  on a line of a two-line note delete that line, and the block stays.

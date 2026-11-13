@@ -192,6 +192,7 @@ export {
   type VimStatus,
   defaultExCommands,
   vimMode,
+  vimToNormal,
 } from './vim-mode.js';
 
 export {
@@ -249,8 +250,14 @@ export {
   type NotebookFrame,
   type NotebookFramesOptions,
   type NotebookMarker,
+  enterNotebookCommand,
+  isNotebookCommandTarget,
+  leaveNotebookCommand,
   notebookFrameOf,
   notebookInsertOf,
+  selectNotebookBlock,
+  selectedNotebookFrame,
+  stepNotebookSelection,
   notebookFrames,
   refreshNotebookFrames,
 } from './notebook-frames.js';

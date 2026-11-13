@@ -541,6 +541,17 @@ export interface Catalogue {
    */
   readonly 'command.recipe.addStep': string;
   readonly 'command.recipe.editStep': string;
+  /** TYTO-676: a recipe's command mode and its block actions, as the command bar lists them. */
+  readonly 'command.recipe.block.commandMode': string;
+  readonly 'command.recipe.block.edit': string;
+  readonly 'command.recipe.block.insertAbove': string;
+  readonly 'command.recipe.block.insertBelow': string;
+  readonly 'command.recipe.block.delete': string;
+  readonly 'command.recipe.block.runAndAdvance': string;
+  readonly 'command.recipe.block.next': string;
+  readonly 'command.recipe.block.previous': string;
+  readonly 'command.recipe.block.toggleResult': string;
+  readonly 'command.recipe.block.undo': string;
   readonly 'recipe.step.title': string;
   readonly 'recipe.step.search': string;
   readonly 'recipe.step.none': string;
@@ -1435,6 +1446,16 @@ export const CATALOGUE_KEYS = [
   'vocabulary.hover.pointer',
   'command.recipe.addStep',
   'command.recipe.editStep',
+  'command.recipe.block.commandMode',
+  'command.recipe.block.edit',
+  'command.recipe.block.insertAbove',
+  'command.recipe.block.insertBelow',
+  'command.recipe.block.delete',
+  'command.recipe.block.runAndAdvance',
+  'command.recipe.block.next',
+  'command.recipe.block.previous',
+  'command.recipe.block.toggleResult',
+  'command.recipe.block.undo',
   'recipe.step.title',
   'recipe.step.search',
   'recipe.step.none',

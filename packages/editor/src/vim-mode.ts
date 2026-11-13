@@ -112,6 +112,20 @@ export interface VimStatus {
 }
 
 /**
+ * Puts vim's engine in normal mode when it is in insert or visual mode (TYTO-676): a recipe's
+ * command mode hands focus back to the text in normal mode, as Jupyter's Enter does with vim.
+ * Nothing when vim is off.
+ */
+export function vimToNormal(view: EditorView): void {
+  const adapter = getCM(view);
+  if (adapter === null) return;
+  const engine = (adapter.state as { vim?: { insertMode?: boolean; visualMode?: boolean } }).vim;
+  if (engine?.insertMode === true || engine?.visualMode === true) {
+    Vim.handleKey(adapter, '<Esc>', 'mapping');
+  }
+}
+
+/**
  * Follows vim through the library's **public** events only (`vim-mode-change`,
  * `vim-keypress`, `vim-command-done`), never `cm.state.vim`, which is its internals.
  *

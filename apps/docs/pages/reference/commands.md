@@ -2,7 +2,7 @@
 
 # Commands
 
-Everything the window can be told to do, by title as the command bar shows it: 97. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
+Everything the window can be told to do, by title as the command bar shows it: 107. Open the bar with **`Ctrl+k` / `⌘k`** and type part of a title. The id is what `keybindings.json` names to put a command on a key.
 
 The window adds more while it runs, which this list cannot show: a toggle for each panel, including a plugin's, an entry for each recently opened file, and one for each export preset of the open folder, `export.preset:<name>`.
 
@@ -64,6 +64,16 @@ The window adds more while it runs, which this list cannot show: a toggle for ea
 | Open cell result in a tab | `recipe.openCellView` |  |  |
 | Add step | `recipe.addStep` |  |  |
 | Edit step | `recipe.editStep` |  |  |
+| Recipe: Select blocks (command mode) | `recipe.block.commandMode` | `Escape`, `Shift+Escape`, `Ctrl+m` | `Escape`, `⇧Escape`, `Ctrlm` |
+| Recipe: Edit the selected block | `recipe.block.edit` | `Enter` | `Enter` |
+| Recipe: Insert a block above | `recipe.block.insertAbove` | `a` | `a` |
+| Recipe: Insert a block below | `recipe.block.insertBelow` | `b` | `b` |
+| Recipe: Delete the block | `recipe.block.delete` | `d` | `d` |
+| Recipe: Run the block and go to the next | `recipe.block.runAndAdvance` | `Shift+Enter` | `⇧Enter` |
+| Recipe: Select the next block | `recipe.block.next` | `j`, `ArrowDown` | `j`, `ArrowDown` |
+| Recipe: Select the previous block | `recipe.block.previous` | `k`, `ArrowUp` | `k`, `ArrowUp` |
+| Recipe: Hide or show the result of the block | `recipe.block.toggleResult` | `o` | `o` |
+| Recipe: Undo, in command mode | `recipe.block.undo` | `z`, `Ctrl+z` | `z`, `⌘z` |
 | New recipe | `explorer.newRecipe` |  |  |
 | New vocabulary | `explorer.newVocabulary` |  |  |
 | Load recipe… | `explorer.loadRecipe` |  |  |

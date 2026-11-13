@@ -693,6 +693,14 @@
     },
     {
       "paths": [
+        "apps/desktop/src/renderer/recipe-command-mode.ts",
+        "apps/desktop/e2e/recipe-command-mode.desktop.test.ts"
+      ],
+      "e2e": ["recipe-command-mode.desktop.test.ts"],
+      "why": "reviewed: a recipe's command mode (TYTO-676, ADR 0195 decision 7); what each action does to the text is recipe-command-mode.test.ts's and which key runs it commands.test.ts's, and only the real window shows focus leaving the text, typing staying the text's and vim keeping its own Escape and dd"
+    },
+    {
+      "paths": [
         "apps/desktop/src/renderer/recipe-blocks-view.ts",
         "apps/desktop/e2e/recipe-blocks.desktop.test.ts"
       ],

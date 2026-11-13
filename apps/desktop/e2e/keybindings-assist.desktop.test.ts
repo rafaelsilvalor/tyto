@@ -191,6 +191,7 @@ const CONTEXTS = [
   'commandBar',
   'panel',
   'terminal',
+  'notebook',
 ];
 const ENTRY = { key: 'ctrl+shift+e', command: 'shell.toggleLocale', when: 'editor' };
 

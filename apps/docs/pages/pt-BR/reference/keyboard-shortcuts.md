@@ -2,7 +2,7 @@
 
 # Atalhos de teclado
 
-As teclas que o app liga antes de você mudar qualquer coisa: 39. Cada uma roda um comando, e só funciona onde o contexto dela vale. Mude-as no `keybindings.json`, que **Preferências: Abrir atalhos de teclado (JSON)** abre; um plugin pode acrescentar as dele.
+As teclas que o app liga antes de você mudar qualquer coisa: 55. Cada uma roda um comando, e só funciona onde o contexto dela vale. Mude-as no `keybindings.json`, que **Preferências: Abrir atalhos de teclado (JSON)** abre; um plugin pode acrescentar as dele.
 
 ::: info Contextos em inglês
 A explicação de cada contexto está em inglês: o código guarda essas frases em um só idioma, e esta página as mostra como estão.
@@ -19,6 +19,7 @@ A explicação de cada contexto está em inglês: o código guarda essas frases 
 | `commandBar` | The command bar is open. |
 | `panel` | Focus is in a panel other than the editor or a terminal, and the command bar is closed. |
 | `terminal` | Focus is in a terminal, and the command bar is closed. |
+| `notebook` | A recipe is in command mode: focus is on its blocks, not in their text. |
 
 ## Em qualquer lugar
 
@@ -43,6 +44,9 @@ The editor has focus, in either input mode.
 | `Ctrl+s` | `⌘s` | Salvar | `editor.save` |
 | `Ctrl+Shift+o` | `⌘⇧o` | Ir para bloco… | `editor.goToBlock` |
 | `Alt+Shift+f` | `⌥⇧f` | Arrumar brief | `editor.formatBrief` |
+| `Shift+Escape` | `⇧Escape` | Receita: Selecionar blocos (modo comando) | `recipe.block.commandMode` |
+| `Ctrl+m` | `Ctrlm` | Receita: Selecionar blocos (modo comando) | `recipe.block.commandMode` |
+| `Shift+Enter` | `⇧Enter` | Receita: Executar o bloco e ir para o próximo | `recipe.block.runAndAdvance` |
 
 ## mode.desktop
 
@@ -79,3 +83,23 @@ The editor has focus and vim mode is off.
 | `Ctrl+7` | `⌘7` | Aba: 7 | `document.select:7` |
 | `Ctrl+8` | `⌘8` | Aba: 8 | `document.select:8` |
 | `Ctrl+9` | `⌘9` | Aba: 9 | `document.select:9` |
+| `Escape` | `Escape` | Receita: Selecionar blocos (modo comando) | `recipe.block.commandMode` |
+
+## notebook
+
+A recipe is in command mode: focus is on its blocks, not in their text.
+
+| Windows e Linux | macOS | Comando | Id |
+| --- | --- | --- | --- |
+| `a` | `a` | Receita: Inserir um bloco acima | `recipe.block.insertAbove` |
+| `b` | `b` | Receita: Inserir um bloco abaixo | `recipe.block.insertBelow` |
+| `d` | `d` | Receita: Apagar o bloco | `recipe.block.delete` |
+| `Enter` | `Enter` | Receita: Editar o bloco selecionado | `recipe.block.edit` |
+| `Shift+Enter` | `⇧Enter` | Receita: Executar o bloco e ir para o próximo | `recipe.block.runAndAdvance` |
+| `j` | `j` | Receita: Selecionar o próximo bloco | `recipe.block.next` |
+| `ArrowDown` | `ArrowDown` | Receita: Selecionar o próximo bloco | `recipe.block.next` |
+| `k` | `k` | Receita: Selecionar o bloco anterior | `recipe.block.previous` |
+| `ArrowUp` | `ArrowUp` | Receita: Selecionar o bloco anterior | `recipe.block.previous` |
+| `o` | `o` | Receita: Ocultar ou mostrar o resultado do bloco | `recipe.block.toggleResult` |
+| `z` | `z` | Receita: Desfazer, no modo comando | `recipe.block.undo` |
+| `Ctrl+z` | `⌘z` | Receita: Desfazer, no modo comando | `recipe.block.undo` |

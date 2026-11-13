@@ -149,6 +149,17 @@ describe('resolveKeybindings', () => {
     expect(codes([{ key: 'j', command: 'preview.zoomIn', when: 'vim.normal' }])).toEqual([]);
   });
 
+  // TYTO-676, ADR 0195 decision 7: a recipe's command mode types nothing either.
+  it("accepts a key with no modifier in a notebook's command mode, and runs it from the window", () => {
+    expect(codes([{ key: 'j', command: 'preview.zoomIn', when: 'notebook' }])).toEqual([]);
+    expect(codes([{ key: 'j', command: 'preview.zoomIn', when: 'panel' }])).toEqual([
+      'W_KEYBINDING_INVALID_KEY',
+    ]);
+    const table = resolve([{ key: 'j', command: 'preview.zoomIn', when: 'notebook' }]).table;
+    expect(windowBindingsOf(table).some((binding) => binding.when === 'notebook')).toBe(true);
+    expect(keymapSetFor(table, false).bindings.some((binding) => binding.key === 'j')).toBe(false);
+  });
+
   it('keeps the first of two entries for the same key and context in one source', () => {
     const resolved = resolve([
       { key: 'alt+j', command: 'preview.zoomIn' },
