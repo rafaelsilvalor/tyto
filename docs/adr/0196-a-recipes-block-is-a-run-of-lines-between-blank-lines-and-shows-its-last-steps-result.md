@@ -49,15 +49,20 @@ Read in the code on `origin/main` (`cdaabe01`) before deciding:
    Delete move or take all of the block's lines; Delete takes the blank line that set it apart,
    so one blank line still separates the blocks around it. The "+" writes **a new block**, set
    apart by a blank line.
-4. **The counter and the fold are the block's, read from its steps.** The counter shows the last
-   step's number; `[*]` when a run reaches any step of the block; stale when any step is; `[ ]`
-   when the last step never ran. The fold is the last step's result's, keyed by its line.
+4. **The counter and the fold are the block's, read from its steps.** A run that reaches a block
+   gives it one number, which every step of it that ran shares, so a block of three steps counts
+   one run, not three. The counter shows the block's latest number; `[*]` when a run reaches any
+   step of the block; stale when any step is not as it ran, a step skipped after a failure
+   included; `[ ]` when no step of it ever ran. The fold is the last step's result's, keyed by its
+   line.
 5. **Add step joins the cursor's block** (amends ADR 0176 decision 1, whose form wrote below the
    cursor's step, as TYTO-402's code did without the record saying so): with the
    cursor inside a block, the step is written at the block's end, the block grows by a step and
-   its result becomes the new step's. With the cursor on a blank line or in the header, it
-   writes a new block after the block above; above every block, or with none, at the end of the
-   text.
+   its result becomes the new step's. With the cursor on a blank line, it writes a new block
+   after the block above. With the cursor in the header, above every block, or with none, it
+   writes a new block at the end of the text, as Add step wrote from above every step before: a
+   new recipe opens with its cursor in the header, and its skeleton's note ("Each line below is
+   one step") stays above the steps added.
 
 ## Consequences
 

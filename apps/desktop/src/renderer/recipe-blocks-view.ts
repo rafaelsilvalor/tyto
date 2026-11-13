@@ -105,20 +105,24 @@ export function recipeFrames(view: EditorView, host: BlockHost): readonly Notebo
 }
 
 /**
- * A block's counter from its steps' (ADR 0196): the last step's number; running when a run
- * reaches any of its steps; stale when any of them is; never ran when its last step never did.
+ * A block's counter from its steps' (ADR 0196): its latest run's number, which every step that
+ * run ran shares; running when a run reaches any of its steps; stale when any of them is not as
+ * it ran; never ran when none of them did.
  */
 export function blockMark(
   marks: readonly ExecutionMark[],
   steps: { readonly first: number; readonly last: number },
 ): ExecutionMark | undefined {
   const own = marks.slice(steps.first, steps.last + 1);
-  const last = marks[steps.last];
-  if (last === undefined) return undefined;
+  if (own.length === 0) return undefined;
   if (own.some((mark) => mark.state === 'running')) return { state: 'running' };
-  if (last.state === 'never' || last.count === undefined) return { state: 'never' };
-  const stale = own.some((mark) => mark.state === 'stale' || mark.state === 'never');
-  return { state: stale ? 'stale' : 'ran', count: last.count };
+  // The block's latest run: the highest number its steps carry, all of a run's sharing one.
+  const counts = own.flatMap((mark) => (mark.count === undefined ? [] : [mark.count]));
+  if (counts.length === 0) return { state: 'never' };
+  const count = Math.max(...counts);
+  // A step changed since, or not run, makes it stale; one main reused keeps its older number.
+  const stale = own.some((mark) => mark.state !== 'ran');
+  return { state: stale ? 'stale' : 'ran', count };
 }
 
 /** What a step's gutter says: `[n]`, `[*]` while it runs, `[ ]` before it ever ran. */

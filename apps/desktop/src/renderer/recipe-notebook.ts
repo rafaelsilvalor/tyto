@@ -290,7 +290,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       ...(scope.until === undefined ? {} : { until: scope.until }),
     });
     places.set(documentId, placesOf(text, answer, since.get(documentId) ?? []));
-    numberRun(documentId, answer);
+    numberRun(documentId, text, answer);
     // A refusal is said once: the run that follows it has the cell's own word.
     refusals.delete(documentId);
     options.show(documentId, text, answer, scope.until);
@@ -300,16 +300,23 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
    * Numbers the cells this answer ran, in cell order, after the last number this tab gave: a
    * cell main reused keeps the `ranAt` of the run that made it, so it keeps its number.
    */
-  const numberRun = (documentId: string, answer: RecipeRunAnswer): void => {
+  const numberRun = (documentId: string, text: string, answer: RecipeRunAnswer): void => {
     const placed = places.get(documentId);
     const kept = counts.get(documentId) ?? new Map<number, number>();
     let count = counters.get(documentId) ?? 0;
-    for (const cell of [...answer.cells].sort((left, right) => left.index - right.index)) {
-      if (!ranIn(cell, answer.ranAt)) continue;
-      const at = placed?.get(cell.index);
-      if (at === undefined) continue;
+    // One number per block a run reached, shared by the cells of it that ran (ADR 0196): a block
+    // runs as a Jupyter cell does, however many steps it holds.
+    const ran = answer.cells.filter((cell) => ranIn(cell, answer.ranAt));
+    for (const block of recipeBlocks(text)) {
+      const steps = block.steps;
+      if (steps === undefined) continue;
+      const own = ran.filter((cell) => cell.index >= steps.first && cell.index <= steps.last);
+      if (own.length === 0) continue;
       count += 1;
-      kept.set(at, count);
+      for (const cell of own) {
+        const at = placed?.get(cell.index);
+        if (at !== undefined) kept.set(at, count);
+      }
     }
     counters.set(documentId, count);
     counts.set(documentId, kept);
@@ -635,10 +642,12 @@ export function cellAtOrAbove(answer: RecipeRunAnswer, line: number): number | u
 /**
  * Where Add step writes its line (TYTO-402, ADR 0176 as ADR 0196 amends it). **With the cursor
  * in a block, at the block's end**: the block grows by a step, as a Jupyter cell grows by a line,
- * and its result is then the new step's. With the cursor on a blank line or in the header, **a
- * new block** after the block above it; above every block, or with none, at the end of the text.
- * `before` is the new step's index among the steps, which the form's column offers are read
- * before.
+ * and its result is then the new step's. With the cursor on a blank line, **a new block** after
+ * the block above it. With the cursor in the header, above every block, or with none, a new
+ * block at the end of the text, as Add step always wrote there from above every step: a new
+ * recipe opens with its cursor in the header, and its skeleton's note ("Each line below is one
+ * step") is to stay above the steps added. `before` is the new step's index among the steps,
+ * which the form's column offers are read before.
  */
 export interface StepSlot {
   readonly at: number;
@@ -656,11 +665,13 @@ export function stepSlot(text: string, cursorLine: number): StepSlot {
     const before = block.steps === undefined ? stepsThrough(blocks, index) : block.steps.last + 1;
     return { at: block.to, prefix: '\n', suffix: '', before };
   }
-  // In the header, the new block goes right after it; on a blank line, after the block above.
-  let above = block === undefined ? -1 : blocks.indexOf(block);
-  blocks.forEach((each, index) => {
-    if (each.lastLine <= cursorLine) above = Math.max(above, index);
-  });
+  // On a blank line, after the block above; in the header, or above every block, at the end.
+  let above = -1;
+  if (block === undefined) {
+    blocks.forEach((each, index) => {
+      if (each.lastLine <= cursorLine) above = index;
+    });
+  }
   const after = blocks[above];
   if (after === undefined) {
     const last = blocks.at(-1);

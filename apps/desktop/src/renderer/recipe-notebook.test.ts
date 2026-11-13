@@ -675,10 +675,15 @@ describe('where Add step writes and what its form offers (TYTO-402)', () => {
     ]);
   });
 
-  it('writes a new block, set apart by a blank line, from the header or a blank line', () => {
-    const header = RECIPE.indexOf('demo') + 'demo'.length;
-    expect(stepSlot(RECIPE, 1)).toEqual({ at: header, prefix: '\n\n', suffix: '', before: 0 });
+  it('writes a new block, set apart by a blank line, after the block above a blank line', () => {
+    const text = 'recipe x\n\nacme.pull\n\n\nselect a\n';
+    const pull = text.indexOf('acme.pull') + 'acme.pull'.length;
+    expect(stepSlot(text, 4)).toEqual({ at: pull, prefix: '\n\n', suffix: '', before: 1 });
+    // From the header, at the end: a new recipe's cursor starts there, under its skeleton's note.
     const end = RECIPE.indexOf('done') + 'done'.length;
+    expect(stepSlot(RECIPE, 1)).toEqual({ at: end, prefix: '\n\n', suffix: '', before: 2 });
+    // On the header's last line too, never between the header and the blocks under it.
+    expect(stepSlot(RECIPE, 2)).toEqual({ at: end, prefix: '\n\n', suffix: '', before: 2 });
     expect(stepSlot(RECIPE, 6)).toEqual({ at: end, prefix: '\n\n', suffix: '', before: 2 });
     expect(stepSlot('recipe empty', 1)).toEqual({
       at: 'recipe empty'.length,
@@ -733,7 +738,7 @@ describe('the execution counter (TYTO-676)', () => {
     await running;
   }
 
-  it('numbers what each run ran, a pause or a button alike, and a reused cell keeps its number', async () => {
+  it('numbers each block a run reached once, a pause or a button alike; a reused cell keeps its number', async () => {
     const run = harness();
     const typed = run.notebook.runNow('tab-1', 'typed');
     expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
@@ -742,9 +747,10 @@ describe('the execution counter (TYTO-676)', () => {
     ]);
     run.replies[0]?.(reply(1, [ran(0, 3, FIRST), ran(1, 4, FIRST)], FIRST));
     await typed;
+    // TEXT's two steps are one block (ADR 0196): one run of it is one number, shared.
     expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
       { state: 'ran', count: 1 },
-      { state: 'ran', count: 2 },
+      { state: 'ran', count: 1 },
     ]);
 
     // Run this block on the second: main reuses the first, which keeps the run that made it.
@@ -757,7 +763,7 @@ describe('the execution counter (TYTO-676)', () => {
     await block;
     expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
       { state: 'ran', count: 1 },
-      { state: 'ran', count: 3 },
+      { state: 'ran', count: 2 },
     ]);
   });
 

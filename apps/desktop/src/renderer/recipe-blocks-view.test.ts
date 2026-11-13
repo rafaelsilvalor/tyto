@@ -293,7 +293,7 @@ describe('inserting, running from here and the counter (TYTO-676)', () => {
 // ADR 0196: a block's counter is read from its steps'.
 describe("a block's counter", () => {
   const steps = { first: 0, last: 2 };
-  it("is the last step's number, stale when any step is, and running when any step runs", () => {
+  it("is its latest run's number, stale when any step is, and running when any step runs", () => {
     const ran = { state: 'ran', count: 7 } as const;
     expect(blockMark([ran, ran, { state: 'ran', count: 9 }], steps)).toEqual({
       state: 'ran',
@@ -306,6 +306,9 @@ describe("a block's counter", () => {
     // A step typed into the block since the last run has no number: the block is out of date.
     expect(blockMark([ran, { state: 'never' }, ran], steps)).toEqual({ state: 'stale', count: 7 });
     expect(blockMark([ran, { state: 'running' }, ran], steps)).toEqual({ state: 'running' });
-    expect(blockMark([ran, ran, { state: 'never' }], steps)).toEqual({ state: 'never' });
+    // Its last step skipped after a failure: the run's number, and stale, since it reruns.
+    expect(blockMark([ran, ran, { state: 'never' }], steps)).toEqual({ state: 'stale', count: 7 });
+    const never = { state: 'never' } as const;
+    expect(blockMark([never, never, never], steps)).toEqual({ state: 'never' });
   });
 });

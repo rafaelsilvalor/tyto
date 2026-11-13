@@ -297,13 +297,12 @@ describe('a recipe built with the step picker and the forms (TYTO-402)', () => {
     // One block of four steps, which shows its last step's result only (ADR 0196).
     const cells = await runCells(1);
     expect(cells.at(-1)).toContain('1 row · 3 columns');
-    // The first step, picked with the cursor in the header, started a block right under it;
-    // each one after joined that block, the cursor still in it. The skeleton's note stays below.
+    // The first step, picked with the cursor in the header, started a block at the end, under
+    // the skeleton's note; each one after joined that block, the cursor still in it.
     const skeleton = recipeSkeleton('weekly');
-    const [header, note] = (skeleton.ok ? skeleton.value : 'no skeleton').split('\n\n');
     await expect
       .poll(() => readFileSync(join(work, 'weekly.recipe'), 'utf8'), { timeout: 10_000 })
-      .toBe(`${header ?? ''}\n\n${shown.join('\n')}\n\n${note ?? ''}`);
+      .toBe(`${skeleton.ok ? skeleton.value : 'no skeleton'}\n${shown.join('\n')}\n`);
     expect(shown.at(-1)).toBe('rules into=kind using=@./company.vocab.json#/rules/kinds');
   }, 30_000);
 });

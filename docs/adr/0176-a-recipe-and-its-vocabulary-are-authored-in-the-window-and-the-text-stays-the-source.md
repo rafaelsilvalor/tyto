@@ -42,8 +42,8 @@ recipe. Decision 5 is implemented by the second.
    file, referred to by `@./file.vocab.json#/pointer`.
 
    _Amended 2026-11-13 (TYTO-676, ADR 0196):_ Add step writes its line at the end of the block
-   the cursor is in, which grows by a step; on a blank line or in the header, as a new block
-   set apart by a blank line. It wrote below the cursor's step before, which TYTO-402's code
+   the cursor is in, which grows by a step; on a blank line, as a new block set apart by a
+   blank line after the block above; in the header, as a new block at the end. It wrote below the cursor's step before, which TYTO-402's code
    did and this record did not state.
 
 2. **Every generic verb has a form, held beside the verbs.** `GENERIC_VERB_FORMS` gives each
