@@ -2,7 +2,7 @@
 
 # Keyboard shortcuts
 
-The keys the app binds before you change anything: 39. Each one runs a command, and works only where its context holds. Change them in `keybindings.json`, which **Preferences: Open Keyboard Shortcuts (JSON)** opens; a plugin can add its own.
+The keys the app binds before you change anything: 55. Each one runs a command, and works only where its context holds. Change them in `keybindings.json`, which **Preferences: Open Keyboard Shortcuts (JSON)** opens; a plugin can add its own.
 
 ## Contexts
 
@@ -15,6 +15,7 @@ The keys the app binds before you change anything: 39. Each one runs a command, 
 | `commandBar` | The command bar is open. |
 | `panel` | Focus is in a panel other than the editor or a terminal, and the command bar is closed. |
 | `terminal` | Focus is in a terminal, and the command bar is closed. |
+| `notebook` | A recipe is in command mode: focus is on its blocks, not in their text. |
 
 ## Everywhere
 
@@ -39,6 +40,9 @@ The editor has focus, in either input mode.
 | `Ctrl+s` | `⌘s` | Save | `editor.save` |
 | `Ctrl+Shift+o` | `⌘⇧o` | Go to Block… | `editor.goToBlock` |
 | `Alt+Shift+f` | `⌥⇧f` | Format Brief | `editor.formatBrief` |
+| `Shift+Escape` | `⇧Escape` | Recipe: Select blocks (command mode) | `recipe.block.commandMode` |
+| `Ctrl+m` | `Ctrlm` | Recipe: Select blocks (command mode) | `recipe.block.commandMode` |
+| `Shift+Enter` | `⇧Enter` | Recipe: Run the block and go to the next | `recipe.block.runAndAdvance` |
 
 ## mode.desktop
 
@@ -75,3 +79,23 @@ The editor has focus and vim mode is off.
 | `Ctrl+7` | `⌘7` | Tab: 7 | `document.select:7` |
 | `Ctrl+8` | `⌘8` | Tab: 8 | `document.select:8` |
 | `Ctrl+9` | `⌘9` | Tab: 9 | `document.select:9` |
+| `Escape` | `Escape` | Recipe: Select blocks (command mode) | `recipe.block.commandMode` |
+
+## notebook
+
+A recipe is in command mode: focus is on its blocks, not in their text.
+
+| Windows and Linux | macOS | Command | Id |
+| --- | --- | --- | --- |
+| `a` | `a` | Recipe: Insert a step above | `recipe.block.insertAbove` |
+| `b` | `b` | Recipe: Insert a step below | `recipe.block.insertBelow` |
+| `d` | `d` | Recipe: Delete the block | `recipe.block.delete` |
+| `Enter` | `Enter` | Recipe: Edit the selected block | `recipe.block.edit` |
+| `Shift+Enter` | `⇧Enter` | Recipe: Run the block and go to the next | `recipe.block.runAndAdvance` |
+| `j` | `j` | Recipe: Select the next block | `recipe.block.next` |
+| `ArrowDown` | `ArrowDown` | Recipe: Select the next block | `recipe.block.next` |
+| `k` | `k` | Recipe: Select the previous block | `recipe.block.previous` |
+| `ArrowUp` | `ArrowUp` | Recipe: Select the previous block | `recipe.block.previous` |
+| `o` | `o` | Recipe: Hide or show the result of the block | `recipe.block.toggleResult` |
+| `z` | `z` | Recipe: Undo, in command mode | `recipe.block.undo` |
+| `Ctrl+z` | `⌘z` | Recipe: Undo, in command mode | `recipe.block.undo` |

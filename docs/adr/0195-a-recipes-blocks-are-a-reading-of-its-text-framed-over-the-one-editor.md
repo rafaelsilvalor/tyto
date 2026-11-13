@@ -142,3 +142,17 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   drawn on CodeMirror's measure, drew only when something read the layout. The suite runs that
   measure before it reads where a toolbar or a "+" is; a shown window draws them on the next
   frame.
+- 2026-11-12 (third pull request): **decision 7 is built as planned**, with what the window
+  showed. The command target is the toolbars' layer itself, focusable by script and outside
+  `.cm-content`; the selected block is kept by its first line's start, marked on its whole band,
+  and dropped when focus goes back into the text. Entering is one command on Escape
+  (`mode.desktop`), Shift+Escape and Ctrl+M (`editor`), offered only with a recipe in front and
+  one empty cursor, so Escape still narrows a selection; right after typing, the first Escape
+  closes the completion the typing asked for, as in any CodeMirror editor, and the next enters.
+  **D D is one command pressed twice**, the second within a second, not a key sequence, which the
+  table refuses (ADR 0074 decision 3); from the command bar it deletes at once. Every block
+  command acts on the selected block in command mode and on the cursor's block otherwise, so the
+  bar lists them all with their keys. Shift+Enter is bound in `editor` too: it runs the cursor's
+  block and moves the caret to the next one, on a recipe only; on any other tab the command is
+  not offered and the key is a new line. Measured in the window with vim on: Escape twice and
+  `dd` delete one line of a two-line note, as vim does, and focus stays in the text.

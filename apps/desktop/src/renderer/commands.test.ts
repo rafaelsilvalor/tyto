@@ -85,6 +85,7 @@ import {
   withCommandGate,
 } from './commands.js';
 import { CATALOGUE_KEYS } from '../../shared/i18n/index.js';
+import type { RecipeBlockAction } from './commands.js';
 import { COMMANDS_PANEL } from '../../shared/layout.js';
 
 /**
@@ -150,6 +151,7 @@ const actions = () =>
     openRecipeCellView: vi.fn<() => void>(),
     addRecipeStep: vi.fn<() => void>(),
     editRecipeStep: vi.fn<() => void>(),
+    recipeBlock: vi.fn<(action: RecipeBlockAction) => void>(),
     runRecipeFresh: vi.fn<() => void>(),
     newSeededFile: vi.fn<(seed: 'recipe' | 'vocabulary') => void>(),
     loadRecipe: vi.fn<() => void>(),
@@ -382,6 +384,44 @@ describe('the ids the window registers', () => {
     expect(bindingsOf(keymapSetFor(false), 'linux')[RECIPE_ADD_STEP]).toBeUndefined();
   });
 
+  // TYTO-676 (ADR 0195 decision 7): a recipe's command mode, its keys in the one table.
+  it("runs each block action through one action, and binds Jupyter's keys in command mode", () => {
+    const spies = actions();
+    const registry = createDesktopRegistry(spies);
+    const ids = [
+      'recipe.block.commandMode',
+      'recipe.block.insertAbove',
+      'recipe.block.delete',
+      'recipe.block.runAndAdvance',
+    ];
+    for (const id of ids) expect(registry.run(id, NO_VIEW)).toBe(true);
+    expect(spies.recipeBlock.mock.calls).toEqual([
+      ['commandMode'],
+      ['insertAbove'],
+      ['delete'],
+      ['runAndAdvance'],
+    ]);
+    const keys = (command: string) =>
+      builtInKeybindings
+        .filter((binding) => binding.command === command)
+        .map(({ key, when }) => `${key} ${when ?? ''}`);
+    expect(keys('recipe.block.commandMode')).toEqual([
+      'Escape mode.desktop',
+      'Shift-Escape editor',
+      'Ctrl-m editor',
+    ]);
+    expect(keys('recipe.block.runAndAdvance')).toEqual([
+      'Shift-Enter editor',
+      'Shift-Enter notebook',
+    ]);
+    expect(keys('recipe.block.delete')).toEqual(['d notebook']);
+    expect(keys('recipe.block.undo')).toEqual(['z notebook', 'Mod-z notebook']);
+    // The window runs command mode's keys; CodeMirror and vim never see them.
+    const table = { bindings: builtInKeybindings };
+    expect(keymapSetFor(false, table).bindings.some((binding) => binding.key === 'd')).toBe(false);
+    expect(keymapSetFor(true, table).bindings.some((binding) => binding.key === 'a')).toBe(false);
+  });
+
   it('runs the two template mode commands, each to its own action (TYTO-44)', () => {
     const spies = actions();
     const registry = createDesktopRegistry(spies);
@@ -566,11 +606,15 @@ describe('the keystroke shown beside a command', () => {
     expect(bindings[EDITOR_UNDO]).toBeUndefined();
     expect(bindings[EDITOR_SAVE]).toBe('Ctrl+s');
     // The same bindings as the editor's vim set, now read off the table (TYTO-207), and the
-    // window's keys for both modes, Go to Block (TYTO-296) and Format Brief (TYTO-297).
+    // window's keys for both modes, Go to Block (TYTO-296) and Format Brief (TYTO-297), and a
+    // recipe's command mode on Shift+Escape and Ctrl+M with Shift+Enter (TYTO-676).
     expect(keymapSetFor(true).bindings).toEqual([
       ...vimKeymapSet.bindings,
       { key: 'Mod-Shift-o', command: EDITOR_GO_TO_BLOCK },
       { key: 'Alt-Shift-f', command: EDITOR_FORMAT_BRIEF },
+      { key: 'Shift-Escape', command: 'recipe.block.commandMode' },
+      { key: 'Ctrl-m', command: 'recipe.block.commandMode' },
+      { key: 'Shift-Enter', command: 'recipe.block.runAndAdvance' },
     ]);
   });
 

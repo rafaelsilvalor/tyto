@@ -30,6 +30,8 @@ import type { CommandBinding, EditorKeymap } from './keymap.js';
  * - `commandBar` — the command bar is open.
  * - `panel` — focus is in a panel other than the editor or a terminal, and the bar is closed.
  * - `terminal` — focus is in a terminal, and the bar is closed (ADR 0164, the seventh).
+ * - `notebook` — a recipe is in command mode: focus is on its blocks, not in its text, and the
+ *   bar is closed (ADR 0195, the eighth). Nothing types there, so a key needs no modifier.
  *
  * A binding with no `when` is global: it runs wherever focus is.
  */
@@ -41,6 +43,7 @@ export const KEYBINDING_CONTEXTS = [
   'commandBar',
   'panel',
   'terminal',
+  'notebook',
 ] as const;
 
 export type KeybindingContext = (typeof KEYBINDING_CONTEXTS)[number];
@@ -58,6 +61,7 @@ export const KEYBINDING_CONTEXT_DESCRIPTIONS: Readonly<Record<KeybindingContext,
   commandBar: 'The command bar is open.',
   panel: 'Focus is in a panel other than the editor or a terminal, and the command bar is closed.',
   terminal: 'Focus is in a terminal, and the command bar is closed.',
+  notebook: 'A recipe is in command mode: focus is on its blocks, not in their text.',
 };
 
 /** The contexts CodeMirror answers; the other three, and global keys, are the window's. */
@@ -291,10 +295,13 @@ export function resolveKeybindings(input: KeybindingInput): ResolvedKeybindings 
         refuse('W_KEYBINDING_UNKNOWN_COMMAND', { key: written, command });
         continue;
       }
-      // A key with no modifier types a character everywhere except in vim's normal mode, so
-      // it is accepted only where the person said vim. Function keys type nothing.
-      if (!parsed.modified && !/^F\d+$/u.test(parsed.key) && !when?.startsWith('vim.')) {
-        const problem = "a key with no modifier types a character; give it when 'vim.normal'";
+      // A key with no modifier types a character everywhere except in vim's normal mode and a
+      // notebook's command mode, so it is accepted only where the person said one of those.
+      // Function keys type nothing.
+      const typesNothing = when?.startsWith('vim.') === true || when === 'notebook';
+      if (!parsed.modified && !/^F\d+$/u.test(parsed.key) && !typesNothing) {
+        const problem =
+          "a key with no modifier types a character; give it when 'vim.normal' or 'notebook'";
         refuse('W_KEYBINDING_INVALID_KEY', { key: written, problem });
         continue;
       }

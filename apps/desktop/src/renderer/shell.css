@@ -1016,6 +1016,21 @@ tyto-preview-pane[hidden] {
   border-left-color: var(--tyto-accent);
 }
 
+/* Command mode (TYTO-676, ADR 0195 decision 7): the selected block is marked on its whole band,
+   as Jupyter marks the selected cell, since there is no caret in it to show where keys go. Scoped
+   to the editor's lines so it wins over CodeMirror's active-line colour, which stays on the
+   caret's line while focus is away from the text; a ring in the accent colour beside it. */
+.cm-editor .cm-line.cm-notebook-frame--selected {
+  border-left-color: var(--tyto-accent);
+  background: var(--tyto-selection);
+  box-shadow: inset 0 0 0 var(--tyto-hairline-width) var(--tyto-accent);
+}
+
+/* The command target is a layer beside the text: focused, it shows nothing of its own. */
+.cm-notebook-toolbars:focus {
+  outline: none;
+}
+
 .cm-notebook-frame--first {
   padding-right: 9rem;
   /* A hairline over each block's first line parts two blocks with no blank line between them.

@@ -147,6 +147,34 @@ export const RECIPE_OPEN_CELL_VIEW = 'recipe.openCellView';
 export const RECIPE_ADD_STEP = 'recipe.addStep';
 export const RECIPE_EDIT_STEP = 'recipe.editStep';
 /**
+ * TYTO-676 (ADR 0195 decision 7). A recipe's command mode and what its keys do, each on the
+ * selected block in command mode and on the cursor's block from the command bar. Offered only
+ * with a recipe in front; entering command mode only with one cursor and nothing selected, so
+ * Escape still narrows a selection and is the desktop's everywhere else.
+ */
+/** What a recipe's block commands do, each through one action (`recipe-command-mode.ts`). */
+export type RecipeBlockAction =
+  | 'commandMode'
+  | 'edit'
+  | 'insertAbove'
+  | 'insertBelow'
+  | 'delete'
+  | 'runAndAdvance'
+  | 'next'
+  | 'previous'
+  | 'toggleResult'
+  | 'undo';
+export const RECIPE_BLOCK_COMMAND_MODE = 'recipe.block.commandMode';
+export const RECIPE_BLOCK_EDIT = 'recipe.block.edit';
+export const RECIPE_BLOCK_INSERT_ABOVE = 'recipe.block.insertAbove';
+export const RECIPE_BLOCK_INSERT_BELOW = 'recipe.block.insertBelow';
+export const RECIPE_BLOCK_DELETE = 'recipe.block.delete';
+export const RECIPE_BLOCK_RUN_AND_ADVANCE = 'recipe.block.runAndAdvance';
+export const RECIPE_BLOCK_NEXT = 'recipe.block.next';
+export const RECIPE_BLOCK_PREVIOUS = 'recipe.block.previous';
+export const RECIPE_BLOCK_TOGGLE_RESULT = 'recipe.block.toggleResult';
+export const RECIPE_BLOCK_UNDO = 'recipe.block.undo';
+/**
  * TYTO-402 (ADR 0176). New recipe and New vocabulary: the explorer's name field, opened in the
  * selected folder, makes `<name>.recipe` or `<name>.vocab.json` from its skeleton. Offered with
  * any tab in front; with no folder open they do nothing, as New File does.
@@ -398,6 +426,16 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [RECIPE_OPEN_CELL_VIEW]: 'command.recipe.openCellView',
   [RECIPE_ADD_STEP]: 'command.recipe.addStep',
   [RECIPE_EDIT_STEP]: 'command.recipe.editStep',
+  [RECIPE_BLOCK_COMMAND_MODE]: 'command.recipe.block.commandMode',
+  [RECIPE_BLOCK_EDIT]: 'command.recipe.block.edit',
+  [RECIPE_BLOCK_INSERT_ABOVE]: 'command.recipe.block.insertAbove',
+  [RECIPE_BLOCK_INSERT_BELOW]: 'command.recipe.block.insertBelow',
+  [RECIPE_BLOCK_DELETE]: 'command.recipe.block.delete',
+  [RECIPE_BLOCK_RUN_AND_ADVANCE]: 'command.recipe.block.runAndAdvance',
+  [RECIPE_BLOCK_NEXT]: 'command.recipe.block.next',
+  [RECIPE_BLOCK_PREVIOUS]: 'command.recipe.block.previous',
+  [RECIPE_BLOCK_TOGGLE_RESULT]: 'command.recipe.block.toggleResult',
+  [RECIPE_BLOCK_UNDO]: 'command.recipe.block.undo',
   [EXPLORER_NEW_RECIPE]: 'command.explorer.newRecipe',
   [EXPLORER_NEW_VOCABULARY]: 'command.explorer.newVocabulary',
   [EXPLORER_LOAD_RECIPE]: 'command.explorer.loadRecipe',
@@ -537,6 +575,8 @@ export interface DesktopActions {
   /** TYTO-402. Opens the step picker, or the cursor step's form, over the recipe in front. */
   addRecipeStep(): void;
   editRecipeStep(): void;
+  /** TYTO-676: one of a recipe's block actions, on the selected or the cursor's block. */
+  recipeBlock(action: RecipeBlockAction): void;
   /** TYTO-402. Opens the explorer's name field for a new recipe or vocabulary. */
   newSeededFile(seed: 'recipe' | 'vocabulary'): void;
   /** TYTO-402. Load recipe into the explorer's selected folder. */
@@ -734,6 +774,36 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(RECIPE_EDIT_STEP, () => {
     actions.editRecipeStep();
+  });
+  add(RECIPE_BLOCK_COMMAND_MODE, () => {
+    actions.recipeBlock('commandMode');
+  });
+  add(RECIPE_BLOCK_EDIT, () => {
+    actions.recipeBlock('edit');
+  });
+  add(RECIPE_BLOCK_INSERT_ABOVE, () => {
+    actions.recipeBlock('insertAbove');
+  });
+  add(RECIPE_BLOCK_INSERT_BELOW, () => {
+    actions.recipeBlock('insertBelow');
+  });
+  add(RECIPE_BLOCK_DELETE, () => {
+    actions.recipeBlock('delete');
+  });
+  add(RECIPE_BLOCK_RUN_AND_ADVANCE, () => {
+    actions.recipeBlock('runAndAdvance');
+  });
+  add(RECIPE_BLOCK_NEXT, () => {
+    actions.recipeBlock('next');
+  });
+  add(RECIPE_BLOCK_PREVIOUS, () => {
+    actions.recipeBlock('previous');
+  });
+  add(RECIPE_BLOCK_TOGGLE_RESULT, () => {
+    actions.recipeBlock('toggleResult');
+  });
+  add(RECIPE_BLOCK_UNDO, () => {
+    actions.recipeBlock('undo');
   });
   add(EXPLORER_NEW_RECIPE, () => {
     actions.newSeededFile('recipe');
@@ -1013,6 +1083,39 @@ export const builtInKeybindings: readonly Keybinding[] = [
   // this table, in CodeMirror's keymaps (which take Shift-Alt only with the arrows, `a` and,
   // on macOS, `m`) and in vim, whose engine binds no Alt key.
   { key: 'Alt-Shift-f', command: EDITOR_FORMAT_BRIEF, when: 'editor', source: 'built-in' },
+  // TYTO-676 (ADR 0195 decision 7). A recipe's command mode: entered with Escape where the
+  // desktop's input mode has it (the command is offered only with one empty cursor, so Escape
+  // still narrows a selection), Shift+Escape in vim too, whose engine keeps plain Escape, and
+  // Jupyter's Ctrl+M in both, which vim's engine leaves unbound. Shift+Enter runs the cursor's
+  // block in the text as in command mode. On any other tab the commands are not offered and the
+  // keys travel on: Shift+Enter is a new line in a brief.
+  { key: 'Escape', command: RECIPE_BLOCK_COMMAND_MODE, when: 'mode.desktop', source: 'built-in' },
+  { key: 'Shift-Escape', command: RECIPE_BLOCK_COMMAND_MODE, when: 'editor', source: 'built-in' },
+  { key: 'Ctrl-m', command: RECIPE_BLOCK_COMMAND_MODE, when: 'editor', source: 'built-in' },
+  { key: 'Shift-Enter', command: RECIPE_BLOCK_RUN_AND_ADVANCE, when: 'editor', source: 'built-in' },
+  // Jupyter's command-mode keys, with no modifier: nothing types in command mode (ADR 0074's
+  // note). Escape there is bound to nothing, as Jupyter's is.
+  ...(
+    [
+      ['a', RECIPE_BLOCK_INSERT_ABOVE],
+      ['b', RECIPE_BLOCK_INSERT_BELOW],
+      ['d', RECIPE_BLOCK_DELETE],
+      ['Enter', RECIPE_BLOCK_EDIT],
+      ['Shift-Enter', RECIPE_BLOCK_RUN_AND_ADVANCE],
+      ['j', RECIPE_BLOCK_NEXT],
+      ['ArrowDown', RECIPE_BLOCK_NEXT],
+      ['k', RECIPE_BLOCK_PREVIOUS],
+      ['ArrowUp', RECIPE_BLOCK_PREVIOUS],
+      ['o', RECIPE_BLOCK_TOGGLE_RESULT],
+      ['z', RECIPE_BLOCK_UNDO],
+      ['Mod-z', RECIPE_BLOCK_UNDO],
+    ] as const
+  ).map(([key, command]) => ({
+    key,
+    command,
+    when: 'notebook' as const,
+    source: 'built-in' as const,
+  })),
 ];
 
 export const builtInTable: KeybindingTable = { bindings: builtInKeybindings };

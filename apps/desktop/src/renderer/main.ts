@@ -18,6 +18,7 @@ import {
   cellOutputs,
   directiveLabel,
   formatBriefInView,
+  isNotebookCommandTarget,
   mapLineStarts,
   notebookFrames,
   previewBlock,
@@ -136,6 +137,7 @@ import {
   tickAges,
 } from './recipe-cell-view.js';
 import { type BlockHost, insertControl, recipeFrames } from './recipe-blocks-view.js';
+import { type CommandModeHost, runBlockAction } from './recipe-command-mode.js';
 import { type ViewContext, fullSizeBody } from './recipe-views.js';
 import {
   type Diagnostic,
@@ -190,6 +192,7 @@ import {
   PREVIEW_ZOOM_IN,
   PREVIEW_ZOOM_OUT,
   PREVIEW_OPEN_TO_SIDE,
+  RECIPE_BLOCK_COMMAND_MODE,
   PREVIEW_TOGGLE_LOCK,
   FILE_EXPORT,
   PLUGINS_SHOW,
@@ -982,6 +985,33 @@ const recipeBlockHost: BlockHost = {
   addStep: (view, slot) => {
     addRecipeStepAt(view, slot);
   },
+};
+
+/**
+ * The recipe pane a block action acts on (TYTO-676): the one holding focus, which command mode
+ * puts beside its text, or the recipe in front's focused or first pane, from the command bar.
+ */
+function recipeBlockView(): EditorPane['view'] | undefined {
+  const focused = document.activeElement;
+  for (const pane of panes.values()) {
+    if (focused !== null && pane.view.dom.contains(focused)) return pane.view;
+  }
+  const front = active();
+  if (!isRecipe(front.kind)) return undefined;
+  return (focusedPane() ?? primaryPaneOf(front.id))?.view;
+}
+
+/** What a recipe's command mode asks of the window (TYTO-676, `recipe-command-mode.ts`). */
+const recipeCommandHost: CommandModeHost = {
+  documentOf: (view) => recipeBlockHost.documentOf(view),
+  runBlock: (documentId, first, last) => void recipeNotebook.runBlock(documentId, first, last),
+  addStep: (view, slot) => {
+    addRecipeStepAt(view, slot);
+  },
+  undo: (view) => {
+    registry.undo({ view });
+  },
+  now: () => Date.now(),
 };
 
 /** Every pane showing a document reads its blocks' frames again: a toolbar's state changed. */
@@ -2139,6 +2169,17 @@ const offeredNow = (id: string): boolean => {
   if (id === COMMAND_PANEL_RENDER_BRIEF) {
     return isBrief(active().kind) && briefCommandPath() !== undefined;
   }
+  // TYTO-676: command mode is entered from one empty cursor only, so Escape still narrows a
+  // selection or a set of cursors, which CodeMirror's own keymap does after the table.
+  if (id === RECIPE_BLOCK_COMMAND_MODE) {
+    const selection = recipeBlockView()?.state.selection;
+    return (
+      commandOffered(activeKind(), id) &&
+      selection !== undefined &&
+      selection.ranges.length === 1 &&
+      selection.main.empty
+    );
+  }
   // And the delivery's export only for a brief main said is in one (TYTO-490).
   if (id === DELIVERY_EXPORT) {
     return commandOffered(activeKind(), id) && deliveryOf(active().id, active()) !== null;
@@ -2314,6 +2355,10 @@ const registry: CommandRegistry = withCommandGate(
     },
     editRecipeStep: () => {
       recipeStep('edit');
+    },
+    recipeBlock: (action) => {
+      const view = recipeBlockView();
+      if (view !== undefined) runBlockAction(view, action, recipeCommandHost);
     },
     openRecipeCellView: () => {
       // TYTO-379: the cell at or above the cursor, as Run from here finds it.
@@ -6410,6 +6455,8 @@ function windowContextHolds(when: KeybindingContext | undefined): boolean {
   // the shell's, except the table's global and `terminal` entries.
   const inTerminal = document.activeElement?.closest('.terminal-panel__screens') != null;
   if (when === 'terminal') return !barOpen && inTerminal;
+  // A recipe in command mode (TYTO-676, ADR 0195): focus on its blocks, beside its text.
+  if (when === 'notebook') return !barOpen && isNotebookCommandTarget(document.activeElement);
   const panelElement = document.activeElement?.closest('[data-panel]');
   return (
     when === 'panel' &&

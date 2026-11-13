@@ -1,4 +1,4 @@
-import { type Extension, Facet, RangeSetBuilder, StateEffect } from '@codemirror/state';
+import { type Extension, Facet, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state';
 import {
   Decoration,
   type DecorationSet,
@@ -33,6 +33,12 @@ import {
  * and one below the last frame, each built by the host ({@link NotebookFramesOptions.insert});
  * and a gutter at the left shows each frame's marker on its first line, a notebook's execution
  * counter (TYTO-676, second pull request).
+ *
+ * **Command mode** (TYTO-676, third pull request, ADR 0195 decision 7) is DOM focus on the
+ * toolbars' layer, a focusable element beside `.cm-content`, with one block selected: CodeMirror
+ * and vim listen on `.cm-content`, so a key pressed there never reaches them, and the window's
+ * `notebook` keybindings answer it. The selected block is kept here by its first line's start,
+ * following its line through every edit, and its lines carry `cm-notebook-frame--selected`.
  */
 
 export interface NotebookFrame {
@@ -73,6 +79,25 @@ const framesOptions = Facet.define<NotebookFramesOptions, NotebookFramesOptions 
   combine: (values) => values[0],
 });
 
+/** Selects a block by a position on its first line, or `null` for none (command mode left). */
+export const selectNotebookBlock = StateEffect.define<number | null>();
+
+/** The start of the selected block's first line, while in command mode; `null` otherwise. */
+const selectedField = StateField.define<number | null>({
+  create: () => null,
+  update(value, transaction) {
+    let selected = value;
+    if (selected !== null && !transaction.changes.empty) {
+      selected = transaction.changes.mapPos(selected, 1);
+    }
+    for (const effect of transaction.effects) {
+      if (effect.is(selectNotebookBlock)) selected = effect.value;
+    }
+    if (selected === null) return null;
+    return transaction.newDoc.lineAt(Math.min(selected, transaction.newDoc.length)).from;
+  },
+});
+
 const refreshed = (update: ViewUpdate): boolean =>
   update.transactions.some((transaction) =>
     transaction.effects.some((effect) => effect.is(refreshNotebookFrames)),
@@ -82,17 +107,20 @@ const refreshed = (update: ViewUpdate): boolean =>
 function decorate(view: EditorView, frames: readonly NotebookFrame[]): DecorationSet {
   const { doc, selection } = view.state;
   const caret = doc.lineAt(selection.main.head).number;
+  const selected = view.state.field(selectedField, false) ?? null;
   const builder = new RangeSetBuilder<Decoration>();
   for (const frame of frames) {
     if (!fits(frame, doc.length)) continue;
     const first = doc.lineAt(frame.from);
     const last = doc.lineAt(frame.to);
     const active = caret >= first.number && caret <= last.number;
+    const chosen = selected !== null && selected >= first.from && selected <= last.to;
     for (let number = first.number; number <= last.number; number += 1) {
       const classes = ['cm-notebook-frame', `cm-notebook-frame--${frame.kind}`];
       if (number === first.number) classes.push('cm-notebook-frame--first');
       if (number === last.number) classes.push('cm-notebook-frame--last');
       if (active) classes.push('cm-notebook-frame--active');
+      if (chosen) classes.push('cm-notebook-frame--selected');
       const line = doc.line(number);
       builder.add(line.from, line.from, Decoration.line({ class: classes.join(' ') }));
     }
@@ -118,7 +146,9 @@ const framesPlugin = ViewPlugin.fromClass(
       if (update.docChanged || refreshed(update)) {
         this.frames = update.state.facet(framesOptions)?.framesOf(update.view) ?? [];
       }
-      if (update.docChanged || update.selectionSet || refreshed(update)) {
+      const reselected =
+        update.startState.field(selectedField, false) !== update.state.field(selectedField, false);
+      if (update.docChanged || update.selectionSet || refreshed(update) || reselected) {
         this.decorations = decorate(update.view, this.frames);
       }
     }
@@ -284,9 +314,13 @@ const toolbarLayer = layer({
   // A result folded under a line moves every line below it with no edit: the toolbars follow.
   update: (update) =>
     update.docChanged || update.viewportChanged || update.heightChanged || refreshed(update),
-  // CodeMirror hides a layer from a screen reader; this one holds the person's buttons.
+  // CodeMirror hides a layer from a screen reader; this one holds the person's buttons. It is
+  // also what command mode focuses: an element outside `.cm-content`, focusable by script only.
   mount: (dom) => {
     dom.removeAttribute('aria-hidden');
+    dom.tabIndex = -1;
+    dom.dataset['notebookCommand'] = '';
+    dom.setAttribute('role', 'group');
   },
 });
 
@@ -383,10 +417,96 @@ export function notebookFrameOf(view: EditorView, element: Element): NotebookFra
   return view.plugin(framesPlugin)?.frames[index];
 }
 
+/** The element command mode focuses in a view, once its layer is mounted. */
+const commandTarget = (view: EditorView): HTMLElement | null =>
+  view.scrollDOM.querySelector<HTMLElement>(':scope > [data-notebook-command]');
+
+/** Whether focus is in command mode: on a notebook's command target. */
+export const isNotebookCommandTarget = (element: Element | null): boolean =>
+  element instanceof HTMLElement && element.dataset['notebookCommand'] !== undefined;
+
+/**
+ * Enters command mode: selects the block at `at` (the caret's when absent) and moves focus off
+ * the text onto the command target. `false` when the view shows no notebook.
+ */
+export function enterNotebookCommand(view: EditorView, at?: number): boolean {
+  const target = commandTarget(view);
+  if (target === null) return false;
+  const frame = frameAt(view, at ?? view.state.selection.main.head);
+  if (frame === undefined) return false;
+  view.dispatch({ effects: selectNotebookBlock.of(frame.from), scrollIntoView: false });
+  target.focus({ preventScroll: true });
+  return true;
+}
+
+/** Leaves command mode for the text, the caret at `at`. */
+export function leaveNotebookCommand(view: EditorView, at: number): void {
+  view.dispatch({
+    effects: selectNotebookBlock.of(null),
+    selection: { anchor: at },
+    scrollIntoView: true,
+  });
+  view.focus();
+}
+
+/** The frame holding a position, as the frames were read after the last edit. */
+function frameAt(view: EditorView, at: number): NotebookFrame | undefined {
+  const line = view.state.doc.lineAt(at);
+  return view.plugin(framesPlugin)?.frames.find((frame) => {
+    const first = view.state.doc.lineAt(frame.from).number;
+    const last = view.state.doc.lineAt(frame.to).number;
+    return first <= line.number && line.number <= last;
+  });
+}
+
+/** The selected block's frame, while in command mode. */
+export function selectedNotebookFrame(view: EditorView): NotebookFrame | undefined {
+  const selected = view.state.field(selectedField, false) ?? null;
+  return selected === null ? undefined : frameAt(view, selected);
+}
+
+/**
+ * Moves the selection to the next or previous frame for which `selectable` holds (the host
+ * skips its header), keeping focus where it is, and scrolls it into view. `false` at an end.
+ */
+export function stepNotebookSelection(
+  view: EditorView,
+  direction: 1 | -1,
+  selectable: (frame: NotebookFrame) => boolean = () => true,
+): boolean {
+  const frames = view.plugin(framesPlugin)?.frames ?? [];
+  const current = selectedNotebookFrame(view);
+  const index = current === undefined ? -1 : frames.indexOf(current);
+  for (let next = index + direction; next >= 0 && next < frames.length; next += direction) {
+    const frame = frames[next];
+    if (frame === undefined || !selectable(frame)) continue;
+    view.dispatch({
+      effects: [
+        selectNotebookBlock.of(frame.from),
+        EditorView.scrollIntoView(frame.from, { y: 'nearest' }),
+      ],
+    });
+    return true;
+  }
+  return false;
+}
+
+/** Focus back in the text leaves command mode: nothing stays selected. */
+const leaveOnTextFocus = EditorView.domEventHandlers({
+  focus: (_event, view) => {
+    if ((view.state.field(selectedField, false) ?? null) !== null) {
+      view.dispatch({ effects: selectNotebookBlock.of(null) });
+    }
+    return false;
+  },
+});
+
 /** Mount once per editor that shows a notebook. */
 export function notebookFrames(options: NotebookFramesOptions): Extension {
   return [
     framesOptions.of(options),
+    selectedField,
+    leaveOnTextFocus,
     framesPlugin,
     markerGutter,
     toolbarLayer,

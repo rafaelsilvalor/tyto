@@ -124,9 +124,12 @@ one, and a key that works in the editor and not in a panel is worse than none.
   `keybindings.json` is offered on a new version's first run with the other records (ADR 0036,
   TYTO-257).
 
-## Note, 2026-11-12 — a seventh context is decided (TYTO-676)
+## Note, 2026-11-12 — an eighth context, `notebook` (TYTO-676)
 
-ADR 0195 decision 7 amends decisions 2 and 6: a `notebook` context, focus on a recipe block's
-frame, outside the text, where a key with no modifier is valid as under `vim.*`, since nothing is
-typed there. It lands with the notebook's command mode, TYTO-676's third pull request; until then
-the six contexts above are the whole list.
+ADR 0195 decision 7 amends decisions 2 and 6. `terminal` (ADR 0164) was already the seventh, so
+`notebook` is the **eighth**: a recipe in command mode, focus on its blocks beside the text and
+the command bar closed. A key with no modifier is valid under it as under `vim.*`, since nothing
+is typed there. It is the window's, as `panel` and `terminal` are: the dispatcher answers it,
+CodeMirror and vim never see its keys. Landed with TYTO-676's third pull request; its keys are
+built in (`a`, `b`, `d`, Enter, Shift+Enter, `j`, `k`, the arrows, `o`, `z`, Mod+Z), each a
+command the bar lists, and a person's file can bind any other.
