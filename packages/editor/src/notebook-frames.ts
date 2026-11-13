@@ -251,7 +251,9 @@ class ToolbarMarker implements LayerMarker {
  * **The top is read from the line's element, not from CodeMirror's height map.** A result
  * folded in place shrinks a block widget that the map goes on counting at its old height
  * (measured in the window on 2026-11-12: a line drawn at 170 px that `lineBlockAt` put at 243),
- * and a toolbar placed by the map then sits over the wrong line.
+ * and a toolbar placed by the map then sits over the wrong line. Since TYTO-703 a fold asks
+ * for the heights again (`remeasureCellOutput`), so the map follows it; the element stays the
+ * source here as a guard for any block that changes height without saying so.
  */
 function toolbarMarkers(view: EditorView): readonly LayerMarker[] {
   const frames = view.plugin(framesPlugin)?.frames ?? [];

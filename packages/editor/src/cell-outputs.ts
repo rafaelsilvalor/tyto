@@ -15,6 +15,8 @@ import {
   WidgetType,
 } from '@codemirror/view';
 
+import { markContentForMeasure } from './remeasure.js';
+
 /**
  * Block widgets under a line — a notebook's output under its cell (TYTO-377).
  *
@@ -247,9 +249,19 @@ export function cellOutputs(): Extension {
 /**
  * Tells the editor holding an output that its height changed — a table folded or unfolded in
  * place, with no new key — so the lines below it are measured again and not drawn over it.
+ *
+ * **A bare measure is not enough** (TYTO-703). CodeMirror re-reads the heights of the lines in
+ * view only when asked to or when the content box changed height, and a recipe shorter than
+ * its pane sits in a box held at `min-height: 100%`: the fold shrinks the output, the box keeps
+ * its height, and the height map went on counting the unfolded output — measured in the window
+ * on 2026-11-13, a line drawn at 170 px that the map put at 243. So the heights are asked for.
+ * `true`, not `'refresh'`: the text's size did not change, only a block's height.
  */
 export function remeasureCellOutput(element: HTMLElement): void {
-  EditorView.findFromDOM(element)?.requestMeasure();
+  const view = EditorView.findFromDOM(element);
+  if (view === null) return;
+  markContentForMeasure(view, true);
+  view.requestMeasure();
 }
 
 /** The outputs as they stand: each key and the line (1-based) it sits under. */
