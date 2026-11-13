@@ -60,18 +60,34 @@ question open that the prompt does not settle, stop and report it instead of dec
     literal `## Left open` heading. Compare the PR's `headRefOid` with `HEAD`.
 11. **Stop at the draft.** Do not wait for CI, do not mark the PR ready, do not merge, do not
     arm auto-merge. Always pass `--repo rafaelsilvalor/tyto` to `gh`.
-12. **Your final message is the report**, in English, and the coordinator reads nothing else:
+12. **Clean up what you made before the report.** Stop every process you started: dev servers,
+    app windows, watchers, background commands. Remove what you created outside your worktree:
+    test folders, `--user-data-dir` and `TYTO_HOME` folders, scratch files, and the stash entries
+    you pushed (find yours by its tag, never pop another's). Remove only what you created: inside
+    a repository, a file only after `git status --short <path>` shows `??`. Your worktree and
+    your card's branch stay; the coordinator removes them once the PR is merged or closed. When
+    the permission system refuses a deletion, do not work around it: put the command in the
+    report.
+13. **Your final message is the report**, in English, and the coordinator reads nothing else:
     - `pwd` and the worktree's top level, quoted;
     - the PR number and URL, and its head SHA;
     - the files and line counts (`git diff --stat origin/main`);
     - every local check's output, verbatim, with its command;
     - the decisions you took that neither the card nor the prompt dictated;
     - the cards that should exist, with a reason each;
-    - a Left open table: what it is, why it matters, its state, and who owns it.
+    - a Left open table: what it is, why it matters, its state, and who owns it;
+    - what you cleaned up, and what you left on disk (worktree, branch, any folder), with paths.
 
     Then stop. **Push nothing after the report**, unless the coordinator resumes you with an
     explicit authorisation to push once more; that authorisation covers one push to the same
     branch, before merge, and you report again after it.
+
+## When the batch closes
+
+When the batch closes, the coordinator resumes you to clean up. Repeat step 12 for anything
+made since your report, delete the local branches you created whose PR is MERGED or CLOSED
+(`gh pr list --state all --head <branch>`), except the one your worktree has checked out, and
+report what you removed and what is left, with paths. Push nothing.
 
 ## A plan-only executor
 

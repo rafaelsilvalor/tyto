@@ -81,8 +81,29 @@ rafaelsilvalor/tyto --state open`, the latest ADR on `origin/main`, and the
    batch in Jira (`labels = batch-<name>`, `fields: ["summary", "status"]`).
    The file and reality may differ;
    reality wins, and the file is corrected.
-3. Report to Rafael in 5 to 8 lines: what the batch is, what is open, what runs
-   first and why.
+3. **Clean up what a previous coordinator left.** When the batch file or the
+   registry names an earlier coordinator for this batch, you replace it, and
+   its noise is yours to clear before you drive any card. If its session is
+   still running (`mcp__ccd_session_mgmt__list_sessions`), stop and ask Rafael:
+   two coordinators never drive one batch. Otherwise, clean:
+   - the registry: its coordinator row, the package rows whose PR is MERGED or
+     CLOSED, and the ADR reservations already on `origin/main`;
+   - the batch file: what step 2 contradicts is corrected, never deleted, so
+     the history stays;
+   - worktrees and branches: its own coordinator worktree and branch when they
+     hold nothing unpushed (`git status`, `git log origin/main..<branch>`), and
+     the executor worktrees and branches whose PR is MERGED or CLOSED, with the
+     command and the guards of closing step 5;
+   - the executor sessions it started that have finished: list them, and offer
+     Rafael to archive them;
+   - what it left outside the repository: test folders, scratch files in the
+     coordination folder.
+
+   Write in the batch file what you removed and what you could not; a deletion
+   the permission system refuses becomes a command for Rafael.
+
+4. Report to Rafael in 5 to 8 lines: what the batch is, what is open, what was
+   cleaned up, what runs first and why.
 
 ### Driving the cards
 
@@ -146,7 +167,7 @@ in the background:
 - Write the agent id in the batch file beside the card: it is the address you
   resume it by.
 - Agent worktrees are born **locked**: removing one takes
-  `git worktree unlock` before `git worktree remove` (closing, step 4).
+  `git worktree unlock` before `git worktree remove` (closing, step 5).
 
 ### When a separate session is still right
 
@@ -218,13 +239,21 @@ batch, with a reason):
 2. Close the batch file with that report and remove the batch from the
    registry's active list.
 3. Update the memory with what changed.
-4. List the executor worktrees and branches left behind (`git worktree list`,
+4. **Ask each executor to clean up.** Resume every executor still reachable
+   (`SendMessage` to its agent id; a separate session through
+   `mcp__ccd_session_mgmt__send_message`) with "the batch is closed: follow
+   docs/executor-protocol.md › When the batch closes", and read its report.
+5. List the executor worktrees and branches left behind (`git worktree list`,
    and each branch's PR state with `gh pr list --state all --head <branch>`),
    and any separate executor sessions. Offer to delete the sessions, and give
    him the cleanup command for the worktrees and branches. Agent worktrees are
    born locked, so the command unlocks each one first:
    `git worktree unlock <path>; git worktree remove <path>; git branch -D <branch>`,
    the branch only when its PR is MERGED or CLOSED (AGENTS.md).
+6. **Clean up your own noise.** Stop your background commands and watchers,
+   remove your rows from the registry (coordinator, packages, ADRs), and end the
+   batch file with what is left on disk and whose it is, so the next
+   coordinator finds nothing unexplained.
 
 ## Executor template
 

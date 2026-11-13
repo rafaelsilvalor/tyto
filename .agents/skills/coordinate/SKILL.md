@@ -80,8 +80,27 @@ transition ids); each step below names the `fields` it reads.
 2. **Re-query, never trust the file blindly:** `gh pr list --repo rafaelsilvalor/tyto --state
 open`, the latest ADR on `origin/main`, and the batch in Jira (`labels = batch-<name>`,
    `fields: ["summary", "status"]`). Reality wins, and the file is corrected.
-3. Report to the maintainer in 5 to 8 lines: what the batch is, what is open, what runs first
-   and why.
+3. **Clean up what a previous coordinator left.** When the batch file or the registry names an
+   earlier coordinator for this batch, you replace it, and its noise is yours to clear before
+   you drive any card. If it is still running (a Claude Code session, or a Codex thread with a
+   turn in progress), stop and ask the maintainer: two coordinators never drive one batch.
+   Otherwise, clean:
+   - the registry: its coordinator row, the package rows whose PR is MERGED or CLOSED, and the
+     ADR reservations already on `origin/main`;
+   - the batch file: what step 2 contradicts is corrected, never deleted, so the history stays;
+   - worktrees and branches: its own coordinator worktree and branch when they hold nothing
+     unpushed (`git status`, `git log origin/main..<branch>`), and the executor worktrees and
+     branches whose PR is MERGED or CLOSED, with the command and the guards of closing step 5;
+   - the executor threads or sessions it started that have finished: list them, and offer the
+     maintainer to archive them;
+   - what it left outside the repository: test folders, `<KEY>.last.md` files and other
+     scratch files in the coordination folder.
+
+   Write in the batch file what you removed and what you could not; a deletion the sandbox or
+   an approval refuses becomes a command for the maintainer.
+
+4. Report to the maintainer in 5 to 8 lines: what the batch is, what is open, what was cleaned
+   up, what runs first and why.
 
 ### Starting and reaching an executor
 
@@ -224,13 +243,20 @@ reason):
    ficou" table.
 2. Close the batch file with that report and remove the batch from the registry's active list.
 3. Record what changed in the home agent notes.
-4. List the executor threads, worktrees and branches left behind (`git worktree list`, and
+4. **Ask each executor to clean up.** Resume every executor thread still reachable
+   (`codex exec resume <thread_id>`, as in "Starting and reaching an executor") with "the batch
+   is closed: follow docs/executor-protocol.md › When the batch closes", and read its report.
+5. List the executor threads, worktrees and branches left behind (`git worktree list`, and
    each branch's PR state with `gh pr list --state all --head <branch>`), and give him the
    cleanup command for the worktrees and branches:
    `git worktree unlock <path>; git worktree remove <path>; git branch -D <branch>`, the branch
    only when its PR is MERGED or CLOSED (`AGENTS.md`). The unlock matters for a worktree a
    Claude Code agent left, which is born locked; on one you made, it only prints that the
    worktree is not locked, and the commands after the `;` still run.
+6. **Clean up your own noise.** Stop your background jobs, remove your rows from the registry
+   (coordinator, packages, ADRs) and the `<KEY>.last.md` files of the batch, and end the batch
+   file with what is left on disk and whose it is, so the next coordinator finds nothing
+   unexplained.
 
 ## Executor template
 
