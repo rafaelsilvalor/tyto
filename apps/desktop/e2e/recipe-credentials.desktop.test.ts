@@ -49,7 +49,9 @@ const VALUE = 'e2e-value-never-on-screen';
 const HOST = 'hooks.example.com';
 const RECIPE = [
   'recipe dispatch',
+  // A blank line between the steps: each is a block of its own, and draws its result (ADR 0196).
   VERB,
+  '',
   `call url=https://${HOST}/run token=${NAME} body={"title":"{title|}"}`,
   '',
 ].join('\n');

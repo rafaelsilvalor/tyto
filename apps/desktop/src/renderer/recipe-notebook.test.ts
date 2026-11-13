@@ -9,6 +9,7 @@ import {
   type RecipeRunAnswer,
   type RecipeRunRequest,
   answerDiagnostics,
+  blockResults,
   blockSlot,
   cellAtOrAbove,
   cellStatuses,
@@ -140,15 +141,15 @@ describe('when a recipe runs', () => {
     ]);
   });
 
-  // TYTO-676, ADR 0195: Run this block is Run from that cell, stopping after it.
-  it('runs one block as Run, from that cell and until it', async () => {
+  // TYTO-676, ADR 0195 and 0196: Run this block is Run from its first cell through its last.
+  it('runs one block as Run, from its first cell and until its last', async () => {
     const { notebook, asked } = harness();
-    void notebook.runBlock('tab-1', 3);
+    void notebook.runBlock('tab-1', 2, 3);
     void notebook.runFrom('tab-1', 3);
     await settle();
 
     expect(asked.map(({ explicit, from, until }) => ({ explicit, from, until }))).toEqual([
-      { explicit: true, from: 3, until: 3 },
+      { explicit: true, from: 2, until: 3 },
       { explicit: true, from: 3, until: undefined },
     ]);
   });
@@ -157,7 +158,7 @@ describe('when a recipe runs', () => {
   // and again when it shows that answer again (a change of language).
   it('shows the answer of a block run with its stop, and again on reshow', async () => {
     const { notebook, replies, shown } = harness();
-    const running = notebook.runBlock('tab-1', 1);
+    const running = notebook.runBlock('tab-1', 1, 1);
     replies[0]?.(answer(1, []));
     await running;
     notebook.reshow();
@@ -659,28 +660,33 @@ describe('where Add step writes and what its form offers (TYTO-402)', () => {
         }),
   });
 
-  it("writes below the step at or above the cursor's line, as its own line", () => {
+  // ADR 0196 amends ADR 0176: in a block the step joins it; elsewhere it starts a new block.
+  it("writes at the end of the cursor's block, which grows by a step", () => {
     const slot = stepSlot(RECIPE, 4);
-    const lineEnd = RECIPE.indexOf('\n', RECIPE.indexOf('acme.pull'));
+    const end = RECIPE.indexOf('done') + 'done'.length;
 
-    expect(slot).toEqual({ at: lineEnd, prefix: '\n', suffix: '', before: 1 });
+    expect(slot).toEqual({ at: end, prefix: '\n', suffix: '', before: 2 });
     const written = `${RECIPE.slice(0, slot.at)}${slot.prefix}select key${slot.suffix}${RECIPE.slice(slot.at)}`;
-    expect(written.split('\n').slice(2, 5)).toEqual([
+    expect(written.split('\n').slice(2, 6)).toEqual([
       'acme.pull',
-      'select key',
       '# keep the open ones',
+      'where status != done',
+      'select key',
     ]);
   });
 
-  it('writes at the end above every step, with no step, and in a text that does not parse', () => {
-    expect(stepSlot(RECIPE, 1)).toEqual({ at: RECIPE.length, prefix: '', suffix: '\n', before: 2 });
+  it('writes a new block, set apart by a blank line, from the header or a blank line', () => {
+    const header = RECIPE.indexOf('demo') + 'demo'.length;
+    expect(stepSlot(RECIPE, 1)).toEqual({ at: header, prefix: '\n\n', suffix: '', before: 0 });
+    const end = RECIPE.indexOf('done') + 'done'.length;
+    expect(stepSlot(RECIPE, 6)).toEqual({ at: end, prefix: '\n\n', suffix: '', before: 2 });
     expect(stepSlot('recipe empty', 1)).toEqual({
       at: 'recipe empty'.length,
-      prefix: '\n',
+      prefix: '\n\n',
       suffix: '',
       before: 0,
     });
-    expect(stepSlot('not a recipe\n', 1).before).toBeUndefined();
+    expect(stepSlot('', 1)).toEqual({ at: 0, prefix: '', suffix: '\n', before: 0 });
   });
 
   it("finds the step on the cursor's line, and none on a comment", () => {
@@ -742,7 +748,7 @@ describe('the execution counter (TYTO-676)', () => {
     ]);
 
     // Run this block on the second: main reuses the first, which keeps the run that made it.
-    const block = run.notebook.runBlock('tab-1', 1);
+    const block = run.notebook.runBlock('tab-1', 1, 1);
     expect(run.notebook.executionOf('tab-1', TEXT)).toEqual([
       { state: 'ran', count: 1 },
       { state: 'running' },
@@ -764,6 +770,8 @@ describe('the execution counter (TYTO-676)', () => {
     expect(marks(TEXT.replace('acme.pull', 'acme.pall'))).toEqual(['stale', 'stale']);
     expect(marks(TEXT.replace('status = done', 'status = open'))).toEqual(['ran', 'stale']);
     expect(marks(TEXT.replace('recipe weekly', 'recipe weakly'))).toEqual(['stale', 'stale']);
+    // A param line written inside a step's block is still a header line: every step reads it.
+    expect(marks(`${TEXT}param p = 1\n`)).toEqual(['stale', 'stale']);
     // A note does not run: editing it leaves every step as it ran.
     expect(marks(TEXT.replace('# the team', '# the tame'))).toEqual(['ran', 'ran']);
     // A step typed below has no number yet.
@@ -788,24 +796,69 @@ describe('the execution counter (TYTO-676)', () => {
 });
 
 describe('where a block\'s "+" writes (TYTO-676)', () => {
-  it('goes above the block it stands over, on a line of its own, counting the steps above', () => {
-    // Blocks: the header, the note, `acme.pull`, `where status = done`.
-    expect(blockSlot(TEXT, 2)).toEqual({
-      at: TEXT.indexOf('acme.pull'),
+  it('goes above the block it stands over, as a block of its own, counting the steps above', () => {
+    // Blocks: the header, and one of the note and both steps (ADR 0196): "+" makes a new one.
+    expect(blockSlot(TEXT, 1)).toEqual({
+      at: TEXT.indexOf('# the team'),
       prefix: '',
-      suffix: '\n',
+      suffix: '\n\n',
       before: 0,
     });
-    expect(blockSlot(TEXT, 1).before).toBe(0);
   });
 
-  it('goes below the last block, keeping the blank lines after it where they were', () => {
+  it('goes below the last block as a block of its own, the blank lines after it kept', () => {
     const text = `${TEXT}\n\n`;
     expect(blockSlot(text, 'end')).toEqual({
       at: text.indexOf('done') + 'done'.length,
-      prefix: '\n',
+      prefix: '\n\n',
       suffix: '',
       before: 2,
     });
+  });
+});
+
+// TYTO-676, ADR 0196: a block draws its last step's result, and nothing under its other steps.
+describe("a block's result", () => {
+  const BLOCKS = [
+    'recipe weekly',
+    '',
+    'acme.pull',
+    '# keep the open ones',
+    'where status = open',
+    '',
+    'select key',
+    '',
+  ].join('\n');
+  const cell = (index: number, line: number): Cell => ({
+    index,
+    line,
+    status: 'ok',
+    diagnostics: [],
+    table: table(1, 1),
+  });
+
+  it("draws only each block's last step, a lone step's too", () => {
+    const statuses = cellStatuses(BLOCKS, answer(1, [cell(0, 3), cell(1, 5), cell(2, 7)]), 'en');
+    expect(blockResults(BLOCKS, statuses).map((status) => status.index)).toEqual([1, 2]);
+  });
+
+  it("keeps every step's problems: they are the answer's, not the drawn lines'", () => {
+    const failed: Cell = {
+      ...cell(0, 3),
+      status: 'failed',
+      diagnostics: [
+        {
+          code: 'E_RECIPE_SYNTAX',
+          severity: 'error',
+          message: 'bad',
+          range: { start: 21, end: 30 },
+        },
+      ],
+    };
+    const shown = answer(1, [failed, { ...cell(1, 5), status: 'skipped' }]);
+    expect(answerDiagnostics(shown).map((found) => found.message)).toEqual(['bad']);
+    expect(
+      blockResults(BLOCKS, cellStatuses(BLOCKS, shown, 'en')).map((status) => status.text),
+    ).toEqual(['Skipped: a cell above failed']);
   });
 });

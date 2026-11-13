@@ -41,7 +41,7 @@ Clique nas linhas para fechá-las.
 
 Rode **Adicionar passo** pela barra de comandos com uma receita na frente. Abre uma lista de todos os verbos, agrupados em **Fontes**, **Transformações**, **Ações** e **Destinos**: os genéricos e todos os que os seus plugins instalados acrescentam. Digite para filtrar, ande com as setas e aperte Enter, ou clique num verbo.
 
-Em seguida vem o formulário do verbo, um campo por argumento. Um campo obrigatório diz isso; um campo deixado em branco mostra o valor que o verbo assume; um campo com um conjunto fixo de valores é uma lista. Um campo que nomeia uma coluna, uma lista de colunas ou uma expressão `where` oferece as colunas do passo anterior, da última execução dele: clique numa para colocá-la. Embaixo dos campos, o formulário mostra a linha que vai escrever. **Escrever passo** põe essa única linha embaixo do passo em que está o cursor, ou no fim quando o cursor está acima de todos os passos.
+Em seguida vem o formulário do verbo, um campo por argumento. Um campo obrigatório diz isso; um campo deixado em branco mostra o valor que o verbo assume; um campo com um conjunto fixo de valores é uma lista. Um campo que nomeia uma coluna, uma lista de colunas ou uma expressão `where` oferece as colunas do passo anterior, da última execução dele: clique numa para colocá-la. Embaixo dos campos, o formulário mostra a linha que vai escrever. **Escrever passo** põe essa única linha no fim do bloco em que está o cursor: o bloco ganha um passo e passa a mostrar o resultado dele. Com o cursor numa linha em branco ou no cabeçalho, a linha começa um bloco novo abaixo, separado por uma linha em branco; acima de todos os blocos, ela vai para o fim. Veja [Trabalhar em blocos](#trabalhar-em-blocos).
 
 Para mudar um passo, ponha o cursor na linha dele e rode **Editar passo**: o formulário abre preenchido pela linha, e **Escrever passo** escreve a linha de volta no lugar dela.
 
@@ -75,7 +75,7 @@ Só os passos que mudaram rodam de novo: um passo cuja linha não mudou guarda a
   alt="Uma receita depois de Executar receita: embaixo do passo da fonte, a linha 30 linhas · 5 colunas com a idade e os botões Executar daqui e Buscar de novo, uma tabela com as 20 primeiras linhas e mais 10 linhas embaixo; o passo where logo abaixo mostra a própria linha e a tabela."
 />
 
-Embaixo de cada passo há uma linha e, depois, a tabela dele:
+Embaixo do último passo de cada bloco há uma linha e, depois, a tabela dele. Um bloco de vários passos mostra só o resultado do último (veja [Trabalhar em blocos](#trabalhar-em-blocos)):
 
 - **A linha** diz o que o passo respondeu: _12 linhas · 4 colunas_, um plano (_Plano: 3 a gravar em Pauta_), _Falhou: veja Problemas_ ou por que ele não rodou.
 - **A idade**: quando o passo rodou e quão antigos são os dados, como _rodou há 2 min. · dados buscados há 3 h_. A idade dos dados é quando a fonte os buscou, que pode ser bem antes de o passo rodar. As idades vão aumentando enquanto a aba está aberta.
@@ -122,30 +122,32 @@ A grade desenha 48 cartões; **mais 252** desenha os próximos. _Filtrar linhas_
 
 ## Abrir um passo numa aba
 
-**Abrir numa aba**, na linha de um passo cuja tabela a última execução guardou, desenha o resultado desse passo em tamanho cheio numa aba própria, ao lado da receita: a mesma visão que o passo tem, Tabela, Resumo, Quadro, Calendário ou cartões soltos, com toda a altura da janela. Um passo sem `show` acima abre na visão de Tabela, já que a aba tem espaço para todas as linhas. O comando **Abrir o resultado da célula numa aba** faz o mesmo com o passo em que está o cursor, ou o de cima. A aba leva o nome da receita e o número do passo, contado de cima (_semanal.recipe · célula 2_).
+**Abrir numa aba**, na linha de um passo cuja tabela a última execução guardou, desenha o resultado desse passo em tamanho cheio numa aba própria, ao lado da receita: a mesma visão que o passo tem, Tabela, Resumo, Quadro, Calendário ou cartões soltos, com toda a altura da janela. Um passo sem `show` acima abre na visão de Tabela, já que a aba tem espaço para todas as linhas. O comando **Abrir o resultado da célula numa aba** faz o mesmo com o passo em que está o cursor, ou o de cima, inclusive um passo no meio de um bloco, cujo resultado o bloco não desenha. A aba leva o nome da receita e o número do passo, contado de cima (_semanal.recipe · célula 2_).
 
 A aba acompanha a receita: uma nova execução a desenha de novo com as linhas novas, e ela fecha quando a aba da receita fecha. A ordenação, o filtro e as colunas dela são só dela, separados dos do passo. Ela fica no passo dela: um passo acrescentado ou apagado acima não lhe dá outro, e o número no nome da aba acompanha. Quando a linha do próprio passo é apagada, a aba diz que não tem resultado. Ela não volta quando o Tyto abre de novo: abra de novo pelo passo. Um passo de uma receita aberta por `run` não tem o botão; abra essa receita para desenhar os passos dela numa aba.
 
 ## Trabalhar em blocos
 
-Uma receita se lê em blocos, como um notebook. Cada passo é um bloco, uma sequência de linhas de comentário `#` é um bloco de **nota**, e o cabeçalho (a linha `recipe`, a descrição `|` e as linhas `apply`, `every` e `param`) é um bloco só, no topo. Uma linha em branco não pertence a nenhum bloco. O bloco onde está o cursor tem uma barra colorida à esquerda.
+Uma receita se lê em blocos, como um notebook se lê em células. **Uma linha em branco separa um bloco do seguinte**: um bloco são as linhas entre duas linhas em branco, e pode ter vários passos e linhas de comentário `#`. Um bloco só de linhas de comentário é um bloco de **nota**. O cabeçalho (a linha `recipe`, a descrição `|` e as linhas `apply`, `every` e `param` do topo) é um bloco à parte, mesmo sem linha em branco embaixo. Uma linha em branco não pertence a nenhum bloco. O bloco onde está o cursor tem uma barra colorida à esquerda.
+
+**Um bloco mostra só o resultado do último passo**, embaixo da linha desse passo. Todos os passos do bloco continuam rodando, e o problema de um passo continua marcado na linha dele e listado em Problemas; quando um passo do meio falha, a linha do bloco diz _Pulada: uma célula acima falhou_. Para ver o resultado de um passo do meio, ponha uma linha em branco embaixo dele, o que divide o bloco em dois, ou ponha o cursor nele e rode **Abrir o resultado da célula numa aba**.
 
 Na primeira linha de cada bloco, menos o cabeçalho, à direita, uma pequena barra:
 
-- **▶ Executar este bloco**, num passo: executa esse passo e os passos acima dele que mudaram desde a última execução, e para ali. Os passos abaixo mantêm as últimas tabelas e dizem _Abaixo do bloco executado: roda na próxima execução_. É **Executar receita** para esse trecho da receita: busca dados e roda numa pasta não confiável.
-- **↑ Mover para cima** e **↓ Mover para baixo**: trocam o bloco de lugar com o vizinho. As linhas em branco entre eles ficam onde estavam. Nenhum bloco sobe acima do cabeçalho.
-- **✕ Apagar bloco**: remove as linhas dele. Não pergunta nada; **Ctrl+Z** traz o bloco de volta, como desfaz uma troca.
-- **▶▶ Executar daqui para baixo**, num passo: executa esse passo e todos os passos abaixo dele, como **Executar daqui**.
-- **▾ Ocultar resultado** (**▸ Mostrar resultado** quando recolhido), num passo com resultado: o mesmo que a seta na linha do resultado.
+- **▶ Executar este bloco**, num bloco com passos: executa todos os passos do bloco e os passos acima dele que mudaram desde a última execução, e para ali. Os passos abaixo mantêm as últimas tabelas e dizem _Abaixo do bloco executado: roda na próxima execução_. É **Executar receita** para esse trecho da receita: busca dados e roda numa pasta não confiável.
+- **↑ Mover para cima** e **↓ Mover para baixo**: trocam o bloco inteiro de lugar com o vizinho. As linhas em branco entre eles ficam onde estavam. Nenhum bloco sobe acima do cabeçalho.
+- **✕ Apagar bloco**: remove todas as linhas dele e a linha em branco que o separava. Não pergunta nada; **Ctrl+Z** traz o bloco de volta, como desfaz uma troca.
+- **▶▶ Executar daqui para baixo**, num bloco com passos: executa do primeiro passo dele até o fim, como **Executar daqui**.
+- **▾ Ocultar resultado** (**▸ Mostrar resultado** quando recolhido), num bloco com resultado: o mesmo que a seta na linha do resultado.
 
 A barra do cabeçalho tem **Executar tudo**, que é **Executar receita**.
 
 Um pequeno **+** fica na fronteira acima de cada bloco, menos o cabeçalho, e outro abaixo do último bloco, logo à esquerda das barras. Clique nele e escolha:
 
-- **Passo…**: o seletor e o formulário de **Adicionar passo** (veja [Adicionar e editar passos](#adicionar-e-editar-passos)), com as colunas do passo de cima, e a linha que ele escreve vai para ali, numa linha só dela.
-- **Nota**: uma linha `# ` ali, com o cursor depois dela. Escreva a nota; ela é um comentário, então nunca roda. Uma nota aparece na fonte da própria janela.
+- **Passo…**: o seletor e o formulário de **Adicionar passo** (veja [Adicionar e editar passos](#adicionar-e-editar-passos)), com as colunas do passo de cima, e a linha que ele escreve vai para ali como um bloco novo, com uma linha em branco de cada lado.
+- **Nota**: uma linha `# ` ali, como um bloco novo, com o cursor depois dela. Escreva a nota; ela é um comentário, então nunca roda. Uma nota aparece na fonte da própria janela.
 
-À esquerda de cada passo, o **contador** diz quando ele rodou pela última vez: `[3]` é a terceira execução que rodou um passo nesta aba, contando tanto as iniciadas por uma pausa na digitação quanto por um botão. `[*]` é um passo que uma execução está alcançando agora, e `[ ]` um que não rodou desde que a aba abriu. Um contador mais apagado, em itálico, está **desatualizado**: esse passo, ou um acima dele, mudou desde que rodou, ou a última execução parou acima dele; passe o mouse para ler o motivo. Os contadores são da aba: recomeçam quando ela fecha.
+À esquerda de cada bloco com passos, o **contador** diz quando o último passo dele rodou pela última vez: `[3]` é a terceira execução que rodou um passo nesta aba, contando tanto as iniciadas por uma pausa na digitação quanto por um botão. `[*]` é um bloco que uma execução está alcançando agora, e `[ ]` um cujo último passo não rodou desde que a aba abriu. Um contador mais apagado, em itálico, está **desatualizado**: um passo do bloco, ou um acima dele, mudou desde que rodou, ou a última execução parou acima dele; passe o mouse para ler o motivo. Os contadores são da aba: recomeçam quando ela fecha.
 
 Os blocos são só um jeito de ler o texto: mover ou apagar um edita as linhas da receita, e salvar grava as linhas na ordem que você vê. O arquivo continua sendo o texto que dá para editar à mão.
 

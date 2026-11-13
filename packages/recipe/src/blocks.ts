@@ -1,14 +1,20 @@
 /**
- * A recipe's text read as a notebook's blocks (TYTO-676, ADR 0195).
+ * A recipe's text read as a notebook's blocks (TYTO-676, ADR 0195 and ADR 0196).
  *
  * The reading is by line and by its first word, never by the parser, so a text that does not
- * parse still has its blocks: a step that fails is a block with an error, not a hole.
+ * parse still has its blocks: a step that fails is a line of its block, not a hole.
  *
- * - A **header** block is a run of `recipe`, `|`, `apply`, `every` and `param` lines. It is
- *   never moved, deleted or crossed by a move: `apply` and `every` belong before the first
- *   step, and a `param` line is part of what every step reads.
- * - A **step** block is one step line, one cell: a recipe has no continuation lines.
- * - A **note** block is a run of `#` lines, which the parser skips.
+ * **A blank line separates blocks**, as a Jupyter notebook separates cells (ADR 0196): a block
+ * is a run of consecutive lines that are not blank, and may hold several steps and `#` lines.
+ *
+ * - The **header** block is the recipe's leading run of `recipe`, `|`, `apply`, `every` and
+ *   `param` lines. It ends at the first other line **even with no blank line before it**, so a
+ *   step written right under `recipe x` is a block of its own. A run elsewhere made only of such
+ *   lines is a header block too. A header block is never moved, deleted or crossed by a move:
+ *   `apply` and `every` belong before the first step, and every step reads the `param` lines.
+ * - A **step** block holds one step or more: `steps` are their cells' indices, first and last.
+ *   Its result is its last step's (ADR 0196).
+ * - A **note** block is made only of `#` lines, which the parser skips.
  * - A blank line belongs to no block and stays where it is.
  *
  * Every operation answers **one text change**, which the host hands to its editor as an edit,
@@ -27,8 +33,12 @@ export interface RecipeBlock {
   /** The one-based numbers of its first and last lines. */
   readonly firstLine: number;
   readonly lastLine: number;
-  /** A step block's index among the recipe's steps, which is its cell's index. */
-  readonly step?: number;
+  /**
+   * A step block's steps, by their index among the recipe's steps, which is their cells'
+   * index: the first and the last, and where the last one's line starts, which is the line its
+   * result is drawn under.
+   */
+  readonly steps?: { readonly first: number; readonly last: number; readonly lastFrom: number };
 }
 
 /** One edit: replace `[from, to)` with `insert`. */
@@ -82,35 +92,63 @@ function linesOf(text: string): readonly Line[] {
 /** The blocks of a recipe's text, in order. */
 export function recipeBlocks(text: string): readonly RecipeBlock[] {
   const blocks: RecipeBlock[] = [];
-  let steps = 0;
-  let open: { kind: RecipeBlockKind; first: Line; last: Line } | undefined;
-  const close = (): void => {
-    if (open === undefined) return;
+  let step = 0;
+  let run: Line[] = [];
+  let first = true;
+  const push = (lines: readonly Line[]): void => {
+    const head = lines[0];
+    const tail = lines.at(-1);
+    if (head === undefined || tail === undefined) return;
+    const steps = lines.filter((line) => line.kind === 'step');
+    const header = lines.some((line) => line.kind === 'header');
+    const kind: RecipeBlockKind = steps.length > 0 ? 'step' : header ? 'header' : 'note';
+    const last = steps.at(-1);
     blocks.push({
-      kind: open.kind,
-      from: open.first.from,
-      to: open.last.to,
-      firstLine: open.first.number,
-      lastLine: open.last.number,
-      ...(open.kind === 'step' ? { step: steps++ } : {}),
+      kind,
+      from: head.from,
+      to: tail.to,
+      firstLine: head.number,
+      lastLine: tail.number,
+      ...(last === undefined
+        ? {}
+        : { steps: { first: step, last: step + steps.length - 1, lastFrom: last.from } }),
     });
-    open = undefined;
+    step += steps.length;
+  };
+  const close = (): void => {
+    if (run.length === 0) return;
+    if (first) {
+      // The recipe's own header is a block of its own even with no blank line after it.
+      const header = run.findIndex((line) => line.kind !== 'header');
+      if (header > 0) {
+        push(run.slice(0, header));
+        run = run.slice(header);
+      }
+      first = false;
+    }
+    push(run);
+    run = [];
   };
   for (const line of linesOf(text)) {
-    if (line.kind === 'blank') {
-      close();
-      continue;
-    }
-    // A step is always its own block; a header or a note run grows line by line.
-    if (open !== undefined && open.kind === line.kind && line.kind !== 'step') {
-      open.last = line;
-      continue;
-    }
-    close();
-    open = { kind: line.kind, first: line, last: line };
+    if (line.kind === 'blank') close();
+    else run.push(line);
   }
   close();
   return blocks;
+}
+
+/**
+ * The lines of one kind, in order, read as `recipeBlocks` reads them: where each starts and
+ * ends. A step's place in the list of `'step'` lines is its cell's index; the `'header'` lines
+ * are every `recipe`, `|`, `apply`, `every` and `param` line, wherever its block is.
+ */
+export function recipeLines(
+  text: string,
+  kind: 'step' | 'header',
+): readonly { readonly from: number; readonly to: number }[] {
+  return linesOf(text)
+    .filter((line) => line.kind === kind)
+    .map(({ from, to }) => ({ from, to }));
 }
 
 /** The block holding a line (one-based), or `undefined` on a blank line or past the end. */
@@ -164,18 +202,23 @@ export function moveBlock(
 }
 
 /**
- * Deletes block `index` with one line break, the one after it when there is one, so the line
- * below moves up into its place. `undefined` for a header block or an index out of range.
+ * Deletes block `index` with the blank line that set it apart (ADR 0196), so one blank line still
+ * separates the blocks around it: up to the next block's start, or, for the last block, from the
+ * end of the block before it. With no block either side, its lines and the break after them.
+ * `undefined` for a header block or an index out of range.
  */
 export function deleteBlock(text: string, index: number): BlockEdit | undefined {
-  const block = recipeBlocks(text)[index];
+  const blocks = recipeBlocks(text);
+  const block = blocks[index];
   if (block === undefined || !isMovable(block)) return undefined;
+  const next = blocks[index + 1];
+  if (next !== undefined) return { changes: [{ from: block.from, to: next.from, insert: '' }] };
+  const previous = blocks[index - 1];
+  if (previous !== undefined) {
+    return { changes: [{ from: previous.to, to: block.to, insert: '' }] };
+  }
   const after = text.indexOf('\n', block.to);
-  if (after !== -1) return { changes: [{ from: block.from, to: after + 1, insert: '' }] };
-  // The last line, with no break after it: take the break before it, if any.
-  let before = block.from > 0 ? text.lastIndexOf('\n', block.from - 1) : -1;
-  if (before > 0 && text[before - 1] === '\r') before -= 1;
-  return { changes: [{ from: before === -1 ? block.from : before, to: block.to, insert: '' }] };
+  return { changes: [{ from: block.from, to: after === -1 ? block.to : after + 1, insert: '' }] };
 }
 
 /** Applies an edit's changes to a text, as the editor does, for a test or a host. */

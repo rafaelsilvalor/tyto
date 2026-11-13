@@ -78,7 +78,8 @@ function rowsTable(): string {
   });
 }
 
-const RECIPE = ['recipe big', VERB, 'show table', ''].join('\n');
+// A blank line between the steps: each is a block of its own, and draws its result (ADR 0196).
+const RECIPE = ['recipe big', VERB, '', 'show table', ''].join('\n');
 
 let scratch: string;
 let home: string;

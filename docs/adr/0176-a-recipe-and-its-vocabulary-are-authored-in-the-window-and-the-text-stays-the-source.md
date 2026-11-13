@@ -40,6 +40,12 @@ recipe. Decision 5 is implemented by the second.
    break or a double quote in a value that needs quoting (a recipe line has no quote escape),
    is refused with `E_RECIPE_FORM` and nothing is written. Such a value belongs in a vocabulary
    file, referred to by `@./file.vocab.json#/pointer`.
+
+   _Amended 2026-11-13 (TYTO-676, ADR 0196):_ Add step writes its line at the end of the block
+   the cursor is in, which grows by a step; on a blank line or in the header, as a new block
+   set apart by a blank line. It wrote below the cursor's step before, which TYTO-402's code
+   did and this record did not state.
+
 2. **Every generic verb has a form, held beside the verbs.** `GENERIC_VERB_FORMS` gives each
    verb's fields: name, kind (column, columns, expression, pattern, template, data reference,
    list, choice, flag…), where it sits on the line (a bare value, `name=value`, a flag word, the

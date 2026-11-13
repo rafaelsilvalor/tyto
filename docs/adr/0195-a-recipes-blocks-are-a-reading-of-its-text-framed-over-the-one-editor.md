@@ -1,7 +1,8 @@
 # 0195 — A recipe's blocks are a reading of its text, framed over the one editor
 
 Status: accepted · 2026-11-12 · TYTO-676 · amends ADR 0148 decision 2 and ADR 0074 decisions 2
-and 6 · builds on ADR 0128, ADR 0141, ADR 0143, ADR 0171 and ADR 0176
+and 6 · builds on ADR 0128, ADR 0141, ADR 0143, ADR 0171 and ADR 0176 · decision 1 superseded
+and decisions 2, 4, 5, 6 and 8 refined by ADR 0196 (2026-11-13)
 
 ## Context
 
@@ -38,6 +39,10 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
    cell, its index the cell's; a **note** block is a run of `#` lines; a blank line belongs to no
    block and stays where it is. A header block is never moved, deleted or passed by a move: `apply`
    and `every` belong before the first step, and every step reads the `param` lines.
+
+   _Superseded 2026-11-13 (TYTO-676, ADR 0196):_ a block is a run of lines between blank lines,
+   which may hold several steps and `#` lines, and shows its last step's result.
+
 2. **Every block action is one edit of the text, dispatched to the editor.** Move swaps a block
    with its movable neighbour, the blank lines between them staying put; delete takes the block's
    lines and one line break. Each is a list of changes applied as one transaction, so one undo

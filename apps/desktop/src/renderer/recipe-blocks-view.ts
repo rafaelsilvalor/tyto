@@ -55,10 +55,10 @@ export interface BlockHost {
   readonly foldable: (documentId: string, at: number) => boolean;
   /** Whether the result under the line starting at `at` is folded (TYTO-451). */
   readonly collapsed: (documentId: string, at: number) => boolean;
-  /** Run this block: cell `step` and the changed cells above it. */
-  readonly runBlock: (documentId: string, step: number) => void;
-  /** Run from here down: cell `step` and every cell below it. */
-  readonly runFrom: (documentId: string, step: number) => void;
+  /** Run this block: its cells, `first` to `last`, and the changed cells above them. */
+  readonly runBlock: (documentId: string, first: number, last: number) => void;
+  /** Run from here down: cell `first`, the block's first, and every cell below it. */
+  readonly runFrom: (documentId: string, first: number) => void;
   /** Run all: Run recipe. */
   readonly runAll: (documentId: string) => void;
   /** Each step's execution counter, as the text is now. */
@@ -84,10 +84,11 @@ export function recipeFrames(view: EditorView, host: BlockHost): readonly Notebo
         toolbar: () => headerToolbar(view, host, locale),
       };
     }
-    const mark = block.step === undefined ? undefined : marks[block.step];
-    const result =
-      block.kind === 'step' && documentId !== undefined && host.foldable(documentId, block.from);
-    const folded = result && documentId !== undefined && host.collapsed(documentId, block.from);
+    // TYTO-676, ADR 0196: a block's result is its last step's, drawn under that step's line.
+    const mark = block.steps === undefined ? undefined : blockMark(marks, block.steps);
+    const at = block.steps?.lastFrom;
+    const result = at !== undefined && documentId !== undefined && host.foldable(documentId, at);
+    const folded = result && documentId !== undefined && host.collapsed(documentId, at);
     const up = moveBlock(text, index, 'up') !== undefined;
     const down = moveBlock(text, index, 'down') !== undefined;
     const shape = { kind: block.kind, result, folded, up, down };
@@ -101,6 +102,23 @@ export function recipeFrames(view: EditorView, host: BlockHost): readonly Notebo
       ...(mark === undefined ? {} : { marker: markerOf(mark, locale) }),
     };
   });
+}
+
+/**
+ * A block's counter from its steps' (ADR 0196): the last step's number; running when a run
+ * reaches any of its steps; stale when any of them is; never ran when its last step never did.
+ */
+export function blockMark(
+  marks: readonly ExecutionMark[],
+  steps: { readonly first: number; readonly last: number },
+): ExecutionMark | undefined {
+  const own = marks.slice(steps.first, steps.last + 1);
+  const last = marks[steps.last];
+  if (last === undefined) return undefined;
+  if (own.some((mark) => mark.state === 'running')) return { state: 'running' };
+  if (last.state === 'never' || last.count === undefined) return { state: 'never' };
+  const stale = own.some((mark) => mark.state === 'stale' || mark.state === 'never');
+  return { state: stale ? 'stale' : 'ran', count: last.count };
 }
 
 /** What a step's gutter says: `[n]`, `[*]` while it runs, `[ ]` before it ever ran. */
@@ -291,20 +309,22 @@ function blockAction(
   switch (action) {
     case 'run': {
       const documentId = host.documentOf(view);
-      if (documentId !== undefined && block.step !== undefined) {
-        host.runBlock(documentId, block.step);
+      if (documentId !== undefined && block.steps !== undefined) {
+        host.runBlock(documentId, block.steps.first, block.steps.last);
       }
       return;
     }
     case 'runFrom': {
       const documentId = host.documentOf(view);
-      if (documentId !== undefined && block.step !== undefined) {
-        host.runFrom(documentId, block.step);
+      if (documentId !== undefined && block.steps !== undefined) {
+        host.runFrom(documentId, block.steps.first);
       }
       return;
     }
     case 'collapse':
-      cellOutputAt(view, block.from)?.querySelector<HTMLButtonElement>(FOLD)?.click();
+      if (block.steps !== undefined) {
+        cellOutputAt(view, block.steps.lastFrom)?.querySelector<HTMLButtonElement>(FOLD)?.click();
+      }
       return;
     case 'up':
     case 'down':

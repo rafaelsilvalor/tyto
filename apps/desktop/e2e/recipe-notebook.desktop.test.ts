@@ -112,9 +112,13 @@ function rowsTable(): string {
 /** Three cells, then enough comment lines that the first table can scroll out of view. */
 const RECIPE = [
   'recipe notebook',
+  // A blank line between the steps: each is a block of its own, and draws its result (ADR 0196).
   VERB,
+  '',
   'where n > 4',
+  '',
   'select n, title',
+  '',
   ...Array.from({ length: 400 }, (_, index) => `# note ${String(index + 1)}`),
   '',
 ].join('\n');
@@ -235,7 +239,11 @@ beforeAll(async () => {
   writeFileSync(recipePath, RECIPE);
   installExample();
   marksPath = join(scratch, 'recipes', 'marks.recipe');
-  writeFileSync(marksPath, ['recipe marks', 'example.pull count=3', `${MARK} done`, ''].join('\n'));
+  // A blank line between the steps: each is a block of its own, and draws its result (ADR 0196).
+  writeFileSync(
+    marksPath,
+    ['recipe marks', 'example.pull count=3', '', `${MARK} done`, ''].join('\n'),
+  );
   outerPath = join(scratch, 'recipes', 'outer.recipe');
   writeFileSync(outerPath, ['recipe outer', 'run marks', ''].join('\n'));
 

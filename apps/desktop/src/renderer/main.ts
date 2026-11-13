@@ -116,6 +116,7 @@ import {
   type RecipeViewState,
   type StepSlot,
   answerDiagnostics,
+  blockResults,
   cellAtOrAbove,
   cellStatuses,
   columnsBefore,
@@ -974,8 +975,8 @@ const recipeBlockHost: BlockHost = {
     return cell !== undefined && hasFoldableResult(cell);
   },
   collapsed: (documentId, at) => recipeNotebook.collapsedOf(documentId).has(at),
-  runBlock: (documentId, step) => void recipeNotebook.runBlock(documentId, step),
-  runFrom: (documentId, step) => void recipeNotebook.runFrom(documentId, step),
+  runBlock: (documentId, first, last) => void recipeNotebook.runBlock(documentId, first, last),
+  runFrom: (documentId, first) => void recipeNotebook.runFrom(documentId, first),
   runAll: (documentId) => void recipeNotebook.runNow(documentId, 'explicit'),
   execution: (documentId, text) => recipeNotebook.executionOf(documentId, text),
   addStep: (view, slot) => {
@@ -1153,7 +1154,8 @@ function showRecipeAnswer(
       },
     },
   };
-  const statuses = cellStatuses(text, answer, state.locale, until);
+  // TYTO-676, ADR 0196: a block shows its last step's result only.
+  const statuses = blockResults(text, cellStatuses(text, answer, state.locale, until));
   // TYTO-676: the block toolbars read the new answer too (which results fold).
   const effects = [
     setCellOutputs.of(statuses.map((status) => cellOutputOf(status, context))),
