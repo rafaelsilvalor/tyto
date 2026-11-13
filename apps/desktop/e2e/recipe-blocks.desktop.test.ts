@@ -160,6 +160,38 @@ async function measured(): Promise<void> {
 }
 
 /**
+ * How far, at most, CodeMirror's height map puts a line in view from where its element is
+ * drawn, in pixels (TYTO-703).
+ */
+async function heightMapOffBy(): Promise<number> {
+  await measured();
+  return page.evaluate(() => {
+    const content = document.querySelector('#editor .cm-content') as unknown as {
+      cmTile?: {
+        root?: {
+          view?: {
+            documentTop: number;
+            posAtDOM(node: Node): number;
+            lineBlockAt(at: number): { top: number };
+          };
+        };
+      };
+    };
+    const view = content.cmTile?.root?.view;
+    if (view === undefined) return Number.POSITIVE_INFINITY;
+    const lines = [...document.querySelectorAll('#editor .cm-line')];
+    return Math.max(
+      ...lines.map((line) =>
+        Math.abs(
+          line.getBoundingClientRect().top -
+            (view.documentTop + view.lineBlockAt(view.posAtDOM(line)).top),
+        ),
+      ),
+    );
+  });
+}
+
+/**
  * The toolbar drawn over the line whose text is `text`: toolbars sit in a layer beside the
  * text, so a toolbar is matched to its line by where it is drawn.
  */
@@ -387,6 +419,10 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
       .toBe('Show result');
     const toggle = page.locator('#editor .recipe-cell--collapsed .recipe-cell__toggle').first();
     expect(await toggle.getAttribute('aria-expanded')).toBe('false');
+    // CodeMirror's height map follows the fold (TYTO-703): this recipe is shorter than the
+    // pane, so the content box keeps its height and only an asked-for measure reads the
+    // folded result's. Before the fix, every line below it was 74 px off.
+    await expect.poll(heightMapOffBy, { timeout: 5_000 }).toBeLessThanOrEqual(1);
   }, 30_000);
 
   it('moves a block up and deletes a note, and saves the blocks in their order', async () => {
