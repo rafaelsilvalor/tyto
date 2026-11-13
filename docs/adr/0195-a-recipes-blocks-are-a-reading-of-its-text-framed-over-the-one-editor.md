@@ -178,3 +178,15 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   `remeasureCellOutput` now asks for the heights through CodeMirror's internal flag, the door
   ADR 0099 already uses. The toolbars and the drop line keep reading their lines' elements, as a
   guard for any block that changes height without saying so.
+- 2026-11-13 (TYTO-710): **a drag near the top or bottom of the pane scrolls it.** In a band of
+  48 px at each edge, or a quarter of a short pane, the speed grows from nothing to 1,200 px a
+  second at the edge and stays there past it, and the drop place is picked again under the
+  pointer. The scroll runs on a timer scaled by the time that passed, not on animation frames,
+  which a hidden window does not run; it rests at the end of the scroll and starts again on the
+  next move. **The moves and the release are now heard on the window, not the grip**: a drag
+  that scrolls far takes the grip's line out of CodeMirror's viewport and unmounts the grip,
+  and measured with the release heard on the grip only, the drop never landed. The drop place
+  also follows any scroll of the pane during a drag; measured in a shown window, a wheel turned
+  mid-drag scrolls the pane 300 px as it does with no drag, and the drop line stays at the
+  pointer (377 px for a pointer at 362), where without it the line went off with the text, to
+  63 px.
