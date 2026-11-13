@@ -1,4 +1,4 @@
-import { type EditorPane, type NotebookFrame, cellOutputAt } from '@tyto/editor';
+import { type EditorPane, type NotebookFrame, cellOutputAt, notebookFrameOf } from '@tyto/editor';
 import {
   type BlockEdit,
   type RecipeBlock,
@@ -26,8 +26,9 @@ import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/ind
  * - **Collapse** presses the fold toggle of the block's own result, so the result's header and
  *   the toolbar are one control with one state, kept by line in the notebook (TYTO-451).
  *
- * A toolbar finds its block on the click, from where its element sits in the text then, not
- * from the block it was built for: an edit since may have moved it.
+ * A toolbar finds its block on the click, from the frames as the editor read them after the
+ * last edit (`notebookFrameOf`), not from the block it was built for: an edit since may have
+ * moved it. The toolbar is drawn beside the text, never in it, so a line's text is its own.
  */
 
 /** A pane's view, named through the editor's handle: the desktop does not import CodeMirror. */
@@ -133,12 +134,9 @@ function blockAction(
   toolbar: HTMLElement,
   action: BlockAction,
 ): void {
-  let line: number;
-  try {
-    line = view.state.doc.lineAt(view.posAtDOM(toolbar)).number;
-  } catch {
-    return;
-  }
+  const frame = notebookFrameOf(view, toolbar);
+  if (frame === undefined || frame.from > view.state.doc.length) return;
+  const line = view.state.doc.lineAt(frame.from).number;
   const text = view.state.doc.toString();
   const blocks = recipeBlocks(text);
   const block = blockAtLine(blocks, line);

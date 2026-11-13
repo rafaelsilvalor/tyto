@@ -3,7 +3,12 @@ import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { type NotebookFrame, notebookFrames, refreshNotebookFrames } from './notebook-frames.js';
+import {
+  type NotebookFrame,
+  notebookFrameOf,
+  notebookFrames,
+  refreshNotebookFrames,
+} from './notebook-frames.js';
 
 /**
  * A notebook's blocks framed over the one editor (TYTO-676), read from the DOM the view built:
@@ -61,16 +66,20 @@ const open = (label: () => string = () => 'tools'): EditorView => {
   return view;
 };
 
-/** Each line's text, without its toolbar's, and the frame classes it carries. */
+/** Each line's text, as the DOM holds it, and the frame classes it carries. */
 const lines = (on: EditorView): [string, string][] =>
   [...on.contentDOM.querySelectorAll('.cm-line')].map((line) => {
-    const copy = line.cloneNode(true) as HTMLElement;
-    copy.querySelector('.cm-notebook-toolbar')?.remove();
     const classes = [...line.classList]
       .filter((name) => name.startsWith('cm-notebook-frame'))
       .map((name) => name.replace('cm-notebook-frame', '') || 'frame');
-    return [copy.textContent ?? '', classes.join(' ')];
+    return [line.textContent ?? '', classes.join(' ')];
   });
+
+/** The toolbars once the layer has drawn: it draws on CodeMirror's next measure. */
+async function toolbars(on: EditorView): Promise<HTMLElement[]> {
+  await new Promise((done) => setTimeout(done, 50));
+  return [...on.dom.querySelectorAll<HTMLElement>('.cm-notebook-toolbar')];
+}
 
 describe('a notebook framed over the editor (TYTO-676)', () => {
   it('frames each block, first and last line marked, and leaves a blank line out', () => {
@@ -84,14 +93,40 @@ describe('a notebook framed over the editor (TYTO-676)', () => {
     ]);
   });
 
-  it("puts one toolbar in each block's first line, and none in its others", () => {
+  // The toolbar is beside the text, never in it: a line's text is the line's alone.
+  it('draws one toolbar per block outside the text, each standing for its block', async () => {
     const on = open();
-    const toolbars = [...on.contentDOM.querySelectorAll('.cm-notebook-toolbar')];
-    expect(toolbars.map((toolbar) => toolbar.closest('.cm-line')?.textContent)).toEqual([
-      'tools# a note',
-      'toolsacme.pull',
-      'toolswhere status = done',
+    const drawn = await toolbars(on);
+    expect(drawn.every((toolbar) => !on.contentDOM.contains(toolbar))).toBe(true);
+    expect(on.contentDOM.textContent).not.toContain('tools');
+    expect(drawn.map((toolbar) => toolbar.closest('.cm-notebook-toolbars') !== null)).toEqual([
+      true,
+      true,
+      true,
     ]);
+    expect(
+      drawn.map((toolbar) => {
+        const frame = notebookFrameOf(on, toolbar);
+        return frame === undefined ? '' : on.state.doc.lineAt(frame.from).text;
+      }),
+    ).toEqual(['# a note', 'acme.pull', 'where status = done']);
+    // Its buttons are the person's: the layer is not hidden from a screen reader.
+    expect(on.dom.querySelector('.cm-notebook-toolbars')?.hasAttribute('aria-hidden')).toBe(false);
+  });
+
+  it('finds the block a toolbar stands for as the text is after an edit', async () => {
+    const on = open();
+    const [, pull] = await toolbars(on);
+    on.dispatch({ changes: { from: 0, insert: 'acme.first\n' } });
+    const frame = pull === undefined ? undefined : notebookFrameOf(on, pull);
+    // Index 1 is now `# a note`'s frame: the toolbars are drawn again on the next measure.
+    expect(frame === undefined ? '' : on.state.doc.lineAt(frame.from).text).toBe('# a note');
+    const again = await toolbars(on);
+    const texts = again.map((toolbar) => {
+      const found = notebookFrameOf(on, toolbar);
+      return found === undefined ? '' : on.state.doc.lineAt(found.from).text;
+    });
+    expect(texts).toEqual(['acme.first', '# a note', 'acme.pull', 'where status = done']);
   });
 
   it('marks the block holding the caret, and follows the caret', () => {
@@ -118,16 +153,19 @@ describe('a notebook framed over the editor (TYTO-676)', () => {
     ]);
   });
 
-  it('keeps a toolbar whose key stays, and builds anew on a refresh that changes it', () => {
+  it('keeps a toolbar whose key stays, and builds anew on a refresh that changes it', async () => {
     let label = 'tools';
     const on = open(() => label);
+    await toolbars(on);
     const before = builds;
     on.dispatch({ selection: EditorSelection.cursor(on.state.doc.line(3).from) });
+    await toolbars(on);
     expect(builds).toBe(before);
 
     label = 'folded';
     on.dispatch({ effects: refreshNotebookFrames.of(null) });
+    const drawn = await toolbars(on);
     expect(builds).toBe(before + 3);
-    expect(on.contentDOM.querySelector('.cm-notebook-toolbar')?.textContent).toBe('folded');
+    expect(drawn.map((toolbar) => toolbar.textContent)).toEqual(['folded', 'folded', 'folded']);
   });
 });

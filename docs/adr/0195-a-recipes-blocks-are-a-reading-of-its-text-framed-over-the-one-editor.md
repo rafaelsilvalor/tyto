@@ -48,10 +48,19 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
    line an edit deletes, so the block the person moved keeps its result and its fold.
 3. **Blocks are frames over the one editor**, not a view of their own. `notebookFrames()` in
    `@tyto/editor` draws, from the host's reading of the text as it is now, a class on each of a
-   block's lines (its kind, its first and last line, the block holding the caret) and the host's
-   toolbar on its first line, read again on every edit. Vim, search, undo, the second pane and every
-   state keyed by line stay as they are. One editor per block was weighed and refused: it splits
-   the history and vim per block and reopens ADR 0148's one editor.
+   block's lines (its kind, its first and last line, the block holding the caret), read again on
+   every edit. Vim, search, undo, the second pane and every state keyed by line stay as they are.
+   One editor per block was weighed and refused: it splits the history and vim per block and
+   reopens ADR 0148's one editor.
+   **A toolbar is drawn in a layer beside the text, never in a line**, as CodeMirror draws the
+   selection: a line's text, what a screen reader names it and what a test reads of it hold the
+   line alone. The first version put it in the line as an inline widget, and every reader of a
+   line's text read `▶↑↓✕` before it (TYTO-377's `recipe-tab` suite, red on CI). The layer is
+   not hidden from a screen reader, as CodeMirror's own layers are, since its buttons are the
+   person's; it spans the visible width, so a toolbar never widens what scrolls. **A toolbar's
+   top is read from its line's element, not from the height map**: a result folded in place
+   shrinks a block widget that the map goes on counting at its old height (measured in the
+   window: a line drawn at 170 px that `lineBlockAt` put at 243).
 4. **The toolbar is always shown**, at the right of a block's first line (TYTO-377: a person sees
    what a block offers before reaching for it): Run this block on a step, Up, Down, Delete, and
    Fold on a step whose result folds. It finds its block where its element sits when clicked, not
@@ -94,7 +103,11 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   a recipe with notes as it always did.
 - A `param` line written between steps is a header block in the middle, which no move passes;
   moving a step across it is done by hand.
-- The toolbar sits over the right end of its line; a step line longer than the pane runs under
-  it. The line's first line is padded so a typical step clears it.
+- The toolbar sits over the right end of its line's band; a step line longer than the pane runs
+  under it. A block's first line is padded so a typical step clears it. Scrolled sideways, the
+  toolbars keep to the visible width at the moment they were drawn, until the next redraw.
+- Open: CodeMirror's height map keeps a folded result at its unfolded height (measured above),
+  which this record works around for the toolbars only; what else reads the map was not
+  measured.
 - Open: the result of the neighbour a move rewrites disappears until the next answer, which the
   move itself triggers, since it changes the chain.

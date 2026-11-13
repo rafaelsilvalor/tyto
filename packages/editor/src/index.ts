@@ -248,6 +248,7 @@ export {
 export {
   type NotebookFrame,
   type NotebookFramesOptions,
+  notebookFrameOf,
   notebookFrames,
   refreshNotebookFrames,
 } from './notebook-frames.js';

@@ -127,19 +127,54 @@ const summaries = (): Promise<Record<string, string>> =>
     Object.fromEntries(
       [...document.querySelectorAll('#editor .recipe-cell-status')].map((line) => {
         const above = line.closest('.cm-cell-output')?.previousElementSibling;
-        const copy = above?.cloneNode(true) as HTMLElement | undefined;
-        copy?.querySelector('.recipe-block-toolbar')?.remove();
         return [
-          copy?.textContent ?? '',
+          above?.textContent ?? '',
           line.querySelector('.recipe-cell-summary')?.textContent ?? '',
         ];
       }),
     ),
   );
 
-/** The toolbar on the line whose text ends with `text`. */
-const toolbar = (text: string) =>
-  page.locator('#editor .cm-line', { hasText: text }).locator('.recipe-block-toolbar');
+/**
+ * The toolbar drawn over the line whose text is `text`: toolbars sit in a layer beside the
+ * text, so a toolbar is matched to its line by where it is drawn.
+ */
+async function toolbar(text: string) {
+  // The layer draws on the editor's next measure: a result folded just now moves it a frame on.
+  let index = -1;
+  for (let tries = 0; tries < 20 && index === -1; tries += 1) {
+    if (tries > 0) await page.waitForTimeout(100);
+    index = await overLine(text);
+  }
+  if (index === -1) {
+    const tops = await page.evaluate(() => ({
+      lines: [...document.querySelectorAll('#editor .cm-line')].map((each) => [
+        each.textContent,
+        Math.round(each.getBoundingClientRect().top),
+      ]),
+      bars: [...document.querySelectorAll('#editor .recipe-block-toolbar')].map((each) =>
+        Math.round(each.getBoundingClientRect().top),
+      ),
+    }));
+    throw new Error(`no toolbar over '${text}' ${JSON.stringify(tops)}`);
+  }
+  return page.locator('#editor .recipe-block-toolbar').nth(index);
+}
+
+/** The index of the toolbar drawn over the line whose text is `text`, or -1. */
+function overLine(text: string): Promise<number> {
+  return page.evaluate((wanted) => {
+    const line = [...document.querySelectorAll('#editor .cm-line')].find(
+      (each) => each.textContent === wanted,
+    );
+    const box = line?.getBoundingClientRect();
+    if (box === undefined) return -1;
+    return [...document.querySelectorAll('#editor .recipe-block-toolbar')].findIndex((each) => {
+      const tools = each.getBoundingClientRect();
+      return Math.abs(tools.top - box.top) < 2;
+    });
+  }, text);
+}
 
 beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-recipe-blocks-e2e-'));
@@ -195,34 +230,41 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
       )
       .toContain('blocks.recipe');
     await page.waitForSelector('#editor .recipe-block-toolbar');
-    const laid = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLElement>('#editor .cm-line')].map((line) => {
-        const bar = line.querySelector<HTMLElement>('.recipe-block-toolbar');
-        const range = document.createRange();
-        // The line's own text: every text node but the toolbar's.
-        const words = [...line.childNodes].filter((node) => node !== bar);
-        const first = words[0];
-        const last = words.at(-1);
-        if (first !== undefined && last !== undefined) {
-          range.setStartBefore(first);
-          range.setEndAfter(last);
-        }
-        const text = range.getBoundingClientRect();
+    const laid = await page.evaluate(() => {
+      const tools = [...document.querySelectorAll<HTMLElement>('#editor .recipe-block-toolbar')];
+      const scroller = document.querySelector<HTMLElement>('#editor .cm-scroller');
+      const visibleRight =
+        (scroller?.getBoundingClientRect().left ?? 0) + (scroller?.clientWidth ?? 0);
+      return [...document.querySelectorAll<HTMLElement>('#editor .cm-line')].map((line) => {
         const box = line.getBoundingClientRect();
-        const tools = bar?.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(line);
+        const text = range.getBoundingClientRect();
+        const bar = tools.find((each) => Math.abs(each.getBoundingClientRect().top - box.top) < 2);
+        const drawn = bar?.getBoundingClientRect();
         return {
+          text: line.textContent ?? '',
           classes: line.className.includes('cm-notebook-frame'),
           toolbar:
-            tools === undefined
+            drawn === undefined
               ? undefined
               : {
-                  inLine: tools.top >= box.top - 1 && tools.bottom <= box.bottom + 1,
-                  right: Math.abs(box.right - tools.right) < 24,
-                  clear: text.width === 0 || tools.left >= text.right,
+                  inLine: drawn.top >= box.top - 1 && drawn.bottom <= box.bottom + 1,
+                  right: Math.abs(visibleRight - drawn.right) < 24,
+                  clear: text.width === 0 || drawn.left >= text.right,
+                  outsideText: !line.contains(bar ?? null),
                 },
         };
-      }),
-    );
+      });
+    });
+    // The toolbars widen nothing: the editor scrolls sideways no more than its text needs.
+    const overflow = await page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>('#editor .cm-scroller');
+      return scroller === null ? -1 : scroller.scrollWidth - scroller.clientWidth;
+    });
+    expect(overflow).toBe(0);
+    // A line's text is its own: no toolbar glyph is in it.
+    expect(laid.map((line) => line.text)).toEqual(RECIPE.split('\n'));
     // Header, blank, source, note, three steps, and the empty last line.
     expect(laid.map((line) => line.classes)).toEqual([
       true,
@@ -235,7 +277,12 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
       false,
     ]);
     expect(laid.filter((line) => line.toolbar !== undefined).map((line) => line.toolbar)).toEqual(
-      Array.from({ length: 5 }, () => ({ inLine: true, right: true, clear: true })),
+      Array.from({ length: 5 }, () => ({
+        inLine: true,
+        right: true,
+        clear: true,
+        outsideText: true,
+      })),
     );
 
     if (shots !== undefined) {
@@ -262,7 +309,7 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
       .poll(summaries, { timeout: 15_000 })
       .toMatchObject({ [VERB]: expect.stringMatching(/save|Run/u) });
 
-    await toolbar('where status = open').locator('[data-action="run"]').click();
+    await (await toolbar('where status = open')).locator('[data-action="run"]').click();
     await expect.poll(summaries, { timeout: 15_000 }).toEqual({
       [VERB]: '2 rows · 2 columns',
       'where status = open': '1 row · 2 columns',
@@ -278,7 +325,7 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
   }, 30_000);
 
   it("folds a block's result from its toolbar, and the result's own toggle agrees", async () => {
-    const fold = toolbar(VERB).locator('[data-action="collapse"]');
+    const fold = (await toolbar(VERB)).locator('[data-action="collapse"]');
     await fold.click();
     await page.waitForSelector('#editor .recipe-cell--collapsed');
     await expect
@@ -289,8 +336,8 @@ describe("a recipe's blocks in the window (TYTO-676)", () => {
   }, 30_000);
 
   it('moves a block up and deletes a note, and saves the blocks in their order', async () => {
-    await toolbar('select title').locator('[data-action="up"]').click();
-    await toolbar('# keep the open ones').locator('[data-action="delete"]').click();
+    await (await toolbar('select title')).locator('[data-action="up"]').click();
+    await (await toolbar('# keep the open ones')).locator('[data-action="delete"]').click();
     await page.keyboard.press('Control+s');
     await expect
       .poll(() => readFileSync(recipePath, 'utf8'), { timeout: 10_000 })

@@ -1004,8 +1004,8 @@ tyto-preview-pane[hidden] {
 
 /* A recipe's blocks (TYTO-676, ADR 0195): each block's lines on a quiet band with an accent bar
    at the left, brighter on the block holding the caret, so the eye reads blocks and the text
-   stays text. The toolbar sits at the right of the block's first line, out of the text's way,
-   always shown (TYTO-377: a person sees what a block offers before reaching for it). */
+   stays text. The toolbar sits at the right of the block's first line, beside the text and
+   never in it, always shown (TYTO-377: a person sees what a block offers before reaching for it). */
 .cm-notebook-frame {
   position: relative;
   border-left: var(--tyto-focus-width) solid var(--tyto-border);
@@ -1031,11 +1031,11 @@ tyto-preview-pane[hidden] {
   background: none;
 }
 
+/* Drawn in a layer beside the text, not in it (`notebook-frames.ts` places it); the padding
+   keeps the last button off the scroller's edge. */
 .recipe-block-toolbar {
-  position: absolute;
-  top: 0;
-  right: var(--tyto-space-2);
   display: inline-flex;
+  padding-right: var(--tyto-space-2);
   gap: var(--tyto-space-1);
   font-style: normal;
   user-select: none;

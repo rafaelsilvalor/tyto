@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { type EditorHandle, createEditor, notebookFrames } from '@tyto/editor';
+import { type EditorHandle, createEditor, notebookFrameOf, notebookFrames } from '@tyto/editor';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type BlockHost, recipeFrames } from './recipe-blocks-view.js';
@@ -49,13 +49,19 @@ function open(more: Partial<BlockHost> = {}) {
   return { on: editor, runBlock };
 }
 
-/** The toolbar on the line holding `text`. */
-function toolbarOn(on: EditorHandle, text: string): HTMLElement {
-  const line = [...on.view.contentDOM.querySelectorAll('.cm-line')].find((each) =>
-    each.textContent?.endsWith(text),
+/**
+ * The toolbar standing for the block whose first line is `text`, once the editor has drawn
+ * its toolbars (on its next measure): they sit beside the text, not in its lines.
+ */
+async function toolbarOn(on: EditorHandle, text: string): Promise<HTMLElement> {
+  await new Promise((done) => setTimeout(done, 50));
+  const toolbar = [...on.view.dom.querySelectorAll<HTMLElement>('.recipe-block-toolbar')].find(
+    (each) => {
+      const frame = notebookFrameOf(on.view, each);
+      return frame !== undefined && on.view.state.doc.lineAt(frame.from).text === text;
+    },
   );
-  const toolbar = line?.querySelector<HTMLElement>('.recipe-block-toolbar');
-  if (toolbar === null || toolbar === undefined) throw new Error(`no toolbar on ${text}`);
+  if (toolbar === undefined) throw new Error(`no toolbar on ${text}`);
   return toolbar;
 }
 
@@ -70,33 +76,34 @@ const actionsOf = (toolbar: HTMLElement) =>
   ]);
 
 describe("a recipe block's toolbar (TYTO-676)", () => {
-  it('offers run on a step, moves where a neighbour allows, and none on the header', () => {
+  it('offers run on a step, moves where a neighbour allows, and none on the header', async () => {
     const { on } = open();
-    expect(actionsOf(toolbarOn(on, 'acme.pull team={team}'))).toEqual([
+    expect(actionsOf(await toolbarOn(on, 'acme.pull team={team}'))).toEqual([
       ['run', false],
       ['up', false],
       ['down', false],
       ['delete', false],
     ]);
     // A note runs nothing, and nothing but the header is above it.
-    expect(actionsOf(toolbarOn(on, '# Pull, then tag.'))).toEqual([
+    expect(actionsOf(await toolbarOn(on, '# Pull, then tag.'))).toEqual([
       ['up', true],
       ['down', false],
       ['delete', false],
     ]);
-    expect(actionsOf(toolbarOn(on, 'where status = done'))).toEqual([
+    expect(actionsOf(await toolbarOn(on, 'where status = done'))).toEqual([
       ['run', false],
       ['up', false],
       ['down', true],
       ['delete', false],
     ]);
-    const header = [...on.view.contentDOM.querySelectorAll('.cm-line')][0];
-    expect(header?.querySelector('.recipe-block-toolbar')).toBeNull();
+    // No toolbar stands for the header, and no line's text holds a toolbar's glyphs.
+    await expect(toolbarOn(on, 'recipe weekly')).rejects.toThrow('no toolbar');
+    expect(on.view.contentDOM.textContent).not.toMatch(/[▶↑↓✕]/u);
   });
 
-  it('moves a block up as one edit the editor undoes, and keeps the caret on it', () => {
+  it('moves a block up as one edit the editor undoes, and keeps the caret on it', async () => {
     const { on } = open();
-    press(toolbarOn(on, 'acme.tag'), 'up');
+    press(await toolbarOn(on, 'acme.tag'), 'up');
     expect(on.getValue()).toBe(
       TEXT.replace('acme.pull team={team}\nacme.tag', 'acme.tag\nacme.pull team={team}'),
     );
@@ -110,9 +117,9 @@ describe("a recipe block's toolbar (TYTO-676)", () => {
     expect(on.getValue()).toBe(TEXT);
   });
 
-  it('moves a step down past the blank line, leaving the blank where it was', () => {
+  it('moves a step down past the blank line, leaving the blank where it was', async () => {
     const { on } = open();
-    press(toolbarOn(on, 'acme.tag'), 'down');
+    press(await toolbarOn(on, 'acme.tag'), 'down');
     expect(on.getValue().split('\n').slice(4, 8)).toEqual([
       'acme.pull team={team}',
       'where status = done',
@@ -121,28 +128,28 @@ describe("a recipe block's toolbar (TYTO-676)", () => {
     ]);
   });
 
-  it('deletes a block with its line break', () => {
+  it('deletes a block with its line break', async () => {
     const { on } = open();
-    press(toolbarOn(on, '# Pull, then tag.'), 'delete');
+    press(await toolbarOn(on, '# Pull, then tag.'), 'delete');
     expect(on.getValue()).toBe(TEXT.replace('# Pull, then tag.\n', ''));
   });
 
-  it("runs the block's own step, by its index in the text as it is now", () => {
+  it("runs the block's own step, by its index in the text as it is now", async () => {
     const { on, runBlock } = open();
     // A step inserted above: the toolbar built for step 2 now sits on step 3.
     on.view.dispatch({ changes: { from: TEXT.indexOf('acme.pull'), insert: 'acme.first\n' } });
-    press(toolbarOn(on, 'where status = done'), 'run');
+    press(await toolbarOn(on, 'where status = done'), 'run');
     expect(runBlock.mock.calls).toEqual([['tab-1', 3]]);
   });
 
-  it('offers to fold a result that folds, saying which way', () => {
+  it('offers to fold a result that folds, saying which way', async () => {
     const at = TEXT.indexOf('acme.tag');
     const { on } = open({ foldable: (_id, line) => line === at, collapsed: () => true });
-    const toolbar = toolbarOn(on, 'acme.tag');
+    const toolbar = await toolbarOn(on, 'acme.tag');
     const fold = toolbar.querySelector<HTMLButtonElement>('[data-action="collapse"]');
     expect(fold?.getAttribute('aria-label')).toBe('Show result');
     expect(
-      toolbarOn(on, 'acme.pull team={team}').querySelector('[data-action="collapse"]'),
+      (await toolbarOn(on, 'acme.pull team={team}')).querySelector('[data-action="collapse"]'),
     ).toBeNull();
   });
 });
