@@ -16,6 +16,7 @@ import type {
   RecipeParam,
   Step,
 } from './ast.js';
+import { chainSegments } from './chain.js';
 
 /**
  * The shortest interval `every` accepts. A scheduled run reads its sources again, so a
@@ -40,7 +41,9 @@ export const MINIMUM_INTERVAL_MINUTES = 5;
  * explicit Run in a trusted folder apply its plans without a click (ADR 0170); `every 30m`
  * or `every 2h` in the header asks the host to run it on that interval while the app is open
  * (ADR 0175); `param` lines declare what varies;
- * every other line is one verb and its arguments, and so one cell. `#` starts a comment line.
+ * every other line is one verb and its arguments, and so one cell, or several steps chained
+ * with a `|` that stands alone (TYTO-706, `chain.ts`), each read as if on its own line.
+ * `#` starts a comment line.
  * It is a line format and not a grammar on purpose: a one-step change is a one-line diff,
  * and the chain of verbs is what the person reads.
  */
@@ -123,23 +126,31 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
       continue;
     }
 
-    const textStart = start + verb.length;
-    const rest = content.slice(verb.length);
-    const leading = rest.length - rest.trimStart().length;
-    const argumentsResult = tokenizeArguments(rest, textStart);
-    if (!argumentsResult.ok) {
-      problems.push(...argumentsResult.error);
-      continue;
+    // TYTO-706: a `|` standing alone splits the line into steps, each read as if on its own line.
+    for (const segment of chainSegments(content)) {
+      const at = start + segment.from;
+      const written = content.slice(segment.from, segment.to);
+      const word = /^\S+/u.exec(written)?.[0] ?? '';
+      if (segment.bar !== undefined && written === '') {
+        const bar = start + segment.bar;
+        syntax("a '|' joins two steps, and no step follows this one", sourceRange(bar, bar + 1));
+        continue;
+      }
+      if (segment.bar !== undefined && (CHAIN_REFUSED.has(word) || word.startsWith('#'))) {
+        const what = word.startsWith('#') ? "a '#' note" : `'${word}', a header line,`;
+        syntax(
+          `${what} is written on a line of its own, not after '|'`,
+          sourceRange(at, at + word.length),
+        );
+        continue;
+      }
+      const step = readStep(written, word, at);
+      if (!step.ok) {
+        problems.push(...step.error);
+        continue;
+      }
+      steps.push(step.value);
     }
-    steps.push({
-      verb,
-      verbRange: sourceRange(start, textStart),
-      positional: argumentsResult.value.positional,
-      named: argumentsResult.value.named,
-      text: rest.trim(),
-      textRange: sourceRange(textStart + leading, start + content.length),
-      range,
-    });
   }
 
   if (name === undefined) {
@@ -160,6 +171,31 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
     ...(apply === undefined ? {} : { apply }),
     ...(every === undefined ? {} : { every }),
     steps,
+  });
+}
+
+/** The first words that may not follow a `|`: they are header lines (TYTO-706). */
+const CHAIN_REFUSED = new Set(['recipe', 'apply', 'every', 'param']);
+
+/** One step, `written` its trimmed text starting at offset `start` in the recipe. */
+function readStep(
+  written: string,
+  verb: string,
+  start: number,
+): Result<Step, readonly Diagnostic[]> {
+  const textStart = start + verb.length;
+  const rest = written.slice(verb.length);
+  const leading = rest.length - rest.trimStart().length;
+  const argumentsResult = tokenizeArguments(rest, textStart);
+  if (!argumentsResult.ok) return argumentsResult;
+  return ok({
+    verb,
+    verbRange: sourceRange(start, textStart),
+    positional: argumentsResult.value.positional,
+    named: argumentsResult.value.named,
+    text: rest.trim(),
+    textRange: sourceRange(textStart + leading, start + written.length),
+    range: sourceRange(start, start + written.length),
   });
 }
 
