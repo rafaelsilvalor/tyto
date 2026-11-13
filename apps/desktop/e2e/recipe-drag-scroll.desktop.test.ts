@@ -149,7 +149,7 @@ beforeAll(async () => {
     await page.waitForTimeout(250);
   }
   await page.waitForSelector('#editor .cm-notebook-grip');
-}, 60_000);
+});
 
 afterAll(async () => {
   await closeApp(app);
