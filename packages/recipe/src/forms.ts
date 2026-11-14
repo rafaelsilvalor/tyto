@@ -406,6 +406,20 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       named('into', 'column', false, 'The number column to write.', { default: 'count' }),
     ]),
     form(
+      'set',
+      'Keeps one value computed from the table, which the steps below read as {name}.',
+      'set last_due = max due',
+      [
+        {
+          name: 'assignment',
+          kind: 'expression',
+          placement: 'rest',
+          required: true,
+          help: 'The name, =, and count, or min, max, first, last or sum of a column.',
+        },
+      ],
+    ),
+    form(
       'warn',
       'Reports each row an expression keeps as a warning of the run.',
       'warn when="status = blocked" message="{key|} is blocked"',

@@ -59,6 +59,9 @@ Three things have to be settled before a renderer can show anything:
    leaves that table folded, and deleting the line drops its fold. The editor's `onChange`
    hands the edit over, once per edit and not again for its copy in a second pane. A text the
    window writes itself (`setValue`) maps nothing, so a fold whose line it moved folds no cell.
+   _Amended 2026-11-14 (TYTO-727, ADR 0199):_ a `const` line is part of the header, so editing
+   one reruns every cell; a run that starts below a `set` cell it reuses hands the steps it runs
+   the values those kept cells set.
 3. **A pause in typing runs from the changed line down, and stops before the first source.**
    A source fetches only on save (`saved`) or Run (`explicit`), as a brief's images do (ADR
    0119). The source's cell and the ones after it are `stale`: they show the table they had and
