@@ -355,6 +355,9 @@ importers:
       '@tyto/core':
         specifier: workspace:*
         version: link:../core
+      '@tyto/recipe':
+        specifier: workspace:*
+        version: link:../recipe
       '@tyto/template-lang':
         specifier: workspace:*
         version: link:../template-lang

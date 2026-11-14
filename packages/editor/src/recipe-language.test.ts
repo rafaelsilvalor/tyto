@@ -1,6 +1,8 @@
 import { highlightTree, tagHighlighter, tags } from '@lezer/highlight';
 import { describe, expect, it } from 'vitest';
 
+import { chainSegments } from '@tyto/recipe';
+
 import { recipeLanguage } from './recipe-language.js';
 
 /**
@@ -21,7 +23,7 @@ const named = tagHighlighter([
   { tag: tags.string, class: 'string' },
   { tag: tags.special(tags.variableName), class: 'placeholder' },
   { tag: tags.url, class: 'data' },
-  { tag: tags.separator, class: 'equals' },
+  { tag: tags.separator, class: 'separator' },
 ]);
 
 const spans = (source: string): [string, string][] => {
@@ -53,11 +55,11 @@ describe('the recipe colours', () => {
       ],
       ['param', 'keyword'],
       ['team', 'param'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['design', 'value'],
       ['param', 'keyword'],
       ['kind', 'param'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['"anuncio"', 'string'],
     ]);
   });
@@ -74,15 +76,15 @@ describe('the recipe colours', () => {
       ['{kind}', 'placeholder'],
       ['join', 'verb'],
       ['left', 'argument'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['"team = ', 'string'],
       ['{team}', 'placeholder'],
       ['"', 'string'],
       ['right', 'argument'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['"team = copy"', 'string'],
       ['on', 'argument'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['pair_key', 'value'],
     ]);
   });
@@ -124,14 +126,14 @@ describe('the recipe colours', () => {
     expect(spans(source)).toEqual([
       ['jira.pull', 'verb'],
       ['project', 'argument'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['{project}', 'placeholder'],
       ['rules', 'verb'],
       ['into', 'argument'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['kind,label', 'value'],
       ['using', 'argument'],
-      ['=', 'equals'],
+      ['=', 'separator'],
       ['@./vocabulary.json#/kinds', 'data'],
       ['test.kinds', 'verb'],
       ['@./vocab.json#/a~1b/~0tilde', 'data'],
@@ -156,5 +158,81 @@ describe('the recipe colours', () => {
       ['"open', 'string'],
       ['show', 'verb'],
     ]);
+  });
+});
+
+/** The verbs a source's highlighting marks, in order. */
+const verbs = (source: string): string[] =>
+  spans(source)
+    .filter(([, tag]) => tag === 'verb')
+    .map(([text]) => text);
+
+describe('a | that chains steps on one line (TYTO-712)', () => {
+  it('colours the first word of every step of a chained line as a verb', () => {
+    expect(spans('rows sheet | where x=1 | count rows\n')).toEqual([
+      ['rows', 'verb'],
+      ['|', 'separator'],
+      ['where', 'verb'],
+      ['x', 'argument'],
+      ['=', 'separator'],
+      ['1', 'value'],
+      ['|', 'separator'],
+      ['count', 'verb'],
+    ]);
+  });
+
+  it('colours a namespaced verb after a | as one verb', () => {
+    expect(verbs('where a = 1 | jira.push status=done\n')).toEqual(['where', 'jira.push']);
+  });
+
+  it("marks no verb inside a description, a quoted |, a pattern's a|b or a template's {x|upper}", () => {
+    const source = [
+      'recipe r',
+      '  | Pull the rows | then count them',
+      'where title matches "copy | web"',
+      'extract title pattern=^(poster|flyer)$',
+      'extract title pattern=a|b',
+      'compose tag={team | upper}',
+      'compose tag="{team | upper}"',
+      'compose "Última Sync"={due|slug}',
+      'where a = 1 |sort due',
+      '',
+    ].join('\n');
+
+    expect(verbs(source)).toEqual([
+      'where',
+      'extract',
+      'extract',
+      'compose',
+      'compose',
+      'compose',
+      'where',
+    ]);
+    expect(spans(source).filter(([text]) => text === '|')).toEqual([]);
+  });
+
+  it('marks a verb after each | the parser splits on, and after no other', () => {
+    // The parser's own cases (TYTO-706's chain.test.ts), read by both: the colours follow the
+    // same rule because they ask the same function, and this fails if that ever stops.
+    const lines = [
+      'where a = 1 | sort due | show table',
+      'extract title pattern=^(poster|flyer)$',
+      'where a = 1 |sort due',
+      'where a = 1| sort due',
+      'where title matches "copy | web"',
+      'compose "Última Sync"={due|slug}',
+      'compose tag={team | upper} | show table',
+      'compose tag="{team | upper}" | show table',
+    ];
+    for (const line of lines) {
+      const firstWords = chainSegments(line).map(
+        (segment) => /^[\w.-]+/u.exec(line.slice(segment.from, segment.to))?.[0],
+      );
+      expect(verbs(`${line}\n`), line).toEqual(firstWords);
+    }
+  });
+
+  it('chains nothing on a header line', () => {
+    expect(verbs('recipe a | b\nparam p = x | y\n')).toEqual([]);
   });
 });

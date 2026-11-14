@@ -38,6 +38,7 @@
     "@replit/codemirror-vim": "^6.4.0",
     "@tyto/brief-lang": "workspace:*",
     "@tyto/core": "workspace:*",
+    "@tyto/recipe": "workspace:*",
     "@tyto/template-lang": "workspace:*"
   },
   "devDependencies": {

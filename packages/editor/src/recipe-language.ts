@@ -1,4 +1,5 @@
 import { LanguageSupport, StreamLanguage, type StringStream } from '@codemirror/language';
+import { chainSegments } from '@tyto/recipe';
 
 /**
  * A `.recipe` file, coloured (TYTO-377, ADR 0128).
@@ -15,6 +16,11 @@ import { LanguageSupport, StreamLanguage, type StringStream } from '@codemirror/
  * - A `|` line under the header is the recipe's description, coloured as `meta`.
  * - The first word of any other line is the verb — `where`, or a plugin's namespaced
  *   `jira.pull` — coloured as a function name, the dot included: one verb, one name.
+ * - A step line may chain steps with a `|` that stands alone (TYTO-706); that `|` is a
+ *   `separator` and the first word after it a verb again (TYTO-712). Which `|` stands alone is
+ *   `@tyto/recipe`'s `chainSegments`, asked for the whole line when the tokenizer meets a `|`,
+ *   so the colours and the parser split at the same places: never inside a quoted string or
+ *   `{ }`, never on a header line, never in `pattern=a|b`.
  * - `name=` is an `attributeName` and its `=` a `separator`; an unquoted value after it is an
  *   `attributeValue`, a quoted one a `string`.
  * - `{param}` is a placeholder (`special(variableName)`), inside a quoted value too.
@@ -38,6 +44,8 @@ interface RecipeState {
   paramNamed: boolean;
   /** Right after an argument's name, before its `=`. */
   named: boolean;
+  /** Right after a `|` that chains steps: the next word is a verb. */
+  verbNext: boolean;
 }
 
 const VERB = /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*/u;
@@ -65,6 +73,18 @@ function readWord(stream: StringStream): void {
     if (/\s/u.test(next) || stream.match(PLACEHOLDER, false)) return;
     stream.next();
   }
+}
+
+/**
+ * A line that is no step, read by its first word with the indentation left out: a comment, a
+ * description, or a header word. The completion asks it too, so the two cannot disagree.
+ */
+export const NOT_A_STEP = /^(?:#|\||(?:recipe|param|apply|every)(?=\s|$))/u;
+
+/** Whether the `|` at the stream's position chains two steps, by the parser's own rule. */
+function atChainBar(stream: StringStream): boolean {
+  if (stream.peek() !== '|') return false;
+  return chainSegments(stream.string).some((segment) => segment.bar === stream.pos);
 }
 
 function lineStart(stream: StringStream, state: RecipeState): string | null {
@@ -116,10 +136,21 @@ function paramRest(stream: StringStream, state: RecipeState): string | null {
 }
 
 function stepRest(stream: StringStream, state: RecipeState): string | null {
+  if (state.verbNext) {
+    state.verbNext = false;
+    if (stream.match(VERB)) return 'variableName.function';
+  }
   if (stream.match(PLACEHOLDER)) return 'variableName.special';
   if (state.quoted) {
     readQuoted(stream, state);
     return 'string';
+  }
+  if (atChainBar(stream)) {
+    stream.next();
+    state.afterEquals = false;
+    state.named = false;
+    state.verbNext = true;
+    return 'separator';
   }
   const value = state.afterEquals;
   state.afterEquals = false;
@@ -150,6 +181,7 @@ function token(stream: StringStream, state: RecipeState): string | null {
     state.afterEquals = false;
     state.paramNamed = false;
     state.named = false;
+    state.verbNext = false;
   }
   if (!state.quoted && stream.eatSpace()) {
     state.afterEquals = false;
@@ -178,6 +210,7 @@ export const recipeLanguage = StreamLanguage.define<RecipeState>({
     afterEquals: false,
     paramNamed: false,
     named: false,
+    verbNext: false,
   }),
   token,
   copyState: (state) => ({ ...state }),

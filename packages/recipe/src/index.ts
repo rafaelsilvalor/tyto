@@ -26,6 +26,8 @@ export {
   recipeLines,
   recipeSteps,
 } from './blocks.js';
+export type { ChainSegment } from './chain.js';
+export { chainSegments } from './chain.js';
 export { checkTable } from './check-table.js';
 export type { RunClock } from './clock.js';
 export { systemClock } from './clock.js';

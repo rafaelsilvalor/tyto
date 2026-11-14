@@ -5,17 +5,22 @@ import {
 } from '@codemirror/autocomplete';
 import { type EditorState, type Extension } from '@codemirror/state';
 
-import { recipeLanguage } from './recipe-language.js';
+import { chainSegments } from '@tyto/recipe';
+
+import { NOT_A_STEP, recipeLanguage } from './recipe-language.js';
 
 /**
- * Verb names offered at the start of a recipe line (TYTO-377).
+ * Verb names offered at the start of a recipe line (TYTO-377), and after a `|` that chains
+ * steps on one line (TYTO-712).
  *
  * The names come from the host, because only the host knows which verbs exist: the built-in
  * ones and whatever the installed plugins contribute, namespaced (`jira.pull`, ADR 0128). This
- * package does not depend on `@tyto/recipe` and does not start to.
+ * package takes from `@tyto/recipe` only its pure line rules (which `|` chains steps), never
+ * its verbs.
  *
  * Only the verb, in v1: the first word of a line that is not a comment, a description or the
- * header. Arguments mean something per verb, and that knowledge is the verb's.
+ * header, or the first word after a chaining `|`. Arguments mean something per verb, and that
+ * knowledge is the verb's.
  */
 export type RecipeVerbSource = (state: EditorState) => readonly string[];
 
@@ -32,11 +37,21 @@ export function completeRecipeVerb(
   const typed = WORD_BEFORE.exec(before)?.[0] ?? '';
   // The word being typed must be the line's first: anything before it makes this an argument,
   // and a `#` or a `|` before it is not a word, so comments and descriptions are left out too.
-  if (indent + typed.length !== before.length) return null;
-  if (typed === '' && !context.explicit) return null;
+  // Or it is the first after a `|` that chains steps, and there `| ` already says a verb comes.
+  const first = indent + typed.length === before.length;
+  if (!first && !afterChainBar(line.text, before.length - typed.length)) return null;
+  if (first && typed === '' && !context.explicit) return null;
   const options = verbs(context.state).map((verb) => ({ label: verb, type: 'function' }));
   if (options.length === 0) return null;
   return { from: context.pos - typed.length, options, validFor: /^[\w.-]*$/u };
+}
+
+/** Whether the word starting at `start` follows, past blanks, a `|` that chains steps. */
+function afterChainBar(text: string, start: number): boolean {
+  if (NOT_A_STEP.test(text.trimStart())) return false;
+  const bar = text.slice(0, start).trimEnd().length - 1;
+  if (bar < 0 || text[bar] !== '|') return false;
+  return chainSegments(text).some((segment) => segment.bar === bar);
 }
 
 /**
