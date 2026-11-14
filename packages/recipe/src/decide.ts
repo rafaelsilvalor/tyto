@@ -1,4 +1,4 @@
-import { type Result, ok } from '@tyto/core';
+import { type Diagnostic, type Result, type SourceRange, diagnostic, ok } from '@tyto/core';
 import { z } from 'zod';
 
 import type { NamedArgument } from './ast.js';
@@ -26,14 +26,21 @@ const NAMES = [
   'hold-when-empty',
   'tie',
   'clear',
+  'clear-limit',
 ] as const;
 const TIES = ['local', 'remote'] as const;
 const CLEARS = ['push', 'pull'] as const;
 const REQUIRED = ['local', 'remote', 'last'] as const;
+/**
+ * The most clears one run of `decide` pushes when `clear-limit=` is not given (TYTO-714). A
+ * person clears a handful of cells between runs; a sheet read that lost cells clears dozens.
+ */
+export const DEFAULT_CLEAR_LIMIT = 5;
 const USAGE =
   'takes one column and local=, remote= and last=, as in decide status local=sheet ' +
   'remote=tracker last=last_status values=todo,doing,done first-run-wins=done; ' +
-  'it also takes hold-when-empty=<column>, tie=local|remote and clear=push|pull';
+  'it also takes hold-when-empty=<column>, tie=local|remote, clear=push|pull and, with ' +
+  'clear=push, clear-limit=<n>|none';
 
 /**
  * What a sync does with a row: write the local value to the remote side (`push`), write the
@@ -205,6 +212,16 @@ function spelt(value: CellValue | undefined): CellValue {
  * side; `push` pushes the empty value, a change like any other, which `tie=` settles when the
  * remote side changed too. With no last value an empty local value never pushes (TYTO-647).
  *
+ * With `clear=push`, two guards hold clears that look like a lost read rather than a person's
+ * edits (TYTO-714). When the `local=` column is missing from the table, or empty on every row
+ * while `last` holds values, no clear is pushed that run, and one warning names the column. When
+ * a run would push more clears than `clear-limit=` (5 when not given; `none` lifts it), none is
+ * pushed, and one warning gives the count and how to release them. A held clear is a `hold`
+ * row, as `hold-when-empty=` holds one, whose decided value is the last one: `_push` is empty,
+ * `_pushes` false, and a `remember` of the decided column stores the value it already held,
+ * with or without `when=`, so the next run sees the same clear again. A missing `local=` column
+ * is an error without `clear=push`, as any unknown column is.
+ *
  * It writes seven columns: `<column>`, the decided value; `<column>_action`, push, pull, same or
  * hold; `<column>_push`, the decided value on a push row and empty on every other, which is what
  * a write to the remote side reads; `<column>_pushes`, true exactly on a push row whatever its
@@ -247,18 +264,68 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
     return argumentsProblem(context, `needs ${missing.map((each) => `${each}=`).join(', ')}`);
   }
 
-  const sides: Column[] = [];
-  for (const side of [...REQUIRED, 'hold-when-empty'] as const) {
+  const clearArgument = written.get('clear');
+  const clear = clearArgument === undefined ? 'pull' : clearArgument.value;
+  if (!isClear(clear)) {
+    return argumentsProblem(
+      context,
+      `takes clear=push or clear=pull, not clear=${clear}`,
+      clearArgument === undefined ? undefined : at(clearArgument.range),
+    );
+  }
+  const limitArgument = written.get('clear-limit');
+  if (limitArgument !== undefined && clear !== 'push') {
+    return argumentsProblem(
+      context,
+      'takes clear-limit= only with clear=push, the one setting that pushes a clear',
+      at(limitArgument.range),
+    );
+  }
+  const clearLimit = limitArgument === undefined ? DEFAULT_CLEAR_LIMIT : readLimit(limitArgument);
+  if (clearLimit === undefined) {
+    return argumentsProblem(
+      context,
+      `takes clear-limit=<a whole number> or clear-limit=none, not clear-limit=${limitArgument?.value ?? ''}`,
+      limitArgument === undefined ? undefined : at(limitArgument.range),
+    );
+  }
+
+  const sides: (Column | undefined)[] = [];
+  let missingLocal: string | undefined;
+  for (const side of REQUIRED) {
     const argument = written.get(side);
-    if (argument === undefined) continue;
+    if (argument === undefined) return argumentsProblem(context, USAGE);
     const column = resolveColumn(table.value, argument.value, at(argument.range), context.aliases);
-    if (!column.ok) return column;
+    if (!column.ok) {
+      // A sheet whose read lost the local column must not error out of a sync, nor clear the
+      // remote side: with clear=push the run goes on and holds every clear (TYTO-714).
+      const unknown = column.error.every((each) => each.code === 'E_RECIPE_UNKNOWN_COLUMN');
+      if (side === 'local' && clear === 'push' && unknown) {
+        missingLocal = argument.value;
+        sides.push(undefined);
+        continue;
+      }
+      return column;
+    }
     sides.push(column.value);
   }
-  const [localColumn, remoteColumn, lastColumn, holdColumn] = sides;
-  if (localColumn === undefined || remoteColumn === undefined || lastColumn === undefined) {
+  const holdArgument = written.get('hold-when-empty');
+  let holdColumn: Column | undefined;
+  if (holdArgument !== undefined) {
+    const column = resolveColumn(
+      table.value,
+      holdArgument.value,
+      at(holdArgument.range),
+      context.aliases,
+    );
+    if (!column.ok) return column;
+    holdColumn = column.value;
+  }
+  const [localColumn, remoteColumn, lastColumn] = sides;
+  if (remoteColumn === undefined || lastColumn === undefined) {
     return argumentsProblem(context, USAGE);
   }
+  const localName = localColumn?.name ?? missingLocal ?? '';
 
   const tieArgument = written.get('tie');
   const tie = tieArgument === undefined ? 'local' : tieArgument.value;
@@ -270,19 +337,10 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
     );
   }
 
-  const clearArgument = written.get('clear');
-  const clear = clearArgument === undefined ? 'pull' : clearArgument.value;
-  if (!isClear(clear)) {
-    return argumentsProblem(
-      context,
-      `takes clear=push or clear=pull, not clear=${clear}`,
-      clearArgument === undefined ? undefined : at(clearArgument.range),
-    );
-  }
-
   const origin = `decide ${name}`;
-  const inPlace = name.toLowerCase() === localColumn.name.toLowerCase();
-  const decidedColumn: Column = { name: inPlace ? localColumn.name : name, type: 'text', origin };
+  const inPlace =
+    localColumn !== undefined && name.toLowerCase() === localColumn.name.toLowerCase();
+  const decidedColumn: Column = { name: inPlace ? localName : name, type: 'text', origin };
   const added: Column[] = [
     { name: `${name}_action`, type: 'text', origin },
     { name: `${name}_push`, type: 'text', origin },
@@ -348,10 +406,10 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
     tie,
     clear,
   };
-  const rows = table.value.rows.map((row): Row => {
-    let decision = decideValue(
+  const decisions = table.value.rows.map((row): Decision => {
+    const decision = decideValue(
       {
-        local: row.values[localColumn.name],
+        local: localColumn === undefined ? null : row.values[localColumn.name],
         remote: row.values[remoteColumn.name],
         last: row.values[lastColumn.name],
       },
@@ -362,7 +420,7 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
       holdColumn !== undefined &&
       comparable(row.values[holdColumn.name]) === ''
     ) {
-      decision = {
+      return {
         ...decision,
         action: 'hold',
         overrides: false,
@@ -370,6 +428,21 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
         reason: 'remote did not return the row',
       };
     }
+    return decision;
+  });
+  const guarded =
+    clear === 'push'
+      ? guardClears(table.value.rows, decisions, {
+          localName,
+          missing: missingLocal !== undefined,
+          lastName: lastColumn.name,
+          limit: clearLimit,
+          range: context.written.range,
+        })
+      : { decisions, warnings: [] };
+  const rows = table.value.rows.map((row, index): Row => {
+    const decision = guarded.decisions[index] ?? decisions[index];
+    if (decision === undefined) return row;
     const decided: Record<string, CellValue> = {
       [decidedColumn.name]: decision.value,
       [`${name}_action`]: decision.action,
@@ -382,11 +455,90 @@ export async function decide(context: VerbContext): Promise<VerbResult> {
     return { ...row, values: { ...row.values, ...decided } };
   });
   const columns = inPlace
-    ? table.value.columns.map((column) =>
-        column.name === localColumn.name ? decidedColumn : column,
-      )
+    ? table.value.columns.map((column) => (column.name === localName ? decidedColumn : column))
     : [...table.value.columns, decidedColumn];
-  return ok({ table: { columns: [...columns, ...added], rows } });
+  return ok({ table: { columns: [...columns, ...added], rows } }, guarded.warnings);
+}
+
+interface ClearGuard {
+  /** The `local=` column, as the table names it, or as the step wrote it when it is missing. */
+  readonly localName: string;
+  readonly missing: boolean;
+  readonly lastName: string;
+  /** The most clears one run pushes; `Infinity` for `clear-limit=none`. */
+  readonly limit: number;
+  readonly range: SourceRange;
+}
+
+/**
+ * Holds every clear of a run that looks like a lost read rather than a person's edits
+ * (TYTO-714): the local column missing, or empty on every row while `last` holds values, or
+ * more clears than the limit. A clear is a push of the empty value; nothing else pushes one.
+ */
+function guardClears(
+  rows: readonly Row[],
+  decisions: readonly Decision[],
+  guard: ClearGuard,
+): { readonly decisions: readonly Decision[]; readonly warnings: readonly Diagnostic[] } {
+  const clears = decisions.filter(isClearPush).length;
+  const lostColumn =
+    guard.missing ||
+    (rows.length > 0 &&
+      rows.every((row) => comparable(row.values[guard.localName]) === '') &&
+      rows.some((row) => comparable(row.values[guard.lastName]) !== ''));
+  const warnings: Diagnostic[] = [];
+  let reason: string | undefined;
+  if (lostColumn && (guard.missing || clears > 0)) {
+    reason = 'clear held, local column lost';
+    warnings.push(
+      diagnostic(
+        'W_RECIPE_DECIDE_CLEAR_COLUMN',
+        {
+          column: guard.localName,
+          problem: guard.missing ? 'is missing from the table' : 'is empty on every row',
+          count: clears,
+        },
+        { range: guard.range },
+      ),
+    );
+  } else if (clears > guard.limit) {
+    reason = 'clear held, over clear-limit';
+    warnings.push(
+      diagnostic(
+        'W_RECIPE_DECIDE_CLEAR_LIMIT',
+        { count: clears, limit: String(guard.limit) },
+        { range: guard.range },
+      ),
+    );
+  }
+  if (reason === undefined || clears === 0) return { decisions, warnings };
+  const held = reason;
+  return {
+    decisions: decisions.map((decision, index) =>
+      isClearPush(decision)
+        ? {
+            action: 'hold',
+            // The last value, so that remembering the decided column keeps the state as it was.
+            value: spelt(rows[index]?.values[guard.lastName]),
+            overrides: false,
+            overwritten: null,
+            reason: held,
+          }
+        : decision,
+    ),
+    warnings,
+  };
+}
+
+function isClearPush(decision: Decision): boolean {
+  return decision.action === 'push' && decision.value === null;
+}
+
+/** `clear-limit=`'s value: a whole number, or `none` for no limit; undefined otherwise. */
+function readLimit(argument: NamedArgument): number | undefined {
+  const value = argument.value.trim().toLowerCase();
+  if (value === 'none') return Number.POSITIVE_INFINITY;
+  return /^\d+$/.test(value) ? Number(value) : undefined;
 }
 
 function isTie(value: string): value is DecideTie {

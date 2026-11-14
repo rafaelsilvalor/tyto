@@ -97,6 +97,20 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
    > cell cleared by mistake, or by a sheet filter, must not clear the tracker's status, while
    > a shared field such as an owner is one a person clears on purpose.
 
+> **Amended by TYTO-714 (2026-11-14), clear guards.** `clear=push` now holds the clears of a
+> run that look like a lost read rather than a person's edits, on by default whenever it is
+> set, and generic in `decide`. A column guard: when the `local=` column is missing from the
+> table, or empty on every row while `last` holds values, no clear is pushed that run, and
+> one `W_RECIPE_DECIDE_CLEAR_COLUMN` names the column; without `clear=push` a missing column
+> is still an error. A quantity guard: `decide` takes `clear-limit=<n>|none`, 5 when not
+> given and only with `clear=push`; a run that would push more than n clears pushes none of
+> them, and one `W_RECIPE_DECIDE_CLEAR_LIMIT` gives the count and says to raise the limit
+> for that run, or write `none`. A held clear is a `hold` row (`_push` empty, `_pushes`
+> false) whose decided value is `last`, so remembering the decided column, with or without
+> `when=`, leaves the state as it was and the next run sees the same clears again. The
+> maintainer decided both guards on 2026-11-14, after TYTO-686 recommended `clear=push` for
+> a tracker's fields.
+
 6. **A host without state is an error, never an empty store.** `last` and `remember` fail with
    `E_RECIPE_STATE` there. If `last` read null instead, every run would be a first run, and the
    first-run rule would let a sheet's done beat the tracker forever.

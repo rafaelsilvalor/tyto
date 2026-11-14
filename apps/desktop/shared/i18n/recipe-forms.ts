@@ -154,6 +154,8 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.decide.field.hold-when-empty.help': 'Segura um envio onde esta coluna está vazia.',
   'recipe.verb.decide.field.tie.help': 'O lado que vence quando os dois mudaram.',
   'recipe.verb.decide.field.clear.help': 'Se um valor apagado desde a última execução é enviado.',
+  'recipe.verb.decide.field.clear-limit.help':
+    'Com clear=push, o máximo de valores apagados que uma execução envia, ou none para não limitar.',
 
   'recipe.verb.rollup.summary': 'Conta os filhos de cada linha-mãe que uma expressão mantém.',
   'recipe.verb.rollup.field.column.help': 'A coluna de contagem a escrever.',

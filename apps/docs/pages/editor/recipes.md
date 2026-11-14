@@ -291,6 +291,23 @@ remember dispatched columns=title
 
 **Where the credential comes from.** In the command line it is an environment variable, `TYTO_RECIPE_CREDENTIAL_` followed by the name in upper case with every character that is not a letter or a digit turned into `_`: `token=routine-hook` reads `TYTO_RECIPE_CREDENTIAL_ROUTINE_HOOK`. `tyto mcp`'s `run_recipe` checks the list and the credential and shows the plan, and never sends: an agent can preview a dispatch, not carry one out. [`tyto recipe run --apply`](#run-from-the-terminal) sends them, in a trusted folder. **In the window**, open **Show plugins** and find **Recipe credentials** under the list of plugins: type the name `token=` uses and its value, and **Save** — or type the name and click **Import from file…** to store a file's text as the value. The value goes to the system keychain, and Tyto never shows it again: the section lists the names only, each with **Forget**, and saving the same name again replaces it. A credential is this computer's, for every folder on it; which hosts a recipe may send to is each folder's `recipes.call.hosts`, read only once you trust the folder. Until a credential is stored, the `call` line fails with a problem that says where to store it; once stored, the plan lists the requests and **Apply** sends them.
 
+## Sync a field both ways
+
+`decide` compares a field on two sides of a sync, row by row: the local side (a sheet's column), the remote side (a tracker's field, already mapped to the sheet's values) and what the last applied run left, which `last` reads. Whichever side changed since then wins: the row says `push`, `pull`, `same` or `hold` in `<column>_action`, and the step that writes to the remote side reads `<column>_push` and `<column>_pushes`.
+
+```
+last sync columns=owner
+decide owner local=owner remote=tracker_owner last=last_owner clear=push
+remember sync columns=owner when="owner_action != hold"
+```
+
+With `clear=push`, a cell emptied since the last run empties the remote field too; without it, the remote value fills the cell again. Because an empty cell is also what a sheet read that lost cells looks like, `decide` holds every clear of a run, pushes none of them and shows one warning on its line, in two cases:
+
+- **The column was lost.** The `local=` column is missing from the table, or empty on every row while the last run left values there. The warning names the column. Check the sheet and run again.
+- **Too many clears at once.** A run would push more clears than `clear-limit=`, 5 when not given. The warning gives the count. If you did mean to empty those cells, run once with a higher limit (`clear-limit=20`), or write `clear-limit=none` to lift the limit.
+
+A held row reads `hold` and pushes nothing, and the state keeps its last value, so the next run sees the same clears again. Clears at or under the limit push as before.
+
 ## Run from the terminal
 
 `tyto recipe run <recipe>` runs a recipe in the workspace folder that holds it, with that folder's trust, through the same runner as the window. [Get the command](../command-line/index.md#get-the-command) says how to build it.

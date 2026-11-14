@@ -239,6 +239,8 @@ non-zero.
 | `W_RECIPE_LOCAL_UNREAD` | warning | no | A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty. |
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
 | `W_RECIPE_WARN` | warning | no | A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed. |
+| `W_RECIPE_DECIDE_CLEAR_COLUMN` | warning | no | A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run. |
+| `W_RECIPE_DECIDE_CLEAR_LIMIT` | warning | no | A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them. |
 | `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
 | `E_VIM_CONTRIBUTION` | error | no | A vim contribution names an operation the editor does not have, or a bad mapping. |
 
@@ -3533,6 +3535,34 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `subject`, `message`
+
+### `W_RECIPE_DECIDE_CLEAR_COLUMN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md`
+
+A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Column '{column}' {problem}, so 'decide' held its {count} clear(s) and cleared nothing on the remote side.
+```
+
+Parameters: `column`, `problem`, `count`
+
+### `W_RECIPE_DECIDE_CLEAR_LIMIT`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md`
+
+A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them.
+
+A warning never replaces a value (ADR 0013).
+
+```
+'decide' held {count} clear(s), more than clear-limit={limit}; to push them, raise clear-limit= for this run, or write clear-limit=none to lift the limit.
+```
+
+Parameters: `count`, `limit`
 
 ### `W_RECIPE_NOT_REMEMBERED`
 
