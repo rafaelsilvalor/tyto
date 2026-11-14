@@ -21,6 +21,11 @@ export interface RunOptions {
   readonly input?: Table | undefined;
   /** Values for the recipe's `param` lines, by name. */
   readonly params?: Readonly<Record<string, string>>;
+  /**
+   * Values `set` steps above the first step given already computed, by name (ADR 0199): a
+   * host that runs a slice of the recipe hands on what the cells it reused had set.
+   */
+  readonly values?: Readonly<Record<string, string>> | undefined;
   readonly verbs: VerbRegistry;
   readonly derivations: DerivationRegistry;
   readonly resolveRecipe: RecipeResolver;
@@ -76,6 +81,10 @@ export interface Cell {
    * notebook to open the cell onto (TYTO-449). Present only when the `run` succeeded.
    */
   readonly included?: IncludedRecipe;
+  /** A `set` cell's: the name it set and the value, which the steps below read (ADR 0199). */
+  readonly named?: { readonly name: string; readonly value: string };
+  /** A line the cell's result shows, which is no diagnostic (`VerbOutput.note`). */
+  readonly note?: string;
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -106,8 +115,10 @@ export async function runRecipe(
   recipe: RecipeAst,
   options: RunOptions,
 ): Promise<Result<RecipeRun, readonly Diagnostic[]>> {
-  const values = paramValues(recipe, options.params ?? {});
-  if (!values.ok) return values;
+  const header = paramValues(recipe, options.params ?? {});
+  if (!header.ok) return header;
+  // ADR 0199: what `{name}` fills grows down the chain, as each `set` cell adds its value.
+  const values = new Map([...Object.entries(options.values ?? {}), ...header.value]);
 
   const aliases = new Map(
     Object.entries(options.aliases ?? {}).map(([alias, column]) => [alias.toLowerCase(), column]),
@@ -138,7 +149,7 @@ export async function runRecipe(
     }
     const outcome = await verb.run({
       table,
-      step: filled(written, values.value),
+      step: filled(written, values),
       written,
       aliases,
       derivations: options.derivations,
@@ -164,7 +175,10 @@ export async function runRecipe(
     keeps.push(...(outcome.value.keeps ?? []));
     const cellRemembers = outcome.value.remembers ?? [];
     remembers.push(...cellRemembers);
-    const { plan, included } = outcome.value;
+    const { plan, included, note } = outcome.value;
+    const computed = Object.entries(outcome.value.values ?? {});
+    for (const [name, value] of computed) values.set(name, value);
+    const [named] = computed;
     cells.push({
       step: written,
       status: 'ok',
@@ -173,6 +187,8 @@ export async function runRecipe(
       ...(cellRemembers.length === 0 ? {} : { remembers: cellRemembers }),
       ...(cellView === undefined ? {} : { view: cellView }),
       ...(included === undefined ? {} : { included }),
+      ...(named === undefined ? {} : { named: { name: named[0], value: named[1] } }),
+      ...(note === undefined ? {} : { note }),
       diagnostics: outcome.diagnostics,
     });
     diagnostics.push(...outcome.diagnostics);
@@ -196,6 +212,10 @@ function paramValues(
   const problems: Diagnostic[] = [];
   for (const name of Object.keys(supplied)) {
     if (declared.includes(name)) continue;
+    if (recipe.consts.some((constant) => constant.name === name)) {
+      problems.push(constGiven(name));
+      continue;
+    }
     problems.push(
       diagnostic('E_RECIPE_PARAM', {
         param: name,
@@ -224,7 +244,25 @@ function paramValues(
       values.set(param.name, value);
     }
   }
+  for (const constant of recipe.consts) values.set(constant.name, constant.value);
   return problems.length > 0 ? err(problems) : ok(values);
+}
+
+/**
+ * A value supplied for a `const` (ADR 0199): from `--param`, the window, an agent or a `run`
+ * line, every way in says the same.
+ */
+export function constGiven(name: string, range?: Diagnostic['range']): Diagnostic {
+  return diagnostic(
+    'E_RECIPE_PARAM',
+    {
+      param: name,
+      problem:
+        "was given a value, and it is a 'const' written in the recipe, which takes no value " +
+        'from outside',
+    },
+    range === undefined ? {} : { range },
+  );
 }
 
 function filled(step: Step, values: ReadonlyMap<string, string>): Step {

@@ -74,6 +74,13 @@ describe('parseRecipe', () => {
     ['every twice', 'recipe x\nevery 5m\nevery 1h', 'every 1h', 'written once'],
     ['every after a step', 'recipe x\nshow table\nevery 5m', 'every 5m', 'header'],
     ['a description after every', 'recipe x\nevery 5m\n| late', '| late', 'right under'],
+    ['a description after a const', 'recipe x\nconst a = 1\n| late', '| late', 'right under'],
+    ['a const without a value', 'recipe x\nconst a', 'const a', "'const <name> = <value>'"],
+    ['a const after a bar', 'recipe x\nshow table | const a = 1', 'const', 'header line'],
+    ['a param and a const of one name', 'recipe x\nparam a\nconst a = 1', 'const a = 1', 'twice'],
+    ["a set of a param's name", 'recipe x\nparam a\nset a = count', 'set a = count', 'twice'],
+    ['a name set twice', 'recipe x\nset a = count\nset a = count', 'set a = count', 'twice'],
+    ['a set without its name', 'recipe x\nset max due', 'set max due', "'set <name> = "],
   ])('refuses %s, at the line that is wrong', (_case, source, wrong, message) => {
     const parsed = parseRecipe(source);
     expect(parsed.ok).toBe(false);
@@ -90,6 +97,30 @@ describe('parseRecipe', () => {
     if (parsed.ok) return;
     expect(parsed.error.map(({ code }) => code)).toEqual(['E_RECIPE_PARAM']);
     expect(slice(source, parsed.error[0]?.range)).toBe('{missing}');
+  });
+
+  it("reads 'const' lines into the recipe's consts, quotes taken off", () => {
+    const parsed = parseRecipe('recipe x\nconst a = 1\nconst b = "two words"\nshow table');
+    if (!parsed.ok) throw new Error(parsed.error.map(({ message }) => message).join('\n'));
+    expect(parsed.value.consts.map(({ name, value }) => [name, value])).toEqual([
+      ['a', '1'],
+      ['b', 'two words'],
+    ]);
+    expect(parsed.value.params).toEqual([]);
+  });
+
+  it("knows a 'set' name only below its step, after a '|' too", () => {
+    const below = parseRecipe('recipe x\nset n = count | where a = {n}\nwhere b = {n}');
+    expect(below.ok).toBe(true);
+    const source = 'recipe x\nwhere a = {n}\nset n = count\nset m = max {m}';
+    const parsed = parseRecipe(source);
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.error.map(({ code }) => code)).toEqual(['E_RECIPE_PARAM', 'E_RECIPE_PARAM']);
+    expect(slice(source, parsed.error[0]?.range)).toBe('{n}');
+    expect(parsed.error[0]?.message).toContain("is set by a 'set' step further down");
+    expect(slice(source, parsed.error[1]?.range)).toBe('{m}');
+    expect(parsed.error[1]?.message).toContain("is set by this 'set' step");
   });
 
   it("reads a pattern's \\p{…} and \\u{…} as the pattern's, not as placeholders", () => {
