@@ -12,11 +12,12 @@ import { recipeLanguage } from './recipe-language.js';
 /** The verbs a host would hand over: built-in ones and a plugin's namespaced ones. */
 const VERBS = ['where', 'select', 'show', 'jira.pull', 'jira.push'];
 
-/** The cursor is written into the document as `|`. */
+/** The cursor is written into the document as its last `|`; any `|` before it is text. */
 const complete = (marked: string, explicit = false): CompletionResult | null => {
-  const pos = marked.indexOf('|');
+  const pos = marked.lastIndexOf('|');
   if (pos === -1) throw new Error('the fixture has no | marking the cursor');
-  const state = EditorState.create({ doc: marked.replace('|', ''), extensions: [recipeLanguage] });
+  const doc = marked.slice(0, pos) + marked.slice(pos + 1);
+  const state = EditorState.create({ doc, extensions: [recipeLanguage] });
   return completeRecipeVerb(new CompletionContext(state, pos, explicit), () => VERBS);
 };
 
@@ -51,6 +52,24 @@ describe('recipe verb completion', () => {
   it('offers nothing on a comment or a description line', () => {
     expect(complete('# wh|')).toBeNull();
     expect(complete('recipe open-ads\n  | wh|')).toBeNull();
+  });
+
+  it('offers them right after a | that chains steps, typed or not (TYTO-712)', () => {
+    const empty = complete('recipe open-ads\nwhere status = done | |');
+    expect(labels(empty)).toEqual(VERBS);
+    expect(empty?.from).toBe('recipe open-ads\nwhere status = done | '.length);
+
+    const typed = complete('recipe open-ads\nwhere status = done | select key | jira.p|');
+    expect(labels(typed)).toEqual(VERBS);
+    expect(typed?.from).toBe('recipe open-ads\nwhere status = done | select key | '.length);
+  });
+
+  it('offers nothing after a | that chains nothing', () => {
+    expect(complete('recipe open-ads\nwhere title matches "copy | |', true)).toBeNull();
+    expect(complete('recipe open-ads\ncompose tag={team | |', true)).toBeNull();
+    expect(complete('recipe open-ads\nwhere a = 1 |so|', true)).toBeNull();
+    expect(complete('recipe open-ads\n  | Pull | wh|', true)).toBeNull();
+    expect(complete('recipe open-ads\nwhere a = 1 | sort du|', true)).toBeNull();
   });
 });
 
