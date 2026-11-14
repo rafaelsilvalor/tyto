@@ -196,6 +196,10 @@ export interface RunnerCell {
   readonly view?: CellView;
   /** TYTO-449: a `run` cell's included recipe and its cells, kept with the cell. */
   readonly included?: IncludedRecipe;
+  /** TYTO-727, ADR 0199: a `set` cell's name and the value it set. */
+  readonly named?: { readonly name: string; readonly value: string };
+  /** TYTO-727: a line the cell's result shows that is no diagnostic (`Cell.note`). */
+  readonly note?: string;
   // TYTO-378, ADR 0170: Apply.
   /** Main's id for the cell's plan, which `apply` names; stamped when the cell planned it. */
   readonly planId?: number;
@@ -388,10 +392,13 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       const plannedNow = new Set<number>();
       if (stop > start) {
         const input = next[start - 1]?.table;
+        // ADR 0199: the steps run read `{name}` from the `set` cells reused above them.
+        const values = setValuesOf(next);
         const result = await runRecipe(
           { ...recipe, steps: steps.slice(start, stop) },
           {
             ...(input === undefined ? {} : { input }),
+            values,
             ...(request.params === undefined ? {} : { params: request.params }),
             verbs: registries.verbs,
             derivations: registries.derivations,
@@ -732,7 +739,7 @@ async function includedTexts(
 
 /**
  * What every cell depends on besides its own line: the header, the parameters, their defaults
- * and the values a run supplied (TYTO-673), the file and the folder's answer. Any change
+ * and the values a run supplied (TYTO-673), the consts (ADR 0199), the file and the folder's answer. Any change
  * reruns every cell, since a parameter fills any line and a folder trusted since the last run
  * reads data it did not.
  */
@@ -746,11 +753,22 @@ function headerSignature(
     recipe.name,
     recipe.description,
     recipe.params.map((param) => [param.name, param.defaultValue ?? null]),
+    // ADR 0199: a const fills any line, as a parameter's default does.
+    recipe.consts.map((constant) => [constant.name, constant.value]),
     Object.entries(supplied).sort(([left], [right]) => left.localeCompare(right)),
     path ?? null,
     place.trust,
     place.folder ?? null,
   ]);
+}
+
+/** The values the reused `set` cells computed, in order, for the slice that runs below them. */
+function setValuesOf(cells: readonly KeptCell[]): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const cell of cells) {
+    if (cell.named !== undefined) values[cell.named.name] = cell.named.value;
+  }
+  return values;
 }
 
 /**
@@ -785,6 +803,8 @@ function keptOf(
     ...(cell.remembers === undefined ? {} : { remembers: cell.remembers }),
     ...(cell.view === undefined ? {} : { view: cell.view }),
     ...(cell.included === undefined ? {} : { included: cell.included }),
+    ...(cell.named === undefined ? {} : { named: cell.named }),
+    ...(cell.note === undefined ? {} : { note: cell.note }),
     diagnostics: cell.diagnostics,
     // A skipped cell did not run, so it has no time of its own.
     ...(cell.status === 'skipped' ? {} : { ranAt }),

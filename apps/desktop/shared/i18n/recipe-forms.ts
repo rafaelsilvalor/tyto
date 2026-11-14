@@ -177,6 +177,11 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.count.field.column.help': 'A coluna de lista a contar.',
   'recipe.verb.count.field.into.help': 'A coluna numérica a escrever.',
 
+  'recipe.verb.set.summary':
+    'Guarda um valor calculado da tabela, que os passos abaixo leem como {name}.',
+  'recipe.verb.set.field.assignment.help':
+    'O nome, =, e count, ou min, max, first, last ou sum de uma coluna.',
+
   'recipe.verb.warn.summary':
     'Informa cada linha que uma expressão mantém como um aviso da execução.',
   'recipe.verb.warn.field.when.help': 'As linhas informadas.',

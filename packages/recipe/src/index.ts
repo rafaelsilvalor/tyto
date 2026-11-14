@@ -10,6 +10,7 @@ export type {
   Argument,
   NamedArgument,
   RecipeAst,
+  RecipeConst,
   RecipeInterval,
   RecipeParam,
   Step,

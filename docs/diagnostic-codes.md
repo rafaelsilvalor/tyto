@@ -202,7 +202,7 @@ non-zero.
 | `W_DELIVERY_ASSET_KEPT` | warning | no | A delivery's assets folder already holds a different file under the name an image would be copied to. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 | `E_RECIPE_SYNTAX` | error | yes | A line of a recipe does not match the recipe format. |
-| `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
+| `E_RECIPE_PARAM` | error | yes | A recipe's param, const or set is used where unknown, has no value, or is overridden. |
 | `E_RECIPE_UNKNOWN_VERB` | error | no | A recipe line names a verb that neither Tyto nor an installed plugin contributes. |
 | `E_RECIPE_REGISTRATION` | error | no | A verb or a derivation cannot be registered under the name it was given. |
 | `E_RECIPE_TABLE` | error | no | A table a verb or a derivation answered repeats a column or a key, or holds a value its columns do not allow. |
@@ -2068,7 +2068,7 @@ Parameters: `problem`
 
 **Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
 
-A recipe's parameter is used without a declaration, or has no value when it runs.
+A recipe's param, const or set is used where unknown, has no value, or is overridden.
 
 Every cell may read the parameter, so none of them can run without it.
 

@@ -63,6 +63,13 @@ describe('a recipe read as blocks (TYTO-676, ADR 0196)', () => {
     ]);
   });
 
+  it('reads a const line as a header line, as a param line is (TYTO-727)', () => {
+    expect(shape('recipe x\nconst a = 1\nacme.pull\n')).toEqual([
+      ['header', 1, 2, undefined],
+      ['step', 3, 3, [0, 0]],
+    ]);
+  });
+
   it('reads a run of param lines further down as a header block, which nothing moves', () => {
     const text = 'recipe x\n\nacme.pull\n\nparam b = 2\n\nacme.tag\n';
     expect(shape(text).map(([kind]) => kind)).toEqual(['header', 'step', 'header', 'step']);

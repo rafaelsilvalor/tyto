@@ -61,7 +61,7 @@ export interface BlockEdit {
   readonly at?: number;
 }
 
-const HEADER_WORDS = new Set(['recipe', 'apply', 'every', 'param']);
+const HEADER_WORDS = new Set(['recipe', 'apply', 'every', 'param', 'const']);
 
 interface Line {
   readonly number: number;

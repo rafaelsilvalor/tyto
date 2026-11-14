@@ -1872,7 +1872,8 @@ export const diagnosticCodes = {
   },
   E_RECIPE_PARAM: {
     severity: 'error',
-    summary: "A recipe's parameter is used without a declaration, or has no value when it runs.",
+    summary:
+      "A recipe's param, const or set is used where unknown, has no value, or is overridden.",
     template: "Parameter '{param}' {problem}.",
     spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
     fatal: true,

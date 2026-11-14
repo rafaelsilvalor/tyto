@@ -1,7 +1,7 @@
 import { type Diagnostic, diagnostic, err, ok } from '@tyto/core';
 
 import type { VerbContext, VerbResult } from './registry.js';
-import { runRecipe } from './run.js';
+import { constGiven, runRecipe } from './run.js';
 import { argumentsProblem } from './support.js';
 
 /**
@@ -63,6 +63,9 @@ export async function include(context: VerbContext): Promise<VerbResult> {
   const declared = recipe.params.map((param) => param.name);
   const params: Record<string, string> = {};
   for (const argument of context.step.named) {
+    if (recipe.consts.some((constant) => constant.name === argument.name)) {
+      return err([constGiven(argument.name, argument.range)]);
+    }
     if (!declared.includes(argument.name)) {
       return err([
         diagnostic(
