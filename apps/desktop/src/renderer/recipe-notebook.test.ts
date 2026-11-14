@@ -13,9 +13,11 @@ import {
   blockSlot,
   cellAtOrAbove,
   cellStatuses,
+  cellUnderCursor,
   columnsBefore,
   createRecipeNotebook,
-  stepOnLine,
+  stepAtCursor,
+  stepIndexAt,
   stepSlot,
 } from './recipe-notebook.js';
 
@@ -695,9 +697,10 @@ describe('where Add step writes and what its form offers (TYTO-402)', () => {
   });
 
   it("finds the step on the cursor's line, and none on a comment", () => {
-    expect(stepOnLine(RECIPE, 5)?.index).toBe(1);
-    expect(stepOnLine(RECIPE, 5)?.step.verb).toBe('where');
-    expect(stepOnLine(RECIPE, 4)).toBeUndefined();
+    const where = RECIPE.indexOf('where');
+    expect(stepAtCursor(RECIPE, where + 3)?.index).toBe(1);
+    expect(stepAtCursor(RECIPE, where)?.step.verb).toBe('where');
+    expect(stepAtCursor(RECIPE, RECIPE.indexOf('# keep'))).toBeUndefined();
   });
 
   it('offers the columns of the nearest cell before the step that has a table', () => {
@@ -927,5 +930,114 @@ describe('a line that chains steps with | (TYTO-706)', () => {
       [1, CHAINED.indexOf('acme')],
       [2, CHAINED.indexOf('select')],
     ]);
+  });
+
+  // TYTO-711: a full-size tab follows its step on the line, not the line's first step.
+  it("keeps a tab on the step it was opened for, a one-step line's as before", async () => {
+    const run = await ranOnce();
+    run.notebook.followCell('view-first', 'tab-1', 0);
+    run.notebook.followCell('view-second', 'tab-1', 1);
+    run.notebook.followCell('view-alone', 'tab-1', 2);
+    expect(run.notebook.cellOfTab('view-first')).toBe(0);
+    expect(run.notebook.cellOfTab('view-second')).toBe(1);
+    expect(run.notebook.cellOfTab('view-alone')).toBe(2);
+
+    // The line chains one step now: the second step's tab has no cell, never the first's. Blanks
+    // take the chain's place so every line starts where it did: this harness reports no edit.
+    const chain = ' | where status = done';
+    const one = CHAINED.replace(chain, ' '.repeat(chain.length));
+    run.texts.set('tab-1', one);
+    const running = run.notebook.runNow('tab-1', 'typed');
+    run.replies.at(-1)?.({
+      requestId: run.asked.length,
+      cells: [ran(0, 3), ran(1, 5)],
+      diagnostics: [],
+      ranAt: RAN_AT,
+    });
+    await running;
+    expect(run.notebook.cellOfTab('view-first')).toBe(0);
+    expect(run.notebook.cellOfTab('view-second')).toBeUndefined();
+    expect(run.notebook.cellOfTab('view-alone')).toBe(1);
+  });
+});
+
+/**
+ * Which step Edit step and Open cell result in a tab act on (TYTO-711, ADR 0196 note of
+ * 2026-11-14): on a chained line, the one under the cursor; on a `|` or the blanks around it,
+ * the side of the `|` the cursor is on; past the line's last step, the last.
+ */
+describe('the step under the cursor (TYTO-711)', () => {
+  // Two blanks on each side of the `|`, so a caret in the blanks is not one touching a step.
+  const SPACED = [
+    'recipe weekly',
+    '',
+    'acme.pull  |  where status = done',
+    '',
+    'select key',
+    '',
+  ].join('\n');
+  const pull = SPACED.indexOf('acme.pull');
+  const bar = SPACED.indexOf('|');
+  const where = SPACED.indexOf('where');
+  const select = SPACED.indexOf('select');
+
+  it('is the segment the cursor is in: the first, or the second', () => {
+    expect(stepIndexAt(SPACED, pull)).toBe(0);
+    expect(stepIndexAt(SPACED, pull + 4)).toBe(0);
+    expect(stepIndexAt(SPACED, pull + 'acme.pull'.length)).toBe(0);
+    expect(stepIndexAt(SPACED, where)).toBe(1);
+    expect(stepIndexAt(SPACED, where + 8)).toBe(1);
+  });
+
+  it('is the side of the bar the cursor is on, between the two steps', () => {
+    // A blank before the bar, and the caret right before it: the step before.
+    expect(stepIndexAt(SPACED, bar - 1)).toBe(0);
+    expect(stepIndexAt(SPACED, bar)).toBe(0);
+    // The caret right after the bar, and a blank after it: the step after.
+    expect(stepIndexAt(SPACED, bar + 1)).toBe(1);
+    expect(stepIndexAt(SPACED, bar + 2)).toBe(1);
+  });
+
+  it("is the line's last step at its end, and none off a step line", () => {
+    expect(stepIndexAt(SPACED, SPACED.indexOf('done') + 'done'.length)).toBe(1);
+    expect(stepIndexAt(SPACED, 0)).toBeUndefined();
+    expect(stepIndexAt(SPACED, pull - 1)).toBeUndefined();
+  });
+
+  it('is the step of a one-step line wherever the cursor is on it', () => {
+    expect(stepIndexAt(SPACED, select)).toBe(2);
+    expect(stepIndexAt(SPACED, select + 3)).toBe(2);
+    expect(stepIndexAt(SPACED, select + 'select key'.length)).toBe(2);
+  });
+
+  it("is the first step before an indented line's first segment", () => {
+    const indented = 'recipe weekly\n\n  acme.pull | select key\n';
+    expect(stepIndexAt(indented, indented.indexOf('  acme'))).toBe(0);
+  });
+
+  it('gives Edit step the segment under the cursor, its own range and not the line', () => {
+    const second = stepAtCursor(SPACED, where + 3);
+    expect(second?.index).toBe(1);
+    expect(second?.step.verb).toBe('where');
+    const range = second?.step.range;
+    expect(range === undefined ? '' : SPACED.slice(range.start, range.end)).toBe(
+      'where status = done',
+    );
+    expect(stepAtCursor(SPACED, pull + 2)?.step.verb).toBe('acme.pull');
+    expect(stepAtCursor(SPACED, select + 2)?.index).toBe(2);
+  });
+
+  it('opens the result of the step under the cursor, and the one-step line its own', () => {
+    const at = (index: number, line: number): Cell => ({
+      index,
+      line,
+      status: 'ok',
+      diagnostics: [],
+    });
+    const shown = answer(1, [at(0, 3), at(1, 3), at(2, 5)]);
+    expect(cellUnderCursor(shown, SPACED, { line: 3, offset: pull + 2 })).toBe(0);
+    expect(cellUnderCursor(shown, SPACED, { line: 3, offset: where + 2 })).toBe(1);
+    expect(cellUnderCursor(shown, SPACED, { line: 3, offset: bar + 1 })).toBe(1);
+    expect(cellUnderCursor(shown, SPACED, { line: 5, offset: select + 2 })).toBe(2);
   });
 });

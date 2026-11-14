@@ -685,11 +685,17 @@
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
       "e2e": [
+        "recipe-chained-step.desktop.test.ts",
         "recipe-notebook.desktop.test.ts",
         "recipe-steps.desktop.test.ts",
         "recipe-tab.desktop.test.ts"
       ],
-      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377), and where Add step writes and which columns its form offers (TYTO-402); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables"
+      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377), where Add step writes and which columns its form offers (TYTO-402), and which step of a chained line Edit step and a result tab act on (TYTO-711); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables and opens the form"
+    },
+    {
+      "paths": ["apps/desktop/e2e/recipe-chained-step.desktop.test.ts"],
+      "e2e": ["recipe-chained-step.desktop.test.ts"],
+      "why": "reviewed: Edit step on a line that chains steps with | opens the step under the caret (TYTO-711, ADR 0196 note of 2026-11-14); which step an offset picks is recipe-notebook.test.ts's, and only the real window carries the caret to the command and opens the form"
     },
     {
       "paths": [

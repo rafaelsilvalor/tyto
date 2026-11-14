@@ -100,3 +100,13 @@ Read in the code on `origin/main` (`cdaabe01`) before deciding:
   segment; the window's counter and stale marks read one mark per step from it, and a line's
   drawn result is its last cell's. A step's per-line state (fold, counter, a tab's cell) stays
   keyed by its line's start, which a chained line's steps share.
+- 2026-11-14 (TYTO-711): **on a chained line, Edit step and Open cell result in a tab act on the
+  step under the cursor**, not the line's first. Inside a step's text, or touching either end of
+  it, that step; on the `|` or the blanks between two steps, the step after the `|` when the
+  caret is after it, else the step before; before the line's first step, the first; past its
+  last, the last. A one-step line answers its step wherever the caret is, as before.
+  `stepIndexAt` in the window's `recipe-notebook.ts` holds the rule over `recipeSteps(text)`. A
+  full-size tab keeps, beside its line's start, which of the line's cells it was opened for, the
+  first being 0, so a tab opened from a block's toolbar on a chained line draws its last step's
+  cell; when the line holds fewer cells after a run, the tab has no result rather than another
+  step's. Run from here still starts at the cursor line's first step.
