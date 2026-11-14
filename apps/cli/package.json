@@ -19,7 +19,7 @@
     "@napi-rs/keyring": "2.1.2",
     "@tyto/command-line": "workspace:*",
     "@tyto/raster": "workspace:*",
-    "playwright": "^1.63.0"
+    "playwright": "^1.65.0"
   },
   "devDependencies": {
     "vitest": "^5.0.1"
