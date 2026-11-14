@@ -1,6 +1,6 @@
 # 0151 — Plugin files install and configure templates from their own repositories
 
-Status: accepted · 2026-10-28 · TYTO-430 · builds on ADR 0007, ADR 0020, ADR 0040, ADR 0046,
+Status: accepted · 2026-10-28 · TYTO-430 · source shape and lock amended by ADR 0197 (an archive source) · builds on ADR 0007, ADR 0020, ADR 0040, ADR 0046,
 ADR 0048, ADR 0049, ADR 0111, ADR 0112, ADR 0117, ADR 0127, ADR 0145, ADR 0149 and ADR 0150
 
 ## Context

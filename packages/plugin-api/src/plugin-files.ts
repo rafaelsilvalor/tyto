@@ -35,10 +35,45 @@ export const PLUGIN_FILES_DIRECTORY = 'plugin-files';
 export const PLUGIN_FILES_LOCK_FILE = 'plugin-files.lock.json';
 export const PLUGIN_FILE_EXTENSION = '.yaml';
 
-/** Where a source is, as the person's `git` reads it, and which ref of it. */
-export interface PluginFileSource {
+/**
+ * Where a source is, and which ref of it. One of two kinds (ADR 0197):
+ *
+ * - `git`: a location the person's `git` reads, at a tag, a branch or a commit;
+ * - `archive`: a `.zip`, an https URL or a path on this machine, in which `{ref}` stands for
+ *   the ref, so one written location serves every version.
+ */
+export type PluginFileSource = GitSource | ArchiveSource;
+
+export interface GitSource {
   readonly git: string;
+  readonly archive?: undefined;
   readonly ref: string;
+}
+
+export interface ArchiveSource {
+  readonly archive: string;
+  readonly git?: undefined;
+  readonly ref: string;
+}
+
+/** Which kind a source is, which is also the key it is written under. */
+export type PluginFileSourceKind = 'git' | 'archive';
+
+export function sourceKind(source: PluginFileSource): PluginFileSourceKind {
+  return source.git === undefined ? 'archive' : 'git';
+}
+
+/** The location as written, whichever kind: what the cache and messages name. */
+export function sourceLocation(source: PluginFileSource): string {
+  return source.git ?? source.archive;
+}
+
+/** The placeholder an archive location writes for its ref. */
+export const ARCHIVE_REF_PLACEHOLDER = '{ref}';
+
+/** An archive's location with its ref in place. */
+export function archiveLocation(source: ArchiveSource): string {
+  return source.archive.split(ARCHIVE_REF_PLACEHOLDER).join(source.ref);
 }
 
 /**
@@ -130,6 +165,23 @@ function textOf(node: Node): string | undefined {
     : undefined;
 }
 
+/**
+ * Why an archive location is refused, or nothing. Over the network only https: a `.zip`
+ * fetched in clear could be swapped on the way before the lock ever pinned it. Anything else
+ * is a path on this machine. The ref is spliced into the location, so it may not climb out of
+ * the folder or reach another host.
+ */
+export function archiveProblem(archive: string, ref: string): string | undefined {
+  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(archive) && !/^https:\/\//iu.test(archive)) {
+    return 'an archive over the network is an https URL';
+  }
+  if (!/\.zip$/iu.test(archiveLocation({ archive, ref }))) return 'an archive is a .zip';
+  if (archive.includes(ARCHIVE_REF_PLACEHOLDER) && /[/\\?#]|\.\./u.test(ref)) {
+    return 'a ref spliced into an archive may not hold /, \\, ?, # or ..';
+  }
+  return undefined;
+}
+
 class FileReader {
   readonly diagnostics: Diagnostic[] = [];
 
@@ -161,18 +213,33 @@ class FileReader {
   }
 
   source(path: string, node: Node): PluginFileSource | undefined {
-    const keys = this.keys(path, node, ['git', 'ref']);
-    if (keys === undefined) return this.refuse(path, 'a source is a mapping of git and ref', node);
+    const keys = this.keys(path, node, ['git', 'archive', 'ref']);
+    if (keys === undefined) {
+      return this.refuse(path, 'a source is a mapping of git or archive, and ref', node);
+    }
     const git = textOf(keys.get('git'));
+    const archive = textOf(keys.get('archive'));
     const ref = textOf(keys.get('ref'));
-    if (git === undefined) return this.refuse(`${path}.git`, 'git is required', node);
+    if (git !== undefined && archive !== undefined) {
+      return this.refuse(path, 'a source is git or archive, not both', node);
+    }
+    if (git === undefined && archive === undefined) {
+      return this.refuse(`${path}.git`, 'git or archive is required', node);
+    }
     if (ref === undefined) {
       return this.refuse(`${path}.ref`, 'ref is required: a tag, a branch or a commit', node);
     }
-    // Both reach `git` as arguments. A leading dash would be read as an option of git's own.
-    if (git.startsWith('-')) return this.refuse(`${path}.git`, 'it may not start with -', node);
+    // A ref reaches `git` as an argument, and a git location too. A leading dash would be read
+    // as an option of git's own.
     if (ref.startsWith('-')) return this.refuse(`${path}.ref`, 'it may not start with -', node);
-    return { git, ref };
+    if (git !== undefined) {
+      if (git.startsWith('-')) return this.refuse(`${path}.git`, 'it may not start with -', node);
+      return { git, ref };
+    }
+    if (archive === undefined) return undefined;
+    const problem = archiveProblem(archive, ref);
+    if (problem !== undefined) return this.refuse(`${path}.archive`, problem, node);
+    return { archive, ref };
   }
 
   /**
@@ -378,14 +445,35 @@ export function parsePluginFile(source: string, file: string): PluginFileRead {
 
 /* ---------------------------------------------------------------------------- lock -- */
 
-/** One source as the lock pins it: the ref the file names and the commit it resolved to. */
-export interface PluginFilesLockEntry {
-  readonly git: string;
+/**
+ * One source as the lock pins it: the ref the file names and what it resolved to. A git
+ * source pins the commit; an archive pins the sha256 of the `.zip`'s bytes, since an archive
+ * has no commit to name and its bytes are what must not change (ADR 0197).
+ */
+export type PluginFilesLockEntry = (
+  | {
+      readonly git: string;
+      readonly archive?: undefined;
+      /** The full commit hash. */
+      readonly commit: string;
+      readonly sha256?: undefined;
+    }
+  | {
+      readonly archive: string;
+      readonly git?: undefined;
+      readonly commit?: undefined;
+      /** The sha256 of the archive's bytes, lowercase hex. */
+      readonly sha256: string;
+    }
+) & {
   readonly ref: string;
-  /** The full commit hash. */
-  readonly commit: string;
   /** The name the fetched copy's `tyto-plugin.json` declares. */
   readonly plugin: string;
+};
+
+/** What a lock entry pins, whichever kind: a commit or an archive's sha256. */
+export function pinOf(entry: PluginFilesLockEntry): string {
+  return entry.commit ?? entry.sha256;
 }
 
 export interface PluginFilesLock {
@@ -397,12 +485,24 @@ export const EMPTY_PLUGIN_FILES_LOCK: PluginFilesLock = { sources: [] };
 const lockSchema = z.object({
   version: z.literal(1),
   sources: z.array(
-    z.object({
-      git: z.string().min(1),
-      ref: z.string().min(1),
-      commit: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u, 'a full commit hash'),
-      plugin: z.string().min(1),
-    }),
+    z.union([
+      z
+        .object({
+          git: z.string().min(1),
+          ref: z.string().min(1),
+          commit: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u, 'a full commit hash'),
+          plugin: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          archive: z.string().min(1),
+          ref: z.string().min(1),
+          sha256: z.string().regex(/^[0-9a-f]{64}$/u, 'a sha256 in lowercase hex'),
+          plugin: z.string().min(1),
+        })
+        .strict(),
+    ]),
   ),
 });
 
@@ -430,26 +530,36 @@ export function parsePluginFilesLock(
 /** Sorted, so a lock that pins the same commits is the same bytes in version control. */
 export function serializePluginFilesLock(lock: PluginFilesLock): string {
   const sources = [...lock.sources]
-    .sort((left, right) => left.git.localeCompare(right.git) || left.ref.localeCompare(right.ref))
-    .map(({ git, ref, commit, plugin }) => ({ git, ref, commit, plugin }));
+    .sort(
+      (left, right) =>
+        sourceLocation(left).localeCompare(sourceLocation(right)) ||
+        left.ref.localeCompare(right.ref),
+    )
+    // Key order fixed, so a git entry is written as it was before archives existed.
+    .map((entry) =>
+      entry.git === undefined
+        ? { archive: entry.archive, ref: entry.ref, sha256: entry.sha256, plugin: entry.plugin }
+        : { git: entry.git, ref: entry.ref, commit: entry.commit, plugin: entry.plugin },
+    );
   return `${JSON.stringify({ version: 1, sources }, null, 2)}\n`;
 }
 
+/** One source, of one kind, at one ref. A git and an archive location are never one. */
 export function sameSource(left: PluginFileSource, right: PluginFileSource): boolean {
-  return left.git === right.git && left.ref === right.ref;
+  return left.git === right.git && left.archive === right.archive && left.ref === right.ref;
 }
 
 /* ------------------------------------------------------------------------- folders -- */
 
 /** One source a folder's files name, once however many entries name it. */
-export interface PluginFolderSource extends PluginFileSource {
+export type PluginFolderSource = PluginFileSource & {
   /** The first file that names it, for messages. */
   readonly file: string;
   /** The templates the files name from it. Empty for a `plugin:` entry alone. */
   readonly templates: readonly string[];
   /** A `plugin:` entry names it, so it loads whatever templates it holds. */
   readonly wholePlugin: boolean;
-}
+};
 
 export interface PluginFolderSources {
   readonly sources: readonly PluginFolderSource[];
@@ -483,11 +593,12 @@ export function folderSources(files: readonly PluginFile[]): PluginFolderSources
     }
   }
 
-  const sources: { -readonly [Key in keyof PluginFolderSource]: PluginFolderSource[Key] }[] = [];
-  const sourceOf = (file: string, source: PluginFileSource): (typeof sources)[number] => {
+  type Gathering = PluginFileSource & { file: string; templates: string[]; wholePlugin: boolean };
+  const sources: Gathering[] = [];
+  const sourceOf = (file: string, source: PluginFileSource): Gathering => {
     const found = sources.find((item) => sameSource(item, source));
     if (found !== undefined) return found;
-    const added = { ...source, file, templates: [] as string[], wholePlugin: false };
+    const added: Gathering = { ...source, file, templates: [], wholePlugin: false };
     sources.push(added);
     return added;
   };
@@ -547,8 +658,8 @@ export interface PluginSyncStep {
   /** The lock's entry for it, when there is one. */
   readonly locked?: PluginFilesLockEntry;
   /**
-   * Ask `git` where the ref is now. True for a source the lock lacks and, on the explicit
-   * update, for every source; a start never moves a pinned ref (ADR 0151 decision 3).
+   * Ask where the ref is now: `git`, or the archive fetched again. True for a source the lock
+   * lacks and, on the explicit update, for every source; a start never moves a pinned ref (ADR 0151 decision 3).
    */
   readonly resolve: boolean;
 }
@@ -572,9 +683,11 @@ export function planPluginSync(
 export interface PluginFilesCopy {
   readonly plugin: string;
   readonly file: string;
-  readonly git: string;
+  /** The source's location as written: a git location or an archive. */
+  readonly location: string;
   readonly ref: string;
-  readonly commit: string;
+  /** What the lock pins it at: a commit, or an archive's sha256. */
+  readonly pin: string;
   readonly templates: readonly string[];
   readonly wholePlugin: boolean;
 }
@@ -599,7 +712,7 @@ export function chooseCopies<Copy extends PluginFilesCopy>(
       const other = merged.find((item) => item.plugin === copy.plugin);
       if (other === undefined) {
         merged.push(copy);
-      } else if (other.git === copy.git && other.commit === copy.commit) {
+      } else if (other.location === copy.location && other.pin === copy.pin) {
         merged[merged.indexOf(other)] = {
           ...other,
           templates: [...other.templates, ...copy.templates],

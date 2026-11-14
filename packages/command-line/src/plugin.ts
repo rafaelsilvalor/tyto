@@ -96,10 +96,12 @@ function formatPluginFiles(files: ListedPluginFiles): string {
   if (files.sources.length > 0) {
     const pluginOf = (source: ListedPluginFiles['sources'][number]): string => source.plugin ?? '-';
     const commitOf = (source: ListedPluginFiles['sources'][number]): string =>
-      source.commit?.slice(0, 12) ?? '-';
+      (source.commit ?? source.sha256)?.slice(0, 12) ?? '-';
+    const locationOf = (source: ListedPluginFiles['sources'][number]): string =>
+      source.git ?? source.archive ?? '-';
     const plugin = column(files.sources.map(pluginOf));
     const scope = column(files.sources.map((source) => source.scope));
-    const git = column(files.sources.map((source) => source.git));
+    const git = column(files.sources.map(locationOf));
     const ref = column(files.sources.map((source) => source.ref));
     const commit = column(files.sources.map(commitOf));
     const status = column(files.sources.map((source) => source.status));
@@ -108,7 +110,7 @@ function formatPluginFiles(files: ListedPluginFiles): string {
       'plugin files:',
       ...files.sources.map(
         (source) =>
-          `${plugin(pluginOf(source))}  ${scope(source.scope)}  ${git(source.git)}  ` +
+          `${plugin(pluginOf(source))}  ${scope(source.scope)}  ${git(locationOf(source))}  ` +
           `${ref(source.ref)}  ${commit(commitOf(source))}  ${status(source.status)}  ${source.file}`,
       ),
     );
@@ -144,9 +146,11 @@ function document(plugins: readonly ListedPlugin[], files: ListedPluginFiles): u
       plugin: source.plugin ?? null,
       scope: source.scope,
       file: source.file,
-      git: source.git,
+      ...(source.archive === undefined ? { git: source.git ?? null } : { archive: source.archive }),
       ref: source.ref,
-      commit: source.commit ?? null,
+      ...(source.archive === undefined
+        ? { commit: source.commit ?? null }
+        : { sha256: source.sha256 ?? null }),
       status: source.status,
     })),
     aliases: files.aliases,

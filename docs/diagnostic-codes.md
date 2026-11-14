@@ -94,7 +94,7 @@ non-zero.
 | `W_PLUGIN_FILE_REPLACES_INSTALLED` | warning | no | A plugin from the plugin files has the name of one installed with tyto plugin install. |
 | `W_PLUGIN_FILE_FETCH` | warning | no | A source the plugin files name could not be fetched. |
 | `E_TYTO_HOME_PATH_TOO_LONG` | error | no | A path Tyto writes under TYTO_HOME is longer than the system accepts. |
-| `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A commit a plugin file names was fetched and could not be loaded as a plugin. |
+| `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A source a plugin file names was fetched and could not be loaded as a plugin. |
 | `E_GALLERY_INDEX_SYNTAX` | error | no | The gallery index could not be read or is not YAML of the shape it needs. |
 | `E_GALLERY_INDEX_ENTRY` | error | no | An entry of the gallery index is refused, and the others stand. |
 | `W_GALLERY_INDEX_KEY_UNKNOWN` | warning | no | The gallery index has a key Tyto does not know. |
@@ -1394,12 +1394,12 @@ Parameters: `home`, `length`, `reason`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
 
-A commit a plugin file names was fetched and could not be loaded as a plugin.
+A source a plugin file names was fetched and could not be loaded as a plugin.
 
 The commit locked before loads when there is one; otherwise nothing from that source does.
 
 ```
-'{git}' at '{ref}' resolved to commit {commit}, which was refused: {problem}. {outcome}
+'{git}' at '{ref}' resolved to {commit}, which was refused: {problem}. {outcome}
 ```
 
 Parameters: `git`, `ref`, `commit`, `problem`, `outcome`

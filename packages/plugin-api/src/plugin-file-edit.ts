@@ -1,7 +1,14 @@
 import { type Result, err, hasErrors, ok } from '@tyto/core';
 import { isMap, isScalar, parse, parseDocument } from 'yaml';
 
-import { type PluginFile, type PluginFileSource, parsePluginFile } from './plugin-files.js';
+import {
+  type PluginFile,
+  type PluginFileSource,
+  parsePluginFile,
+  sameSource,
+  sourceKind,
+  sourceLocation,
+} from './plugin-files.js';
 
 /**
  * Writing a plugin file somebody owns (ADR 0162): the gallery adds an entry or moves a ref.
@@ -41,7 +48,11 @@ function read(text: string, file: string): Result<PluginFile, string> {
 
 /** The text of a new file that holds one plugin. */
 export function newPluginFileText(source: PluginFileSource): string {
-  return `version: 1\nplugin:\n  source:\n    git: ${scalar(source.git)}\n    ref: ${scalar(source.ref)}\n`;
+  return (
+    `version: 1\nplugin:\n  source:\n` +
+    `    ${sourceKind(source)}: ${scalar(sourceLocation(source))}\n` +
+    `    ref: ${scalar(source.ref)}\n`
+  );
 }
 
 function templateBlock(names: readonly string[], source: PluginFileSource, indent: string): string {
@@ -50,7 +61,7 @@ function templateBlock(names: readonly string[], source: PluginFileSource, inden
       (name) =>
         `${indent}${scalar(name)}:\n` +
         `${indent}${indent}source:\n` +
-        `${indent}${indent}${indent}git: ${scalar(source.git)}\n` +
+        `${indent}${indent}${indent}${sourceKind(source)}: ${scalar(sourceLocation(source))}\n` +
         `${indent}${indent}${indent}ref: ${scalar(source.ref)}\n`,
     )
     .join('');
@@ -111,8 +122,7 @@ export function addTemplateEntries(
   const added = after.value.templates.filter((entry) => names.includes(entry.name));
   const unchanged = withoutRanges(kept) === withoutRanges(before.value.templates);
   const landed =
-    added.length === names.length &&
-    added.every((entry) => entry.source.git === source.git && entry.source.ref === source.ref);
+    added.length === names.length && added.every((entry) => sameSource(entry.source, source));
   if (!unchanged || !landed) return err('the edit would change entries it did not mean to');
   return ok(next);
 }

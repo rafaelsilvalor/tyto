@@ -257,7 +257,7 @@ async function approve(
 
     const yes =
       missing.length === 0 ||
-      (ask !== undefined && (await ask(manifest, `${copy.git} at ${copy.ref}`)));
+      (ask !== undefined && (await ask(manifest, `${copy.location} at ${copy.ref}`)));
     if (!yes) {
       unapproved.push(manifest.name);
       continue;
@@ -265,7 +265,7 @@ async function approve(
     state = withPluginEntry(state, manifest.name, {
       enabled: entry?.enabled ?? true,
       permissions: manifest.permissions,
-      source: copy.git,
+      source: copy.location,
     });
   }
 

@@ -963,12 +963,13 @@ pdf                 1.0.0  external  disabled  exporter
 
 ### Plugin files (ADR 0151)
 
-A plugin file names a source to fetch, `{ git, ref }`, for one plugin or for several templates. The machine's are `TYTO_HOME/plugin-files/*.yaml`; a workspace's are `.tyto/plugin-files/*.yaml`, read only once the folder is trusted. The parser, the lock's schema and the rules for which folder wins a name are `@tyto/plugin-api`'s `plugin-files.ts`; reading the folders, running `git` and the cache are `@tyto/io`'s `plugin-files.ts`, and both folders' sync is its `syncPluginFiles` (`plugin-files-sync.ts`), which takes what only an app knows as parameters: the built-in plugins' names, how a path is shown, and who answers a permission prompt. The CLI composes it in `packages/command-line/src/plugin-files.ts` (TYTO-432) and the desktop in `apps/desktop/src/main/plugin-files.ts` (TYTO-433).
+A plugin file names a source to fetch, `{ git, ref }` or `{ archive, ref }` (a `.zip` over https or on the machine, pinned by its sha256, ADR 0197), for one plugin or for several templates. The machine's are `TYTO_HOME/plugin-files/*.yaml`; a workspace's are `.tyto/plugin-files/*.yaml`, read only once the folder is trusted. The parser, the lock's schema and the rules for which folder wins a name are `@tyto/plugin-api`'s `plugin-files.ts`; reading the folders, running `git` and the cache are `@tyto/io`'s `plugin-files.ts`, and both folders' sync is its `syncPluginFiles` (`plugin-files-sync.ts`), which takes what only an app knows as parameters: the built-in plugins' names, how a path is shown, and who answers a permission prompt. The CLI composes it in `packages/command-line/src/plugin-files.ts` (TYTO-432) and the desktop in `apps/desktop/src/main/plugin-files.ts` (TYTO-433).
 
 ```
 TYTO_HOME/
   plugin-files/*.yaml, plugin-files.lock.json      the machine's files and their lock
   cache/plugin-files/<sha256(git)>/<commit>/       one copy per commit, without .git
+  cache/plugin-files/<sha256(archive)>/<sha256[:40]>/   one copy per archive, by its bytes (ADR 0197)
 <workspace>/.tyto/plugin-files/*.yaml, plugin-files.lock.json
 ```
 

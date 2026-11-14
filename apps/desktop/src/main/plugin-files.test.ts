@@ -33,9 +33,9 @@ function copy(
 ): PluginFilesCopyOnDisk {
   return {
     plugin,
-    git: `https://example.invalid/${plugin}.git`,
+    location: `https://example.invalid/${plugin}.git`,
     ref: 'v1',
-    commit: 'a'.repeat(40),
+    pin: 'a'.repeat(40),
     file: 'templates.yaml',
     wholePlugin: false,
     templates: [`${plugin}-template`],

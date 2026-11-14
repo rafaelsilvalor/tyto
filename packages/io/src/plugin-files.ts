@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
@@ -10,7 +10,9 @@ import {
   PLUGIN_API_VERSION,
   PLUGIN_FILES_LOCK_FILE,
   PLUGIN_FILE_EXTENSION,
+  type ArchiveSource,
   type PluginFile,
+  type PluginFileSource,
   type PluginFilesCopy,
   type PluginFilesLock,
   type PluginFilesLockEntry,
@@ -20,8 +22,11 @@ import {
   folderSources,
   parsePluginFile,
   parsePluginFilesLock,
+  archiveLocation,
+  pinOf,
   planPluginSync,
   serializePluginFilesLock,
+  sourceLocation,
 } from '@tyto/plugin-api';
 
 import {
@@ -32,6 +37,10 @@ import {
   writeAtomically,
 } from './fs-plugin-store.js';
 import { type HomePathOptions, checkHomePath } from './home-path.js';
+import { type ArchiveDownload, downloadOverHttps } from './archive-download.js';
+import { readZip } from './plugin-archive.js';
+
+export type { ArchiveDownload } from './archive-download.js';
 
 /**
  * Plugin files on a disk: reading a folder, fetching with `git`, the lock and the cache
@@ -51,6 +60,13 @@ import { type HomePathOptions, checkHomePath } from './home-path.js';
  * `git` runs with `GIT_TERMINAL_PROMPT=0` and a missing credential fails instead of waiting on
  * a prompt nobody sees (ADR 0151 decision 5). Nothing a fetched repository ships is run here:
  * it is a plugin folder, loaded as an installed one is.
+ *
+ * **An archive source needs no `git`** (ADR 0197): a `.zip` downloaded over https or read
+ * from this machine, cached under the sha256 of its bytes, which is also what the lock pins.
+ *
+ * ```
+ * TYTO_HOME/cache/plugin-files/<sha256(archive)>/<sha256(bytes), 40 hex>/   one copy per archive
+ * ```
  */
 
 const run = promisify(execFile);
@@ -243,6 +259,85 @@ export async function fetchToCache(
   }
 }
 
+/** The bytes at an archive's location, ref in place: downloaded, or read from this disk. */
+async function archiveBytes(location: string, download: ArchiveDownload): Promise<Uint8Array> {
+  if (/^https:\/\//iu.test(location)) return download(location);
+  const bytes = await readFile(location);
+  return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+}
+
+/**
+ * Fetches an archive into the cache, under the sha256 of its bytes.
+ *
+ * `expected` is what the lock pins, when it does: bytes that hash to anything else are
+ * refused and nothing is written, since a pinned source must not change under the person.
+ * The copy is staged beside its name and renamed into place, as a git copy is.
+ */
+export async function fetchArchiveToCache(
+  home: string,
+  source: ArchiveSource,
+  directory: string,
+  download: ArchiveDownload,
+  expected?: string,
+): Promise<Result<{ readonly sha256: string; readonly directory: string }, string>> {
+  const location = locationOf(source.archive, directory);
+  let bytes: Uint8Array;
+  try {
+    bytes = await archiveBytes(locationOf(archiveLocation(source), directory), download);
+  } catch (cause) {
+    return err(problemOf(cause));
+  }
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  if (expected !== undefined && sha256 !== expected) {
+    return err(
+      `its bytes changed since the lock pinned them (sha256 ${expected}, now ${sha256}); ` +
+        'tyto plugin sync --update takes the new ones',
+    );
+  }
+  const cached = await cachedCopy(home, location, archiveCopyName(sha256));
+  if (cached !== undefined) return ok({ sha256, directory: cached });
+
+  const files = readZip(bytes);
+  if (!files.ok) return err(files.error);
+  const root = sourceFolder(home, location);
+  await mkdir(root, { recursive: true });
+  const staging = await mkdtemp(join(root, '.fetching-'));
+  try {
+    for (const file of files.value) {
+      const path = join(staging, ...file.path.split('/'));
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, file.bytes);
+    }
+    const target = join(root, archiveCopyName(sha256));
+    if ((await cachedCopy(home, location, archiveCopyName(sha256))) === undefined)
+      await rename(staging, target);
+    return ok({ sha256, directory: target });
+  } catch (cause) {
+    return err(problemOf(cause));
+  } finally {
+    await rm(staging, { recursive: true, force: true });
+  }
+}
+
+/** What a lock entry pins, as a message says it. */
+/**
+ * The cache folder of an archive's copy: the first 40 hex of its sha256, so the copy is no
+ * deeper than a commit's and the longest path TYTO-470 measured still holds. The lock keeps
+ * the whole sha256, which is what the bytes are checked against.
+ */
+export function archiveCopyName(sha256: string): string {
+  return sha256.slice(0, 40);
+}
+
+/** The cache folder a lock entry's copy is in, whichever kind. */
+export function copyNameOf(entry: PluginFilesLockEntry): string {
+  return entry.commit ?? archiveCopyName(entry.sha256);
+}
+
+function pinned(entry: PluginFilesLockEntry): string {
+  return entry.commit === undefined ? `archive sha256 ${entry.sha256}` : `commit ${entry.commit}`;
+}
+
 /** The plugin a copy holds, by its manifest, or why it is not one this Tyto can load. */
 async function pluginOf(directory: string): Promise<Result<string, string>> {
   const manifestPath = join(directory, PLUGIN_MANIFEST_FILE);
@@ -273,6 +368,8 @@ export interface SyncPluginFolderOptions {
   readonly onSourceProblem?: SourceProblemListener;
   /** The platform and limit a fetch's paths under `home` are checked against (TYTO-470). */
   readonly homePath?: HomePathOptions;
+  /** How an https archive is downloaded; the runtime's `fetch` when absent (ADR 0197). */
+  readonly download?: ArchiveDownload;
 }
 
 /** The plugin file, as `shown` names it, a source's range-less diagnostics are about. */
@@ -311,23 +408,42 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
     options.onSourceProblem?.(file, [item]);
   };
   const failed = (
-    step: { git: string; ref: string; file: string },
+    step: PluginFileSource & { file: string },
     problem: string,
     kept?: string,
   ): void => {
     about(
       step.file,
       diagnostic('W_PLUGIN_FILE_FETCH', {
-        git: step.git,
+        git: sourceLocation(step),
         ref: step.ref,
         problem,
         outcome:
           kept === undefined
             ? 'Nothing from it loads.'
-            : `The copy of commit ${kept} fetched earlier loads.`,
+            : `The copy of ${kept} fetched earlier loads.`,
       }),
     );
   };
+  const refused = (
+    step: PluginFileSource & { file: string },
+    pin: string,
+    problem: string,
+    locked: PluginFilesLockEntry | undefined,
+  ): void => {
+    about(
+      step.file,
+      diagnostic('E_PLUGIN_FILE_SOURCE_REFUSED', {
+        git: sourceLocation(step),
+        ref: step.ref,
+        commit: pin,
+        problem,
+        outcome:
+          locked === undefined ? 'Nothing from it loads.' : `The lock keeps ${pinned(locked)}.`,
+      }),
+    );
+  };
+  const download = options.download ?? downloadOverHttps;
 
   // Checked once, and said once, before the first fetch: a home too deep for its copies
   // fetches nothing, and a copy already cached still loads (TYTO-470).
@@ -342,24 +458,25 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
 
   for (const step of planPluginSync(named.sources, read.lock, options.update)) {
     const { source, locked } = step;
-    const location = locationOf(source.git, directory);
+    const location = locationOf(sourceLocation(source), directory);
     const copyOf = (entry: PluginFilesLockEntry, at: string): PluginFilesCopyOnDisk => ({
       plugin: entry.plugin,
       file: source.file,
-      git: source.git,
+      location: sourceLocation(source),
       ref: source.ref,
-      commit: entry.commit,
+      pin: pinOf(entry),
       templates: source.templates,
       wholePlugin: source.wholePlugin,
       directory: at,
     });
     const lockedCopy =
-      locked === undefined ? undefined : await cachedCopy(home, location, locked.commit);
+      locked === undefined ? undefined : await cachedCopy(home, location, copyNameOf(locked));
     const keepLocked = (): void => {
       if (locked === undefined) return;
       lock.push(locked);
       if (lockedCopy !== undefined) copies.push(copyOf(locked, lockedCopy));
     };
+    const keptPin = lockedCopy === undefined || locked === undefined ? undefined : pinned(locked);
 
     if (!options.fetches) {
       if (locked === undefined || lockedCopy === undefined) {
@@ -372,7 +489,46 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
       continue;
     }
 
-    if (!step.resolve && locked !== undefined) {
+    if (source.archive !== undefined) {
+      // A copy is named by the sha256 of its bytes, so a cached one is the pinned one.
+      if (!step.resolve && locked !== undefined && lockedCopy !== undefined) {
+        keepLocked();
+        continue;
+      }
+      if (!mayFetch()) {
+        keepLocked();
+        continue;
+      }
+      const fetched = await fetchArchiveToCache(
+        home,
+        source,
+        directory,
+        download,
+        step.resolve ? undefined : locked?.sha256,
+      );
+      if (!fetched.ok) {
+        failed(source, fetched.error, keptPin);
+        keepLocked();
+        continue;
+      }
+      const plugin = await pluginOf(fetched.value.directory);
+      if (!plugin.ok) {
+        refused(source, `archive sha256 ${fetched.value.sha256}`, plugin.error, locked);
+        keepLocked();
+        continue;
+      }
+      const entry: PluginFilesLockEntry = {
+        archive: source.archive,
+        ref: source.ref,
+        sha256: fetched.value.sha256,
+        plugin: plugin.value,
+      };
+      lock.push(entry);
+      copies.push(copyOf(entry, fetched.value.directory));
+      continue;
+    }
+
+    if (!step.resolve && locked?.commit !== undefined) {
       if (lockedCopy !== undefined && (await isKnownCommit(home, location, locked.commit))) {
         keepLocked();
         continue;
@@ -403,30 +559,18 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
     }
     const fetched = await fetchToCache(home, location, source.ref);
     if (!fetched.ok) {
-      failed(source, fetched.error, lockedCopy === undefined ? undefined : locked?.commit);
+      failed(source, fetched.error, keptPin);
       keepLocked();
       continue;
     }
     const plugin = await pluginOf(fetched.value.directory);
     if (!plugin.ok) {
-      about(
-        source.file,
-        diagnostic('E_PLUGIN_FILE_SOURCE_REFUSED', {
-          git: source.git,
-          ref: source.ref,
-          commit: fetched.value.commit,
-          problem: plugin.error,
-          outcome:
-            locked === undefined
-              ? 'Nothing from it loads.'
-              : `The lock keeps commit ${locked.commit}.`,
-        }),
-      );
+      refused(source, `commit ${fetched.value.commit}`, plugin.error, locked);
       keepLocked();
       continue;
     }
-    const entry = {
-      git: source.git,
+    const entry: PluginFilesLockEntry = {
+      git: sourceLocation(source),
       ref: source.ref,
       commit: fetched.value.commit,
       plugin: plugin.value,
@@ -458,7 +602,10 @@ export async function cleanPluginFilesCache(
   const keep = new Set(
     locks.flatMap(({ directory, lock }) =>
       lock.sources.flatMap((entry) => {
-        const copy = join(sourceFolder(home, locationOf(entry.git, directory)), entry.commit);
+        const copy = join(
+          sourceFolder(home, locationOf(sourceLocation(entry), directory)),
+          copyNameOf(entry),
+        );
         return [copy, `${copy}.commit`];
       }),
     ),

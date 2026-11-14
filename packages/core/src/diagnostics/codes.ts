@@ -784,9 +784,8 @@ export const diagnosticCodes = {
   },
   E_PLUGIN_FILE_SOURCE_REFUSED: {
     severity: 'error',
-    summary: 'A commit a plugin file names was fetched and could not be loaded as a plugin.',
-    template:
-      "'{git}' at '{ref}' resolved to commit {commit}, which was refused: {problem}. {outcome}",
+    summary: 'A source a plugin file names was fetched and could not be loaded as a plugin.',
+    template: "'{git}' at '{ref}' resolved to {commit}, which was refused: {problem}. {outcome}",
     spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
     fatal: false,
     fatality:

@@ -176,7 +176,7 @@ export async function pluginSyncCommand(
 
   for (const copy of synced.copies) {
     environment.console.out(
-      `${copy.plugin}  ${copy.git}  ${copy.ref}  ${copy.commit.slice(0, 12)}  ${copy.file}\n`,
+      `${copy.plugin}  ${copy.location}  ${copy.ref}  ${copy.pin.slice(0, 12)}  ${copy.file}\n`,
     );
   }
   if (synced.diagnostics.length > 0) environment.console.err(formatDiagnostics(synced.diagnostics));
