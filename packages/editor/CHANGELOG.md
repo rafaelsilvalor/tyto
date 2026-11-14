@@ -1,5 +1,75 @@
 # @tyto/editor
 
+## 0.17.0
+
+### Minor Changes
+
+- 4213daa: TYTO-710: dragging a recipe block near the top or bottom of the editor scrolls it, faster the
+  nearer the edge, so a block can be moved anywhere in a recipe taller than the pane. The drop
+  line follows the scroll, the mouse wheel's included, and the drop lands even after the dragged
+  block has scrolled out of view.
+- 3ff3d59: A recipe's block can be dragged to another place by its grip (TYTO-676). `moveBlockTo` in
+  `@tyto/recipe` moves a block before any other, or below the last, as one edit that rewrites the
+  blocks passed over and never the block moved. `notebookFrames()` in `@tyto/editor` draws a grip
+  on each movable frame, drags with pointer events (Escape, blur or an edit cancel it) and draws
+  the drop line; the host's `move` receives the drop. In the desktop the drop is one undo.
+- cdaabe0: A recipe's blocks gain a "+" between them and an execution counter (TYTO-676, ADR 0195).
+  `notebookFrames()` in `@tyto/editor` takes an `insert` control drawn on every boundary, read
+  back with `notebookInsertOf`, and a frame's `marker`, shown in a gutter of its own. In the
+  desktop the "+" offers Step…, the step picker writing its line there, and Note; notes read as
+  prose; each step shows `[n]`, `[*]`, `[ ]` or a stale `[n]`; a step's toolbar gains Run from
+  here down and the header's Run all.
+- e34def6: A recipe reads as blocks in the window (TYTO-676, ADR 0195). `@tyto/recipe` gains
+  `recipeBlocks`, the text read by line as header, step and note blocks, and `moveBlock` and
+  `deleteBlock`, each one edit of the text that keeps every other byte. `@tyto/editor` gains
+  `notebookFrames()`, which frames each block over the one editor with the host's toolbar on its
+  first line, and `cellOutputAt`. The runner takes `until`, the cell a run stops after. In the
+  desktop each block but the header has a toolbar: Run this block, Move up, Move down, Delete
+  block, and Hide result, which now folds a plan's lines and a run cell's included cells too.
+- 76f363a: A recipe has Jupyter's command mode (TYTO-676, ADR 0195 decision 7). `@tyto/editor` gains an
+  eighth keybinding context, `notebook`, where a key needs no modifier; `notebookFrames()` makes
+  its toolbars' layer the command target, with `enterNotebookCommand`, `leaveNotebookCommand`,
+  `selectedNotebookFrame` and `stepNotebookSelection`; and `vimToNormal`. In the desktop, Escape
+  (Shift+Escape in vim, Ctrl+M in both) enters command mode, where A, B, D D, Enter, Shift+Enter,
+  J, K, the arrows, O and Z act on the selected block; Shift+Enter in a recipe's text runs the
+  cursor's block and moves on.
+- 9389baa: TYTO-402, ADR 0176: Add step and Edit step over a recipe. Add step opens a picker of every verb
+  a recipe may name here, grouped into sources, transforms, actions and sinks, searchable and
+  keyboard-navigable, then the verb's form; Edit step opens the form of the step on the cursor's
+  line, filled by `valuesOfStep`. The form writes one line through `formatStep`, below the cursor's
+  step or at the end; a value one line cannot carry is refused with `E_RECIPE_FORM` next to its
+  field and nothing is written. Column fields offer the columns of the cell before the step.
+  `recipe:verbs` answers an additive `catalog` (each verb's kind and form fields, a plugin verb's
+  from its declared arguments), and the new `recipe:vocabulary-names` channel answers what a
+  `@./<file>.vocab.json#/<pointer>` may name, read only inside the recipe's folder.
+  `recipeCompletion` in `@tyto/editor` takes an optional source that completes those references
+  (`completeRecipeReference`).
+- 4508667: TYTO-402, ADR 0176: New recipe and New vocabulary, in the explorer's menu and as commands, write
+  `recipeSkeleton` and `vocabularySkeleton` into a new `<name>.recipe` or `<name>.vocab.json`, and
+  never over a file already there; a recipe name a `run` line could not name is refused with
+  `E_RECIPE_FORM`. A `*.vocab.json` opens in a vocabulary tab of its own, in JSON's colours, and no
+  other `.json` does. Main checks it on the pause with `lintVocabulary`, every problem at its
+  characters in the file, and answers its completion and hover on the new `vocabulary:lint`,
+  `vocabulary:complete` and `vocabulary:hover` channels. `jsonAssist` in `@tyto/editor` takes a
+  source whose answers arrive later (`JsonAssistSourceLater`).
+
+### Patch Changes
+
+- b439e2f: TYTO-703: CodeMirror's height map follows a recipe result folded in place. `remeasureCellOutput`
+  now asks for the lines' heights, which a plain measure reads only when the content box changed
+  height, and a recipe shorter than its pane never changes it: before, every line below a fold was
+  placed 74 px too low by the map while drawn at its real place.
+- Updated dependencies [46a013d]
+- Updated dependencies [d700cf3]
+- Updated dependencies [ef76145]
+- Updated dependencies [1fae4a5]
+- Updated dependencies [30bb335]
+- Updated dependencies [399281d]
+- Updated dependencies [ca2bc10]
+  - @tyto/core@0.45.0
+  - @tyto/brief-lang@0.8.4
+  - @tyto/template-lang@0.8.19
+
 ## 0.16.3
 
 ### Patch Changes

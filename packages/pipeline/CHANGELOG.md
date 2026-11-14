@@ -1,5 +1,31 @@
 # @tyto/pipeline
 
+## 0.12.17
+
+### Patch Changes
+
+- 1fae4a5: TYTO-640: `fileSafeName` keeps the base letter of an accented Latin letter (`Matemática` →
+  `Matematica`, `Straße` → `Strasse`), drops a trailing dot or space, and gives a Windows device
+  name (`CON`, `nul.brief`, `COM1`…) a `_` on its stem. Both callers change with it: a `to-brief`
+  row named `Matemática` writes `Matematica.brief`, and a format named `miniatura-vídeo` is
+  delivered as `miniatura-video-01.png` (ADR 0053, note of 2026-11-12). Names that were already
+  ASCII-safe are unchanged.
+- Updated dependencies [46a013d]
+- Updated dependencies [d700cf3]
+- Updated dependencies [ef76145]
+- Updated dependencies [0ff1b0d]
+- Updated dependencies [1fae4a5]
+- Updated dependencies [30bb335]
+- Updated dependencies [399281d]
+- Updated dependencies [4526606]
+- Updated dependencies [89efc2d]
+- Updated dependencies [ca2bc10]
+  - @tyto/core@0.45.0
+  - @tyto/plugin-api@0.21.0
+  - @tyto/brief-lang@0.8.4
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.19
+
 ## 0.12.16
 
 ### Patch Changes
