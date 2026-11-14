@@ -1,5 +1,12 @@
 # @tyto/cli
 
+## 0.12.1
+
+### Patch Changes
+
+- @tyto/command-line@0.8.1
+  - @tyto/raster@0.2.4
+
 ## 0.12.0
 
 ### Minor Changes

@@ -1,5 +1,39 @@
 # @tyto/desktop
 
+## 0.22.1
+
+### Patch Changes
+
+- 65587b1: TYTO-711: on a recipe line that chains steps with `|`, Edit step opens the step under the
+  cursor and Open cell result in a tab opens that step's result, not the line's first. On the
+  `|` or the blanks around it, the side of the `|` the cursor is on wins; past the last step, the
+  last. A result tab opened on a chained line keeps drawing the step it was opened for.
+- 85f200f: TYTO-714: `decide` with `clear=push` holds the clears of a run that look like a lost read. When
+  the `local=` column is missing or empty on every row while `last` holds values, no clear is
+  pushed and one `W_RECIPE_DECIDE_CLEAR_COLUMN` names the column; when a run would push more
+  clears than the new `clear-limit=<n>|none` (5 when not given), none is pushed and one
+  `W_RECIPE_DECIDE_CLEAR_LIMIT` gives the count. A held clear is a `hold` row whose decided value
+  is the last one, so the state does not advance. The desktop's recipe form gains the
+  `clear-limit` field's Portuguese help, and the user manual a section on syncing a field both
+  ways.
+- Updated dependencies [0c38153]
+- Updated dependencies [85f200f]
+  - @tyto/editor@0.18.0
+  - @tyto/recipe@0.7.0
+  - @tyto/core@0.46.0
+  - @tyto/command-line@0.8.1
+  - @tyto/io@5.8.1
+  - @tyto/plugin-api@0.21.1
+  - @tyto/brief-lang@0.8.5
+  - @tyto/export-html@0.7.22
+  - @tyto/export-svg@2.0.22
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.21
+  - @tyto/pipeline@0.12.18
+  - @tyto/template-lang@0.8.20
+  - @tyto/templates@1.2.16
+  - @tyto/theme-pack@0.1.21
+
 ## 0.22.0
 
 ### Minor Changes

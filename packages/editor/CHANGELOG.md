@@ -1,5 +1,22 @@
 # @tyto/editor
 
+## 0.18.0
+
+### Minor Changes
+
+- 0c38153: TYTO-712: the recipe editor reads the word after a `|` that chains steps as a verb. It colours
+  it as one and offers verbs there, splitting a line where the parser does, through
+  `chainSegments`, which `@tyto/recipe` now exports.
+
+### Patch Changes
+
+- Updated dependencies [0c38153]
+- Updated dependencies [85f200f]
+  - @tyto/recipe@0.7.0
+  - @tyto/core@0.46.0
+  - @tyto/brief-lang@0.8.5
+  - @tyto/template-lang@0.8.20
+
 ## 0.17.0
 
 ### Minor Changes
