@@ -120,9 +120,10 @@ import {
   blockResults,
   cellAtOrAbove,
   cellStatuses,
+  cellUnderCursor,
   columnsBefore,
   createRecipeNotebook,
-  stepOnLine,
+  stepAtCursor,
   stepSlot,
 } from './recipe-notebook.js';
 import { type RecipeStepDialog, RECIPE_STEP_TAG } from './recipe-step-dialog.js';
@@ -893,7 +894,8 @@ function recipeStep(mode: 'add' | 'edit'): void {
       if (written !== undefined) writeStepAt(pane.view, slot, written);
       return;
     }
-    const found = stepOnLine(text, line);
+    // TYTO-711: on a line that chains steps with `|`, the step under the cursor, not the line's.
+    const found = stepAtCursor(text, pane.state().selection.main.head);
     const entry = recipeCatalog.find((candidate) => candidate.name === found?.step.verb);
     const values =
       found === undefined || entry === undefined
@@ -2369,12 +2371,16 @@ const registry: CommandRegistry = withCommandGate(
       if (view !== undefined) runBlockAction(view, action, recipeCommandHost);
     },
     openRecipeCellView: () => {
-      // TYTO-379: the cell at or above the cursor, as Run from here finds it.
+      // TYTO-379: the cell at or above the cursor, as Run from here finds it; on a line that
+      // chains steps, the step under the cursor (TYTO-711).
       const front = active();
       const shown = isRecipe(front.kind) ? recipeNotebook.lastOf(front.id) : undefined;
       const pane = focusedPane() ?? primaryPaneOf(front.id);
       if (shown === undefined || pane === undefined) return;
-      const cell = cellAtOrAbove(shown.answer, cursorOf(pane.state()).line);
+      const cell = cellUnderCursor(shown.answer, pane.state().doc.toString(), {
+        line: cursorOf(pane.state()).line,
+        offset: pane.state().selection.main.head,
+      });
       if (cell !== undefined) openRecipeCell(front.id, cell);
     },
     newSeededFile: (seed) => {

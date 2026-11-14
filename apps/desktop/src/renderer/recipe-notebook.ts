@@ -186,12 +186,15 @@ export interface RecipeNotebook {
   keepView(documentId: string, at: number, state: RecipeViewState): void;
   /**
    * A full-size tab drawing cell `index` of the last answer (TYTO-642): from now on it follows
-   * that cell's line, not its index. A tab already following a cell keeps it.
+   * that cell's line, not its index, and, on a line that chains steps with `|`, which of the
+   * line's steps it is, counted from the line's first (TYTO-711). A tab already following a
+   * cell keeps it.
    */
   followCell(tabId: string, documentId: string, index: number): void;
   /**
-   * The index, in the last answer, of the cell a tab follows: the cell now on its line, or
-   * `undefined` once that line was deleted, or when no cell of the answer is on it.
+   * The index, in the last answer, of the cell a tab follows: the cell now on its line, the
+   * same one of the line's steps on a chained line, or `undefined` once that line was deleted,
+   * or when the answer has no such cell on it.
    */
   cellOfTab(tabId: string): number | undefined;
   /** What a full-size tab's view keeps across a rebuild (TYTO-639), apart from its cell's. */
@@ -241,9 +244,18 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const places = new Map<string, Map<number, number | undefined>>();
   /** The edits since the newest request took its text, to move its answer's lines through. */
   const since = new Map<string, LineMap[]>();
+  /**
+   * Each full-size tab's cell, by the start of its line and, on a line that chains steps, which
+   * of the line's cells it is, the first being 0 (TYTO-711): a one-step line's is always 0.
+   */
   const tabs = new Map<
     string,
-    { readonly documentId: string; at: number | undefined; view: RecipeViewState }
+    {
+      readonly documentId: string;
+      at: number | undefined;
+      readonly nth: number;
+      view: RecipeViewState;
+    }
   >();
   let requests = 0;
 
@@ -438,15 +450,15 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     },
     followCell(tabId, documentId, index) {
       if (tabs.has(tabId)) return;
-      tabs.set(tabId, { documentId, at: places.get(documentId)?.get(index), view: {} });
+      const placed = places.get(documentId);
+      const at = placed?.get(index);
+      const nth = at === undefined ? 0 : Math.max(0, cellsOnLine(placed, at).indexOf(index));
+      tabs.set(tabId, { documentId, at, nth, view: {} });
     },
     cellOfTab(tabId) {
       const tab = tabs.get(tabId);
       if (tab?.at === undefined) return undefined;
-      for (const [index, at] of places.get(tab.documentId) ?? []) {
-        if (at === tab.at) return index;
-      }
-      return undefined;
+      return cellsOnLine(places.get(tab.documentId), tab.at)[tab.nth];
     },
     cellAt(documentId, at) {
       // A line that chains steps with `|` holds several cells; its result is its last one's
@@ -488,6 +500,19 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       for (const [tabId, tab] of tabs) if (tab.documentId === documentId) tabs.delete(tabId);
     },
   };
+}
+
+/**
+ * The cells of the last answer placed on the line starting at `at`, in order: one on a line
+ * with one step, one per step on a line that chains them with `|` (TYTO-706).
+ */
+function cellsOnLine(
+  placed: ReadonlyMap<number, number | undefined> | undefined,
+  at: number,
+): readonly number[] {
+  const found: number[] = [];
+  for (const [index, place] of placed ?? []) if (place === at) found.push(index);
+  return found.sort((left, right) => left - right);
 }
 
 /**
@@ -687,21 +712,76 @@ export function stepSlot(text: string, cursorLine: number): StepSlot {
 }
 
 /**
- * The step on the cursor's line, for Edit step (TYTO-402): its index among the steps and its
- * line's range, or `undefined` when that line is no step or the text does not parse.
+ * The step under the cursor at `offset`, by its index among `recipeSteps(text)`, which is its
+ * cell's; `undefined` when the cursor's line holds no step (TYTO-711, ADR 0196 note of
+ * 2026-11-14). On a line that chains steps with `|`:
+ *
+ * - **inside a step's text, or touching either end of it**, that step;
+ * - **on the blanks or the `|` between two steps**, the step after the `|` when the cursor is
+ *   after it, else the step before: the caret right before the `|` is the left step's, the caret
+ *   right after it the right step's;
+ * - **before the first step** (its indent), the first; **past the last**, the last.
+ *
+ * A line with one step answers that step wherever the cursor is on it, as before chaining.
  */
-export function stepOnLine(
+export function stepIndexAt(text: string, offset: number): number | undefined {
+  const lineStart = offset <= 0 ? 0 : text.lastIndexOf('\n', offset - 1) + 1;
+  const onLine = recipeSteps(text)
+    .map((step, index) => ({ ...step, index }))
+    .filter((step) => step.line === lineStart);
+  for (const [position, step] of onLine.entries()) {
+    const next = onLine[position + 1];
+    if (next === undefined || offset <= step.to) return step.index;
+    if (offset < next.from) {
+      // Between the two: the one `|` that split them stands somewhere in this gap.
+      const bar = text.lastIndexOf('|', next.from - 1);
+      return offset > bar ? next.index : step.index;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The step under the cursor, for Edit step (TYTO-402, TYTO-711): its index among the steps and
+ * its own range, a chained line's segment and not the whole line, chosen by
+ * {@link stepIndexAt}; `undefined` when the cursor's line is no step or the text does not parse.
+ */
+export function stepAtCursor(
   text: string,
-  cursorLine: number,
+  offset: number,
 ): { readonly index: number; readonly step: Step } | undefined {
   const parsed = parseRecipe(text);
   if (!parsed.ok) return undefined;
-  const starts = lineStarts(text);
-  const index = parsed.value.steps.findIndex(
-    (step) => lineOf(starts, step.range.start) === cursorLine,
-  );
+  const under = stepIndexAt(text, offset);
+  const from = under === undefined ? undefined : recipeSteps(text)[under]?.from;
+  if (from === undefined) return undefined;
+  const index = parsed.value.steps.findIndex((step) => step.range.start === from);
   const step = parsed.value.steps[index];
   return step === undefined ? undefined : { index, step };
+}
+
+/**
+ * The cell "Open cell result in a tab" opens (TYTO-379, TYTO-711): the cell at or above the
+ * cursor's line, as {@link cellAtOrAbove} finds it, and, when the cursor is on a line that chains
+ * steps, the cell of the step under it ({@link stepIndexAt}), counted among that line's cells.
+ * The text is the one in the editor now; the answer's cells are matched by their line.
+ */
+export function cellUnderCursor(
+  answer: RecipeRunAnswer,
+  text: string,
+  cursor: { readonly line: number; readonly offset: number },
+): number | undefined {
+  const above = cellAtOrAbove(answer, cursor.line);
+  const onLine = answer.cells
+    .filter((cell) => cell.line === cursor.line)
+    .map((cell) => cell.index)
+    .sort((left, right) => left - right);
+  const under = stepIndexAt(text, cursor.offset);
+  if (onLine.length < 2 || under === undefined) return above;
+  const steps = recipeSteps(text);
+  const lineStart = steps[under]?.line;
+  const first = steps.findIndex((step) => step.line === lineStart);
+  return onLine[under - first] ?? onLine.at(-1);
 }
 
 /**
@@ -720,13 +800,6 @@ export function columnsBefore(
     if (found === undefined || cell.index > found.index) found = cell;
   }
   return found?.table?.columns.map((column) => column.name) ?? [];
-}
-
-/** The one-based line a character offset is on, by the starts of the lines. */
-function lineOf(starts: readonly number[], offset: number): number {
-  let line = 1;
-  while (line < starts.length && (starts[line] ?? Infinity) <= offset) line += 1;
-  return line;
 }
 
 /** One cell's line: where it goes, what it says, and whether it is a failure. */
