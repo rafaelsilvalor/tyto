@@ -1,5 +1,73 @@
 # @tyto/recipe
 
+## 0.6.0
+
+### Minor Changes
+
+- d267e4a: `decide` takes `clear=push|pull`. With `clear=push`, a value cleared in the local side since the last applied run pushes the empty value to the remote side (`_pushes` true, `_push` empty), and `tie=` settles it when the remote side changed too. `pull`, the default, keeps today's rule: an empty local value never pushes. The `decide` form lists the new choice.
+- b250bc7: `decide` also writes `<column>_pushes`, a boolean true exactly on push rows, so a write to the remote side can choose its rows without reading the pushed value.
+- 61edee2: The recipe step forms show each verb's summary and each field's help in the window's language
+  (TYTO-685). `@tyto/recipe` adds `formTexts`, `summaryKey` and `helpKey`: every generic form's
+  sentence keyed by the verb's and the field's names, the English the source; the desktop
+  translates them into Portuguese and keeps the English for any sentence it has no translation of.
+- 0ff1b0d: A contributed recipe verb's argument may carry `description`, at most 1,000 characters
+  (`ARGUMENT_DESCRIPTION_MAX_LENGTH`), and `formOfArguments` shows it as the field's help in the
+  step form (TYTO-687). An isolated plugin's crosses the strict `recipe-verb` schema: isolation
+  protocol 26. One over the bound is refused at load with the same `E_PLUGIN_ACTIVATE` in
+  process as isolated.
+- 928e28b: A recipe line may name a column it writes or picks in double quotes, with accents and blanks:
+  `into="Última Sync"`, `compose "Última Sync"={due|slug}`, `select key, "Última Sync"`. Bare
+  names keep their rule; the form library quotes such names and round-trips them (TYTO-674).
+- 3ff3d59: A recipe's block can be dragged to another place by its grip (TYTO-676). `moveBlockTo` in
+  `@tyto/recipe` moves a block before any other, or below the last, as one edit that rewrites the
+  blocks passed over and never the block moved. `notebookFrames()` in `@tyto/editor` draws a grip
+  on each movable frame, drags with pointer events (Escape, blur or an edit cancel it) and draws
+  the drop line; the host's `move` receives the drop. In the desktop the drop is one undo.
+- 672be6c: A recipe's block is a run of lines between blank lines, like a Jupyter cell, and shows its last
+  step's result (TYTO-676, ADR 0196). `recipeBlocks` in `@tyto/recipe` reads blocks of several
+  steps and `#` lines, the header split from a step written right under it; `RecipeBlock.step`
+  becomes `steps: { first, last, lastFrom }`, and `recipeLines` lists a text's step or header
+  lines. `deleteBlock` takes the blank line that set the block apart. In the desktop a block draws
+  one result, its last step's, while every step still runs and marks its own problems; Run this
+  block runs all its steps; the "+" writes a new block; the counter and the fold are the block's;
+  Add step joins the block the cursor is in.
+- 30bb335: TYTO-675 (ADR 0139 note of 2026-11-12): a recipe template writes an ISO-8601 instant as
+  wall-clock time in the run's zone with the filter `local:<format>`, as in
+  `compose day="{due|local:yyyy-MM-dd}"` or `{due|local:dd/MM/yyyy HH:mm}`, so a delivery at
+  22:00 in São Paulo stays on its day. The format takes the tokens `age format=` reads (dd, MM,
+  yyyy, HH, mm); a letter outside a token is refused with `E_RECIPE_TEMPLATE`. `RunClock` gains
+  an optional IANA `timeZone`: with it the wall clock is read through `Intl.DateTimeFormat`, with
+  its daylight-saving rules; without it through `offsetMinutes`. The desktop's clock names the
+  zone of the `recipeTimeZone` setting. A cell that is not an instant with `Z` or an offset is
+  written empty and counted by the new warning `W_RECIPE_LOCAL_UNREAD` in `@tyto/core`.
+- e34def6: A recipe reads as blocks in the window (TYTO-676, ADR 0195). `@tyto/recipe` gains
+  `recipeBlocks`, the text read by line as header, step and note blocks, and `moveBlock` and
+  `deleteBlock`, each one edit of the text that keeps every other byte. `@tyto/editor` gains
+  `notebookFrames()`, which frames each block over the one editor with the host's toolbar on its
+  first line, and `cellOutputAt`. The runner takes `until`, the cell a run stops after. In the
+  desktop each block but the header has a toolbar: Run this block, Move up, Move down, Delete
+  block, and Hide result, which now folds a plan's lines and a run cell's included cells too.
+- 399281d: A recipe can report to a person with `warn when="<where>" message="<template>"`: one `W_RECIPE_WARN` warning per row the expression keeps, in table order, naming the row's key, its message filled from the row with `compose`'s `{column|filter}` templates or read from a data file. The table passes on unchanged, so the warning outlives a later `where` that drops the row. One step lists at most 100 rows and adds one warning counting the rest. `@tyto/core` gains the `W_RECIPE_WARN` code; the `warn` form joins `GENERIC_VERB_FORMS`.
+- b704587: TYTO-706: a `|` standing alone on a step line chains several steps, each read as if on its own line of the same block; `recipeSteps(text)` gives each step's place.
+
+### Patch Changes
+
+- 1fae4a5: TYTO-640: `fileSafeName` keeps the base letter of an accented Latin letter (`Matemática` →
+  `Matematica`, `Straße` → `Strasse`), drops a trailing dot or space, and gives a Windows device
+  name (`CON`, `nul.brief`, `COM1`…) a `_` on its stem. Both callers change with it: a `to-brief`
+  row named `Matemática` writes `Matematica.brief`, and a format named `miniatura-vídeo` is
+  delivered as `miniatura-video-01.png` (ADR 0053, note of 2026-11-12). Names that were already
+  ASCII-safe are unchanged.
+- Updated dependencies [46a013d]
+- Updated dependencies [d700cf3]
+- Updated dependencies [ef76145]
+- Updated dependencies [1fae4a5]
+- Updated dependencies [30bb335]
+- Updated dependencies [399281d]
+- Updated dependencies [ca2bc10]
+  - @tyto/core@0.45.0
+  - @tyto/brief-lang@0.8.4
+
 ## 0.5.0
 
 ### Minor Changes
