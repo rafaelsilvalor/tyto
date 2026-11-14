@@ -205,6 +205,12 @@ export const ALLOWED_PORT_DIFFERENCES: readonly AllowedPortDifference[] = [
   },
   {
     command: 'coordinate',
+    inCommand: '### A cloud executor',
+    reason:
+      'start_session in the cloud is Claude desktop only; a Codex cloud executor is not measured',
+  },
+  {
+    command: 'coordinate',
     inCommand: '## Session template',
     reason: 'the prompt for start_session, which Codex lacks (docs/agents.md)',
   },

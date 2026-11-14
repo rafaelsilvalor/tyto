@@ -152,6 +152,10 @@ codex exec -C <worktrees>/<KEY> --json -o <coordination folder>/<name>/<KEY>.las
   still reaches it. Its report is the last message of its turn: when it ran in the app, not
   through your `codex exec`, no `<KEY>.last.md` holds it, so ask him to say when it reported
   (reading an app thread's turn from the CLI is not measured).
+- **The cloud first.** The Claude Code command runs an executor in a cloud session when the
+  card needs no Tyto window, no Windows or macOS machine and no local measurement, to spare
+  the machine's memory. A Codex cloud task as an executor is not measured: until it is, a
+  Codex coordinator runs executors locally, one at a time, and says so in the batch file.
 
 ### Driving the cards
 
@@ -191,6 +195,21 @@ codex exec -C <worktrees>/<KEY> --json -o <coordination folder>/<name>/<KEY>.las
   and a Portuguese half that explains what the card adds to Tyto for somebody who does not
   write code. Re-read the status after creating (`fields: ["status"]`): a new card lands in
   To Do or Ready unpredictably.
+
+### Closing an executor
+
+**An executor is closed as soon as its work is done**: its PR merged or closed, or its card
+dropped. Close it in the same turn, not at the end of the batch (the maintainer, 2026-11-14).
+Its own cleanup (`docs/executor-protocol.md`, step 12) leaves its worktree and branch for you:
+
+- Remove its worktree once `git status --short` there shows nothing and
+  `git log origin/<branch>..HEAD` is empty (`git worktree remove --force <path>`), delete its
+  branch with `git branch -D`, and delete its `<KEY>.last.md`. A worktree that installed
+  `node_modules` may fail with `Filename too long`.
+- A thread the maintainer watches in the Codex app: tell him it is done, so he can archive it.
+- A deletion the sandbox or an approval refuses becomes a command for the maintainer, in your
+  next message; never work around it. Write in the batch file what you removed and what is
+  left.
 
 ### Merging (non-negotiable)
 
@@ -243,7 +262,8 @@ reason):
    ficou" table.
 2. Close the batch file with that report and remove the batch from the registry's active list.
 3. Record what changed in the home agent notes.
-4. **Ask each executor to clean up.** Resume every executor thread still reachable
+4. **Ask each executor to clean up.** Executors are closed as they finish; this catches any
+   left open. Resume every executor thread still reachable
    (`codex exec resume <thread_id>`, as in "Starting and reaching an executor") with "the batch
    is closed: follow docs/executor-protocol.md › When the batch closes", and read its report.
 5. List the executor threads, worktrees and branches left behind (`git worktree list`, and
