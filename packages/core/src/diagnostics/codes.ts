@@ -2247,6 +2247,30 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // TYTO-714: with clear=push, a sheet read that lost a column reads as every cell cleared. The
+  // run holds those clears instead of clearing the remote side, and says which column.
+  W_RECIPE_DECIDE_CLEAR_COLUMN: {
+    severity: 'warning',
+    summary:
+      "A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run.",
+    template:
+      "Column '{column}' {problem}, so 'decide' held its {count} clear(s) and cleared nothing on the remote side.",
+    spec: 'docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // TYTO-714: more clears in one run than a person makes between runs is held, all of them, until
+  // the recipe raises clear-limit= for a run that means it.
+  W_RECIPE_DECIDE_CLEAR_LIMIT: {
+    severity: 'warning',
+    summary:
+      "A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them.",
+    template:
+      "'decide' held {count} clear(s), more than clear-limit={limit}; to push them, raise clear-limit= for this run, or write clear-limit=none to lift the limit.",
+    spec: 'docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // An Apply wrote, but the recipe's state was not committed (TYTO-378, ADR 0170 decision 4):
   // another cell was stale or failed, or the state store refused the write. The next run sees
   // the rows as changed and plans them again, so the person has to know.

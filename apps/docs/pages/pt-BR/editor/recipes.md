@@ -291,6 +291,23 @@ remember dispatched columns=title
 
 **De onde vem a credencial.** Na linha de comando, ela é uma variável de ambiente, `TYTO_RECIPE_CREDENTIAL_` seguido do nome em maiúsculas, com todo caractere que não é letra nem dígito trocado por `_`: `token=routine-hook` lê `TYTO_RECIPE_CREDENTIAL_ROUTINE_HOOK`. O `run_recipe` do `tyto mcp` confere a lista e a credencial e mostra o plano, e nunca envia: um agente pode ver um envio antes, não realizá-lo. O [`tyto recipe run --apply`](#rodar-pelo-terminal) as envia, numa pasta confiável. **Na janela**, abra **Mostrar plugins** e procure **Credenciais de receitas** abaixo da lista de plugins: digite o nome que o `token=` usa e o valor, e clique em **Salvar** — ou digite o nome e clique em **Importar de arquivo…** para guardar o texto de um arquivo como o valor. O valor vai para o cofre do sistema, e o Tyto não o mostra de novo: a seção lista só os nomes, cada um com **Esquecer**, e salvar o mesmo nome outra vez troca o valor. Uma credencial é deste computador, para todas as pastas dele; para quais endereços uma receita pode enviar é o `recipes.call.hosts` de cada pasta, lido só depois que você confia na pasta. Enquanto a credencial não está guardada, a linha `call` falha com um problema que diz onde guardá-la; guardada, o plano lista as requisições e **Aplicar** as envia.
 
+## Sincronizar um campo nos dois sentidos
+
+`decide` compara um campo dos dois lados de uma sincronização, linha a linha: o lado local (a coluna de uma planilha), o lado remoto (o campo de um rastreador, já mapeado para os valores da planilha) e o que a última execução aplicada deixou, que `last` lê. Vence o lado que mudou desde então: a linha diz `push`, `pull`, `same` ou `hold` em `<coluna>_action`, e o passo que escreve no lado remoto lê `<coluna>_push` e `<coluna>_pushes`.
+
+```
+last sync columns=owner
+decide owner local=owner remote=tracker_owner last=last_owner clear=push
+remember sync columns=owner when="owner_action != hold"
+```
+
+Com `clear=push`, uma célula esvaziada desde a última execução esvazia o campo remoto também; sem ele, o valor remoto preenche a célula de novo. Como uma célula vazia também é o que uma leitura da planilha que perdeu células parece, `decide` segura todos os valores apagados de uma execução, não envia nenhum e mostra um aviso na sua linha, em dois casos:
+
+- **A coluna se perdeu.** A coluna de `local=` falta na tabela, ou está vazia em todas as linhas enquanto a última execução deixou valores ali. O aviso diz o nome da coluna. Confira a planilha e rode de novo.
+- **Apagados demais de uma vez.** Uma execução enviaria mais valores apagados do que `clear-limit=`, 5 quando não é dado. O aviso diz quantos. Se você quis mesmo esvaziar essas células, rode uma vez com um limite maior (`clear-limit=20`), ou escreva `clear-limit=none` para tirar o limite.
+
+Uma linha segurada diz `hold` e não envia nada, e o estado guarda o último valor, então a próxima execução vê os mesmos valores apagados de novo. Os apagados até o limite são enviados como antes.
+
 ## Rodar pelo terminal
 
 `tyto recipe run <receita>` roda uma receita na pasta de trabalho que a contém, com a confiança dessa pasta, pelo mesmo executor da janela. [Obter o comando](../command-line/index.md#obter-o-comando) diz como construí-lo.

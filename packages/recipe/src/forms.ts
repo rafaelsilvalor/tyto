@@ -365,6 +365,13 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           values: ['push', 'pull'],
           default: 'pull',
         }),
+        named(
+          'clear-limit',
+          'text',
+          false,
+          'With clear=push, the most clears one run pushes, or none for no limit.',
+          { default: '5' },
+        ),
       ],
     ),
     form(
