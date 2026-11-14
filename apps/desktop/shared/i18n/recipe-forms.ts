@@ -180,7 +180,8 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.set.summary':
     'Guarda um valor calculado da tabela, que os passos abaixo leem como {name}.',
   'recipe.verb.set.field.assignment.help':
-    'O nome, =, e count, ou min, max, first, last ou sum de uma coluna.',
+    'Escrito nome = agregado coluna, como last_due = max due. O agregado é count, que não ' +
+    'leva coluna, ou min, max, first, last ou sum.',
 
   'recipe.verb.warn.summary':
     'Informa cada linha que uma expressão mantém como um aviso da execução.',

@@ -195,6 +195,32 @@ describe('a recipe run on the wire', () => {
     });
   });
 
+  // TYTO-727, ADR 0199: the value a `set` step set and its note reach the window, cut.
+  it("sends a set cell's named value and its note, each cut to text", () => {
+    const wire = recipeAnswerToWire({
+      cells: [
+        {
+          index: 0,
+          line: 2,
+          status: 'ok',
+          diagnostics: [],
+          named: { name: 'last_due', value: 'y'.repeat(5000) },
+          note: "the table has no rows, so 'x' is empty",
+        },
+        { index: 1, line: 3, status: 'ok', diagnostics: [] },
+      ],
+      diagnostics: [],
+      ranAt: '2026-11-14T12:00:00.000Z',
+    });
+
+    expect(wire.cells[0]?.named?.name).toBe('last_due');
+    expect(wire.cells[0]?.named?.value).toHaveLength(RECIPE_WIRE_LIMITS.text);
+    expect(wire.cells[0]?.note).toBe("the table has no rows, so 'x' is empty");
+    expect(wire.cells[1]).not.toHaveProperty('named');
+    expect(wire.cells[1]).not.toHaveProperty('note');
+    expect(() => parseIpc('recipe:run', 'response', { requestId: 1, ...wire })).not.toThrow();
+  });
+
   it('cuts a long text with an ellipsis, and leaves a short one and a scalar alone', () => {
     expect(cut('short')).toBe('short');
     expect(cut('y'.repeat(RECIPE_WIRE_LIMITS.text + 10)).endsWith('…')).toBe(true);

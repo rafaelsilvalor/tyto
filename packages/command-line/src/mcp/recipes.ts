@@ -64,6 +64,10 @@ export interface RecipeCellAnswer {
   readonly table?: RecipeTableAnswer;
   readonly plan?: RecipePlanAnswer;
   readonly applied?: RecipeAppliedAnswer;
+  /** TYTO-727, ADR 0199: the value a `set` step set, which the steps below read as `{name}`. */
+  readonly named?: { readonly name: string; readonly value: string };
+  /** TYTO-727: a line of the cell's result that is no diagnostic, as why a value is empty. */
+  readonly note?: string;
 }
 
 export interface RecipeRunAnswer {
@@ -158,8 +162,14 @@ export function cellAnswer(cell: RunnerCell, source: RecipeSource): RecipeCellAn
             })),
           },
         }),
+    ...(cell.named === undefined
+      ? {}
+      : { named: { name: cell.named.name, value: cutText(cell.named.value) } }),
+    ...(cell.note === undefined ? {} : { note: cutText(cell.note) }),
   };
 }
+
+const cutText = (text: string): string => cut(text) as string;
 
 export function runAnswer(answer: RunnerAnswer, source: RecipeSource): RecipeRunAnswer {
   return {

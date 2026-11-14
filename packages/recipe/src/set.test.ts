@@ -86,6 +86,11 @@ describe('set', () => {
     expect(empty.cells[2]?.status).toBe('ok');
   });
 
+  it('adds decimals without floating point noise, so 0.1 + 0.2 is 0.3', async () => {
+    const result = await run(['set x = sum points'], { input: pointsTable(['0.1', 0.2]) });
+    expect(result.cells[0]?.named?.value).toBe('0.3');
+  });
+
   it('refuses to sum a cell that is no number, naming its row', async () => {
     const result = await run(['set x = sum title']);
     expect(result.cells[0]?.status).toBe('failed');

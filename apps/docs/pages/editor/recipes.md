@@ -57,6 +57,40 @@ At the top level the tab offers the three sections, `rules`, `rewrites` and `loo
 
 In the recipe, typing `@./` offers the vocabulary files beside it, and after the file's `#` the tables it holds, such as `/rules/kinds`. Only files in the recipe's own folder, or below it, are read for this.
 
+## Name values with const and set
+
+A recipe can name a value once and use it in any step below as `{name}`, the way it uses a `param`. There are two ways to name one, and `param`, `const` and `set` share one set of names: a name declared twice is refused with `E_RECIPE_SYNTAX`.
+
+**`const`** names a value written in the recipe. It goes in the header, beside the `param` lines, and every step can read it:
+
+```
+recipe weekly
+const team = Platform
+where team = {team}
+```
+
+Unlike a `param`, a `const` takes no value from outside: `--param team=…` on the command line, or `run weekly team=…` in another recipe, is refused with `E_RECIPE_PARAM`.
+
+**`set`** is a step that computes one value from the table at its line. It is written `set <name> = <aggregate> <column>`:
+
+```
+set last_due = max due
+where due = {last_due}
+```
+
+The aggregate is one of:
+
+- `count`: how many rows the table has. It takes no column: `set total = count`.
+- `min` and `max`: the least and the greatest value of the column, compared as numbers when every value that is not empty is a number, and as text without minding case or accents otherwise.
+- `first` and `last`: the column's value in the first and in the last row.
+- `sum`: the column's values added up. A value that is not a number is refused with `E_RECIPE_ARGUMENTS`, naming its row.
+
+The table passes through `set` unchanged, so the next step reads the same rows. Only the steps below a `set` can read its value; using it above, or in the `set` line itself, is refused with `E_RECIPE_PARAM`. On a table with no rows, `count` gives 0 and the others an empty value, which the step's result says.
+
+The block's result says each value its steps set, such as _Set last_due = 2026-12-01_, even when the `set` is not the block's last step (see [What a step shows](#what-a-step-shows)).
+
+In the editor, `const` is coloured as a header line, and a `set` step's name, `=` and aggregate each have their colour. Typing `{` in a step offers the names in scope there: every `param` and `const`, and each `set` above the step. After `set <name> = ` the editor offers the aggregates.
+
 ## When it runs
 
 A recipe runs by itself, but not everything runs at every moment:
@@ -78,6 +112,7 @@ Only the steps that changed run again: a step whose line did not change keeps it
 Under each block's last step is one line, then its table. A block of several steps shows only its last step's result (see [Work in blocks](#work-in-blocks)):
 
 - **The line** says what the step answered: _12 rows · 4 columns_, a plan (_Plan: 3 to write to Pauta_), _Failed: see Problems_, or why it did not run.
+- **The values set**: each value a `set` step of the block set, such as _Set last_due = 2026-12-01_, and a note when one is empty. They stay on the line when the result is folded. See [Name values with const and set](#name-values-with-const-and-set).
 - **Its age**: when the step ran and how old its data is, such as _ran 2 min. ago · data fetched 3 hr. ago_. The data's age is when the source fetched it, which can be long before the step ran. The ages count up while the tab is open.
 - **The table** shows the step's first 20 rows, then how many it leaves out (_30 more rows_). A wide table scrolls sideways inside the step. A long value is cut with an ellipsis; point at it to read it whole, and point at a column's name to see its type.
 
@@ -128,7 +163,7 @@ The tab follows the recipe: a new run draws it again with the new rows, and it c
 
 ## Work in blocks
 
-A recipe reads as blocks, the way a notebook reads as cells. **A blank line separates one block from the next**: a block is the lines between two blank lines, and it can hold several steps and `#` comment lines. A block of comment lines only is a **note** block. The header (the `recipe` line, its `|` description and the `apply`, `every` and `param` lines at the top) is a block of its own, even with no blank line under it. A blank line belongs to no block. The block your cursor is in has a coloured bar at its left.
+A recipe reads as blocks, the way a notebook reads as cells. **A blank line separates one block from the next**: a block is the lines between two blank lines, and it can hold several steps and `#` comment lines. A block of comment lines only is a **note** block. The header (the `recipe` line, its `|` description and the `apply`, `every`, `param` and `const` lines at the top) is a block of its own, even with no blank line under it. A blank line belongs to no block. The block your cursor is in has a coloured bar at its left.
 
 **A block shows only its last step's result**, under that step's line. Every step of the block still runs, and a step's problem is still marked on its own line and listed in Problems; when a step in the middle fails, the block's line says _Skipped: a cell above failed_. To see the result of a step in the middle, put a blank line under it, which splits the block in two, or put the cursor on it and run **Open cell result in a tab**.
 
@@ -316,10 +351,10 @@ A held row reads `hold` and pushes nothing, and the state keeps its last value, 
 tyto recipe run recipes/sync.recipe
 ```
 
-It prints one line per step, with its status and how many rows its table has, and under a step that writes, every operation of its plan, one per line: none is left out. It writes nothing and remembers nothing, as a save does; a recipe with `apply auto` only shows its plans.
+It prints one line per step, with its status and how many rows its table has, under a `set` step the value it set (`set last_due = "2026-12-01"`) and its note, and under a step that writes, every operation of its plan, one per line: none is left out. It writes nothing and remembers nothing, as a save does; a recipe with `apply auto` only shows its plans.
 
 - `--json` prints the whole answer as one JSON document: every row of every table with where it came from, every operation with its description and the plugin's data for applying it, and every problem with the line it points at. Send it to a file to keep a day's plan: `tyto recipe run recipes/sync.recipe --json > plan.json`.
-- `--param <name>=<value>` gives one of the recipe's `param` lines a value for this run; repeat it for each. A name the recipe does not declare is an error.
+- `--param <name>=<value>` gives one of the recipe's `param` lines a value for this run; repeat it for each. A name the recipe does not declare is an error, and so is a `const`'s.
 - `--section <plugin>.<key>=<value>` sets a key of a plugin's section for this run, as in [`tyto render`](../command-line/render.md#other-options). A recipe's steps are handed sections only in a trusted folder, typed or not.
 - `--apply` applies every plan once, as a click on **Apply** does, and remembers what the recipe remembers. It runs only in a trusted folder: anywhere else it is refused before any step runs. A recipe with `apply auto` applies once too. It is how the command line sends a `call` step's requests.
 

@@ -634,6 +634,14 @@ export interface Catalogue {
   readonly 'recipe.view.tab': string;
   readonly 'recipe.view.empty': string;
   /**
+   * TYTO-727, ADR 0199, a block's result header: a value one of its `set` steps set (`{name}`
+   * and `{value}`), the same when the value is empty, and a step's note (`{note}`, the
+   * recipe's own English, as a diagnostic's message is).
+   */
+  readonly 'recipe.cell.named': string;
+  readonly 'recipe.cell.named.empty': string;
+  readonly 'recipe.cell.note': string;
+  /**
    * TYTO-378, a plan cell (`recipe-plan-view.ts`): Apply, what the lines leave out, each
    * line's mark, the summary's counts, `apply auto` held outside a trusted folder, and the
    * words for a refusal that came with no reason.
@@ -1513,6 +1521,9 @@ export const CATALOGUE_KEYS = [
   'recipe.cell.openTab',
   'recipe.view.tab',
   'recipe.view.empty',
+  'recipe.cell.named',
+  'recipe.cell.named.empty',
+  'recipe.cell.note',
   'recipe.plan.apply',
   'recipe.plan.more',
   'recipe.plan.more.one',

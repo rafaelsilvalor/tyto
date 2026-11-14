@@ -49,6 +49,8 @@ export type {
 } from './references.js';
 export { leavesFolder, referencesOf } from './references.js';
 export { recipeSkeleton } from './skeleton.js';
+export type { SetAggregate, SetStep } from './set.js';
+export { SET_AGGREGATES, readSet } from './set.js';
 export type { VocabularyEntry, VocabularyOutline, VocabularySection } from './vocabulary.js';
 export {
   VOCABULARY_EXTENSION,

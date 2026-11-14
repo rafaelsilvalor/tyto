@@ -43,8 +43,9 @@ const SET_FORM = "is written 'set <name> = <aggregate> <column>', as in 'set las
  * line, which the steps below read as `{name}`. The table passes through unchanged. `count` is
  * the number of rows; `min` and `max` compare as numbers when every non-empty cell is one, and
  * as text without case or accents otherwise; `first` and `last` read the first and last row;
- * `sum` adds numbers and refuses a cell that is not one, naming its row. A table without rows
- * gives an empty value, which the cell's note says; `count` gives 0.
+ * `sum` adds numbers, rounded to 15 significant digits, and refuses a cell that is not one,
+ * naming its row. A table without rows gives an empty value, which the cell's note says;
+ * `count` gives 0.
  */
 export function set(context: VerbContext): VerbResult {
   const table = requireTable(context);
@@ -118,7 +119,8 @@ export function set(context: VerbContext): VerbResult {
         }
         total += value;
       }
-      return ok({ ...passed, values: { [read.name]: String(total) } });
+      // Fifteen significant digits drop binary floating point's noise, so 0.1 + 0.2 reads 0.3.
+      return ok({ ...passed, values: { [read.name]: String(Number(total.toPrecision(15))) } });
     }
     case 'min':
     case 'max': {

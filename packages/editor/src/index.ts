@@ -230,8 +230,11 @@ export { recipe, recipeLanguage } from './recipe-language.js';
 export {
   type RecipeReferenceSource,
   type RecipeVerbSource,
+  completeNamedValue,
   completeRecipeReference,
   completeRecipeVerb,
+  completeSetAggregate,
+  namedValuesAt,
   recipeCompletion,
 } from './recipe-completion.js';
 
