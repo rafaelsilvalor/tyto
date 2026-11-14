@@ -3,6 +3,7 @@
 O que mudou em cada versão do aplicativo, da mais nova para a mais antiga. Cada página é o texto
 publicado com aquela versão.
 
+- [Tyto 0.22.0](./desktop-v0.22.0) — uma receita em blocos, como um notebook, e login pela linha de comando
 - [Tyto 0.20.0](./desktop-v0.20.0) — um painel que conversa com o Claude, e agentes que escrevem briefs
 - [Tyto 0.17.0](./desktop-v0.17.0) — um agente de IA trabalha com a janela aberta e propõe mudanças
 - [Tyto 0.15.0](./desktop-v0.15.0) — um plugin buscado traz tudo, não só os templates
