@@ -1,7 +1,7 @@
 import { Command, CommanderError, Option } from 'commander';
 import { DEFAULT_GALLERY_INDEX } from '@tyto/plugin-api';
 
-import type { CliEnvironment, CommandInvocation } from './environment.js';
+import { CLEARABLE_OPTIONS, type CliEnvironment, type CommandInvocation } from './environment.js';
 import { deliveryNewCommand } from './delivery.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import { galleryInstallCommand, galleryListCommand, galleryUpdateCommand } from './gallery.js';
@@ -22,6 +22,7 @@ import { renderCommand } from './render.js';
 import { signinCommand, signoutCommand } from './signin.js';
 import { withDiagnosticsSink } from './report.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
+import { templateListCommand } from './template-list.js';
 import { trustAddCommand, trustListCommand, trustRemoveCommand } from './trust.js';
 import { BUILT_IN_TYPES, type ValueDescription, valuesOf } from './value-kinds.js';
 import { watchCommand } from './watch.js';
@@ -285,6 +286,27 @@ export function createProgram(
       captured.code = await templateNewCommand(name, scaffold.opts(), environment);
     });
   valuesOf(scaffold, { '--out': FOLDER, '--formats': { kind: 'formats', list: true } });
+
+  const templateList = template
+    .command('list')
+    .description(
+      'list every template a render in the folder can use: name, origin (built-in, plugin, workspace) and formats; aliases name the template they reach',
+    )
+    .argument('[folder]', 'a folder inside the workspace a render would run in', '.')
+    .option('--json', 'print a machine-readable document instead of prose', false)
+    .option(
+      '--trust',
+      'trust the workspace folder and its work profile for this run only; never written to trust.json',
+      false,
+    )
+    .option(
+      '--no-sync',
+      'fetch nothing: a plugin file whose copy is not on this computer yet is left out, and said so',
+    )
+    .action(async (folder: string) => {
+      captured.code = await templateListCommand({ ...templateList.opts(), folder }, environment);
+    });
+  valuesOf(templateList, { '<folder>': FOLDER });
 
   /* ------------------------------------------------------------------------- delivery -- */
 
@@ -567,14 +589,44 @@ export function createProgram(
   const { refuse } = environment;
   if (refuse !== undefined) {
     program.hook('preAction', async (_program, command) => {
-      const refusal = await refuse(invocationOf(command));
-      if (refusal === undefined) return;
-      environment.console.err(`error: ${refusal}
+      const answer = await refuse(invocationOf(command));
+      if (answer === undefined) return;
+      if (typeof answer === 'string') {
+        environment.console.err(`error: ${answer}
 `);
-      throw new CommanderError(EXIT_DIAGNOSTICS, 'tyto.refused', refusal);
+        throw new CommanderError(EXIT_DIAGNOSTICS, 'tyto.refused', answer);
+      }
+      if ('handled' in answer) {
+        environment.console.out(`${answer.handled}
+`);
+        throw new CommanderError(EXIT_OK, HANDLED, answer.handled);
+      }
+      clearOptions(command, answer.without);
     });
   }
   return program;
+}
+
+/** The code of the stop a `{ handled }` answer throws, which `run` reads as exit 0. */
+const HANDLED = 'tyto.handled';
+
+/**
+ * Clears the options a `{ without }` answer names. An option outside `CLEARABLE_OPTIONS`, or one
+ * this command does not declare as a boolean, is a defect in the hook, never skipped: a clear
+ * that silently did nothing would run the command as typed.
+ */
+export function clearOptions(command: Command, names: readonly string[]): void {
+  for (const name of names) {
+    const declared = command.options.find((option) => option.attributeName() === name);
+    if (
+      !(CLEARABLE_OPTIONS as readonly string[]).includes(name) ||
+      declared === undefined ||
+      !declared.isBoolean()
+    ) {
+      throw new Error(`refuse asked to clear '${name}', which this command cannot clear`);
+    }
+    command.setOptionValue(name, false);
+  }
 }
 
 function exitOverrideDeep(command: Command): void {
@@ -616,7 +668,8 @@ export async function run(
       if (
         cause.code === 'commander.helpDisplayed' ||
         cause.code === 'commander.help' ||
-        cause.code === 'commander.version'
+        cause.code === 'commander.version' ||
+        cause.code === HANDLED
       ) {
         return EXIT_OK;
       }

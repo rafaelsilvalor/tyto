@@ -154,6 +154,8 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.decide.field.hold-when-empty.help': 'Segura um envio onde esta coluna está vazia.',
   'recipe.verb.decide.field.tie.help': 'O lado que vence quando os dois mudaram.',
   'recipe.verb.decide.field.clear.help': 'Se um valor apagado desde a última execução é enviado.',
+  'recipe.verb.decide.field.clear-limit.help':
+    'Com clear=push, o máximo de valores apagados que uma execução envia, ou none para não limitar.',
 
   'recipe.verb.rollup.summary': 'Conta os filhos de cada linha-mãe que uma expressão mantém.',
   'recipe.verb.rollup.field.column.help': 'A coluna de contagem a escrever.',
@@ -174,6 +176,12 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.count.summary': 'Conta os itens de uma coluna de lista.',
   'recipe.verb.count.field.column.help': 'A coluna de lista a contar.',
   'recipe.verb.count.field.into.help': 'A coluna numérica a escrever.',
+
+  'recipe.verb.set.summary':
+    'Guarda um valor calculado da tabela, que os passos abaixo leem como {name}.',
+  'recipe.verb.set.field.assignment.help':
+    'Escrito nome = agregado coluna, como last_due = max due. O agregado é count, que não ' +
+    'leva coluna, ou min, max, first, last ou sum.',
 
   'recipe.verb.warn.summary':
     'Informa cada linha que uma expressão mantém como um aviso da execução.',

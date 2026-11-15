@@ -220,6 +220,22 @@ describe('cell outputs', () => {
     expect(asked).toBe(1);
   });
 
+  it("asks for the lines' heights, which a bare measure reads only when the box resized", () => {
+    // TYTO-703: a fold inside a box held at `min-height: 100%` leaves the box's height alone,
+    // so without the flag the height map kept the unfolded output. jsdom lays nothing out; the
+    // map agreeing with the drawn lines is `recipe-blocks.desktop.test.ts`'s.
+    const on = open();
+    on.dispatch({ effects: setCellOutputs.of([output(3, 'select', on)]) });
+    const internal = on as unknown as { viewState: { mustMeasureContent: boolean | 'refresh' } };
+    internal.viewState.mustMeasureContent = false;
+    const element = outputElement(on, 'select');
+    if (!(element instanceof HTMLElement)) throw new Error('no output');
+
+    remeasureCellOutput(element);
+
+    expect(internal.viewState.mustMeasureContent).toBe(true);
+  });
+
   it('ignores an output whose position is outside the document', () => {
     const on = open();
     on.dispatch({

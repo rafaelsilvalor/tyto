@@ -101,4 +101,12 @@ describe('cutting a line into pieces', () => {
       { text: ' failed', style: {} },
     ]);
   });
+  it('cuts at a diagnostic code and marks the pieces inside it (TYTO-725)', () => {
+    const runs = [{ text: 'error E_X bad', style: {} }];
+    expect(piecesOf(runs, [], [], { start: 6, end: 9 })).toEqual([
+      { text: 'error ', style: {} },
+      { text: 'E_X', style: {}, code: true },
+      { text: ' bad', style: {} },
+    ]);
+  });
 });

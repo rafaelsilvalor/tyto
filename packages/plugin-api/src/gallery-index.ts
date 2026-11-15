@@ -9,7 +9,7 @@ import { type Document, isMap, isNode, isScalar, isSeq, parseDocument } from 'ya
 import { z } from 'zod';
 
 import { satisfiesEngine } from './engine.js';
-import type { PluginFile, PluginFilesLock } from './plugin-files.js';
+import type { GitSource, PluginFile, PluginFileSource, PluginFilesLock } from './plugin-files.js';
 
 /**
  * The gallery index (ADR 0162): a maintained list of templates and plugins, read from strings.
@@ -304,25 +304,29 @@ export interface GalleryFolder {
 function placementsOf(entry: GalleryEntry, folder: GalleryFolder): GalleryPlacement[] {
   const synced = (git: string, ref: string): boolean =>
     folder.lock.sources.some((locked) => locked.git === git && locked.ref === ref);
+  // The index names git repositories, so only a git source can be one of its entries; an
+  // archive source is the person's own, never the gallery's (ADR 0197).
+  const placementOf = (source: PluginFileSource | undefined): GitSource | undefined =>
+    source?.git !== undefined && sameRepository(source.git, entry.git)
+      ? { git: source.git, ref: source.ref }
+      : undefined;
   const placements: GalleryPlacement[] = [];
   for (const file of folder.files) {
     if (entry.kind === 'plugin') {
-      const source = file.plugin?.source;
-      if (source !== undefined && sameRepository(source.git, entry.git)) {
+      const source = placementOf(file.plugin?.source);
+      if (source !== undefined) {
         placements.push({ file: file.file, ...source, synced: synced(source.git, source.ref) });
       }
       continue;
     }
     for (const template of file.templates) {
-      if (
-        entry.templates.includes(template.name) &&
-        sameRepository(template.source.git, entry.git)
-      ) {
+      const source = placementOf(template.source);
+      if (entry.templates.includes(template.name) && source !== undefined) {
         placements.push({
           file: file.file,
           template: template.name,
-          ...template.source,
-          synced: synced(template.source.git, template.source.ref),
+          ...source,
+          synced: synced(source.git, source.ref),
         });
       }
     }

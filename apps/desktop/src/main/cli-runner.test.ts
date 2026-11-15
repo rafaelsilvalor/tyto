@@ -1,6 +1,8 @@
-import { resolve } from 'node:path';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
-import type { CliEnvironment, ExitCode } from '@tyto/command-line';
+import { type CliEnvironment, type ExitCode, run as runCommand } from '@tyto/command-line';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,6 +16,7 @@ import {
   confirmInABox,
   createCliRunner,
 } from './cli-runner.js';
+import { WATCH_REFUSED, windowRefusals } from './cli-refusals.js';
 
 /**
  * The runner in main (TYTO-495, ADR 0159), with `run` replaced by a script of what a command
@@ -254,6 +257,29 @@ describe('a question a command asks', () => {
   });
 });
 
+describe('stopping every run', () => {
+  // TYTO-726: the trust a refusal's box grants re-reads the folder, which stops every run.
+  it('spares the run named, and stops the others', async () => {
+    const release: (() => void)[] = [];
+    const { cli, recorded } = runner(
+      () =>
+        new Promise<ExitCode>((done) => {
+          release.push(() => done(0));
+        }),
+    );
+
+    const first = cli.start(['render', 'a']).runId;
+    const second = cli.start(['render', 'b', '--trust']).runId;
+    await settled();
+    cli.cancelAll(second);
+
+    expect(recorded.states.filter((change) => change.state === 'cancelled')).toEqual([
+      { runId: first, state: 'cancelled' },
+    ]);
+    for (const done of release) done();
+  });
+});
+
 describe('a refusal', () => {
   it("is asked with the run's cwd", async () => {
     const asked: string[] = [];
@@ -268,6 +294,31 @@ describe('a refusal', () => {
     await settled();
 
     expect(asked).toEqual(['/work']);
+  });
+
+  // TYTO-726: an offer's box is the run waiting on a question, as a confirm's box is.
+  it('shows its box as the run waiting, with the run it belongs to', async () => {
+    const runs: string[] = [];
+    const { cli, recorded } = runner(() => Promise.resolve(0), {
+      refuse: async (_invocation, _cwd, run) => {
+        runs.push(run.runId);
+        await run.waiting('Trust the folder /work and run the command?', () =>
+          Promise.resolve(false),
+        );
+        return undefined;
+      },
+    });
+
+    const { runId } = cli.start(['render', 'x', '--trust']);
+    await settled();
+
+    expect(runs).toEqual([runId]);
+    expect(recorded.states).toEqual([
+      { runId, state: 'running' },
+      { runId, state: 'waiting', question: 'Trust the folder /work and run the command?' },
+      { runId, state: 'running' },
+      { runId, state: 'finished', code: 0 },
+    ]);
   });
 });
 
@@ -397,5 +448,120 @@ describe("a run's diagnostics", () => {
     expect(cli.diagnosticPath(ids[0]!, 0)).toBeUndefined();
     expect(cli.diagnosticPath(ids[1]!, 0)).toBeDefined();
     expect(cli.diagnosticPath(ids[KEPT_RUNS]!, 0)).toBeDefined();
+  });
+});
+
+/**
+ * TYTO-537, ADR 0201 decision 3: the command panel's `cd` runs a command in a subfolder of the
+ * workspace, with the real CLI. Trust is the workspace's, found from there upwards, and the
+ * window's refusals are asked with that folder.
+ */
+describe('a run in a folder under the workspace', () => {
+  async function workspace() {
+    const scratch = await realpath(await mkdtemp(join(tmpdir(), 'tyto-cli-folder-')));
+    const root = join(scratch, 'promo');
+    const home = join(scratch, 'home');
+    await mkdir(join(root, '.tyto'), { recursive: true });
+    await mkdir(join(root, 'entregas'), { recursive: true });
+    await mkdir(home, { recursive: true });
+    await writeFile(join(root, '.tyto', 'project.json'), '{}');
+    await writeFile(join(root, 'entregas', 'semana.recipe'), 'recipe semana\n');
+    return { scratch, root, home };
+  }
+
+  function realRunner(root: string, home: string) {
+    const outputs: string[] = [];
+    const refused: { cwd: string; message: string | undefined }[] = [];
+    const ended: number[] = [];
+    const refuse = windowRefusals({
+      platform: process.platform,
+      queue: () => Promise.resolve({ folder: root, autoRun: true }),
+    });
+    const cli = createCliRunner({
+      environment: () => ({
+        version: '0.0.0-test',
+        cwd: root,
+        home,
+        variables: {},
+        rasterizer: () => {
+          throw new Error('nothing rasters here');
+        },
+      }),
+      refuse: async (invocation, cwd) => {
+        const answer = await refuse(invocation, cwd);
+        refused.push({ cwd, message: answer?.message });
+        return answer?.message;
+      },
+      confirm: () => Promise.resolve(false),
+      output: (output) => outputs.push(output.text),
+      state: (change) => {
+        if (change.state === 'finished') ended.push(change.code ?? -1);
+      },
+      run: runCommand,
+    });
+    const finish = async (): Promise<void> => {
+      for (let round = 0; round < 200 && ended.length === 0; round += 1) {
+        await new Promise((done) => setTimeout(done, 10));
+      }
+    };
+    return { cli, outputs, refused, ended, finish };
+  }
+
+  it('is restricted in a subfolder of a restricted workspace, and trusted once it is', async () => {
+    const { scratch, root, home } = await workspace();
+    try {
+      const restricted = realRunner(root, home);
+      restricted.cli.start(['recipe', 'run', 'semana.recipe', '--json'], join(root, 'entregas'));
+      await restricted.finish();
+      const before = JSON.parse(restricted.outputs.join('')) as {
+        workspace: { folder: string; trust: string };
+      };
+      // The workspace is the folder above, and its trust is what the run gets.
+      expect(before.workspace).toMatchObject({ trust: 'restricted' });
+      expect(restricted.refused.map((each) => each.cwd)).toEqual([join(root, 'entregas')]);
+
+      // Control: the same command, the workspace trusted, from the same subfolder.
+      expect(
+        await runCommand(['trust', 'add', root], {
+          console: { out: () => undefined, err: () => undefined },
+          version: '0.0.0-test',
+          cwd: root,
+          home,
+          variables: {},
+          confirm: () => Promise.resolve(true),
+          rasterizer: () => {
+            throw new Error('nothing rasters here');
+          },
+        }),
+      ).toBe(0);
+      const trusted = realRunner(root, home);
+      trusted.cli.start(['recipe', 'run', 'semana.recipe', '--json'], join(root, 'entregas'));
+      await trusted.finish();
+      const after = JSON.parse(trusted.outputs.join('')) as { workspace: { trust: string } };
+      expect(after.workspace).toMatchObject({ trust: 'trusted' });
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it("asks the window's refusals with the subfolder, so a path relative to it is read there", async () => {
+    const { scratch, root, home } = await workspace();
+    try {
+      // `..` from `entregas` is the queue's folder, with auto-run on: refused.
+      const inside = realRunner(root, home);
+      inside.cli.start(['watch', '..'], join(root, 'entregas'));
+      await inside.finish();
+      expect(inside.refused).toEqual([{ cwd: join(root, 'entregas'), message: WATCH_REFUSED }]);
+      expect(inside.outputs.join('')).toContain(WATCH_REFUSED);
+
+      // Control: `..` from the root is another folder, which the rule leaves alone.
+      const atRoot = realRunner(root, home);
+      const { runId } = atRoot.cli.start(['watch', '..']);
+      await new Promise((done) => setTimeout(done, 50));
+      atRoot.cli.cancel(runId);
+      expect(atRoot.refused).toEqual([{ cwd: root, message: undefined }]);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
   });
 });

@@ -58,6 +58,28 @@ export const ptBR: Catalogue = {
   'pluginFiles.approve.skip': 'Agora não',
   'cli.confirm.yes': 'Sim',
   'cli.confirm.no': 'Não',
+  'cli.offer.trust.message': 'Confiar na pasta {folder} e rodar o comando?',
+  'cli.offer.trust.detail':
+    '--trust confia numa pasta só por uma execução, e a janela não tem essa confiança. Confiar aqui grava a pasta no trust.json, como Pasta de trabalho: gerenciar confiança faz: ela continua confiável em toda execução e janela até você retirar a confiança em Pasta de trabalho: gerenciar confiança ou com tyto trust remove. O comando então roda sem --trust.',
+  'cli.offer.trust.yes': 'Confiar e rodar',
+  'cli.offer.signin.message': 'Entrar em {plugin} ({id}) pela janela?',
+  'cli.offer.signin.detail':
+    'A janela entra como a tela de plugins faz, no seu navegador, e guarda o login junto com os da janela. O tyto signin de um terminal guarda outro, separado, no chaveiro do sistema, e esse não é tocado.',
+  'cli.offer.signin.yes': 'Entrar',
+  'cli.offer.signout.message': 'Sair de {plugin} ({id}) na janela?',
+  'cli.offer.signout.detail':
+    'A janela esquece o próprio login, como o Sair da tela de plugins faz. O login de um terminal no chaveiro do sistema não é tocado.',
+  'cli.offer.signout.yes': 'Sair',
+  'cli.offer.apply.message': 'Abrir {recipe} no caderno?',
+  'cli.offer.apply.detail':
+    'A aba de comandos só planeja. O caderno mostra o plano de cada passo e aplica quando você clica em Aplicar, sob a confiança da pasta e os logins da janela. Abrir não aplica nada.',
+  'cli.offer.apply.yes': 'Abrir o caderno',
+  'cli.offer.watch.message':
+    'Desligar o Renderizar automaticamente do painel da fila e vigiar {folder} aqui?',
+  'cli.offer.watch.detail':
+    'Uma pasta de fila tem um consumidor só. O Renderizar automaticamente fica desligado até você ligá-lo de novo no painel da fila; os arquivos que já estão na fila ficam onde estão.',
+  'cli.offer.watch.yes': 'Desligar e vigiar',
+  'cli.offer.no': 'Cancelar',
   'terminal.quit.message': 'Ainda há um programa rodando em {terminals}. Sair e encerrá-lo?',
   'terminal.quit.quit': 'Sair',
   'terminal.quit.stay': 'Continuar',
@@ -352,11 +374,15 @@ export const ptBR: Catalogue = {
   'recipe.block.run': 'Executar este bloco',
   'recipe.block.up': 'Mover para cima',
   'recipe.block.down': 'Mover para baixo',
+  'recipe.block.drag': 'Arraste para mover o bloco',
   'recipe.block.delete': 'Apagar bloco',
   'command.recipe.openCellView': 'Abrir o resultado da célula numa aba',
   'recipe.cell.openTab': 'Abrir numa aba',
   'recipe.view.tab': '{name} · célula {cell}',
   'recipe.view.empty': 'Esta célula ainda não tem resultado. Execute a receita para vê-lo aqui.',
+  'recipe.cell.named': 'Definido {name} = {value}',
+  'recipe.cell.named.empty': 'Definido {name} como vazio',
+  'recipe.cell.note': 'Nota: {note}',
   'recipe.plan.apply': 'Aplicar',
   'recipe.plan.more': 'mais {count} operações',
   'recipe.plan.more.one': 'mais {count} operação',
@@ -739,6 +765,137 @@ export const ptBR: Catalogue = {
   'command.commandPanel.run': 'Comandos: Executar…',
   'command.commandPanel.renderBrief': 'Comandos: Renderizar este brief',
   'commandPanel.suggestions': 'Sugestões',
+  'commandPanel.emptyStep':
+    'Um && na coluna {column} não tem comando de um dos lados. Nada foi executado.',
+  'commandPanel.noHistoryEntry':
+    'O histórico não tem a entrada {entry}. Digite history para ver os números.',
+  'commandPanel.glob.outside':
+    '{pattern} leva para fora da pasta do projeto; um padrão só lê dentro dela.',
+  'commandPanel.glob.no-folder':
+    '{pattern} precisa de uma pasta de projeto aberta: um padrão só lê dentro dela.',
+  'commandPanel.glob.no-match': 'Nenhum arquivo corresponde a {pattern}. Nada foi executado.',
+  'commandPanel.glob.too-many':
+    '{pattern} corresponde a mais de 1.000 arquivos. Nada foi executado.',
+  'commandPanel.builtin.restricted':
+    '{name} não roda numa pasta restrita. Confie nela em Pasta de trabalho: gerenciar confiança.',
+  'commandPanel.builtin.clear': 'limpa a saída',
+  'commandPanel.builtin.history': 'lista as linhas rodadas nesta pasta, numeradas',
+  'commandPanel.builtin.history.empty': 'Nada foi rodado nesta pasta ainda.',
+  'commandPanel.builtin.exit': 'fecha esta sessão',
+  'commandPanel.builtin.last': 'roda de novo o último comando tyto',
+  'commandPanel.builtin.templates':
+    'lista os templates que um render nesta pasta pode usar (tyto template list)',
+  'commandPanel.builtin.last.none': 'Nenhum comando tyto no histórico para rodar de novo.',
+  'commandPanel.builtin.help':
+    'lista estes comandos; help <comando> mostra a ajuda de um comando tyto',
+  'commandPanel.builtin.help.panel': 'Comandos do próprio painel:',
+  'commandPanel.builtin.help.tyto': 'Comandos tyto (o tyto pode ficar de fora):',
+  'commandPanel.builtin.rerun': 'roda de novo a entrada N do histórico',
+  'commandPanel.builtin.and': 'roda b só se a terminou com código 0',
+  'commandPanel.builtin.glob': 'casa nomes de arquivo na pasta do projeto (render *.brief)',
+  'commandPanel.builtin.ls': 'lista uma pasta: pastas terminam em /, cada nome ao lado do tipo',
+  'commandPanel.builtin.cd': 'vai para uma pasta do projeto; cd sozinho volta à raiz',
+  'commandPanel.builtin.pwd': 'mostra a pasta em que os comandos tyto rodam',
+  'commandPanel.builtin.cat': 'mostra um arquivo de texto',
+  'cli.offer.origin.user':
+    "Esta linha veio do seu apelido '{alias}', definido nas suas configurações (commandAliases).",
+  'cli.offer.origin.workspace':
+    "Esta linha veio do apelido '{alias}', definido no .tyto/project.json desta pasta de trabalho (aliases).",
+  'commandPanel.builtin.alias':
+    "lista os apelidos, ou define um: alias nome='linha', --workspace para os desta pasta",
+  'commandPanel.builtin.unalias': 'remove um apelido seu; --workspace remove um desta pasta',
+  'commandPanel.builtin.set': 'lista as variáveis desta sessão, ou define uma: set nome=valor',
+  'commandPanel.builtin.variable':
+    'uma variável definida nesta sessão (nunca do ambiente; não entre aspas simples)',
+  'commandPanel.alias.none': 'Nenhum apelido.',
+  'commandPanel.alias.where.user': 'suas configurações',
+  'commandPanel.alias.where.workspace': 'esta pasta de trabalho',
+  'commandPanel.alias.unknown': 'Nenhum apelido chamado {name}.',
+  'commandPanel.alias.badName':
+    '{name} não pode ser nome de apelido: letras, dígitos, _ e -, sem começar por dígito ou -.',
+  'commandPanel.alias.reserved':
+    '{name} é um comando do próprio painel ou o tyto: um apelido não pode ter esse nome.',
+  'commandPanel.alias.usage':
+    "Escreva alias nome='linha', com aspas numa linha que tem espaços; --workspace para os desta pasta.",
+  'commandPanel.unalias.usage': 'Escreva unalias nome; --workspace remove um desta pasta.',
+  'commandPanel.alias.inWorkspace':
+    '{name} é um apelido desta pasta de trabalho: unalias --workspace {name} o remove.',
+  'commandPanel.alias.saved.user': 'Apelido {name} salvo nas suas configurações.',
+  'commandPanel.alias.saved.workspace':
+    'Apelido {name} salvo no .tyto/project.json desta pasta de trabalho, para todos que a abrirem.',
+  'commandPanel.alias.removed.user': 'Apelido {name} removido das suas configurações.',
+  'commandPanel.alias.removed.workspace':
+    'Apelido {name} removido do .tyto/project.json desta pasta de trabalho.',
+  'commandPanel.alias.refused.invalid':
+    '{name} não foi salvo: o nome ou a linha não serve para um apelido.',
+  'commandPanel.alias.refused.noFolder':
+    '{name} não foi salvo: --workspace precisa de uma pasta de trabalho aberta.',
+  'commandPanel.alias.refused.profile':
+    '{name} está definido no perfil de trabalho da pasta, não no .tyto/project.json dela: o painel nunca edita um perfil. Remova-o no arquivo do perfil.',
+  'commandPanel.alias.refused.restricted':
+    '{name} não foi salvo: esta pasta é restrita, e o {where} dela não é escrito pelo painel. Confie nela em Workspace: Manage Trust.',
+  'commandPanel.alias.refused.syntax':
+    '{name} não foi salvo: o {where} não é JSON válido e não é sobrescrito. Corrija-o antes.',
+  'commandPanel.alias.refused.unwritable':
+    '{name} não foi salvo: não foi possível gravar o {where}.',
+  'commandPanel.alias.ignored':
+    'O apelido {name} em {where} é ignorado: tem o nome de um comando do painel ou do tyto.',
+  'commandPanel.alias.unreadable':
+    'O apelido {name} não pode ser lido: a linha dele tem aspas abertas ou um && vazio na coluna {column}. Nada foi executado.',
+  'commandPanel.alias.from': 'Esta linha veio do apelido {name}, definido em {where}.',
+  'commandPanel.variable.unknown':
+    'Nenhuma variável chamada {name} nesta sessão: set {name}=valor define uma. Nada foi executado.',
+  'commandPanel.variable.none': 'Nenhuma variável nesta sessão.',
+  'commandPanel.variable.badName':
+    '{name} não pode ser nome de variável: letras, dígitos e _, sem começar por dígito.',
+  'commandPanel.set.usage': 'Escreva set nome=valor, com aspas num valor que tem espaços.',
+  'commandPanel.files.noFolder':
+    '{name} precisa de uma pasta de projeto aberta: os comandos de arquivo do painel trabalham dentro dela.',
+  'commandPanel.files.outside':
+    '{path} leva para fora da pasta do projeto; os comandos de arquivo do painel ficam dentro dela.',
+  'commandPanel.files.missing': '{path}: não há arquivo nem pasta com esse nome no projeto.',
+  'commandPanel.files.notFolder': '{path} não é uma pasta.',
+  'commandPanel.files.isFolder': '{path} é uma pasta: o ls a lista.',
+  'commandPanel.files.binary': '{path} não é texto: o cat mostra só arquivos de texto.',
+  'commandPanel.files.truncated': '{path} passa de 256 KB: só os primeiros 256 KB foram mostrados.',
+  'commandPanel.files.more': '… e mais {count}, além do limite do explorador.',
+  'commandPanel.files.usage.ls': 'aceita no máximo um caminho.',
+  'commandPanel.files.usage.cd': 'aceita no máximo uma pasta.',
+  'commandPanel.files.usage.cat': 'aceita um ou mais arquivos.',
+  'commandPanel.files.kind.folder': 'pasta',
+  'commandPanel.files.kind.brief': 'brief',
+  'commandPanel.files.kind.recipe': 'receita',
+  'commandPanel.files.kind.file': 'arquivo',
+  'commandPanel.builtin.new':
+    'cria um arquivo vazio; new x.brief --template t grava o esqueleto do template',
+  'commandPanel.builtin.mkdir': 'cria uma pasta',
+  'commandPanel.builtin.mv': 'move ou renomeia um arquivo ou pasta, nunca por cima de outro',
+  'commandPanel.builtin.cp': 'copia um arquivo ou pasta, nunca por cima de outro',
+  'commandPanel.builtin.rm': 'manda arquivos ou pastas para a lixeira',
+  'commandPanel.builtin.open': 'abre um arquivo numa aba',
+  'commandPanel.builtin.reveal': 'seleciona um arquivo ou pasta no Explorador',
+  'commandPanel.files.exists': '{path} já existe: nada foi substituído.',
+  'commandPanel.files.invalid': '{path}: esse nome ou lugar não serve para um arquivo ou pasta.',
+  'commandPanel.files.link':
+    '{path} contém um link ou junção: o cp não copia nada que leve para outro lugar.',
+  'commandPanel.files.trashFailed': '{path} não pôde ir para a {bin}. Nada foi apagado.',
+  'commandPanel.files.failed': '{path} não pôde ser gravado: {detail}.',
+  'commandPanel.files.root':
+    '{path} é a própria pasta do projeto: ela não é movida, copiada nem removida daqui.',
+  'commandPanel.files.intoItself': '{path} não pode ir para dentro de si mesmo.',
+  'commandPanel.files.noTab':
+    '{path} não abre numa aba: o open abre briefs, receitas e arquivos de texto.',
+  'commandPanel.files.noTemplate': 'Nenhum template se chama {template}.',
+  'commandPanel.files.templateBrief': '--template cria um brief: dê um nome que termine em .brief.',
+  'commandPanel.files.kept': 'Nada mais foi para a lixeira.',
+  'commandPanel.files.usage.new': 'aceita um nome, e --template com um template para um brief.',
+  'commandPanel.files.usage.mkdir': 'aceita um nome de pasta.',
+  'commandPanel.files.usage.mvcp': 'aceita uma origem e um destino.',
+  'commandPanel.files.usage.rm': 'aceita um ou mais caminhos.',
+  'commandPanel.files.usage.open': 'aceita um arquivo.',
+  'commandPanel.files.usage.reveal': 'aceita um caminho.',
+  'commandPanel.workingFolderGone':
+    'A pasta {path} não está mais no projeto. Digite cd para voltar à raiz.',
   'command.gallery.show': 'Galeria: ver templates e plugins',
   'gallery.heading': 'Galeria',
   'gallery.index': 'Índice',

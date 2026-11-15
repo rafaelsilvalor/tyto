@@ -1,5 +1,188 @@
 # @tyto/desktop
 
+## 0.22.0
+
+### Minor Changes
+
+- e999595: TYTO-646: a browser sign-in still waiting can be cancelled from the plugins screen. The waiting
+  line has Cancel, which reaches main through the new `signin:cancel` channel: the loopback
+  listener closes at once, the attempt answers `cancelled` with nothing stored, and Sign in works
+  again without waiting out the five-minute timeout. A callback arriving afterwards gets no
+  answer.
+- 4213daa: TYTO-710: dragging a recipe block near the top or bottom of the editor scrolls it, faster the
+  nearer the edge, so a block can be moved anywhere in a recipe taller than the pane. The drop
+  line follows the scroll, the mouse wheel's included, and the drop lands even after the dragged
+  block has scrolled out of view.
+- 2f3719f: Removing a plugin from the plugins screen can forget its secrets (TYTO-682): the remove box has
+  an unticked checkbox, "Also forget this plugin's saved credentials and sign-ins", which deletes
+  the plugin's `plugin:`, `signin:` and `signin-client:` keychain entries once the remove
+  succeeds. `tyto plugin remove` never touches the keychain, and now says so in one line.
+- 61edee2: The recipe step forms show each verb's summary and each field's help in the window's language
+  (TYTO-685). `@tyto/recipe` adds `formTexts`, `summaryKey` and `helpKey`: every generic form's
+  sentence keyed by the verb's and the field's names, the English the source; the desktop
+  translates them into Portuguese and keeps the English for any sentence it has no translation of.
+- b1c1b24: TYTO-649: a multi-line credential, such as a service account's JSON key, can be stored from the
+  plugins screen. Each credential line has Import from file…: main opens the picker, reads the
+  file (16 KiB at most, ADR 0134; empty or non-UTF-8 files are refused, a UTF-8 byte-order mark is
+  dropped) and stores its exact text in the keychain. The new `credentials:import` and
+  `recipe-credential:import` channels name the credential and answer an outcome, never the path or
+  the text. The credential fields, a plugin's and a recipe's, are now masked textareas that keep
+  line breaks (Ctrl+Enter saves), open empty and never show a stored value.
+- ef76145: A plugin's panel no longer reads a credential in plaintext (TYTO-641, ADR 0173). The desktop
+  answers a panel's `credentials` request with the new diagnostic code `E_PANEL_CREDENTIAL_READ`,
+  whose message names `call`, before any permission check or keychain read; a panel reaches a
+  secret's effect by asking its own plugin through `call`. A panel still stores and forgets its
+  plugin's declared keys with `storeCredential` and `deleteCredential`.
+- 3ff3d59: A recipe's block can be dragged to another place by its grip (TYTO-676). `moveBlockTo` in
+  `@tyto/recipe` moves a block before any other, or below the last, as one edit that rewrites the
+  blocks passed over and never the block moved. `notebookFrames()` in `@tyto/editor` draws a grip
+  on each movable frame, drags with pointer events (Escape, blur or an edit cancel it) and draws
+  the drop line; the host's `move` receives the drop. In the desktop the drop is one undo.
+- 672be6c: A recipe's block is a run of lines between blank lines, like a Jupyter cell, and shows its last
+  step's result (TYTO-676, ADR 0196). `recipeBlocks` in `@tyto/recipe` reads blocks of several
+  steps and `#` lines, the header split from a step written right under it; `RecipeBlock.step`
+  becomes `steps: { first, last, lastFrom }`, and `recipeLines` lists a text's step or header
+  lines. `deleteBlock` takes the blank line that set the block apart. In the desktop a block draws
+  one result, its last step's, while every step still runs and marks its own problems; Run this
+  block runs all its steps; the "+" writes a new block; the counter and the fold are the block's;
+  Add step joins the block the cursor is in.
+- 409c6c6: TYTO-402, ADR 0176 decision 7: Load recipe, from the Explorer's menu and the command bar. Main
+  asks for a `.recipe` anywhere on disk and copies it into the chosen folder with the recipes its
+  `run` lines include and the data and vocabulary files it names (`referencesOf`), then opens the
+  copy. Nothing is overwritten: when any of those files is already there, nothing is copied and
+  each one is named. A reference that leaves the source folder (`../`), a link that leads out of
+  it, a malformed reference, a missing file and a path under `.tyto` are reported above the tree
+  and never read. The new `recipe:load` channel takes an explorer id, never a path.
+- cdaabe0: A recipe's blocks gain a "+" between them and an execution counter (TYTO-676, ADR 0195).
+  `notebookFrames()` in `@tyto/editor` takes an `insert` control drawn on every boundary, read
+  back with `notebookInsertOf`, and a frame's `marker`, shown in a gutter of its own. In the
+  desktop the "+" offers Step…, the step picker writing its line there, and Note; notes read as
+  prose; each step shows `[n]`, `[*]`, `[ ]` or a stale `[n]`; a step's toolbar gains Run from
+  here down and the header's Run all.
+- e34def6: A recipe reads as blocks in the window (TYTO-676, ADR 0195). `@tyto/recipe` gains
+  `recipeBlocks`, the text read by line as header, step and note blocks, and `moveBlock` and
+  `deleteBlock`, each one edit of the text that keeps every other byte. `@tyto/editor` gains
+  `notebookFrames()`, which frames each block over the one editor with the host's toolbar on its
+  first line, and `cellOutputAt`. The runner takes `until`, the cell a run stops after. In the
+  desktop each block but the header has a toolbar: Run this block, Move up, Move down, Delete
+  block, and Hide result, which now folds a plan's lines and a run cell's included cells too.
+- 76f363a: A recipe has Jupyter's command mode (TYTO-676, ADR 0195 decision 7). `@tyto/editor` gains an
+  eighth keybinding context, `notebook`, where a key needs no modifier; `notebookFrames()` makes
+  its toolbars' layer the command target, with `enterNotebookCommand`, `leaveNotebookCommand`,
+  `selectedNotebookFrame` and `stepNotebookSelection`; and `vimToNormal`. In the desktop, Escape
+  (Shift+Escape in vim, Ctrl+M in both) enters command mode, where A, B, D D, Enter, Shift+Enter,
+  J, K, the arrows, O and Z act on the selected block; Shift+Enter in a recipe's text runs the
+  cursor's block and moves on.
+- 9389baa: TYTO-402, ADR 0176: Add step and Edit step over a recipe. Add step opens a picker of every verb
+  a recipe may name here, grouped into sources, transforms, actions and sinks, searchable and
+  keyboard-navigable, then the verb's form; Edit step opens the form of the step on the cursor's
+  line, filled by `valuesOfStep`. The form writes one line through `formatStep`, below the cursor's
+  step or at the end; a value one line cannot carry is refused with `E_RECIPE_FORM` next to its
+  field and nothing is written. Column fields offer the columns of the cell before the step.
+  `recipe:verbs` answers an additive `catalog` (each verb's kind and form fields, a plugin verb's
+  from its declared arguments), and the new `recipe:vocabulary-names` channel answers what a
+  `@./<file>.vocab.json#/<pointer>` may name, read only inside the recipe's folder.
+  `recipeCompletion` in `@tyto/editor` takes an optional source that completes those references
+  (`completeRecipeReference`).
+- 4508667: TYTO-402, ADR 0176: New recipe and New vocabulary, in the explorer's menu and as commands, write
+  `recipeSkeleton` and `vocabularySkeleton` into a new `<name>.recipe` or `<name>.vocab.json`, and
+  never over a file already there; a recipe name a `run` line could not name is refused with
+  `E_RECIPE_FORM`. A `*.vocab.json` opens in a vocabulary tab of its own, in JSON's colours, and no
+  other `.json` does. Main checks it on the pause with `lintVocabulary`, every problem at its
+  characters in the file, and answers its completion and hover on the new `vocabulary:lint`,
+  `vocabulary:complete` and `vocabulary:hover` channels. `jsonAssist` in `@tyto/editor` takes a
+  source whose answers arrive later (`JsonAssistSourceLater`).
+- b704587: TYTO-706: a `|` standing alone on a step line chains several steps, each read as if on its own line of the same block; `recipeSteps(text)` gives each step's place.
+
+### Patch Changes
+
+- 46a013d: The command line signs in through the browser (TYTO-683, ADR 0194). `tyto signin <plugin> [id]`
+  runs the sign-in the desktop runs and keeps the refresh token in the system keychain through
+  `@napi-rs/keyring` (at most 2,560 bytes a value, no plaintext fallback); `--client` asks for
+  the OAuth client a manifest leaves out, never reading it from the command line. `tyto signout`
+  forgets it. Every command that loads plugins answers `host.signin.accessToken` from it, and
+  `E_SIGNIN_REQUIRED` now says how to sign in on the host that answers it, through the new
+  optional `HostCapabilities.describeSignin`. The window's command panel refuses both commands.
+- b439e2f: TYTO-703: CodeMirror's height map follows a recipe result folded in place. `remeasureCellOutput`
+  now asks for the lines' heights, which a plain measure reads only when the content box changed
+  height, and a recipe shorter than its pane never changes it: before, every line below a fold was
+  placed 74 px too low by the map while drawn at its real place.
+- d700cf3: A panel's call now reaches its own plugin by plugin and panel id together, and answers the same
+  in process as isolated (TYTO-644, ADR 0173). **Breaking for a host calling these directly:**
+  `panelCallerOf(registry)` now returns `(plugin, panelId, request)` instead of
+  `(panelId, request)`, and reads the registry's new `ownedPanels()`, so two plugins that each
+  contribute a `settings` panel can no longer reach each other's; `callPanel(panel, request,
+plugin)` takes the contributing plugin's name as a third argument. An in-process `call` whose
+  answer the isolation protocol refuses — `{ ok: true, value }` without `diagnostics`, a value
+  over 1 MiB or not JSON, anything that is not a result — is refused as `E_PLUGIN_PROTOCOL`
+  naming the plugin, exactly as the same plugin running isolated, rather than passed (missing
+  `diagnostics`) or refused as `E_PANEL_CALL`. The isolation protocol does not change.
+  `@tyto/core` updates the `E_PANEL_CALL` and `E_PLUGIN_PROTOCOL` summaries to match; the
+  desktop passes the panel's plugin to `callPanel`.
+- 4d8d4bb: The command panel refuses `tyto recipe run --apply` with a line naming the notebook's Apply button and a terminal: the window's panel only plans a recipe (TYTO-684). `recipe run` without `--apply` still runs and prints its plans.
+- 30bb335: TYTO-675 (ADR 0139 note of 2026-11-12): a recipe template writes an ISO-8601 instant as
+  wall-clock time in the run's zone with the filter `local:<format>`, as in
+  `compose day="{due|local:yyyy-MM-dd}"` or `{due|local:dd/MM/yyyy HH:mm}`, so a delivery at
+  22:00 in São Paulo stays on its day. The format takes the tokens `age format=` reads (dd, MM,
+  yyyy, HH, mm); a letter outside a token is refused with `E_RECIPE_TEMPLATE`. `RunClock` gains
+  an optional IANA `timeZone`: with it the wall clock is read through `Intl.DateTimeFormat`, with
+  its daylight-saving rules; without it through `offsetMinutes`. The desktop's clock names the
+  zone of the `recipeTimeZone` setting. A cell that is not an instant with `Z` or an offset is
+  written empty and counted by the new warning `W_RECIPE_LOCAL_UNREAD` in `@tyto/core`.
+- 009f08e: TYTO-639, TYTO-642: a recipe view keeps its quick filter, the Calendar its span and Cards its
+  opened card when a new run or another language builds the cell again; a cell's full-size tab
+  follows its step when steps are inserted above it, and shows no result once that step's line
+  is deleted.
+- 4526606: Browser sign-in's host side moves out of the desktop's main so a second host can compose it
+  (TYTO-683): the PKCE flow, the token endpoint and the sign-in service are exported by
+  `@tyto/plugin-api`, with the loopback listener as a port (`CallbackListen`), and its adapter
+  `listenForCallback` by `@tyto/io`. The desktop composes them as before; nothing a person sees
+  changes.
+- ca2bc10: A plugin file source may be an `archive`: a `.zip` over https or on the machine, with `{ref}`
+  in its location, fetched without Git and pinned in the lock by the sha256 of its bytes
+  (ADR 0197). `PluginFilesCopy` names `location` and `pin` in place of `git` and `commit`.
+- Updated dependencies [46a013d]
+- Updated dependencies [d267e4a]
+- Updated dependencies [b250bc7]
+- Updated dependencies [4213daa]
+- Updated dependencies [2f3719f]
+- Updated dependencies [61edee2]
+- Updated dependencies [b439e2f]
+- Updated dependencies [d700cf3]
+- Updated dependencies [ef76145]
+- Updated dependencies [0ff1b0d]
+- Updated dependencies [928e28b]
+- Updated dependencies [1fae4a5]
+- Updated dependencies [3ff3d59]
+- Updated dependencies [672be6c]
+- Updated dependencies [30bb335]
+- Updated dependencies [cdaabe0]
+- Updated dependencies [e34def6]
+- Updated dependencies [76f363a]
+- Updated dependencies [9389baa]
+- Updated dependencies [4508667]
+- Updated dependencies [399281d]
+- Updated dependencies [a4e7ebe]
+- Updated dependencies [4526606]
+- Updated dependencies [89efc2d]
+- Updated dependencies [ca2bc10]
+- Updated dependencies [b704587]
+  - @tyto/core@0.45.0
+  - @tyto/plugin-api@0.21.0
+  - @tyto/command-line@0.8.0
+  - @tyto/recipe@0.6.0
+  - @tyto/editor@0.17.0
+  - @tyto/pipeline@0.12.17
+  - @tyto/io@5.8.0
+  - @tyto/brief-lang@0.8.4
+  - @tyto/export-html@0.7.21
+  - @tyto/export-svg@2.0.21
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.20
+  - @tyto/template-lang@0.8.19
+  - @tyto/templates@1.2.15
+  - @tyto/theme-pack@0.1.20
+
 ## 0.21.0
 
 ### Minor Changes

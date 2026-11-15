@@ -1,6 +1,12 @@
 import type { IpcEventPayload } from '../../shared/ipc.js';
 import { type AnsiState, freshAnsiState } from './ansi.js';
-import { EMPTY_SCROLLBACK, type Scrollback, withNote, withOutput } from './command-output.js';
+import {
+  EMPTY_SCROLLBACK,
+  type Scrollback,
+  withNote,
+  withOutput,
+  withPanelLine,
+} from './command-output.js';
 import type { CommandProblemRow } from './problems-panel.js';
 
 /**
@@ -33,6 +39,12 @@ export interface CommandRun {
   readonly startedAt: number;
   readonly state: CliState['state'] | 'refused';
   readonly code?: number;
+  /**
+   * The folder its relative paths are in, as steps under the workspace root (TYTO-537): the
+   * working folder it ran in, or the folder `ls` listed. What its output's links resolve against;
+   * the root when absent.
+   */
+  readonly folder?: readonly string[];
 }
 
 export interface CommandSession {
@@ -54,6 +66,17 @@ export interface CommandSession {
   readonly diagnostics: readonly CommandProblemRow[];
   /** Every line run here, oldest first; each is a block of the scrollback. */
   readonly runs: readonly CommandRun[];
+  /**
+   * The panel's working folder, as steps under the workspace root (TYTO-535, ADR 0200): what a
+   * glob, a file command's path and a `tyto` command's folder are read against. `cd` (TYTO-537,
+   * ADR 0201) changes only this value; the prompt shows it.
+   */
+  readonly workingFolder: readonly string[];
+  /**
+   * The variables `set` gave this session (TYTO-536), which `$name` reads: the panel's own,
+   * never the environment's, and gone when the tab closes.
+   */
+  readonly variables: ReadonlyMap<string, string>;
 }
 
 /** A run that is going: Stop applies, and the tab may not start another. */
@@ -62,11 +85,13 @@ export const isBusy = (session: CommandSession): boolean =>
 
 /**
  * Whether the window asks for the open folder again after this run: a `trust` command that
- * finished. Main re-reads the folder's trust when the command changes it (ADR 0159 decision 3)
- * but tells the window nothing, so the banner and Manage Trust would show the old answer.
+ * finished, or a line with `--trust`, whose box may have trusted the open folder (TYTO-726).
+ * Main re-reads the folder's trust when either changes it (ADR 0159 decision 3) but tells the
+ * window nothing, so the banner and Manage Trust would show the old answer.
  */
 export const refreshesWorkspace = (session: CommandSession): boolean =>
-  session.state === 'finished' && session.words?.[0] === 'trust';
+  session.state === 'finished' &&
+  (session.words?.[0] === 'trust' || session.words?.includes('--trust') === true);
 
 /** Events for a run whose id `cli:run` has not answered yet are kept for this many runs. */
 const EARLY_RUNS = 20;
@@ -135,6 +160,8 @@ export class CommandSessions {
       scrollback: EMPTY_SCROLLBACK,
       diagnostics: [],
       runs: [],
+      workingFolder: [],
+      variables: new Map(),
     };
     this.list = [...this.list, session];
     this.activeId = session.id;
@@ -177,6 +204,26 @@ export class CommandSessions {
     }));
   }
 
+  /** `cd` (TYTO-537): the session's working folder is now `steps` under the root. */
+  changeFolder(id: string, steps: readonly string[]): void {
+    this.update(id, (session) => ({ ...session, workingFolder: [...steps] }));
+  }
+
+  /** `set name=value` (TYTO-536): a variable of this session, which `$name` reads. */
+  setVariable(id: string, name: string, value: string): void {
+    this.update(id, (session) => ({
+      ...session,
+      variables: new Map([...session.variables, [name, value]]),
+    }));
+  }
+
+  /** Another workspace folder opened: every session goes back to its root. */
+  resetFolders(): void {
+    if (this.list.every((session) => session.workingFolder.length === 0)) return;
+    this.list = this.list.map((session) => ({ ...session, workingFolder: [] }));
+    this.changed();
+  }
+
   /** A line that never ran, with the reason, as a block of its own (TYTO-496). */
   refused(id: string, line: string, reason: string, at: number = Date.now()): void {
     this.update(id, (session) => {
@@ -186,6 +233,75 @@ export class CommandSessions {
         runs: [...session.runs, { number, line, words: [], startedAt: at, state: 'refused' }],
         scrollback: withNote(session.scrollback, reason, number),
       };
+    });
+  }
+
+  /**
+   * A line the panel answered itself (TYTO-535): a built-in's block, ended with `code` as a run
+   * would. What it printed is what the person asked to see, so plain output; a built-in that
+   * failed printed why, which is one of the panel's own notes (TYTO-725). The session's own state is left as it was: a
+   * built-in is not the run Stop and the tab's status speak of.
+   */
+  printed(
+    id: string,
+    line: string,
+    lines: readonly string[],
+    code: number,
+    at: number = Date.now(),
+    more: { readonly notes?: readonly string[]; readonly folder?: readonly string[] } = {},
+  ): void {
+    this.update(id, (session) => {
+      const number = (session.runs.at(-1)?.number ?? 0) + 1;
+      const printed = lines.reduce(
+        (scrollback, text) => withPanelLine(scrollback, code === 0 ? 'out' : 'note', text, number),
+        session.scrollback,
+      );
+      const folder = more.folder ?? session.workingFolder;
+      return {
+        ...session,
+        runs: [
+          ...session.runs,
+          {
+            number,
+            line,
+            words: [],
+            startedAt: at,
+            state: 'finished',
+            code,
+            ...(folder.length === 0 ? {} : { folder }),
+          },
+        ],
+        scrollback: (more.notes ?? []).reduce(
+          (scrollback, text) => withNote(scrollback, text, number),
+          printed,
+        ),
+      };
+    });
+  }
+
+  /**
+   * The run `runId` once it has ended, finished or cancelled; `undefined` when its session was
+   * closed first. What `&&` waits on before the next step (TYTO-535).
+   */
+  whenEnded(runId: string): Promise<CommandRun | undefined> {
+    const look = (): { done: boolean; run?: CommandRun } => {
+      const session = this.byRun(runId);
+      if (session === undefined) return { done: true };
+      const run = session.runs.find((each) => each.runId === runId);
+      if (run === undefined) return { done: true };
+      // Stop sets the session's state, which then ignores the run's later events (`state`).
+      if (session.state === 'cancelled') return { done: true, run: { ...run, state: 'cancelled' } };
+      return run.state === 'finished' ? { done: true, run } : { done: false };
+    };
+    const now = look();
+    if (now.done) return Promise.resolve(now.run);
+    return new Promise((resolve) => {
+      const unsubscribe = this.subscribe(() => {
+        const later = look();
+        if (!later.done) return;
+        unsubscribe();
+        resolve(later.run);
+      });
     });
   }
 
@@ -233,6 +349,7 @@ export class CommandSessions {
           runId,
           startedAt: at,
           state: 'running',
+          ...(session.workingFolder.length === 0 ? {} : { folder: session.workingFolder }),
         },
       ],
     }));

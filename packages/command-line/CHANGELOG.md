@@ -1,5 +1,58 @@
 # @tyto/command-line
 
+## 0.8.0
+
+### Minor Changes
+
+- 46a013d: The command line signs in through the browser (TYTO-683, ADR 0194). `tyto signin <plugin> [id]`
+  runs the sign-in the desktop runs and keeps the refresh token in the system keychain through
+  `@napi-rs/keyring` (at most 2,560 bytes a value, no plaintext fallback); `--client` asks for
+  the OAuth client a manifest leaves out, never reading it from the command line. `tyto signout`
+  forgets it. Every command that loads plugins answers `host.signin.accessToken` from it, and
+  `E_SIGNIN_REQUIRED` now says how to sign in on the host that answers it, through the new
+  optional `HostCapabilities.describeSignin`. The window's command panel refuses both commands.
+- ca2bc10: A plugin file source may be an `archive`: a `.zip` over https or on the machine, with `{ref}`
+  in its location, fetched without Git and pinned in the lock by the sha256 of its bytes
+  (ADR 0197). `PluginFilesCopy` names `location` and `pin` in place of `git` and `commit`.
+
+### Patch Changes
+
+- 2f3719f: Removing a plugin from the plugins screen can forget its secrets (TYTO-682): the remove box has
+  an unticked checkbox, "Also forget this plugin's saved credentials and sign-ins", which deletes
+  the plugin's `plugin:`, `signin:` and `signin-client:` keychain entries once the remove
+  succeeds. `tyto plugin remove` never touches the keychain, and now says so in one line.
+- Updated dependencies [46a013d]
+- Updated dependencies [d267e4a]
+- Updated dependencies [b250bc7]
+- Updated dependencies [61edee2]
+- Updated dependencies [d700cf3]
+- Updated dependencies [ef76145]
+- Updated dependencies [0ff1b0d]
+- Updated dependencies [928e28b]
+- Updated dependencies [1fae4a5]
+- Updated dependencies [3ff3d59]
+- Updated dependencies [672be6c]
+- Updated dependencies [30bb335]
+- Updated dependencies [e34def6]
+- Updated dependencies [399281d]
+- Updated dependencies [a4e7ebe]
+- Updated dependencies [4526606]
+- Updated dependencies [89efc2d]
+- Updated dependencies [ca2bc10]
+- Updated dependencies [b704587]
+  - @tyto/core@0.45.0
+  - @tyto/plugin-api@0.21.0
+  - @tyto/recipe@0.6.0
+  - @tyto/pipeline@0.12.17
+  - @tyto/io@5.8.0
+  - @tyto/export-html@0.7.21
+  - @tyto/export-svg@2.0.21
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.20
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.19
+  - @tyto/templates@1.2.15
+
 ## 0.7.0
 
 ### Minor Changes

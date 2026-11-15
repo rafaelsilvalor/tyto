@@ -208,20 +208,26 @@ export {
 } from './fs-trust-store.js';
 export {
   type FileReadListener,
+  type ArchiveDownload,
   type PluginFilesCopyOnDisk,
   type PluginFolderRead,
   type SourceProblemListener,
   type SyncPluginFolderOptions,
   type SyncedFolder,
   PLUGIN_FILES_CACHE,
+  archiveCopyName,
   cachedCopy,
   cleanPluginFilesCache,
+  copyNameOf,
+  fetchArchiveToCache,
   fetchToCache,
   locationOf,
   pluginStoreWithCopies,
   readPluginFolder,
   syncPluginFolder,
 } from './plugin-files.js';
+export { type ArchiveFile, ARCHIVE_MAX_BYTES, readZip } from './plugin-archive.js';
+export { downloadOverHttps } from './archive-download.js';
 export { type PluginFileImagesOptions, pluginFileImages } from './plugin-file-images.js';
 export { type HomePathOptions, checkHomePath, homePathProblem } from './home-path.js';
 export {

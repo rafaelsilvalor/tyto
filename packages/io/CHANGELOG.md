@@ -1,5 +1,62 @@
 # @tyto/io
 
+## 5.8.0
+
+### Minor Changes
+
+- e34def6: A recipe reads as blocks in the window (TYTO-676, ADR 0195). `@tyto/recipe` gains
+  `recipeBlocks`, the text read by line as header, step and note blocks, and `moveBlock` and
+  `deleteBlock`, each one edit of the text that keeps every other byte. `@tyto/editor` gains
+  `notebookFrames()`, which frames each block over the one editor with the host's toolbar on its
+  first line, and `cellOutputAt`. The runner takes `until`, the cell a run stops after. In the
+  desktop each block but the header has a toolbar: Run this block, Move up, Move down, Delete
+  block, and Hide result, which now folds a plan's lines and a run cell's included cells too.
+- 4526606: Browser sign-in's host side moves out of the desktop's main so a second host can compose it
+  (TYTO-683): the PKCE flow, the token endpoint and the sign-in service are exported by
+  `@tyto/plugin-api`, with the loopback listener as a port (`CallbackListen`), and its adapter
+  `listenForCallback` by `@tyto/io`. The desktop composes them as before; nothing a person sees
+  changes.
+- ca2bc10: A plugin file source may be an `archive`: a `.zip` over https or on the machine, with `{ref}`
+  in its location, fetched without Git and pinned in the lock by the sha256 of its bytes
+  (ADR 0197). `PluginFilesCopy` names `location` and `pin` in place of `git` and `commit`.
+
+### Patch Changes
+
+- a4e7ebe: TYTO-643, ADR 0170 note of 2026-11-12: after an Apply that wrote, the recipe runner marks the
+  applied cell, and the next run plans it again with the cells below it instead of reusing it, so
+  the plan shows what the Apply changed (`to-brief` now reads `: overwrites` for the briefs it
+  wrote). The Apply itself plans nothing. An Apply refused, or whose every operation failed,
+  leaves the cell as it was. An explicit Run of an `apply auto` recipe now plans the applied cell
+  again and applies that new plan.
+- 89efc2d: A recipe transform is handed `refresh: true` on a run without cache, as a source's `page` is
+  (TYTO-681): Fetch again and every scheduled run. Isolation protocol 25; `testPlugin`'s
+  `runRecipe` takes `refresh`.
+- Updated dependencies [46a013d]
+- Updated dependencies [d267e4a]
+- Updated dependencies [b250bc7]
+- Updated dependencies [61edee2]
+- Updated dependencies [d700cf3]
+- Updated dependencies [ef76145]
+- Updated dependencies [0ff1b0d]
+- Updated dependencies [928e28b]
+- Updated dependencies [1fae4a5]
+- Updated dependencies [3ff3d59]
+- Updated dependencies [672be6c]
+- Updated dependencies [30bb335]
+- Updated dependencies [e34def6]
+- Updated dependencies [399281d]
+- Updated dependencies [4526606]
+- Updated dependencies [89efc2d]
+- Updated dependencies [ca2bc10]
+- Updated dependencies [b704587]
+  - @tyto/core@0.45.0
+  - @tyto/plugin-api@0.21.0
+  - @tyto/recipe@0.6.0
+  - @tyto/pipeline@0.12.17
+  - @tyto/export-html@0.7.21
+  - @tyto/export-svg@2.0.21
+  - @tyto/template-lang@0.8.19
+
 ## 5.7.0
 
 ### Minor Changes

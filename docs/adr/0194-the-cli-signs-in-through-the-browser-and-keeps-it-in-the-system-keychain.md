@@ -95,3 +95,17 @@ for sign-ins: the CLI keeps `signin:` and `signin-client:` entries, which only t
 The CLI composes the `signinAccessToken` port wherever its app gave it a keychain, which
 `apps/cli` always does; `E_SIGNIN_UNAVAILABLE` remains the answer of a command line composed
 without one, a test's or the window's panel's.
+
+## Amendment — no service account, and no headless sign-in (TYTO-701, 2026-11-14)
+
+**Tyto's Google verbs act only as a signed-in person.** The maintainer chose on 2026-11-14 that
+the app always acts as the person, because the decisions are theirs, and that the service
+account goes. tyto-plugin-google#15 removed it: the fallback on `E_SIGNIN_UNAVAILABLE`, the key
+in `TYTO_PLUGIN_GOOGLE_SERVICE_ACCOUNT`, and the `credentials:service-account` and
+`net:oauth2.googleapis.com` permissions. A terminal with no keychain now answers
+`E_GOOGLE_SIGNIN`, saying it cannot sign in, with no credential read and no token request.
+
+The second consequence above is closed by not adding a credential: a recipe that reads a
+person's files runs in the window or in a terminal with a keychain, and nowhere else. A refresh
+token injected by a CI secret was weighed and refused, because it is the person's whole Drive in
+a secret store. Reopening it needs a new ADR.

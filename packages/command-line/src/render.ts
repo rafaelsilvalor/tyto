@@ -6,32 +6,19 @@ import { type Diagnostics, builtInDelivery, deliveryOfBrief, diagnostic } from '
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
 import {
-  NO_PLUGIN_FILES,
-  type SyncedPluginFiles,
-  leftOutPluginFiles,
-  syncPluginFiles,
-} from './plugin-files.js';
-import {
   type OutputKind,
   type SectionOverrides,
   needsRasterizer,
   outputRequests,
   unavailableTypes,
 } from './options.js';
-import {
-  type LoadedPlugins,
-  loadInstalledPlugins,
-  pluginCapabilities,
-  pluginFolders,
-  reachableExporters,
-  withoutRefused,
-} from './plugins/index.js';
-import { cliSigninCapabilities } from './signin.js';
-import { type RenderContextOptions, loadRenderContext, readFailure } from './render-context.js';
+import { reachableExporters, withoutRefused } from './plugins/index.js';
+import { readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { googleFontsOption } from './google-fonts.js';
 import { optionalSources, renderSources } from './sources.js';
-import { diagnosticsDocument, formatDiagnostics, json, registerUnplaced } from './report.js';
+import { diagnosticsDocument, formatDiagnostics, json } from './report.js';
+import { templatesInReach } from './templates-in-reach.js';
 import { workspaceOfBrief } from './workspace.js';
 
 /**
@@ -109,23 +96,6 @@ const BRIEF_SUFFIX = '.brief';
 
 /** What a delivery exports when no sheet says, as for a preset (ADR 0126, ADR 0157 §6). */
 const DELIVERY_TYPES = ['png'] as const;
-
-/** What `loadRenderContext` needs to search installed packs, when there is a home to read. */
-export function installedOption(
-  environment: CliEnvironment,
-  plugins: LoadedPlugins,
-  pluginFiles: SyncedPluginFiles = NO_PLUGIN_FILES,
-): Pick<RenderContextOptions, 'installed'> {
-  return environment.home === undefined
-    ? {}
-    : {
-        installed: {
-          plugins,
-          folderOf: pluginFolders(environment.home, pluginFiles.copies),
-          pluginFiles,
-        },
-      };
-}
 
 /** Paths are printed as the user would type them, not as this machine stores them. */
 export function displayPath(cwd: string, path: string): string {
@@ -214,54 +184,23 @@ export async function renderCommand(
 
   // Before the project, because an installed plugin's template pack is part of it: the
   // registry a brief is resolved against has to be able to find its templates (ADR 0046).
-  // A plugin's cache lives in `TYTO_HOME`; its workspace files are the brief's folder's, with
-  // that folder's trust, and a brief in no workspace answers that none is open (ADR 0138).
-  // The plugin files first: their copies load as installed plugins. A render never moves a
-  // pinned ref and never asks, so it reaches the network only for a copy the cache lacks
-  // (ADR 0151 decision 3); a plugin nobody approved is skipped with the reason.
-  const pluginFilesWorkspace =
-    workspace === undefined
-      ? undefined
-      : { folder: workspace.loaded.folder, trusted: workspace.loaded.trust === 'trusted' };
-  const pluginFiles =
-    environment.home === undefined
-      ? NO_PLUGIN_FILES
-      : await syncPluginFiles(
-          {
-            home: environment.home,
-            ...(pluginFilesWorkspace === undefined ? {} : { workspace: pluginFilesWorkspace }),
-            update: false,
-            fetches: true,
-            approval: 'never',
-          },
-          environment,
-        );
-  // A source that could not be fetched is about no file this run names: not the brief's.
-  registerUnplaced(pluginFiles.diagnostics);
-  // On stderr in both modes: `--json`'s stdout is one document, and this line is not in it.
-  const leftOut = await leftOutPluginFiles(pluginFilesWorkspace, 'loaded', environment);
-  if (leftOut !== '') environment.console.err(leftOut);
-  const loaded = await loadInstalledPlugins(environment.home, {
-    launch: environment.launch,
-    copies: pluginFiles.copies,
-    capabilities: pluginCapabilities(environment.variables, {
+  // The same steps `tyto template list` prints from (TYTO-728), so the two never disagree.
+  const reach = await templatesInReach(
+    {
+      workspace,
       hostName: 'tyto render',
-      signin: cliSigninCapabilities(environment),
-      ...(environment.home === undefined ? {} : { home: environment.home }),
-      workspace:
-        workspace === undefined
-          ? { trust: 'restricted' }
-          : { folder: workspace.loaded.folder, trust: workspace.loaded.trust },
-    }),
-  });
-  const context = await loadRenderContext({
-    templatesDirectory: resolve(cwd, options.templates),
-    projectTemplatesDirectories: project?.templates ?? [],
-    formatsFile: resolve(cwd, options.formatsFile),
-    templatesDirectoryIsDefault: options.templatesNamed !== true,
-    formatsFileIsDefault: options.formatsNamed !== true,
-    ...installedOption(environment, loaded, pluginFiles),
-  });
+      folder: cwd,
+      templates: {
+        directory: resolve(cwd, options.templates),
+        named: options.templatesNamed === true,
+      },
+      formats: { file: resolve(cwd, options.formatsFile), named: options.formatsNamed === true },
+    },
+    environment,
+  );
+  const { pluginFiles, plugins: loaded, context } = reach;
+  // On stderr in both modes: `--json`'s stdout is one document, and this line is not in it.
+  if (reach.leftOut !== '') environment.console.err(reach.leftOut);
   if (!context.ok) {
     await loaded.close();
     return reportFailure([...pluginFiles.diagnostics, ...context.error], options, environment, {

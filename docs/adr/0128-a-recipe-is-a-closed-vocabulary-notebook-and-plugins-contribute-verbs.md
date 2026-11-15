@@ -67,3 +67,10 @@ its old diagnostics. Names still compare without case, so `"ÚLTIMA SYNC"` is th
 start. The form library (ADR 0176) quotes a single column that would not read back bare, and
 keeps a list's quoted members, so `formatStep` and `valuesOfStep` round-trip these lines.
 `where` expressions still name columns bare.
+
+## Note, 2026-11-14 (TYTO-727)
+
+ADR 0199 adds a `const` header line, a value written in the recipe that nothing outside it
+overrides, and `set`, a generic verb that keeps one value computed from the table for the steps
+below it. Decision 1's `param` lines now share one set of names with both; the vocabulary stays
+closed.

@@ -12,7 +12,8 @@
  *   step written right under `recipe x` is a block of its own. A run elsewhere made only of such
  *   lines is a header block too. A header block is never moved, deleted or crossed by a move:
  *   `apply` and `every` belong before the first step, and every step reads the `param` lines.
- * - A **step** block holds one step or more: `steps` are their cells' indices, first and last.
+ * - A **step** block holds one step or more, on one line chained with `|` (TYTO-706) or on
+ *   several: `steps` are their cells' indices, first and last.
  *   Its result is its last step's (ADR 0196).
  * - A **note** block is made only of `#` lines, which the parser skips.
  * - A blank line belongs to no block and stays where it is.
@@ -21,6 +22,8 @@
  * so undo, the marks kept by line and the saved file follow as they follow typing. The text is
  * the source (ADR 0176): the blocks are a reading of it, never a second copy.
  */
+
+import { chainSegments } from './chain.js';
 
 export type RecipeBlockKind = 'header' | 'step' | 'note';
 
@@ -58,7 +61,7 @@ export interface BlockEdit {
   readonly at?: number;
 }
 
-const HEADER_WORDS = new Set(['recipe', 'apply', 'every', 'param']);
+const HEADER_WORDS = new Set(['recipe', 'apply', 'every', 'param', 'const']);
 
 interface Line {
   readonly number: number;
@@ -66,6 +69,8 @@ interface Line {
   /** Past the text, before `\r\n` or `\n`. */
   readonly to: number;
   readonly kind: RecipeBlockKind | 'blank';
+  /** A step line's steps, more than one when it chains them with `|` (TYTO-706). */
+  readonly steps: readonly { readonly from: number; readonly to: number }[];
 }
 
 function kindOf(content: string): Line['kind'] {
@@ -82,11 +87,32 @@ function linesOf(text: string): readonly Line[] {
   let number = 1;
   for (const raw of text.split('\n')) {
     const body = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
-    lines.push({ number, from, to: from + body.length, kind: kindOf(body.trim()) });
+    const kind = kindOf(body.trim());
+    const steps =
+      kind === 'step'
+        ? chainSegments(body).map((segment) => ({
+            from: from + segment.from,
+            to: from + segment.to,
+          }))
+        : [];
+    lines.push({ number, from, to: from + body.length, kind, steps });
     from += raw.length + 1;
     number += 1;
   }
   return lines;
+}
+
+/**
+ * Each step of a recipe's text, in order, so a step's place in the list is its cell's index:
+ * where its text starts and ends, and where its line starts. A line that chains steps with `|`
+ * gives one entry per step, all with the same `line` (TYTO-706).
+ */
+export function recipeSteps(
+  text: string,
+): readonly { readonly from: number; readonly to: number; readonly line: number }[] {
+  return linesOf(text).flatMap((line) =>
+    line.steps.map((step) => ({ from: step.from, to: step.to, line: line.from })),
+  );
 }
 
 /** The blocks of a recipe's text, in order. */
@@ -99,7 +125,7 @@ export function recipeBlocks(text: string): readonly RecipeBlock[] {
     const head = lines[0];
     const tail = lines.at(-1);
     if (head === undefined || tail === undefined) return;
-    const steps = lines.filter((line) => line.kind === 'step');
+    const steps = lines.flatMap((line) => line.steps.map(() => line));
     const header = lines.some((line) => line.kind === 'header');
     const kind: RecipeBlockKind = steps.length > 0 ? 'step' : header ? 'header' : 'note';
     const last = steps.at(-1);
@@ -139,7 +165,8 @@ export function recipeBlocks(text: string): readonly RecipeBlock[] {
 
 /**
  * The lines of one kind, in order, read as `recipeBlocks` reads them: where each starts and
- * ends. A step's place in the list of `'step'` lines is its cell's index; the `'header'` lines
+ * ends. A step line may chain several steps with `|`, so a cell's index is its place in
+ * {@link recipeSteps}, not in the `'step'` lines (TYTO-706); the `'header'` lines
  * are every `recipe`, `|`, `apply`, `every` and `param` line, wherever its block is.
  */
 export function recipeLines(
@@ -173,31 +200,55 @@ export function moveBlock(
   index: number,
   direction: 'up' | 'down',
 ): BlockEdit | undefined {
+  return moveBlockTo(text, index, direction === 'up' ? index - 1 : index + 2);
+}
+
+/**
+ * Moves block `index` to just before block `before`, or below the last block with `'end'`, as
+ * a drag drops it (TYTO-676). The blocks it passes and every one of them must be movable: a
+ * header is never moved nor crossed. `undefined` when the block would not move (`before` is the
+ * block itself or the one after it) or may not.
+ *
+ * **The blocks passed over are what the edit moves**, as in {@link moveBlock}: they and the gap
+ * that set the block apart change sides, and the block keeps its lines, so its result and its
+ * fold stay with it. The blank lines between blocks stay as they were: the block takes the
+ * place, and the separator, of the first block it passes.
+ */
+export function moveBlockTo(
+  text: string,
+  index: number,
+  before: number | 'end',
+): BlockEdit | undefined {
   const blocks = recipeBlocks(text);
+  const target = before === 'end' ? blocks.length : before;
   const block = blocks[index];
-  const other = blocks[direction === 'up' ? index - 1 : index + 1];
-  if (block === undefined || other === undefined) return undefined;
-  if (!isMovable(block) || !isMovable(other)) return undefined;
-  if (direction === 'up') {
-    // `other gap block` becomes `block gap other`: `other` and the gap go below `block`.
-    const gap = text.slice(other.to, block.from);
+  if (block === undefined || !isMovable(block)) return undefined;
+  if (!Number.isInteger(target) || target < 0 || target > blocks.length) return undefined;
+  // Dropped on the block itself or just below it, nothing is passed: nothing moves.
+  const passed = target < index ? blocks.slice(target, index) : blocks.slice(index + 1, target);
+  const first = passed[0];
+  const last = passed.at(-1);
+  if (first === undefined || last === undefined || !passed.every(isMovable)) return undefined;
+  const others = text.slice(first.from, last.to);
+  if (target < index) {
+    // `others gap block` becomes `block gap others`: the others and the gap go below the block.
+    const gap = text.slice(last.to, block.from);
     return {
       changes: [
-        { from: other.from, to: block.from, insert: '' },
-        { from: block.to, to: block.to, insert: gap + text.slice(other.from, other.to) },
+        { from: first.from, to: block.from, insert: '' },
+        { from: block.to, to: block.to, insert: gap + others },
       ],
-      at: other.from,
+      at: first.from,
     };
   }
-  // `block gap other` becomes `other gap block`: `other` and the gap go above `block`.
-  const gap = text.slice(block.to, other.from);
-  const moved = text.slice(other.from, other.to);
+  // `block gap others` becomes `others gap block`: the others and the gap go above the block.
+  const gap = text.slice(block.to, first.from);
   return {
     changes: [
-      { from: block.from, to: block.from, insert: moved + gap },
-      { from: block.to, to: other.to, insert: '' },
+      { from: block.from, to: block.from, insert: others + gap },
+      { from: block.to, to: last.to, insert: '' },
     ],
-    at: block.from + moved.length + gap.length,
+    at: block.from + others.length + gap.length,
   };
 }
 

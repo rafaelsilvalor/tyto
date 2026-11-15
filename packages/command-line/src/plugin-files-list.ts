@@ -5,6 +5,7 @@ import { type ConfigurationScope, type Diagnostic, configurationAlias } from '@t
 import {
   PLUGIN_MANIFEST_FILE,
   cachedCopy,
+  copyNameOf,
   fsPluginStore,
   locationOf,
   readPluginFolder,
@@ -17,6 +18,7 @@ import {
   configuredTemplates,
   folderSources,
   planPluginSync,
+  sourceLocation,
 } from '@tyto/plugin-api';
 
 import type { CliEnvironment } from './environment.js';
@@ -51,10 +53,14 @@ export interface ListedPluginFileSource {
   readonly scope: ConfigurationScope;
   /** The first file that names the source, as messages name it. */
   readonly file: string;
-  readonly git: string;
+  /** Exactly one of `git` and `archive`, as the file writes it (ADR 0197). */
+  readonly git?: string;
+  readonly archive?: string;
   readonly ref: string;
-  /** The full locked commit; absent before the first sync. */
+  /** The full locked commit of a git source; absent before the first sync. */
   readonly commit?: string;
+  /** The locked sha256 of an archive source; absent before the first sync. */
+  readonly sha256?: string;
   readonly status: PluginFileStatus;
 }
 
@@ -102,16 +108,22 @@ export async function listPluginFiles(
     for (const step of planPluginSync(named.sources, read.lock ?? EMPTY_PLUGIN_FILES_LOCK, false)) {
       const { source, locked } = step;
       sources.push({
-        ...(locked === undefined ? {} : { plugin: locked.plugin, commit: locked.commit }),
+        ...(locked === undefined ? {} : { plugin: locked.plugin }),
+        ...(locked?.commit === undefined ? {} : { commit: locked.commit }),
+        ...(locked?.sha256 === undefined ? {} : { sha256: locked.sha256 }),
         scope,
         file: source.file,
-        git: source.git,
+        ...(source.git === undefined ? { archive: source.archive } : { git: source.git }),
         ref: source.ref,
         status:
           read.lock === undefined || locked === undefined
             ? 'not synced'
             : await statusOf(
-                await cachedCopy(home, locationOf(source.git, directory), locked.commit),
+                await cachedCopy(
+                  home,
+                  locationOf(sourceLocation(source), directory),
+                  copyNameOf(locked),
+                ),
                 state,
               ),
       });

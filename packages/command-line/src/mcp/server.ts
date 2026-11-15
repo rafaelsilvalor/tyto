@@ -466,7 +466,7 @@ function registerWriteTools(
       {
         title: 'Run a recipe',
         description:
-          "Runs a .recipe file inside the served folder and answers each cell: its status, diagnostics with line and column, its table (columns, at most 50 rows and how many there are) and, for a cell that plans writes, its plan (target, operations as one line each, and an id). A run changes nothing outside this session, an `apply auto` recipe included: it only plans. To carry out one cell's plan, call again with apply set to that cell's index and the plan id the run answered; a plan replaced since, applied already or from a cell that did not run is refused. Sources fetch with this workspace's settings, which are never shown.",
+          "Runs a .recipe file inside the served folder and answers each cell: its status, diagnostics with line and column, its table (columns, at most 50 rows and how many there are) and, for a cell that plans writes, its plan (target, operations as one line each, and an id); a `set` cell also answers the value it set (named) and a note when that value is empty. A run changes nothing outside this session, an `apply auto` recipe included: it only plans. To carry out one cell's plan, call again with apply set to that cell's index and the plan id the run answered; a plan replaced since, applied already or from a cell that did not run is refused. Sources fetch with this workspace's settings, which are never shown.",
         inputSchema: z.object({
           path: z
             .string()

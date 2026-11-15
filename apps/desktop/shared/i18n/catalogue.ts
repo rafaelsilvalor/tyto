@@ -119,6 +119,26 @@ export interface Catalogue {
   readonly 'pluginFiles.approve.skip': string;
   readonly 'cli.confirm.yes': string;
   readonly 'cli.confirm.no': string;
+  /**
+   * TYTO-726, ADR 0159 note of 2026-11-15: the native box a refused command offers the window's
+   * own way in. `{folder}`, `{plugin}`, `{id}` and `{recipe}` are filled by `cli-offers.ts`.
+   */
+  readonly 'cli.offer.trust.message': string;
+  readonly 'cli.offer.trust.detail': string;
+  readonly 'cli.offer.trust.yes': string;
+  readonly 'cli.offer.signin.message': string;
+  readonly 'cli.offer.signin.detail': string;
+  readonly 'cli.offer.signin.yes': string;
+  readonly 'cli.offer.signout.message': string;
+  readonly 'cli.offer.signout.detail': string;
+  readonly 'cli.offer.signout.yes': string;
+  readonly 'cli.offer.apply.message': string;
+  readonly 'cli.offer.apply.detail': string;
+  readonly 'cli.offer.apply.yes': string;
+  readonly 'cli.offer.watch.message': string;
+  readonly 'cli.offer.watch.detail': string;
+  readonly 'cli.offer.watch.yes': string;
+  readonly 'cli.offer.no': string;
   readonly 'terminal.quit.message': string;
   readonly 'terminal.quit.quit': string;
   readonly 'terminal.quit.stay': string;
@@ -622,6 +642,7 @@ export interface Catalogue {
   readonly 'recipe.block.stale': string;
   readonly 'recipe.block.up': string;
   readonly 'recipe.block.down': string;
+  readonly 'recipe.block.drag': string;
   readonly 'recipe.block.delete': string;
   /**
    * TYTO-379, a cell drawn full size in a tab of its own: the command, the cell's button, the
@@ -632,6 +653,14 @@ export interface Catalogue {
   readonly 'recipe.cell.openTab': string;
   readonly 'recipe.view.tab': string;
   readonly 'recipe.view.empty': string;
+  /**
+   * TYTO-727, ADR 0199, a block's result header: a value one of its `set` steps set (`{name}`
+   * and `{value}`), the same when the value is empty, and a step's note (`{note}`, the
+   * recipe's own English, as a diagnostic's message is).
+   */
+  readonly 'recipe.cell.named': string;
+  readonly 'recipe.cell.named.empty': string;
+  readonly 'recipe.cell.note': string;
   /**
    * TYTO-378, a plan cell (`recipe-plan-view.ts`): Apply, what the lines leave out, each
    * line's mark, the summary's counts, `apply auto` held outside a trusted folder, and the
@@ -1111,6 +1140,102 @@ export interface Catalogue {
   readonly 'command.commandPanel.renderBrief': string;
   /** TYTO-496. The completion list under the command panel's prompt. */
   readonly 'commandPanel.suggestions': string;
+  readonly 'commandPanel.emptyStep': string;
+  readonly 'commandPanel.noHistoryEntry': string;
+  readonly 'commandPanel.glob.outside': string;
+  readonly 'commandPanel.glob.no-folder': string;
+  readonly 'commandPanel.glob.no-match': string;
+  readonly 'commandPanel.glob.too-many': string;
+  readonly 'commandPanel.builtin.restricted': string;
+  readonly 'commandPanel.builtin.clear': string;
+  readonly 'commandPanel.builtin.history': string;
+  readonly 'commandPanel.builtin.history.empty': string;
+  readonly 'commandPanel.builtin.exit': string;
+  readonly 'commandPanel.builtin.last': string;
+  readonly 'commandPanel.builtin.last.none': string;
+  readonly 'commandPanel.builtin.templates': string;
+  readonly 'commandPanel.builtin.help': string;
+  readonly 'commandPanel.builtin.help.panel': string;
+  readonly 'commandPanel.builtin.help.tyto': string;
+  readonly 'commandPanel.builtin.rerun': string;
+  readonly 'commandPanel.builtin.and': string;
+  readonly 'commandPanel.builtin.glob': string;
+  readonly 'commandPanel.builtin.ls': string;
+  readonly 'commandPanel.builtin.cd': string;
+  readonly 'commandPanel.builtin.pwd': string;
+  readonly 'commandPanel.builtin.cat': string;
+  readonly 'cli.offer.origin.user': string;
+  readonly 'cli.offer.origin.workspace': string;
+  readonly 'commandPanel.builtin.alias': string;
+  readonly 'commandPanel.builtin.unalias': string;
+  readonly 'commandPanel.builtin.set': string;
+  readonly 'commandPanel.builtin.variable': string;
+  readonly 'commandPanel.alias.none': string;
+  readonly 'commandPanel.alias.where.user': string;
+  readonly 'commandPanel.alias.where.workspace': string;
+  readonly 'commandPanel.alias.unknown': string;
+  readonly 'commandPanel.alias.badName': string;
+  readonly 'commandPanel.alias.reserved': string;
+  readonly 'commandPanel.alias.usage': string;
+  readonly 'commandPanel.unalias.usage': string;
+  readonly 'commandPanel.alias.inWorkspace': string;
+  readonly 'commandPanel.alias.saved.user': string;
+  readonly 'commandPanel.alias.saved.workspace': string;
+  readonly 'commandPanel.alias.removed.user': string;
+  readonly 'commandPanel.alias.removed.workspace': string;
+  readonly 'commandPanel.alias.refused.invalid': string;
+  readonly 'commandPanel.alias.refused.noFolder': string;
+  readonly 'commandPanel.alias.refused.profile': string;
+  readonly 'commandPanel.alias.refused.restricted': string;
+  readonly 'commandPanel.alias.refused.syntax': string;
+  readonly 'commandPanel.alias.refused.unwritable': string;
+  readonly 'commandPanel.alias.ignored': string;
+  readonly 'commandPanel.alias.unreadable': string;
+  readonly 'commandPanel.alias.from': string;
+  readonly 'commandPanel.variable.unknown': string;
+  readonly 'commandPanel.variable.none': string;
+  readonly 'commandPanel.variable.badName': string;
+  readonly 'commandPanel.set.usage': string;
+  readonly 'commandPanel.files.noFolder': string;
+  readonly 'commandPanel.files.outside': string;
+  readonly 'commandPanel.files.missing': string;
+  readonly 'commandPanel.files.notFolder': string;
+  readonly 'commandPanel.files.isFolder': string;
+  readonly 'commandPanel.files.binary': string;
+  readonly 'commandPanel.files.truncated': string;
+  readonly 'commandPanel.files.more': string;
+  readonly 'commandPanel.files.usage.ls': string;
+  readonly 'commandPanel.files.usage.cd': string;
+  readonly 'commandPanel.files.usage.cat': string;
+  readonly 'commandPanel.files.kind.folder': string;
+  readonly 'commandPanel.files.kind.brief': string;
+  readonly 'commandPanel.files.kind.recipe': string;
+  readonly 'commandPanel.files.kind.file': string;
+  readonly 'commandPanel.builtin.new': string;
+  readonly 'commandPanel.builtin.mkdir': string;
+  readonly 'commandPanel.builtin.mv': string;
+  readonly 'commandPanel.builtin.cp': string;
+  readonly 'commandPanel.builtin.rm': string;
+  readonly 'commandPanel.builtin.open': string;
+  readonly 'commandPanel.builtin.reveal': string;
+  readonly 'commandPanel.files.exists': string;
+  readonly 'commandPanel.files.invalid': string;
+  readonly 'commandPanel.files.link': string;
+  readonly 'commandPanel.files.trashFailed': string;
+  readonly 'commandPanel.files.failed': string;
+  readonly 'commandPanel.files.root': string;
+  readonly 'commandPanel.files.intoItself': string;
+  readonly 'commandPanel.files.noTab': string;
+  readonly 'commandPanel.files.noTemplate': string;
+  readonly 'commandPanel.files.templateBrief': string;
+  readonly 'commandPanel.files.kept': string;
+  readonly 'commandPanel.files.usage.new': string;
+  readonly 'commandPanel.files.usage.mkdir': string;
+  readonly 'commandPanel.files.usage.mvcp': string;
+  readonly 'commandPanel.files.usage.rm': string;
+  readonly 'commandPanel.files.usage.open': string;
+  readonly 'commandPanel.files.usage.reveal': string;
+  readonly 'commandPanel.workingFolderGone': string;
   readonly 'commandPanel.sessions': string;
   readonly 'commandPanel.session': string;
   readonly 'commandPanel.session.new': string;
@@ -1233,6 +1358,22 @@ export const CATALOGUE_KEYS = [
   'pluginFiles.approve.skip',
   'cli.confirm.yes',
   'cli.confirm.no',
+  'cli.offer.trust.message',
+  'cli.offer.trust.detail',
+  'cli.offer.trust.yes',
+  'cli.offer.signin.message',
+  'cli.offer.signin.detail',
+  'cli.offer.signin.yes',
+  'cli.offer.signout.message',
+  'cli.offer.signout.detail',
+  'cli.offer.signout.yes',
+  'cli.offer.apply.message',
+  'cli.offer.apply.detail',
+  'cli.offer.apply.yes',
+  'cli.offer.watch.message',
+  'cli.offer.watch.detail',
+  'cli.offer.watch.yes',
+  'cli.offer.no',
   'terminal.quit.message',
   'terminal.quit.quit',
   'terminal.quit.stay',
@@ -1506,11 +1647,15 @@ export const CATALOGUE_KEYS = [
   'recipe.block.stale',
   'recipe.block.up',
   'recipe.block.down',
+  'recipe.block.drag',
   'recipe.block.delete',
   'command.recipe.openCellView',
   'recipe.cell.openTab',
   'recipe.view.tab',
   'recipe.view.empty',
+  'recipe.cell.named',
+  'recipe.cell.named.empty',
+  'recipe.cell.note',
   'recipe.plan.apply',
   'recipe.plan.more',
   'recipe.plan.more.one',
@@ -1832,6 +1977,102 @@ export const CATALOGUE_KEYS = [
   'command.commandPanel.run',
   'command.commandPanel.renderBrief',
   'commandPanel.suggestions',
+  'commandPanel.emptyStep',
+  'commandPanel.noHistoryEntry',
+  'commandPanel.glob.outside',
+  'commandPanel.glob.no-folder',
+  'commandPanel.glob.no-match',
+  'commandPanel.glob.too-many',
+  'commandPanel.builtin.restricted',
+  'commandPanel.builtin.clear',
+  'commandPanel.builtin.history',
+  'commandPanel.builtin.history.empty',
+  'commandPanel.builtin.exit',
+  'commandPanel.builtin.last',
+  'commandPanel.builtin.last.none',
+  'commandPanel.builtin.templates',
+  'commandPanel.builtin.help',
+  'commandPanel.builtin.help.panel',
+  'commandPanel.builtin.help.tyto',
+  'commandPanel.builtin.rerun',
+  'commandPanel.builtin.and',
+  'commandPanel.builtin.glob',
+  'commandPanel.builtin.ls',
+  'commandPanel.builtin.cd',
+  'commandPanel.builtin.pwd',
+  'commandPanel.builtin.cat',
+  'cli.offer.origin.user',
+  'cli.offer.origin.workspace',
+  'commandPanel.builtin.alias',
+  'commandPanel.builtin.unalias',
+  'commandPanel.builtin.set',
+  'commandPanel.builtin.variable',
+  'commandPanel.alias.none',
+  'commandPanel.alias.where.user',
+  'commandPanel.alias.where.workspace',
+  'commandPanel.alias.unknown',
+  'commandPanel.alias.badName',
+  'commandPanel.alias.reserved',
+  'commandPanel.alias.usage',
+  'commandPanel.unalias.usage',
+  'commandPanel.alias.inWorkspace',
+  'commandPanel.alias.saved.user',
+  'commandPanel.alias.saved.workspace',
+  'commandPanel.alias.removed.user',
+  'commandPanel.alias.removed.workspace',
+  'commandPanel.alias.refused.invalid',
+  'commandPanel.alias.refused.noFolder',
+  'commandPanel.alias.refused.profile',
+  'commandPanel.alias.refused.restricted',
+  'commandPanel.alias.refused.syntax',
+  'commandPanel.alias.refused.unwritable',
+  'commandPanel.alias.ignored',
+  'commandPanel.alias.unreadable',
+  'commandPanel.alias.from',
+  'commandPanel.variable.unknown',
+  'commandPanel.variable.none',
+  'commandPanel.variable.badName',
+  'commandPanel.set.usage',
+  'commandPanel.files.noFolder',
+  'commandPanel.files.outside',
+  'commandPanel.files.missing',
+  'commandPanel.files.notFolder',
+  'commandPanel.files.isFolder',
+  'commandPanel.files.binary',
+  'commandPanel.files.truncated',
+  'commandPanel.files.more',
+  'commandPanel.files.usage.ls',
+  'commandPanel.files.usage.cd',
+  'commandPanel.files.usage.cat',
+  'commandPanel.files.kind.folder',
+  'commandPanel.files.kind.brief',
+  'commandPanel.files.kind.recipe',
+  'commandPanel.files.kind.file',
+  'commandPanel.builtin.new',
+  'commandPanel.builtin.mkdir',
+  'commandPanel.builtin.mv',
+  'commandPanel.builtin.cp',
+  'commandPanel.builtin.rm',
+  'commandPanel.builtin.open',
+  'commandPanel.builtin.reveal',
+  'commandPanel.files.exists',
+  'commandPanel.files.invalid',
+  'commandPanel.files.link',
+  'commandPanel.files.trashFailed',
+  'commandPanel.files.failed',
+  'commandPanel.files.root',
+  'commandPanel.files.intoItself',
+  'commandPanel.files.noTab',
+  'commandPanel.files.noTemplate',
+  'commandPanel.files.templateBrief',
+  'commandPanel.files.kept',
+  'commandPanel.files.usage.new',
+  'commandPanel.files.usage.mkdir',
+  'commandPanel.files.usage.mvcp',
+  'commandPanel.files.usage.rm',
+  'commandPanel.files.usage.open',
+  'commandPanel.files.usage.reveal',
+  'commandPanel.workingFolderGone',
   'commandPanel.sessions',
   'commandPanel.session',
   'commandPanel.session.new',

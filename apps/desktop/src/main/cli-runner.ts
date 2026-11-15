@@ -7,12 +7,14 @@ import {
   EXIT_INTERNAL,
   type ExitCode,
   type LocatedDiagnostic,
+  type RefuseAnswer,
   commandTree,
   run as runCommand,
 } from '@tyto/command-line';
 import type { Rasterizer } from '@tyto/raster';
 
 import { opensInTab } from '../../shared/file-icons.js';
+import type { RefusalOrigin } from './cli-refusals.js';
 
 /**
  * `tyto` commands run in main, in-process, for the window (ADR 0159, TYTO-495).
@@ -40,14 +42,29 @@ export interface CliStateChange {
   readonly question?: string;
 }
 
+/** The run a refusal is asked for: its id, and the panel's waiting state around a box. */
+export interface RefusalRun {
+  readonly runId: string;
+  /** The alias the window expanded into this run's words, for the refusal to name (TYTO-536). */
+  readonly origin?: RefusalOrigin;
+  waiting<T>(question: string, during: () => Promise<T>): Promise<T>;
+}
+
 /** What a run's environment holds that the runner does not supply itself. */
 export type CliBaseEnvironment = Omit<CliEnvironment, 'console' | 'confirm' | 'refuse'>;
 
 export interface CliRunnerOptions {
   /** A fresh base for each run, so a run started after Open Folder sees the new folder. */
   readonly environment: () => CliBaseEnvironment;
-  /** The window's refusals (`cli-refusals.ts`), asked with the run's `cwd`. */
-  readonly refuse: (invocation: CommandInvocation, cwd: string) => Promise<string | undefined>;
+  /**
+   * The window's refusals (`cli-refusals.ts`), asked with the run's `cwd`. `run` lets a refusal
+   * that offers the window's own way (TYTO-726) show its box as the run waiting on a question.
+   */
+  readonly refuse: (
+    invocation: CommandInvocation,
+    cwd: string,
+    run: RefusalRun,
+  ) => Promise<RefuseAnswer>;
   /** A native yes-or-no box, no being the default and what Escape answers. */
   readonly confirm: (question: string) => Promise<boolean>;
   readonly output: (output: CliOutput) => void;
@@ -91,14 +108,38 @@ const opensInATab = opensInTab;
 const SEVERITIES = new Set(['error', 'warning', 'info']);
 
 export interface CliRunner {
-  start(argv: readonly string[]): { readonly runId: string };
+  /**
+   * Starts `argv` in the open folder, or in `cwd`, a folder main checked lies inside it: the
+   * command panel's working folder (TYTO-537, ADR 0201). The workspace and its trust are still
+   * found from there upwards, so a subfolder of a restricted folder is restricted too.
+   */
+  start(argv: readonly string[], cwd?: string, origin?: RefusalOrigin): { readonly runId: string };
   /** Fires the run's signal. Unknown or finished ids are ignored: Stop raced the end. */
   cancel(runId: string): void;
-  /** Every running command, stopped: the app quits or the window opens another folder. */
-  cancelAll(): void;
+  /**
+   * Every running command, stopped: the app quits or the window opens another folder. `except`
+   * spares the run whose own box trusted the folder (TYTO-726): the re-read that trust causes
+   * would otherwise stop the very command it was granted for.
+   */
+  cancelAll(except?: string): void;
+  /**
+   * Runs `argv` in `cwd` with the same `run` and environment as {@link start}, but nothing is
+   * pushed to the window: what it prints comes back whole (TYTO-729). **For words main writes
+   * itself, never the window's**: no refusal is asked and every question is answered no, so it
+   * is only for a command that neither the window refuses nor asks anything, such as
+   * `template list --json`.
+   */
+  capture(argv: readonly string[], cwd?: string): Promise<CapturedRun>;
   commands(): CommandDescription;
   /** The file a run's Problems row names, while the run is one of the last {@link KEPT_RUNS}. */
   diagnosticPath(runId: string, index: number): string | undefined;
+}
+
+/** What a {@link CliRunner.capture} printed, and how it ended. */
+export interface CapturedRun {
+  readonly code: ExitCode;
+  readonly out: string;
+  readonly err: string;
 }
 
 /** The two commands that stop part of the way through (decision 6); the rest run to their end. */
@@ -139,7 +180,7 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
   };
 
   return {
-    start(argv) {
+    start(argv, cwd, origin) {
       const runId = newId();
       const controller = new AbortController();
       const entry: { readonly controller: AbortController; path: readonly string[] } = {
@@ -147,7 +188,7 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
         path: [],
       };
       running.set(runId, entry);
-      const base = options.environment();
+      const base = { ...options.environment(), ...(cwd === undefined ? {} : { cwd }) };
       const write = (stream: 'out' | 'err') => (text: string) => {
         options.output({ runId, stream, text });
       };
@@ -162,7 +203,18 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
         },
         refuse: (invocation) => {
           entry.path = invocation.path;
-          return options.refuse(invocation, base.cwd);
+          return options.refuse(invocation, base.cwd, {
+            runId,
+            ...(origin === undefined ? {} : { origin }),
+            waiting: async (question, during) => {
+              options.state({ runId, state: 'waiting', question });
+              try {
+                return await during();
+              } finally {
+                if (!controller.signal.aborted) options.state({ runId, state: 'running' });
+              }
+            },
+          });
         },
         diagnostics: (items: readonly LocatedDiagnostic[]) => {
           const report = options.diagnostics;
@@ -216,8 +268,33 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
       return { runId };
     },
     cancel,
-    cancelAll() {
-      for (const runId of [...running.keys()]) cancel(runId);
+    cancelAll(except) {
+      for (const runId of [...running.keys()]) if (runId !== except) cancel(runId);
+    },
+    async capture(argv, cwd) {
+      let out = '';
+      let err = '';
+      const environment: CliEnvironment = {
+        ...options.environment(),
+        ...(cwd === undefined ? {} : { cwd }),
+        console: {
+          out: (text) => {
+            out += text;
+          },
+          err: (text) => {
+            err += text;
+          },
+        },
+        confirm: () => Promise.resolve(false),
+        refuse: () => Promise.resolve(undefined),
+      };
+      const code = await run(argv, environment, new AbortController().signal).catch(
+        (cause: unknown): ExitCode => {
+          err += `tyto: internal failure — ${String(cause)}\n`;
+          return EXIT_INTERNAL;
+        },
+      );
+      return { code, out, err };
     },
     commands: () => commandTree({ ...options.environment(), console: { out() {}, err() {} } }),
     diagnosticPath: (runId, index) => paths.get(runId)?.[index],

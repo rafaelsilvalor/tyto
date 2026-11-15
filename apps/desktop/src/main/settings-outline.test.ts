@@ -39,6 +39,7 @@ describe("the app's settings outline", () => {
       'lineNumbers',
       'commandsOrder',
       'commandsFoldOlderRuns',
+      'commandAliases',
       'zoom',
       'uiFontFamily',
       'uiFontSize',

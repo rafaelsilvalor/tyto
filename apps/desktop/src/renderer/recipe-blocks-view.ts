@@ -12,6 +12,7 @@ import {
   blockAtLine,
   deleteBlock,
   moveBlock,
+  moveBlockTo,
   recipeBlocks,
 } from '@tyto/recipe';
 
@@ -99,6 +100,8 @@ export function recipeFrames(view: EditorView, host: BlockHost): readonly Notebo
       key: [block.kind, result, folded, up, down, locale].join('\u0000'),
       toolbar: () => toolbarOf(view, host, shape, locale),
       insertable: true,
+      // Dragged by its grip (TYTO-676, fourth pull request); a header never moves.
+      movable: true,
       ...(mark === undefined ? {} : { marker: markerOf(mark, locale) }),
     };
   });
@@ -339,6 +342,17 @@ function blockAction(
       return;
   }
 }
+
+/**
+ * A block dropped by a drag (TYTO-676): block `from` to just before block `before`, or below the
+ * last, as one edit, so one undo takes it back. The frames are the blocks, one each, in order.
+ */
+export function dropBlock(view: EditorView, from: number, before: number | 'end'): void {
+  dispatchEdit(view, moveBlockTo(view.state.doc.toString(), from, before), 'move.block');
+}
+
+/** What a block's grip says, in the window's language. */
+export const gripLabel = (locale: Locale): string => translate(locale, 'recipe.block.drag');
 
 /** One edit to the pane, as a keystroke is: undone in one step, the caret on the block. */
 function dispatchEdit(view: EditorView, edit: BlockEdit | undefined, userEvent: string): void {

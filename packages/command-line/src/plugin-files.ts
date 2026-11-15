@@ -79,6 +79,8 @@ export interface PluginFilesSyncOptions {
   readonly update: boolean;
   /** False for `tyto watch`, which only reads copies that already exist. */
   readonly fetches: boolean;
+  /** Why a source was not fetched when `fetches` is false; `tyto watch`'s reason otherwise. */
+  readonly notFetchedBecause?: string;
   readonly approval: Approval;
 }
 
@@ -92,6 +94,9 @@ export function syncPluginFiles(
     ...(options.workspace === undefined ? {} : { workspace: options.workspace }),
     update: options.update,
     fetches: options.fetches,
+    ...(options.notFetchedBecause === undefined
+      ? {}
+      : { notFetchedBecause: options.notFetchedBecause }),
     builtInNames: new Set(builtInManifests().manifests.map((manifest) => manifest.name)),
     shown,
     onFileRead: (path, source, items) => {
@@ -176,7 +181,7 @@ export async function pluginSyncCommand(
 
   for (const copy of synced.copies) {
     environment.console.out(
-      `${copy.plugin}  ${copy.git}  ${copy.ref}  ${copy.commit.slice(0, 12)}  ${copy.file}\n`,
+      `${copy.plugin}  ${copy.location}  ${copy.ref}  ${copy.pin.slice(0, 12)}  ${copy.file}\n`,
     );
   }
   if (synced.diagnostics.length > 0) environment.console.err(formatDiagnostics(synced.diagnostics));

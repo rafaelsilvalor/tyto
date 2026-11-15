@@ -10,6 +10,7 @@ export type {
   Argument,
   NamedArgument,
   RecipeAst,
+  RecipeConst,
   RecipeInterval,
   RecipeParam,
   Step,
@@ -21,9 +22,13 @@ export {
   deleteBlock,
   isMovable,
   moveBlock,
+  moveBlockTo,
   recipeBlocks,
   recipeLines,
+  recipeSteps,
 } from './blocks.js';
+export type { ChainSegment } from './chain.js';
+export { chainSegments } from './chain.js';
 export { checkTable } from './check-table.js';
 export type { RunClock } from './clock.js';
 export { systemClock } from './clock.js';
@@ -44,6 +49,8 @@ export type {
 } from './references.js';
 export { leavesFolder, referencesOf } from './references.js';
 export { recipeSkeleton } from './skeleton.js';
+export type { SetAggregate, SetStep } from './set.js';
+export { SET_AGGREGATES, readSet } from './set.js';
 export type { VocabularyEntry, VocabularyOutline, VocabularySection } from './vocabulary.js';
 export {
   VOCABULARY_EXTENSION,

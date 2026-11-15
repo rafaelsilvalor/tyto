@@ -685,11 +685,17 @@
     {
       "paths": ["apps/desktop/src/renderer/recipe-notebook.ts"],
       "e2e": [
+        "recipe-chained-step.desktop.test.ts",
         "recipe-notebook.desktop.test.ts",
         "recipe-steps.desktop.test.ts",
         "recipe-tab.desktop.test.ts"
       ],
-      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377), and where Add step writes and which columns its form offers (TYTO-402); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables"
+      "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377), where Add step writes and which columns its form offers (TYTO-402), and which step of a chained line Edit step and a result tab act on (TYTO-711); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables and opens the form"
+    },
+    {
+      "paths": ["apps/desktop/e2e/recipe-chained-step.desktop.test.ts"],
+      "e2e": ["recipe-chained-step.desktop.test.ts"],
+      "why": "reviewed: Edit step on a line that chains steps with | opens the step under the caret (TYTO-711, ADR 0196 note of 2026-11-14); which step an offset picks is recipe-notebook.test.ts's, and only the real window carries the caret to the command and opens the form"
     },
     {
       "paths": [
@@ -706,6 +712,11 @@
       ],
       "e2e": ["recipe-blocks.desktop.test.ts"],
       "why": "reviewed: a recipe's blocks framed over the one editor and each block's toolbar (TYTO-676, ADR 0195); the block model and its edits are in @tyto/recipe's blocks.test.ts, the frames in @tyto/editor's notebook-frames.test.ts, and only the real window lays the toolbar over the line and moves the caret"
+    },
+    {
+      "paths": ["apps/desktop/e2e/recipe-drag-scroll.desktop.test.ts"],
+      "e2e": ["recipe-drag-scroll.desktop.test.ts"],
+      "why": "reviewed: a block dragged past the edge of its pane scrolls it (TYTO-710); the speed, the stop at the end of the scroll, the cancels and the drop place following any scroll are in @tyto/editor's notebook-frames.test.ts, and only the real window scrolls under a held pointer and unmounts the dragged block's grip on the way"
     },
     {
       "paths": ["apps/desktop/src/renderer/recipe-cell-view.ts"],
@@ -821,9 +832,15 @@
       "why": "reviewed: Delivery: New…, a delivery made in the open folder and its brief opened (TYTO-489); Delivery: Export, the strip's button and the delivery's export (TYTO-490)"
     },
     {
-      "paths": ["apps/desktop/src/main/cli-runner.ts", "apps/desktop/src/main/cli-refusals.ts"],
+      "paths": [
+        "apps/desktop/src/main/cli-runner.ts",
+        "apps/desktop/src/main/cli-refusals.ts",
+        "apps/desktop/src/main/cli-offers.ts",
+        "apps/desktop/src/main/command-aliases.ts",
+        "apps/desktop/src/main/command-templates.ts"
+      ],
       "e2e": ["cli-runner.desktop.test.ts"],
-      "why": "reviewed: tyto commands run in main for the window, streamed, stopped and refused (TYTO-495, ADR 0159)"
+      "why": "reviewed: tyto commands run in main for the window, streamed, stopped and refused (TYTO-495, ADR 0159); a refusal's offer box and its yes through the window's own functions (TYTO-726), unit-tested, every refusal's e2e is TYTO-718; the panel's template completion as template list in its folder (TYTO-729), unit-tested over the real runner"
     },
     {
       "paths": [
@@ -853,15 +870,26 @@
     },
     {
       "paths": [
+        "apps/desktop/shared/command-aliases.ts",
         "apps/desktop/shared/command-runs.ts",
         "apps/desktop/src/renderer/ansi.ts",
+        "apps/desktop/src/renderer/command-alias-builtins.ts",
+        "apps/desktop/src/renderer/command-aliases.ts",
         "apps/desktop/src/renderer/command-blocks.ts",
+        "apps/desktop/src/renderer/command-builtins.ts",
         "apps/desktop/src/renderer/command-completion.ts",
+        "apps/desktop/src/renderer/command-file-builtins.ts",
+        "apps/desktop/src/renderer/command-file-writes.ts",
+        "apps/desktop/src/renderer/command-glob.ts",
         "apps/desktop/src/renderer/command-history.ts",
         "apps/desktop/src/renderer/command-links.ts",
         "apps/desktop/src/renderer/command-output.ts",
         "apps/desktop/src/renderer/command-panel.ts",
+        "apps/desktop/src/renderer/command-paths.ts",
         "apps/desktop/src/renderer/command-sessions.ts",
+        "apps/desktop/src/renderer/command-steps.ts",
+        "apps/desktop/src/renderer/command-templates.ts",
+        "apps/desktop/src/renderer/command-tone.ts",
         "apps/desktop/src/renderer/command-words.ts"
       ],
       "e2e": ["command-panel.desktop.test.ts"],

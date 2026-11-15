@@ -12,10 +12,13 @@ import type {
   Argument,
   NamedArgument,
   RecipeAst,
+  RecipeConst,
   RecipeInterval,
   RecipeParam,
   Step,
 } from './ast.js';
+import { chainSegments } from './chain.js';
+import { readSet } from './set.js';
 
 /**
  * The shortest interval `every` accepts. A scheduled run reads its sources again, so a
@@ -39,14 +42,19 @@ export const MINIMUM_INTERVAL_MINUTES = 5;
  * A header names the recipe and `|` lines describe it; `apply auto` in the header lets an
  * explicit Run in a trusted folder apply its plans without a click (ADR 0170); `every 30m`
  * or `every 2h` in the header asks the host to run it on that interval while the app is open
- * (ADR 0175); `param` lines declare what varies;
- * every other line is one verb and its arguments, and so one cell. `#` starts a comment line.
+ * (ADR 0175); `param` lines declare what varies and `const` lines what does not (ADR 0199);
+ * every other line is one verb and its arguments, and so one cell, or several steps chained
+ * with a `|` that stands alone (TYTO-706, `chain.ts`), each read as if on its own line.
+ * `#` starts a comment line.
  * It is a line format and not a grammar on purpose: a one-step change is a one-line diff,
  * and the chain of verbs is what the person reads.
  */
 export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic[]> {
   const problems: Diagnostic[] = [];
   const params: RecipeParam[] = [];
+  const consts: RecipeConst[] = [];
+  // ADR 0199: `param`, `const` and `set` share one set of names, checked in the order written.
+  const declared = new Set<string>();
   const steps: Step[] = [];
   const description: string[] = [];
   let name: string | undefined;
@@ -73,7 +81,13 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
     }
 
     if (content.startsWith('|')) {
-      if (steps.length > 0 || params.length > 0 || apply !== undefined || every !== undefined) {
+      if (
+        steps.length > 0 ||
+        params.length > 0 ||
+        consts.length > 0 ||
+        apply !== undefined ||
+        every !== undefined
+      ) {
         syntax("a '|' description line belongs right under the 'recipe' line");
       } else {
         description.push(content.slice(1).trim());
@@ -82,6 +96,17 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
     }
 
     const verb = /^\S+/u.exec(content)?.[0] ?? '';
+    const declare = (declaredName: string, at: SourceRange = range): boolean => {
+      if (!declared.has(declaredName)) {
+        declared.add(declaredName);
+        return true;
+      }
+      syntax(
+        `'${declaredName}' is declared twice; 'param', 'const' and 'set' share one set of names`,
+        at,
+      );
+      return false;
+    };
     if (verb === 'recipe') {
       syntax("a file holds one recipe, so 'recipe' appears once, on its first line");
       continue;
@@ -115,31 +140,61 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
       const param = parseParam(content.slice(verb.length), range);
       if (!param.ok) {
         problems.push(...param.error);
-      } else if (params.some((known) => known.name === param.value.name)) {
-        syntax(`parameter '${param.value.name}' is declared twice`);
-      } else {
+      } else if (declare(param.value.name)) {
         params.push(param.value);
       }
       continue;
     }
-
-    const textStart = start + verb.length;
-    const rest = content.slice(verb.length);
-    const leading = rest.length - rest.trimStart().length;
-    const argumentsResult = tokenizeArguments(rest, textStart);
-    if (!argumentsResult.ok) {
-      problems.push(...argumentsResult.error);
+    if (verb === 'const') {
+      const constant = parseParam(content.slice(verb.length), range);
+      if (!constant.ok || constant.value.defaultValue === undefined) {
+        syntax("a constant is declared as 'const <name> = <value>'");
+      } else if (declare(constant.value.name)) {
+        consts.push({
+          name: constant.value.name,
+          value: constant.value.defaultValue,
+          range,
+        });
+      }
       continue;
     }
-    steps.push({
-      verb,
-      verbRange: sourceRange(start, textStart),
-      positional: argumentsResult.value.positional,
-      named: argumentsResult.value.named,
-      text: rest.trim(),
-      textRange: sourceRange(textStart + leading, start + content.length),
-      range,
-    });
+
+    // TYTO-706: a `|` standing alone splits the line into steps, each read as if on its own line.
+    for (const segment of chainSegments(content)) {
+      const at = start + segment.from;
+      const written = content.slice(segment.from, segment.to);
+      const word = /^\S+/u.exec(written)?.[0] ?? '';
+      if (segment.bar !== undefined && written === '') {
+        const bar = start + segment.bar;
+        syntax("a '|' joins two steps, and no step follows this one", sourceRange(bar, bar + 1));
+        continue;
+      }
+      if (segment.bar !== undefined && (CHAIN_REFUSED.has(word) || word.startsWith('#'))) {
+        const what = word.startsWith('#') ? "a '#' note" : `'${word}', a header line,`;
+        syntax(
+          `${what} is written on a line of its own, not after '|'`,
+          sourceRange(at, at + word.length),
+        );
+        continue;
+      }
+      const step = readStep(written, word, at);
+      if (!step.ok) {
+        problems.push(...step.error);
+        continue;
+      }
+      if (word === 'set') {
+        const named = readSet(step.value.text);
+        if (named === undefined) {
+          syntax(
+            "a 'set' step is written 'set <name> = <aggregate>', as in 'set last_due = max due'",
+            step.value.range,
+          );
+        } else {
+          declare(named.name, step.value.range);
+        }
+      }
+      steps.push(step.value);
+    }
   }
 
   if (name === undefined) {
@@ -151,15 +206,41 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
       ),
     );
   }
-  problems.push(...undeclaredPlaceholders(steps, params));
+  problems.push(...placeholdersOutOfScope(steps, [...params, ...consts]));
   if (problems.length > 0 || name === undefined) return err(problems);
   return ok({
     name,
     description: description.join('\n'),
     params,
+    consts,
     ...(apply === undefined ? {} : { apply }),
     ...(every === undefined ? {} : { every }),
     steps,
+  });
+}
+
+/** The first words that may not follow a `|`: they are header lines (TYTO-706). */
+const CHAIN_REFUSED = new Set(['recipe', 'apply', 'every', 'param', 'const']);
+
+/** One step, `written` its trimmed text starting at offset `start` in the recipe. */
+function readStep(
+  written: string,
+  verb: string,
+  start: number,
+): Result<Step, readonly Diagnostic[]> {
+  const textStart = start + verb.length;
+  const rest = written.slice(verb.length);
+  const leading = rest.length - rest.trimStart().length;
+  const argumentsResult = tokenizeArguments(rest, textStart);
+  if (!argumentsResult.ok) return argumentsResult;
+  return ok({
+    verb,
+    verbRange: sourceRange(start, textStart),
+    positional: argumentsResult.value.positional,
+    named: argumentsResult.value.named,
+    text: rest.trim(),
+    textRange: sourceRange(textStart + leading, start + written.length),
+    range: sourceRange(start, start + written.length),
   });
 }
 
@@ -301,26 +382,44 @@ function tokenizeArguments(rest: string, offset: number): Result<Arguments, read
 // A pattern's `\p{Lu}`, `\P{Nd}` and `\u{FF}` are the pattern's own braces (ADR 0136).
 const PLACEHOLDER = /(?<!\\[pPu])\{([A-Za-z_][\w-]*)\}/gu;
 
-/** `{name}` in a step that no `param` line declares. */
-function undeclaredPlaceholders(
+/**
+ * `{name}` where no name of that kind is known (ADR 0199). A `param` or a `const` is known on
+ * every step; a `set` only on the steps below its own, since its value is computed there, so a
+ * use above it, or in the `set` itself, is refused at that use.
+ */
+function placeholdersOutOfScope(
   steps: readonly Step[],
-  params: readonly RecipeParam[],
+  header: readonly { readonly name: string }[],
 ): readonly Diagnostic[] {
-  const declared = new Set(params.map((param) => param.name));
+  const known = new Set(header.map((declaration) => declaration.name));
+  const setAt = new Map<string, number>();
+  for (const [index, step] of steps.entries()) {
+    const name = step.verb === 'set' ? readSet(step.text)?.name : undefined;
+    if (name !== undefined && !setAt.has(name)) setAt.set(name, index);
+  }
   const problems: Diagnostic[] = [];
-  for (const step of steps) {
+  for (const [index, step] of steps.entries()) {
     for (const match of step.text.matchAll(PLACEHOLDER)) {
       const used = match[1] ?? '';
-      if (declared.has(used)) continue;
+      if (known.has(used)) continue;
+      const setIndex = setAt.get(used);
+      const problem =
+        setIndex === undefined
+          ? "is used here, and no 'param', 'const' or 'set' declares it"
+          : setIndex === index
+            ? "is set by this 'set' step, and only the steps below it can read it"
+            : "is set by a 'set' step further down, and only the steps below it can read it";
       const start = step.textRange.start + match.index;
       problems.push(
         diagnostic(
           'E_RECIPE_PARAM',
-          { param: used, problem: "is used here, and no 'param' line declares it" },
+          { param: used, problem },
           { range: sourceRange(start, start + match[0].length) },
         ),
       );
     }
+    const setHere = step.verb === 'set' ? readSet(step.text)?.name : undefined;
+    if (setHere !== undefined) known.add(setHere);
   }
   return problems;
 }

@@ -5,7 +5,7 @@ import { columnOf, runOverShop } from './__fixtures__/rules-harness.js';
 import { column, memoryState, runWithState } from './__fixtures__/state-harness.js';
 import { type DecideRules, type DecideTie, type Decision, decideValue } from './decide.js';
 import { stateToCommit } from './state.js';
-import { type CellValue, comparable } from './table.js';
+import { type CellValue, type Table, comparable } from './table.js';
 
 /** The sheet's five statuses, as in `__fixtures__/flows.ts`; done wins a first run. */
 const STATUSES = ['todo', 'doing', 'approval', 'review', 'done'];
@@ -470,7 +470,8 @@ describe('decide', () => {
   describe('with clear=push', () => {
     // TYTO-647: T-0 was cleared and the tracker did not move; T-1 was cleared and the tracker
     // moved too; T-2 is a first run with an empty cell; T-3 was cleared on a row the tracker
-    // did not return; T-4 was cleared where the tracker is empty already.
+    // did not return; T-4 was cleared where the tracker is empty already; T-5 kept its owner,
+    // so the sheet's column was read (TYTO-714 holds every clear of a column empty everywhere).
     const owners = tasks(
       ['sheet', 'tracker', 'last_owner', 'found'],
       [
@@ -479,6 +480,7 @@ describe('decide', () => {
         [null, 'ana', null, 'T-2'],
         [null, 'ana', 'ana', ''],
         [null, null, 'ana', 'T-4'],
+        ['bia', 'bia', 'bia', 'T-5'],
       ],
     );
     const line = 'decide owner local=sheet remote=tracker last=last_owner hold-when-empty=found';
@@ -501,6 +503,7 @@ describe('decide', () => {
         'T-2': ['pull', null, false, 'no state, local value not recognised'],
         'T-3': ['hold', null, false, 'remote did not return the row'],
         'T-4': ['same', null, false, 'both already agree'],
+        'T-5': ['same', null, false, 'nothing changed'],
       });
     });
 
@@ -517,6 +520,7 @@ describe('decide', () => {
         'T-2': ['pull', null, false, 'no state, local value not recognised'],
         'T-3': ['pull', null, false, 'local value not recognised'],
         'T-4': ['pull', null, false, 'local value not recognised'],
+        'T-5': ['same', null, false, 'nothing changed'],
       };
       expect(await rows('')).toEqual(pulled);
       expect(await rows('clear=pull')).toEqual(pulled);
@@ -723,4 +727,172 @@ describe.each<DecideTie>(['local', 'remote'])('a shared field synced with tie=%s
       tie === 'local' ? 'approval' : 'done',
     );
   });
+});
+
+/**
+ * TYTO-714: with clear=push, a sheet read that lost a column, or a run that would clear more
+ * cells than a person clears between runs, holds its clears and says why, once.
+ */
+describe('decide holds clears that look like a lost read', () => {
+  const LINE = 'decide owner local=sheet remote=tracker last=last_owner clear=push';
+  const COLUMNS = ['owner', 'owner_action', 'owner_push', 'owner_pushes', 'owner_reason'];
+  const GUARDS = ['W_RECIPE_DECIDE_CLEAR_COLUMN', 'W_RECIPE_DECIDE_CLEAR_LIMIT'];
+
+  /** `cleared` rows the sheet cleared since the last run, then one it kept, so it was read. */
+  function owners(cleared: number, kept = true) {
+    const rows: CellValue[][] = Array.from({ length: cleared }, () => [null, 'ana', 'ana']);
+    if (kept) rows.push(['bia', 'bia', 'bia']);
+    return tasks(['sheet', 'tracker', 'last_owner'], rows);
+  }
+
+  async function decideOver(line: string, input: Table) {
+    const ran = await runWithState([line], input, undefined);
+    expect(ran.errors).toEqual([]);
+    const warnings = ran.run.cells
+      .flatMap((cell) => cell.diagnostics)
+      .filter(({ code }) => GUARDS.includes(code));
+    const byRow = Object.fromEntries(
+      (ran.table?.rows ?? []).map((row) => [
+        row.key,
+        COLUMNS.map((name) => row.values[name] ?? null),
+      ]),
+    );
+    return { byRow, warnings };
+  }
+
+  const held = (reason: string) => ['ana', 'hold', null, false, reason];
+  const pushed = [null, 'push', null, true, 'local cleared'];
+
+  it('holds every clear when the local column is missing, and warns once naming it', async () => {
+    const input = tasks(
+      ['tracker', 'last_owner'],
+      [
+        ['ana', 'ana'],
+        ['caio', null],
+      ],
+    );
+    const { byRow, warnings } = await decideOver(LINE, input);
+    expect(byRow['T-0']).toEqual(held('clear held, local column lost'));
+    expect(byRow['T-1']).toEqual([
+      'caio',
+      'pull',
+      null,
+      false,
+      'no state, local value not recognised',
+    ]);
+    expect(warnings.map(({ code, message }) => [code, message])).toEqual([
+      [
+        'W_RECIPE_DECIDE_CLEAR_COLUMN',
+        "Column 'sheet' is missing from the table, so 'decide' held its 1 clear(s) and " +
+          'cleared nothing on the remote side.',
+      ],
+    ]);
+  });
+
+  it('refuses a missing local column without clear=push, as any unknown column', async () => {
+    const input = tasks(['tracker', 'last_owner'], [['ana', 'ana']]);
+    const ran = await runWithState(
+      ['decide owner local=sheet remote=tracker last=last_owner'],
+      input,
+      undefined,
+    );
+    expect(ran.errors.map(({ code }) => code)).toEqual(['E_RECIPE_UNKNOWN_COLUMN']);
+  });
+
+  it('holds every clear when the local column is empty on every row', async () => {
+    const { byRow, warnings } = await decideOver(LINE, owners(2, false));
+    expect(byRow['T-0']).toEqual(held('clear held, local column lost'));
+    expect(byRow['T-1']).toEqual(held('clear held, local column lost'));
+    expect(warnings.map(({ code }) => code)).toEqual(['W_RECIPE_DECIDE_CLEAR_COLUMN']);
+    expect(warnings[0]?.message).toContain("Column 'sheet' is empty on every row");
+  });
+
+  it('holds six clears under the default limit of five, and warns once with the count', async () => {
+    const { byRow, warnings } = await decideOver(LINE, owners(6));
+    for (const key of ['T-0', 'T-1', 'T-2', 'T-3', 'T-4', 'T-5']) {
+      expect(byRow[key]).toEqual(held('clear held, over clear-limit'));
+    }
+    expect(byRow['T-6']).toEqual(['bia', 'same', null, false, 'nothing changed']);
+    expect(warnings.map(({ code, message }) => [code, message])).toEqual([
+      [
+        'W_RECIPE_DECIDE_CLEAR_LIMIT',
+        "'decide' held 6 clear(s), more than clear-limit=5; to push them, raise clear-limit= " +
+          'for this run, or write clear-limit=none to lift the limit.',
+      ],
+    ]);
+  });
+
+  it('pushes five clears, the default limit, as before', async () => {
+    const { byRow, warnings } = await decideOver(LINE, owners(5));
+    for (const key of ['T-0', 'T-1', 'T-2', 'T-3', 'T-4']) expect(byRow[key]).toEqual(pushed);
+    expect(warnings).toEqual([]);
+  });
+
+  it('pushes six clears with clear-limit=10, and with clear-limit=none', async () => {
+    for (const limit of ['10', 'none', 'NONE']) {
+      const { byRow, warnings } = await decideOver(`${LINE} clear-limit=${limit}`, owners(6));
+      expect(Object.values(byRow).filter((row) => row[1] === 'push')).toHaveLength(6);
+      expect(warnings).toEqual([]);
+    }
+  });
+
+  it('holds one clear over clear-limit=0', async () => {
+    const { byRow, warnings } = await decideOver(`${LINE} clear-limit=0`, owners(1));
+    expect(byRow['T-0']).toEqual(held('clear held, over clear-limit'));
+    expect(warnings.map(({ code }) => code)).toEqual(['W_RECIPE_DECIDE_CLEAR_LIMIT']);
+  });
+
+  it('refuses clear-limit= without clear=push, and a limit that is not a number', async () => {
+    const input = owners(1);
+    const without = await runWithState(
+      ['decide owner local=sheet remote=tracker last=last_owner clear-limit=3'],
+      input,
+      undefined,
+    );
+    expect([without.errors[0]?.code, without.at]).toEqual(['E_RECIPE_ARGUMENTS', 'clear-limit=3']);
+    for (const bad of ['many', '-1', '2.5', '']) {
+      const ran = await runWithState([`${LINE} clear-limit=${bad}`], input, undefined);
+      expect(ran.errors[0]?.code).toBe('E_RECIPE_ARGUMENTS');
+    }
+  });
+
+  it.each([
+    ['without when=', 'remember sync columns=owner'],
+    ['with when=', 'remember sync columns=owner when="owner_action != hold"'],
+  ])(
+    "leaves a held row's state as it was, %s, so the next run sees the clear again",
+    async (_, remember) => {
+      const lines = (extra: string) => [
+        'last sync columns=owner',
+        `decide owner local=sheet remote=tracker last=last_owner clear=push ${extra}`,
+        remember,
+      ];
+      const keys = ['T-0', 'T-1', 'T-2', 'T-3', 'T-4', 'T-5', 'T-6'];
+      const state = memoryState({
+        sync: Object.fromEntries(
+          keys.map((key) => [key, { owner: key === 'T-6' ? 'bia' : 'ana' }]),
+        ),
+      });
+      const input = tasks(
+        ['sheet', 'tracker'],
+        keys.map((key) => (key === 'T-6' ? ['bia', 'bia'] : [null, 'ana'])),
+      );
+
+      const first = await runWithState(lines(''), input, state);
+      expect(first.errors).toEqual([]);
+      expect(column(first.table, 'owner_action')).toEqual([...Array(6).fill('hold'), 'same']);
+      for (const commit of stateToCommit(first.run.remembers, { operations: [] })) {
+        await state.write(commit.store, commit.puts, commit.deletes);
+      }
+      const stored = state.stores.get('sync');
+      expect(keys.map((key) => stored?.get(key)?.values.owner)).toEqual([
+        ...Array(6).fill('ana'),
+        'bia',
+      ]);
+
+      const second = await runWithState(lines('clear-limit=none'), input, state);
+      expect(second.errors).toEqual([]);
+      expect(column(second.table, 'owner_action')).toEqual([...Array(6).fill('push'), 'same']);
+    },
+  );
 });

@@ -386,7 +386,10 @@ export {
   type PluginFile,
   type PluginFileConfiguration,
   type PluginFileRead,
+  type ArchiveSource,
+  type GitSource,
   type PluginFileSource,
+  type PluginFileSourceKind,
   type PluginFileTemplate,
   type PluginFilesCopy,
   type PluginFilesLock,
@@ -394,6 +397,7 @@ export {
   type PluginFolderSource,
   type PluginFolderSources,
   type PluginSyncStep,
+  ARCHIVE_REF_PLACEHOLDER,
   EMPTY_PLUGIN_FILES_LOCK,
   PLUGIN_FILES_DIRECTORY,
   PLUGIN_FILES_LOCK_FILE,
@@ -403,9 +407,14 @@ export {
   folderSources,
   parsePluginFile,
   parsePluginFilesLock,
+  archiveLocation,
+  archiveProblem,
+  pinOf,
   planPluginSync,
   sameSource,
   serializePluginFilesLock,
+  sourceKind,
+  sourceLocation,
 } from './plugin-files.js';
 
 export { addTemplateEntries, moveEntryRef, newPluginFileText } from './plugin-file-edit.js';

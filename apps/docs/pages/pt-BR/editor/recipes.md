@@ -1,7 +1,7 @@
 # Receitas
 
 ::: info Como esta página foi conferida
-Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo numa aba foi conferido em 2026-11-08 pela mesma suíte, desenhando as 5.000 linhas em tamanho cheio e fechando a receita. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Escrever briefs com `to-brief` foi conferido em 2026-11-08 por um teste do processo principal do app de mesa que planeja três linhas numa pasta, aplica o plano e renderiza cada brief com `tyto render`, não na janela. Uma execução por intervalo buscando além do cache da fonte foi conferida em 2026-11-11 por um teste do processo principal do app de mesa com uma fonte que guarda as respostas por dez minutos, não na janela. Enviar com `call` foi conferido em 2026-11-11 por testes do executor de receitas compartilhado contra um endereço simulado, não pela rede e não na janela. O `tyto recipe run` foi conferido em 2026-11-11 pelos testes da linha de comando, pelo executor compartilhado com um plugin simulado que planeja 120 operações e um endereço simulado, não à mão. Criar uma receita e um vocabulário, e as marcas da aba de vocabulário, foram conferidos em 2026-11-11 pela suíte de testes do app de mesa que começa numa pasta confiável vazia, e a sugestão e a ajuda ao apontar, por testes unitários. Adicionar e editar passos por formulário foi conferido em 2026-11-11 pela suíte de testes do app de mesa que monta uma receita numa pasta confiável vazia com um plugin de fonte, `where`, `select` e `rules`, a executa e compara o arquivo salvo com as linhas que os formulários mostraram, e pela mesma suíte reabrindo o último passo com **Editar passo**; um valor recusado e a sugestão de uma referência ao vocabulário, por testes unitários. Planejar um passo de novo depois de Aplicar foi conferido em 2026-11-12 pelos testes do executor de receitas compartilhado, com `to-brief` numa pasta real e um plugin simulado, não na janela. Os blocos, a barra deles e **Executar este bloco** foram conferidos em 2026-11-12 pela suíte de testes do app de mesa que abre uma receita sobre um plugin de fonte, executa um bloco, recolhe um resultado, sobe um passo, apaga uma nota e compara o arquivo salvo; mover e apagar cada bloco de uma receita, por testes de unidade. O **+** entre blocos, as notas, o contador e **Executar daqui para baixo** foram conferidos em 2026-11-12 pela mesma suíte, que insere um passo entre dois blocos com o **+**, executa só esse bloco, lê os contadores, sobe o bloco e compara o arquivo salvo. O modo comando foi conferido em 2026-11-13 pela suíte de testes do app de mesa que entra e sai dele pelo teclado, com e sem o vim, seleciona inteiro um bloco de dois passos, apaga e desfaz um bloco de nota e confere que digitar no texto continua digitando e que o `dd` do vim apaga uma linha, nunca um bloco. Os menus e rótulos abaixo são os da janela em português.
+Cada comportamento abaixo foi conferido em 2026-10-28 numa versão de desenvolvimento do Tyto no Windows 11, pela suíte de testes do app de mesa que abre um `.recipe` sobre um plugin de fonte instalado e conta as buscas da fonte: nenhuma ao abrir, uma em **Executar receita**, nenhuma em **Executar daqui**, uma em **Buscar de novo**, nenhuma numa edição abaixo da fonte. **Aplicar** foi conferido em 2026-11-07 pela mesma suíte, aplicando o plano do plugin de receita de exemplo e lendo a marca de cada operação. A visão de Tabela foi conferida em 2026-11-07 por uma suíte que rola uma tabela de 5.000 linhas até a última, ordena e filtra; a cópia foi conferida por testes unitários, não na janela. Abrir um passo numa aba foi conferido em 2026-11-08 pela mesma suíte, desenhando as 5.000 linhas em tamanho cheio e fechando a receita. Abrir um passo `run` foi conferido em 2026-11-08 pela mesma suíte de Aplicar, lendo as tabelas e o plano da receita incluída. Escrever briefs com `to-brief` foi conferido em 2026-11-08 por um teste do processo principal do app de mesa que planeja três linhas numa pasta, aplica o plano e renderiza cada brief com `tyto render`, não na janela. Uma execução por intervalo buscando além do cache da fonte foi conferida em 2026-11-11 por um teste do processo principal do app de mesa com uma fonte que guarda as respostas por dez minutos, não na janela. Enviar com `call` foi conferido em 2026-11-11 por testes do executor de receitas compartilhado contra um endereço simulado, não pela rede e não na janela. O `tyto recipe run` foi conferido em 2026-11-11 pelos testes da linha de comando, pelo executor compartilhado com um plugin simulado que planeja 120 operações e um endereço simulado, não à mão. Criar uma receita e um vocabulário, e as marcas da aba de vocabulário, foram conferidos em 2026-11-11 pela suíte de testes do app de mesa que começa numa pasta confiável vazia, e a sugestão e a ajuda ao apontar, por testes unitários. Adicionar e editar passos por formulário foi conferido em 2026-11-11 pela suíte de testes do app de mesa que monta uma receita numa pasta confiável vazia com um plugin de fonte, `where`, `select` e `rules`, a executa e compara o arquivo salvo com as linhas que os formulários mostraram, e pela mesma suíte reabrindo o último passo com **Editar passo**; um valor recusado e a sugestão de uma referência ao vocabulário, por testes unitários. Planejar um passo de novo depois de Aplicar foi conferido em 2026-11-12 pelos testes do executor de receitas compartilhado, com `to-brief` numa pasta real e um plugin simulado, não na janela. Os blocos, a barra deles e **Executar este bloco** foram conferidos em 2026-11-12 pela suíte de testes do app de mesa que abre uma receita sobre um plugin de fonte, executa um bloco, recolhe um resultado, sobe um passo, apaga uma nota e compara o arquivo salvo; mover e apagar cada bloco de uma receita, por testes de unidade. O **+** entre blocos, as notas, o contador e **Executar daqui para baixo** foram conferidos em 2026-11-12 pela mesma suíte, que insere um passo entre dois blocos com o **+**, executa só esse bloco, lê os contadores, sobe o bloco e compara o arquivo salvo. O modo comando foi conferido em 2026-11-13 pela suíte de testes do app de mesa que entra e sai dele pelo teclado, com e sem o vim, seleciona inteiro um bloco de dois passos, apaga e desfaz um bloco de nota e confere que digitar no texto continua digitando e que o `dd` do vim apaga uma linha, nunca um bloco. Arrastar um bloco foi conferido em 2026-11-13 pela suíte dos blocos, que arrasta o último bloco para cima de outro com o mouse, lê onde a linha de destino aparece, salva e desfaz a troca com um único desfazer; cancelar um arraste, por testes de unidade. Encadear passos numa linha com `|` foi conferido em 2026-11-13 pelos testes do leitor e do executor de receitas compartilhados e pelos testes de unidade da janela para o contador e o resultado do bloco, não na janela. Os menus e rótulos abaixo são os da janela em português.
 :::
 
 Uma receita (`.recipe`) é uma lista de passos, um por linha, que buscam linhas de uma fonte, filtram e reorganizam essas linhas e planejam o que gravar. O Tyto abre uma receita numa aba como um caderno: **embaixo de cada passo, o resultado dele**, uma tabela que você lê enquanto escreve a próxima linha.
@@ -57,6 +57,40 @@ No nível de cima a aba oferece as três seções, `rules`, `rewrites` e `lookup
 
 Na receita, digitar `@./` oferece os arquivos de vocabulário ao lado dela, e depois do `#` do arquivo as tabelas que ele guarda, como `/rules/kinds`. Só arquivos da própria pasta da receita, ou abaixo dela, são lidos para isso.
 
+## Dar nome a valores com const e set
+
+Uma receita pode dar nome a um valor uma vez e usá-lo em qualquer passo abaixo como `{nome}`, do jeito que usa um `param`. Há dois jeitos de dar nome a um valor, e `param`, `const` e `set` dividem um único conjunto de nomes: um nome declarado duas vezes é recusado com `E_RECIPE_SYNTAX`.
+
+**`const`** dá nome a um valor escrito na receita. Ele vai no cabeçalho, ao lado das linhas `param`, e todos os passos podem lê-lo:
+
+```
+recipe semanal
+const time = Plataforma
+where time = {time}
+```
+
+Ao contrário de um `param`, um `const` não recebe valor de fora: `--param time=…` na linha de comando, ou `run semanal time=…` em outra receita, é recusado com `E_RECIPE_PARAM`.
+
+**`set`** é um passo que calcula um valor a partir da tabela na linha dele. Ele se escreve `set <nome> = <agregado> <coluna>`:
+
+```
+set ultimo_prazo = max due
+where due = {ultimo_prazo}
+```
+
+O agregado é um destes:
+
+- `count`: quantas linhas a tabela tem. Ele não leva coluna: `set total = count`.
+- `min` e `max`: o menor e o maior valor da coluna, comparados como números quando todo valor que não está vazio é um número, e como texto, sem ligar para maiúsculas nem acentos, caso contrário.
+- `first` e `last`: o valor da coluna na primeira e na última linha.
+- `sum`: os valores da coluna somados. Um valor que não é número é recusado com `E_RECIPE_ARGUMENTS`, que diz a linha dele.
+
+A tabela passa pelo `set` sem mudar, então o passo seguinte lê as mesmas linhas. Só os passos abaixo de um `set` podem ler o valor dele; usá-lo acima, ou na própria linha do `set`, é recusado com `E_RECIPE_PARAM`. Numa tabela sem linhas, `count` dá 0 e os outros dão um valor vazio, o que o resultado do passo diz.
+
+O resultado do bloco diz cada valor que os passos dele definiram, como _Definido ultimo_prazo = 2026-12-01_, mesmo quando o `set` não é o último passo do bloco (veja [O que um passo mostra](#o-que-um-passo-mostra)).
+
+No editor, `const` tem a cor de uma linha do cabeçalho, e o nome, o `=` e o agregado de um passo `set` têm cada um a sua cor. Digitar `{` num passo oferece os nomes que valem ali: todo `param` e `const`, e cada `set` acima do passo. Depois de `set <nome> = ` o editor oferece os agregados.
+
 ## Quando ela roda
 
 Uma receita roda sozinha, mas nem tudo roda a todo momento:
@@ -78,6 +112,7 @@ Só os passos que mudaram rodam de novo: um passo cuja linha não mudou guarda a
 Embaixo do último passo de cada bloco há uma linha e, depois, a tabela dele. Um bloco de vários passos mostra só o resultado do último (veja [Trabalhar em blocos](#trabalhar-em-blocos)):
 
 - **A linha** diz o que o passo respondeu: _12 linhas · 4 colunas_, um plano (_Plano: 3 a gravar em Pauta_), _Falhou: veja Problemas_ ou por que ele não rodou.
+- **Os valores definidos**: cada valor que um passo `set` do bloco definiu, como _Definido ultimo_prazo = 2026-12-01_, e uma nota quando um deles está vazio. Eles continuam na linha quando o resultado está recolhido. Veja [Dar nome a valores com const e set](#dar-nome-a-valores-com-const-e-set).
 - **A idade**: quando o passo rodou e quão antigos são os dados, como _rodou há 2 min. · dados buscados há 3 h_. A idade dos dados é quando a fonte os buscou, que pode ser bem antes de o passo rodar. As idades vão aumentando enquanto a aba está aberta.
 - **A tabela** mostra as 20 primeiras linhas do passo e quantas ficaram de fora (_mais 30 linhas_). Uma tabela larga rola para o lado dentro do passo. Um valor longo é cortado com reticências; pare o mouse sobre ele para ler inteiro, e sobre o nome de uma coluna para ver o tipo dela.
 
@@ -128,9 +163,21 @@ A aba acompanha a receita: uma nova execução a desenha de novo com as linhas n
 
 ## Trabalhar em blocos
 
-Uma receita se lê em blocos, como um notebook se lê em células. **Uma linha em branco separa um bloco do seguinte**: um bloco são as linhas entre duas linhas em branco, e pode ter vários passos e linhas de comentário `#`. Um bloco só de linhas de comentário é um bloco de **nota**. O cabeçalho (a linha `recipe`, a descrição `|` e as linhas `apply`, `every` e `param` do topo) é um bloco à parte, mesmo sem linha em branco embaixo. Uma linha em branco não pertence a nenhum bloco. O bloco onde está o cursor tem uma barra colorida à esquerda.
+Uma receita se lê em blocos, como um notebook se lê em células. **Uma linha em branco separa um bloco do seguinte**: um bloco são as linhas entre duas linhas em branco, e pode ter vários passos e linhas de comentário `#`. Um bloco só de linhas de comentário é um bloco de **nota**. O cabeçalho (a linha `recipe`, a descrição `|` e as linhas `apply`, `every`, `param` e `const` do topo) é um bloco à parte, mesmo sem linha em branco embaixo. Uma linha em branco não pertence a nenhum bloco. O bloco onde está o cursor tem uma barra colorida à esquerda.
 
 **Um bloco mostra só o resultado do último passo**, embaixo da linha desse passo. Todos os passos do bloco continuam rodando, e o problema de um passo continua marcado na linha dele e listado em Problemas; quando um passo do meio falha, a linha do bloco diz _Pulada: uma célula acima falhou_. Para ver o resultado de um passo do meio, ponha uma linha em branco embaixo dele, o que divide o bloco em dois, ou ponha o cursor nele e rode **Abrir o resultado da célula numa aba**.
+
+### Encadear passos numa linha
+
+Um `|` com um espaço de cada lado divide a linha em passos, lidos exatamente como se cada um estivesse na sua própria linha do mesmo bloco:
+
+```
+where status != done | sort due | show table
+```
+
+são três passos, e o bloco mostra o resultado do último, `show table`. O problema de um deles é marcado no trecho da linha desse passo. Um `|` sem passo depois dele, ou uma linha de cabeçalho como `param` depois de um `|`, é recusado com `E_RECIPE_SYNTAX`.
+
+**Um `|` encostado numa palavra nunca divide**, então `extract title pattern=^(poster|flyer)` continua um passo só: o `|` é do padrão, como o do filtro de um marcador, `{team|upper}`, é do modelo. Também não dividem um `|` entre aspas duplas, `where title matches "copy | web"`, nem entre chaves, nem o `|` que abre uma linha de descrição no cabeçalho.
 
 Na primeira linha de cada bloco, menos o cabeçalho, à direita, uma pequena barra:
 
@@ -141,6 +188,8 @@ Na primeira linha de cada bloco, menos o cabeçalho, à direita, uma pequena bar
 - **▾ Ocultar resultado** (**▸ Mostrar resultado** quando recolhido), num bloco com resultado: o mesmo que a seta na linha do resultado.
 
 A barra do cabeçalho tem **Executar tudo**, que é **Executar receita**.
+
+Para levar um bloco mais longe, arraste-o pela **alça** (⠿), na ponta esquerda da primeira linha dele: uma linha mostra onde ele vai cair, e ele vai para lá com todas as linhas, o resultado e a dobra, e as linhas em branco continuam entre os blocos. **Esc** cancela o arraste. Um **Ctrl+Z** devolve o bloco. Pelo teclado, **↑ Mover para cima** e **↓ Mover para baixo**, na barra dele, o movem uma posição por vez. O cabeçalho não tem alça, e nenhum bloco sobe acima dele.
 
 Um pequeno **+** fica na fronteira acima de cada bloco, menos o cabeçalho, e outro abaixo do último bloco, logo à esquerda das barras. Clique nele e escolha:
 
@@ -277,6 +326,23 @@ remember dispatched columns=title
 
 **De onde vem a credencial.** Na linha de comando, ela é uma variável de ambiente, `TYTO_RECIPE_CREDENTIAL_` seguido do nome em maiúsculas, com todo caractere que não é letra nem dígito trocado por `_`: `token=routine-hook` lê `TYTO_RECIPE_CREDENTIAL_ROUTINE_HOOK`. O `run_recipe` do `tyto mcp` confere a lista e a credencial e mostra o plano, e nunca envia: um agente pode ver um envio antes, não realizá-lo. O [`tyto recipe run --apply`](#rodar-pelo-terminal) as envia, numa pasta confiável. **Na janela**, abra **Mostrar plugins** e procure **Credenciais de receitas** abaixo da lista de plugins: digite o nome que o `token=` usa e o valor, e clique em **Salvar** — ou digite o nome e clique em **Importar de arquivo…** para guardar o texto de um arquivo como o valor. O valor vai para o cofre do sistema, e o Tyto não o mostra de novo: a seção lista só os nomes, cada um com **Esquecer**, e salvar o mesmo nome outra vez troca o valor. Uma credencial é deste computador, para todas as pastas dele; para quais endereços uma receita pode enviar é o `recipes.call.hosts` de cada pasta, lido só depois que você confia na pasta. Enquanto a credencial não está guardada, a linha `call` falha com um problema que diz onde guardá-la; guardada, o plano lista as requisições e **Aplicar** as envia.
 
+## Sincronizar um campo nos dois sentidos
+
+`decide` compara um campo dos dois lados de uma sincronização, linha a linha: o lado local (a coluna de uma planilha), o lado remoto (o campo de um rastreador, já mapeado para os valores da planilha) e o que a última execução aplicada deixou, que `last` lê. Vence o lado que mudou desde então: a linha diz `push`, `pull`, `same` ou `hold` em `<coluna>_action`, e o passo que escreve no lado remoto lê `<coluna>_push` e `<coluna>_pushes`.
+
+```
+last sync columns=owner
+decide owner local=owner remote=tracker_owner last=last_owner clear=push
+remember sync columns=owner when="owner_action != hold"
+```
+
+Com `clear=push`, uma célula esvaziada desde a última execução esvazia o campo remoto também; sem ele, o valor remoto preenche a célula de novo. Como uma célula vazia também é o que uma leitura da planilha que perdeu células parece, `decide` segura todos os valores apagados de uma execução, não envia nenhum e mostra um aviso na sua linha, em dois casos:
+
+- **A coluna se perdeu.** A coluna de `local=` falta na tabela, ou está vazia em todas as linhas enquanto a última execução deixou valores ali. O aviso diz o nome da coluna. Confira a planilha e rode de novo.
+- **Apagados demais de uma vez.** Uma execução enviaria mais valores apagados do que `clear-limit=`, 5 quando não é dado. O aviso diz quantos. Se você quis mesmo esvaziar essas células, rode uma vez com um limite maior (`clear-limit=20`), ou escreva `clear-limit=none` para tirar o limite.
+
+Uma linha segurada diz `hold` e não envia nada, e o estado guarda o último valor, então a próxima execução vê os mesmos valores apagados de novo. Os apagados até o limite são enviados como antes.
+
 ## Rodar pelo terminal
 
 `tyto recipe run <receita>` roda uma receita na pasta de trabalho que a contém, com a confiança dessa pasta, pelo mesmo executor da janela. [Obter o comando](../command-line/index.md#obter-o-comando) diz como construí-lo.
@@ -285,10 +351,10 @@ remember dispatched columns=title
 tyto recipe run recipes/sync.recipe
 ```
 
-Ele imprime uma linha por passo, com o estado e quantas linhas tem a tabela, e embaixo de um passo que grava, todas as operações do plano, uma por linha: nenhuma fica de fora. Ele não grava nada e não guarda nada na memória da receita, como um salvamento; uma receita com `apply auto` só mostra os planos.
+Ele imprime uma linha por passo, com o estado e quantas linhas tem a tabela, embaixo de um passo `set` o valor que ele definiu (`set ultimo_prazo = "2026-12-01"`) e a nota dele, e embaixo de um passo que grava, todas as operações do plano, uma por linha: nenhuma fica de fora. Ele não grava nada e não guarda nada na memória da receita, como um salvamento; uma receita com `apply auto` só mostra os planos.
 
 - `--json` imprime a resposta inteira como um único documento JSON: todas as linhas de todas as tabelas com a origem de cada uma, todas as operações com a descrição e os dados do plugin para aplicá-las, e todos os problemas com a linha a que apontam. Mande para um arquivo para guardar o plano do dia: `tyto recipe run recipes/sync.recipe --json > plan.json`.
-- `--param <nome>=<valor>` dá a uma das linhas `param` da receita um valor para esta execução; repita para cada uma. Um nome que a receita não declara é um erro.
+- `--param <nome>=<valor>` dá a uma das linhas `param` da receita um valor para esta execução; repita para cada uma. Um nome que a receita não declara é um erro, e o de um `const` também.
 - `--section <plugin>.<chave>=<valor>` define uma chave da seção de um plugin para esta execução, como no [`tyto render`](../command-line/render.md#outras-opcoes). Os passos de uma receita só recebem seções numa pasta confiável, digitadas ou não.
 - `--apply` aplica cada plano uma vez, como um clique em **Aplicar**, e guarda o que a receita guarda. Só roda numa pasta confiável: em qualquer outro lugar é recusado antes de qualquer passo rodar. Uma receita com `apply auto` também aplica uma vez. É assim que a linha de comando envia as requisições de um passo `call`.
 

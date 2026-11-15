@@ -2,7 +2,7 @@
 
 # Settings
 
-Every key the app declares in `settings.json`: 35. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
+Every key the app declares in `settings.json`: 36. Open the file with **Preferences: Open Settings (JSON)**; a key you leave out keeps its default, and a value the app cannot read is reported in the Problems panel and the default applies. A plugin adds its own keys as `<plugin id>.<key>`, which are not listed here.
 
 ## templatesFolder
 
@@ -285,6 +285,14 @@ Fold every run of the command panel but the newest to its header line; a click o
 | Type | Default |
 | --- | --- |
 | `boolean` | `false` |
+
+## commandAliases
+
+The command panel's aliases, by name: the line each one stands for, as `alias name='line'` writes it. A workspace's `aliases` in .tyto/project.json win over these, name by name.
+
+| Type | Default |
+| --- | --- |
+| `object` | `{}` |
 
 ## zoom
 

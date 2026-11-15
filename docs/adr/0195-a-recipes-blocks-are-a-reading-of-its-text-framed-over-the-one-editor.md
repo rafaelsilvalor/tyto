@@ -156,3 +156,37 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   block and moves the caret to the next one, on a recipe only; on any other tab the command is
   not offered and the key is a new line. Measured in the window with vim on: Escape twice and
   `dd` delete one line of a two-line note, as vim does, and focus stays in the text.
+- 2026-11-13 (fourth pull request): **behaviour 3, drag to reorder, is built** on the blocks of
+  ADR 0196. A grip in a gutter of its own on each movable block's first line (never the
+  header's) starts the drag; a line in a layer of its own marks the nearest boundary the block
+  may drop on, read from the lines' elements as the toolbars are; the dragged block's lines are
+  dimmed. On release the block moves in one edit, one undo, with its separating blank line, by
+  `moveBlockTo` in `@tyto/recipe`, which, as decision 2's move does, rewrites the blocks passed
+  over and never the block moved, so it keeps its result and its fold. **The drag is pointer
+  events with the pointer captured on the grip, not HTML5 drag and drop**: CodeMirror reads a
+  native `dragstart` in the editor as a text drag and would move text, and a native drag gives a
+  script or a test no pointer to drive, while a captured pointer delivers every move and the
+  release to the grip wherever it goes. Escape, the window losing focus, and an edit of the text
+  while dragging (a run rewriting it, say) cancel the drag and release the pointer. The keyboard
+  path stays the toolbar's Up and Down; no key was added.
+- 2026-11-13 (TYTO-703): **the height map now follows a fold**, which closes the first open
+  point above. CodeMirror re-reads the heights of the lines in view only when asked to or when
+  the content box changed height, and a recipe shorter than its pane sits in a box held at
+  `min-height: 100%`, so a fold left the box, and the map, as they were. Measured in the window
+  at the same wait: with the recipe shorter than the pane the map stayed 74 px off after a fold;
+  with one taller than the pane the box shrank and the map was right without the fix.
+  `remeasureCellOutput` now asks for the heights through CodeMirror's internal flag, the door
+  ADR 0099 already uses. The toolbars and the drop line keep reading their lines' elements, as a
+  guard for any block that changes height without saying so.
+- 2026-11-13 (TYTO-710): **a drag near the top or bottom of the pane scrolls it.** In a band of
+  48 px at each edge, or a quarter of a short pane, the speed grows from nothing to 1,200 px a
+  second at the edge and stays there past it, and the drop place is picked again under the
+  pointer. The scroll runs on a timer scaled by the time that passed, not on animation frames,
+  which a hidden window does not run; it rests at the end of the scroll and starts again on the
+  next move. **The moves and the release are now heard on the window, not the grip**: a drag
+  that scrolls far takes the grip's line out of CodeMirror's viewport and unmounts the grip,
+  and measured with the release heard on the grip only, the drop never landed. The drop place
+  also follows any scroll of the pane during a drag; measured in a shown window, a wheel turned
+  mid-drag scrolls the pane 300 px as it does with no drag, and the drop line stays at the
+  pointer (377 px for a pointer at 362), where without it the line went off with the text, to
+  63 px.

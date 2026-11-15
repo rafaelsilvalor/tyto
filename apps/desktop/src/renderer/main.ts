@@ -120,9 +120,10 @@ import {
   blockResults,
   cellAtOrAbove,
   cellStatuses,
+  cellUnderCursor,
   columnsBefore,
   createRecipeNotebook,
-  stepOnLine,
+  stepAtCursor,
   stepSlot,
 } from './recipe-notebook.js';
 import { type RecipeStepDialog, RECIPE_STEP_TAG } from './recipe-step-dialog.js';
@@ -136,7 +137,13 @@ import {
   hasFoldableResult,
   tickAges,
 } from './recipe-cell-view.js';
-import { type BlockHost, insertControl, recipeFrames } from './recipe-blocks-view.js';
+import {
+  type BlockHost,
+  dropBlock,
+  gripLabel,
+  insertControl,
+  recipeFrames,
+} from './recipe-blocks-view.js';
 import { type CommandModeHost, runBlockAction } from './recipe-command-mode.js';
 import { type ViewContext, fullSizeBody } from './recipe-views.js';
 import {
@@ -176,10 +183,13 @@ import { type CommandSession, CommandSessions, refreshesWorkspace } from './comm
 import { inRunOrder, sectionTitle, shortCommand } from './command-blocks.js';
 import type { CommandsOrder } from '../../shared/command-runs.js';
 import { type OutputLink, commandPathOf, listFolderAt, resolveEntry } from './command-links.js';
-import { type Completion, complete } from './command-completion.js';
+import { folderId, stepsOf } from './command-paths.js';
+import { PANEL_BUILTINS } from './command-builtins.js';
+import { type Completion, type ListedEntry, complete } from './command-completion.js';
+import { createPanelTemplates } from './command-templates.js';
 import { joinCommandLine } from './command-words.js';
 import { loadHistory, saveHistory, withHistoryLine } from './command-history.js';
-import { type ExplorerPanel, EXPLORER_PANEL_TAG } from './explorer-panel.js';
+import { type ExplorerPanel, EXPLORER_PANEL_TAG, binOf, deleteQuestion } from './explorer-panel.js';
 import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
@@ -627,6 +637,39 @@ let commandProblems: readonly CommandProblems[] = [];
 const commandSessions = new CommandSessions();
 
 /**
+ * What the command panel completes `--template` and `--formats` with (TYTO-729): `tyto template
+ * list` in the session's working folder, kept per folder and trust, never the window's picker.
+ */
+const panelTemplates = createPanelTemplates({
+  ask: async (folder) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return { templates: [] };
+    return bridge['commands:templates'](folder === undefined ? {} : { folder });
+  },
+  folderOf: (steps) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return Promise.resolve(undefined);
+    return folderId(
+      steps,
+      async (entryId) => {
+        const listing = await bridge['explorer:list']({ entryId });
+        return { entries: listing.entries, more: listing.more };
+      },
+      pathsCaseless(),
+    );
+  },
+  trust: () =>
+    workspaceShown === undefined || workspaceShown.folder === null ? 'none' : workspaceShown.trust,
+  get caseless() {
+    return pathsCaseless();
+  },
+  // Into the session in front, the one whose prompt asked (TYTO-729).
+  note: (text) => {
+    commandSessions.note(commandSessions.active.id, text);
+  },
+});
+
+/**
  * The terminals main has open (TYTO-497, ADR 0164), for the window's life, as the command panel's
  * sessions are: the dock makes the panel element again on every layout change, and a shell's
  * screen must survive it. Main chooses the program, the folder and the environment; these ports
@@ -824,6 +867,8 @@ const appFileAssists: AppFileAssists = {
     notebookFrames({
       framesOf: (view) => recipeFrames(view, recipeBlockHost),
       insert: (view) => insertControl(view, recipeBlockHost, state.locale),
+      move: dropBlock,
+      gripLabel: () => gripLabel(state.locale),
     }),
   ],
   // A vocabulary's (TYTO-402, ADR 0176): its sections and fields, and what a key is, from main.
@@ -885,7 +930,8 @@ function recipeStep(mode: 'add' | 'edit'): void {
       if (written !== undefined) writeStepAt(pane.view, slot, written);
       return;
     }
-    const found = stepOnLine(text, line);
+    // TYTO-711: on a line that chains steps with `|`, the step under the cursor, not the line's.
+    const found = stepAtCursor(text, pane.state().selection.main.head);
     const entry = recipeCatalog.find((candidate) => candidate.name === found?.step.verb);
     const values =
       found === undefined || entry === undefined
@@ -2361,12 +2407,16 @@ const registry: CommandRegistry = withCommandGate(
       if (view !== undefined) runBlockAction(view, action, recipeCommandHost);
     },
     openRecipeCellView: () => {
-      // TYTO-379: the cell at or above the cursor, as Run from here finds it.
+      // TYTO-379: the cell at or above the cursor, as Run from here finds it; on a line that
+      // chains steps, the step under the cursor (TYTO-711).
       const front = active();
       const shown = isRecipe(front.kind) ? recipeNotebook.lastOf(front.id) : undefined;
       const pane = focusedPane() ?? primaryPaneOf(front.id);
       if (shown === undefined || pane === undefined) return;
-      const cell = cellAtOrAbove(shown.answer, cursorOf(pane.state()).line);
+      const cell = cellUnderCursor(shown.answer, pane.state().doc.toString(), {
+        line: cursorOf(pane.state()).line,
+        offset: pane.state().selection.main.head,
+      });
       if (cell !== undefined) openRecipeCell(front.id, cell);
     },
     newSeededFile: (seed) => {
@@ -3741,6 +3791,24 @@ function pickTemplate(): void {
 }
 
 /**
+ * The skeleton of a new brief for the template `name` among the window's templates, or none for
+ * a name it does not know: what Delivery: New writes, and the command panel's
+ * `new x.brief --template t` (TYTO-537).
+ */
+function templateSkeletonOf(name: string): string | undefined {
+  const template = panel.templates.find((candidate) => candidate.name === name);
+  if (template === undefined) return undefined;
+  return skeletonText(
+    briefSkeleton({
+      name: template.name,
+      formats: template.formats.map((format) => format.id),
+      slots: template.slots,
+      ...(template.configured === undefined ? {} : { configured: template.configured }),
+    }),
+  );
+}
+
+/**
  * "Delivery: New…" (TYTO-489, ADR 0157 §5): the name and a template in the bar, the delivery
  * made by main, its brief opened in a new tab and selected in the explorer. An empty brief opens
  * with the "/" menu, which writes the skeleton of the template chosen there.
@@ -3768,18 +3836,7 @@ function newDelivery(): void {
           ...(declared === undefined ? {} : { title: declared }),
         };
       }),
-    skeletonOf: (name) => {
-      const template = panel.templates.find((candidate) => candidate.name === name);
-      if (template === undefined) return undefined;
-      return skeletonText(
-        briefSkeleton({
-          name: template.name,
-          formats: template.formats.map((format) => format.id),
-          slots: template.slots,
-          ...(template.configured === undefined ? {} : { configured: template.configured }),
-        }),
-      );
-    },
+    skeletonOf: templateSkeletonOf,
     create: async (name, brief) => {
       const bridge = window.tyto;
       if (bridge === undefined) return { ok: false, code: 'no-folder', message: '' };
@@ -4160,6 +4217,8 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   deliveries.clear();
   workspaceShown = answer;
   useCommandHistoryOf(answer.folder);
+  // Another folder, or its trust or plugin files read again: what a render there reaches too.
+  panelTemplates.forget();
   // Another folder, or the same one trusted now: the last refusal is no longer the answer.
   terminalSessions.forgetRefusal();
   showExportPresets(answer.exportPresets);
@@ -4201,6 +4260,90 @@ const wiredExplorerPanels = new WeakSet<ExplorerPanel>();
 const EXPLORER_NO_BRIDGE = { ok: false, reason: 'gone' } as const;
 
 /**
+ * The Explorer's writes (TYTO-352, ADR 0121), shared with the command panel's file commands
+ * (TYTO-537, ADR 0201): a new brief opens through `adopt`, a rename or a move renames the tabs it
+ * moved and keeps their text unsaved, and a delete leaves each tab that held a file there in no
+ * file. One copy of each, whichever side asks.
+ */
+async function explorerCreate(
+  parentId: string | null,
+  name: string,
+  kind: 'file' | 'folder',
+  seed?: IpcRequest<'explorer:create'>['seed'],
+  text?: string,
+): Promise<IpcResponse<'explorer:create'>> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+  const wanted = nextDocumentId();
+  const made = await bridge['explorer:create']({
+    documentId: wanted,
+    parentId,
+    name,
+    kind,
+    ...(seed === undefined ? {} : { seed }),
+    ...(text === undefined ? {} : { text }),
+  });
+  if (made.ok && made.document !== null) adopt(made.document, made.documentId, wanted);
+  return made;
+}
+
+async function explorerRename(
+  entryId: string,
+  name: string,
+  parentId?: string | null,
+): Promise<IpcResponse<'explorer:rename'>> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+  const renamed = await bridge['explorer:rename']({
+    entryId,
+    name,
+    ...(parentId === undefined ? {} : { parentId }),
+  });
+  if (renamed.ok && renamed.moved.length > 0) {
+    workspace = withMovedDocuments(workspace, renamed.moved);
+    repaint();
+  }
+  return renamed;
+}
+
+async function explorerUnsavedUnder(entryId: string): Promise<number> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return 0;
+  const { documentIds } = await bridge['explorer:tabs-under']({ entryId });
+  return documentIds.filter((id) => {
+    const held = documentOf(workspace, id);
+    return held !== undefined && isUnsaved(held);
+  }).length;
+}
+
+async function explorerConfirm(question: IpcRequest<'dialog:confirm'>): Promise<boolean> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return false;
+  return (await bridge['dialog:confirm'](question)).confirmed;
+}
+
+async function explorerRemove(entryId: string): Promise<IpcResponse<'explorer:delete'>> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+  const deleted = await bridge['explorer:delete']({ entryId });
+  if (deleted.ok && deleted.released.length > 0) {
+    workspace = withReleasedDocuments(workspace, deleted.released);
+    repaint();
+  }
+  return deleted;
+}
+
+/** Opens an explorer entry in a tab, as a click there does; answers whether a tab opened. */
+async function explorerOpen(entryId: string): Promise<boolean> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return false;
+  const wanted = nextDocumentId();
+  const opened = await bridge['explorer:open']({ documentId: wanted, entryId });
+  adopt(opened.document, opened.documentId, wanted);
+  return opened.document !== null;
+}
+
+/**
  * The explorer (TYTO-279): what it asks main, and its first tree. A brief opens through `adopt`,
  * like a picked file, so one already in a tab is that tab. A new brief opens the same way, a
  * rename renames the tabs it moved and keeps their text unsaved, and a delete leaves each tab
@@ -4228,54 +4371,11 @@ function wireExplorerPanel(): void {
     openFolder: () => {
       runCommand('workspace.openFolder');
     },
-    create: async (parentId, name, kind, seed) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
-      const wanted = nextDocumentId();
-      const made = await bridge['explorer:create']({
-        documentId: wanted,
-        parentId,
-        name,
-        kind,
-        ...(seed === undefined ? {} : { seed }),
-      });
-      if (made.ok && made.document !== null) adopt(made.document, made.documentId, wanted);
-      return made;
-    },
-    rename: async (entryId, name) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
-      const renamed = await bridge['explorer:rename']({ entryId, name });
-      if (renamed.ok && renamed.moved.length > 0) {
-        workspace = withMovedDocuments(workspace, renamed.moved);
-        repaint();
-      }
-      return renamed;
-    },
-    unsavedUnder: async (entryId) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return 0;
-      const { documentIds } = await bridge['explorer:tabs-under']({ entryId });
-      return documentIds.filter((id) => {
-        const held = documentOf(workspace, id);
-        return held !== undefined && isUnsaved(held);
-      }).length;
-    },
-    confirm: async (question) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return false;
-      return (await bridge['dialog:confirm'](question)).confirmed;
-    },
-    remove: async (entryId) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
-      const deleted = await bridge['explorer:delete']({ entryId });
-      if (deleted.ok && deleted.released.length > 0) {
-        workspace = withReleasedDocuments(workspace, deleted.released);
-        repaint();
-      }
-      return deleted;
-    },
+    create: (parentId, name, kind, seed) => explorerCreate(parentId, name, kind, seed),
+    rename: (entryId, name) => explorerRename(entryId, name),
+    unsavedUnder: explorerUnsavedUnder,
+    confirm: explorerConfirm,
+    remove: explorerRemove,
     menu: async (x, y, items) => {
       const bridge = window.tyto;
       if (bridge === undefined) return null;
@@ -6533,10 +6633,27 @@ function wireCommandPanel(): void {
   element.order = commandsOrder;
   element.foldOlderRuns = commandsFoldOlderRuns;
   element.ports = {
-    run: async (words) => {
+    run: async (words, folder, origin) => {
       const bridge = window.tyto;
       if (bridge === undefined) throw new Error('no bridge');
-      return (await bridge['cli:run']({ argv: [...words] })).runId;
+      return (
+        await bridge['cli:run']({
+          argv: [...words],
+          ...(folder === undefined ? {} : { folder }),
+          ...(origin === undefined ? {} : { origin }),
+        })
+      ).runId;
+    },
+    // TYTO-536: the aliases in force, asked for every line, and `alias`'s writes, main checking.
+    aliases: async () => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { aliases: [], workspace: 'none' };
+      return bridge['commands:aliases']({});
+    },
+    setAlias: async (name, body, inWorkspace) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { ok: false, reason: 'no-folder' };
+      return bridge['commands:set-alias']({ name, body, workspace: inWorkspace });
     },
     cancel: (runId) => {
       void withBridge(async (bridge) => {
@@ -6551,6 +6668,51 @@ function wireCommandPanel(): void {
     remember: (line) => {
       commandHistory = withHistoryLine(commandHistory, line);
       saveHistory(historyStorage(), commandHistoryFolder ?? null, commandHistory);
+    },
+    list: listInWorkspace,
+    commands: async () => {
+      const tree = await commandTree();
+      return (tree?.commands ?? []).map((command) => ({
+        name: command.name,
+        description: command.description,
+      }));
+    },
+    restricted: () => workspaceShown?.trust === 'restricted',
+    listById: async (entryId) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { entries: [], more: 0 };
+      const listing = await bridge['explorer:list']({ entryId });
+      return { entries: listing.entries, more: listing.more };
+    },
+    read: async (entryId) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { ok: false, reason: 'gone' };
+      return bridge['explorer:read']({ entryId });
+    },
+    // TYTO-537, ADR 0201: the Explorer's own writes, so tabs follow as they do there.
+    writes: {
+      create: (parentId, name, kind, brief) =>
+        brief === undefined
+          ? explorerCreate(parentId, name, kind)
+          : explorerCreate(parentId, name, kind, 'brief', brief),
+      move: (entryId, parentId, name) => explorerRename(entryId, name, parentId),
+      copy: async (entryId, parentId, name) => {
+        const bridge = window.tyto;
+        if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+        return bridge['explorer:copy']({ entryId, parentId, name });
+      },
+      unsavedUnder: explorerUnsavedUnder,
+      confirmRemove: (entry, unsaved) =>
+        explorerConfirm(deleteQuestion(state.locale, state.platform, entry, unsaved)),
+      remove: explorerRemove,
+      open: explorerOpen,
+      reveal: (ids) => {
+        void changeLayout(withPanelOpen(layout, EXPLORER_PANEL, true)).then(() => {
+          elements.explorerPanel?.reveal(ids);
+        });
+      },
+      skeletonOf: templateSkeletonOf,
+      bin: binOf(state.locale, state.platform),
     },
   };
 }
@@ -6617,38 +6779,63 @@ function briefCommandPath(): string | undefined {
 /** The CLI's tree, asked once: it does not change while the window runs (ADR 0159). */
 let commandTreeAsked: Promise<IpcResponse<'cli:commands'>['tree'] | undefined> | undefined;
 
-/**
- * What can come at the caret on the command panel's prompt (TYTO-496): the CLI's tree, and for a
- * value the window's templates, the installed plugins and the open folder's files, listed by the
- * explorer's ids.
- */
-async function completeCommand(line: string, caret: number): Promise<Completion> {
+/** The CLI's tree, or `undefined` without a bridge or when main could not give it. */
+function commandTree(): Promise<IpcResponse<'cli:commands'>['tree'] | undefined> {
   const bridge = window.tyto;
-  const none: Completion = { from: caret, to: caret, items: [] };
-  if (bridge === undefined) return none;
+  if (bridge === undefined) return Promise.resolve(undefined);
   commandTreeAsked ??= bridge['cli:commands']({}).then(
     (answer) => answer.tree,
     () => undefined,
   );
-  const tree = await commandTreeAsked;
+  return commandTreeAsked;
+}
+
+/**
+ * The entries of a folder under the open one, by the explorer's ids (ADR 0113): what the command
+ * panel's completion and its globs read (TYTO-496, TYTO-535). `undefined` with no folder open.
+ */
+function listInWorkspace(segments: readonly string[]): Promise<readonly ListedEntry[] | undefined> {
+  const bridge = window.tyto;
+  if (
+    bridge === undefined ||
+    workspaceShown?.folder === null ||
+    workspaceShown?.folder === undefined
+  ) {
+    return Promise.resolve(undefined);
+  }
+  return listFolderAt(segments, (entryId) => bridge['explorer:list']({ entryId }), pathsCaseless());
+}
+
+/**
+ * What can come at the caret on the command panel's prompt (TYTO-496): the CLI's tree, and for a
+ * value the templates a render in the working folder reaches (TYTO-729), the installed plugins and the open folder's files, listed by the
+ * explorer's ids.
+ */
+async function completeCommand(
+  line: string,
+  caret: number,
+  base: readonly string[],
+): Promise<Completion> {
+  const bridge = window.tyto;
+  const none: Completion = { from: caret, to: caret, items: [] };
+  if (bridge === undefined) return none;
+  const tree = await commandTree();
   if (tree === undefined) return none;
   return complete(line, caret, tree, {
-    templates: () =>
-      panel.templates.map((template) => ({
-        name: template.name,
-        formats: template.formats.map((format) => format.id),
-        ...(template.alias === undefined ? {} : { aliasOf: template.alias.template }),
-      })),
+    // TYTO-729: what a render in the session's working folder accepts, not the window's picker.
+    templates: () => panelTemplates.of(base),
     plugins: async () => (await bridge['plugins:list']({})).plugins.map((plugin) => plugin.name),
-    list: (segments) =>
-      workspaceShown?.folder === null || workspaceShown?.folder === undefined
-        ? Promise.resolve(undefined)
-        : listFolderAt(
-            segments,
-            (entryId) => bridge['explorer:list']({ entryId }),
-            pathsCaseless(),
-          ),
+    // From the session's working folder (TYTO-537); a `..` may step back, never above the root.
+    list: (segments) => {
+      const steps = stepsOf(base, segments.join('/'));
+      return steps.ok ? listInWorkspace(steps.steps) : Promise.resolve(undefined);
+    },
     caseless: pathsCaseless(),
+    builtins: PANEL_BUILTINS.names().map(({ name, entry }) => ({
+      name,
+      detail: translate(state.locale, entry.help),
+      ...(entry.arguments === undefined ? {} : { arguments: entry.arguments }),
+    })),
     // Refused before any command starts (`src/main/cli-refusals.ts`, ADR 0159 decision 2): the
     // window trusts a folder through Workspace: Manage Trust only.
     refused: REFUSED_OPTIONS,
@@ -6670,6 +6857,8 @@ function historyStorage(): Storage | undefined {
 function useCommandHistoryOf(folder: string | null): void {
   if (folder === commandHistoryFolder) return;
   commandHistoryFolder = folder;
+  // A working folder is steps under the folder that was open: under another, it names nothing.
+  commandSessions.resetFolders();
   commandHistory = loadHistory(historyStorage(), folder);
 }
 
@@ -6934,6 +7123,16 @@ async function load(): Promise<void> {
     });
     bridge.on('cli:state', (pushed) => {
       commandSessions.state(pushed);
+      // A command may have made, fetched or trusted what a render reaches (TYTO-729).
+      if (pushed.state === 'finished') panelTemplates.forget();
+    });
+    // A yes in a refused `recipe run --apply`'s box (TYTO-726): main kept the recipe for the
+    // run, and the window opens it as a tab, as it opens a command's Problems row.
+    bridge.on('cli:recipe-offered', (pushed) => {
+      const wanted = nextDocumentId();
+      void bridge['cli:open-recipe']({ documentId: wanted, runId: pushed.runId }).then((opened) => {
+        adopt(opened.document, opened.documentId, wanted);
+      });
     });
     // What a terminal's shell printed and its end, into its screen (TYTO-497, ADR 0164).
     bridge.on('terminal:output', (pushed) => {
@@ -6965,6 +7164,7 @@ async function load(): Promise<void> {
     // folders again. Ignored while it is closed, for the queue's reason.
     bridge.on('explorer:changed', () => {
       elements.explorerPanel?.refresh();
+      panelTemplates.forget();
       // TYTO-366: an image a preview shows is asked again with its version, so main answers
       // `unchanged` from a `stat` unless the file did change.
       refreshImages();
@@ -6973,6 +7173,7 @@ async function load(): Promise<void> {
     // A sync of the plugin files fetched or dropped a pack (TYTO-433): the picker, the "/"
     // menu and the problems panel list again, and every open brief is compiled again.
     bridge.on('templates:changed', () => {
+      panelTemplates.forget();
       void afterTemplatesReread(bridge);
     });
 
@@ -6985,6 +7186,7 @@ async function load(): Promise<void> {
     });
 
     bridge.on('plugins:changed', () => {
+      panelTemplates.forget();
       void readPluginContributions(bridge).catch((cause: unknown) => {
         reportToLog(bridge, cause, 'plugin panels not read again');
       });

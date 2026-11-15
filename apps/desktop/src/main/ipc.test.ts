@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -15,8 +15,15 @@ import {
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { recipeCredentialStore } from './recipe-credentials.js';
-import { type ExplorerService } from './explorer.js';
-import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import { type ExplorerService, createExplorerService } from './explorer.js';
+import {
+  WORKING_FOLDER_REFUSED,
+  type WindowThemes,
+  createHandlers,
+  guard,
+  registerIpcHandlers,
+} from './ipc.js';
+import { OfferedRecipes } from './cli-offers.js';
 import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
 import { type Table, vocabularySkeleton } from '@tyto/recipe';
 
@@ -161,6 +168,15 @@ const explorerFiles = () => {
         dataUrl: 'data:image/png;base64,iVBORw==',
       });
     },
+    // TYTO-537: `cat`'s text, by id only.
+    read: (entryId: string): ReturnType<ExplorerService['read']> => {
+      asked.push(entryId);
+      return Promise.resolve(
+        entryId === 'e-brief'
+          ? { ok: true, text: 'hello', truncated: false }
+          : { ok: false, reason: 'gone' },
+      );
+    },
     // TYTO-352: one name already taken, one folder that renames and trashes, and a trash that
     // refuses everything else.
     create: (
@@ -181,8 +197,14 @@ const explorerFiles = () => {
         path: `/work/promo/${name}`,
       });
     },
-    rename: (entryId: string, name: string): ReturnType<ExplorerService['rename']> => {
+    rename: (
+      entryId: string,
+      name: string,
+      parentId?: string | null,
+    ): ReturnType<ExplorerService['rename']> => {
       asked.push(entryId);
+      // TYTO-537: a move names the folder it goes into.
+      if (parentId !== undefined) asked.push(parentId);
       return Promise.resolve(
         entryId === 'e-folder'
           ? {
@@ -192,6 +214,23 @@ const explorerFiles = () => {
               to: `/work/promo/${name}`,
             }
           : { ok: false, reason: 'gone' },
+      );
+    },
+    // TYTO-537: `cp`, by ids and a name.
+    copy: (
+      entryId: string,
+      parentId: string | null,
+      name: string,
+    ): ReturnType<ExplorerService['copy']> => {
+      asked.push(entryId, parentId);
+      return Promise.resolve(
+        entryId === 'e-brief'
+          ? {
+              ok: true,
+              entry: { id: 'e-copy', name, kind: 'brief' },
+              path: `/work/promo/${name}`,
+            }
+          : { ok: false, reason: 'link' },
       );
     },
     delete: (entryId: string): ReturnType<ExplorerService['delete']> => {
@@ -908,7 +947,13 @@ const dependencies = () => {
       start: () => ({ runId: 'cli-1' }),
       cancel: () => {},
       commands: () => ({ name: 'tyto', description: '', arguments: [], options: [], commands: [] }),
+      capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
       diagnosticPath: () => undefined,
+    },
+    offeredRecipes: { take: () => undefined },
+    commandAliases: {
+      list: () => ({ aliases: [], workspace: 'none' as const }),
+      set: () => Promise.resolve({ ok: true as const }),
     },
     terminals: {
       open: () => ({ terminalId: 'terminal-1', title: 'bash' }),
@@ -3042,6 +3087,67 @@ describe('the explorer write channels', () => {
     expect(deps.explorer.written).toEqual([]);
   });
 
+  // TYTO-537, ADR 0201: `new x.brief --template t` writes the window's skeleton, and nothing else.
+  it('writes a new brief with the text given, only for a .brief and under the cap', async () => {
+    const deps = dependencies();
+    const create = guard('explorer:create', createHandlers(deps)['explorer:create']);
+    const brief = (name: string, extra: Record<string, unknown> = {}) =>
+      create({
+        documentId: 'd-1',
+        parentId: null,
+        name,
+        kind: 'file',
+        seed: 'brief',
+        text: '---\ntemplate: story\n---\n',
+        ...extra,
+      } as never);
+
+    await expect(brief('cartaz.brief')).resolves.toMatchObject({ ok: true });
+    await expect(brief('notas.txt')).resolves.toEqual({ ok: false, reason: 'invalid' });
+    await expect(brief('sem-texto.brief', { text: undefined })).resolves.toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    // Text without the brief's seed is never a way to write a file.
+    await expect(
+      create({ documentId: 'd-2', parentId: null, name: 'x.txt', kind: 'file', text: 'hi' }),
+    ).resolves.toEqual({ ok: false, reason: 'invalid' });
+    await expect(brief('grande.brief', { text: 'x'.repeat(64 * 1024 + 1) })).rejects.toThrow();
+    expect(deps.explorer.written).toEqual([
+      { name: 'cartaz.brief', text: '---\ntemplate: story\n---\n' },
+    ]);
+  });
+
+  it('copies by ids and a name, and moves into a folder by its id (TYTO-537)', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+    const copy = guard('explorer:copy', handlers['explorer:copy']);
+    const rename = guard('explorer:rename', handlers['explorer:rename']);
+
+    await expect(copy({ entryId: 'e-brief', parentId: null, name: 'b.brief' })).resolves.toEqual({
+      ok: true,
+      entry: { id: 'e-copy', name: 'b.brief', kind: 'brief' },
+    });
+    await expect(copy({ entryId: 'e-other', parentId: 'e-folder', name: 'x' })).resolves.toEqual({
+      ok: false,
+      reason: 'link',
+    });
+    await expect(
+      copy({ entryId: 'e-brief', parentId: null, name: 'b', path: '/etc' } as never),
+    ).rejects.toThrow();
+    await expect(
+      rename({ entryId: 'e-folder', name: 'capitulos', parentId: 'e-edit' }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(deps.explorer.asked).toEqual([
+      'e-brief',
+      null,
+      'e-other',
+      'e-folder',
+      'e-folder',
+      'e-edit',
+    ]);
+  });
+
   it('moves the tabs under a renamed entry and answers each one, never a path', async () => {
     const deps = dependencies();
     const handlers = createHandlers(deps);
@@ -3191,6 +3297,7 @@ describe('cli:run, cli:cancel and cli:commands', () => {
           options: [],
           commands: [],
         }),
+        capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
         diagnosticPath: () => undefined,
       },
     });
@@ -3218,6 +3325,7 @@ describe('cli:run, cli:cancel and cli:commands', () => {
       cli: {
         start: () => ({ runId: 'cli-7' }),
         cancel: () => {},
+        capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
         commands: () => ({
           name: 'tyto',
           description: '',
@@ -3250,12 +3358,147 @@ describe('cli:run, cli:cancel and cli:commands', () => {
     ).rejects.toThrow();
   });
 
+  // TYTO-726: the recipe a refused --apply's box offered opens by run, once, never by a path.
+  it('open the recipe a yes offered, by run and once', async () => {
+    const offered = new OfferedRecipes();
+    offered.keep('cli-9', '/work/flows/weekly.recipe');
+    const handlers = createHandlers({ ...dependencies(), offeredRecipes: offered });
+    const open = guard('cli:open-recipe', handlers['cli:open-recipe']);
+
+    await expect(open({ documentId: 'document-4', runId: 'cli-9' })).resolves.toMatchObject({
+      documentId: 'document-4',
+      document: { path: '/work/flows/weekly.recipe' },
+    });
+    await expect(open({ documentId: 'document-4', runId: 'cli-9' })).resolves.toEqual({
+      document: null,
+      documentId: null,
+    });
+    await expect(
+      open({ documentId: 'document-4', runId: 'cli-9', path: '/etc/hosts' } as never),
+    ).rejects.toThrow();
+  });
+
+  // TYTO-537, ADR 0201 decision 2: the folder is an id main checks itself, at the call.
+  it('run in the folder an id names, and start nothing for one that leads out', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'tyto-ipc-cli-folder-')));
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: () => ({ close: () => undefined }),
+    });
+    try {
+      const work = join(scratch, 'work');
+      const outside = join(scratch, 'outside');
+      mkdirSync(join(work, 'entregas'), { recursive: true });
+      mkdirSync(join(work, 'swapped'));
+      mkdirSync(outside);
+      // A junction on Windows needs no privilege, and is the link a person there would make.
+      symlinkSync(outside, join(work, 'atalho'), 'junction');
+      await explorer.setRoot(work);
+      const listed = await explorer.list(null);
+      const idOf = (name: string) => listed.entries.find((entry) => entry.name === name)?.id;
+      const started: { argv: readonly string[]; cwd: string | undefined }[] = [];
+      const handlers = createHandlers({
+        ...dependencies(),
+        explorer,
+        cli: {
+          start: (argv, cwd) => {
+            started.push({ argv, cwd });
+            return { runId: 'cli-8' };
+          },
+          cancel: () => {},
+          commands: () => ({
+            name: 'tyto',
+            description: '',
+            arguments: [],
+            options: [],
+            commands: [],
+          }),
+          capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
+          diagnosticPath: () => undefined,
+        },
+      });
+      const run = guard('cli:run', handlers['cli:run']);
+
+      await run({ argv: ['check', 'a.brief'], folder: idOf('entregas')! });
+      // The junction out was never listed, so it has no id to hand.
+      expect(idOf('atalho')).toBeUndefined();
+      // A folder listed inside, then made a junction out: refused when it is used.
+      const swapped = idOf('swapped')!;
+      rmSync(join(work, 'swapped'), { recursive: true });
+      symlinkSync(outside, join(work, 'swapped'), 'junction');
+      await expect(run({ argv: ['check', 'a.brief'], folder: swapped })).rejects.toThrow(
+        /no longer inside the open workspace folder/u,
+      );
+      // An id main never minted.
+      await expect(run({ argv: ['check'], folder: 'not-an-id' })).rejects.toThrow(
+        /no longer inside the open workspace folder/u,
+      );
+      // Without a folder, the open one, as before.
+      await run({ argv: ['check'] });
+
+      expect(started).toEqual([
+        { argv: ['check', 'a.brief'], cwd: join(work, 'entregas') },
+        { argv: ['check'], cwd: undefined },
+      ]);
+    } finally {
+      explorer.close();
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
   it('refuse a command line given as one string', async () => {
     const handlers = createHandlers(dependencies());
 
     await expect(
       guard('cli:run', handlers['cli:run'])({ argv: 'render a.brief' } as never),
     ).rejects.toThrow();
+  });
+});
+
+/** TYTO-537, ADR 0201: `cat` reads text by id, and main checks the id at the call. */
+describe('explorer:read', () => {
+  it('reads a file inside, and answers gone for one whose folder became a junction out', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'tyto-ipc-explorer-read-')));
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: () => ({ close: () => undefined }),
+    });
+    try {
+      const work = join(scratch, 'work');
+      const outside = join(scratch, 'outside');
+      mkdirSync(join(work, 'notas'), { recursive: true });
+      mkdirSync(outside);
+      writeFileSync(join(work, 'notas', 'a.txt'), 'inside');
+      writeFileSync(join(outside, 'a.txt'), 'outside secret');
+      await explorer.setRoot(work);
+      const folder = (await explorer.list(null)).entries.find((entry) => entry.name === 'notas')!;
+      const file = (await explorer.list(folder.id)).entries.find(
+        (entry) => entry.name === 'a.txt',
+      )!;
+      const read = guard(
+        'explorer:read',
+        createHandlers({ ...dependencies(), explorer })['explorer:read'],
+      );
+
+      await expect(read({ entryId: file.id })).resolves.toEqual({
+        ok: true,
+        text: 'inside',
+        truncated: false,
+      });
+      await expect(read({ entryId: folder.id })).resolves.toEqual({ ok: false, reason: 'folder' });
+      // The folder swapped for a junction out after the listing: the same id now reads nothing.
+      rmSync(join(work, 'notas'), { recursive: true });
+      symlinkSync(outside, join(work, 'notas'), 'junction');
+      await expect(read({ entryId: file.id })).resolves.toEqual({ ok: false, reason: 'gone' });
+      await expect(read({ entryId: 'not-an-id' })).resolves.toEqual({ ok: false, reason: 'gone' });
+      // A path is not a way in: the request takes none.
+      await expect(
+        read({ entryId: file.id, path: join(outside, 'a.txt') } as never),
+      ).rejects.toThrow();
+    } finally {
+      explorer.close();
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
 
@@ -3309,5 +3552,119 @@ describe('recipe:load', () => {
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
+  });
+});
+
+// TYTO-729: the panel completes --template from `tyto template list --json` in its folder.
+describe('commands:templates', () => {
+  const capturing = (answer: { code: 0 | 1 | 2; out: string; err: string }) => {
+    const asked: { argv: readonly string[]; cwd: string | undefined }[] = [];
+    return {
+      asked,
+      cli: {
+        ...dependencies().cli,
+        capture: (argv: readonly string[], cwd?: string) => {
+          asked.push({ argv, cwd });
+          return Promise.resolve(answer);
+        },
+      },
+    };
+  };
+
+  it('runs template list --json in the folder an id names, and none for one that leads out', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'tyto-ipc-templates-')));
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: () => ({ close: () => undefined }),
+    });
+    try {
+      const work = join(scratch, 'work');
+      mkdirSync(join(work, 'entregas'), { recursive: true });
+      await explorer.setRoot(work);
+      const listed = await explorer.list(null);
+      const entregas = listed.entries.find((entry) => entry.name === 'entregas')?.id;
+      const fake = capturing({
+        code: 0,
+        out: JSON.stringify({
+          templates: [
+            { name: 'x', origin: 'project', formats: ['story', 'feed'] },
+            { name: 'y', origin: 'project', formats: ['feed'], aliasOf: 'x' },
+          ],
+        }),
+        err: '',
+      });
+      const handlers = createHandlers({ ...dependencies(), explorer, cli: fake.cli });
+      const ask = guard('commands:templates', handlers['commands:templates']);
+
+      await expect(ask({ folder: entregas! })).resolves.toEqual({
+        templates: [
+          { name: 'x', formats: ['story', 'feed'] },
+          { name: 'y', formats: ['feed'], aliasOf: 'x' },
+        ],
+      });
+      await ask({});
+      await expect(ask({ folder: 'not-an-id' })).resolves.toEqual({
+        templates: [],
+        note: WORKING_FOLDER_REFUSED,
+      });
+      // The working folder is the run's cwd; without one, the open folder; nothing for the rest.
+      expect(fake.asked).toEqual([
+        { argv: ['template', 'list', '--json', '--no-sync'], cwd: join(work, 'entregas') },
+        { argv: ['template', 'list', '--json', '--no-sync'], cwd: undefined },
+      ]);
+    } finally {
+      explorer.close();
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses any words from the window: main runs template list --json and nothing else', async () => {
+    const fake = capturing({ code: 0, out: '{"templates":[]}', err: '' });
+    const ask = guard(
+      'commands:templates',
+      createHandlers({ ...dependencies(), cli: fake.cli })['commands:templates'],
+    );
+
+    for (const extra of [
+      { argv: ['plugin', 'install', 'x'] },
+      { words: ['render', 'a.brief'] },
+      { folder: 'e-1', argv: ['trust', 'add', '.'] },
+    ]) {
+      await expect(ask(extra as never)).rejects.toThrow();
+    }
+    expect(fake.asked).toEqual([]);
+  });
+
+  it('answers no rows and a note, never an error, when the listing failed', async () => {
+    const failed = capturing({
+      code: 1,
+      out: '',
+      err: ['', 'E_PROJECT_INVALID: bad project.json', ''].join('\n'),
+    });
+    const garbled = capturing({ code: 0, out: 'not json', err: '' });
+    const leftOut = capturing({
+      code: 0,
+      out: '{"templates":[]}',
+      err: ['aviso.yaml: it has not been fetched yet', ''].join('\n'),
+    });
+    const ask = (cli: ReturnType<typeof capturing>['cli']) =>
+      guard(
+        'commands:templates',
+        createHandlers({ ...dependencies(), cli })['commands:templates'],
+      )({});
+
+    await expect(ask(failed.cli)).resolves.toEqual({
+      templates: [],
+      note: 'E_PROJECT_INVALID: bad project.json',
+    });
+    await expect(ask(garbled.cli)).resolves.toEqual({
+      templates: [],
+      note: 'tyto template list --json printed no listing',
+    });
+    // A listing that worked and left something out says what, once, beside its rows.
+    await expect(ask(leftOut.cli)).resolves.toEqual({
+      templates: [],
+      note: 'aviso.yaml: it has not been fetched yet',
+    });
   });
 });

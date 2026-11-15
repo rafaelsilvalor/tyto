@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -324,6 +324,66 @@ describe('the hosts call may reach (TYTO-671, ADR 0193 decision 4)', () => {
 
     await workspace.close();
     expect(workspace.callHostsFor(recipes)).toBeUndefined();
+  });
+});
+
+describe('the command panel aliases of the open folder (TYTO-536)', () => {
+  it('withholds and never writes a restricted folder, and writes its own file once trusted', async () => {
+    const file = join(work, '.tyto', 'project.json');
+    await writeFile(file, '{\n  // ours\n  "aliases": { "entrega": "render --trust" }\n}\n');
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    expect(await workspace.writeAlias('x', 'render')).toEqual({ ok: false, reason: 'no-folder' });
+
+    await workspace.open(work);
+    expect(workspace.aliases()).toEqual({ trust: 'restricted', aliases: [] });
+    expect(workspace.state().leftOut).toBe(1);
+    expect(await workspace.writeAlias('x', 'render')).toEqual({ ok: false, reason: 'restricted' });
+    expect(await readFile(file, 'utf8')).not.toContain('"x"');
+
+    expect((await workspace.grant('folder')).ok).toBe(true);
+    expect(await workspace.writeAlias('x', 'render')).toEqual({ ok: true });
+    expect(await readFile(file, 'utf8')).toContain('// ours');
+    expect(workspace.aliases()?.aliases.map((alias) => alias.name)).toEqual(['entrega', 'x']);
+  });
+});
+
+describe('alias --workspace never writes a work profile (TYTO-536)', () => {
+  it("writes the folder's own file and leaves the profile's bytes and time as they were", async () => {
+    const profileFolder = join(home, 'profiles', 'saude');
+    await mkdir(profileFolder, { recursive: true });
+    const profileFile = join(profileFolder, 'profile.json');
+    const profileText =
+      '{\n  // shared\n  "aliases": { "x": "render --delivery", "y": "check" }\n}\n';
+    await writeFile(profileFile, profileText);
+    const own = join(work, '.tyto', 'project.json');
+    await writeFile(own, '{ "profile": "saude" }\n');
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    await workspace.open(work);
+    expect((await workspace.grant('folder')).ok).toBe(true);
+    const before = (await stat(profileFile)).mtimeMs;
+
+    expect(await workspace.writeAlias('x', 'render --formats png')).toEqual({ ok: true });
+    // An alias only the profile defines is the profile's: removing it is refused, not done.
+    expect(await workspace.writeAlias('y', null)).toEqual({ ok: false, reason: 'profile' });
+
+    expect(JSON.parse(await readFile(own, 'utf8'))).toEqual({
+      profile: 'saude',
+      aliases: { x: 'render --formats png' },
+    });
+    expect(await readFile(profileFile, 'utf8')).toBe(profileText);
+    expect((await stat(profileFile)).mtimeMs).toBe(before);
+    expect(workspace.aliases()?.aliases).toEqual([
+      { name: 'x', body: 'render --formats png', origin: 'folder' },
+      { name: 'y', body: 'check', origin: 'profile' },
+    ]);
   });
 });
 

@@ -21,7 +21,10 @@ export interface NamedArgument extends Argument {
   readonly nameQuoted?: true;
 }
 
-/** One line of the chain, and so one cell of the notebook. */
+/**
+ * One step of the chain, and so one cell of the notebook: a line, or one of the steps a line
+ * chains with `|` (TYTO-706).
+ */
 export interface Step {
   readonly verb: string;
   readonly verbRange: SourceRange;
@@ -34,7 +37,7 @@ export interface Step {
    */
   readonly text: string;
   readonly textRange: SourceRange;
-  /** The whole line. */
+  /** The whole step: its line, or its segment of a chained line. */
   readonly range: SourceRange;
 }
 
@@ -42,6 +45,16 @@ export interface RecipeParam {
   readonly name: string;
   /** Absent when the person running the recipe must supply it. */
   readonly defaultValue?: string;
+  readonly range: SourceRange;
+}
+
+/**
+ * `const name = value` (TYTO-727, ADR 0199): a value written in the recipe, used as `{name}`
+ * like a parameter, and never given from outside the file.
+ */
+export interface RecipeConst {
+  readonly name: string;
+  readonly value: string;
   readonly range: SourceRange;
 }
 
@@ -54,6 +67,8 @@ export interface RecipeAst {
   readonly name: string;
   readonly description: string;
   readonly params: readonly RecipeParam[];
+  /** The header's `const` lines, which share one namespace with `params` (ADR 0199). */
+  readonly consts: readonly RecipeConst[];
   /**
    * `auto` when the header says `apply auto`: an explicit Run in a trusted folder applies the
    * plans without a click (ADR 0129 decision 4, ADR 0170). Absent otherwise.

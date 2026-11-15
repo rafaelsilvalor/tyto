@@ -129,6 +129,29 @@ example-pack  ../../my-pack  v1.0.0  c50a1231d0be  home\plugin-files\avisos.yaml
 
 **`tyto render` faz o mesmo antes de renderizar**, então um render só usa a rede quando falta uma cópia, na primeira vez, e no resto usa o que já está neste computador. Ele nunca move o que o lock fixou: uma branch que alguém atualizou fica onde o lock diz até você rodar `tyto plugin sync --update`. O lock de um projeto vai para o controle de versão dele, para todo mundo renderizar o mesmo commit. `tyto watch` nunca busca nada.
 
+### Um `.zip` no lugar do git
+
+Uma origem também pode ser um `.zip`, baixado por https ou lido deste computador. **Não precisa do Git instalado.** `{ref}` no endereço é trocado pelo `ref`, então passar para uma versão nova muda uma linha:
+
+<!-- Executado em 2026-11-04 num build da branch feat/TYTO-562-https-archive-sources, no Windows 11, com TYTO_HOME apontando para uma pasta vazia e o git fora do PATH. -->
+
+```yaml
+# ~/.tyto/plugin-files/gallery-https.yaml
+version: 1
+templates:
+  tabela:
+    source:
+      archive: https://github.com/rafaelsilvalor/tyto-template-tabela/archive/refs/tags/{ref}.zip
+      ref: v1.1.1
+```
+
+```
+$ tyto plugin sync --yes
+tabela  https://github.com/rafaelsilvalor/tyto-template-tabela/archive/refs/tags/{ref}.zip  v1.1.1  d37e473b3e39  home\plugin-files\gallery-https.yaml
+```
+
+Pela rede, só `https://` é lido. Um caminho como `./packs/tabela-{ref}.zip` é lido a partir da pasta do próprio arquivo de plugin. O lock fixa o sha256 dos bytes do `.zip` no lugar de um commit: se o arquivo naquele endereço mudar depois sem um `ref` novo, a próxima busca o recusa e a cópia que você já tinha continua carregando, até `tyto plugin sync --update` aceitar os bytes novos. Um plugin privado não é buscado assim: nenhuma senha ou token vai no endereço.
+
 Sem rede, a cópia buscada antes é usada, e a execução avisa:
 
 ```

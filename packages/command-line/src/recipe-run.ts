@@ -15,26 +15,12 @@ import { type CellValue, type JsonValue, type Plan, type Table, systemClock } fr
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 import type { RecipeParams, SectionOverrides } from './options.js';
-import { leftOutPluginFiles, syncPluginFiles } from './plugin-files.js';
-import {
-  activateBuiltIns,
-  activateInstalled,
-  loadInstalledPlugins,
-  pluginCapabilities,
-  withoutRefused,
-} from './plugins/index.js';
-import { cliSigninCapabilities } from './signin.js';
+import { activateBuiltIns, activateInstalled, withoutRefused } from './plugins/index.js';
 import { environmentRecipeCredentials } from './recipe-credentials.js';
-import { loadRenderContext } from './render-context.js';
-import { displayPath, installedOption } from './render.js';
-import {
-  type LocatedDiagnostic,
-  diagnosticsDocument,
-  formatDiagnostics,
-  json,
-  registerUnplaced,
-} from './report.js';
+import { displayPath } from './render.js';
+import { type LocatedDiagnostic, diagnosticsDocument, formatDiagnostics, json } from './report.js';
 import { projectSections } from './sources.js';
+import { templatesInReach } from './templates-in-reach.js';
 import { workspaceOfFolder } from './workspace.js';
 
 /**
@@ -110,6 +96,10 @@ export interface RecipeRunCellDocument {
       readonly reason?: string;
     }[];
   };
+  /** TYTO-727, ADR 0199: the value a `set` step set, which the steps below read as `{name}`. */
+  readonly named?: { readonly name: string; readonly value: string };
+  /** TYTO-727: a line of the cell's result that is no diagnostic, as why a value is empty. */
+  readonly note?: string;
 }
 
 export interface RecipeRunDocument {
@@ -177,48 +167,17 @@ export async function recipeRunCommand(
     return EXIT_DIAGNOSTICS;
   }
 
-  // As `tyto render` and `tyto mcp` do: the plugin files first, never moving a pinned ref and
-  // never asking, and a restricted folder's own plugin files left out with the reason on stderr.
-  const pluginFilesWorkspace =
-    workspace === undefined
-      ? undefined
-      : { folder: workspace.loaded.folder, trusted: workspace.loaded.trust === 'trusted' };
-  const pluginFiles = await syncPluginFiles(
-    {
-      home,
-      ...(pluginFilesWorkspace === undefined ? {} : { workspace: pluginFilesWorkspace }),
-      update: false,
-      fetches: true,
-      approval: 'never',
-    },
+  // As `tyto render` does, through the same steps (TYTO-728): the plugin files first, never
+  // moving a pinned ref and never asking, and a restricted folder's own plugin files left out
+  // with the reason on stderr.
+  const reach = await templatesInReach(
+    { workspace, hostName: 'tyto recipe run', folder: cwd },
     environment,
   );
-  registerUnplaced(pluginFiles.diagnostics);
-  const leftOut = await leftOutPluginFiles(pluginFilesWorkspace, 'loaded', environment);
-  if (leftOut !== '') console.err(leftOut);
-  const loaded = await loadInstalledPlugins(home, {
-    launch: environment.launch,
-    copies: pluginFiles.copies,
-    capabilities: pluginCapabilities(environment.variables, {
-      hostName: 'tyto recipe run',
-      signin: cliSigninCapabilities(environment),
-      home,
-      workspace:
-        workspace === undefined
-          ? { trust: 'restricted' }
-          : { folder: workspace.loaded.folder, trust: workspace.loaded.trust },
-    }),
-  });
+  const { pluginFiles, plugins: loaded, context } = reach;
+  if (reach.leftOut !== '') console.err(reach.leftOut);
 
   try {
-    const context = await loadRenderContext({
-      templatesDirectory: resolve(cwd, 'templates'),
-      projectTemplatesDirectories: workspace?.loaded.project.templates ?? [],
-      formatsFile: resolve(cwd, 'formats.yaml'),
-      templatesDirectoryIsDefault: true,
-      formatsFileIsDefault: true,
-      ...installedOption(environment, loaded, pluginFiles),
-    });
     if (!context.ok) {
       const failed = [...workspaceDiagnostics, ...pluginFiles.diagnostics, ...context.error];
       printFailure(failed, options, environment);
@@ -356,6 +315,8 @@ function cellDocument(
             })),
           },
         }),
+    ...(cell.named === undefined ? {} : { named: cell.named }),
+    ...(cell.note === undefined ? {} : { note: cell.note }),
   };
 }
 
@@ -390,14 +351,20 @@ const plural = (count: number, one: string, many: string): string =>
   `${String(count)} ${count === 1 ? one : many}`;
 
 /**
- * One cell as a person reads it: its line, its status and row count, then every operation of
- * its plan, one per line, and how its Apply went. The rows themselves are `--json`'s.
+ * One cell as a person reads it: its line, its status and row count, the value a `set` step set
+ * and its note (TYTO-727), then every operation of its plan, one per line, and how its Apply
+ * went. The rows themselves are `--json`'s.
  */
 function cellText(cell: RunnerCell): string {
   const rows = cell.table === undefined ? '' : `, ${plural(cell.table.rows.length, 'row', 'rows')}`;
   const lines = [
     `cell ${String(cell.index + 1)} (line ${String(cell.line)}): ${cell.status}${rows}`,
   ];
+  if (cell.named !== undefined) {
+    // JSON quotes show an empty value, and blanks at either end, as they are.
+    lines.push(`  set ${cell.named.name} = ${JSON.stringify(cell.named.value)}`);
+  }
+  if (cell.note !== undefined) lines.push(`  note: ${cell.note}`);
   if (cell.plan !== undefined) {
     lines.push(
       `  plan: ${plural(cell.plan.count, 'operation', 'operations')} on ${cell.plan.target}`,

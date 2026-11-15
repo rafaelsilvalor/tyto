@@ -94,7 +94,7 @@ non-zero.
 | `W_PLUGIN_FILE_REPLACES_INSTALLED` | warning | no | A plugin from the plugin files has the name of one installed with tyto plugin install. |
 | `W_PLUGIN_FILE_FETCH` | warning | no | A source the plugin files name could not be fetched. |
 | `E_TYTO_HOME_PATH_TOO_LONG` | error | no | A path Tyto writes under TYTO_HOME is longer than the system accepts. |
-| `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A commit a plugin file names was fetched and could not be loaded as a plugin. |
+| `E_PLUGIN_FILE_SOURCE_REFUSED` | error | no | A source a plugin file names was fetched and could not be loaded as a plugin. |
 | `E_GALLERY_INDEX_SYNTAX` | error | no | The gallery index could not be read or is not YAML of the shape it needs. |
 | `E_GALLERY_INDEX_ENTRY` | error | no | An entry of the gallery index is refused, and the others stand. |
 | `W_GALLERY_INDEX_KEY_UNKNOWN` | warning | no | The gallery index has a key Tyto does not know. |
@@ -190,6 +190,7 @@ non-zero.
 | `W_PROJECT_KEY_INVALID` | warning | no | A project key's value, or one entry of it, is not accepted, so it is left out. |
 | `W_PROJECT_PATH_OUTSIDE` | warning | no | A restricted source's folder key leads outside the source, directly or through a link, so it is left out. |
 | `W_PROJECT_SECTIONS_WITHHELD` | warning | no | A restricted source's plugin sections are withheld from the plugins that would read them. |
+| `W_PROJECT_ALIASES_WITHHELD` | warning | no | A restricted source's command panel aliases are withheld until it is trusted. |
 | `W_PROJECT_PLUGIN_FILES_WITHHELD` | warning | no | A restricted folder's plugin files are neither fetched nor loaded until the folder is trusted. |
 | `W_PROJECT_PROFILE_INVALID` | warning | no | The project file names a work profile in a form Tyto does not accept, so no profile is read. |
 | `W_PROJECT_PROFILE_MISSING` | warning | no | The work profile the project file names is not there, so no profile is read. |
@@ -202,7 +203,7 @@ non-zero.
 | `W_DELIVERY_ASSET_KEPT` | warning | no | A delivery's assets folder already holds a different file under the name an image would be copied to. |
 | `E_TRUST_FILE` | error | no | TYTO_HOME/trust.json cannot be read or written. |
 | `E_RECIPE_SYNTAX` | error | yes | A line of a recipe does not match the recipe format. |
-| `E_RECIPE_PARAM` | error | yes | A recipe's parameter is used without a declaration, or has no value when it runs. |
+| `E_RECIPE_PARAM` | error | yes | A recipe's param, const or set is used where unknown, has no value, or is overridden. |
 | `E_RECIPE_UNKNOWN_VERB` | error | no | A recipe line names a verb that neither Tyto nor an installed plugin contributes. |
 | `E_RECIPE_REGISTRATION` | error | no | A verb or a derivation cannot be registered under the name it was given. |
 | `E_RECIPE_TABLE` | error | no | A table a verb or a derivation answered repeats a column or a key, or holds a value its columns do not allow. |
@@ -239,6 +240,8 @@ non-zero.
 | `W_RECIPE_LOCAL_UNREAD` | warning | no | A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty. |
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
 | `W_RECIPE_WARN` | warning | no | A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed. |
+| `W_RECIPE_DECIDE_CLEAR_COLUMN` | warning | no | A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run. |
+| `W_RECIPE_DECIDE_CLEAR_LIMIT` | warning | no | A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them. |
 | `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
 | `E_VIM_CONTRIBUTION` | error | no | A vim contribution names an operation the editor does not have, or a bad mapping. |
 
@@ -1394,12 +1397,12 @@ Parameters: `home`, `length`, `reason`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
 
-A commit a plugin file names was fetched and could not be loaded as a plugin.
+A source a plugin file names was fetched and could not be loaded as a plugin.
 
 The commit locked before loads when there is one; otherwise nothing from that source does.
 
 ```
-'{git}' at '{ref}' resolved to commit {commit}, which was refused: {problem}. {outcome}
+'{git}' at '{ref}' resolved to {commit}, which was refused: {problem}. {outcome}
 ```
 
 Parameters: `git`, `ref`, `commit`, `problem`, `outcome`
@@ -2066,7 +2069,7 @@ Parameters: `problem`
 
 **Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md`
 
-A recipe's parameter is used without a declaration, or has no value when it runs.
+A recipe's param, const or set is used where unknown, has no value, or is overridden.
 
 Every cell may read the parameter, so none of them can run without it.
 
@@ -3352,6 +3355,20 @@ The sections for {plugins} are withheld because this folder is not trusted.
 
 Parameters: `plugins`
 
+### `W_PROJECT_ALIASES_WITHHELD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md`
+
+A restricted source's command panel aliases are withheld until it is trusted.
+
+Only the source's aliases are left out; the person's own still expand.
+
+```
+The aliases {aliases} are withheld because this folder is not trusted.
+```
+
+Parameters: `aliases`
+
 ### `W_PROJECT_PLUGIN_FILES_WITHHELD`
 
 **Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0151-plugin-files-install-and-configure-templates.md`
@@ -3533,6 +3550,34 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `subject`, `message`
+
+### `W_RECIPE_DECIDE_CLEAR_COLUMN`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md`
+
+A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Column '{column}' {problem}, so 'decide' held its {count} clear(s) and cleared nothing on the remote side.
+```
+
+Parameters: `column`, `problem`, `count`
+
+### `W_RECIPE_DECIDE_CLEAR_LIMIT`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md`
+
+A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them.
+
+A warning never replaces a value (ADR 0013).
+
+```
+'decide' held {count} clear(s), more than clear-limit={limit}; to push them, raise clear-limit= for this run, or write clear-limit=none to lift the limit.
+```
+
+Parameters: `count`, `limit`
 
 ### `W_RECIPE_NOT_REMEMBERED`
 

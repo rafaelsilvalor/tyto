@@ -78,6 +78,24 @@ describe('finding the links in a line', () => {
     ).toEqual([]);
   });
 
+  // TYTO-537: a run in a subfolder printed paths relative to it.
+  it('reads a relative path from the folder the run ran in, `..` stepping back inside', () => {
+    const inside = context({ base: ['entregas', 'novembro'] });
+    expect(linked('wrote story.brief and ../capa.md', inside)).toEqual([
+      {
+        text: 'story.brief',
+        link: { kind: 'path', segments: ['entregas', 'novembro', 'story.brief'] },
+      },
+      { text: '../capa.md', link: { kind: 'path', segments: ['entregas', 'capa.md'] } },
+    ]);
+    expect(linksIn('../../../x.brief', inside)).toEqual([]);
+    // An absolute path is the open folder's, wherever the run ran.
+    expect(linked('C:\\work\\a.brief', inside)[0]?.link).toEqual({
+      kind: 'path',
+      segments: ['a.brief'],
+    });
+  });
+
   it('reads a folder named with accents as part of the path', () => {
     expect(linked('Ação/b.brief', context())[0]?.text).toBe('Ação/b.brief');
   });

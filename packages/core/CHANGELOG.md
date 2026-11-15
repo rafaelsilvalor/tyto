@@ -1,5 +1,56 @@
 # @tyto/core
 
+## 0.45.0
+
+### Minor Changes
+
+- 46a013d: The command line signs in through the browser (TYTO-683, ADR 0194). `tyto signin <plugin> [id]`
+  runs the sign-in the desktop runs and keeps the refresh token in the system keychain through
+  `@napi-rs/keyring` (at most 2,560 bytes a value, no plaintext fallback); `--client` asks for
+  the OAuth client a manifest leaves out, never reading it from the command line. `tyto signout`
+  forgets it. Every command that loads plugins answers `host.signin.accessToken` from it, and
+  `E_SIGNIN_REQUIRED` now says how to sign in on the host that answers it, through the new
+  optional `HostCapabilities.describeSignin`. The window's command panel refuses both commands.
+- ef76145: A plugin's panel no longer reads a credential in plaintext (TYTO-641, ADR 0173). The desktop
+  answers a panel's `credentials` request with the new diagnostic code `E_PANEL_CREDENTIAL_READ`,
+  whose message names `call`, before any permission check or keychain read; a panel reaches a
+  secret's effect by asking its own plugin through `call`. A panel still stores and forgets its
+  plugin's declared keys with `storeCredential` and `deleteCredential`.
+- 1fae4a5: TYTO-640: `fileSafeName` keeps the base letter of an accented Latin letter (`Matemática` →
+  `Matematica`, `Straße` → `Strasse`), drops a trailing dot or space, and gives a Windows device
+  name (`CON`, `nul.brief`, `COM1`…) a `_` on its stem. Both callers change with it: a `to-brief`
+  row named `Matemática` writes `Matematica.brief`, and a format named `miniatura-vídeo` is
+  delivered as `miniatura-video-01.png` (ADR 0053, note of 2026-11-12). Names that were already
+  ASCII-safe are unchanged.
+- 30bb335: TYTO-675 (ADR 0139 note of 2026-11-12): a recipe template writes an ISO-8601 instant as
+  wall-clock time in the run's zone with the filter `local:<format>`, as in
+  `compose day="{due|local:yyyy-MM-dd}"` or `{due|local:dd/MM/yyyy HH:mm}`, so a delivery at
+  22:00 in São Paulo stays on its day. The format takes the tokens `age format=` reads (dd, MM,
+  yyyy, HH, mm); a letter outside a token is refused with `E_RECIPE_TEMPLATE`. `RunClock` gains
+  an optional IANA `timeZone`: with it the wall clock is read through `Intl.DateTimeFormat`, with
+  its daylight-saving rules; without it through `offsetMinutes`. The desktop's clock names the
+  zone of the `recipeTimeZone` setting. A cell that is not an instant with `Z` or an offset is
+  written empty and counted by the new warning `W_RECIPE_LOCAL_UNREAD` in `@tyto/core`.
+- 399281d: A recipe can report to a person with `warn when="<where>" message="<template>"`: one `W_RECIPE_WARN` warning per row the expression keeps, in table order, naming the row's key, its message filled from the row with `compose`'s `{column|filter}` templates or read from a data file. The table passes on unchanged, so the warning outlives a later `where` that drops the row. One step lists at most 100 rows and adds one warning counting the rest. `@tyto/core` gains the `W_RECIPE_WARN` code; the `warn` form joins `GENERIC_VERB_FORMS`.
+
+### Patch Changes
+
+- d700cf3: A panel's call now reaches its own plugin by plugin and panel id together, and answers the same
+  in process as isolated (TYTO-644, ADR 0173). **Breaking for a host calling these directly:**
+  `panelCallerOf(registry)` now returns `(plugin, panelId, request)` instead of
+  `(panelId, request)`, and reads the registry's new `ownedPanels()`, so two plugins that each
+  contribute a `settings` panel can no longer reach each other's; `callPanel(panel, request,
+plugin)` takes the contributing plugin's name as a third argument. An in-process `call` whose
+  answer the isolation protocol refuses — `{ ok: true, value }` without `diagnostics`, a value
+  over 1 MiB or not JSON, anything that is not a result — is refused as `E_PLUGIN_PROTOCOL`
+  naming the plugin, exactly as the same plugin running isolated, rather than passed (missing
+  `diagnostics`) or refused as `E_PANEL_CALL`. The isolation protocol does not change.
+  `@tyto/core` updates the `E_PANEL_CALL` and `E_PLUGIN_PROTOCOL` summaries to match; the
+  desktop passes the panel's plugin to `callPanel`.
+- ca2bc10: A plugin file source may be an `archive`: a `.zip` over https or on the machine, with `{ref}`
+  in its location, fetched without Git and pinned in the lock by the sha256 of its bytes
+  (ADR 0197). `PluginFilesCopy` names `location` and `pin` in place of `git` and `commit`.
+
 ## 0.44.0
 
 ### Minor Changes

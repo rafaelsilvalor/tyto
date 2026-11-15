@@ -296,6 +296,17 @@ export default tseslint.config(
 
   {
     /**
+     * The one file where `@tyto/io` downloads a plugin file's https archive (ADR 0197), for the
+     * same reason as above: `fetch` follows redirects and lets the final URL be checked for
+     * https in one line. Scoped to the file; the sync reaches it through an injected seam.
+     */
+    name: 'boundary/io-archive-download',
+    files: ['packages/io/src/archive-download.ts'],
+    rules: { 'no-restricted-globals': 'off' },
+  },
+
+  {
+    /**
      * The desktop's build step that downloads Node's official archive from nodejs.org, for the
      * Node the app carries (ADR 0050). A build tool, not the app: it never ships, it reaches one
      * host, and it checks the archive against the sha256 `bundled-node.json` pins before

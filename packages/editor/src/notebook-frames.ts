@@ -39,6 +39,15 @@ import {
  * and vim listen on `.cm-content`, so a key pressed there never reaches them, and the window's
  * `notebook` keybindings answer it. The selected block is kept here by its first line's start,
  * following its line through every edit, and its lines carry `cm-notebook-frame--selected`.
+ *
+ * **A block is dragged by its grip** (TYTO-676, fourth pull request), in a gutter of its own on
+ * each movable frame's first line. The drag is pointer events with the pointer captured on the
+ * grip, not HTML5 drag and drop: the editor's own text drag listens for `dragstart` and would
+ * take a native drag for a text move, and a native drag hands no pointer to a test or a script.
+ * While a block is dragged its lines carry `cm-notebook-frame--dragged` and a drop line is drawn
+ * on the nearest boundary it may go to; on release the host moves it ({@link
+ * NotebookFramesOptions.move}). Escape, the window losing focus, and any edit of the text while
+ * dragging (a run rewriting it, say) cancel the drag and release the pointer.
  */
 
 export interface NotebookFrame {
@@ -56,6 +65,8 @@ export interface NotebookFrame {
   readonly insertable?: boolean;
   /** What the gutter shows on the block's first line, as the text says it. */
   readonly marker?: NotebookMarker;
+  /** Whether the block may be dragged, and dropped above: it gets a grip. */
+  readonly movable?: boolean;
 }
 
 /** A frame's gutter mark: its text, a class for how it looks, and what it says on hover. */
@@ -70,6 +81,13 @@ export interface NotebookFramesOptions {
   readonly framesOf: (view: EditorView) => readonly NotebookFrame[];
   /** Builds a "+" control; absent, none is drawn. Its place is read with `notebookInsertOf`. */
   readonly insert?: (view: EditorView) => HTMLElement;
+  /**
+   * Moves frame `from` to just before frame `before`, or below the last with `'end'`, as a drag
+   * dropped it; absent, no grip is drawn. The host decides whether that is a move at all.
+   */
+  readonly move?: (view: EditorView, from: number, before: number | 'end') => void;
+  /** What a grip says on hover and to a screen reader. */
+  readonly gripLabel?: (view: EditorView) => string;
 }
 
 /** Reads the frames again: the host's own state changed what a toolbar shows. */
@@ -98,6 +116,31 @@ const selectedField = StateField.define<number | null>({
   },
 });
 
+/** A drag on its way: the frame dragged, and where it would drop now (`null` nowhere yet). */
+export interface NotebookDrag {
+  readonly from: number;
+  readonly before: number | 'end' | null;
+}
+
+/** Starts, moves or (with `null`) ends a drag. */
+export const setNotebookDrag = StateEffect.define<NotebookDrag | null>();
+
+/** The drag on its way. **Any edit of the text ends it**: the frames it counted are gone. */
+const dragField = StateField.define<NotebookDrag | null>({
+  create: () => null,
+  update(value, transaction) {
+    let drag = transaction.docChanged ? null : value;
+    for (const effect of transaction.effects) {
+      if (effect.is(setNotebookDrag)) drag = effect.value;
+    }
+    return drag;
+  },
+});
+
+/** The drag on its way in a view, if any. */
+export const notebookDragOf = (view: EditorView): NotebookDrag | null =>
+  view.state.field(dragField, false) ?? null;
+
 const refreshed = (update: ViewUpdate): boolean =>
   update.transactions.some((transaction) =>
     transaction.effects.some((effect) => effect.is(refreshNotebookFrames)),
@@ -108,6 +151,7 @@ function decorate(view: EditorView, frames: readonly NotebookFrame[]): Decoratio
   const { doc, selection } = view.state;
   const caret = doc.lineAt(selection.main.head).number;
   const selected = view.state.field(selectedField, false) ?? null;
+  const dragged = frames[view.state.field(dragField, false)?.from ?? -1];
   const builder = new RangeSetBuilder<Decoration>();
   for (const frame of frames) {
     if (!fits(frame, doc.length)) continue;
@@ -121,6 +165,7 @@ function decorate(view: EditorView, frames: readonly NotebookFrame[]): Decoratio
       if (number === last.number) classes.push('cm-notebook-frame--last');
       if (active) classes.push('cm-notebook-frame--active');
       if (chosen) classes.push('cm-notebook-frame--selected');
+      if (frame === dragged) classes.push('cm-notebook-frame--dragged');
       const line = doc.line(number);
       builder.add(line.from, line.from, Decoration.line({ class: classes.join(' ') }));
     }
@@ -148,7 +193,15 @@ const framesPlugin = ViewPlugin.fromClass(
       }
       const reselected =
         update.startState.field(selectedField, false) !== update.state.field(selectedField, false);
-      if (update.docChanged || update.selectionSet || refreshed(update) || reselected) {
+      const redragged =
+        update.startState.field(dragField, false) !== update.state.field(dragField, false);
+      if (
+        update.docChanged ||
+        update.selectionSet ||
+        refreshed(update) ||
+        reselected ||
+        redragged
+      ) {
         this.decorations = decorate(update.view, this.frames);
       }
     }
@@ -198,7 +251,9 @@ class ToolbarMarker implements LayerMarker {
  * **The top is read from the line's element, not from CodeMirror's height map.** A result
  * folded in place shrinks a block widget that the map goes on counting at its old height
  * (measured in the window on 2026-11-12: a line drawn at 170 px that `lineBlockAt` put at 243),
- * and a toolbar placed by the map then sits over the wrong line.
+ * and a toolbar placed by the map then sits over the wrong line. Since TYTO-703 a fold asks
+ * for the heights again (`remeasureCellOutput`), so the map follows it; the element stays the
+ * source here as a guard for any block that changes height without saying so.
  */
 function toolbarMarkers(view: EditorView): readonly LayerMarker[] {
   const frames = view.plugin(framesPlugin)?.frames ?? [];
@@ -501,16 +556,308 @@ const leaveOnTextFocus = EditorView.domEventHandlers({
   },
 });
 
+/** A movable frame's grip, in a gutter of its own. */
+class GripMarker extends GutterMarker {
+  constructor(
+    readonly index: number,
+    readonly label: string,
+  ) {
+    super();
+  }
+
+  override eq(other: GripMarker): boolean {
+    return other.index === this.index && other.label === this.label;
+  }
+
+  override toDOM(): Node {
+    const grip = document.createElement('span');
+    grip.className = 'cm-notebook-grip';
+    grip.textContent = '⠿';
+    grip.title = this.label;
+    grip.setAttribute('aria-label', this.label);
+    grip.setAttribute('role', 'button');
+    // The frame it drags, read on the press: the gutter finds a line by height, the grip knows.
+    grip.dataset['notebookGrip'] = String(this.index);
+    return grip;
+  }
+}
+
+const gripGutter = gutter({
+  class: 'cm-notebook-grips',
+  lineMarker: (view, line) => {
+    const options = view.state.facet(framesOptions);
+    if (options?.move === undefined) return null;
+    const frames = view.plugin(framesPlugin)?.frames ?? [];
+    const index = frames.findIndex((each) => each.from === line.from);
+    if (frames[index]?.movable !== true) return null;
+    return new GripMarker(index, options.gripLabel?.(view) ?? '');
+  },
+  lineMarkerChange: (update) => update.docChanged || refreshed(update),
+  domEventHandlers: {
+    pointerdown: (view, _line, event) => {
+      const grip = (event.target as Element | null)?.closest?.('[data-notebook-grip]');
+      if (!(grip instanceof HTMLElement) || !(event instanceof MouseEvent)) return false;
+      const index = Number(grip.dataset['notebookGrip']);
+      const frames = view.plugin(framesPlugin)?.frames ?? [];
+      if (!Number.isInteger(index) || frames[index]?.movable !== true) return false;
+      event.preventDefault();
+      startDrag(view, index, grip, event);
+      return true;
+    },
+  },
+});
+
+/** Where a drop may go: above a movable frame, or below the last, and the top of that line. */
+export interface NotebookDropPlace {
+  readonly before: number | 'end';
+  readonly top: number;
+}
+
+/** The place nearest a pointer's height, or `undefined` with none. */
+export function nearestDrop(
+  places: readonly NotebookDropPlace[],
+  y: number,
+): NotebookDropPlace | undefined {
+  let best: NotebookDropPlace | undefined;
+  for (const place of places) {
+    if (best === undefined || Math.abs(place.top - y) < Math.abs(best.top - y)) best = place;
+  }
+  return best;
+}
+
+/** Every place a dragged block may drop, as drawn now, in client coordinates. */
+function dropPlaces(view: EditorView): readonly NotebookDropPlace[] {
+  const frames = view.plugin(framesPlugin)?.frames ?? [];
+  const length = view.state.doc.length;
+  const places: NotebookDropPlace[] = [];
+  frames.forEach((frame, index) => {
+    if (frame.movable === true && fits(frame, length)) {
+      places.push({ before: index, top: lineTop(view, frame.from) });
+    }
+  });
+  const last = frames.at(-1);
+  if (last !== undefined && fits(last, length)) {
+    places.push({ before: 'end', top: boundaryBelow(view, last.to) });
+  }
+  return places;
+}
+
+/** How deep the band at each edge of the pane is where a drag scrolls it, at most, in px. */
+const EDGE_BAND = 48;
+/** How fast a drag scrolls the pane with the pointer at its edge or past it, in px a second. */
+const EDGE_SPEED = 1200;
+/** How often a drag in the band scrolls, in ms. */
+const EDGE_TICK = 16;
+/** The longest step one tick may take, in ms: a throttled timer jumps no further than this. */
+const EDGE_STEP_LIMIT = 200;
+
+/**
+ * How fast a drag with the pointer at `y` scrolls a pane whose visible top and bottom are
+ * `top` and `bottom` (TYTO-710), in px a second: negative up, positive down, 0 outside the
+ * bands. A band is 48 px deep, or a quarter of a short pane; the speed grows from nothing at
+ * its inner edge to {@link EDGE_SPEED} at the pane's edge, and stays there past it, since the
+ * captured pointer may leave the pane.
+ */
+export function edgeScrollSpeed(y: number, top: number, bottom: number): number {
+  const band = Math.min(EDGE_BAND, (bottom - top) / 4);
+  if (!(band > 0)) return 0;
+  if (y < top + band) return -EDGE_SPEED * Math.min(1, (top + band - y) / band);
+  if (y > bottom - band) return EDGE_SPEED * Math.min(1, (y - (bottom - band)) / band);
+  return 0;
+}
+
+/** One drag on its way per view: how to end it. */
+const sessions = new WeakMap<EditorView, { readonly end: (drop: boolean) => void }>();
+
+/**
+ * Starts dragging frame `index` from its grip: the pointer is captured on the grip, so every
+ * move and the release reach it wherever the pointer goes. Escape and the window losing focus
+ * cancel; an edit of the text cancels too ({@link dragCanceller}).
+ *
+ * **The moves and the release are heard on the window, not the grip** (TYTO-710). A drag that
+ * scrolls far takes the grip's line out of CodeMirror's viewport, which unmounts the grip and
+ * its capture with it; the events then reach whatever is under the pointer, and bubble up to
+ * the window still. What the drag is — the frame dragged, its dimming — lives in the state, so
+ * it outlives its grip.
+ *
+ * With the pointer in a band at the top or bottom of the pane, a timer scrolls it, faster
+ * nearer the edge ({@link edgeScrollSpeed}), and the drop place is picked again under the
+ * pointer, as it is on any scroll, the wheel's included. A timer and not an animation frame:
+ * a hidden window, as the desktop suite's is, runs no frames (measured on 2026-11-12), and each
+ * step is scaled by the time that passed, so a throttled timer scrolls as far. The timer stops
+ * at the end of the scroll, outside the bands and with the drag, and a move starts it again.
+ */
+function startDrag(view: EditorView, index: number, grip: HTMLElement, down: MouseEvent): void {
+  sessions.get(view)?.end(false);
+  const pointerId = 'pointerId' in down ? (down as PointerEvent).pointerId : undefined;
+  if (pointerId !== undefined) grip.setPointerCapture?.(pointerId);
+  const window = view.dom.ownerDocument.defaultView;
+  const scroller = view.scrollDOM;
+  let pointerY: number | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let lastTick = 0;
+  const repick = (): void => {
+    if (pointerY === undefined || notebookDragOf(view) === null) return;
+    const before = nearestDrop(dropPlaces(view), pointerY)?.before ?? null;
+    if (notebookDragOf(view)?.before === before) return;
+    view.dispatch({ effects: setNotebookDrag.of({ from: index, before }) });
+  };
+  const speed = (): number => {
+    if (pointerY === undefined) return 0;
+    const box = scroller.getBoundingClientRect();
+    return edgeScrollSpeed(pointerY, box.top, box.bottom);
+  };
+  const tick = (): void => {
+    timer = undefined;
+    const now = Date.now();
+    const elapsed = Math.min(EDGE_STEP_LIMIT, now - lastTick);
+    lastTick = now;
+    const pace = speed();
+    if (pace === 0) return;
+    const from = scroller.scrollTop;
+    // At least a pixel a step: a pane rounds a smaller step away, which would read as its end.
+    const step = (pace * elapsed) / 1000;
+    scroller.scrollTop = from + Math.sign(step) * Math.max(1, Math.abs(step));
+    // The end of the scroll: the timer rests until the pointer moves again.
+    if (scroller.scrollTop === from) return;
+    repick();
+    timer = setTimeout(tick, EDGE_TICK);
+  };
+  const startTicker = (): void => {
+    if (timer === undefined && speed() !== 0) {
+      lastTick = Date.now();
+      timer = setTimeout(tick, EDGE_TICK);
+    }
+  };
+  const move = (event: Event): void => {
+    if (!(event instanceof MouseEvent)) return;
+    pointerY = event.clientY;
+    repick();
+    startTicker();
+  };
+  const up = (): void => {
+    end(true);
+  };
+  const cancel = (): void => {
+    end(false);
+  };
+  const key = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    end(false);
+  };
+  const end = (drop: boolean): void => {
+    if (sessions.get(view)?.end !== end) return;
+    sessions.delete(view);
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+    window?.removeEventListener('pointermove', move);
+    window?.removeEventListener('pointerup', up);
+    window?.removeEventListener('pointercancel', cancel);
+    window?.removeEventListener('keydown', key, true);
+    window?.removeEventListener('blur', cancel);
+    scroller.removeEventListener('scroll', repick);
+    if (pointerId !== undefined && grip.hasPointerCapture?.(pointerId) === true) {
+      grip.releasePointerCapture(pointerId);
+    }
+    const drag = notebookDragOf(view);
+    // An edit already ended it in the state: nothing to clear, nothing to drop.
+    if (drag === null) return;
+    view.dispatch({ effects: setNotebookDrag.of(null) });
+    if (drop && drag.before !== null)
+      view.state.facet(framesOptions)?.move?.(view, drag.from, drag.before);
+  };
+  sessions.set(view, { end });
+  window?.addEventListener('pointermove', move);
+  window?.addEventListener('pointerup', up);
+  window?.addEventListener('pointercancel', cancel);
+  window?.addEventListener('keydown', key, true);
+  window?.addEventListener('blur', cancel);
+  scroller.addEventListener('scroll', repick);
+  view.dispatch({ effects: setNotebookDrag.of({ from: index, before: null }) });
+}
+
+/** An edit of the text while dragging ends the drag and releases the pointer. */
+const dragCanceller = ViewPlugin.fromClass(
+  class {
+    constructor(readonly view: EditorView) {}
+
+    update(update: ViewUpdate): void {
+      if (!update.docChanged) return;
+      const session = sessions.get(update.view);
+      // Out of the update cycle: ending a session may dispatch, which an update must not.
+      if (session !== undefined) queueMicrotask(() => session.end(false));
+    }
+
+    destroy(): void {
+      sessions.get(this.view)?.end(false);
+    }
+  },
+);
+
+/** The drop line on its boundary, while a drag is on its way. */
+class DropMarker implements LayerMarker {
+  constructor(readonly top: number) {}
+
+  eq(other: DropMarker): boolean {
+    return other.top === this.top;
+  }
+
+  draw(): HTMLElement {
+    const line = document.createElement('div');
+    line.className = 'cm-notebook-drop';
+    line.style.top = `${String(this.top)}px`;
+    return line;
+  }
+}
+
+function dropMarkers(view: EditorView): readonly LayerMarker[] {
+  const drag = notebookDragOf(view);
+  if (drag === null || drag.before === null) return [];
+  const place = dropPlaces(view).find((each) => each.before === drag.before);
+  if (place === undefined) return [];
+  const scroller = view.scrollDOM;
+  const baseTop = scroller.getBoundingClientRect().top - scroller.scrollTop;
+  return [new DropMarker(place.top - baseTop)];
+}
+
+const dropLayer = layer({
+  above: true,
+  class: 'cm-notebook-drops',
+  markers: dropMarkers,
+  update: (update) =>
+    update.startState.field(dragField, false) !== update.state.field(dragField, false) ||
+    update.viewportChanged ||
+    update.heightChanged,
+});
+
+const dragTheme = EditorView.baseTheme({
+  '.cm-notebook-drops': { pointerEvents: 'none', width: '100%' },
+  '.cm-notebook-drops > .cm-notebook-drop': {
+    left: 0,
+    right: 0,
+    height: '2px',
+    transform: 'translateY(-50%)',
+  },
+  '.cm-notebook-grip': { cursor: 'grab', touchAction: 'none', userSelect: 'none' },
+});
+
 /** Mount once per editor that shows a notebook. */
 export function notebookFrames(options: NotebookFramesOptions): Extension {
   return [
     framesOptions.of(options),
     selectedField,
+    dragField,
     leaveOnTextFocus,
     framesPlugin,
+    gripGutter,
     markerGutter,
     toolbarLayer,
     insertLayer,
+    dropLayer,
+    dragCanceller,
     toolbarTheme,
+    dragTheme,
   ];
 }

@@ -784,9 +784,8 @@ export const diagnosticCodes = {
   },
   E_PLUGIN_FILE_SOURCE_REFUSED: {
     severity: 'error',
-    summary: 'A commit a plugin file names was fetched and could not be loaded as a plugin.',
-    template:
-      "'{git}' at '{ref}' resolved to commit {commit}, which was refused: {problem}. {outcome}",
+    summary: 'A source a plugin file names was fetched and could not be loaded as a plugin.',
+    template: "'{git}' at '{ref}' resolved to {commit}, which was refused: {problem}. {outcome}",
     spec: 'docs/adr/0151-plugin-files-install-and-configure-templates.md',
     fatal: false,
     fatality:
@@ -1745,6 +1744,15 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // TYTO-536: a shared folder must not put words in a person's command line before it is trusted.
+  W_PROJECT_ALIASES_WITHHELD: {
+    severity: 'warning',
+    summary: "A restricted source's command panel aliases are withheld until it is trusted.",
+    template: 'The aliases {aliases} are withheld because this folder is not trusted.',
+    spec: 'docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md',
+    fatal: false,
+    fatality: "Only the source's aliases are left out; the person's own still expand.",
+  },
   W_PROJECT_PLUGIN_FILES_WITHHELD: {
     severity: 'warning',
     summary:
@@ -1873,7 +1881,8 @@ export const diagnosticCodes = {
   },
   E_RECIPE_PARAM: {
     severity: 'error',
-    summary: "A recipe's parameter is used without a declaration, or has no value when it runs.",
+    summary:
+      "A recipe's param, const or set is used where unknown, has no value, or is overridden.",
     template: "Parameter '{param}' {problem}.",
     spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
     fatal: true,
@@ -2245,6 +2254,30 @@ export const diagnosticCodes = {
       "A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed.",
     template: '{subject}: {message}',
     spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // TYTO-714: with clear=push, a sheet read that lost a column reads as every cell cleared. The
+  // run holds those clears instead of clearing the remote side, and says which column.
+  W_RECIPE_DECIDE_CLEAR_COLUMN: {
+    severity: 'warning',
+    summary:
+      "A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run.",
+    template:
+      "Column '{column}' {problem}, so 'decide' held its {count} clear(s) and cleared nothing on the remote side.",
+    spec: 'docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // TYTO-714: more clears in one run than a person makes between runs is held, all of them, until
+  // the recipe raises clear-limit= for a run that means it.
+  W_RECIPE_DECIDE_CLEAR_LIMIT: {
+    severity: 'warning',
+    summary:
+      "A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them.",
+    template:
+      "'decide' held {count} clear(s), more than clear-limit={limit}; to push them, raise clear-limit= for this run, or write clear-limit=none to lift the limit.",
+    spec: 'docs/adr/0140-a-recipe-remembers-applied-rows-in-machine-local-state.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },

@@ -117,4 +117,74 @@ describe('after a trust command', () => {
     sessions.state({ runId: 'run-2', state: 'finished', code: 0 });
     expect(refreshesWorkspace(sessions.active)).toBe(false);
   });
+
+  it('asks again after a line with --trust, whatever its box was answered', () => {
+    // TYTO-726: a yes trusted the open folder through Workspace: Manage Trust's own function.
+    const sessions = new CommandSessions();
+    const id = sessions.active.id;
+    sessions.started(id, 'render a.brief --trust', ['render', 'a.brief', '--trust'], 'run-1');
+    expect(refreshesWorkspace(sessions.active)).toBe(false);
+    sessions.state({ runId: 'run-1', state: 'finished', code: 1 });
+    expect(refreshesWorkspace(sessions.active)).toBe(true);
+  });
+});
+
+describe('what a line of steps needs (TYTO-535)', () => {
+  it("keeps a built-in's lines as a finished block, leaving the tab's state alone", () => {
+    const sessions = new CommandSessions();
+    const id = sessions.active.id;
+    sessions.printed(id, 'history', ['1  check a.brief'], 0, 5);
+    expect(sessions.active.runs).toEqual([
+      { number: 1, line: 'history', words: [], startedAt: 5, state: 'finished', code: 0 },
+    ]);
+    expect(outputOf(sessions)).toEqual(['1  check a.brief']);
+    expect(sessions.active.state).toBe('idle');
+  });
+
+  it('answers when a run ends, finished or cancelled, and when its tab closes first', async () => {
+    const sessions = new CommandSessions();
+    const id = sessions.active.id;
+    sessions.started(id, 'check a.brief', ['check', 'a.brief'], 'run-1');
+    const finished = sessions.whenEnded('run-1');
+    sessions.state({ runId: 'run-1', state: 'finished', code: 2 });
+    expect(await finished).toMatchObject({ state: 'finished', code: 2 });
+
+    sessions.started(id, 'watch .', ['watch', '.'], 'run-2');
+    const cancelled = sessions.whenEnded('run-2');
+    sessions.state({ runId: 'run-2', state: 'cancelled' });
+    expect(await cancelled).toMatchObject({ state: 'cancelled' });
+
+    sessions.started(id, 'watch .', ['watch', '.'], 'run-3');
+    const closed = sessions.whenEnded('run-3');
+    sessions.close(id);
+    expect(await closed).toBeUndefined();
+  });
+
+  it('starts every tab at the workspace root, the one value cd will change', () => {
+    expect(new CommandSessions().active.workingFolder).toEqual([]);
+  });
+
+  // TYTO-537: a block remembers the folder it ran in, for its links.
+  it('keeps each tab its own folder, and every run the folder it ran in', () => {
+    const sessions = new CommandSessions();
+    const first = sessions.active.id;
+    const second = sessions.create().id;
+    sessions.changeFolder(first, ['entregas']);
+    sessions.started(first, 'check a', ['check', 'a'], 'run-1');
+    sessions.printed(first, 'ls novembro', ['b.brief  brief'], 0, 5, {
+      folder: ['entregas', 'novembro'],
+      notes: ['… and 2 more'],
+    });
+    sessions.printed(second, 'pwd', ['/w'], 0, 6);
+
+    const one = sessions.sessions.find((session) => session.id === first)!;
+    expect(one.runs.map((run) => run.folder)).toEqual([['entregas'], ['entregas', 'novembro']]);
+    expect(one.scrollback.lines.map((line) => line.stream)).toEqual(['out', 'note']);
+    expect(sessions.sessions.find((session) => session.id === second)?.runs[0]?.folder).toBe(
+      undefined,
+    );
+
+    sessions.resetFolders();
+    expect(sessions.sessions.map((session) => session.workingFolder)).toEqual([[], []]);
+  });
 });

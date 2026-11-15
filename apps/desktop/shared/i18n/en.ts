@@ -58,6 +58,28 @@ export const en: Catalogue = {
   'pluginFiles.approve.skip': 'Not now',
   'cli.confirm.yes': 'Yes',
   'cli.confirm.no': 'No',
+  'cli.offer.trust.message': 'Trust the folder {folder} and run the command?',
+  'cli.offer.trust.detail':
+    '--trust trusts a folder for one run only, and the window has no such trust. Trusting it here saves it in trust.json, as Workspace: Manage Trust does: it stays trusted for every run and window until you take it back in Workspace: Manage Trust or with tyto trust remove. The command then runs without --trust.',
+  'cli.offer.trust.yes': 'Trust and run',
+  'cli.offer.signin.message': 'Sign in to {plugin} ({id}) from the window?',
+  'cli.offer.signin.detail':
+    "The window signs in as the plugins screen does, in your browser, and keeps the sign-in with the window's own. A terminal's tyto signin keeps a separate one in the system keychain, which is not touched.",
+  'cli.offer.signin.yes': 'Sign in',
+  'cli.offer.signout.message': 'Sign out of {plugin} ({id}) in the window?',
+  'cli.offer.signout.detail':
+    "The window forgets its own sign-in, as Sign out on the plugins screen does. A terminal's sign-in in the system keychain is not touched.",
+  'cli.offer.signout.yes': 'Sign out',
+  'cli.offer.apply.message': 'Open {recipe} in its notebook?',
+  'cli.offer.apply.detail':
+    "The command panel only plans. The notebook shows each step's plan and applies it when you click Apply, under the folder's trust and the window's sign-ins. Opening it applies nothing.",
+  'cli.offer.apply.yes': 'Open the notebook',
+  'cli.offer.watch.message':
+    "Turn the queue panel's Render automatically off and watch {folder} here?",
+  'cli.offer.watch.detail':
+    'A queue folder has one consumer. Render automatically stays off until you turn it back on in the queue panel; the files already in the queue stay where they are.',
+  'cli.offer.watch.yes': 'Turn off and watch',
+  'cli.offer.no': 'Cancel',
   'terminal.quit.message': 'A program is still running in {terminals}. Quit and end it?',
   'terminal.quit.quit': 'Quit',
   'terminal.quit.stay': 'Keep running',
@@ -349,11 +371,15 @@ export const en: Catalogue = {
   'recipe.block.run': 'Run this block',
   'recipe.block.up': 'Move up',
   'recipe.block.down': 'Move down',
+  'recipe.block.drag': 'Drag to move the block',
   'recipe.block.delete': 'Delete block',
   'command.recipe.openCellView': 'Open cell result in a tab',
   'recipe.cell.openTab': 'Open in a tab',
   'recipe.view.tab': '{name} · cell {cell}',
   'recipe.view.empty': 'This cell has no result to show yet. Run the recipe to draw it here.',
+  'recipe.cell.named': 'Set {name} = {value}',
+  'recipe.cell.named.empty': 'Set {name} to an empty value',
+  'recipe.cell.note': 'Note: {note}',
   'recipe.plan.apply': 'Apply',
   'recipe.plan.more': '{count} more operations',
   'recipe.plan.more.one': '{count} more operation',
@@ -733,6 +759,135 @@ export const en: Catalogue = {
   'command.commandPanel.run': 'Commands: Run…',
   'command.commandPanel.renderBrief': 'Commands: Render This Brief',
   'commandPanel.suggestions': 'Suggestions',
+  'commandPanel.emptyStep': 'An && at column {column} has no command on one side. Nothing was run.',
+  'commandPanel.noHistoryEntry':
+    'The history has no entry {entry}. Type history to see the numbers.',
+  'commandPanel.glob.outside':
+    '{pattern} leads outside the workspace folder; a pattern only reads inside it.',
+  'commandPanel.glob.no-folder':
+    '{pattern} needs a workspace folder open: a pattern only reads inside it.',
+  'commandPanel.glob.no-match': 'No file matches {pattern}. Nothing was run.',
+  'commandPanel.glob.too-many': '{pattern} matches more than 1,000 files. Nothing was run.',
+  'commandPanel.builtin.restricted':
+    '{name} does not run in a restricted folder. Trust it with Workspace: Manage Trust.',
+  'commandPanel.builtin.clear': 'clear the output',
+  'commandPanel.builtin.history': 'list the lines run in this folder, numbered',
+  'commandPanel.builtin.history.empty': 'Nothing has been run in this folder yet.',
+  'commandPanel.builtin.exit': 'close this session',
+  'commandPanel.builtin.last': 'run the last tyto command again',
+  'commandPanel.builtin.templates':
+    'list the templates a render in this folder can use (tyto template list)',
+  'commandPanel.builtin.last.none': 'No tyto command in the history to run again.',
+  'commandPanel.builtin.help': "list these commands; help <command> shows a tyto command's help",
+  'commandPanel.builtin.help.panel': "The panel's own commands:",
+  'commandPanel.builtin.help.tyto': 'tyto commands (tyto may be left out):',
+  'commandPanel.builtin.rerun': 'run history entry N again',
+  'commandPanel.builtin.and': 'run b only if a ended with exit code 0',
+  'commandPanel.builtin.glob': 'match file names in the workspace folder (render *.brief)',
+  'commandPanel.builtin.ls': 'list a folder: folders end in /, each name beside its kind',
+  'commandPanel.builtin.cd': 'go to a folder of the workspace; cd alone goes back to its root',
+  'commandPanel.builtin.pwd': 'print the folder tyto commands run in',
+  'commandPanel.builtin.cat': 'print a text file',
+  'cli.offer.origin.user':
+    "This line came from your alias '{alias}', defined in your settings (commandAliases).",
+  'cli.offer.origin.workspace':
+    "This line came from the alias '{alias}', defined in this workspace's .tyto/project.json (aliases).",
+  'commandPanel.builtin.alias':
+    "list aliases, or define one: alias name='line', --workspace for this folder's",
+  'commandPanel.builtin.unalias':
+    'remove an alias of yours; --workspace removes one of this folder',
+  'commandPanel.builtin.set': "list this session's variables, or set one: set name=value",
+  'commandPanel.builtin.variable':
+    "a variable set in this session (never the environment's; not in single quotes)",
+  'commandPanel.alias.none': 'No aliases.',
+  'commandPanel.alias.where.user': 'your settings',
+  'commandPanel.alias.where.workspace': 'this workspace',
+  'commandPanel.alias.unknown': 'No alias named {name}.',
+  'commandPanel.alias.badName':
+    "{name} cannot be an alias's name: letters, digits, _ and -, not starting with a digit or -.",
+  'commandPanel.alias.reserved':
+    '{name} is a command of the panel or tyto itself: an alias cannot take its name.',
+  'commandPanel.alias.usage':
+    "Write alias name='line', quoting a line that has spaces; add --workspace for this folder's.",
+  'commandPanel.unalias.usage': 'Write unalias name; add --workspace to remove one of this folder.',
+  'commandPanel.alias.inWorkspace':
+    "{name} is this workspace's alias: unalias --workspace {name} removes it.",
+  'commandPanel.alias.saved.user': 'Alias {name} saved in your settings.',
+  'commandPanel.alias.saved.workspace':
+    "Alias {name} saved in this workspace's .tyto/project.json, for everyone who opens it.",
+  'commandPanel.alias.removed.user': 'Alias {name} removed from your settings.',
+  'commandPanel.alias.removed.workspace':
+    "Alias {name} removed from this workspace's .tyto/project.json.",
+  'commandPanel.alias.refused.invalid':
+    '{name} was not saved: its name or its line is not one an alias may have.',
+  'commandPanel.alias.refused.noFolder':
+    '{name} was not saved: --workspace needs a workspace folder open.',
+  'commandPanel.alias.refused.profile':
+    "{name} is defined in the folder's work profile, not in its own .tyto/project.json: the panel never edits a profile. Remove it in the profile's file.",
+  'commandPanel.alias.refused.restricted':
+    '{name} was not saved: this folder is restricted, and its {where} is not written from the panel. Trust it with Workspace: Manage Trust.',
+  'commandPanel.alias.refused.syntax':
+    '{name} was not saved: {where} does not parse, and is not written over. Fix it first.',
+  'commandPanel.alias.refused.unwritable': '{name} was not saved: {where} could not be written.',
+  'commandPanel.alias.ignored':
+    'The alias {name} in {where} is ignored: it has the name of a command of the panel or tyto.',
+  'commandPanel.alias.unreadable':
+    'The alias {name} cannot be read: its line has an unclosed quote or an empty && at column {column}. Nothing was run.',
+  'commandPanel.alias.from': 'This line came from the alias {name}, defined in {where}.',
+  'commandPanel.variable.unknown':
+    'No variable named {name} in this session: set {name}=value sets one. Nothing was run.',
+  'commandPanel.variable.none': 'No variables in this session.',
+  'commandPanel.variable.badName':
+    "{name} cannot be a variable's name: letters, digits and _, not starting with a digit.",
+  'commandPanel.set.usage': 'Write set name=value, quoting a value that has spaces.',
+  'commandPanel.files.noFolder':
+    "{name} needs a workspace folder open: the panel's file commands work inside it.",
+  'commandPanel.files.outside':
+    "{path} leads outside the workspace folder; the panel's file commands stay inside it.",
+  'commandPanel.files.missing': '{path}: no such file or folder in the workspace.',
+  'commandPanel.files.notFolder': '{path} is not a folder.',
+  'commandPanel.files.isFolder': '{path} is a folder: ls lists it.',
+  'commandPanel.files.binary': '{path} is not text: cat prints text files only.',
+  'commandPanel.files.truncated':
+    '{path} is longer than 256 KB: only its first 256 KB are printed.',
+  'commandPanel.files.more': "… and {count} more, past the explorer's limit.",
+  'commandPanel.files.usage.ls': 'takes at most one path.',
+  'commandPanel.files.usage.cd': 'takes at most one folder.',
+  'commandPanel.files.usage.cat': 'takes one or more files.',
+  'commandPanel.files.kind.folder': 'folder',
+  'commandPanel.files.kind.brief': 'brief',
+  'commandPanel.files.kind.recipe': 'recipe',
+  'commandPanel.files.kind.file': 'file',
+  'commandPanel.builtin.new':
+    "make an empty file; new x.brief --template t writes the template's skeleton",
+  'commandPanel.builtin.mkdir': 'make a folder',
+  'commandPanel.builtin.mv': 'move or rename a file or folder, never over another',
+  'commandPanel.builtin.cp': 'copy a file or folder, never over another',
+  'commandPanel.builtin.rm': 'move files or folders to the bin',
+  'commandPanel.builtin.open': 'open a file in a tab',
+  'commandPanel.builtin.reveal': 'select a file or folder in the Explorer',
+  'commandPanel.files.exists': '{path} already exists: nothing was replaced.',
+  'commandPanel.files.invalid': '{path}: that name or place cannot be used for a file or folder.',
+  'commandPanel.files.link':
+    '{path} holds a link or junction: cp copies nothing that leads elsewhere.',
+  'commandPanel.files.trashFailed': '{path} could not go to the {bin}. Nothing was deleted.',
+  'commandPanel.files.failed': '{path} could not be written: {detail}.',
+  'commandPanel.files.root':
+    '{path} is the workspace folder itself: it is not moved, copied or removed from here.',
+  'commandPanel.files.intoItself': '{path} cannot go into itself.',
+  'commandPanel.files.noTab':
+    '{path} does not open in a tab: open opens briefs, recipes and text files.',
+  'commandPanel.files.noTemplate': 'No template is called {template}.',
+  'commandPanel.files.templateBrief': '--template makes a brief: give a name that ends in .brief.',
+  'commandPanel.files.kept': 'Nothing more was moved to the bin.',
+  'commandPanel.files.usage.new': 'takes one name, and --template with a template for a brief.',
+  'commandPanel.files.usage.mkdir': 'takes one folder name.',
+  'commandPanel.files.usage.mvcp': 'takes a source and a target.',
+  'commandPanel.files.usage.rm': 'takes one or more paths.',
+  'commandPanel.files.usage.open': 'takes one file.',
+  'commandPanel.files.usage.reveal': 'takes one path.',
+  'commandPanel.workingFolderGone':
+    'The folder {path} is no longer in the workspace. Type cd to go back to its root.',
   'command.gallery.show': 'Gallery: Browse Templates and Plugins',
   'gallery.heading': 'Gallery',
   'gallery.index': 'Index',

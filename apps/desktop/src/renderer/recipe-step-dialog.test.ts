@@ -227,6 +227,85 @@ describe('the step dialog (TYTO-402)', () => {
     ).toBe('Predicates joined by AND, as in status = done AND team = print.');
   });
 
+  it("offers decide's clear like tie, and writes clear= and clear-limit= only when set (TYTO-715)", async () => {
+    const dialog = open();
+    const answer = dialog.ask({
+      locale: 'pt-BR',
+      catalog: CATALOG,
+      columns: [],
+      edit: {
+        entry: entry('decide'),
+        values: { column: 'status', local: 'sheet', remote: 'tracker', last: 'last_status' },
+      },
+    });
+    await settle(dialog);
+    const base = 'decide status local=sheet remote=tracker last=last_status';
+    const line = (): string | null | undefined =>
+      dialog.querySelector('.recipe-step-form__line')?.textContent;
+    const choose = async (field: string, value: string): Promise<void> => {
+      const select = dialog.querySelector<HTMLSelectElement>(`[data-field="${field}"] select`);
+      if (select === null) throw new Error(`no choice ${field}`);
+      select.value = value;
+      select.dispatchEvent(new Event('change'));
+      await settle(dialog);
+    };
+    const shown = (field: string): Record<string, unknown> => {
+      const box = dialog.querySelector(`[data-field="${field}"]`);
+      const select = box?.querySelector('select');
+      return {
+        options: [...(select?.options ?? [])].map((option) => option.value),
+        selected: select?.value,
+        help: box?.querySelector('.recipe-step-form__help')?.textContent,
+        default: box?.querySelector('.recipe-step-form__default')?.textContent?.trim(),
+      };
+    };
+
+    // A line with neither tie= nor clear=: both left unset, each naming its default.
+    expect(shown('clear')).toEqual({
+      options: ['', 'push', 'pull'],
+      selected: '',
+      help: 'Se um valor apagado desde a última execução é enviado.',
+      default: 'Se ficar em branco: pull',
+    });
+    expect(shown('tie')).toMatchObject({ options: ['', 'local', 'remote'], selected: '' });
+    expect(line()).toBe(base);
+
+    const lines: Record<string, string | null | undefined> = {};
+    for (const [field, value] of [
+      ['clear', 'push'],
+      ['clear', 'pull'],
+      ['clear', ''],
+      ['tie', 'remote'],
+      ['tie', ''],
+    ] as const) {
+      await choose(field, value);
+      lines[`${field}=${value}`] = line();
+    }
+    expect(lines).toEqual({
+      'clear=push': `${base} clear=push`,
+      'clear=pull': `${base} clear=pull`,
+      'clear=': base,
+      'tie=remote': `${base} tie=remote`,
+      'tie=': base,
+    });
+
+    const limit = dialog.querySelector<HTMLInputElement>('[data-field="clear-limit"] input');
+    expect(limit?.placeholder).toBe('5');
+    expect(
+      dialog.querySelector('[data-field="clear-limit"] .recipe-step-form__help')?.textContent,
+    ).toBe(
+      'Com clear=push, o máximo de valores apagados que uma execução envia, ou none para não limitar.',
+    );
+    type(dialog, 'clear-limit', '');
+    await settle(dialog);
+    expect(line()).toBe(base);
+    await choose('clear', 'push');
+    type(dialog, 'clear-limit', '3');
+    await settle(dialog);
+    click(dialog, '.recipe-step__write');
+    expect(await answer).toBe(`${base} clear=push clear-limit=3`);
+  });
+
   it('answers nothing when cancelled with Escape from the search field', async () => {
     const dialog = open();
     const answer = dialog.ask({ locale: 'en', catalog: CATALOG, columns: [] });

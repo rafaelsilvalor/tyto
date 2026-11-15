@@ -425,6 +425,15 @@ const recipeCell = z.object({
     .optional(),
   /** A `run` cell's: the included recipe's cells, sent only when the `run` succeeded. */
   included: z.array(recipeIncludedCell).max(RECIPE_WIRE_LIMITS.included).optional(),
+  /** TYTO-727, ADR 0199: the value a `set` step set, which the steps below read as `{name}`. */
+  named: z
+    .object({
+      name: z.string().max(RECIPE_WIRE_LIMITS.text),
+      value: z.string().max(RECIPE_WIRE_LIMITS.text),
+    })
+    .optional(),
+  /** TYTO-727: a line of the cell's result that is no diagnostic, as why a value is empty. */
+  note: z.string().max(RECIPE_WIRE_LIMITS.text).optional(),
 });
 
 /** Whether a source is trusted; `revoked` is trust taken back while it is open (ADR 0111). */
@@ -692,8 +701,11 @@ const explorerWriteFailure = z.object({
    * `recipe-name` (TYTO-402): a new recipe whose name `recipeSkeleton` refuses with
    * `E_RECIPE_FORM`, since a `run` line could not name it.
    */
-  reason: z.enum(['invalid', 'exists', 'gone', 'failed', 'recipe-name']),
-  /** With `failed` only: the system's error code (`EPERM`, `EROFS`), never a path. */
+  reason: z.enum(['invalid', 'exists', 'gone', 'failed', 'recipe-name', 'link']),
+  /**
+   * `link` (TYTO-537, ADR 0201): a copy refused because a link or junction is in it.
+   * With `failed` only: the system's error code (`EPERM`, `EROFS`), never a path.
+   */
   detail: z.string().max(100).optional(),
 });
 
@@ -708,6 +720,15 @@ export const EXPLORER_IMAGE_MAX_BYTES = ASSET_SOURCE_MAX_BYTES;
 
 /** The longest `data:` URI an image at the ceiling becomes: base64 is four bytes per three. */
 const IMAGE_DATA_URL_MAX = Math.ceil(EXPLORER_IMAGE_MAX_BYTES / 3) * 4 + 64;
+
+/**
+ * The most bytes of a file `explorer:read` reads for the command panel's `cat` (TYTO-537): 256 KB.
+ * UTF-8 spends at least one byte on a character, so the text is at most this many characters.
+ */
+export const EXPLORER_READ_MAX = 256 * 1024;
+
+/** The longest brief text `explorer:create` writes for `new x.brief --template t` (TYTO-537). */
+export const BRIEF_SEED_MAX = 64 * 1024;
 
 /** A tab whose file a rename moved, as the window shows it now. */
 const movedDocument = z.object({
@@ -1591,7 +1612,14 @@ export const IPC_CHANNELS = {
        * in the same call that refuses an existing file. A recipe name `recipeSkeleton` refuses
        * answers `recipe-name`.
        */
-      seed: z.enum(['recipe', 'vocabulary']).optional(),
+      seed: z.enum(['recipe', 'vocabulary', 'brief']).optional(),
+      /**
+       * With `seed: 'brief'` only (TYTO-537, ADR 0201): the new brief's text, the skeleton the
+       * window writes for a template, as it would save a tab's. Only for a `.brief` name, at
+       * most {@link BRIEF_SEED_MAX} characters, and in the same call that refuses an existing
+       * file.
+       */
+      text: z.string().max(BRIEF_SEED_MAX).optional(),
     }),
     z.discriminatedUnion('ok', [
       z.object({
@@ -1611,7 +1639,15 @@ export const IPC_CHANNELS = {
    * a tab with unsaved text keeps it.
    */
   'explorer:rename': channel(
-    z.strictObject({ entryId: explorerEntryId, name: explorerEntryName }),
+    z.strictObject({
+      entryId: explorerEntryId,
+      name: explorerEntryName,
+      /**
+       * A move (TYTO-537, ADR 0201): the folder it goes into, by id (`null` is the open folder).
+       * Main checks the entry and that folder at the call, and refuses a folder into itself.
+       */
+      parentId: explorerEntryId.nullable().optional(),
+    }),
     z.discriminatedUnion('ok', [
       z.object({ ok: z.literal(true), entry: explorerEntry, moved: z.array(movedDocument) }),
       explorerWriteFailure,
@@ -1629,6 +1665,45 @@ export const IPC_CHANNELS = {
     z.discriminatedUnion('ok', [
       z.object({ ok: z.literal(true), released: z.array(documentId) }),
       z.object({ ok: z.literal(false), reason: z.enum(['gone', 'trash-failed']) }),
+    ]),
+  ),
+
+  /**
+   * A copy of an entry, for the command panel's `cp` (TYTO-537, ADR 0201): `name` in the folder
+   * `parentId` names (`null` is the open folder). **Strict, ids and a name, never a path.** Main
+   * checks the source and the target folder at the call; nothing is overwritten (`exists`); a
+   * folder is never copied into itself (`invalid`); and a copy holding a link or junction is
+   * refused (`link`), the copy sent to the trash if one landed in it after the check.
+   */
+  'explorer:copy': channel(
+    z.strictObject({
+      entryId: explorerEntryId,
+      parentId: explorerEntryId.nullable(),
+      name: explorerEntryName,
+    }),
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), entry: explorerEntry }),
+      explorerWriteFailure,
+    ]),
+  ),
+
+  /**
+   * A file's text, for the command panel's `cat` (TYTO-537, ADR 0201). **Strict, by id, never a
+   * path**, and only a file whose real path lies inside the open folder, checked at the call:
+   * an id main did not mint, or one whose file became a link out since, answers `gone`, and a
+   * folder's id answers `folder`. Text only, never bytes: decoded as UTF-8, a NUL byte answers
+   * `binary`, and past {@link EXPLORER_READ_MAX} bytes the text stops there with `truncated`. It
+   * runs nothing, so it works in a restricted folder (ADR 0111).
+   */
+  'explorer:read': channel(
+    z.strictObject({ entryId: explorerEntryId }),
+    z.discriminatedUnion('ok', [
+      z.object({
+        ok: z.literal(true),
+        text: z.string().max(EXPLORER_READ_MAX),
+        truncated: z.boolean(),
+      }),
+      z.object({ ok: z.literal(false), reason: z.enum(['gone', 'folder', 'binary']) }),
     ]),
   ),
 
@@ -3300,7 +3375,25 @@ export const IPC_CHANNELS = {
    * run's id; what it prints and how it ends arrive on `cli:output` and `cli:state`.
    */
   'cli:run': channel(
-    z.object({ argv: z.array(z.string().max(4096)).max(256) }),
+    z.object({
+      argv: z.array(z.string().max(4096)).max(256),
+      /**
+       * The folder it runs in, by the explorer's id (TYTO-537, ADR 0201): the command panel's
+       * working folder after `cd`. Absent, the open folder. Main runs nothing for an id that is
+       * not a folder whose real path lies inside the open one: the window is not the boundary.
+       */
+      folder: explorerEntryId.optional(),
+      /**
+       * The alias the panel expanded into `argv` (TYTO-536): a label the refusal names, with
+       * where the alias is defined. Main still decides on `argv` alone.
+       */
+      origin: z
+        .strictObject({
+          alias: z.string().min(1).max(200),
+          definedIn: z.enum(['user', 'workspace']),
+        })
+        .optional(),
+    }),
     z.object({ runId: z.string().min(1) }),
   ),
 
@@ -3312,6 +3405,85 @@ export const IPC_CHANNELS = {
 
   /** The command tree, for help and completion: the same program `cli:run` parses. */
   'cli:commands': channel(z.object({}), z.object({ tree: commandDescription })),
+
+  /**
+   * The command panel's aliases in force (TYTO-536, ADR 0200 note of 2026-11-15): the person's
+   * `commandAliases` with the open folder's `aliases` over them, name by name. A restricted
+   * folder's are withheld before they reach this answer, so the window never holds one to run.
+   * `workspace` says whether `alias --workspace` may write there.
+   */
+  'commands:aliases': channel(
+    z.object({}),
+    z.object({
+      aliases: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(200),
+            body: z.string().max(1000),
+            definedIn: z.enum(['user', 'workspace']),
+          }),
+        )
+        .max(500),
+      workspace: z.enum(['none', 'trusted', 'restricted']),
+    }),
+  ),
+
+  /**
+   * `alias` and `unalias` (TYTO-536): one alias set, or removed with `body: null`, in the
+   * person's settings or, with `workspace`, in the open folder's own `.tyto/project.json`.
+   * **Main checks it again**: the name and body by the readers' rules, and a workspace write
+   * only into a trusted folder that is open; the window is not the boundary. `profile` is an
+   * `unalias --workspace` of an alias only the work profile defines: the profile's file is
+   * never written from the panel.
+   */
+  'commands:set-alias': channel(
+    z.strictObject({
+      name: z.string().min(1).max(200),
+      body: z.string().max(1000).nullable(),
+      workspace: z.boolean(),
+    }),
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true) }),
+      z.object({
+        ok: z.literal(false),
+        reason: z.enum(['invalid', 'no-folder', 'profile', 'restricted', 'syntax', 'unwritable']),
+      }),
+    ]),
+  ),
+
+  /**
+   * The templates the command panel completes `--template` and `--formats` with (TYTO-729):
+   * `tyto template list --json` run by main in `folder`, the session's working folder by the
+   * explorer's id, or the open folder when absent. The same folder check as `cli:run`: main
+   * lists nothing for an id outside the open folder. A listing that failed answers no rows and a
+   * `note`, never an error, and the window's own pickers keep `templates:list`. **Strict, and
+   * no words**: main runs only `template list --json`, so this is never a quiet `cli:run`.
+   */
+  'commands:templates': channel(
+    z.strictObject({ folder: explorerEntryId.optional() }),
+    z.object({
+      templates: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(500),
+            formats: z.array(z.string().max(200)).max(200),
+            aliasOf: z.string().max(500).optional(),
+          }),
+        )
+        .max(2000),
+      note: z.string().max(1000).optional(),
+    }),
+  ),
+
+  /**
+   * Opens the recipe a refused `recipe run --apply` offered to open in its notebook (TYTO-726),
+   * **by the run, never by a path**: main kept the recipe when the person said yes in its box,
+   * and answers it once. A run with no recipe kept answers no document.
+   */
+  'cli:open-recipe': channel(
+    z.strictObject({ documentId, runId: z.string().min(1) }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
 
   /**
    * Opens the file a command's Problems row names (ADR 0159 decision 7), **by the run and the
@@ -3437,6 +3609,12 @@ export const IPC_EVENTS = {
       )
       .max(500),
   }),
+
+  /**
+   * A yes in a refused `recipe run --apply`'s box (TYTO-726): the window asks `cli:open-recipe`
+   * for the run, as it asks `agent:open` after `agent:act`. The run's id and nothing else.
+   */
+  'cli:recipe-offered': z.object({ runId: z.string().min(1) }),
 
   'cli:state': z.object({
     runId: z.string().min(1),

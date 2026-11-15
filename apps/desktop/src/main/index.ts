@@ -63,6 +63,7 @@ import {
   statusBarColorsContrast,
   statusBarColorsExample,
 } from '../../shared/status-bar-colors.js';
+import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
 import { statusBarItemsExample } from '../../shared/status-bar-items.js';
 import { DEFAULT_THEME_SETTING, type ThemeSetting, modeOf } from '../../shared/theme-setting.js';
 import { vimModeStyleExample } from '../../shared/vim-mode-style.js';
@@ -79,10 +80,13 @@ import {
 } from '../../shared/typography.js';
 import {
   type CliBaseEnvironment,
+  KEPT_RUNS,
   confirmInABox,
   createCliRunner,
   registeredRasterizer,
 } from './cli-runner.js';
+import { type OfferBox, OfferedRecipes, settleRefusal } from './cli-offers.js';
+import { aliasWriteProblem, aliasesAnswer } from './command-aliases.js';
 import { SHELL_REFUSED, windowRefusals } from './cli-refusals.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
@@ -717,6 +721,8 @@ async function start(): Promise<void> {
   // And how the command panel lays out its runs (TYTO-496), on the same answer.
   let commandsOrder = saved.commandsOrder;
   let commandsFoldOlderRuns = saved.commandsFoldOlderRuns;
+  // And the person's own command panel aliases (TYTO-536), read by `commands:aliases`.
+  let userAliases = saved.commandAliases;
   let terminalShell = { shell: saved.terminalShell, args: saved.terminalArgs };
   // And the agent Open an Agent Here starts (TYTO-567, ADR 0181), on the same answer.
   let agentProgram = { command: saved.agentCommand, args: saved.agentArgs };
@@ -1427,9 +1433,93 @@ async function start(): Promise<void> {
       return windowRasterizer;
     },
   });
+  // `workspace:trust`'s function, also what a refused `--trust`'s box runs (TYTO-726).
+  const setWorkspaceTrust = async (
+    trusted: boolean,
+    source: IpcRequest<'workspace:trust'>['source'],
+  ): Promise<IpcResponse<'workspace:trust'>> => {
+    const done = trusted ? await workspace.grant(source) : await workspace.revoke(source);
+    // A trust taken back keeps the folder as it is until it reopens (ADR 0111), but not the
+    // programs a plugin started in it (ADR 0182).
+    programs.settle();
+    const state = workspace.state();
+    if (done.ok) return state;
+    // A trust.json that cannot be written: said in the problems panel, nothing changed.
+    const failures = done.error.map(({ range: _range, ...row }) => row);
+    return { ...state, problems: [...state.problems, ...failures] };
+  };
+  // TYTO-374: who is signed in, and signing in and out, only when the person clicks: on the
+  // plugins screen, or on yes in a refused `tyto signin`'s box (TYTO-726).
+  const windowSignin = signinWindow(pluginStore, signin);
+  // TYTO-726, ADR 0159 note of 2026-11-15: a refusal offers the window's own way in a box, and
+  // a yes runs the function the window's own control runs, never a path of its own.
+  const refusals = windowRefusals({
+    platform: process.platform,
+    queue: () => queue.view(),
+    openFolder: () => workspace.state().folder,
+    signins: async (plugin) =>
+      (await windowSignin.list()).signins
+        .filter((each) => each.plugin === plugin)
+        .map((each) => each.id),
+  });
+  const offeredRecipes = new OfferedRecipes(KEPT_RUNS);
+  // The run whose box is trusting the open folder, spared by `stopCommands` meanwhile.
+  let trustingRun: string | undefined;
+  const say = (key: CatalogueKey): string => translate(uiLocale, key);
+  const showOffer = async (box: OfferBox): Promise<boolean> => {
+    const options = { ...box, buttons: [...box.buttons] };
+    const answer =
+      mainWindow === undefined
+        ? await dialog.showMessageBox(options)
+        : await dialog.showMessageBox(mainWindow, options);
+    return answer.response === 0;
+  };
   const cli = createCliRunner({
     environment: cliEnvironment,
-    refuse: windowRefusals({ platform: process.platform, queue: () => queue.view() }),
+    refuse: async (invocation, cwd, run) => {
+      const found = await refusals(invocation, cwd);
+      if (found === undefined) return undefined;
+      // TYTO-536: a line the window expanded from an alias names it, in the sentence and the box.
+      const refusal = run.origin === undefined ? found : { ...found, origin: run.origin };
+      return settleRefusal(
+        refusal,
+        (box) => run.waiting(box.message, () => showOffer(box)),
+        {
+          trust: async (folder) => {
+            // The box named the open folder; a folder changed while it was up is not trusted.
+            if (workspace.state().folder !== folder) return false;
+            // The grant re-reads the folder, which stops running commands; not this one.
+            trustingRun = run.runId;
+            try {
+              const state = await setWorkspaceTrust(true, 'folder');
+              return state.trust === 'trusted';
+            } finally {
+              trustingRun = undefined;
+            }
+          },
+          signin: async (plugin, id, out) => {
+            if (out) {
+              await windowSignin.out(plugin, id);
+              return { ok: true };
+            }
+            const done = await windowSignin.start(plugin, id);
+            return done.ok ? { ok: true } : { ok: false, message: done.message ?? done.reason };
+          },
+          openRecipe: (recipe) => {
+            offeredRecipes.keep(run.runId, recipe);
+            toWindow('cli:recipe-offered', { runId: run.runId });
+            return Promise.resolve();
+          },
+          autoRunOff: async () => {
+            // `queue:set-auto-run`'s two calls, and the panel told as it is after a sweep.
+            queue.setAutoRun(false);
+            await remember({ queueAutoRun: false });
+            toWindow('queue:changed', {});
+          },
+        },
+        say,
+      );
+    },
     confirm: confirmInABox(
       (box) => {
         const options = { ...box, buttons: [...box.buttons] };
@@ -1459,7 +1549,7 @@ async function start(): Promise<void> {
     },
   });
   stopCommands = () => {
-    cli.cancelAll();
+    cli.cancelAll(trustingRun);
   };
   app.on('will-quit', () => {
     cli.cancelAll();
@@ -1625,6 +1715,7 @@ async function start(): Promise<void> {
       if (keys.includes('commandsFoldOlderRuns')) {
         commandsFoldOlderRuns = next.commandsFoldOlderRuns;
       }
+      if (keys.includes('commandAliases')) userAliases = next.commandAliases;
       if (keys.includes('terminalShell') || keys.includes('terminalArgs')) {
         terminalShell = { shell: next.terminalShell, args: next.terminalArgs };
       }
@@ -2012,17 +2103,7 @@ async function start(): Promise<void> {
         if (chosen === undefined) return workspace.state();
         return switchingFolder(() => workspace.open(chosen));
       },
-      setTrust: async (trusted, source) => {
-        const done = trusted ? await workspace.grant(source) : await workspace.revoke(source);
-        // A trust taken back keeps the folder as it is until it reopens (ADR 0111), but not the
-        // programs a plugin started in it (ADR 0182).
-        programs.settle();
-        const state = workspace.state();
-        if (done.ok) return state;
-        // A trust.json that cannot be written: said in the problems panel, nothing changed.
-        const failures = done.error.map(({ range: _range, ...row }) => row);
-        return { ...state, problems: [...state.problems, ...failures] };
-      },
+      setTrust: setWorkspaceTrust,
     },
     pluginFiles: { sync: (update) => syncPluginFiles(update) },
     // TYTO-504: the gallery writes the machine's plugin files, then syncs them as the command
@@ -2033,6 +2114,21 @@ async function start(): Promise<void> {
       sync: () => syncPluginFiles(false),
     }),
     cli,
+    offeredRecipes,
+    commandAliases: {
+      list: () => aliasesAnswer(userAliases, workspace.aliases()),
+      set: async ({ name, body, workspace: inWorkspace }) => {
+        // Checked here whatever the window checked: the readers' rules, then where it goes.
+        if (aliasWriteProblem(name, body) !== undefined) return { ok: false, reason: 'invalid' };
+        if (inWorkspace) return workspace.writeAlias(name, body);
+        const next: Record<string, string> = { ...userAliases };
+        if (body === null) delete next[name];
+        else next[name] = body;
+        if (!(await remember({ commandAliases: next }))) return { ok: false, reason: 'syntax' };
+        userAliases = next;
+        return { ok: true };
+      },
+    },
     terminals,
     explorer,
     delivery: createDeliveryService({ layout: () => workspace.deliveryLayout() }),
@@ -2104,7 +2200,7 @@ async function start(): Promise<void> {
       read: () => liveSnippets.read().catch(() => ''),
     },
     // TYTO-374: who is signed in, and signing in and out, only when the person clicks.
-    signin: signinWindow(pluginStore, signin),
+    signin: windowSignin,
     recipeCredentials,
     // TYTO-649: a key file, picked and read here; the path never leaves main. No filter: a key
     // is a .json, a .pem or a file with no extension at all.

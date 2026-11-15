@@ -80,6 +80,16 @@ export interface VerbOutput {
    * them (TYTO-449). Present only when the included recipe ran to a table.
    */
   readonly included?: IncludedRecipe;
+  /**
+   * A `set`'s: the values it computed, by name, which `{name}` reads in the steps below it
+   * (ADR 0199). The run adds them to the values it fills placeholders from.
+   */
+  readonly values?: Readonly<Record<string, string>>;
+  /**
+   * A line the cell's result shows, which is no diagnostic: `set` on a table without rows says
+   * its value is empty.
+   */
+  readonly note?: string;
 }
 
 /** The cells of a recipe a `run` included, under the name the `run` line gave it. */
@@ -138,6 +148,7 @@ export const GENERIC_VERBS = [
   'stamp',
   'group',
   'count',
+  'set',
   'warn',
   'to-brief',
   'call',

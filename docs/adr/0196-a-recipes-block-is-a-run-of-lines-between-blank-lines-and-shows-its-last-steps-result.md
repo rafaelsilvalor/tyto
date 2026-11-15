@@ -86,3 +86,27 @@ Read in the code on `origin/main` (`cdaabe01`) before deciding:
   next block, or, in the text, moves the caret to the end of the next block's first line; O
   folds its result, its last step's. Measured in the window with vim on: Escape twice and `dd`
   on a line of a two-line note delete that line, and the block stays.
+- 2026-11-13 (TYTO-706): **a `|` standing alone chains steps on one line.** On a step line, a
+  `|` with a blank or the line's edge on both sides, outside a double-quoted string and outside
+  `{ }`, splits the line into steps, each read exactly as if on its own line of the same block:
+  `where status != done | sort due | show table` is three steps, three cells, and the block
+  shows the last one's result. Each step's ranges, and so its diagnostics, are its own
+  segment's. **`a|b` never splits**: `|` already means a header description line, a pattern's
+  alternation and a template's filter, and main accepts unquoted patterns
+  (`pattern=^(poster|flyer)`), whose `|` touches its words, as a filter's does
+  (`{team|upper}`). A `|` with no step after it, and a header word or `#` after a `|`, are
+  `E_RECIPE_SYNTAX`; a header line is never split. `recipeSteps(text)` in `@tyto/recipe` gives
+  each step's place, its index being its cell's, and `recipeBlocks` counts a block's steps by
+  segment; the window's counter and stale marks read one mark per step from it, and a line's
+  drawn result is its last cell's. A step's per-line state (fold, counter, a tab's cell) stays
+  keyed by its line's start, which a chained line's steps share.
+- 2026-11-14 (TYTO-711): **on a chained line, Edit step and Open cell result in a tab act on the
+  step under the cursor**, not the line's first. Inside a step's text, or touching either end of
+  it, that step; on the `|` or the blanks between two steps, the step after the `|` when the
+  caret is after it, else the step before; before the line's first step, the first; past its
+  last, the last. A one-step line answers its step wherever the caret is, as before.
+  `stepIndexAt` in the window's `recipe-notebook.ts` holds the rule over `recipeSteps(text)`. A
+  full-size tab keeps, beside its line's start, which of the line's cells it was opened for, the
+  first being 0, so a tab opened from a block's toolbar on a chained line draws its last step's
+  cell; when the line holds fewer cells after a run, the tab has no result rather than another
+  step's. Run from here still starts at the cursor line's first step.

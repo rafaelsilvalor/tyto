@@ -337,6 +337,50 @@ describe('tyto recipe run', () => {
     expect(await stored('agree.recipe')).toEqual({});
   });
 
+  // TYTO-727, ADR 0199: a `set` step's value and its note, as text and in --json.
+  it('prints the value a set step set and its note, as text and in --json', async () => {
+    await trust();
+    await writeFile(
+      join(workspace, 'recipes', 'named.recipe'),
+      [
+        'recipe named',
+        'acme.pull count=3',
+        'set total = count',
+        'set last = last key',
+        'where status = closed',
+        'set first_closed = first key',
+        '',
+      ].join('\n'),
+    );
+
+    const code = await recipeRunCommand('recipes/named.recipe', {}, environment(), {
+      contributions: verbs(newSink()),
+    });
+    expect(code).toBe(EXIT_OK);
+    expect(out).toContain('cell 2 (line 3): ok, 3 rows\n  set total = "3"\n');
+    expect(out).toContain('  set last = "EX-3"\n');
+    expect(out).toContain(
+      'cell 5 (line 6): ok, 0 rows\n  set first_closed = ""\n' +
+        "  note: the table has no rows, so 'first_closed' is empty\n",
+    );
+    expect(out.match(/^ {2}set /gmu)).toHaveLength(3);
+
+    out = '';
+    await recipeRunCommand('recipes/named.recipe', { json: true }, environment(), {
+      contributions: verbs(newSink()),
+    });
+    const document = JSON.parse(out) as RecipeRunDocument;
+    expect(document.cells.map((cell) => cell.named)).toEqual([
+      undefined,
+      { name: 'total', value: '3' },
+      { name: 'last', value: 'EX-3' },
+      undefined,
+      { name: 'first_closed', value: '' },
+    ]);
+    expect(document.cells[4]?.note).toBe("the table has no rows, so 'first_closed' is empty");
+    expect(document.cells[1]).not.toHaveProperty('note');
+  });
+
   it('exits 1 when a cell failed, and says why on stderr', async () => {
     await trust();
     await writeFile(join(workspace, 'recipes', 'broken.recipe'), 'recipe broken\nnope.verb\n');

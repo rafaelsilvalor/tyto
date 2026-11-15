@@ -23,6 +23,9 @@ import { viewBody } from './recipe-views.js';
  * draws the preview of its table: a view pages its rows from main by the outer cell's index,
  * which an included cell does not have.
  *
+ * The header also says the values the block's `set` steps set, and their notes (TYTO-727,
+ * ADR 0199), so they stay in sight when the result is folded.
+ *
  * A cell under `show table` or `show summary` draws its view instead of the table
  * (`recipe-views.ts`, TYTO-379). Under no `show`, the table is a preview: the first
  * {@link SHOWN_ROWS} of the rows the wire carries, then how many it leaves out. It scrolls sideways inside the cell, and a long value is cut with an
@@ -132,6 +135,7 @@ export function cellOutputOf(status: CellStatus, context: CellViewContext): Cell
       // TYTO-381: `show board by=status` and `by=owner` draw different boards.
       JSON.stringify(cell.view?.options ?? {}),
       expanded ? 'included' : '',
+      JSON.stringify([status.named ?? [], status.notes ?? []]),
     ].join('\u0000'),
     render: () => renderCell(status, context, collapsed, expanded),
   };
@@ -187,6 +191,7 @@ function renderCell(
   }
 
   header.append(text(element('span', 'recipe-cell-summary'), status.text));
+  for (const line of namedLines(status, locale)) header.append(line);
   const age = ageOf(cell, locale, context.now());
   if (age !== undefined) header.append(age);
 
@@ -244,6 +249,26 @@ function renderCell(
   if (planned !== undefined) root.append(planned);
   if (included !== undefined && expanded) root.append(includedBody(included, locale));
   return root;
+}
+
+/** TYTO-727: "Set last_due = 2026-12-01" per value the block set, then each note. */
+export function namedLines(status: CellStatus, locale: Locale): readonly HTMLElement[] {
+  const lines: HTMLElement[] = [];
+  for (const { name, value } of status.named ?? []) {
+    const words =
+      value === ''
+        ? translate(locale, 'recipe.cell.named.empty').replace('{name}', name)
+        : translate(locale, 'recipe.cell.named').replace('{name}', name).replace('{value}', value);
+    const line = text(element('span', 'recipe-cell-named'), words);
+    line.dataset['name'] = name;
+    line.title = words;
+    lines.push(line);
+  }
+  for (const note of status.notes ?? []) {
+    const words = translate(locale, 'recipe.cell.note').replace('{note}', note);
+    lines.push(text(element('span', 'recipe-cell-note'), words));
+  }
+  return lines;
 }
 
 // TYTO-449: a `run` cell opened onto its included recipe's cells.

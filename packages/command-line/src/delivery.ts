@@ -17,12 +17,10 @@ import { createDelivery } from '@tyto/io';
 
 import type { CliEnvironment } from './environment.js';
 import { EXIT_DIAGNOSTICS, EXIT_OK, type ExitCode } from './exit.js';
-import { NO_PLUGIN_FILES, syncPluginFiles } from './plugin-files.js';
-import { loadInstalledPlugins, pluginCapabilities } from './plugins/index.js';
-import { cliSigninCapabilities } from './signin.js';
-import { type RenderContext, loadRenderContext } from './render-context.js';
-import { displayPath, installedOption } from './render.js';
+import type { RenderContext } from './render-context.js';
+import { displayPath } from './render.js';
 import { formatDiagnostics, registerUnplaced } from './report.js';
+import { templatesInReach } from './templates-in-reach.js';
 import { type BriefWorkspace, workspaceOfFolder } from './workspace.js';
 
 /**
@@ -98,47 +96,15 @@ async function skeletonOf(
   workspace: BriefWorkspace | undefined,
   environment: CliEnvironment,
 ): Promise<Result<string, Diagnostics>> {
-  const { cwd } = environment;
-  const pluginFilesWorkspace =
-    workspace === undefined
-      ? undefined
-      : { folder: workspace.loaded.folder, trusted: workspace.loaded.trust === 'trusted' };
-  const pluginFiles =
-    environment.home === undefined
-      ? NO_PLUGIN_FILES
-      : await syncPluginFiles(
-          {
-            home: environment.home,
-            ...(pluginFilesWorkspace === undefined ? {} : { workspace: pluginFilesWorkspace }),
-            update: false,
-            fetches: true,
-            approval: 'never',
-          },
-          environment,
-        );
-  registerUnplaced(pluginFiles.diagnostics);
-  const loaded = await loadInstalledPlugins(environment.home, {
-    launch: environment.launch,
-    copies: pluginFiles.copies,
-    capabilities: pluginCapabilities(environment.variables, {
-      hostName: 'tyto delivery new',
-      signin: cliSigninCapabilities(environment),
-      ...(environment.home === undefined ? {} : { home: environment.home }),
-      workspace:
-        workspace === undefined
-          ? { trust: 'restricted' }
-          : { folder: workspace.loaded.folder, trust: workspace.loaded.trust },
-    }),
-  });
+  const {
+    pluginFiles,
+    plugins: loaded,
+    context,
+  } = await templatesInReach(
+    { workspace, hostName: 'tyto delivery new', folder: environment.cwd },
+    environment,
+  );
   try {
-    const context = await loadRenderContext({
-      templatesDirectory: resolve(cwd, 'templates'),
-      projectTemplatesDirectories: workspace?.loaded.project.templates ?? [],
-      formatsFile: resolve(cwd, 'formats.yaml'),
-      templatesDirectoryIsDefault: true,
-      formatsFileIsDefault: true,
-      ...installedOption(environment, loaded, pluginFiles),
-    });
     if (!context.ok) return err([...pluginFiles.diagnostics, ...context.error]);
 
     const skeleton = templateSkeleton(context.value, template);

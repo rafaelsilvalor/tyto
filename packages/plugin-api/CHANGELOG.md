@@ -1,5 +1,66 @@
 # @tyto/plugin-api
 
+## 0.21.0
+
+### Minor Changes
+
+- 46a013d: The command line signs in through the browser (TYTO-683, ADR 0194). `tyto signin <plugin> [id]`
+  runs the sign-in the desktop runs and keeps the refresh token in the system keychain through
+  `@napi-rs/keyring` (at most 2,560 bytes a value, no plaintext fallback); `--client` asks for
+  the OAuth client a manifest leaves out, never reading it from the command line. `tyto signout`
+  forgets it. Every command that loads plugins answers `host.signin.accessToken` from it, and
+  `E_SIGNIN_REQUIRED` now says how to sign in on the host that answers it, through the new
+  optional `HostCapabilities.describeSignin`. The window's command panel refuses both commands.
+- d700cf3: A panel's call now reaches its own plugin by plugin and panel id together, and answers the same
+  in process as isolated (TYTO-644, ADR 0173). **Breaking for a host calling these directly:**
+  `panelCallerOf(registry)` now returns `(plugin, panelId, request)` instead of
+  `(panelId, request)`, and reads the registry's new `ownedPanels()`, so two plugins that each
+  contribute a `settings` panel can no longer reach each other's; `callPanel(panel, request,
+plugin)` takes the contributing plugin's name as a third argument. An in-process `call` whose
+  answer the isolation protocol refuses — `{ ok: true, value }` without `diagnostics`, a value
+  over 1 MiB or not JSON, anything that is not a result — is refused as `E_PLUGIN_PROTOCOL`
+  naming the plugin, exactly as the same plugin running isolated, rather than passed (missing
+  `diagnostics`) or refused as `E_PANEL_CALL`. The isolation protocol does not change.
+  `@tyto/core` updates the `E_PANEL_CALL` and `E_PLUGIN_PROTOCOL` summaries to match; the
+  desktop passes the panel's plugin to `callPanel`.
+- 0ff1b0d: A contributed recipe verb's argument may carry `description`, at most 1,000 characters
+  (`ARGUMENT_DESCRIPTION_MAX_LENGTH`), and `formOfArguments` shows it as the field's help in the
+  step form (TYTO-687). An isolated plugin's crosses the strict `recipe-verb` schema: isolation
+  protocol 26. One over the bound is refused at load with the same `E_PLUGIN_ACTIVATE` in
+  process as isolated.
+- 4526606: Browser sign-in's host side moves out of the desktop's main so a second host can compose it
+  (TYTO-683): the PKCE flow, the token endpoint and the sign-in service are exported by
+  `@tyto/plugin-api`, with the loopback listener as a port (`CallbackListen`), and its adapter
+  `listenForCallback` by `@tyto/io`. The desktop composes them as before; nothing a person sees
+  changes.
+- 89efc2d: A recipe transform is handed `refresh: true` on a run without cache, as a source's `page` is
+  (TYTO-681): Fetch again and every scheduled run. Isolation protocol 25; `testPlugin`'s
+  `runRecipe` takes `refresh`.
+- ca2bc10: A plugin file source may be an `archive`: a `.zip` over https or on the machine, with `{ref}`
+  in its location, fetched without Git and pinned in the lock by the sha256 of its bytes
+  (ADR 0197). `PluginFilesCopy` names `location` and `pin` in place of `git` and `commit`.
+
+### Patch Changes
+
+- Updated dependencies [46a013d]
+- Updated dependencies [d267e4a]
+- Updated dependencies [b250bc7]
+- Updated dependencies [61edee2]
+- Updated dependencies [d700cf3]
+- Updated dependencies [ef76145]
+- Updated dependencies [0ff1b0d]
+- Updated dependencies [928e28b]
+- Updated dependencies [1fae4a5]
+- Updated dependencies [3ff3d59]
+- Updated dependencies [672be6c]
+- Updated dependencies [30bb335]
+- Updated dependencies [e34def6]
+- Updated dependencies [399281d]
+- Updated dependencies [ca2bc10]
+- Updated dependencies [b704587]
+  - @tyto/core@0.45.0
+  - @tyto/recipe@0.6.0
+
 ## 0.20.0
 
 ### Minor Changes

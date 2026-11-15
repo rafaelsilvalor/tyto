@@ -2,9 +2,11 @@ import { type TemplateResult, html, nothing } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 import type { CatalogueKey } from '../../shared/i18n/index.js';
+import type { IpcResponse } from '../../shared/ipc.js';
 import { ansiPresentation } from './ansi.js';
 import { type Completion, accept } from './command-completion.js';
 import { type OutputLink, linksIn } from './command-links.js';
+import { type LineReading, readLines } from './command-tone.js';
 import {
   type FindMatch,
   type OutputLine,
@@ -22,7 +24,24 @@ import {
   type CommandSessions,
   isBusy,
 } from './command-sessions.js';
-import { splitCommandLine } from './command-words.js';
+import {
+  type BuiltinRegistry,
+  type FileRead,
+  type PanelBuiltin,
+  type PanelFiles,
+  type PanelWrites,
+  PANEL_BUILTINS,
+} from './command-builtins.js';
+import type { AliasesInForce } from './command-alias-builtins.js';
+import { expandAliases, expandVariables } from './command-aliases.js';
+import { type ListById, folderId, stepsLabel } from './command-paths.js';
+import { type GlobExpansion, type ListFolder, expandGlob, isGlob } from './command-glob.js';
+import {
+  type ExpandedLine,
+  type LineStep,
+  expandHistory,
+  parseCommandLine,
+} from './command-steps.js';
 import { icon } from './icons.js';
 import { DockedPanel } from './panels.js';
 
@@ -42,13 +61,23 @@ import { DockedPanel } from './panels.js';
 export const COMMAND_PANEL_TAG = 'tyto-command-panel';
 
 export interface CommandPanelPorts {
-  /** Starts the words as a run and answers its id; throws when `cli:run` refused them. */
-  readonly run: (words: readonly string[]) => Promise<string>;
+  /**
+   * Starts the words as a run and answers its id; throws when `cli:run` refused them. `folder`
+   * is the explorer id of the folder it runs in, absent for the workspace root (TYTO-537).
+   */
+  readonly run: (
+    words: readonly string[],
+    folder?: string,
+    origin?: LineStep['origin'],
+  ) => Promise<string>;
   readonly cancel: (runId: string) => void;
   /** Opens what a link in a session's output names. */
   readonly open: (session: CommandSession, link: OutputLink) => void;
-  /** What can come at the caret, from the CLI's own tree (`command-completion.ts`). */
-  readonly complete: (line: string, caret: number) => Promise<Completion>;
+  /**
+   * What can come at the caret, from the CLI's own tree (`command-completion.ts`); a path is
+   * completed from `base`, the session's working folder (TYTO-537).
+   */
+  readonly complete: (line: string, caret: number, base: readonly string[]) => Promise<Completion>;
   /** The open workspace folder, absolute, for telling which printed paths are inside it. */
   readonly folder: () => string | null;
   /** Whether this platform compares paths without case. */
@@ -56,7 +85,45 @@ export interface CommandPanelPorts {
   /** The lines run before in this folder, oldest first. */
   readonly history: () => readonly string[];
   readonly remember: (line: string) => void;
+  /** The entries of a folder under the open one, by the explorer's ids: what a glob reads. */
+  readonly list: ListFolder;
+  /** The CLI's first-level commands, for `help` (TYTO-535). */
+  readonly commands: () => Promise<
+    readonly { readonly name: string; readonly description: string }[]
+  >;
+  /** Whether the open folder is restricted: a built-in that writes does not run there. */
+  readonly restricted: () => boolean;
+  /** A folder's listing by the explorer's id (`null` is the root): what file commands walk. */
+  readonly listById: ListById;
+  /** A file's text by the explorer's id (`explorer:read`), for `cat` (TYTO-537). */
+  readonly read: (entryId: string) => Promise<FileRead>;
+  /** The Explorer's own writes, for `new`, `mkdir`, `mv`, `cp`, `rm`, `open`, `reveal`. */
+  readonly writes: PanelWrites;
+  /** The aliases in force (`commands:aliases`, TYTO-536), asked again for every line. */
+  readonly aliases: () => Promise<AliasesInForce>;
+  /** `commands:set-alias`: one alias written, main checking where it may go. */
+  readonly setAlias: (
+    name: string,
+    body: string | null,
+    workspace: boolean,
+  ) => Promise<IpcResponse<'commands:set-alias'>>;
 }
+
+/** The aliases with a built-in's name already said to be ignored, once per window (TYTO-536). */
+const IGNORED_SAID = new Set<string>();
+
+const NO_WRITES: PanelWrites = {
+  create: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  move: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  copy: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  unsavedUnder: () => Promise.resolve(0),
+  confirmRemove: () => Promise.resolve(false),
+  remove: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  open: () => Promise.resolve(false),
+  reveal: () => undefined,
+  skeletonOf: () => undefined,
+  bin: 'bin',
+};
 
 const NO_PORTS: CommandPanelPorts = {
   run: () => Promise.reject(new Error('no bridge')),
@@ -67,6 +134,14 @@ const NO_PORTS: CommandPanelPorts = {
   caseless: false,
   history: () => [],
   remember: () => undefined,
+  list: () => Promise.resolve(undefined),
+  commands: () => Promise.resolve([]),
+  restricted: () => false,
+  listById: () => Promise.resolve({ entries: [], more: 0 }),
+  read: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  writes: NO_WRITES,
+  aliases: () => Promise.resolve({ aliases: [], workspace: 'none' }),
+  setAlias: () => Promise.resolve({ ok: false, reason: 'no-folder' }),
 };
 
 /** Ctrl+R's state: what is typed in the search, and where the match is in the history. */
@@ -108,6 +183,10 @@ export class CommandPanel extends DockedPanel {
   private chosen = -1;
   /** Counts the questions asked, so an answer to an older line is dropped. */
   private asked = 0;
+  /** The sessions running a line's steps: one line at a time in a tab, as one run is. */
+  private readonly chaining = new Set<string>();
+  /** The panel's own commands (TYTO-535); a test may hand another registry. */
+  builtins: BuiltinRegistry = PANEL_BUILTINS;
 
   constructor() {
     super();
@@ -179,46 +258,289 @@ export class CommandPanel extends DockedPanel {
 
   /* -------------------------------------------------------------------- running -- */
 
-  /** Enter on the input line: the line split into words, refused or run in this tab. */
+  /**
+   * Enter on the input line (TYTO-535, ADR 0200): the line read as steps joined by `&&`, each
+   * `!N` replaced by its history entry, and each step run in turn — a built-in by the panel, any
+   * other as a `tyto` command — until one does not succeed.
+   */
   async submit(line: string): Promise<void> {
     const sessions = this.sessions;
     const session = this.active();
     if (sessions === undefined || session === undefined) return;
     if (line.trim() === '') return;
-    if (isBusy(session)) {
+    if (isBusy(session) || this.chaining.has(session.id)) {
       sessions.note(session.id, this.say('commandPanel.busy'));
       return;
     }
-    const split = splitCommandLine(line);
-    if (!split.ok) {
-      sessions.refused(
-        session.id,
-        line.trim(),
-        this.say('commandPanel.unclosedQuote').replaceAll('{column}', String(split.at + 1)),
-      );
+    const parsed = parseCommandLine(line);
+    const expanded = parsed.ok ? expandHistory(parsed.steps, this.ports.history()) : parsed;
+    if (!expanded.ok) {
+      sessions.refused(session.id, line.trim(), this.lineProblem(expanded));
       return;
     }
-    if (split.words.length === 0) return;
+    if (expanded.steps.length === 0) return;
 
-    this.ports.remember(line.trim());
+    this.ports.remember(expanded.line);
     this.cursor = undefined;
     this.closeSuggestions();
     const input = this.input();
     if (input !== null) input.value = '';
     this.following = true;
+    this.chaining.add(session.id);
     try {
-      const runId = await this.ports.run(split.words);
-      sessions.started(session.id, line.trim(), split.words, runId);
+      // TYTO-536: the aliases a step starts with, once, before the registry (ADR 0200).
+      const inForce = await this.ports
+        .aliases()
+        .catch((): AliasesInForce => ({ aliases: [], workspace: 'none' }));
+      const aliased = expandAliases(expanded.steps, inForce.aliases, (name) => this.reserved(name));
+      if (!aliased.ok) {
+        sessions.refused(
+          session.id,
+          line.trim(),
+          this.say('commandPanel.alias.unreadable')
+            .replaceAll('{name}', aliased.alias)
+            .replaceAll('{column}', String(aliased.at + 1)),
+        );
+        return;
+      }
+      // The last step is not waited on: nothing comes after it, and the tab is busy while it
+      // runs, as a single command's is.
+      for (const [index, step] of aliased.steps.entries()) {
+        const next = index < aliased.steps.length - 1;
+        if (!(await this.runStep(session.id, step, next))) break;
+      }
+      // After the line, so the note sits under the block it ran rather than nowhere.
+      this.sayIgnored(session.id, inForce);
+    } finally {
+      this.chaining.delete(session.id);
+    }
+  }
+
+  /** A name an alias may not take: a built-in's, or `tyto` (TYTO-536). */
+  private reserved(name: string): boolean {
+    return name === 'tyto' || this.builtins.find({ text: name, quoted: false }) !== undefined;
+  }
+
+  /** An alias in force with a built-in's name is never run, and said so once (TYTO-536). */
+  private sayIgnored(sessionId: string, inForce: AliasesInForce): void {
+    for (const alias of inForce.aliases) {
+      const key = `${alias.definedIn}:${alias.name}`;
+      if (!this.reserved(alias.name) || IGNORED_SAID.has(key)) continue;
+      IGNORED_SAID.add(key);
+      this.sessions?.note(
+        sessionId,
+        this.say('commandPanel.alias.ignored')
+          .replaceAll('{name}', alias.name)
+          .replaceAll('{where}', this.whereOf(alias.definedIn)),
+      );
+    }
+  }
+
+  private whereOf(definedIn: 'user' | 'workspace'): string {
+    return this.say(
+      definedIn === 'user' ? 'commandPanel.alias.where.user' : 'commandPanel.alias.where.workspace',
+    );
+  }
+
+  /** What a refusal of an alias-expanded step adds: the alias and where it is defined. */
+  private fromAlias(step: LineStep): string {
+    if (step.origin === undefined) return '';
+    const from = this.say('commandPanel.alias.from')
+      .replaceAll('{name}', step.origin.alias)
+      .replaceAll('{where}', this.whereOf(step.origin.definedIn));
+    return ` ${from}`;
+  }
+
+  /** What a line that cannot be read says, in the block it gets. */
+  private lineProblem(problem: Exclude<ExpandedLine, { ok: true }>): string {
+    switch (problem.problem) {
+      case 'unclosed-quote':
+        return this.say('commandPanel.unclosedQuote').replaceAll(
+          '{column}',
+          String(problem.at + 1),
+        );
+      case 'empty-step':
+        return this.say('commandPanel.emptyStep').replaceAll('{column}', String(problem.at + 1));
+      case 'no-entry':
+        return this.say('commandPanel.noHistoryEntry').replaceAll('{entry}', String(problem.entry));
+    }
+  }
+
+  /**
+   * One step of a line: answers whether it succeeded, which an `&&` after it needs. With `wait`
+   * false a `tyto` command it starts is not waited on, and counts as succeeding once started.
+   */
+  private async runStep(sessionId: string, typedStep: LineStep, wait: boolean): Promise<boolean> {
+    const sessions = this.sessions;
+    const found = sessions?.sessions.find((each) => each.id === sessionId);
+    if (sessions === undefined || found === undefined) return false;
+    // TYTO-536: `$name` from this session's `set`, inside words, never adding one.
+    const read = expandVariables(typedStep.words, found.variables);
+    if (!read.ok) {
+      sessions.refused(
+        sessionId,
+        typedStep.source,
+        this.say('commandPanel.variable.unknown').replaceAll('{name}', read.name),
+      );
+      return false;
+    }
+    const step: LineStep = { ...typedStep, words: read.words };
+    const builtin = this.builtins.find(step.words[0]);
+    if (builtin !== undefined) return this.runBuiltin(sessionId, step, builtin, wait);
+
+    const typed =
+      step.words[0]?.quoted === false && step.words[0].text === 'tyto'
+        ? step.words.slice(1)
+        : step.words;
+    const words: string[] = [];
+    for (const word of typed) {
+      if (word.quoted || !isGlob(word.text)) {
+        words.push(word.text);
+        continue;
+      }
+      const expansion = await expandGlob(word.text, found.workingFolder, this.ports.list, {
+        caseless: this.ports.caseless,
+        folder: this.ports.folder() !== null,
+      });
+      if (!expansion.ok) {
+        sessions.refused(sessionId, step.source, this.globProblem(expansion));
+        return false;
+      }
+      words.push(...expansion.words);
+    }
+    if (words.length === 0) return true;
+    return this.runTyto(sessionId, step.source, words, wait, step.origin);
+  }
+
+  private globProblem(problem: Extract<GlobExpansion, { ok: false }>): string {
+    const key: CatalogueKey = `commandPanel.glob.${problem.problem}`;
+    return this.say(key).replaceAll('{pattern}', problem.pattern);
+  }
+
+  /** Runs `words` through `cli:run` in this session, waiting for it to end; true on exit 0. */
+  private async runTyto(
+    sessionId: string,
+    line: string,
+    words: readonly string[],
+    wait: boolean,
+    origin?: LineStep['origin'],
+  ): Promise<boolean> {
+    const sessions = this.sessions;
+    if (sessions === undefined) return false;
+    const steps = sessions.sessions.find((each) => each.id === sessionId)?.workingFolder ?? [];
+    // The working folder by the id main minted for it; main checks that id again (ADR 0201).
+    const folder =
+      steps.length === 0 ? null : await folderId(steps, this.ports.listById, this.ports.caseless);
+    if (folder === undefined) {
+      sessions.refused(
+        sessionId,
+        line,
+        this.say('commandPanel.workingFolderGone').replaceAll('{path}', stepsLabel(steps)),
+      );
+      return false;
+    }
+    let runId: string;
+    try {
+      runId = await this.ports.run(words, folder ?? undefined, origin);
     } catch (error) {
       sessions.refused(
-        session.id,
-        line.trim(),
+        sessionId,
+        line,
         this.say('commandPanel.refused').replaceAll(
           '{reason}',
           error instanceof Error ? error.message : String(error),
         ),
       );
+      return false;
     }
+    sessions.started(sessionId, line, words, runId);
+    if (!wait) return true;
+    const ended = await sessions.whenEnded(runId);
+    return ended?.state === 'finished' && ended.code === 0;
+  }
+
+  /** A built-in, in a restricted folder only when it may run there (ADR 0200). */
+  private async runBuiltin(
+    sessionId: string,
+    step: LineStep,
+    builtin: PanelBuiltin,
+    wait: boolean,
+  ): Promise<boolean> {
+    const sessions = this.sessions;
+    if (sessions === undefined) return false;
+    if (!builtin.runsInRestrictedFolder && this.ports.restricted()) {
+      sessions.refused(
+        sessionId,
+        step.source,
+        this.say('commandPanel.builtin.restricted').replaceAll('{name}', builtin.name) +
+          this.fromAlias(step),
+      );
+      return false;
+    }
+    const outcome = await builtin.run({
+      args: step.words.slice(1),
+      history: () => this.ports.history(),
+      runTyto: (line, words) => this.runTyto(sessionId, line, words, wait),
+      clear: () => {
+        sessions.clear(sessionId);
+      },
+      exit: () => {
+        this.closeSession(sessionId);
+      },
+      commands: () => this.ports.commands(),
+      say: (key) => this.say(key),
+      registry: this.builtins,
+      files: this.filesOf(sessionId),
+      aliases: {
+        list: () => this.ports.aliases(),
+        set: (name, body, workspace) => this.ports.setAlias(name, body, workspace),
+        reserved: (name) => this.reserved(name),
+      },
+      variables: {
+        all: () => sessions.sessions.find((each) => each.id === sessionId)?.variables ?? new Map(),
+        set: (name, value) => {
+          sessions.setVariable(sessionId, name, value);
+        },
+      },
+    });
+    switch (outcome.kind) {
+      case 'printed':
+        sessions.printed(
+          sessionId,
+          step.source,
+          outcome.lines,
+          outcome.failed === true ? 1 : 0,
+          Date.now(),
+          {
+            ...(outcome.notes === undefined ? {} : { notes: outcome.notes }),
+            ...(outcome.base === undefined ? {} : { folder: outcome.base }),
+          },
+        );
+        return outcome.failed !== true;
+      case 'acted':
+        return outcome.ok;
+      case 'ended':
+        return false;
+    }
+  }
+
+  /** The workspace as a file command reaches it from this session, or none with no folder. */
+  private filesOf(sessionId: string): PanelFiles | undefined {
+    const folder = this.ports.folder();
+    const sessions = this.sessions;
+    const session = sessions?.sessions.find((each) => each.id === sessionId);
+    if (folder === null || sessions === undefined || session === undefined) return undefined;
+    return {
+      folder,
+      workingFolder: session.workingFolder,
+      changeFolder: (steps) => {
+        sessions.changeFolder(sessionId, steps);
+      },
+      list: this.ports.listById,
+      read: (entryId) => this.ports.read(entryId),
+      caseless: this.ports.caseless,
+      writes: this.ports.writes,
+    };
   }
 
   private stop(): void {
@@ -321,7 +643,11 @@ export class CommandPanel extends DockedPanel {
   private async suggest(input: HTMLInputElement, takeOnly = false): Promise<void> {
     const asked = (this.asked += 1);
     const line = input.value;
-    const completion = await this.ports.complete(line, input.selectionStart ?? line.length);
+    const completion = await this.ports.complete(
+      line,
+      input.selectionStart ?? line.length,
+      this.active()?.workingFolder ?? [],
+    );
     if (asked !== this.asked || input.value !== line) return;
     if (takeOnly && completion.items.length === 1) {
       this.completion = completion;
@@ -568,7 +894,8 @@ export class CommandPanel extends DockedPanel {
   }
 
   private piece(session: CommandSession, piece: Piece, current: number): TemplateResult {
-    const { classes, css } = ansiPresentation(piece.style);
+    const { classes: ansi, css } = ansiPresentation(piece.style);
+    const classes = piece.code === true ? `${ansi} command-panel__code`.trim() : ansi;
     const match =
       piece.match === undefined
         ? ''
@@ -598,6 +925,7 @@ export class CommandPanel extends DockedPanel {
     line: OutputLine,
     index: number,
     matches: readonly FindMatch[],
+    reading: LineReading,
   ): TemplateResult {
     const own = matches
       .map((match, position) => ({ ...match, index: position }))
@@ -609,12 +937,15 @@ export class CommandPanel extends DockedPanel {
             diagnostics: session.diagnostics,
             folder: this.ports.folder(),
             caseless: this.ports.caseless,
+            base: session.runs.find((run) => run.number === line.run)?.folder ?? [],
           });
-    const pieces = piecesOf(line.runs, links, own);
+    const pieces = piecesOf(line.runs, links, own, reading.code);
     const drawn = pieces.map((piece) => this.piece(session, piece, this.findCurrent));
-    // On one line, and it has to stay on one: the line is `pre-wrap`, so any whitespace around
-    // the pieces in this template would be drawn as part of what the command printed.
-    return html`<div class="command-panel__line" data-stream=${line.stream}>${drawn}</div>`;
+    // Coloured by what it means, not by its stream (TYTO-725). On one line, and it has to stay
+    // on one: the line is `pre-wrap`, so any whitespace around the pieces in this template
+    // would be drawn as part of what the command printed, so Prettier must not break it.
+    // prettier-ignore
+    return html`<div class="command-panel__line" data-stream=${line.stream} data-tone=${reading.tone}>${drawn}</div>`;
   }
 
   private findBar(total: number): TemplateResult | typeof nothing {
@@ -810,10 +1141,22 @@ export class CommandPanel extends DockedPanel {
           ?data-folded=${folded}
         >
           ${this.header(session, block, folded)}
-          ${folded ? nothing : block.lines.map(({ line, index }) => this.line(session, line, index, matches))}
+          ${folded ? nothing : this.blockLines(session, block, matches)}
         </section>`;
       },
     )}`;
+  }
+
+  /** A block's lines, each read for what it means (TYTO-725) against the one before it. */
+  private blockLines(
+    session: CommandSession,
+    block: RunBlock,
+    matches: readonly FindMatch[],
+  ): readonly TemplateResult[] {
+    const readings = readLines(block.lines.map(({ line }) => line));
+    return block.lines.map(({ line, index }, at) =>
+      this.line(session, line, index, matches, readings[at] ?? { tone: 'plain' }),
+    );
   }
 
   /** The words a run's state is said in: on its header's badge, for a screen reader. */
@@ -883,7 +1226,7 @@ export class CommandPanel extends DockedPanel {
       search?.index === undefined ? undefined : this.ports.history()[search.index];
     return html`<div class="command-panel__prompt-line">
         <label class="command-panel__prompt" for="command-panel-input"
-          >${search === undefined ? 'tyto ›' : `${this.say('commandPanel.history.search')} ›`}</label
+          >${search === undefined ? this.promptLabel() : `${this.say('commandPanel.history.search')} ›`}</label
         >
         <input
           id="command-panel-input"
@@ -916,6 +1259,15 @@ export class CommandPanel extends DockedPanel {
         }
       </div>
       ${this.suggestions()}`;
+  }
+
+  /**
+   * `tyto ›` at the workspace root, `tyto entregas/novembro ›` under it (TYTO-537): where the
+   * next `tyto` command runs is always on the line it is typed on.
+   */
+  private promptLabel(): string {
+    const steps = this.active()?.workingFolder ?? [];
+    return steps.length === 0 ? 'tyto ›' : `tyto ${stepsLabel(steps)} ›`;
   }
 
   /**

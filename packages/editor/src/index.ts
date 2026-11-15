@@ -230,8 +230,11 @@ export { recipe, recipeLanguage } from './recipe-language.js';
 export {
   type RecipeReferenceSource,
   type RecipeVerbSource,
+  completeNamedValue,
   completeRecipeReference,
   completeRecipeVerb,
+  completeSetAggregate,
+  namedValuesAt,
   recipeCompletion,
 } from './recipe-completion.js';
 
@@ -250,6 +253,11 @@ export {
   type NotebookFrame,
   type NotebookFramesOptions,
   type NotebookMarker,
+  type NotebookDrag,
+  type NotebookDropPlace,
+  nearestDrop,
+  notebookDragOf,
+  setNotebookDrag,
   enterNotebookCommand,
   isNotebookCommandTarget,
   leaveNotebookCommand,

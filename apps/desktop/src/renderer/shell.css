@@ -1129,6 +1129,27 @@ tyto-preview-pane[hidden] {
   font-style: italic;
 }
 
+/* Dragging a block by its grip (TYTO-676, fourth pull request): the grip muted until pointed
+   at, the block dragged dimmed where it was, and the line it will drop on in the accent colour,
+   across the visible width, on the boundary between two blocks. */
+.cm-notebook-grips .cm-notebook-grip {
+  padding: 0 var(--tyto-space-1);
+  color: var(--tyto-text-disabled);
+}
+
+.cm-notebook-grips .cm-notebook-grip:hover {
+  color: var(--tyto-text-muted);
+}
+
+.cm-editor .cm-line.cm-notebook-frame--dragged {
+  opacity: 0.45;
+}
+
+.cm-notebook-drops > .cm-notebook-drop {
+  height: var(--tyto-focus-width);
+  background: var(--tyto-accent);
+}
+
 /* The line under a recipe's cell (TYTO-377): muted and smaller than the text, so it reads as
    the cell's result and not as a line of the recipe. A failure is muted too (Rafael): its
    marker and its Problems row are what draw the eye. */
@@ -1141,6 +1162,17 @@ tyto-preview-pane[hidden] {
   color: var(--tyto-text-muted);
   font-size: var(--tyto-text-sm);
   user-select: none;
+}
+
+/* A value a block's `set` step set (TYTO-727): in the text's colour, since it is the result
+   the step exists for; a long one is cut, its whole text in the title. */
+.recipe-cell-named {
+  max-width: 48ch;
+  overflow: hidden;
+  color: var(--tyto-text);
+  font-family: var(--tyto-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The header's toggle and buttons (TYTO-377, pull request D): always shown, small and quiet, so
@@ -2447,12 +2479,27 @@ button.problems__row:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.command-panel__line[data-stream='err'] {
+/*
+ * A line is coloured by what it means, not by the stream it came on (TYTO-725): stderr also
+ * carries questions and notices, and a run that ended ✓ 0 read as failed when every stderr
+ * line was red. Whether the run worked is its header's badge to say. A line the command
+ * coloured itself has no tone, so its own colours show.
+ */
+.command-panel__line[data-tone='error'] {
   color: var(--tyto-error);
 }
 
-.command-panel__line[data-stream='note'] {
+.command-panel__line[data-tone='warning'] {
+  color: var(--tyto-warning);
+}
+
+.command-panel__line[data-tone='hint'],
+.command-panel__line[data-tone='note'] {
   color: var(--tyto-text-muted);
+}
+
+.command-panel__code {
+  font-weight: var(--tyto-weight-strong);
 }
 
 .command-panel__dropped {
@@ -2469,6 +2516,15 @@ button.problems__row:focus-visible {
 
 .command-panel__match {
   background: var(--tyto-selection);
+}
+
+/*
+ * Inside a find match the text is the window's own (TYTO-725): a line's tone or a command's
+ * colour on `selection` read as low as 2.05:1, and the match is what the eye is looking for.
+ * Doubled so it wins over a line's tone and an `ansi-fg-*` class alike.
+ */
+.command-panel__line .command-panel__match {
+  color: var(--tyto-text);
 }
 
 .command-panel__match--current {

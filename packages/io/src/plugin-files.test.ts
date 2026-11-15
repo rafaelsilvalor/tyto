@@ -187,7 +187,7 @@ describe("a folder's sync", () => {
     });
 
     expect(synced.diagnostics).toEqual([]);
-    expect(synced.copies.map((copy) => copy.commit)).toEqual([source.commit]);
+    expect(synced.copies.map((copy) => copy.pin)).toEqual([source.commit]);
     const lock = JSON.parse(await readFile(join(folder, 'plugin-files.lock.json'), 'utf8')) as {
       sources: { git: string }[];
     };
@@ -209,7 +209,7 @@ describe("a folder's sync", () => {
     });
 
     expect(synced.diagnostics).toEqual([]);
-    expect(synced.copies.map((copy) => copy.commit)).toEqual([source.commit]);
+    expect(synced.copies.map((copy) => copy.pin)).toEqual([source.commit]);
     expect(await lockedCommits(folder)).toEqual([source.commit]);
   });
 
@@ -234,7 +234,7 @@ describe("a folder's sync", () => {
     });
 
     expect(synced.diagnostics).toEqual([]);
-    expect(synced.copies.map((copy) => [copy.commit, copy.directory])).toEqual([
+    expect(synced.copies.map((copy) => [copy.pin, copy.directory])).toEqual([
       [source.commit, join(cacheOf(source.url), source.commit)],
     ]);
     expect(await lockedCommits(folder)).toEqual([source.commit]);
@@ -257,7 +257,7 @@ describe("a folder's sync", () => {
     });
 
     expect(synced.diagnostics).toEqual([]);
-    expect(synced.copies.map((copy) => copy.commit)).toEqual([tagObject]);
+    expect(synced.copies.map((copy) => copy.pin)).toEqual([tagObject]);
     expect(await lockedCommits(folder)).toEqual([tagObject]);
   });
 
@@ -275,7 +275,7 @@ describe("a folder's sync", () => {
     const synced = await syncPluginFolder(options);
 
     expect(synced.diagnostics).toEqual([]);
-    expect(synced.copies.map((copy) => copy.commit)).toEqual([source.commit]);
+    expect(synced.copies.map((copy) => copy.pin)).toEqual([source.commit]);
     expect((await stat(record)).mtime).toEqual(longAgo);
   });
 

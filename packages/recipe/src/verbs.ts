@@ -16,6 +16,7 @@ import { path } from './path.js';
 import type { Verb, VerbContext, VerbResult } from './registry.js';
 import { rollup } from './rollup.js';
 import { rules } from './rules.js';
+import { set } from './set.js';
 import { stamp } from './stamp.js';
 import { argumentsProblem, columnNames, refuseNamed, requireTable, rowFilter } from './support.js';
 import { type CellValue, type Column, type Row, type Table, comparable } from './table.js';
@@ -54,6 +55,7 @@ export const genericVerbs: Readonly<Record<string, Verb>> = {
   stamp: { kind: 'transform', run: stamp },
   group: { kind: 'transform', run: group },
   count: { kind: 'transform', run: count },
+  set: { kind: 'transform', run: set },
   warn: { kind: 'transform', run: warn },
 };
 

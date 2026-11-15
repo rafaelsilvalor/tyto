@@ -1,7 +1,7 @@
 # Recipes
 
 ::: info How this page was checked
-Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a step in a tab was checked on 2026-11-08 by the same suite, drawing the 5,000 rows full size and closing the recipe. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Writing briefs with `to-brief` was checked on 2026-11-08 by a test of the desktop's main process that plans three rows into a folder, applies the plan and renders each brief with `tyto render`, not in the window. A run on an interval fetching past a source's cache was checked on 2026-11-11 by a test of the desktop's main process with a source that keeps its answers for ten minutes, not in the window. Sending with `call` was checked on 2026-11-11 by tests of the shared recipe runner against a stand-in endpoint, not over the network and not in the window. `tyto recipe run` was checked on 2026-11-11 by the command line's tests, through the shared runner with a stand-in plugin that plans 120 operations and a stand-in endpoint, not by hand. Making a recipe and a vocabulary, and the vocabulary tab's marks, were checked on 2026-11-11 by the desktop test suite that starts from an empty trusted folder, and its completion and hover by unit tests. Adding and editing steps by form was checked on 2026-11-11 by the desktop test suite that builds a recipe from an empty trusted folder with a source plugin, `where`, `select` and `rules`, runs it and compares the saved file with the lines the forms showed, and by the same suite reopening the last step with **Edit step**; a refused value and the completion of a vocabulary reference by unit tests. Planning a step again after Apply was checked on 2026-11-12 by the shared recipe runner's tests, with `to-brief` over a real folder and a stand-in plugin, not in the window. Blocks, their toolbar and **Run this block** were checked on 2026-11-12 by the desktop test suite that opens a recipe over a source plugin, runs one block, folds a result, moves a step up, deletes a note and compares the saved file; moving and deleting every block of a recipe by unit tests. The **+** between blocks, notes, the counter and **Run from here down** were checked on 2026-11-12 by the same suite, which inserts a step between two blocks with **+**, runs only that block, reads the counters, moves the block up and compares the saved file. Command mode was checked on 2026-11-13 by the desktop test suite that enters and leaves it from the keyboard, with vim on and off, selects a block of two steps whole, deletes and restores a note block, and checks that typing in the text still types and that vim's `dd` deletes one line, never a block. Menus and labels below are the English window's.
+Every behaviour below was checked on 2026-10-28 on a development build of Tyto on Windows 11, by the desktop test suite that opens a `.recipe` over an installed source plugin and counts the source's fetches: none on open, one on **Run recipe**, none on **Run from here**, one on **Fetch again**, none on an edit below the source. **Apply** was checked on 2026-11-07 by the same suite, applying the example recipe plugin's plan and reading each operation's mark. The Table view was checked on 2026-11-07 by a suite that scrolls a 5,000-row table to its last row, sorts it and filters it; copying was checked by unit tests, not in the window. Opening a step in a tab was checked on 2026-11-08 by the same suite, drawing the 5,000 rows full size and closing the recipe. Opening a `run` step was checked on 2026-11-08 by the same suite as Apply, reading the included recipe's tables and plan. Writing briefs with `to-brief` was checked on 2026-11-08 by a test of the desktop's main process that plans three rows into a folder, applies the plan and renders each brief with `tyto render`, not in the window. A run on an interval fetching past a source's cache was checked on 2026-11-11 by a test of the desktop's main process with a source that keeps its answers for ten minutes, not in the window. Sending with `call` was checked on 2026-11-11 by tests of the shared recipe runner against a stand-in endpoint, not over the network and not in the window. `tyto recipe run` was checked on 2026-11-11 by the command line's tests, through the shared runner with a stand-in plugin that plans 120 operations and a stand-in endpoint, not by hand. Making a recipe and a vocabulary, and the vocabulary tab's marks, were checked on 2026-11-11 by the desktop test suite that starts from an empty trusted folder, and its completion and hover by unit tests. Adding and editing steps by form was checked on 2026-11-11 by the desktop test suite that builds a recipe from an empty trusted folder with a source plugin, `where`, `select` and `rules`, runs it and compares the saved file with the lines the forms showed, and by the same suite reopening the last step with **Edit step**; a refused value and the completion of a vocabulary reference by unit tests. Planning a step again after Apply was checked on 2026-11-12 by the shared recipe runner's tests, with `to-brief` over a real folder and a stand-in plugin, not in the window. Blocks, their toolbar and **Run this block** were checked on 2026-11-12 by the desktop test suite that opens a recipe over a source plugin, runs one block, folds a result, moves a step up, deletes a note and compares the saved file; moving and deleting every block of a recipe by unit tests. The **+** between blocks, notes, the counter and **Run from here down** were checked on 2026-11-12 by the same suite, which inserts a step between two blocks with **+**, runs only that block, reads the counters, moves the block up and compares the saved file. Command mode was checked on 2026-11-13 by the desktop test suite that enters and leaves it from the keyboard, with vim on and off, selects a block of two steps whole, deletes and restores a note block, and checks that typing in the text still types and that vim's `dd` deletes one line, never a block. Dragging a block was checked on 2026-11-13 by the blocks suite, which drags the last block above another with the mouse, reads where the drop line is drawn, saves, and takes the move back with one undo; cancelling a drag by unit tests. Chaining steps on one line with `|` was checked on 2026-11-13 by the shared recipe parser's and runner's tests and by the window's unit tests for the counter and the block's result, not in the window. Menus and labels below are the English window's.
 :::
 
 A recipe (`.recipe`) is a list of steps, one per line, that fetch rows from a source, filter and reshape them, and plan what to write. Tyto opens a recipe in a tab as a notebook: **under each step, its result**, a table you can read while you write the next line.
@@ -57,6 +57,40 @@ At the top level the tab offers the three sections, `rules`, `rewrites` and `loo
 
 In the recipe, typing `@./` offers the vocabulary files beside it, and after the file's `#` the tables it holds, such as `/rules/kinds`. Only files in the recipe's own folder, or below it, are read for this.
 
+## Name values with const and set
+
+A recipe can name a value once and use it in any step below as `{name}`, the way it uses a `param`. There are two ways to name one, and `param`, `const` and `set` share one set of names: a name declared twice is refused with `E_RECIPE_SYNTAX`.
+
+**`const`** names a value written in the recipe. It goes in the header, beside the `param` lines, and every step can read it:
+
+```
+recipe weekly
+const team = Platform
+where team = {team}
+```
+
+Unlike a `param`, a `const` takes no value from outside: `--param team=…` on the command line, or `run weekly team=…` in another recipe, is refused with `E_RECIPE_PARAM`.
+
+**`set`** is a step that computes one value from the table at its line. It is written `set <name> = <aggregate> <column>`:
+
+```
+set last_due = max due
+where due = {last_due}
+```
+
+The aggregate is one of:
+
+- `count`: how many rows the table has. It takes no column: `set total = count`.
+- `min` and `max`: the least and the greatest value of the column, compared as numbers when every value that is not empty is a number, and as text without minding case or accents otherwise.
+- `first` and `last`: the column's value in the first and in the last row.
+- `sum`: the column's values added up. A value that is not a number is refused with `E_RECIPE_ARGUMENTS`, naming its row.
+
+The table passes through `set` unchanged, so the next step reads the same rows. Only the steps below a `set` can read its value; using it above, or in the `set` line itself, is refused with `E_RECIPE_PARAM`. On a table with no rows, `count` gives 0 and the others an empty value, which the step's result says.
+
+The block's result says each value its steps set, such as _Set last_due = 2026-12-01_, even when the `set` is not the block's last step (see [What a step shows](#what-a-step-shows)).
+
+In the editor, `const` is coloured as a header line, and a `set` step's name, `=` and aggregate each have their colour. Typing `{` in a step offers the names in scope there: every `param` and `const`, and each `set` above the step. After `set <name> = ` the editor offers the aggregates.
+
 ## When it runs
 
 A recipe runs by itself, but not everything runs at every moment:
@@ -78,6 +112,7 @@ Only the steps that changed run again: a step whose line did not change keeps it
 Under each block's last step is one line, then its table. A block of several steps shows only its last step's result (see [Work in blocks](#work-in-blocks)):
 
 - **The line** says what the step answered: _12 rows · 4 columns_, a plan (_Plan: 3 to write to Pauta_), _Failed: see Problems_, or why it did not run.
+- **The values set**: each value a `set` step of the block set, such as _Set last_due = 2026-12-01_, and a note when one is empty. They stay on the line when the result is folded. See [Name values with const and set](#name-values-with-const-and-set).
 - **Its age**: when the step ran and how old its data is, such as _ran 2 min. ago · data fetched 3 hr. ago_. The data's age is when the source fetched it, which can be long before the step ran. The ages count up while the tab is open.
 - **The table** shows the step's first 20 rows, then how many it leaves out (_30 more rows_). A wide table scrolls sideways inside the step. A long value is cut with an ellipsis; point at it to read it whole, and point at a column's name to see its type.
 
@@ -128,9 +163,21 @@ The tab follows the recipe: a new run draws it again with the new rows, and it c
 
 ## Work in blocks
 
-A recipe reads as blocks, the way a notebook reads as cells. **A blank line separates one block from the next**: a block is the lines between two blank lines, and it can hold several steps and `#` comment lines. A block of comment lines only is a **note** block. The header (the `recipe` line, its `|` description and the `apply`, `every` and `param` lines at the top) is a block of its own, even with no blank line under it. A blank line belongs to no block. The block your cursor is in has a coloured bar at its left.
+A recipe reads as blocks, the way a notebook reads as cells. **A blank line separates one block from the next**: a block is the lines between two blank lines, and it can hold several steps and `#` comment lines. A block of comment lines only is a **note** block. The header (the `recipe` line, its `|` description and the `apply`, `every`, `param` and `const` lines at the top) is a block of its own, even with no blank line under it. A blank line belongs to no block. The block your cursor is in has a coloured bar at its left.
 
 **A block shows only its last step's result**, under that step's line. Every step of the block still runs, and a step's problem is still marked on its own line and listed in Problems; when a step in the middle fails, the block's line says _Skipped: a cell above failed_. To see the result of a step in the middle, put a blank line under it, which splits the block in two, or put the cursor on it and run **Open cell result in a tab**.
+
+### Chain steps on one line
+
+A `|` with a space on each side splits a line into steps, read exactly as if each were on its own line of the same block:
+
+```
+where status != done | sort due | show table
+```
+
+is three steps, and its block shows the result of the last one, `show table`. A problem in one of them is marked on that step's part of the line. A `|` with no step after it, or a header line such as `param` after a `|`, is refused with `E_RECIPE_SYNTAX`.
+
+**A `|` touching a word never splits**, so `extract title pattern=^(poster|flyer)` stays one step: its `|` is the pattern's, as the one in a placeholder's filter, `{team|upper}`, is the template's. Neither does a `|` inside double quotes, `where title matches "copy | web"`, or inside braces, nor the `|` that starts a description line in the header.
 
 On the first line of every block but the header, at the right, a small toolbar:
 
@@ -141,6 +188,8 @@ On the first line of every block but the header, at the right, a small toolbar:
 - **▾ Hide result** (**▸ Show result** when folded), on a block with a result: the same as the arrow on its result's line.
 
 The header's toolbar has **Run all**, which is **Run recipe**.
+
+To move a block further, drag it by its **grip** (⠿), at the far left of its first line: a line shows where it will drop, and it goes there with all its lines, its result and its fold, the blank lines staying between the blocks. **Escape** cancels a drag. One **Ctrl+Z** puts the block back. From the keyboard, **↑ Move up** and **↓ Move down** on its toolbar move it one place at a time. The header has no grip, and no block goes above it.
 
 A small **+** sits on the boundary above every block but the header, and one below the last block, just left of the toolbars. Press it and choose:
 
@@ -277,6 +326,23 @@ remember dispatched columns=title
 
 **Where the credential comes from.** In the command line it is an environment variable, `TYTO_RECIPE_CREDENTIAL_` followed by the name in upper case with every character that is not a letter or a digit turned into `_`: `token=routine-hook` reads `TYTO_RECIPE_CREDENTIAL_ROUTINE_HOOK`. `tyto mcp`'s `run_recipe` checks the list and the credential and shows the plan, and never sends: an agent can preview a dispatch, not carry one out. [`tyto recipe run --apply`](#run-from-the-terminal) sends them, in a trusted folder. **In the window**, open **Show plugins** and find **Recipe credentials** under the list of plugins: type the name `token=` uses and its value, and **Save** — or type the name and click **Import from file…** to store a file's text as the value. The value goes to the system keychain, and Tyto never shows it again: the section lists the names only, each with **Forget**, and saving the same name again replaces it. A credential is this computer's, for every folder on it; which hosts a recipe may send to is each folder's `recipes.call.hosts`, read only once you trust the folder. Until a credential is stored, the `call` line fails with a problem that says where to store it; once stored, the plan lists the requests and **Apply** sends them.
 
+## Sync a field both ways
+
+`decide` compares a field on two sides of a sync, row by row: the local side (a sheet's column), the remote side (a tracker's field, already mapped to the sheet's values) and what the last applied run left, which `last` reads. Whichever side changed since then wins: the row says `push`, `pull`, `same` or `hold` in `<column>_action`, and the step that writes to the remote side reads `<column>_push` and `<column>_pushes`.
+
+```
+last sync columns=owner
+decide owner local=owner remote=tracker_owner last=last_owner clear=push
+remember sync columns=owner when="owner_action != hold"
+```
+
+With `clear=push`, a cell emptied since the last run empties the remote field too; without it, the remote value fills the cell again. Because an empty cell is also what a sheet read that lost cells looks like, `decide` holds every clear of a run, pushes none of them and shows one warning on its line, in two cases:
+
+- **The column was lost.** The `local=` column is missing from the table, or empty on every row while the last run left values there. The warning names the column. Check the sheet and run again.
+- **Too many clears at once.** A run would push more clears than `clear-limit=`, 5 when not given. The warning gives the count. If you did mean to empty those cells, run once with a higher limit (`clear-limit=20`), or write `clear-limit=none` to lift the limit.
+
+A held row reads `hold` and pushes nothing, and the state keeps its last value, so the next run sees the same clears again. Clears at or under the limit push as before.
+
 ## Run from the terminal
 
 `tyto recipe run <recipe>` runs a recipe in the workspace folder that holds it, with that folder's trust, through the same runner as the window. [Get the command](../command-line/index.md#get-the-command) says how to build it.
@@ -285,10 +351,10 @@ remember dispatched columns=title
 tyto recipe run recipes/sync.recipe
 ```
 
-It prints one line per step, with its status and how many rows its table has, and under a step that writes, every operation of its plan, one per line: none is left out. It writes nothing and remembers nothing, as a save does; a recipe with `apply auto` only shows its plans.
+It prints one line per step, with its status and how many rows its table has, under a `set` step the value it set (`set last_due = "2026-12-01"`) and its note, and under a step that writes, every operation of its plan, one per line: none is left out. It writes nothing and remembers nothing, as a save does; a recipe with `apply auto` only shows its plans.
 
 - `--json` prints the whole answer as one JSON document: every row of every table with where it came from, every operation with its description and the plugin's data for applying it, and every problem with the line it points at. Send it to a file to keep a day's plan: `tyto recipe run recipes/sync.recipe --json > plan.json`.
-- `--param <name>=<value>` gives one of the recipe's `param` lines a value for this run; repeat it for each. A name the recipe does not declare is an error.
+- `--param <name>=<value>` gives one of the recipe's `param` lines a value for this run; repeat it for each. A name the recipe does not declare is an error, and so is a `const`'s.
 - `--section <plugin>.<key>=<value>` sets a key of a plugin's section for this run, as in [`tyto render`](../command-line/render.md#other-options). A recipe's steps are handed sections only in a trusted folder, typed or not.
 - `--apply` applies every plan once, as a click on **Apply** does, and remembers what the recipe remembers. It runs only in a trusted folder: anywhere else it is refused before any step runs. A recipe with `apply auto` applies once too. It is how the command line sends a `call` step's requests.
 

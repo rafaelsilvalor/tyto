@@ -39,6 +39,8 @@ import { type LineNumbersLook } from '../../shared/line-numbers.js';
 import { type CommandsOrder } from '../../shared/command-runs.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type CliRunner } from './cli-runner.js';
+import type { OfferedRecipes } from './cli-offers.js';
+import { commandTemplates } from './command-templates.js';
 import { type Terminals } from './terminal.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
@@ -311,12 +313,32 @@ export interface IpcDependencies {
    */
   readonly explorer: Pick<
     ExplorerService,
-    'list' | 'filePath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf' | 'idsTo' | 'folderOf'
+    | 'list'
+    | 'filePath'
+    | 'image'
+    | 'read'
+    | 'create'
+    | 'rename'
+    | 'copy'
+    | 'delete'
+    | 'pathOf'
+    | 'idsTo'
+    | 'folderOf'
   >;
   /** A new delivery in the open folder (TYTO-489, ADR 0157): planned and written by main. */
   readonly delivery: DeliveryService;
   /** `tyto` commands run in main for the window (TYTO-495, ADR 0159). */
-  readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands' | 'diagnosticPath'>;
+  readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'capture' | 'commands' | 'diagnosticPath'>;
+  /** The recipe a refused `--apply`'s box offered to open, once, by run (TYTO-726). */
+  readonly offeredRecipes: Pick<OfferedRecipes, 'take'>;
+  /**
+   * The command panel's aliases (TYTO-536): read from the setting and the open folder, and
+   * written by `alias` to one of them, main checking every write (`command-aliases.ts`).
+   */
+  readonly commandAliases: {
+    list: () => IpcResponse<'commands:aliases'>;
+    set: (request: IpcRequest<'commands:set-alias'>) => Promise<IpcResponse<'commands:set-alias'>>;
+  };
   /** The terminals, which main owns and the window only draws and types into (ADR 0164). */
   readonly terminals: Pick<Terminals, 'open' | 'input' | 'resize' | 'kill' | 'list'>;
   /**
@@ -494,6 +516,13 @@ function wireOutline(setting: SettingOutline): IpcResponse<'settings:outline'>['
   };
 }
 
+/**
+ * Why `cli:run` did not start a command in the folder the window named (TYTO-537, ADR 0201): the
+ * id names no folder inside the open one any more, or never did.
+ */
+export const WORKING_FOLDER_REFUSED =
+  "The panel's folder is no longer inside the open workspace folder. Type cd to go back to its root.";
+
 /** What crosses the bridge of a diagnostic: the fields the contract names, and no others. */
 const wireDiagnostic = (item: TemplateDiagnostic) => ({
   severity: item.severity,
@@ -534,6 +563,8 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
   const {
     askToSave,
     cli,
+    commandAliases,
+    offeredRecipes,
     terminals,
     confirm,
     contextMenu,
@@ -820,6 +851,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     // TYTO-366, ADR 0124: an image for the preview, by id, as bytes main checked.
     // TYTO-274: the image's tab says where it is, as a brief's does (ADR 0086, ADR 0125).
+    'explorer:read': ({ entryId }) => explorer.read(entryId),
     'explorer:image': async ({ entryId, have }) => {
       const answer = await explorer.image(entryId, have);
       const path = explorer.pathOf(entryId);
@@ -831,8 +863,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     // place that holds both the explorer and the documents.
     // TYTO-402, ADR 0176: New recipe and New vocabulary write their skeleton through the same
     // create, so an existing file is refused, never replaced.
-    'explorer:create': async ({ documentId, parentId, name, kind, seed }) => {
-      const seeded = seed === undefined || kind !== 'file' ? undefined : seedOf(name, seed);
+    'explorer:create': async ({ documentId, parentId, name, kind, seed, text }) => {
+      const seeded = seed === undefined || kind !== 'file' ? undefined : seedOf(name, seed, text);
+      // Text rides only on a brief's seed: it is never a way to write any other file.
+      if (text !== undefined && seed !== 'brief') return { ok: false, reason: 'invalid' };
       if (seeded !== undefined && !seeded.ok) return seeded;
       const made = await explorer.create(parentId, seeded?.name ?? name, kind, seeded?.text);
       if (!made.ok) return made;
@@ -896,14 +930,19 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return started.then(({ exportId }) => ({ ok: true, exportId, directory: found.exports }));
     },
 
-    'explorer:rename': async ({ entryId, name }) => {
-      const renamed = await explorer.rename(entryId, name);
+    'explorer:rename': async ({ entryId, name, parentId }) => {
+      const renamed = await explorer.rename(entryId, name, parentId);
       if (!renamed.ok) return renamed;
       return {
         ok: true,
         entry: renamed.entry,
         moved: documents.retargetUnder(renamed.from, renamed.to),
       };
+    },
+
+    'explorer:copy': async ({ entryId, parentId, name }) => {
+      const copied = await explorer.copy(entryId, parentId, name);
+      return copied.ok ? { ok: true, entry: copied.entry } : copied;
     },
 
     'explorer:tabs-under': async ({ entryId }) => {
@@ -1056,7 +1095,28 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       });
     },
 
-    'cli:run': ({ argv }) => Promise.resolve(cli.start(argv)),
+    'cli:run': async ({ argv, folder, origin }) => {
+      if (folder === undefined) return cli.start(argv, undefined, origin);
+      // Checked here, not trusted from the window (ADR 0201): an id main minted for a folder
+      // whose real path still lies inside the open one, or the command does not start.
+      const cwd = await explorer.folderOf(folder);
+      if (cwd === undefined) throw new Error(WORKING_FOLDER_REFUSED);
+      return cli.start(argv, cwd, origin);
+    },
+
+    'commands:aliases': () => Promise.resolve(commandAliases.list()),
+
+    'commands:set-alias': (request) => commandAliases.set(request),
+
+    // TYTO-729: what a render in the panel's folder can use, by the runner `cli:run` uses and
+    // after the same folder check; a folder outside the open one lists nothing, quietly.
+    'commands:templates': async ({ folder }) => {
+      const capture = (argv: readonly string[], cwd?: string) => cli.capture(argv, cwd);
+      if (folder === undefined) return commandTemplates(capture, undefined);
+      const cwd = await explorer.folderOf(folder);
+      if (cwd === undefined) return { templates: [], note: WORKING_FOLDER_REFUSED };
+      return commandTemplates(capture, cwd);
+    },
 
     'cli:cancel': ({ runId }) => {
       cli.cancel(runId);
@@ -1072,6 +1132,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       if (path === undefined || !opensInTab(path)) {
         return { document: null, documentId: null };
       }
+      return documents.openPath(documentId, path);
+    },
+
+    'cli:open-recipe': async ({ documentId, runId }) => {
+      const path = offeredRecipes.take(runId);
+      if (path === undefined) return { document: null, documentId: null };
       return documents.openPath(documentId, path);
     },
 

@@ -5,6 +5,7 @@ import {
   parseRecipe,
   recipeBlocks,
   recipeLines,
+  recipeSteps,
 } from '@tyto/recipe';
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
@@ -185,12 +186,15 @@ export interface RecipeNotebook {
   keepView(documentId: string, at: number, state: RecipeViewState): void;
   /**
    * A full-size tab drawing cell `index` of the last answer (TYTO-642): from now on it follows
-   * that cell's line, not its index. A tab already following a cell keeps it.
+   * that cell's line, not its index, and, on a line that chains steps with `|`, which of the
+   * line's steps it is, counted from the line's first (TYTO-711). A tab already following a
+   * cell keeps it.
    */
   followCell(tabId: string, documentId: string, index: number): void;
   /**
-   * The index, in the last answer, of the cell a tab follows: the cell now on its line, or
-   * `undefined` once that line was deleted, or when no cell of the answer is on it.
+   * The index, in the last answer, of the cell a tab follows: the cell now on its line, the
+   * same one of the line's steps on a chained line, or `undefined` once that line was deleted,
+   * or when the answer has no such cell on it.
    */
   cellOfTab(tabId: string): number | undefined;
   /** What a full-size tab's view keeps across a rebuild (TYTO-639), apart from its cell's. */
@@ -240,9 +244,18 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const places = new Map<string, Map<number, number | undefined>>();
   /** The edits since the newest request took its text, to move its answer's lines through. */
   const since = new Map<string, LineMap[]>();
+  /**
+   * Each full-size tab's cell, by the start of its line and, on a line that chains steps, which
+   * of the line's cells it is, the first being 0 (TYTO-711): a one-step line's is always 0.
+   */
   const tabs = new Map<
     string,
-    { readonly documentId: string; at: number | undefined; view: RecipeViewState }
+    {
+      readonly documentId: string;
+      at: number | undefined;
+      readonly nth: number;
+      view: RecipeViewState;
+    }
   >();
   let requests = 0;
 
@@ -437,22 +450,25 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     },
     followCell(tabId, documentId, index) {
       if (tabs.has(tabId)) return;
-      tabs.set(tabId, { documentId, at: places.get(documentId)?.get(index), view: {} });
+      const placed = places.get(documentId);
+      const at = placed?.get(index);
+      const nth = at === undefined ? 0 : Math.max(0, cellsOnLine(placed, at).indexOf(index));
+      tabs.set(tabId, { documentId, at, nth, view: {} });
     },
     cellOfTab(tabId) {
       const tab = tabs.get(tabId);
       if (tab?.at === undefined) return undefined;
-      for (const [index, at] of places.get(tab.documentId) ?? []) {
-        if (at === tab.at) return index;
-      }
-      return undefined;
+      return cellsOnLine(places.get(tab.documentId), tab.at)[tab.nth];
     },
     cellAt(documentId, at) {
+      // A line that chains steps with `|` holds several cells; its result is its last one's
+      // (TYTO-706, ADR 0196 decision 2), so the last cell placed on the line answers.
+      let found: number | undefined;
       for (const [index, place] of places.get(documentId) ?? []) {
-        if (place !== at) continue;
-        return last.get(documentId)?.answer.cells.find((cell) => cell.index === index);
+        if (place === at && (found === undefined || index > found)) found = index;
       }
-      return undefined;
+      if (found === undefined) return undefined;
+      return last.get(documentId)?.answer.cells.find((cell) => cell.index === found);
     },
     executionOf: (documentId, text) =>
       executionMarks({
@@ -484,6 +500,19 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       for (const [tabId, tab] of tabs) if (tab.documentId === documentId) tabs.delete(tabId);
     },
   };
+}
+
+/**
+ * The cells of the last answer placed on the line starting at `at`, in order: one on a line
+ * with one step, one per step on a line that chains them with `|` (TYTO-706).
+ */
+function cellsOnLine(
+  placed: ReadonlyMap<number, number | undefined> | undefined,
+  at: number,
+): readonly number[] {
+  const found: number[] = [];
+  for (const [index, place] of placed ?? []) if (place === at) found.push(index);
+  return found.sort((left, right) => left - right);
 }
 
 /**
@@ -531,12 +560,14 @@ export function executionMarks(input: {
   readonly countAt: (at: number) => number | undefined;
   readonly running: RecipeRunScope | undefined;
 }): readonly ExecutionMark[] {
-  const steps = recipeLines(input.text, 'step');
+  // One mark per step, a line chaining steps with `|` giving several (TYTO-706); a run's number
+  // is kept by the step's line, so it is read there.
+  const steps = recipeSteps(input.text);
   const changed = firstStale(input.text, input.shown);
   const start = Math.min(changed, input.running?.from ?? Infinity);
   const end = input.running?.until ?? Infinity;
-  return steps.map((block, index) => {
-    const count = input.countAt(block.from);
+  return steps.map((step, index) => {
+    const count = input.countAt(step.line);
     if (input.running !== undefined && index >= start && index <= end) return { state: 'running' };
     if (count === undefined) return { state: 'never' };
     return { state: index >= changed ? 'stale' : 'ran', count };
@@ -548,19 +579,18 @@ export function executionMarks(input: {
  * (wherever its block is, every step), or a cell not `ok`.
  */
 function firstStale(text: string, shown: Shown | undefined): number {
-  const steps = recipeLines(text, 'step');
+  const steps = recipeSteps(text);
   if (shown === undefined) return 0;
   const header = (source: string): string =>
     recipeLines(source, 'header')
       .map((line) => source.slice(line.from, line.to))
       .join('\n');
   if (header(text) !== header(shown.text)) return 0;
-  const ran = recipeLines(shown.text, 'step');
-  const differs = steps.findIndex((block, index) => {
+  const ran = recipeSteps(shown.text);
+  const differs = steps.findIndex((step, index) => {
     const then = ran[index];
     return (
-      then === undefined ||
-      text.slice(block.from, block.to) !== shown.text.slice(then.from, then.to)
+      then === undefined || text.slice(step.from, step.to) !== shown.text.slice(then.from, then.to)
     );
   });
   const notOk = shown.answer.cells
@@ -682,21 +712,76 @@ export function stepSlot(text: string, cursorLine: number): StepSlot {
 }
 
 /**
- * The step on the cursor's line, for Edit step (TYTO-402): its index among the steps and its
- * line's range, or `undefined` when that line is no step or the text does not parse.
+ * The step under the cursor at `offset`, by its index among `recipeSteps(text)`, which is its
+ * cell's; `undefined` when the cursor's line holds no step (TYTO-711, ADR 0196 note of
+ * 2026-11-14). On a line that chains steps with `|`:
+ *
+ * - **inside a step's text, or touching either end of it**, that step;
+ * - **on the blanks or the `|` between two steps**, the step after the `|` when the cursor is
+ *   after it, else the step before: the caret right before the `|` is the left step's, the caret
+ *   right after it the right step's;
+ * - **before the first step** (its indent), the first; **past the last**, the last.
+ *
+ * A line with one step answers that step wherever the cursor is on it, as before chaining.
  */
-export function stepOnLine(
+export function stepIndexAt(text: string, offset: number): number | undefined {
+  const lineStart = offset <= 0 ? 0 : text.lastIndexOf('\n', offset - 1) + 1;
+  const onLine = recipeSteps(text)
+    .map((step, index) => ({ ...step, index }))
+    .filter((step) => step.line === lineStart);
+  for (const [position, step] of onLine.entries()) {
+    const next = onLine[position + 1];
+    if (next === undefined || offset <= step.to) return step.index;
+    if (offset < next.from) {
+      // Between the two: the one `|` that split them stands somewhere in this gap.
+      const bar = text.lastIndexOf('|', next.from - 1);
+      return offset > bar ? next.index : step.index;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The step under the cursor, for Edit step (TYTO-402, TYTO-711): its index among the steps and
+ * its own range, a chained line's segment and not the whole line, chosen by
+ * {@link stepIndexAt}; `undefined` when the cursor's line is no step or the text does not parse.
+ */
+export function stepAtCursor(
   text: string,
-  cursorLine: number,
+  offset: number,
 ): { readonly index: number; readonly step: Step } | undefined {
   const parsed = parseRecipe(text);
   if (!parsed.ok) return undefined;
-  const starts = lineStarts(text);
-  const index = parsed.value.steps.findIndex(
-    (step) => lineOf(starts, step.range.start) === cursorLine,
-  );
+  const under = stepIndexAt(text, offset);
+  const from = under === undefined ? undefined : recipeSteps(text)[under]?.from;
+  if (from === undefined) return undefined;
+  const index = parsed.value.steps.findIndex((step) => step.range.start === from);
   const step = parsed.value.steps[index];
   return step === undefined ? undefined : { index, step };
+}
+
+/**
+ * The cell "Open cell result in a tab" opens (TYTO-379, TYTO-711): the cell at or above the
+ * cursor's line, as {@link cellAtOrAbove} finds it, and, when the cursor is on a line that chains
+ * steps, the cell of the step under it ({@link stepIndexAt}), counted among that line's cells.
+ * The text is the one in the editor now; the answer's cells are matched by their line.
+ */
+export function cellUnderCursor(
+  answer: RecipeRunAnswer,
+  text: string,
+  cursor: { readonly line: number; readonly offset: number },
+): number | undefined {
+  const above = cellAtOrAbove(answer, cursor.line);
+  const onLine = answer.cells
+    .filter((cell) => cell.line === cursor.line)
+    .map((cell) => cell.index)
+    .sort((left, right) => left - right);
+  const under = stepIndexAt(text, cursor.offset);
+  if (onLine.length < 2 || under === undefined) return above;
+  const steps = recipeSteps(text);
+  const lineStart = steps[under]?.line;
+  const first = steps.findIndex((step) => step.line === lineStart);
+  return onLine[under - first] ?? onLine.at(-1);
 }
 
 /**
@@ -717,12 +802,8 @@ export function columnsBefore(
   return found?.table?.columns.map((column) => column.name) ?? [];
 }
 
-/** The one-based line a character offset is on, by the starts of the lines. */
-function lineOf(starts: readonly number[], offset: number): number {
-  let line = 1;
-  while (line < starts.length && (starts[line] ?? Infinity) <= offset) line += 1;
-  return line;
-}
+/** TYTO-727, ADR 0199: a value a `set` step set, as the wire carries it. */
+export type NamedValue = NonNullable<WireCell['named']>;
 
 /** One cell's line: where it goes, what it says, and whether it is a failure. */
 export interface CellStatus {
@@ -734,6 +815,12 @@ export interface CellStatus {
   /** The cell as it came, for its table, its age and whether it fetches. */
   readonly cell: WireCell;
   readonly held: RecipeRunAnswer['held'];
+  /**
+   * TYTO-727: the values `set` steps set and their notes, in the order they ran: the cell's
+   * own, and once {@link blockResults} has read the blocks, every step's of its block.
+   */
+  readonly named?: readonly NamedValue[];
+  readonly notes?: readonly string[];
 }
 
 /**
@@ -762,6 +849,8 @@ export function cellStatuses(
       failed: cell.status === 'failed',
       cell,
       held: answer.held,
+      ...(cell.named === undefined ? {} : { named: [cell.named] }),
+      ...(cell.note === undefined ? {} : { notes: [cell.note] }),
     });
   }
   return statuses;
@@ -818,12 +907,30 @@ function counted(
  * The lines a block's result is drawn under (TYTO-676, ADR 0196): only each block's last step's.
  * The other steps run and are kept, and their problems are marked at their lines, but nothing is
  * drawn under them. Applied to `cellStatuses`' lines by the window.
+ *
+ * A value a `set` step set is the one thing of a hidden step the block's result still shows
+ * (TYTO-727, ADR 0199): the drawn status carries every step's of its block, with their notes,
+ * since a `set` in the middle of a block is the usual place for one.
  */
 export function blockResults(text: string, statuses: readonly CellStatus[]): readonly CellStatus[] {
-  const drawn = new Set(
-    recipeBlocks(text).flatMap((block) => (block.steps === undefined ? [] : [block.steps.last])),
-  );
-  return statuses.filter((status) => drawn.has(status.index));
+  const shown: CellStatus[] = [];
+  for (const block of recipeBlocks(text)) {
+    const steps = block.steps;
+    if (steps === undefined) continue;
+    const drawn = statuses.find((status) => status.index === steps.last);
+    if (drawn === undefined) continue;
+    const inBlock = statuses.filter(
+      (status) => status.index >= steps.first && status.index <= steps.last,
+    );
+    const named = inBlock.flatMap((status) => status.named ?? []);
+    const notes = inBlock.flatMap((status) => status.notes ?? []);
+    shown.push({
+      ...drawn,
+      ...(named.length === 0 ? {} : { named }),
+      ...(notes.length === 0 ? {} : { notes }),
+    });
+  }
+  return shown;
 }
 
 /** Each line's start, by index: `starts[n - 1]` is line `n`'s. */

@@ -365,6 +365,13 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           values: ['push', 'pull'],
           default: 'pull',
         }),
+        named(
+          'clear-limit',
+          'text',
+          false,
+          'With clear=push, the most clears one run pushes, or none for no limit.',
+          { default: '5' },
+        ),
       ],
     ),
     form(
@@ -398,6 +405,22 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       positional('column', 'column', true, 'The list column to count.'),
       named('into', 'column', false, 'The number column to write.', { default: 'count' }),
     ]),
+    form(
+      'set',
+      'Keeps one value computed from the table, which the steps below read as {name}.',
+      'set last_due = max due',
+      [
+        {
+          name: 'assignment',
+          kind: 'expression',
+          placement: 'rest',
+          required: true,
+          help:
+            'Written name = aggregate column, as last_due = max due. The aggregate is count, ' +
+            'which takes no column, or min, max, first, last or sum.',
+        },
+      ],
+    ),
     form(
       'warn',
       'Reports each row an expression keeps as a warning of the run.',

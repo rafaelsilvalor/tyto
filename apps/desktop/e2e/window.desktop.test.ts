@@ -277,7 +277,13 @@ describe('the bridge', () => {
       'cli:cancel',
       'cli:commands',
       'cli:open-diagnostic',
+      'cli:open-recipe',
       'cli:run',
+      // TYTO-536: the command panel's aliases in force, and alias's one write, main checking.
+      'commands:aliases',
+      'commands:set-alias',
+      // TYTO-729: the templates the panel completes, `tyto template list` in its folder.
+      'commands:templates',
       'credentials:delete',
       // TYTO-649: a key file stored from the plugins screen; main picks and reads it, and the
       // answer is an outcome. Exercised by `e2e/credential-file.desktop.test.ts`.
@@ -298,6 +304,8 @@ describe('the bridge', () => {
       'editor:vim-mode',
       // TYTO-279, ADR 0115: the explorer, by ids main minted.
       // TYTO-352, ADR 0121: new, rename and delete by id and name, and the tabs under an entry.
+      // TYTO-537, ADR 0201: the command panel's `cp`, by ids and a name.
+      'explorer:copy',
       'explorer:create',
       'explorer:delete',
       // TYTO-366, ADR 0124: an image for the preview, by id. Exercised by
@@ -305,6 +313,8 @@ describe('the bridge', () => {
       'explorer:image',
       'explorer:list',
       'explorer:open',
+      // TYTO-537, ADR 0201: the text of a file, by id, for the command panel's `cat`.
+      'explorer:read',
       'explorer:rename',
       'explorer:tabs-under',
       'export:cancel',
@@ -601,6 +611,26 @@ describe('switching the language', () => {
     // TYTO-495: the native box a `tyto` command run in the window asks through (ADR 0159).
     'cli.confirm.yes',
     'cli.confirm.no',
+    // TYTO-726: the refusal's offer is a native box, like the confirm above.
+    'cli.offer.trust.message',
+    'cli.offer.trust.detail',
+    'cli.offer.trust.yes',
+    'cli.offer.signin.message',
+    'cli.offer.signin.detail',
+    'cli.offer.signin.yes',
+    'cli.offer.signout.message',
+    'cli.offer.signout.detail',
+    'cli.offer.signout.yes',
+    'cli.offer.apply.message',
+    'cli.offer.apply.detail',
+    'cli.offer.apply.yes',
+    'cli.offer.watch.message',
+    'cli.offer.watch.detail',
+    'cli.offer.watch.yes',
+    'cli.offer.no',
+    // TYTO-536: the line the offer box adds when the refused line came from an alias.
+    'cli.offer.origin.user',
+    'cli.offer.origin.workspace',
     // TYTO-497, ADR 0164: the Terminal tab is closed until Ctrl+Shift+` opens it and renders its
     // own words, the paste and quit questions are boxes, and its command is the bar's text only;
     // `terminal-panel.test.ts` holds the tab's.
@@ -1078,6 +1108,7 @@ describe('switching the language', () => {
     'recipe.block.run',
     'recipe.block.up',
     'recipe.block.down',
+    'recipe.block.drag',
     'recipe.block.delete',
     // TYTO-676: command mode's commands, whose titles the command bar shows, never an element on
     // load; `commands.test.ts` lists them, `recipe-command-mode.desktop.test.ts` runs their keys.
@@ -1102,6 +1133,12 @@ describe('switching the language', () => {
     'recipe.cell.openTab',
     'recipe.view.tab',
     'recipe.view.empty',
+    // TYTO-727: what a block's `set` steps set and their notes, drawn only in the header of a
+    // recipe's result once a run set a value; `recipe-cell-view.test.ts` paints all three in
+    // both languages.
+    'recipe.cell.named',
+    'recipe.cell.named.empty',
+    'recipe.cell.note',
     // TYTO-378: drawn only under a plan cell; `recipe-plan-view.test.ts` paints them in both
     // languages, and `recipe-notebook.desktop.test.ts` clicks Apply in the real window.
     'recipe.plan.apply',

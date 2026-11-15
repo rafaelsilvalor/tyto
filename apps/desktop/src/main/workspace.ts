@@ -4,6 +4,7 @@ import { basename, dirname, join, relative } from 'node:path';
 import {
   type Diagnostic,
   PROFILES_DIRECTORY,
+  type ProjectAlias,
   PROFILE_FILE_NAME,
   type ResolvedDelivery,
   type Result,
@@ -24,6 +25,7 @@ import {
 import { PLUGIN_FILE_EXTENSION } from '@tyto/plugin-api';
 
 import type { IpcResponse } from '../../shared/ipc.js';
+import { type AliasWritten, writeWorkspaceAlias } from './command-aliases.js';
 import { type FontsInForce, fontsFor } from './fonts.js';
 
 /**
@@ -130,6 +132,23 @@ export interface WorkspaceService {
    * `undefined` with nothing open, where the window makes no delivery.
    */
   deliveryLayout(): { readonly root: string; readonly delivery: ResolvedDelivery } | undefined;
+  /**
+   * The open folder's command panel aliases and its trust (TYTO-536); `undefined` with nothing
+   * open. A restricted folder's are already withheld by the resolver, so the list is empty.
+   */
+  aliases():
+    | {
+        readonly trust: 'trusted' | 'restricted' | 'revoked';
+        readonly aliases: readonly ProjectAlias[];
+      }
+    | undefined;
+  /**
+   * `alias --workspace`: one alias written into the open folder's own `.tyto/project.json`, then
+   * the folder read again. Refused with nothing open and in a folder that is not trusted now,
+   * a trust taken back included: a shared folder's file is never written from the panel then.
+   * A work profile's file is never written: removing an alias only it defines is refused.
+   */
+  writeAlias(name: string, body: string | null): Promise<AliasWritten>;
 }
 
 /** The places of the resolved project: what a restricted folder refused is not among them. */
@@ -171,6 +190,8 @@ const NOTHING_OPEN: WorkspaceState = {
 const LEFT_OUT: ReadonlySet<string> = new Set([
   'W_PROJECT_PATH_OUTSIDE',
   'W_PROJECT_SECTIONS_WITHHELD',
+  // TYTO-536: a restricted folder's command panel aliases, never run until it is trusted.
+  'W_PROJECT_ALIASES_WITHHELD',
 ]);
 
 const PLACE_KEYS = ['assets', 'templates', 'fonts', 'output'] as const;
@@ -324,6 +345,26 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       if (open === undefined || recipeDirectory === undefined) return undefined;
       if (!isInside(open.folder, recipeDirectory)) return undefined;
       return open.project.callHosts;
+    },
+
+    aliases() {
+      if (open === undefined) return undefined;
+      return {
+        trust: revoked.folder ? 'revoked' : open.trust,
+        aliases: open.project.aliases,
+      };
+    },
+
+    async writeAlias(name, body) {
+      if (open === undefined) return { ok: false, reason: 'no-folder' };
+      if (open.trust !== 'trusted' || revoked.folder) return { ok: false, reason: 'restricted' };
+      // Only the folder's own file is written. An alias the profile alone defines is the
+      // profile's, shared by every folder that names it, and removing it is not this folder's.
+      const inForce = open.project.aliases.find((alias) => alias.name === name);
+      if (body === null && inForce?.origin === 'profile') return { ok: false, reason: 'profile' };
+      const written = await writeWorkspaceAlias(open.folder, name, body);
+      if (written.ok) await read(open.folder);
+      return written;
     },
 
     deliveryLayout() {
