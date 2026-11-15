@@ -105,4 +105,4 @@ as steps under the workspace root (`CommandSession.workingFolder`). It is the ro
   command then fails with a file it cannot find, far from the pattern that caused it.
 - **A `templates` built-in listing the window's templates.** The card asked for one. The CLI has
   no command that lists the templates in reach, and the panel does not reimplement one in the
-  renderer: a `tyto` command that does would make it a one-line entry. Left open.
+  renderer: a `tyto` command that does would make it a one-line entry. TYTO-728 adds both.
