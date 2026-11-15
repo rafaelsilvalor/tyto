@@ -30,6 +30,8 @@ interface Harness {
   readonly history: string[];
   /** The folder id each run was started in, `undefined` for the root (TYTO-537). */
   readonly folders: (string | undefined)[];
+  /** What the file writes asked the Explorer to make (TYTO-537). */
+  readonly written: unknown[][];
 }
 
 async function mount(
@@ -56,6 +58,7 @@ async function mount(
     opened: [],
     history: options.history ?? [],
     folders: [],
+    written: [],
   };
   let runs = 0;
   const ports: CommandPanelPorts = {
@@ -93,6 +96,27 @@ async function mount(
       });
     },
     read: (entryId) => Promise.resolve(options.texts?.[entryId] ?? { ok: false, reason: 'gone' }),
+    // TYTO-537: the Explorer's writes, recorded; only `create` is reached from here.
+    writes: {
+      create: (parentId, name, kind) => {
+        harness.written.push([parentId, name, kind]);
+        return Promise.resolve({
+          ok: true,
+          entry: { id: name, name, kind: kind === 'folder' ? 'folder' : 'file' },
+          document: null,
+          documentId: null,
+        });
+      },
+      move: () => Promise.resolve({ ok: false, reason: 'gone' }),
+      copy: () => Promise.resolve({ ok: false, reason: 'gone' }),
+      unsavedUnder: () => Promise.resolve(0),
+      confirmRemove: () => Promise.resolve(false),
+      remove: () => Promise.resolve({ ok: false, reason: 'gone' }),
+      open: () => Promise.resolve(false),
+      reveal: () => undefined,
+      skeletonOf: () => undefined,
+      bin: 'Recycle Bin',
+    },
   };
   element.locale = options.locale ?? 'en';
   element.sessions = sessions;
@@ -881,5 +905,33 @@ describe('the file commands that read (TYTO-537, ADR 0201)', () => {
     input(harness.element).value = 'cd n';
     await press(harness.element, input(harness.element), 'Tab');
     expect(asked).toEqual([['entregas']]);
+  });
+});
+
+describe('the file commands that write (TYTO-537, ADR 0201)', () => {
+  const settle = async (element: CommandPanel): Promise<void> => {
+    for (let round = 0; round < 4; round += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await element.updateComplete;
+    }
+  };
+  const files: Record<string, ListedEntry[]> = { '': [{ name: 'entregas', kind: 'folder' }] };
+
+  it('make a folder through the Explorer, in the working folder', async () => {
+    const harness = await mount({ folder: '/work', files });
+    await typeAndRun(harness, 'cd entregas && mkdir novembro');
+    await settle(harness.element);
+    expect(harness.written).toEqual([['entregas', 'novembro', 'folder']]);
+    expect(headers(harness.element)).toEqual(['cd entregas', 'mkdir novembro']);
+  });
+
+  it('are refused in a restricted folder, naming Manage Trust, writing nothing', async () => {
+    const harness = await mount({ folder: '/work', files, restricted: true });
+    await typeAndRun(harness, 'mkdir novembro');
+    await settle(harness.element);
+    expect(harness.written).toEqual([]);
+    expect(lines(harness.element).at(-1)).toBe(
+      'mkdir does not run in a restricted folder. Trust it with Workspace: Manage Trust.',
+    );
   });
 });

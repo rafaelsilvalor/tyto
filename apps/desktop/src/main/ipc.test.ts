@@ -191,8 +191,14 @@ const explorerFiles = () => {
         path: `/work/promo/${name}`,
       });
     },
-    rename: (entryId: string, name: string): ReturnType<ExplorerService['rename']> => {
+    rename: (
+      entryId: string,
+      name: string,
+      parentId?: string | null,
+    ): ReturnType<ExplorerService['rename']> => {
       asked.push(entryId);
+      // TYTO-537: a move names the folder it goes into.
+      if (parentId !== undefined) asked.push(parentId);
       return Promise.resolve(
         entryId === 'e-folder'
           ? {
@@ -202,6 +208,23 @@ const explorerFiles = () => {
               to: `/work/promo/${name}`,
             }
           : { ok: false, reason: 'gone' },
+      );
+    },
+    // TYTO-537: `cp`, by ids and a name.
+    copy: (
+      entryId: string,
+      parentId: string | null,
+      name: string,
+    ): ReturnType<ExplorerService['copy']> => {
+      asked.push(entryId, parentId);
+      return Promise.resolve(
+        entryId === 'e-brief'
+          ? {
+              ok: true,
+              entry: { id: 'e-copy', name, kind: 'brief' },
+              path: `/work/promo/${name}`,
+            }
+          : { ok: false, reason: 'link' },
       );
     },
     delete: (entryId: string): ReturnType<ExplorerService['delete']> => {
@@ -3051,6 +3074,67 @@ describe('the explorer write channels', () => {
       create({ documentId: 'd-2', parentId: null, name: 'taken', kind: 'file', seed: 'recipe' }),
     ).resolves.toEqual({ ok: false, reason: 'exists' });
     expect(deps.explorer.written).toEqual([]);
+  });
+
+  // TYTO-537, ADR 0201: `new x.brief --template t` writes the window's skeleton, and nothing else.
+  it('writes a new brief with the text given, only for a .brief and under the cap', async () => {
+    const deps = dependencies();
+    const create = guard('explorer:create', createHandlers(deps)['explorer:create']);
+    const brief = (name: string, extra: Record<string, unknown> = {}) =>
+      create({
+        documentId: 'd-1',
+        parentId: null,
+        name,
+        kind: 'file',
+        seed: 'brief',
+        text: '---\ntemplate: story\n---\n',
+        ...extra,
+      } as never);
+
+    await expect(brief('cartaz.brief')).resolves.toMatchObject({ ok: true });
+    await expect(brief('notas.txt')).resolves.toEqual({ ok: false, reason: 'invalid' });
+    await expect(brief('sem-texto.brief', { text: undefined })).resolves.toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    // Text without the brief's seed is never a way to write a file.
+    await expect(
+      create({ documentId: 'd-2', parentId: null, name: 'x.txt', kind: 'file', text: 'hi' }),
+    ).resolves.toEqual({ ok: false, reason: 'invalid' });
+    await expect(brief('grande.brief', { text: 'x'.repeat(64 * 1024 + 1) })).rejects.toThrow();
+    expect(deps.explorer.written).toEqual([
+      { name: 'cartaz.brief', text: '---\ntemplate: story\n---\n' },
+    ]);
+  });
+
+  it('copies by ids and a name, and moves into a folder by its id (TYTO-537)', async () => {
+    const deps = dependencies();
+    const handlers = createHandlers(deps);
+    const copy = guard('explorer:copy', handlers['explorer:copy']);
+    const rename = guard('explorer:rename', handlers['explorer:rename']);
+
+    await expect(copy({ entryId: 'e-brief', parentId: null, name: 'b.brief' })).resolves.toEqual({
+      ok: true,
+      entry: { id: 'e-copy', name: 'b.brief', kind: 'brief' },
+    });
+    await expect(copy({ entryId: 'e-other', parentId: 'e-folder', name: 'x' })).resolves.toEqual({
+      ok: false,
+      reason: 'link',
+    });
+    await expect(
+      copy({ entryId: 'e-brief', parentId: null, name: 'b', path: '/etc' } as never),
+    ).rejects.toThrow();
+    await expect(
+      rename({ entryId: 'e-folder', name: 'capitulos', parentId: 'e-edit' }),
+    ).resolves.toMatchObject({ ok: true });
+    expect(deps.explorer.asked).toEqual([
+      'e-brief',
+      null,
+      'e-other',
+      'e-folder',
+      'e-folder',
+      'e-edit',
+    ]);
   });
 
   it('moves the tabs under a renamed entry and answers each one, never a path', async () => {

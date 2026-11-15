@@ -701,8 +701,11 @@ const explorerWriteFailure = z.object({
    * `recipe-name` (TYTO-402): a new recipe whose name `recipeSkeleton` refuses with
    * `E_RECIPE_FORM`, since a `run` line could not name it.
    */
-  reason: z.enum(['invalid', 'exists', 'gone', 'failed', 'recipe-name']),
-  /** With `failed` only: the system's error code (`EPERM`, `EROFS`), never a path. */
+  reason: z.enum(['invalid', 'exists', 'gone', 'failed', 'recipe-name', 'link']),
+  /**
+   * `link` (TYTO-537, ADR 0201): a copy refused because a link or junction is in it.
+   * With `failed` only: the system's error code (`EPERM`, `EROFS`), never a path.
+   */
   detail: z.string().max(100).optional(),
 });
 
@@ -723,6 +726,9 @@ const IMAGE_DATA_URL_MAX = Math.ceil(EXPLORER_IMAGE_MAX_BYTES / 3) * 4 + 64;
  * UTF-8 spends at least one byte on a character, so the text is at most this many characters.
  */
 export const EXPLORER_READ_MAX = 256 * 1024;
+
+/** The longest brief text `explorer:create` writes for `new x.brief --template t` (TYTO-537). */
+export const BRIEF_SEED_MAX = 64 * 1024;
 
 /** A tab whose file a rename moved, as the window shows it now. */
 const movedDocument = z.object({
@@ -1606,7 +1612,14 @@ export const IPC_CHANNELS = {
        * in the same call that refuses an existing file. A recipe name `recipeSkeleton` refuses
        * answers `recipe-name`.
        */
-      seed: z.enum(['recipe', 'vocabulary']).optional(),
+      seed: z.enum(['recipe', 'vocabulary', 'brief']).optional(),
+      /**
+       * With `seed: 'brief'` only (TYTO-537, ADR 0201): the new brief's text, the skeleton the
+       * window writes for a template, as it would save a tab's. Only for a `.brief` name, at
+       * most {@link BRIEF_SEED_MAX} characters, and in the same call that refuses an existing
+       * file.
+       */
+      text: z.string().max(BRIEF_SEED_MAX).optional(),
     }),
     z.discriminatedUnion('ok', [
       z.object({
@@ -1626,7 +1639,15 @@ export const IPC_CHANNELS = {
    * a tab with unsaved text keeps it.
    */
   'explorer:rename': channel(
-    z.strictObject({ entryId: explorerEntryId, name: explorerEntryName }),
+    z.strictObject({
+      entryId: explorerEntryId,
+      name: explorerEntryName,
+      /**
+       * A move (TYTO-537, ADR 0201): the folder it goes into, by id (`null` is the open folder).
+       * Main checks the entry and that folder at the call, and refuses a folder into itself.
+       */
+      parentId: explorerEntryId.nullable().optional(),
+    }),
     z.discriminatedUnion('ok', [
       z.object({ ok: z.literal(true), entry: explorerEntry, moved: z.array(movedDocument) }),
       explorerWriteFailure,
@@ -1644,6 +1665,25 @@ export const IPC_CHANNELS = {
     z.discriminatedUnion('ok', [
       z.object({ ok: z.literal(true), released: z.array(documentId) }),
       z.object({ ok: z.literal(false), reason: z.enum(['gone', 'trash-failed']) }),
+    ]),
+  ),
+
+  /**
+   * A copy of an entry, for the command panel's `cp` (TYTO-537, ADR 0201): `name` in the folder
+   * `parentId` names (`null` is the open folder). **Strict, ids and a name, never a path.** Main
+   * checks the source and the target folder at the call; nothing is overwritten (`exists`); a
+   * folder is never copied into itself (`invalid`); and a copy holding a link or junction is
+   * refused (`link`), the copy sent to the trash if one landed in it after the check.
+   */
+  'explorer:copy': channel(
+    z.strictObject({
+      entryId: explorerEntryId,
+      parentId: explorerEntryId.nullable(),
+      name: explorerEntryName,
+    }),
+    z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), entry: explorerEntry }),
+      explorerWriteFailure,
     ]),
   ),
 

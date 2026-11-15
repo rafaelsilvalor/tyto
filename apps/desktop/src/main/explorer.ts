@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { type Dirent, type FSWatcher, watch as watchFolder } from 'node:fs';
-import { lstat, mkdir, open, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  realpath,
+  rename,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { isInside } from '@tyto/io';
@@ -117,13 +127,29 @@ export interface ExplorerService {
     text?: string,
   ): Promise<ExplorerWrite<{ entry: ExplorerEntry; path: string }>>;
   /**
-   * Renames the entry in place, in its own folder. The entry keeps its id and everything under
-   * a folder keeps theirs, so an expanded subtree survives; `from` and `to` are for the tabs.
+   * Renames the entry in place, in its own folder, or moves it into the folder `parentId` names
+   * (the command panel's `mv`, TYTO-537): the entry's real path and the target folder's are
+   * checked at the call, and a folder is never moved into itself. The entry keeps its id and
+   * everything under a folder keeps theirs, so an expanded subtree survives; `from` and `to`
+   * are for the tabs.
    */
   rename(
     entryId: string,
     name: string,
+    parentId?: string | null,
   ): Promise<ExplorerWrite<{ entry: ExplorerEntry; from: string; to: string }>>;
+  /**
+   * Copies the entry to `name` in the folder `parentId` names (`null` is the root), for the
+   * command panel's `cp` (TYTO-537, ADR 0201). Source and target are checked at the call; a
+   * folder is never copied into itself; nothing is overwritten; and a copy that holds a link or
+   * junction is refused: before, by a walk of the source, and after, by a walk of the copy,
+   * which goes to the trash if one landed there anyway.
+   */
+  copy(
+    entryId: string,
+    parentId: string | null,
+    name: string,
+  ): Promise<ExplorerWrite<{ entry: ExplorerEntry; path: string }>>;
   /**
    * Moves the entry to the operating system's trash through the injected adapter, and forgets
    * its ids. A trash that fails answers `trash-failed` and leaves the entry where it was:
@@ -180,13 +206,28 @@ export interface ExplorerServiceOptions {
    * in for it. Absent, every delete answers `trash-failed`: there is no fallback to `rm`.
    */
   readonly trash?: (path: string) => Promise<void>;
+  /**
+   * Copies a file or a folder for `copy`, `fs.cp` with links copied as links and never followed.
+   * Injected so a test can change the source between the walk and the copy (TYTO-537).
+   */
+  readonly copyTree?: (from: string, to: string) => Promise<void>;
 }
+
+/** `copy`'s default: never overwrite, never follow a link (ADR 0201). */
+export const copyTreeOnDisk = (from: string, to: string): Promise<void> =>
+  cp(from, to, {
+    recursive: true,
+    force: false,
+    errorOnExist: true,
+    dereference: false,
+    verbatimSymlinks: true,
+  });
 
 /**
  * Why a new or a rename did not happen; see ADR 0121. `failed` is any other refusal from the
  * disk — a read-only drive, a permission — and carries the system's error code, never a path.
  */
-export type ExplorerWriteFailure = 'invalid' | 'exists' | 'gone' | 'failed';
+export type ExplorerWriteFailure = 'invalid' | 'exists' | 'gone' | 'failed' | 'link';
 
 export type ExplorerWrite<Done> =
   | ({ readonly ok: true } & Done)
@@ -631,14 +672,21 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       };
     },
 
-    async rename(entryId, name) {
+    async rename(entryId, name, parentId) {
       const current = root;
       const entry = entryOf.get(entryId);
       if (current === undefined || entry === undefined) return GONE;
       if (!checkEntryName(name)) return INVALID;
       const from = entry.path;
-      const folder = dirname(from);
+      // A move (TYTO-537): the target folder by its id, checked now, as a new entry's is.
+      const folder =
+        parentId === undefined ? dirname(from) : await folderToWriteIn(parentId, current.real);
+      if (folder === undefined) return GONE;
       if (!(await folderInside(folder, current.real)) || !(await exists(from))) return GONE;
+      if (parentId !== undefined) {
+        if (!(await entryInside(from, current.real))) return GONE;
+        if (await intoItself(from, folder)) return INVALID;
+      }
       const to = join(folder, name);
       if (dirname(resolve(to)) !== resolve(folder)) return INVALID;
       const isFolder = entry.kind === 'folder';
@@ -659,6 +707,56 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       }
       if (root !== current) return GONE;
       return { ok: true, entry: await describeEntry(to, isFolder, current.real), from, to };
+    },
+
+    async copy(entryId, parentId, name) {
+      const current = root;
+      const entry = entryOf.get(entryId);
+      if (current === undefined || entry === undefined) return GONE;
+      if (!checkEntryName(name)) return INVALID;
+      const from = entry.path;
+      const folder = await folderToWriteIn(parentId, current.real);
+      if (folder === undefined || !(await entryInside(from, current.real))) return GONE;
+      if (await intoItself(from, folder)) return INVALID;
+      const to = join(folder, name);
+      if (dirname(resolve(to)) !== resolve(folder)) return INVALID;
+      if (await exists(to)) return EXISTS;
+      // Nothing that leads anywhere is copied in: a link inside refuses the whole copy.
+      const linked = await holdsLink(from).catch(() => undefined);
+      if (linked === undefined) return GONE;
+      if (linked) return LINK;
+      // Whatever a copy left behind, refused, goes to the trash: the one way anything leaves.
+      const discard = async (): Promise<void> => {
+        if (!(await exists(to))) return;
+        try {
+          await options.trash?.(to);
+        } catch (cause) {
+          options.onError?.('explorer: the trash refused a copy it could not keep', cause);
+        }
+      };
+      try {
+        await (options.copyTree ?? copyTreeOnDisk)(from, to);
+      } catch (cause) {
+        const code = codeOf(cause);
+        if (code === 'ERR_FS_CP_EEXIST' || code === 'EEXIST') return EXISTS;
+        await discard();
+        // A link that appeared after the walk: Windows refuses to copy one without privilege.
+        if (await holdsLink(from).catch(() => false)) return LINK;
+        if (code === 'ENOENT') return GONE;
+        return failed(cause);
+      }
+      // A link that appeared after the walk was copied as a link, never followed; it still does
+      // not stay.
+      if (await holdsLink(to).catch(() => false)) {
+        await discard();
+        return LINK;
+      }
+      if (root !== current) return GONE;
+      return {
+        ok: true,
+        entry: await describeEntry(to, entry.kind === 'folder', current.real),
+        path: to,
+      };
     },
 
     async delete(entryId) {
@@ -710,6 +808,38 @@ const failed = (cause: unknown) =>
 const GONE = { ok: false, reason: 'gone' } as const;
 const INVALID = { ok: false, reason: 'invalid' } as const;
 const EXISTS = { ok: false, reason: 'exists' } as const;
+const LINK = { ok: false, reason: 'link' } as const;
+
+/** Whether `path`, resolved to its real path, still lies inside the root. */
+async function entryInside(path: string, rootReal: string): Promise<boolean> {
+  try {
+    return isInside(rootReal, await realpath(path));
+  } catch {
+    return false;
+  }
+}
+
+/** Whether `folder` is `from` or lies under it: a folder moved or copied into itself. */
+async function intoItself(from: string, folder: string): Promise<boolean> {
+  try {
+    return relativeUnder(await realpath(from), await realpath(folder)) !== undefined;
+  } catch {
+    return true;
+  }
+}
+
+/** Whether `path`, or anything under it, is a symbolic link or a junction (`lstat`). */
+async function holdsLink(path: string): Promise<boolean> {
+  const info = await lstat(path);
+  if (info.isSymbolicLink()) return true;
+  if (!info.isDirectory()) return false;
+  const children = await readdir(path, { withFileTypes: true });
+  for (const child of children) {
+    if (child.isSymbolicLink()) return true;
+    if (child.isDirectory() && (await holdsLink(join(path, child.name)))) return true;
+  }
+  return false;
+}
 
 /** Whether `folder` is still a folder whose real path lies inside the root's. */
 const GONE_READ: ExplorerRead = { ok: false, reason: 'gone' };

@@ -50,12 +50,19 @@ describe('the registry', () => {
       'cd',
       'clear',
       'cls',
+      'cp',
       'exit',
       'help',
       'history',
       'last',
       'ls',
+      'mkdir',
+      'mv',
+      'new',
+      'open',
       'pwd',
+      'reveal',
+      'rm',
     ]);
   });
 
@@ -66,8 +73,10 @@ describe('the registry', () => {
     );
   });
 
-  it('marks every built-in so far as safe in a restricted folder: none writes (ADR 0201)', () => {
-    expect(PANEL_BUILTINS.entries.every((entry) => entry.runsInRestrictedFolder)).toBe(true);
+  it('runs in a restricted folder only what reads: the file writes do not (ADR 0201)', () => {
+    expect(
+      PANEL_BUILTINS.entries.filter((entry) => !entry.runsInRestrictedFolder).map((e) => e.name),
+    ).toEqual(['new', 'mkdir', 'mv', 'cp', 'rm', 'open', 'reveal']);
   });
 });
 

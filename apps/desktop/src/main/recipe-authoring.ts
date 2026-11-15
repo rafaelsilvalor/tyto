@@ -35,7 +35,7 @@ export type Seed = NonNullable<IpcRequest<'explorer:create'>['seed']>;
 /** What a seeded new file is called and holds, or why there is none. */
 export type Seeded =
   | { readonly ok: true; readonly name: string; readonly text: string }
-  | { readonly ok: false; readonly reason: 'recipe-name' };
+  | { readonly ok: false; readonly reason: 'recipe-name' | 'invalid' };
 
 const RECIPE_EXTENSION = '.recipe';
 
@@ -44,8 +44,14 @@ const RECIPE_EXTENSION = '.recipe';
  * is missing, and the skeleton that runs or lints clean as made. A recipe's stem is checked by
  * `recipeSkeleton`, since a `run` line names a recipe by it.
  */
-export function seedOf(name: string, seed: Seed): Seeded {
+export function seedOf(name: string, seed: Seed, text?: string): Seeded {
   const lower = name.toLowerCase();
+  // TYTO-537: `new x.brief --template t` writes the window's skeleton, only into a `.brief`.
+  if (seed === 'brief') {
+    return lower.endsWith('.brief') && text !== undefined
+      ? { ok: true, name, text }
+      : { ok: false, reason: 'invalid' };
+  }
   if (seed === 'vocabulary') {
     const full = lower.endsWith(VOCABULARY_EXTENSION) ? name : `${name}${VOCABULARY_EXTENSION}`;
     return { ok: true, name: full, text: vocabularySkeleton() };

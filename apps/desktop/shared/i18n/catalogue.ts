@@ -1178,6 +1178,30 @@ export interface Catalogue {
   readonly 'commandPanel.files.kind.brief': string;
   readonly 'commandPanel.files.kind.recipe': string;
   readonly 'commandPanel.files.kind.file': string;
+  readonly 'commandPanel.builtin.new': string;
+  readonly 'commandPanel.builtin.mkdir': string;
+  readonly 'commandPanel.builtin.mv': string;
+  readonly 'commandPanel.builtin.cp': string;
+  readonly 'commandPanel.builtin.rm': string;
+  readonly 'commandPanel.builtin.open': string;
+  readonly 'commandPanel.builtin.reveal': string;
+  readonly 'commandPanel.files.exists': string;
+  readonly 'commandPanel.files.invalid': string;
+  readonly 'commandPanel.files.link': string;
+  readonly 'commandPanel.files.trashFailed': string;
+  readonly 'commandPanel.files.failed': string;
+  readonly 'commandPanel.files.root': string;
+  readonly 'commandPanel.files.intoItself': string;
+  readonly 'commandPanel.files.noTab': string;
+  readonly 'commandPanel.files.noTemplate': string;
+  readonly 'commandPanel.files.templateBrief': string;
+  readonly 'commandPanel.files.kept': string;
+  readonly 'commandPanel.files.usage.new': string;
+  readonly 'commandPanel.files.usage.mkdir': string;
+  readonly 'commandPanel.files.usage.mvcp': string;
+  readonly 'commandPanel.files.usage.rm': string;
+  readonly 'commandPanel.files.usage.open': string;
+  readonly 'commandPanel.files.usage.reveal': string;
   readonly 'commandPanel.workingFolderGone': string;
   readonly 'commandPanel.sessions': string;
   readonly 'commandPanel.session': string;
@@ -1958,6 +1982,30 @@ export const CATALOGUE_KEYS = [
   'commandPanel.files.kind.brief',
   'commandPanel.files.kind.recipe',
   'commandPanel.files.kind.file',
+  'commandPanel.builtin.new',
+  'commandPanel.builtin.mkdir',
+  'commandPanel.builtin.mv',
+  'commandPanel.builtin.cp',
+  'commandPanel.builtin.rm',
+  'commandPanel.builtin.open',
+  'commandPanel.builtin.reveal',
+  'commandPanel.files.exists',
+  'commandPanel.files.invalid',
+  'commandPanel.files.link',
+  'commandPanel.files.trashFailed',
+  'commandPanel.files.failed',
+  'commandPanel.files.root',
+  'commandPanel.files.intoItself',
+  'commandPanel.files.noTab',
+  'commandPanel.files.noTemplate',
+  'commandPanel.files.templateBrief',
+  'commandPanel.files.kept',
+  'commandPanel.files.usage.new',
+  'commandPanel.files.usage.mkdir',
+  'commandPanel.files.usage.mvcp',
+  'commandPanel.files.usage.rm',
+  'commandPanel.files.usage.open',
+  'commandPanel.files.usage.reveal',
   'commandPanel.workingFolderGone',
   'commandPanel.sessions',
   'commandPanel.session',

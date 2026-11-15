@@ -1,7 +1,7 @@
 # Comandos
 
 ::: info Como esta página foi conferida
-Todos os passos foram seguidos em 30/10/2026 numa build de desenvolvimento do Tyto, a partir da branch que acrescentou esta página, no Windows 11, com a janela em inglês. Os nomes em português foram lidos do catálogo da própria janela, não de uma janela aberta. Os blocos e o lugar da lista de sugestões foram conferidos de novo em 31/10/2026, depois que a página passou a descrevê-los. As recusas de `tyto mcp`, `watch` e `recipe run --apply` entraram nesta lista em 12/11/2026 a partir do código da janela e dos testes unitários dela, a última pelo próprio analisador da linha de comando, não na janela. Os comandos do próprio painel, o `&&`, o `!N` e os padrões entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela, não na janela. Os comandos de arquivo `ls`, `cd`, `pwd` e `cat`, e o completar depois deles, entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela; o prompt mostrando uma pasta depois do `cd` foi olhado na janela, nos temas claro e escuro. As caixas que uma recusa oferece entraram em 15/11/2026: as de `--trust` e `recipe run --apply` foram seguidas na janela, com as duas respostas; as de `signin`, `signout` e `watch` vêm do código da janela e dos testes unitários dela.
+Todos os passos foram seguidos em 30/10/2026 numa build de desenvolvimento do Tyto, a partir da branch que acrescentou esta página, no Windows 11, com a janela em inglês. Os nomes em português foram lidos do catálogo da própria janela, não de uma janela aberta. Os blocos e o lugar da lista de sugestões foram conferidos de novo em 31/10/2026, depois que a página passou a descrevê-los. As recusas de `tyto mcp`, `watch` e `recipe run --apply` entraram nesta lista em 12/11/2026 a partir do código da janela e dos testes unitários dela, a última pelo próprio analisador da linha de comando, não na janela. Os comandos do próprio painel, o `&&`, o `!N` e os padrões entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela, não na janela. Os comandos de arquivo `ls`, `cd`, `pwd` e `cat`, e o completar depois deles, entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela; o prompt mostrando uma pasta depois do `cd` foi olhado na janela, nos temas claro e escuro. `new`, `mkdir`, `mv`, `cp`, `rm`, `open` e `reveal` entraram no mesmo dia a partir do código da janela e dos testes unitários dela, não na janela. As caixas que uma recusa oferece entraram em 15/11/2026: as de `--trust` e `recipe run --apply` foram seguidas na janela, com as duas respostas; as de `signin`, `signout` e `watch` vêm do código da janela e dos testes unitários dela.
 :::
 
 A aba **Comandos** da área inferior roda comandos `tyto`, os mesmos da [linha de comando](../command-line/index.md), dentro da janela, e alguns comandos próprios. Nada mais roda ali: nem um shell, nem outro programa. Para um shell, use a aba [Terminal](terminal.md).
@@ -35,24 +35,33 @@ Cada comando que você roda é um bloco. O cabeçalho mostra o comando, com os c
 
 ## Os comandos do próprio painel
 
-Estes não são comandos `tyto`: o painel responde a eles sozinho, e nenhum grava arquivo, então também rodam numa [pasta restrita](workspace-folder.md). Escrever `tyto` antes manda a linha para a linha de comando: `tyto help` é a ajuda dela.
+Estes não são comandos `tyto`: o painel responde a eles sozinho. Os que só leem também rodam numa [pasta restrita](workspace-folder.md); `new`, `mkdir`, `mv`, `cp`, `rm`, `open` e `reveal` não rodam, e dizem por quê. Escrever `tyto` antes manda a linha para a linha de comando: `tyto help` é a ajuda dela.
 
-| Comando          | O que faz                                                                                       |
-| ---------------- | ----------------------------------------------------------------------------------------------- |
-| `help`           | Lista estes comandos e os comandos `tyto`. `help render` mostra a ajuda do `tyto render`.       |
-| `clear` ou `cls` | Esvazia a saída, como **Limpar** e **Ctrl+L**.                                                  |
-| `history`        | Lista as linhas rodadas nesta pasta de trabalho, numeradas a partir de 1.                       |
-| `!N`             | Roda de novo a linha N do `history`: `!5` roda a quinta.                                        |
-| `last`           | Roda de novo o último comando `tyto`: não um destes, nem uma linha com `&&`.                    |
-| `exit`           | Fecha esta sessão, parando o que ela roda.                                                      |
-| `ls`             | Lista a pasta do painel, ou a pasta indicada: `ls entregas`.                                    |
-| `cd`             | Vai para uma pasta: `cd entregas/novembro`, `cd ..` volta uma. `cd` sozinho volta ao topo.      |
-| `pwd`            | Mostra o caminho completo da pasta do painel.                                                   |
-| `cat`            | Mostra um arquivo de texto: `cat notas.txt`. Até 256 KB dele, com uma linha dizendo que cortou. |
+| Comando          | O que faz                                                                                                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `help`           | Lista estes comandos e os comandos `tyto`. `help render` mostra a ajuda do `tyto render`.                                                                                           |
+| `clear` ou `cls` | Esvazia a saída, como **Limpar** e **Ctrl+L**.                                                                                                                                      |
+| `history`        | Lista as linhas rodadas nesta pasta de trabalho, numeradas a partir de 1.                                                                                                           |
+| `!N`             | Roda de novo a linha N do `history`: `!5` roda a quinta.                                                                                                                            |
+| `last`           | Roda de novo o último comando `tyto`: não um destes, nem uma linha com `&&`.                                                                                                        |
+| `exit`           | Fecha esta sessão, parando o que ela roda.                                                                                                                                          |
+| `ls`             | Lista a pasta do painel, ou a pasta indicada: `ls entregas`.                                                                                                                        |
+| `cd`             | Vai para uma pasta: `cd entregas/novembro`, `cd ..` volta uma. `cd` sozinho volta ao topo.                                                                                          |
+| `pwd`            | Mostra o caminho completo da pasta do painel.                                                                                                                                       |
+| `cat`            | Mostra um arquivo de texto: `cat notas.txt`. Até 256 KB dele, com uma linha dizendo que cortou.                                                                                     |
+| `new`            | Cria um arquivo vazio: `new notas.txt`. `new cartaz.brief --template story` grava o esqueleto do template, como **Entrega: nova…** faz. Um brief ou arquivo de texto abre numa aba. |
+| `mkdir`          | Cria uma pasta: `mkdir entrega-123`.                                                                                                                                                |
+| `mv`             | Move ou renomeia: `mv capa.brief entregas` põe em `entregas`, `mv capa.brief nova.brief` renomeia. As abas abertas acompanham.                                                      |
+| `cp`             | Copia um arquivo ou uma pasta, com o destino lido como no `mv`.                                                                                                                     |
+| `rm`             | Manda arquivos ou pastas para a lixeira: `rm velho.brief rascunhos`.                                                                                                                |
+| `open`           | Abre um brief, receita ou arquivo de texto numa aba.                                                                                                                                |
+| `reveal`         | Seleciona um arquivo ou pasta no Explorador.                                                                                                                                        |
 
 O `ls` lista as pastas primeiro, cada uma terminando em `/`, e cada nome ao lado do tipo: pasta, brief, receita ou arquivo. Um brief, uma receita ou um arquivo de texto é um link que o abre numa aba, a menos que o nome tenha espaço.
 
 Os comandos de arquivo só alcançam o que está dentro da pasta de trabalho aberta. Um caminho que sai dela é recusado: `..` acima da pasta, um caminho começando com `/`, `C:\`, `\\servidor` ou `~`, e um link ou junção que aponta para fora dela, que o [Explorador](workspace-folder.md#ver-os-arquivos-dela-o-explorador) também não mostra. Cada sessão tem a sua pasta; abrir outra pasta de trabalho manda todas as sessões de volta ao topo. O `cat` recusa um arquivo que não é texto.
+
+Nada é substituído: `mv`, `cp`, `new` e `mkdir` recusam um nome que já existe, e dizem isso. O `rm` nunca apaga de vez: tudo vai para a lixeira do sistema, de onde dá para restaurar. Ele só pergunta antes quando uma aba aberta dentro do que vai sair tem alterações não salvas, e nunca remove a própria pasta de trabalho. O `cp` recusa uma pasta que contém um link ou junção, e uma pasta nunca vai para dentro de si mesma.
 
 ## Vários comandos numa linha
 

@@ -299,6 +299,8 @@ describe('the bridge', () => {
       'editor:vim-mode',
       // TYTO-279, ADR 0115: the explorer, by ids main minted.
       // TYTO-352, ADR 0121: new, rename and delete by id and name, and the tabs under an entry.
+      // TYTO-537, ADR 0201: the command panel's `cp`, by ids and a name.
+      'explorer:copy',
       'explorer:create',
       'explorer:delete',
       // TYTO-366, ADR 0124: an image for the preview, by id. Exercised by
