@@ -31,5 +31,8 @@
     "@tyto/core": "workspace:*",
     "@tyto/export-html": "workspace:*",
     "@tyto/template-lang": "workspace:*"
+  },
+  "devDependencies": {
+    "@tyto/export-svg": "workspace:*"
   }
 }

@@ -7,11 +7,13 @@ import withoutBlankLines from './__fixtures__/block-without-blank-lines.brief?ra
 import { parseBrief } from './parse-brief.js';
 
 /**
- * A blank line has no meaning, and does not end an indented block (TYTO-294, ADR 0087).
+ * A blank line does not end an indented block (TYTO-294, ADR 0087), and between two lines of
+ * text it makes a paragraph (TYTO-557, ADR 0205).
  *
- * The maintainer's rule: blank lines — one or several in a row — inside an indented block
- * are there for whoever reads the brief, and the language ignores them. A block still ends
- * only at the next line that is not blank and starts back at column 0.
+ * The maintainer's rules: blank lines — one or several in a row — inside an indented block
+ * never end it; a block still ends only at the next line that is not blank and starts back at
+ * column 0. Between two lines of text they are one paragraph boundary; at the start or the end
+ * of a block they mean nothing.
  *
  * Every comparison here strips the ranges first. A blank line moves every offset after it,
  * so the two ASTs cannot be equal byte for byte; what has to be equal is what they say. The
@@ -49,22 +51,39 @@ function withBlankLines(count: number, fill = ''): string {
   ].join('\n');
 }
 
-describe('a blank line inside an indented block', () => {
-  it('leaves the committed fixture meaning what the control means', () => {
-    expect(meaningOf(withBlankLine)).toEqual(meaningOf(withoutBlankLines));
+/**
+ * The control with the break in front of its second group marked as a paragraph: what a blank
+ * line there means since ADR 0205. The control has no other blank line, so that is the only
+ * difference a run of blank lines may make.
+ */
+function controlWithParagraph(text: string = withoutBlankLines): unknown {
+  const meaning = meaningOf(text) as {
+    directives: { body: { kind: string; paragraph?: true }[] }[];
+  };
+  const breaks = meaning.directives[0]!.body.filter((item) => item.kind === 'break');
+  // The head, three lines of the first group, then the second: its break is the third.
+  breaks[2]!.paragraph = true;
+  return meaning;
+}
+
+describe('a blank line inside an indented block makes a paragraph (ADR 0205)', () => {
+  it('leaves the committed fixture meaning the control with one paragraph boundary', () => {
+    expect(meaningOf(withBlankLine)).toEqual(controlWithParagraph());
   });
 
-  it.each([1, 2, 3, 7])('ignores %i blank lines in a row', (count) => {
-    expect(meaningOf(withBlankLines(count))).toEqual(meaningOf(withoutBlankLines));
+  it.each([1, 2, 3, 7])('makes one paragraph of %i blank lines in a row', (count) => {
+    expect(meaningOf(withBlankLines(count))).toEqual(controlWithParagraph());
   });
 
-  it.each([1, 3])('ignores %i lines holding only spaces and tabs', (count) => {
-    expect(meaningOf(withBlankLines(count, ' \t  '))).toEqual(meaningOf(withoutBlankLines));
+  it.each([1, 3])('makes one paragraph of %i lines holding only spaces and tabs', (count) => {
+    expect(meaningOf(withBlankLines(count, ' \t  '))).toEqual(controlWithParagraph());
   });
 
-  it('ignores the same blank lines in a file saved with CRLF', () => {
+  it('reads the same blank lines the same way in a file saved with CRLF', () => {
     const crlf = (text: string): string => text.replaceAll('\n', '\r\n');
-    expect(meaningOf(crlf(withBlankLines(3)))).toEqual(meaningOf(crlf(withoutBlankLines)));
+    expect(meaningOf(crlf(withBlankLines(3)))).toEqual(
+      controlWithParagraph(crlf(withoutBlankLines)),
+    );
   });
 
   it('ignores blank lines between the directive and its first body line', () => {
@@ -85,6 +104,35 @@ describe('a blank line inside an indented block', () => {
     expect(result.value.directives[0]?.body.filter((item) => item.kind === 'break')).toHaveLength(
       4,
     );
+  });
+
+  it('makes a paragraph between a head with text of its own and the first body line', () => {
+    const body = meaningOf('::lamina Um\n\n  Dois\n') as { directives: { body: unknown[] }[] };
+    expect(body.directives[0]!.body).toEqual([
+      { kind: 'text', value: 'Um' },
+      { kind: 'break', paragraph: true },
+      { kind: 'text', value: 'Dois' },
+    ]);
+  });
+
+  it('makes none where a comment stands between two lines, and one where a blank line does too', () => {
+    const kinds = (text: string): unknown =>
+      (meaningOf(text) as { directives: { body: unknown[] }[] }).directives[0]!.body;
+    const plain = [
+      { kind: 'text', value: 'Um' },
+      { kind: 'break' },
+      { kind: 'text', value: 'Dois' },
+    ];
+    const paragraph = [
+      { kind: 'text', value: 'Um' },
+      { kind: 'break', paragraph: true },
+      { kind: 'text', value: 'Dois' },
+    ];
+    expect(kinds('::lamina\n  Um\n  // nota\n  Dois\n')).toEqual(plain);
+    expect(kinds('::lamina\n  Um\n// nota\n  Dois\n')).toEqual(plain);
+    expect(kinds('::lamina\n  Um\n\n  // nota\n  Dois\n')).toEqual(paragraph);
+    expect(kinds('::lamina\n  Um\n  // nota\n\n  Dois\n')).toEqual(paragraph);
+    expect(kinds('::lamina\n  Um\n// nota\n\n  Dois\n')).toEqual(paragraph);
   });
 });
 

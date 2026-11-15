@@ -560,6 +560,10 @@ importers:
       '@tyto/template-lang':
         specifier: workspace:*
         version: link:../template-lang
+    devDependencies:
+      '@tyto/export-svg':
+        specifier: workspace:*
+        version: link:../export-svg
 
   packages/template-lang:
     dependencies:

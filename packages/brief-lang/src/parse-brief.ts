@@ -207,7 +207,9 @@ function inlinesOf(nodes: Iterable<SyntaxNode>, text: string): RichText {
  * produces. The author wrote three lines and means three lines; the language has no other
  * way to say so, and concatenating them would silently glue two words together. No break
  * is emitted before the first line, where the boundary separates the body from the
- * directive name rather than one line of text from the next.
+ * directive name rather than one line of text from the next. A blank line between two lines
+ * makes their break a paragraph boundary (ADR 0205); at the start or the end of a block there
+ * is no second line, so it still means nothing.
  */
 /**
  * Spaces and tabs at the end of a line of text say nothing (TYTO-297, ADR 0096).
@@ -255,8 +257,24 @@ function dropRedundantBreak(body: Inline[], text: string, diagnostics: Diagnosti
   trimLineEnd(body);
 }
 
+/**
+ * Whether a blank line stands between two lines of text (TYTO-557, ADR 0205): the source from
+ * the end of the line above to the start of the line below, read as whole lines, holds one that
+ * is empty or only spaces and tabs. Several in a row are one paragraph. A comment line is not
+ * blank — it is skipped as if it were not there (ADR 0204) — so a comment between two lines
+ * makes no paragraph, and a blank line beside a comment still does.
+ */
+function blankLineBetween(text: string, from: number, to: number): boolean {
+  const lines = text.slice(from, to).split(/\r\n|\r|\n/u);
+  // The first piece is the end of the line above and the last the indent of the line below;
+  // only the ones between are whole lines.
+  return lines.slice(1, -1).some((line) => /^[ \t]*$/u.test(line));
+}
+
 function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): RichText {
   const body: Inline[] = [];
+  // Where the last line with text ended, to look for a blank line before the next one.
+  let lineEnd: number | undefined;
 
   for (const child of children(node)) {
     if (child.name === 'InlineBody') {
@@ -266,6 +284,7 @@ function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): Rich
       if (parts[0]?.name === 'Space') parts.shift();
       appendInlines(body, parts, text);
       trimLineEnd(body);
+      if (body.length > 0) lineEnd = child.to;
     } else if (child.name === 'BodyLine') {
       // A line holding only spaces is a `BodyLine` with no text (ADR 0087). It says
       // nothing, and a break for it would be a blank line in the artwork.
@@ -280,13 +299,16 @@ function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): Rich
         // (TYTO-64). With blank lines in front of the indent the token covers them too,
         // and the break stays on the first line break: the one the previous line ends with.
         const isCrLf = text[child.from] === '\r' && text[child.from + 1] === '\n';
+        const paragraph = lineEnd !== undefined && blankLineBetween(text, lineEnd, blockText.from);
         body.push({
           kind: 'break',
+          ...(paragraph ? { paragraph: true } : {}),
           range: sourceRange(child.from, child.from + (isCrLf ? 2 : 1)),
         });
       }
       appendInlines(body, children(blockText), text);
       trimLineEnd(body);
+      lineEnd = blockText.to;
     }
   }
 

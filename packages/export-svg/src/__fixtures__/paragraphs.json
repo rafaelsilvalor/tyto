@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "fonts": [
+    {
+      "family": "Inter",
+      "source": "bundled"
+    }
+  ],
+  "assets": [],
+  "artworks": [
+    {
+      "id": "paragraph-artwork",
+      "label": "Two paragraphs 24 px apart, above the same lines with no paragraph spacing",
+      "frames": [
+        {
+          "format": "feed",
+          "size": {
+            "w": 400,
+            "h": 400
+          },
+          "background": {
+            "kind": "solid",
+            "color": {
+              "r": 250,
+              "g": 250,
+              "b": 250
+            }
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "paragraphs",
+              "transform": {
+                "x": 20,
+                "y": 20
+              },
+              "box": {
+                "w": 360,
+                "h": 170
+              },
+              "align": "left",
+              "valign": "bottom",
+              "lineHeight": 1.5,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "ORTOPEDISTA",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                },
+                {
+                  "kind": "break"
+                },
+                {
+                  "kind": "text",
+                  "text": "10-09 - 20h | Cuidado dos pés",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                },
+                {
+                  "kind": "break",
+                  "space": 24
+                },
+                {
+                  "kind": "text",
+                  "text": "ORTOPEDISTA",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                },
+                {
+                  "kind": "break"
+                },
+                {
+                  "kind": "text",
+                  "text": "11-09 - 20h | Cuidado com a coluna",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "kind": "text",
+              "id": "control",
+              "transform": {
+                "x": 20,
+                "y": 210
+              },
+              "box": {
+                "w": 360,
+                "h": 170
+              },
+              "align": "left",
+              "valign": "middle",
+              "lineHeight": 1.5,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "ORTOPEDISTA",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                },
+                {
+                  "kind": "break"
+                },
+                {
+                  "kind": "text",
+                  "text": "10-09 - 20h | Cuidado dos pés",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                },
+                {
+                  "kind": "break"
+                },
+                {
+                  "kind": "text",
+                  "text": "ORTOPEDISTA",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                },
+                {
+                  "kind": "break"
+                },
+                {
+                  "kind": "text",
+                  "text": "11-09 - 20h | Cuidado com a coluna",
+                  "font": {
+                    "family": "Inter",
+                    "source": "bundled"
+                  },
+                  "size": 20,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 20,
+                      "g": 20,
+                      "b": 20
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

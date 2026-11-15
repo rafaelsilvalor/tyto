@@ -719,6 +719,21 @@ rather than a `
 `{cor:laranja}` names a colour in the template's own vocabulary, so the template supplies
 the mapping, and a mark nothing maps passes its children through unchanged.
 
+**Paragraphs are spaced by the template** (ADR 0205). A blank line between two lines of the
+brief's text is a paragraph boundary, and `paragraphSpacing` is how far apart two
+paragraphs are, in px, on top of the line advance:
+
+```ts
+runsOf(text, { font, size, color }, { paragraphSpacing: 24 });
+// template-kit: textBlock(value, size, { font, size, weight, color, paragraphSpacing: 24 })
+```
+
+Absent or 0 is no space: the boundary is the plain `LineBreak` it was before paragraphs
+existed, so a template that declares nothing draws a brief with blank lines exactly as it
+drew it. The space reaches the Scene as `space` on that break, the measured height counts
+it, and a shrink scales it with the text. A markup template (`template.html`) cannot set it
+yet; its paragraphs are drawn at 0.
+
 ### What `compile` does with the result
 
 It calls the function once per (artwork, format), collects the fonts and assets **the scene

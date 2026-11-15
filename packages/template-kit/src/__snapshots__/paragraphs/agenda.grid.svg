@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+  <defs>
+    <style>@font-face{font-family:"Test";font-weight:400;font-style:normal;src:url("tyto-test-font:Test-400-normal")}
+    </style>
+  </defs>
+  <g id="lamina-1.grid.0" transform="matrix(1 0 0 1 20 20)">
+    <text x="0" y="16.8" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">ORTOPEDISTA</tspan></text>
+    <text x="0" y="40.8" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">10-09 - 20h | Cuidado dos pés 1. | Profª. Mara Rebeiro</tspan></text>
+    <text x="0" y="64.8" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">10-09 - 21h | Cuidado dos pés 2. | Profª. Mara Rebeiro</tspan></text>
+    <text x="0" y="112.8" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">ORTOPEDISTA</tspan></text>
+    <text x="0" y="136.8" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">11-09 - 20h | Cuidado com a coluna 1. | Profª. Mara Rebeiro</tspan></text>
+  </g>
+</svg>

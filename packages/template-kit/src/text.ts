@@ -29,6 +29,12 @@ export interface TextStyle {
    * 700 in the surrounding colour — because `**…**` works in every template (TYTO-554).
    */
   readonly highlights?: Highlights;
+  /**
+   * The px between two paragraphs — a blank line between two lines of the brief's text — on
+   * top of the line advance (ADR 0205). Absent is 0: a paragraph is drawn as any other line
+   * break, exactly as before paragraphs existed.
+   */
+  readonly paragraphSpacing?: number;
 }
 
 /** Everything `text()` takes except what these functions decide themselves. */
@@ -52,7 +58,9 @@ function runsIn(value: RichText, style: TextStyle): NonEmpty<TextRun> | undefine
     runsOf(
       value,
       { font: style.font, size: style.size, weight: style.weight, color: style.color },
-      style.highlights?.options,
+      style.paragraphSpacing === undefined
+        ? style.highlights?.options
+        : { ...style.highlights?.options, paragraphSpacing: style.paragraphSpacing },
     ),
   );
 }

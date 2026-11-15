@@ -30,22 +30,30 @@ interface Line {
   readonly runs: readonly TextSpan[];
   /** The tallest run decides the line, which is what a line box does. */
   readonly size: number;
+  /** The px a paragraph boundary puts above this line (ADR 0205); 0 for none. */
+  readonly space: number;
 }
 
-/** The runs split at every break; a break between two breaks makes an empty line. */
+/**
+ * The runs split at every break; a break between two breaks makes an empty line. The line
+ * after a paragraph boundary carries the boundary's space above it (ADR 0205).
+ */
 function linesOf(node: TextNode): Line[] {
   const lines: Line[] = [];
   let current: TextSpan[] = [];
+  let space = 0;
 
   const flush = (): void => {
     const size = current.reduce((tallest, run) => Math.max(tallest, run.size), 0);
-    lines.push({ runs: current, size: size === 0 ? fallbackSize(node) : size });
+    lines.push({ runs: current, size: size === 0 ? fallbackSize(node) : size, space });
     current = [];
   };
 
   for (const run of node.runs) {
-    if (run.kind === 'break') flush();
-    else current.push(run);
+    if (run.kind === 'break') {
+      flush();
+      space = run.space ?? 0;
+    } else current.push(run);
   }
   flush();
 
@@ -109,7 +117,7 @@ function verticalOffset(node: TextNode, lines: readonly Line[], sink: Sink): num
     return 0;
   }
 
-  const total = lines.reduce((sum, line) => sum + line.size * node.lineHeight, 0);
+  const total = lines.reduce((sum, line) => sum + line.space + line.size * node.lineHeight, 0);
   return node.valign === 'middle' ? (height - total) / 2 : height - total;
 }
 
@@ -175,8 +183,10 @@ function textElement(node: TextNode, lines: readonly Line[], sink: Sink): string
   const drawn: string[] = [];
 
   for (const line of lines) {
-    // Half-leading above the glyphs and half below, then the ascent: the same place a
-    // browser puts the first baseline, which is what keeps the two exports aligned.
+    // A paragraph's space first, then half-leading above the glyphs and half below, then the
+    // ascent: the same place a browser puts the first baseline, which is what keeps the two
+    // exports aligned.
+    top += line.space;
     const leading = (line.size * node.lineHeight - line.size) / 2;
     const baseline = top + leading + line.size * ASCENT;
     top += line.size * node.lineHeight;
@@ -237,6 +247,7 @@ function pathElement(node: TextNode, lines: readonly Line[], sink: Sink): string
   const parts: string[] = [];
 
   for (const line of lines) {
+    top += line.space;
     const leading = (line.size * node.lineHeight - line.size) / 2;
     const baseline = top + leading + line.size * ASCENT;
     top += line.size * node.lineHeight;

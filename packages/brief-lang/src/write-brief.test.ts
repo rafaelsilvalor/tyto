@@ -70,12 +70,33 @@ describe('writeBrief', () => {
     });
   });
 
-  it('writes a value of several lines as an indented block, blank lines dropped', () => {
+  it('writes a value of several lines as an indented block, blank lines at its ends dropped', () => {
     const text = textOf(
-      writeBrief({ template: 'notice', slots: [{ name: 'lamina', value: 'Um\r\n\r\n  Dois  ' }] }),
+      writeBrief({
+        template: 'notice',
+        slots: [{ name: 'lamina', value: '\r\n  \r\nUm\r\n  Dois  \r\n\r\n' }],
+      }),
     );
     expect(text).toContain('::lamina\n  Um\n  Dois\n');
     expect(written(text).slots).toEqual({ lamina: 'Um\nDois' });
+  });
+
+  it('keeps a run of blank lines between two lines as one, a paragraph (ADR 0205)', () => {
+    const text = textOf(
+      writeBrief({
+        template: 'notice',
+        slots: [{ name: 'lamina', value: 'Um\r\n\r\n \r\n  Dois  ' }],
+      }),
+    );
+    expect(text).toContain('::lamina\n  Um\n\n  Dois\n');
+    const parsed = parseBrief(text);
+    if (!parsed.ok) throw new Error('should parse');
+    const body = parsed.value.directives[0]!.body;
+    expect(body.map((item) => (item.kind === 'break' ? item.paragraph : item.kind))).toEqual([
+      'text',
+      true,
+      'text',
+    ]);
   });
 
   it('escapes a line starting with :: and nothing else', () => {

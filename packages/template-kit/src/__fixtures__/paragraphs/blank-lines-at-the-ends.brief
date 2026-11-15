@@ -1,0 +1,15 @@
+---
+template: agenda-teste
+---
+::lamina
+
+
+  ORTOPEDISTA
+  10-09 - 20h | Cuidado dos pés 1. | Profª. Mara Rebeiro
+  10-09 - 21h | Cuidado dos pés 2. | Profª. Mara Rebeiro
+  // a comment is not a blank line (ADR 0204)
+  ORTOPEDISTA
+  11-09 - 20h | Cuidado com a coluna 1. | Profª. Mara Rebeiro
+
+  
+

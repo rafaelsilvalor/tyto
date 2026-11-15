@@ -290,6 +290,7 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
           },
           {
             "kind": "break",
+            "paragraph": true,
             "range": {
               "end": 149,
               "start": 148,

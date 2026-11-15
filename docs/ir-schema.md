@@ -13,7 +13,7 @@ Base     { id; name?; kind; transform: Transform; opacity: 0..1; blend: BlendMod
 Group    extends Base { children: Node[] }
 Rect     extends Base { size; radius: [tl,tr,br,bl]; fill?: Paint; stroke?: Stroke }
 Text     extends Base { box: {w?, h?}; runs: TextRun[]; align; valign; lineHeight; letterSpacing; overflow: 'clip'|'shrink'|'grow' }
-TextRun  = TextSpan{kind:'text', text, font: FontRef, size, weight, style, color: Paint, decoration?} | LineBreak{kind:'break'}
+TextRun  = TextSpan{kind:'text', text, font: FontRef, size, weight, style, color: Paint, decoration?} | LineBreak{kind:'break', space?}
 Image    extends Base { asset: AssetRef; size; fit: 'cover'|'contain'|'fill'; position }
 Vector   extends Base { geometry: VectorGeometry; size; fill?; stroke? }
 
@@ -58,6 +58,12 @@ The prose above is the contract; these are the decisions taken while writing the
   reason colour is structured. Leading, trailing and consecutive breaks are all legal: an
   empty line is a thing an author asks for. A `LineBreak` carries no styling, because it
   has no glyph; the runs around it decide what the line looks like.
+- **A paragraph boundary is a break with `space`** (ADR 0205): px between the line it ends
+  and the next, on top of the line advance, so the node is that much taller. Only a
+  positive number is valid; a template that declares no paragraph spacing writes the plain
+  break, so a scene without paragraphs and one whose paragraphs are spaced 0 are the same
+  bytes. Layout keeps the space on the break it came on through a wrap and scales it with a
+  shrink.
 - **Adjacent runs that would draw the same thing are one run.** `runsOf` merges a run into
   its predecessor when `font`, `size`, `weight`, `style`, `color` and `decoration` all
   match, so a mark the template never declared costs nothing downstream: a sentence split
@@ -140,6 +146,7 @@ per node id or wants hidden nodes counted after all.
 | Shadow/Blur              | `filter: drop-shadow()/blur()`, spread `url(#…)`  | `<filter>`                                                                    |
 | Text                     | `div` + spans; bundled `@font-face`               | `<text>`+`<tspan>`; font embedded in `<style>` or converted to paths (option) |
 | TextRun `break`          | `<br>`                                            | ends the `<tspan>`; the next one starts at `x` with `dy` of one line          |
+| TextRun `break` `space`  | `<br>` + an empty `display: block` span that tall | the next line's baseline moves down by `space`                                |
 | Vector.svg               | inline `<svg>`, once `checkSvgMarkup` accepts it  | inline (namespaces normalized), once `checkSvgMarkup` accepts it              |
 
 Where the table is silent and a visitor cannot be, ADR 0018 decides: `clip` on a group is

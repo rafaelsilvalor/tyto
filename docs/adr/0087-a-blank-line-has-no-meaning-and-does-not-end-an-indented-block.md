@@ -77,3 +77,11 @@ and CSS, whose nesting the second-blank-line rule does not describe.
 ADR 0202 goes one step further: not only the width of an indent but its presence stops
 meaning anything (a text line at column 0 is a body line too), and nesting comes from the
 manifest. Every rule above about blank lines stands.
+
+## Note, 2026-11-15 — a blank line between two lines makes a paragraph (ADR 0205)
+
+ADR 0205 replaces decision 1 for the blank lines between two lines of text: one or several in
+a row are now one paragraph boundary, whose space each template sets and which defaults to 0.
+At 0 the Scene is the one this ADR produced, so the agendas that motivated it draw exactly as
+before. A blank line at the start or the end of a block still means nothing, and none of
+decisions 2 to 5 changes: a blank line never ends a block.

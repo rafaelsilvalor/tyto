@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { exportHtml } from './export-html.js';
 import type { HtmlFontFace, HtmlResources } from './html.js';
 import mappingFixture from './__fixtures__/mapping.json';
+import paragraphsFixture from './__fixtures__/paragraphs.json';
 import promoFixture from './__fixtures__/promo.json';
 import twoIconsFixture from './__fixtures__/two-icons.json';
 
@@ -129,6 +130,12 @@ describe('a scene becomes one self-contained document per frame', () => {
 
     await expect(feed).toMatchFileSnapshot('./__snapshots__/promo.feed.html');
     await expect(story).toMatchFileSnapshot('./__snapshots__/promo.story.html');
+  });
+
+  it('renders the paragraphs fixture to its committed snapshot (ADR 0205)', async () => {
+    const [feed] = htmlOf(sceneOf(paragraphsFixture));
+
+    await expect(feed).toMatchFileSnapshot('./__snapshots__/paragraphs.feed.html');
   });
 
   it('renders the mapping fixture to its committed snapshot', async () => {
