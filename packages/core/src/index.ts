@@ -101,6 +101,7 @@ export {
   type TemplateBuild,
   type TemplateAnswer,
   type TemplateCall,
+  type ArtworkSummary,
   type TemplateContext,
   type TemplateFiles,
   type TemplateReport,
