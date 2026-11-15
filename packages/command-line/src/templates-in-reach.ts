@@ -29,7 +29,9 @@ import type { BriefWorkspace } from './workspace.js';
  * workspace's template folders, the built-in pack and the installed plugins, with what the
  * plugin files fetched, configure and alias. **One function, so what `tyto template list`
  * prints is what `tyto render`, `tyto recipe run` and `tyto delivery new --template` accept**:
- * three copies of these steps are how a listing and a render would come to disagree.
+ * three copies of these steps are how a listing and a render would come to disagree. `tyto mcp`
+ * calls its two halves, {@link pluginsInReach} once per session and
+ * {@link renderContextInReach} per call (TYTO-730), so an agent reaches the same templates.
  *
  * The folder's trust decides as it does for a render: a restricted folder's plugin files are
  * neither fetched nor loaded (ADR 0111), and `leftOut` says so. Never moves a pinned ref and
@@ -60,12 +62,7 @@ export interface TemplatesInReachOptions {
   readonly withoutFetching?: string;
 }
 
-export interface TemplatesInReach {
-  readonly pluginFiles: SyncedPluginFiles;
-  /** Why a restricted folder's plugin files count for nothing, or `''`. Printed on stderr. */
-  readonly leftOut: string;
-  /** The installed plugins, loaded; the caller closes them. */
-  readonly plugins: LoadedPlugins;
+export interface TemplatesInReach extends PluginsInReach {
   readonly context: Result<RenderContext, Diagnostics>;
 }
 
@@ -73,6 +70,32 @@ export async function templatesInReach(
   options: TemplatesInReachOptions,
   environment: CliEnvironment,
 ): Promise<TemplatesInReach> {
+  const plugins = await pluginsInReach(options, environment);
+  const context = await renderContextInReach(options, plugins, environment);
+  return { ...plugins, context };
+}
+
+/**
+ * The half of {@link templatesInReach} a long-lived host does once (TYTO-730): the plugin files
+ * synced, the restricted folder's left out, and the installed plugins loaded with what they
+ * fetched. `tyto mcp` holds this for its session; loading needs the synced copies, so the plugin
+ * files are part of it.
+ */
+export interface PluginsInReach {
+  readonly pluginFiles: SyncedPluginFiles;
+  /** Why a restricted folder's plugin files count for nothing, or `''`. Printed on stderr. */
+  readonly leftOut: string;
+  /** The installed plugins, loaded; the caller closes them. */
+  readonly plugins: LoadedPlugins;
+}
+
+export async function pluginsInReach(
+  options: Pick<
+    TemplatesInReachOptions,
+    'workspace' | 'hostName' | 'leftOutAs' | 'withoutFetching'
+  >,
+  environment: CliEnvironment,
+): Promise<PluginsInReach> {
   const { workspace } = options;
   const pluginFilesWorkspace =
     workspace === undefined
@@ -114,15 +137,27 @@ export async function templatesInReach(
           : { folder: workspace.loaded.folder, trust: workspace.loaded.trust },
     }),
   });
-  const context = await loadRenderContext({
+  return { pluginFiles, leftOut, plugins };
+}
+
+/**
+ * The other half (TYTO-730): the folder's templates, the workspace's and the installed packs,
+ * read now. Fetches nothing and loads no plugin, so a host may call it on every request and see
+ * a template edited since the last one.
+ */
+export function renderContextInReach(
+  options: Pick<TemplatesInReachOptions, 'workspace' | 'folder' | 'templates' | 'formats'>,
+  reach: PluginsInReach,
+  environment: CliEnvironment,
+): Promise<Result<RenderContext, Diagnostics>> {
+  return loadRenderContext({
     templatesDirectory: options.templates?.directory ?? resolve(options.folder, 'templates'),
-    projectTemplatesDirectories: workspace?.loaded.project.templates ?? [],
+    projectTemplatesDirectories: options.workspace?.loaded.project.templates ?? [],
     formatsFile: options.formats?.file ?? resolve(options.folder, 'formats.yaml'),
     templatesDirectoryIsDefault: options.templates?.named !== true,
     formatsFileIsDefault: options.formats?.named !== true,
-    ...installedOption(environment, plugins, pluginFiles),
+    ...installedOption(environment, reach.plugins, reach.pluginFiles),
   });
-  return { pluginFiles, leftOut, plugins, context };
 }
 
 /** What `loadRenderContext` needs to search installed packs, when there is a home to read. */
