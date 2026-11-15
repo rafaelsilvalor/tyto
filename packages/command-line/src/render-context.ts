@@ -1,3 +1,5 @@
+import { isAbsolute, relative } from 'node:path';
+
 import {
   type Diagnostics,
   type FileSystem,
@@ -109,6 +111,16 @@ export interface RenderContextOptions {
   };
 }
 
+/**
+ * Where a template in the registry came from, as `tyto template list` prints it (TYTO-728):
+ * the built-in pack, an installed plugin (by its name, as `tyto plugin list` names it), or the
+ * workspace — the folder's `templates/` and the project's template folders.
+ */
+export type TemplateOrigin =
+  | { readonly kind: 'built-in' }
+  | { readonly kind: 'plugin'; readonly plugin: string }
+  | { readonly kind: 'workspace' };
+
 export interface RenderContext {
   readonly fileSystem: FileSystem;
   readonly registry: TemplateRegistry;
@@ -124,6 +136,8 @@ export interface RenderContext {
   readonly refusedPlugins: ReadonlySet<string>;
   /** Installed packs whose code templates are built in their plugin's process (ADR 0048). */
   readonly codePacks: readonly InstalledCodePack[];
+  /** Where a template the registry holds came from; `undefined` for a name it does not hold. */
+  originOf(name: string): TemplateOrigin | undefined;
 }
 
 /**
@@ -241,9 +255,30 @@ export async function loadRenderContext(
         .map((entry) => ({ name: entry.name, version: entry.version })),
       refusedPlugins: installed.refused,
       codePacks: installed.code,
+      originOf: (name) => originIn(registry.value, builtInDirectories, name),
     },
     problems,
   );
+}
+
+/**
+ * An installed pack's root carries its plugin's name (`fetchedRoot`); every other root is the
+ * built-in pack's, found by the folder it lies under, or the workspace's.
+ */
+function originIn(
+  registry: TemplateRegistry,
+  builtInDirectories: readonly string[],
+  name: string,
+): TemplateOrigin | undefined {
+  const directory = registry.directoryOf(name);
+  if (directory === undefined) return undefined;
+  const plugin = registry.originOf?.(name);
+  if (plugin !== undefined) return { kind: 'plugin', plugin };
+  const builtIn = builtInDirectories.some((root) => {
+    const inside = relative(root, directory);
+    return inside !== '' && !inside.startsWith('..') && !isAbsolute(inside);
+  });
+  return builtIn ? { kind: 'built-in' } : { kind: 'workspace' };
 }
 
 /**

@@ -40,7 +40,8 @@ import {
   memoryTaskOutput,
   renderTask,
 } from '../render-task.js';
-import { displayPath, installedOption } from '../render.js';
+import { displayPath } from '../render.js';
+import { installedOption } from '../templates-in-reach.js';
 import { type LocatedDiagnostic, diagnosticsDocument, registerUnplaced } from '../report.js';
 import { optionalSources, projectSections, renderSources } from '../sources.js';
 import { type BriefWorkspace, workspaceOfFolder } from '../workspace.js';

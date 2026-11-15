@@ -256,6 +256,23 @@ const last: PanelBuiltin = {
   },
 };
 
+/**
+ * `templates [folder] [--json] [--trust]`: `tyto template list` in the session's working folder
+ * (TYTO-728). The CLI's command and nothing of its own, so what it lists is what a render there
+ * accepts, and the folder's trust decides it exactly as it decides a typed `tyto` line.
+ */
+const templates: PanelBuiltin = {
+  name: 'templates',
+  help: 'commandPanel.builtin.templates',
+  runsInRestrictedFolder: true,
+  arguments: 'folder',
+  run: async (context) => {
+    const words = ['template', 'list', ...context.args.map((each) => each.text)];
+    const line = ['templates', ...context.args.map((each) => each.text)].join(' ');
+    return { kind: 'acted', ok: await context.runTyto(line, words) };
+  },
+};
+
 /** The column a list of names is padded to, so the help lines start together. */
 const pad = (names: readonly string[]): number => Math.max(0, ...names.map((name) => name.length));
 
@@ -307,6 +324,7 @@ export const PANEL_BUILTINS = new BuiltinRegistry([
   ...FILE_BUILTINS,
   ...FILE_WRITES,
   ...ALIAS_BUILTINS,
+  templates,
   clear,
   history,
   last,

@@ -1153,6 +1153,7 @@ export interface Catalogue {
   readonly 'commandPanel.builtin.exit': string;
   readonly 'commandPanel.builtin.last': string;
   readonly 'commandPanel.builtin.last.none': string;
+  readonly 'commandPanel.builtin.templates': string;
   readonly 'commandPanel.builtin.help': string;
   readonly 'commandPanel.builtin.help.panel': string;
   readonly 'commandPanel.builtin.help.tyto': string;
@@ -1989,6 +1990,7 @@ export const CATALOGUE_KEYS = [
   'commandPanel.builtin.exit',
   'commandPanel.builtin.last',
   'commandPanel.builtin.last.none',
+  'commandPanel.builtin.templates',
   'commandPanel.builtin.help',
   'commandPanel.builtin.help.panel',
   'commandPanel.builtin.help.tyto',

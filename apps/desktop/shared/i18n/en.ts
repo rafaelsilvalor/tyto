@@ -775,6 +775,8 @@ export const en: Catalogue = {
   'commandPanel.builtin.history.empty': 'Nothing has been run in this folder yet.',
   'commandPanel.builtin.exit': 'close this session',
   'commandPanel.builtin.last': 'run the last tyto command again',
+  'commandPanel.builtin.templates':
+    'list the templates a render in this folder can use (tyto template list)',
   'commandPanel.builtin.last.none': 'No tyto command in the history to run again.',
   'commandPanel.builtin.help': "list these commands; help <command> shows a tyto command's help",
   'commandPanel.builtin.help.panel': "The panel's own commands:",

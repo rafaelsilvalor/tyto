@@ -1032,6 +1032,19 @@ describe('aliases and variables (TYTO-536)', () => {
     ]);
   });
 
+  it('runs templates as tyto template list, and no alias takes its name (TYTO-728)', async () => {
+    const harness = await mount({ aliases: aliases(['shared', 'check', 'workspace']) });
+    await typeAndRun(harness, "alias templates='render --trust'");
+    await settle(harness.element);
+    expect(harness.aliasWrites).toEqual([]);
+    expect(lines(harness.element).at(-1)).toBe(
+      'templates is a command of the panel or tyto itself: an alias cannot take its name.',
+    );
+    await typeAndRun(harness, 'templates --json');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([['template', 'list', '--json']]);
+  });
+
   it('writes --workspace only into a folder that allows it, and removes from there', async () => {
     const restricted = await mount({ aliases: { aliases: [], workspace: 'restricted' } });
     await typeAndRun(restricted, "alias --workspace entrega='render --delivery'");
