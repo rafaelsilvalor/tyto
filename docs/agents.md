@@ -147,7 +147,7 @@ by hand. It offers four reads to any folder, and four writes to a trusted one:
 
 | Tool                | What it answers                                                        |
 | ------------------- | ---------------------------------------------------------------------- |
-| `list_templates`    | Every template a brief in the folder can name                          |
+| `list_templates`    | Every template and alias a brief in the folder can name                |
 | `describe_template` | A template's formats and sizes, its slots, and a new brief's skeleton  |
 | `check_brief`       | A brief's diagnostics with line and column; structure only, no fetch   |
 | `render_preview`    | One format as PNG, at most 1,024 px on its longest side, 4 artworks    |

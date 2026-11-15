@@ -31,6 +31,7 @@ import {
   renderTask,
 } from '../render-task.js';
 import { displayPath } from '../render.js';
+import { type ListedTemplate, listedTemplates } from '../template-list.js';
 import { pluginsInReach, renderContextInReach } from '../templates-in-reach.js';
 import { type LocatedDiagnostic, diagnosticsDocument } from '../report.js';
 import { optionalSources, projectSections, renderSources } from '../sources.js';
@@ -61,11 +62,21 @@ import { type BriefWrite, type BriefWriteAnswer, writeBrief } from './writes.js'
 /** A brief named by path, confined (see `confine.ts`), or handed over as text. */
 export type BriefInput = { readonly path: string } | { readonly text: string };
 
+/**
+ * A row of `list_templates`: a template, or an alias of one (TYTO-731), as `tyto template list`
+ * lists it. `version` and `description` are the template's; `formats` are what a render accepts
+ * under this name, so a configuration that restricts them (ADR 0155) narrows them here too.
+ */
 export interface TemplateSummary {
   readonly name: string;
   readonly version: string;
   readonly description?: string;
   readonly formats: readonly string[];
+  readonly origin: ListedTemplate['origin'];
+  /** The plugin, when `origin` is `plugin`. */
+  readonly plugin?: string;
+  /** The template an alias reaches; absent on a template's own row. */
+  readonly aliasOf?: string;
 }
 
 export interface CheckAnswer {
@@ -476,12 +487,22 @@ export async function openSession(
 
     async listTemplates() {
       const { value } = await context();
-      return value.registry.list().map((manifest) => ({
-        name: manifest.name,
-        version: manifest.version,
-        ...(manifest.description === undefined ? {} : { description: manifest.description }),
-        formats: manifest.formats,
-      }));
+      // The terminal's rows, so an agent is offered the names `tyto template list` prints.
+      return listedTemplates(value).flatMap((row) => {
+        const manifest = value.registry.get(row.aliasOf ?? row.name);
+        if (manifest === undefined) return [];
+        return [
+          {
+            name: row.name,
+            version: manifest.version,
+            ...(manifest.description === undefined ? {} : { description: manifest.description }),
+            formats: row.formats,
+            origin: row.origin,
+            ...(row.plugin === undefined ? {} : { plugin: row.plugin }),
+            ...(row.aliasOf === undefined ? {} : { aliasOf: row.aliasOf }),
+          },
+        ];
+      });
     },
 
     async describeTemplate(name) {
