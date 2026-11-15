@@ -1744,6 +1744,15 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // TYTO-536: a shared folder must not put words in a person's command line before it is trusted.
+  W_PROJECT_ALIASES_WITHHELD: {
+    severity: 'warning',
+    summary: "A restricted source's command panel aliases are withheld until it is trusted.",
+    template: 'The aliases {aliases} are withheld because this folder is not trusted.',
+    spec: 'docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md',
+    fatal: false,
+    fatality: "Only the source's aliases are left out; the person's own still expand.",
+  },
   W_PROJECT_PLUGIN_FILES_WITHHELD: {
     severity: 'warning',
     summary:

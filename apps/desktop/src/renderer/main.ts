@@ -6597,12 +6597,27 @@ function wireCommandPanel(): void {
   element.order = commandsOrder;
   element.foldOlderRuns = commandsFoldOlderRuns;
   element.ports = {
-    run: async (words, folder) => {
+    run: async (words, folder, origin) => {
       const bridge = window.tyto;
       if (bridge === undefined) throw new Error('no bridge');
       return (
-        await bridge['cli:run']({ argv: [...words], ...(folder === undefined ? {} : { folder }) })
+        await bridge['cli:run']({
+          argv: [...words],
+          ...(folder === undefined ? {} : { folder }),
+          ...(origin === undefined ? {} : { origin }),
+        })
       ).runId;
+    },
+    // TYTO-536: the aliases in force, asked for every line, and `alias`'s writes, main checking.
+    aliases: async () => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { aliases: [] };
+      return bridge['commands:aliases']({});
+    },
+    setAlias: async (name, body) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { ok: false, reason: 'invalid' };
+      return bridge['commands:set-alias']({ name, body });
     },
     cancel: (runId) => {
       void withBridge(async (bridge) => {

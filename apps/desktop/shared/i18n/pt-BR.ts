@@ -795,6 +795,45 @@ export const ptBR: Catalogue = {
   'commandPanel.builtin.cd': 'vai para uma pasta do projeto; cd sozinho volta à raiz',
   'commandPanel.builtin.pwd': 'mostra a pasta em que os comandos tyto rodam',
   'commandPanel.builtin.cat': 'mostra um arquivo de texto',
+  'cli.offer.origin.user':
+    "Esta linha veio do seu apelido '{alias}', definido nas suas configurações (commandAliases).",
+  'cli.offer.origin.workspace':
+    "Esta linha veio do apelido '{alias}', definido no .tyto/project.json desta pasta de trabalho (aliases).",
+  'commandPanel.builtin.alias':
+    "lista os apelidos, ou salva um nas suas configurações: alias nome='linha'",
+  'commandPanel.builtin.unalias': 'remove um apelido seu',
+  'commandPanel.builtin.set': 'lista as variáveis desta sessão, ou define uma: set nome=valor',
+  'commandPanel.builtin.variable':
+    'uma variável definida nesta sessão (nunca do ambiente; não entre aspas simples)',
+  'commandPanel.alias.none': 'Nenhum apelido.',
+  'commandPanel.alias.where.user': 'suas configurações',
+  'commandPanel.alias.where.workspace': 'esta pasta de trabalho',
+  'commandPanel.alias.unknown': 'Nenhum apelido chamado {name}.',
+  'commandPanel.alias.badName':
+    '{name} não pode ser nome de apelido: letras, dígitos, _ e -, sem começar por dígito ou -.',
+  'commandPanel.alias.reserved':
+    '{name} é um comando do próprio painel ou o tyto: um apelido não pode ter esse nome.',
+  'commandPanel.alias.usage': "Escreva alias nome='linha', com aspas numa linha que tem espaços.",
+  'commandPanel.unalias.usage': 'Escreva unalias nome.',
+  'commandPanel.alias.inWorkspace':
+    '{name} é um apelido desta pasta de trabalho, definido no .tyto/project.json dela: remova-o lá.',
+  'commandPanel.alias.saved.user': 'Apelido {name} salvo nas suas configurações.',
+  'commandPanel.alias.removed.user': 'Apelido {name} removido das suas configurações.',
+  'commandPanel.alias.refused.invalid':
+    '{name} não foi salvo: o nome ou a linha não serve para um apelido.',
+  'commandPanel.alias.refused.syntax':
+    '{name} não foi salvo: o {where} não é JSON válido e não é sobrescrito. Corrija-o antes.',
+  'commandPanel.alias.ignored':
+    'O apelido {name} em {where} é ignorado: tem o nome de um comando do painel ou do tyto.',
+  'commandPanel.alias.unreadable':
+    'O apelido {name} não pode ser lido: a linha dele tem aspas abertas ou um && vazio na coluna {column}. Nada foi executado.',
+  'commandPanel.alias.from': 'Esta linha veio do apelido {name}, definido em {where}.',
+  'commandPanel.variable.unknown':
+    'Nenhuma variável chamada {name} nesta sessão: set {name}=valor define uma. Nada foi executado.',
+  'commandPanel.variable.none': 'Nenhuma variável nesta sessão.',
+  'commandPanel.variable.badName':
+    '{name} não pode ser nome de variável: letras, dígitos e _, sem começar por dígito.',
+  'commandPanel.set.usage': 'Escreva set nome=valor, com aspas num valor que tem espaços.',
   'commandPanel.files.noFolder':
     '{name} precisa de uma pasta de projeto aberta: os comandos de arquivo do painel trabalham dentro dela.',
   'commandPanel.files.outside':

@@ -279,6 +279,9 @@ describe('the bridge', () => {
       'cli:open-diagnostic',
       'cli:open-recipe',
       'cli:run',
+      // TYTO-536: the command panel's aliases in force, and alias's one write, main checking.
+      'commands:aliases',
+      'commands:set-alias',
       'credentials:delete',
       // TYTO-649: a key file stored from the plugins screen; main picks and reads it, and the
       // answer is an outcome. Exercised by `e2e/credential-file.desktop.test.ts`.
@@ -623,6 +626,9 @@ describe('switching the language', () => {
     'cli.offer.watch.detail',
     'cli.offer.watch.yes',
     'cli.offer.no',
+    // TYTO-536: the line the offer box adds when the refused line came from an alias.
+    'cli.offer.origin.user',
+    'cli.offer.origin.workspace',
     // TYTO-497, ADR 0164: the Terminal tab is closed until Ctrl+Shift+` opens it and renders its
     // own words, the paste and quit questions are boxes, and its command is the bar's text only;
     // `terminal-panel.test.ts` holds the tab's.

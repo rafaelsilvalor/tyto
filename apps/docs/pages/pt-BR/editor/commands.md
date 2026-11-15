@@ -1,7 +1,7 @@
 # Comandos
 
 ::: info Como esta página foi conferida
-Todos os passos foram seguidos em 30/10/2026 numa build de desenvolvimento do Tyto, a partir da branch que acrescentou esta página, no Windows 11, com a janela em inglês. Os nomes em português foram lidos do catálogo da própria janela, não de uma janela aberta. Os blocos e o lugar da lista de sugestões foram conferidos de novo em 31/10/2026, depois que a página passou a descrevê-los. As recusas de `tyto mcp`, `watch` e `recipe run --apply` entraram nesta lista em 12/11/2026 a partir do código da janela e dos testes unitários dela, a última pelo próprio analisador da linha de comando, não na janela. Os comandos do próprio painel, o `&&`, o `!N` e os padrões entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela, não na janela. Os comandos de arquivo `ls`, `cd`, `pwd` e `cat`, e o completar depois deles, entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela; o prompt mostrando uma pasta depois do `cd` foi olhado na janela, nos temas claro e escuro. `new`, `mkdir`, `mv`, `cp`, `rm`, `open` e `reveal` entraram no mesmo dia a partir do código da janela e dos testes unitários dela, não na janela. As caixas que uma recusa oferece entraram em 15/11/2026: as de `--trust` e `recipe run --apply` foram seguidas na janela, com as duas respostas; as de `signin`, `signout` e `watch` vêm do código da janela e dos testes unitários dela.
+Todos os passos foram seguidos em 30/10/2026 numa build de desenvolvimento do Tyto, a partir da branch que acrescentou esta página, no Windows 11, com a janela em inglês. Os nomes em português foram lidos do catálogo da própria janela, não de uma janela aberta. Os blocos e o lugar da lista de sugestões foram conferidos de novo em 31/10/2026, depois que a página passou a descrevê-los. As recusas de `tyto mcp`, `watch` e `recipe run --apply` entraram nesta lista em 12/11/2026 a partir do código da janela e dos testes unitários dela, a última pelo próprio analisador da linha de comando, não na janela. Os comandos do próprio painel, o `&&`, o `!N` e os padrões entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela, não na janela. Os comandos de arquivo `ls`, `cd`, `pwd` e `cat`, e o completar depois deles, entraram em 15/11/2026 a partir do código da janela e dos testes unitários dela; o prompt mostrando uma pasta depois do `cd` foi olhado na janela, nos temas claro e escuro. `new`, `mkdir`, `mv`, `cp`, `rm`, `open` e `reveal` entraram no mesmo dia a partir do código da janela e dos testes unitários dela, não na janela. Apelidos e variáveis entraram em 15/11/2026, a partir do código da janela e dos testes unitários dela, não da janela. As caixas que uma recusa oferece entraram em 15/11/2026: as de `--trust` e `recipe run --apply` foram seguidas na janela, com as duas respostas; as de `signin`, `signout` e `watch` vêm do código da janela e dos testes unitários dela.
 :::
 
 A aba **Comandos** da área inferior roda comandos `tyto`, os mesmos da [linha de comando](../command-line/index.md), dentro da janela, e alguns comandos próprios. Nada mais roda ali: nem um shell, nem outro programa. Para um shell, use a aba [Terminal](terminal.md).
@@ -19,7 +19,7 @@ A área inferior mostra uma aba por vez. O **×** dela esconde a área inteira, 
 Digite depois de `tyto ›` e tecle **Enter**. Escrever `tyto` antes é opcional.
 
 - As palavras se separam por espaços. Ponha entre aspas um caminho com espaços: `render "Meus briefs/cartaz.brief"`. Uma aspa deixada aberta é recusada, e nada roda.
-- `|`, `>`, `;`, `$HOME` e `~` não querem dizer nada aqui. Chegam ao comando como palavras. `&&`, `!N`, `*` e `?` são lidos pelo painel, como diz [Vários comandos numa linha](#varios-comandos-numa-linha).
+- `|`, `>`, `;` e `~` não querem dizer nada aqui. Chegam ao comando como palavras. `&&`, `!N`, `*` e `?` são lidos pelo painel, como diz [Vários comandos numa linha](#varios-comandos-numa-linha), e `$nome` e apelidos como diz [Apelidos e variáveis](#apelidos-e-variaveis).
 - O comando roda na pasta do painel: a [pasta de trabalho](workspace-folder.md) aberta, ou a pasta dentro dela para a qual o `cd` foi, que o prompt mostra (`tyto entregas/novembro ›`). Um caminho pode ser escrito a partir dela. Sem pasta aberta, roda na sua pasta do Tyto (`~/.tyto`). A confiança de uma pasta é a da pasta de trabalho: dentro de uma pasta restrita, toda pasta é restrita também.
 - Alguns comandos são recusados, com uma linha dizendo por quê:
   - `--trust`, porque a janela confia numa pasta pelo **Workspace: Manage Trust**. Com uma pasta aberta, uma caixa oferece confiar nela ali e então rodar o comando sem `--trust`. Diferente do `--trust`, que vale por uma execução, essa confiança fica gravada: a pasta continua confiável até você retirar a confiança em **Workspace: Manage Trust** ou com `tyto trust remove`;
@@ -56,6 +56,9 @@ Estes não são comandos `tyto`: o painel responde a eles sozinho. Os que só le
 | `rm`             | Manda arquivos ou pastas para a lixeira: `rm velho.brief rascunhos`.                                                                                                                |
 | `open`           | Abre um brief, receita ou arquivo de texto numa aba.                                                                                                                                |
 | `reveal`         | Seleciona um arquivo ou pasta no Explorador.                                                                                                                                        |
+| `alias`          | Lista os apelidos, ou salva um: `alias entrega='render --delivery'`. Veja [Apelidos e variáveis](#apelidos-e-variaveis).                                                            |
+| `unalias`        | Remove um apelido: `unalias entrega`.                                                                                                                                               |
+| `set`            | Lista as variáveis desta sessão, ou define uma: `set brief=cartaz.brief`.                                                                                                           |
 
 O `ls` lista as pastas primeiro, cada uma terminando em `/`, e cada nome ao lado do tipo: pasta, brief, receita ou arquivo. Um brief, uma receita ou um arquivo de texto é um link que o abre numa aba, a menos que o nome tenha espaço.
 
@@ -67,6 +70,24 @@ Nada é substituído: `mv`, `cp`, `new` e `mkdir` recusam um nome que já existe
 
 - `&&` roda o comando seguinte só se o anterior terminou com **✓ 0**: `check cartaz.brief && render cartaz.brief`. Cada comando é um bloco próprio. Um comando recusado, parado ou que termina com erro para a linha ali. Enquanto uma linha roda, a sessão não aceita outra.
 - `*` vale por qualquer parte de um nome, e `?` por um caractere: `render *.brief` renderiza todos os briefs da pasta aberta, e `render entregas/*.brief` os de `entregas`. Um padrão só olha dentro da pasta de trabalho aberta e nunca atravessa uma `/`: `*` não casa um nome que começa com `.`, e não existe `**`. Um padrão que leva para fora da pasta (`..`, `/`, `C:\`, `~`), ou que não casa nenhum arquivo, é recusado, e nada da linha roda. Ponha a palavra entre aspas para manter o `*` como está.
+
+## Apelidos e variáveis
+
+Um apelido é um nome curto para uma linha que você digita muito. `alias entrega='render --delivery'` salva o apelido, e daí em diante `entrega cartaz.brief` roda `render --delivery cartaz.brief`: as palavras depois do nome vão depois da linha do apelido.
+
+- `alias` sozinho lista os apelidos em vigor, cada um com onde está definido; `alias entrega` mostra um. `unalias entrega` o remove.
+- `alias` salva nas suas configurações (`commandAliases` no `settings.json`), para toda pasta que você abrir. Os apelidos da própria pasta ficam escritos no `.tyto/project.json` dela, em `aliases`, para todos que abrirem aquela pasta: `"aliases": { "entrega": "render --delivery" }`. `unalias` remove só os seus.
+- **O apelido da pasta ganha** do seu de mesmo nome. Os apelidos de uma pasta também podem vir do [perfil de trabalho](workspace-folder.md#perfis-de-trabalho) dela, e os da própria pasta ganham nome a nome.
+- Numa [pasta restrita](workspace-folder.md#uma-pasta-em-que-voce-ainda-nao-confiou) os apelidos da pasta ficam retidos e nunca rodam: a faixa acima do editor os conta, e o painel Problemas os nomeia (`W_PROJECT_ALIASES_WITHHELD`). Os seus continuam valendo.
+- Um apelido se expande uma vez. A linha dele vale como está escrita: um apelido dentro dela não se expande de novo, e um `$` nela é só um caractere. Ponha aspas numa linha com espaços ao salvar.
+- Um apelido não pode ter o nome de um comando do próprio painel (`ls`, `cd`, `help`, `alias`…) nem `tyto`. Um escrito à mão num arquivo com esse nome é ignorado, e o painel avisa uma vez.
+- A linha que um apelido gerou passa pelas mesmas recusas que uma digitada. Quando é recusada, a linha e a caixa dizem de qual apelido ela veio e onde ele está definido.
+
+`set brief=cartaz.brief` define uma variável nesta sessão, e `$brief` numa linha seguinte a lê: `render $brief`. `set` sozinho lista as variáveis. Uma variável dura até a aba da sessão fechar, e cada aba tem as suas.
+
+- Só vale o que `set` deu a esta sessão: `$HOME` e as outras variáveis do sistema não são lidas, e um nome nunca definido recusa a linha, sem rodar nada.
+- `$brief` é lido em qualquer parte de uma palavra, e entre aspas duplas: `"entregas/$brief"`. Entre aspas simples fica como foi digitado: `'$brief'`.
+- Um valor é sempre uma palavra só: espaços, aspas ou `&&` dentro dele fazem parte da palavra, nunca viram outro comando.
 
 ## Completar enquanto digita
 

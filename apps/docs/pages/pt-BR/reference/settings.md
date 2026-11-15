@@ -2,7 +2,7 @@
 
 # Configurações
 
-Todas as chaves que o app declara no `settings.json`: 35. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
+Todas as chaves que o app declara no `settings.json`: 36. Abra o arquivo com **Preferências: Abrir configurações (JSON)**; uma chave que você não escreve fica com o valor padrão, e um valor que o app não consegue ler aparece no painel Problemas e o padrão vale no lugar dele. Um plugin acrescenta as próprias chaves como `<id do plugin>.<chave>`, que não aparecem aqui.
 
 ::: info Descrições em inglês
 As descrições abaixo estão em inglês: o código guarda cada uma em um só idioma, e esta página as mostra como estão em vez de traduzi-las à parte.
@@ -289,6 +289,14 @@ Fold every run of the command panel but the newest to its header line; a click o
 | Tipo | Padrão |
 | --- | --- |
 | `boolean` | `false` |
+
+## commandAliases
+
+The command panel's aliases, by name: the line each one stands for, as `alias name='line'` writes it. A workspace's `aliases` in .tyto/project.json win over these, name by name.
+
+| Tipo | Padrão |
+| --- | --- |
+| `object` | `{}` |
 
 ## zoom
 

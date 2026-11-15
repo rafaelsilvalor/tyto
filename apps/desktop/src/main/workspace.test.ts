@@ -327,6 +327,28 @@ describe('the hosts call may reach (TYTO-671, ADR 0193 decision 4)', () => {
   });
 });
 
+describe('the command panel aliases of the open folder (TYTO-536)', () => {
+  it("withholds a restricted folder's, and hands them over once it is trusted", async () => {
+    const file = join(work, '.tyto', 'project.json');
+    await writeFile(file, '{\n  // ours\n  "aliases": { "entrega": "render --trust" }\n}\n');
+    const workspace = createWorkspaceService({
+      trustStore: fsTrustStore({ home }),
+      home,
+      setTemplateFolders: () => Promise.resolve(),
+    });
+    expect(workspace.aliases()).toEqual([]);
+
+    await workspace.open(work);
+    expect(workspace.aliases()).toEqual([]);
+    expect(workspace.state().leftOut).toBe(1);
+
+    expect((await workspace.grant('folder')).ok).toBe(true);
+    expect(workspace.aliases()).toEqual([
+      { name: 'entrega', body: 'render --trust', origin: 'folder' },
+    ]);
+  });
+});
+
 describe('a work profile in the window (TYTO-347, ADR 0114)', () => {
   async function named(text: string): Promise<string> {
     const folder = join(home, 'profiles', 'saude');

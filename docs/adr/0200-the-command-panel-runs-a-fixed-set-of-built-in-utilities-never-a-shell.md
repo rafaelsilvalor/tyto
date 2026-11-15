@@ -3,7 +3,7 @@
 Status: accepted · 2026-11-15 · TYTO-535 · epic E20 · amends ADR 0159 decision 8 (the panel now
 reads `&&`, `!N` and globs itself) and ADR 0164 decision 9 (the panel runs `tyto` and its own
 built-ins) · builds on ADR 0111 and ADR 0113 · amended by ADR 0201 (file commands touch the
-workspace folder, inside it only)
+workspace folder, inside it only); note of 2026-11-15 (TYTO-536) on aliases and variables
 
 ## Context
 
@@ -107,3 +107,41 @@ as steps under the workspace root (`CommandSession.workingFolder`). It is the ro
 - **A `templates` built-in listing the window's templates.** The card asked for one. The CLI has
   no command that lists the templates in reach, and the panel does not reimplement one in the
   renderer: a `tyto` command that does would make it a one-line entry. TYTO-728 adds both.
+
+## Note, 2026-11-15 — aliases and variables (TYTO-536)
+
+TYTO-536 fills the seam of decision 2 as it said: an alias is a lookup on the first word before
+the registry, and a variable is part of a word read before step 3. The parser is unchanged but
+for one record: where in a word a `$` was typed outside single quotes.
+
+**An alias expands once.** After `!N`, a step whose unquoted first word names an alias (and is
+not `tyto`) becomes the alias's line, read by the same parser, with the step's other words after
+its last step. The words it brings are taken literally: never looked up as an alias again, and no
+`$` in them is read, so an alias means the same whatever the session has set. An alias can take
+no name the registry answers to, nor `tyto`: one written in a file with such a name is ignored,
+and the panel says so once. The person's aliases (`commandAliases` in `settings.json`) and the
+workspace's (`aliases` in `.tyto/project.json`, ADR 0112 note of 2026-11-15) are merged by main,
+the workspace's winning by name; a restricted folder's never reach the window, so none runs.
+
+**An alias never turns into something a refusal would not see.** What it expands to goes through
+the registry and `cli:run` exactly as typed words do, so a built-in's restricted check, main's
+refusals and their offers (TYTO-726) all apply. `cli:run` gains an optional `origin` — the alias
+and where it is defined — which the refusal's sentence and its box name; it is a label only, and
+main decides on `argv` alone.
+
+**`$VAR` now means a session variable**, amending decision 2's last sentence. `set name=value`
+sets one for the panel's session (one tab), and `$name` reads it:
+
+- only what `set` gave this session, never the environment's variables; a name never set refuses
+  the line and nothing in it runs, as a pattern matching nothing does (decision 4);
+- inside a word, unquoted or in double quotes; never in single quotes;
+- replaced after the line is read, so a value is always one word: its spaces, quotes or `&&` are
+  characters of that word, never a new word or a new step. A word a variable made counts as
+  quoted: never a glob, never a built-in's name.
+
+`|`, `>`, `;` and `||` still mean nothing. The history keeps the line as typed, alias names and
+`$name` included.
+
+`alias`, `unalias` and `set` are registry entries that run in a restricted folder: they write the
+person's own settings (`commands:set-alias`, main checking the name and line again) or this
+session, never the folder.

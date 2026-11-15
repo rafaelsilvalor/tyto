@@ -2,6 +2,7 @@ import { type TemplateResult, html, nothing } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 
 import type { CatalogueKey } from '../../shared/i18n/index.js';
+import type { IpcResponse } from '../../shared/ipc.js';
 import { ansiPresentation } from './ansi.js';
 import { type Completion, accept } from './command-completion.js';
 import { type OutputLink, linksIn } from './command-links.js';
@@ -31,6 +32,8 @@ import {
   type PanelWrites,
   PANEL_BUILTINS,
 } from './command-builtins.js';
+import type { AliasesInForce } from './command-alias-builtins.js';
+import { expandAliases, expandVariables } from './command-aliases.js';
 import { type ListById, folderId, stepsLabel } from './command-paths.js';
 import { type GlobExpansion, type ListFolder, expandGlob, isGlob } from './command-glob.js';
 import {
@@ -62,7 +65,11 @@ export interface CommandPanelPorts {
    * Starts the words as a run and answers its id; throws when `cli:run` refused them. `folder`
    * is the explorer id of the folder it runs in, absent for the workspace root (TYTO-537).
    */
-  readonly run: (words: readonly string[], folder?: string) => Promise<string>;
+  readonly run: (
+    words: readonly string[],
+    folder?: string,
+    origin?: LineStep['origin'],
+  ) => Promise<string>;
   readonly cancel: (runId: string) => void;
   /** Opens what a link in a session's output names. */
   readonly open: (session: CommandSession, link: OutputLink) => void;
@@ -92,7 +99,17 @@ export interface CommandPanelPorts {
   readonly read: (entryId: string) => Promise<FileRead>;
   /** The Explorer's own writes, for `new`, `mkdir`, `mv`, `cp`, `rm`, `open`, `reveal`. */
   readonly writes: PanelWrites;
+  /** The aliases in force (`commands:aliases`, TYTO-536), asked again for every line. */
+  readonly aliases: () => Promise<AliasesInForce>;
+  /** `commands:set-alias`: one alias written, main checking where it may go. */
+  readonly setAlias: (
+    name: string,
+    body: string | null,
+  ) => Promise<IpcResponse<'commands:set-alias'>>;
 }
+
+/** The aliases with a built-in's name already said to be ignored, once per window (TYTO-536). */
+const IGNORED_SAID = new Set<string>();
 
 const NO_WRITES: PanelWrites = {
   create: () => Promise.resolve({ ok: false, reason: 'gone' }),
@@ -122,6 +139,8 @@ const NO_PORTS: CommandPanelPorts = {
   listById: () => Promise.resolve({ entries: [], more: 0 }),
   read: () => Promise.resolve({ ok: false, reason: 'gone' }),
   writes: NO_WRITES,
+  aliases: () => Promise.resolve({ aliases: [] }),
+  setAlias: () => Promise.resolve({ ok: false, reason: 'invalid' }),
 };
 
 /** Ctrl+R's state: what is typed in the search, and where the match is in the history. */
@@ -268,15 +287,65 @@ export class CommandPanel extends DockedPanel {
     this.following = true;
     this.chaining.add(session.id);
     try {
+      // TYTO-536: the aliases a step starts with, once, before the registry (ADR 0200).
+      const inForce = await this.ports.aliases().catch((): AliasesInForce => ({ aliases: [] }));
+      const aliased = expandAliases(expanded.steps, inForce.aliases, (name) => this.reserved(name));
+      if (!aliased.ok) {
+        sessions.refused(
+          session.id,
+          line.trim(),
+          this.say('commandPanel.alias.unreadable')
+            .replaceAll('{name}', aliased.alias)
+            .replaceAll('{column}', String(aliased.at + 1)),
+        );
+        return;
+      }
       // The last step is not waited on: nothing comes after it, and the tab is busy while it
       // runs, as a single command's is.
-      for (const [index, step] of expanded.steps.entries()) {
-        const next = index < expanded.steps.length - 1;
+      for (const [index, step] of aliased.steps.entries()) {
+        const next = index < aliased.steps.length - 1;
         if (!(await this.runStep(session.id, step, next))) break;
       }
+      // After the line, so the note sits under the block it ran rather than nowhere.
+      this.sayIgnored(session.id, inForce);
     } finally {
       this.chaining.delete(session.id);
     }
+  }
+
+  /** A name an alias may not take: a built-in's, or `tyto` (TYTO-536). */
+  private reserved(name: string): boolean {
+    return name === 'tyto' || this.builtins.find({ text: name, quoted: false }) !== undefined;
+  }
+
+  /** An alias in force with a built-in's name is never run, and said so once (TYTO-536). */
+  private sayIgnored(sessionId: string, inForce: AliasesInForce): void {
+    for (const alias of inForce.aliases) {
+      const key = `${alias.definedIn}:${alias.name}`;
+      if (!this.reserved(alias.name) || IGNORED_SAID.has(key)) continue;
+      IGNORED_SAID.add(key);
+      this.sessions?.note(
+        sessionId,
+        this.say('commandPanel.alias.ignored')
+          .replaceAll('{name}', alias.name)
+          .replaceAll('{where}', this.whereOf(alias.definedIn)),
+      );
+    }
+  }
+
+  private whereOf(definedIn: 'user' | 'workspace'): string {
+    return this.say(
+      definedIn === 'user' ? 'commandPanel.alias.where.user' : 'commandPanel.alias.where.workspace',
+    );
+  }
+
+  /** What a refusal of an alias-expanded step adds: the alias and where it is defined. */
+  private fromAlias(step: LineStep): string {
+    if (step.origin === undefined) return '';
+    const from = this.say('commandPanel.alias.from')
+      .replaceAll('{name}', step.origin.alias)
+      .replaceAll('{where}', this.whereOf(step.origin.definedIn));
+    return ` ${from}`;
   }
 
   /** What a line that cannot be read says, in the block it gets. */
@@ -298,9 +367,21 @@ export class CommandPanel extends DockedPanel {
    * One step of a line: answers whether it succeeded, which an `&&` after it needs. With `wait`
    * false a `tyto` command it starts is not waited on, and counts as succeeding once started.
    */
-  private async runStep(sessionId: string, step: LineStep, wait: boolean): Promise<boolean> {
+  private async runStep(sessionId: string, typedStep: LineStep, wait: boolean): Promise<boolean> {
     const sessions = this.sessions;
-    if (sessions?.sessions.some((each) => each.id === sessionId) !== true) return false;
+    const found = sessions?.sessions.find((each) => each.id === sessionId);
+    if (sessions === undefined || found === undefined) return false;
+    // TYTO-536: `$name` from this session's `set`, inside words, never adding one.
+    const read = expandVariables(typedStep.words, found.variables);
+    if (!read.ok) {
+      sessions.refused(
+        sessionId,
+        typedStep.source,
+        this.say('commandPanel.variable.unknown').replaceAll('{name}', read.name),
+      );
+      return false;
+    }
+    const step: LineStep = { ...typedStep, words: read.words };
     const builtin = this.builtins.find(step.words[0]);
     if (builtin !== undefined) return this.runBuiltin(sessionId, step, builtin, wait);
 
@@ -309,13 +390,12 @@ export class CommandPanel extends DockedPanel {
         ? step.words.slice(1)
         : step.words;
     const words: string[] = [];
-    const session = sessions.sessions.find((each) => each.id === sessionId);
     for (const word of typed) {
       if (word.quoted || !isGlob(word.text)) {
         words.push(word.text);
         continue;
       }
-      const expansion = await expandGlob(word.text, session?.workingFolder ?? [], this.ports.list, {
+      const expansion = await expandGlob(word.text, found.workingFolder, this.ports.list, {
         caseless: this.ports.caseless,
         folder: this.ports.folder() !== null,
       });
@@ -326,7 +406,7 @@ export class CommandPanel extends DockedPanel {
       words.push(...expansion.words);
     }
     if (words.length === 0) return true;
-    return this.runTyto(sessionId, step.source, words, wait);
+    return this.runTyto(sessionId, step.source, words, wait, step.origin);
   }
 
   private globProblem(problem: Extract<GlobExpansion, { ok: false }>): string {
@@ -340,6 +420,7 @@ export class CommandPanel extends DockedPanel {
     line: string,
     words: readonly string[],
     wait: boolean,
+    origin?: LineStep['origin'],
   ): Promise<boolean> {
     const sessions = this.sessions;
     if (sessions === undefined) return false;
@@ -357,7 +438,7 @@ export class CommandPanel extends DockedPanel {
     }
     let runId: string;
     try {
-      runId = await this.ports.run(words, folder ?? undefined);
+      runId = await this.ports.run(words, folder ?? undefined, origin);
     } catch (error) {
       sessions.refused(
         sessionId,
@@ -388,7 +469,8 @@ export class CommandPanel extends DockedPanel {
       sessions.refused(
         sessionId,
         step.source,
-        this.say('commandPanel.builtin.restricted').replaceAll('{name}', builtin.name),
+        this.say('commandPanel.builtin.restricted').replaceAll('{name}', builtin.name) +
+          this.fromAlias(step),
       );
       return false;
     }
@@ -406,6 +488,17 @@ export class CommandPanel extends DockedPanel {
       say: (key) => this.say(key),
       registry: this.builtins,
       files: this.filesOf(sessionId),
+      aliases: {
+        list: () => this.ports.aliases(),
+        set: (name, body) => this.ports.setAlias(name, body),
+        reserved: (name) => this.reserved(name),
+      },
+      variables: {
+        all: () => sessions.sessions.find((each) => each.id === sessionId)?.variables ?? new Map(),
+        set: (name, value) => {
+          sessions.setVariable(sessionId, name, value);
+        },
+      },
     });
     switch (outcome.kind) {
       case 'printed':

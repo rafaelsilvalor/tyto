@@ -177,6 +177,7 @@ export {
   PROJECT_FILE_NAME,
   type ProjectEntry,
   type ProjectLayer,
+  type ProjectAlias,
   type ProjectMember,
   type ProjectNode,
   type ProjectOrigins,
@@ -186,6 +187,7 @@ export {
   resolveProject,
 } from './project/project.js';
 
+export { ALIAS_BODY_MAX, ALIAS_NAME, ALIASES_KEY, aliasBodyProblem } from './project/aliases.js';
 export { fileSafeName } from './project/file-safe-name.js';
 
 export { isAbsolutePath, isInsidePath, resolvePath } from './project/paths.js';

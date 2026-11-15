@@ -14,6 +14,7 @@ import {
 import type { Rasterizer } from '@tyto/raster';
 
 import { opensInTab } from '../../shared/file-icons.js';
+import type { RefusalOrigin } from './cli-refusals.js';
 
 /**
  * `tyto` commands run in main, in-process, for the window (ADR 0159, TYTO-495).
@@ -44,6 +45,8 @@ export interface CliStateChange {
 /** The run a refusal is asked for: its id, and the panel's waiting state around a box. */
 export interface RefusalRun {
   readonly runId: string;
+  /** The alias the window expanded into this run's words, for the refusal to name (TYTO-536). */
+  readonly origin?: RefusalOrigin;
   waiting<T>(question: string, during: () => Promise<T>): Promise<T>;
 }
 
@@ -110,7 +113,7 @@ export interface CliRunner {
    * command panel's working folder (TYTO-537, ADR 0201). The workspace and its trust are still
    * found from there upwards, so a subfolder of a restricted folder is restricted too.
    */
-  start(argv: readonly string[], cwd?: string): { readonly runId: string };
+  start(argv: readonly string[], cwd?: string, origin?: RefusalOrigin): { readonly runId: string };
   /** Fires the run's signal. Unknown or finished ids are ignored: Stop raced the end. */
   cancel(runId: string): void;
   /**
@@ -162,7 +165,7 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
   };
 
   return {
-    start(argv, cwd) {
+    start(argv, cwd, origin) {
       const runId = newId();
       const controller = new AbortController();
       const entry: { readonly controller: AbortController; path: readonly string[] } = {
@@ -187,6 +190,7 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
           entry.path = invocation.path;
           return options.refuse(invocation, base.cwd, {
             runId,
+            ...(origin === undefined ? {} : { origin }),
             waiting: async (question, during) => {
               options.state({ runId, state: 'waiting', question });
               try {

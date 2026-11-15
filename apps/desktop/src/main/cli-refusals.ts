@@ -71,8 +71,9 @@ export type RefusalOffer =
   | { readonly kind: 'watch'; readonly folder: string };
 
 /**
- * Where a refused line came from when the person did not type it word for word. Nothing sets it
- * yet: TYTO-536's aliases will, and the box will name the alias and where it is defined.
+ * Where a refused line came from when the person did not type it word for word: an alias of the
+ * command panel (TYTO-536), named with where it is defined in the sentence and the box. A label
+ * the window sends with `cli:run`; what is refused is still decided on the expanded words.
  */
 export interface RefusalOrigin {
   readonly alias: string;

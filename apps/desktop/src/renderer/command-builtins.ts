@@ -1,5 +1,10 @@
 import type { CatalogueKey } from '../../shared/i18n/index.js';
 import type { IpcResponse } from '../../shared/ipc.js';
+import {
+  ALIAS_BUILTINS,
+  type PanelAliasPorts,
+  type PanelVariables,
+} from './command-alias-builtins.js';
 import { FILE_BUILTINS } from './command-file-builtins.js';
 import { FILE_WRITES } from './command-file-writes.js';
 import type { ListById } from './command-paths.js';
@@ -64,6 +69,10 @@ export interface BuiltinContext {
   readonly registry: BuiltinRegistry;
   /** The open workspace folder, for the file commands (TYTO-537); `undefined` with none open. */
   readonly files: PanelFiles | undefined;
+  /** The aliases in force and their writes, for `alias` and `unalias` (TYTO-536). */
+  readonly aliases: PanelAliasPorts;
+  /** This session's variables, for `set` (TYTO-536). */
+  readonly variables: PanelVariables;
 }
 
 /** What `cat` gets for a file: its text, or why there is none (`explorer:read`). */
@@ -273,6 +282,7 @@ const help: PanelBuiltin = {
       { name: '!N', text: context.say('commandPanel.builtin.rerun') },
       { name: 'a && b', text: context.say('commandPanel.builtin.and') },
       { name: '*  ?', text: context.say('commandPanel.builtin.glob') },
+      { name: '$name', text: context.say('commandPanel.builtin.variable') },
     ];
     const commands = await context.commands();
     const width = pad([...own, ...syntax, ...commands].map((item) => item.name));
@@ -296,6 +306,7 @@ export const PANEL_BUILTINS = new BuiltinRegistry([
   help,
   ...FILE_BUILTINS,
   ...FILE_WRITES,
+  ...ALIAS_BUILTINS,
   clear,
   history,
   last,

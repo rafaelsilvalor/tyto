@@ -86,6 +86,7 @@ import {
   registeredRasterizer,
 } from './cli-runner.js';
 import { type OfferBox, OfferedRecipes, settleRefusal } from './cli-offers.js';
+import { aliasWriteProblem, aliasesAnswer } from './command-aliases.js';
 import { SHELL_REFUSED, windowRefusals } from './cli-refusals.js';
 import { fileCredentialStore } from './credential-store.js';
 import { createCredentials } from './credentials.js';
@@ -720,6 +721,8 @@ async function start(): Promise<void> {
   // And how the command panel lays out its runs (TYTO-496), on the same answer.
   let commandsOrder = saved.commandsOrder;
   let commandsFoldOlderRuns = saved.commandsFoldOlderRuns;
+  // And the person's own command panel aliases (TYTO-536), read by `commands:aliases`.
+  let userAliases = saved.commandAliases;
   let terminalShell = { shell: saved.terminalShell, args: saved.terminalArgs };
   // And the agent Open an Agent Here starts (TYTO-567, ADR 0181), on the same answer.
   let agentProgram = { command: saved.agentCommand, args: saved.agentArgs };
@@ -1474,8 +1477,10 @@ async function start(): Promise<void> {
   const cli = createCliRunner({
     environment: cliEnvironment,
     refuse: async (invocation, cwd, run) => {
-      const refusal = await refusals(invocation, cwd);
-      if (refusal === undefined) return undefined;
+      const found = await refusals(invocation, cwd);
+      if (found === undefined) return undefined;
+      // TYTO-536: a line the window expanded from an alias names it, in the sentence and the box.
+      const refusal = run.origin === undefined ? found : { ...found, origin: run.origin };
       return settleRefusal(
         refusal,
         (box) => run.waiting(box.message, () => showOffer(box)),
@@ -1710,6 +1715,7 @@ async function start(): Promise<void> {
       if (keys.includes('commandsFoldOlderRuns')) {
         commandsFoldOlderRuns = next.commandsFoldOlderRuns;
       }
+      if (keys.includes('commandAliases')) userAliases = next.commandAliases;
       if (keys.includes('terminalShell') || keys.includes('terminalArgs')) {
         terminalShell = { shell: next.terminalShell, args: next.terminalArgs };
       }
@@ -2109,6 +2115,19 @@ async function start(): Promise<void> {
     }),
     cli,
     offeredRecipes,
+    commandAliases: {
+      list: () => aliasesAnswer(userAliases, workspace.aliases()),
+      set: async ({ name, body }) => {
+        // Checked here whatever the window checked: the readers' rules.
+        if (aliasWriteProblem(name, body) !== undefined) return { ok: false, reason: 'invalid' };
+        const next: Record<string, string> = { ...userAliases };
+        if (body === null) delete next[name];
+        else next[name] = body;
+        if (!(await remember({ commandAliases: next }))) return { ok: false, reason: 'syntax' };
+        userAliases = next;
+        return { ok: true };
+      },
+    },
     terminals,
     explorer,
     delivery: createDeliveryService({ layout: () => workspace.deliveryLayout() }),

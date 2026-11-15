@@ -1,7 +1,7 @@
 import type { RefuseAnswer } from '@tyto/command-line';
 
 import type { CatalogueKey } from '../../shared/i18n/catalogue.js';
-import type { RefusalOffer, WindowRefusal } from './cli-refusals.js';
+import type { RefusalOffer, RefusalOrigin, WindowRefusal } from './cli-refusals.js';
 
 /**
  * **A refusal that offers the window's own way** (TYTO-726, ADR 0159 note of 2026-11-15). There
@@ -42,14 +42,35 @@ function fill(text: string, offer: RefusalOffer): string {
   return text.replace(/\{(\w+)\}/gu, (whole, name: string) => values[name] ?? whole);
 }
 
+/**
+ * The refusal's sentence, naming the alias the line came from when it came from one (TYTO-536):
+ * the person typed `entrega`, and must learn which words were refused and where they are kept.
+ */
+export function refusalSentence(refusal: WindowRefusal): string {
+  const origin = refusal.origin;
+  if (origin === undefined) return refusal.message;
+  const where =
+    origin.definedIn === 'user'
+      ? 'in your settings (commandAliases)'
+      : "in the workspace's .tyto/project.json (aliases)";
+  return `${refusal.message} The line came from the alias '${origin.alias}', defined ${where}.`;
+}
+
+/** The box's line naming the alias a refused line came from, in the window's language. */
+function originLine(origin: RefusalOrigin, say: Say): string {
+  const key = origin.definedIn === 'user' ? 'cli.offer.origin.user' : 'cli.offer.origin.workspace';
+  return say(key).replace('{alias}', origin.alias);
+}
+
 /** The box for one offer, in the window's language. Pure, so every sentence is tested. */
-export function offerBox(offer: RefusalOffer, say: Say): OfferBox {
+export function offerBox(offer: RefusalOffer, say: Say, origin?: RefusalOrigin): OfferBox {
   const kind = offer.kind === 'signin' && offer.out ? 'signout' : offer.kind;
   const [message, detail, yes] = KEYS[kind];
+  const filled = fill(say(detail), offer);
   return {
     type: 'question',
     message: fill(say(message), offer),
-    detail: fill(say(detail), offer),
+    detail: origin === undefined ? filled : `${filled}\n\n${originLine(origin, say)}`,
     buttons: [say(yes), say('cli.offer.no')],
     defaultId: 1,
     cancelId: 1,
@@ -84,8 +105,9 @@ export async function settleRefusal(
   say: Say,
 ): Promise<RefuseAnswer> {
   const { offer } = refusal;
-  if (offer === undefined) return refusal.message;
-  if (!(await ask(offerBox(offer, say)))) return refusal.message;
+  const sentence = refusalSentence(refusal);
+  if (offer === undefined) return sentence;
+  if (!(await ask(offerBox(offer, say, refusal.origin)))) return sentence;
 
   switch (offer.kind) {
     case 'trust':

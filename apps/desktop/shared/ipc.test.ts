@@ -35,6 +35,9 @@ describe('the IPC contract', () => {
       // TYTO-726: the recipe a refused --apply offered, opened by its run.
       'cli:open-recipe',
       'cli:run',
+      // TYTO-536: the command panel's aliases in force, and alias's one write.
+      'commands:aliases',
+      'commands:set-alias',
       'credentials:delete',
       // TYTO-649: a key file stored from the plugins screen; main picks and reads it.
       'credentials:import',
@@ -603,6 +606,8 @@ describe('what the contract does not promise', () => {
       'menu:model',
       // TYTO-495. Nor "which commands does tyto have": there is one command tree.
       'cli:commands',
+      // TYTO-536. Nor "which aliases are in force": main reads the setting and the folder.
+      'commands:aliases',
       // TYTO-497. Nor "which terminals are open": they are main's.
       'terminal:list',
     ];
