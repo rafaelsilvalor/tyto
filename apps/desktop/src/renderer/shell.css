@@ -1164,6 +1164,17 @@ tyto-preview-pane[hidden] {
   user-select: none;
 }
 
+/* A value a block's `set` step set (TYTO-727): in the text's colour, since it is the result
+   the step exists for; a long one is cut, its whole text in the title. */
+.recipe-cell-named {
+  max-width: 48ch;
+  overflow: hidden;
+  color: var(--tyto-text);
+  font-family: var(--tyto-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* The header's toggle and buttons (TYTO-377, pull request D): always shown, small and quiet, so
    the table stays what the eye lands on. */
 .recipe-cell__toggle,

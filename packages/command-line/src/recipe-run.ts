@@ -110,6 +110,10 @@ export interface RecipeRunCellDocument {
       readonly reason?: string;
     }[];
   };
+  /** TYTO-727, ADR 0199: the value a `set` step set, which the steps below read as `{name}`. */
+  readonly named?: { readonly name: string; readonly value: string };
+  /** TYTO-727: a line of the cell's result that is no diagnostic, as why a value is empty. */
+  readonly note?: string;
 }
 
 export interface RecipeRunDocument {
@@ -356,6 +360,8 @@ function cellDocument(
             })),
           },
         }),
+    ...(cell.named === undefined ? {} : { named: cell.named }),
+    ...(cell.note === undefined ? {} : { note: cell.note }),
   };
 }
 
@@ -390,14 +396,20 @@ const plural = (count: number, one: string, many: string): string =>
   `${String(count)} ${count === 1 ? one : many}`;
 
 /**
- * One cell as a person reads it: its line, its status and row count, then every operation of
- * its plan, one per line, and how its Apply went. The rows themselves are `--json`'s.
+ * One cell as a person reads it: its line, its status and row count, the value a `set` step set
+ * and its note (TYTO-727), then every operation of its plan, one per line, and how its Apply
+ * went. The rows themselves are `--json`'s.
  */
 function cellText(cell: RunnerCell): string {
   const rows = cell.table === undefined ? '' : `, ${plural(cell.table.rows.length, 'row', 'rows')}`;
   const lines = [
     `cell ${String(cell.index + 1)} (line ${String(cell.line)}): ${cell.status}${rows}`,
   ];
+  if (cell.named !== undefined) {
+    // JSON quotes show an empty value, and blanks at either end, as they are.
+    lines.push(`  set ${cell.named.name} = ${JSON.stringify(cell.named.value)}`);
+  }
+  if (cell.note !== undefined) lines.push(`  note: ${cell.note}`);
   if (cell.plan !== undefined) {
     lines.push(
       `  plan: ${plural(cell.plan.count, 'operation', 'operations')} on ${cell.plan.target}`,

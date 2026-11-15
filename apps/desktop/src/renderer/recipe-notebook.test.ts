@@ -870,6 +870,50 @@ describe("a block's result", () => {
       blockResults(BLOCKS, cellStatuses(BLOCKS, shown, 'en')).map((status) => status.text),
     ).toEqual(['Skipped: a cell above failed']);
   });
+
+  // TYTO-727, ADR 0199: a `set` in the middle of a block is shown by the block's result.
+  it('carries every value the steps of its block set, and their notes, in the order they ran', () => {
+    const cells: Cell[] = [
+      { ...cell(0, 3), named: { name: 'total', value: '12' } },
+      {
+        ...cell(1, 4),
+        named: { name: 'last_due', value: '' },
+        note: "the table has no rows, so 'last_due' is empty",
+      },
+      cell(2, 5),
+      { ...cell(3, 7), named: { name: 'other', value: 'x' } },
+    ];
+    const text = [
+      'recipe weekly',
+      '',
+      'set total = count',
+      'set last_due = max due',
+      'where status = open',
+      '',
+      'set other = first key',
+      '',
+    ].join('\n');
+    const shown = blockResults(text, cellStatuses(text, answer(1, cells), 'en'));
+    expect(shown.map((status) => [status.index, status.named, status.notes])).toEqual([
+      [
+        2,
+        [
+          { name: 'total', value: '12' },
+          { name: 'last_due', value: '' },
+        ],
+        ["the table has no rows, so 'last_due' is empty"],
+      ],
+      [3, [{ name: 'other', value: 'x' }], undefined],
+    ]);
+  });
+
+  it('control: a block whose steps set nothing carries no values', () => {
+    const statuses = cellStatuses(BLOCKS, answer(1, [cell(0, 3), cell(1, 5), cell(2, 7)]), 'en');
+    for (const status of blockResults(BLOCKS, statuses)) {
+      expect(status).not.toHaveProperty('named');
+      expect(status).not.toHaveProperty('notes');
+    }
+  });
 });
 
 describe('a line that chains steps with | (TYTO-706)', () => {

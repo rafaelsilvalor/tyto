@@ -40,6 +40,11 @@ export function cellToWire(cell: RunnerCell): WireCell {
     ...(cell.source === true ? { source: true } : {}),
     ...(cell.view === undefined ? {} : { view: viewToWire(cell.view) }),
     ...(cell.included === undefined ? {} : { included: includedToWire(cell.included) }),
+    // TYTO-727: what a `set` step set, and its note, each cut as a value is.
+    ...(cell.named === undefined
+      ? {}
+      : { named: { name: cut(cell.named.name), value: cut(cell.named.value) } }),
+    ...(cell.note === undefined ? {} : { note: cut(cell.note) }),
   };
 }
 

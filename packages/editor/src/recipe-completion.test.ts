@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type RecipeReferenceSource,
+  completeNamedValue,
   completeRecipeReference,
   completeRecipeVerb,
+  completeSetAggregate,
 } from './recipe-completion.js';
 import { recipeLanguage } from './recipe-language.js';
 
@@ -117,5 +119,72 @@ describe('vocabulary reference completion (TYTO-402)', () => {
     expect(await reference('recipe r\nwhere title = @|')).toBeNull();
     expect(await reference('recipe r\nwhere title = x|')).toBeNull();
     expect(asked).toHaveLength(before);
+  });
+});
+
+/** TYTO-727: the cursor is `^`, since these lines chain steps with `|`. */
+const at = (
+  marked: string,
+  answer: (context: CompletionContext) => CompletionResult | null,
+): CompletionResult | null => {
+  const pos = marked.indexOf('^');
+  if (pos === -1) throw new Error('the fixture has no ^ marking the cursor');
+  const doc = marked.slice(0, pos) + marked.slice(pos + 1);
+  const state = EditorState.create({ doc, extensions: [recipeLanguage] });
+  return answer(new CompletionContext(state, pos, false));
+};
+
+describe('set and named values (TYTO-727)', () => {
+  it('offers set among the verbs the host lists', () => {
+    const state = EditorState.create({ doc: 'se', extensions: [recipeLanguage] });
+    const result = completeRecipeVerb(new CompletionContext(state, 2, false), () => [
+      'where',
+      'set',
+    ]);
+    expect(labels(result)).toEqual(['where', 'set']);
+  });
+
+  it("offers the aggregates after a set step's =, alone or chained", () => {
+    const alone = at('recipe r\nset last_due = m^', completeSetAggregate);
+    expect(labels(alone)).toEqual(['count', 'min', 'max', 'first', 'last', 'sum']);
+    expect(alone?.from).toBe('recipe r\nset last_due = '.length);
+    expect(labels(at('recipe r\nset n=^', completeSetAggregate))).toHaveLength(6);
+    const chained = at('recipe r\nwhere a = 1 | set n = ^', completeSetAggregate);
+    expect(chained?.from).toBe('recipe r\nwhere a = 1 | set n = '.length);
+  });
+
+  it('offers no aggregate before the =, past the aggregate, or on another verb', () => {
+    expect(at('recipe r\nset last_due^', completeSetAggregate)).toBeNull();
+    expect(at('recipe r\nset last_due = max d^', completeSetAggregate)).toBeNull();
+    expect(at('recipe r\nwhere a = ^', completeSetAggregate)).toBeNull();
+    expect(at('recipe r\nconst n = ^', completeSetAggregate)).toBeNull();
+  });
+
+  it('offers params and consts anywhere, and a set only on the steps below it', () => {
+    const text = [
+      'recipe r',
+      'param team = design',
+      'set last_due = max due | where due = {^',
+      'const kind = post',
+      'set later = count',
+    ].join('\n');
+    const result = at(text, completeNamedValue);
+    expect(labels(result)).toEqual(['team', 'last_due', 'kind']);
+    expect(result?.options[0]?.apply).toBe('team}');
+  });
+
+  it('leaves a set out of its own step and of the steps above it', () => {
+    const text = ['recipe r', 'where due = {la^}', 'set last_due = max due'].join('\n');
+    expect(at(text, completeNamedValue)).toBeNull();
+    const own = at('recipe r\nconst a = 1\nset b = max {^', completeNamedValue);
+    expect(labels(own)).toEqual(['a']);
+  });
+
+  it('writes only the name when the } is already there, and offers nothing outside a {', () => {
+    const closed = at('recipe r\nconst kind = post\nwhere kind = {k^}', completeNamedValue);
+    expect(closed?.options[0]?.apply).toBe('kind');
+    expect(closed?.from).toBe('recipe r\nconst kind = post\nwhere kind = {'.length);
+    expect(at('recipe r\nconst kind = post\nwhere kind = k^', completeNamedValue)).toBeNull();
+    expect(at('recipe r\nconst kind = post\n# {^', completeNamedValue)).toBeNull();
   });
 });

@@ -78,3 +78,19 @@ signature includes the consts, so editing one reruns every cell, as editing a pa
   a refused override can say exactly what the line is.
 - **A warning on an empty aggregate.** An empty table is a normal answer for a filter; a warning
   there would teach people to ignore the warnings column.
+
+## Note, 2026-11-14 (TYTO-727, second pull request)
+
+- **A block's result shows every value its steps set.** ADR 0196 draws only a block's last
+  step's result. A `set` usually sits in the middle of a block, above the step that reads it,
+  so the result's header line carries the `named` value and the `note` of every step of the
+  block, in the order they ran, and a fold keeps them. Nothing else of a hidden step is drawn.
+- **`tyto recipe run` and `run_recipe` answer `named` and `note`** beside the cell's table, as
+  text (`set last_due = "2026-12-01"`, in JSON quotes so an empty value shows) and in JSON.
+- **`sum` rounds to 15 significant digits** (`Number(total.toPrecision(15))`), so `0.1 + 0.2`
+  is `0.3`: a binary float's noise is not a value a person typed.
+- **The editor scopes `{name}` completion as the parser scopes the names:** every `param` and
+  `const`, and a `set` only on the steps below it, a step chained after it on its line
+  included.
+- **The `set` form stays one `rest` field, `assignment`;** its help says the syntax. No
+  `FieldPlacement` was added.

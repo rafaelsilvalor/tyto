@@ -802,6 +802,9 @@ export function columnsBefore(
   return found?.table?.columns.map((column) => column.name) ?? [];
 }
 
+/** TYTO-727, ADR 0199: a value a `set` step set, as the wire carries it. */
+export type NamedValue = NonNullable<WireCell['named']>;
+
 /** One cell's line: where it goes, what it says, and whether it is a failure. */
 export interface CellStatus {
   /** The start of the cell's line in the text the request carried. */
@@ -812,6 +815,12 @@ export interface CellStatus {
   /** The cell as it came, for its table, its age and whether it fetches. */
   readonly cell: WireCell;
   readonly held: RecipeRunAnswer['held'];
+  /**
+   * TYTO-727: the values `set` steps set and their notes, in the order they ran: the cell's
+   * own, and once {@link blockResults} has read the blocks, every step's of its block.
+   */
+  readonly named?: readonly NamedValue[];
+  readonly notes?: readonly string[];
 }
 
 /**
@@ -840,6 +849,8 @@ export function cellStatuses(
       failed: cell.status === 'failed',
       cell,
       held: answer.held,
+      ...(cell.named === undefined ? {} : { named: [cell.named] }),
+      ...(cell.note === undefined ? {} : { notes: [cell.note] }),
     });
   }
   return statuses;
@@ -896,12 +907,30 @@ function counted(
  * The lines a block's result is drawn under (TYTO-676, ADR 0196): only each block's last step's.
  * The other steps run and are kept, and their problems are marked at their lines, but nothing is
  * drawn under them. Applied to `cellStatuses`' lines by the window.
+ *
+ * A value a `set` step set is the one thing of a hidden step the block's result still shows
+ * (TYTO-727, ADR 0199): the drawn status carries every step's of its block, with their notes,
+ * since a `set` in the middle of a block is the usual place for one.
  */
 export function blockResults(text: string, statuses: readonly CellStatus[]): readonly CellStatus[] {
-  const drawn = new Set(
-    recipeBlocks(text).flatMap((block) => (block.steps === undefined ? [] : [block.steps.last])),
-  );
-  return statuses.filter((status) => drawn.has(status.index));
+  const shown: CellStatus[] = [];
+  for (const block of recipeBlocks(text)) {
+    const steps = block.steps;
+    if (steps === undefined) continue;
+    const drawn = statuses.find((status) => status.index === steps.last);
+    if (drawn === undefined) continue;
+    const inBlock = statuses.filter(
+      (status) => status.index >= steps.first && status.index <= steps.last,
+    );
+    const named = inBlock.flatMap((status) => status.named ?? []);
+    const notes = inBlock.flatMap((status) => status.notes ?? []);
+    shown.push({
+      ...drawn,
+      ...(named.length === 0 ? {} : { named }),
+      ...(notes.length === 0 ? {} : { notes }),
+    });
+  }
+  return shown;
 }
 
 /** Each line's start, by index: `starts[n - 1]` is line `n`'s. */

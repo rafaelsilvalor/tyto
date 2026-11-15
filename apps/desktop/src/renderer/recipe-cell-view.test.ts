@@ -668,3 +668,53 @@ describe("a view's state across a rebuild of its cell", () => {
     expect(main.rows.mock.calls.at(-1)?.[0].filter).toBeUndefined();
   });
 });
+
+// TYTO-727, ADR 0199: the values a block's `set` steps set, and their notes, in its header.
+describe("a block's named values", () => {
+  const named = (locale: Locale = 'en'): CellStatus => ({
+    ...statusOf(cellOf(), locale),
+    named: [
+      { name: 'last_due', value: '2026-12-01' },
+      { name: 'owner', value: '' },
+    ],
+    notes: ["the table has no rows, so 'owner' is empty"],
+  });
+
+  it('says each value and each note in the header, which a fold keeps', () => {
+    const root = cellOutputOf(named(), contextOf().context).render();
+    const header = root.querySelector('.recipe-cell-status');
+    const said = [...(header?.querySelectorAll('.recipe-cell-named, .recipe-cell-note') ?? [])];
+    expect(said.map((line) => line.textContent)).toEqual([
+      'Set last_due = 2026-12-01',
+      'Set owner to an empty value',
+      "Note: the table has no rows, so 'owner' is empty",
+    ]);
+    expect(said.map((line) => (line as HTMLElement).dataset['name'])).toEqual([
+      'last_due',
+      'owner',
+      undefined,
+    ]);
+  });
+
+  it('says them in Portuguese in a Portuguese window', () => {
+    const root = cellOutputOf(named('pt-BR'), contextOf({ locale: 'pt-BR' }).context).render();
+    const said = [...root.querySelectorAll('.recipe-cell-named, .recipe-cell-note')];
+    expect(said.map((line) => line.textContent)).toEqual([
+      'Definido last_due = 2026-12-01',
+      'Definido owner como vazio',
+      "Nota: the table has no rows, so 'owner' is empty",
+    ]);
+  });
+
+  it('builds a new element when a value changes, and keeps it when nothing does', () => {
+    const first = cellOutputOf(named(), contextOf().context).key;
+    expect(cellOutputOf(named(), contextOf().context).key).toBe(first);
+    const changed: CellStatus = { ...named(), named: [{ name: 'last_due', value: '2027-01-01' }] };
+    expect(cellOutputOf(changed, contextOf().context).key).not.toBe(first);
+  });
+
+  it('control: a cell that set nothing says nothing of the kind', () => {
+    const root = cellOutputOf(statusOf(cellOf()), contextOf().context).render();
+    expect(root.querySelectorAll('.recipe-cell-named, .recipe-cell-note')).toHaveLength(0);
+  });
+});

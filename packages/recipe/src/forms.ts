@@ -415,7 +415,9 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           kind: 'expression',
           placement: 'rest',
           required: true,
-          help: 'The name, =, and count, or min, max, first, last or sum of a column.',
+          help:
+            'Written name = aggregate column, as last_due = max due. The aggregate is count, ' +
+            'which takes no column, or min, max, first, last or sum.',
         },
       ],
     ),

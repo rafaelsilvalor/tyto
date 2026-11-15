@@ -10,9 +10,10 @@ import { chainSegments } from '@tyto/recipe';
  * tells the constructs apart, with tags the theme already colours:
  *
  * - `#` at the start of a line is a comment (`lineComment`); a `#` inside a data reference is not.
- * - `recipe`, `param`, `apply` and `every` are `definitionKeyword`; the recipe's name is a
- *   `labelName`, a parameter's name a `propertyName`, and the word after `apply` (`auto`,
- *   TYTO-378, ADR 0170) or `every` (`5m`, TYTO-385, ADR 0175) an `attributeValue`.
+ * - `recipe`, `param`, `const`, `apply` and `every` are `definitionKeyword`; the recipe's name
+ *   is a `labelName`, a parameter's or a constant's name a `propertyName` (TYTO-727, ADR 0199),
+ *   and the word after `apply` (`auto`, TYTO-378, ADR 0170) or `every` (`5m`, TYTO-385,
+ *   ADR 0175) an `attributeValue`.
  * - A `|` line under the header is the recipe's description, coloured as `meta`.
  * - The first word of any other line is the verb — `where`, or a plugin's namespaced
  *   `jira.pull` — coloured as a function name, the dot included: one verb, one name.
@@ -21,6 +22,9 @@ import { chainSegments } from '@tyto/recipe';
  *   `@tyto/recipe`'s `chainSegments`, asked for the whole line when the tokenizer meets a `|`,
  *   so the colours and the parser split at the same places: never inside a quoted string or
  *   `{ }`, never on a header line, never in `pattern=a|b`.
+ * - A `set` step names a value as `param` does (TYTO-727, ADR 0199): in `set last_due = max due`
+ *   the name is a `propertyName`, the `=` a `separator` and the aggregate a `keyword`; the
+ *   column after it is a plain word, as `sort`'s is.
  * - `name=` is an `attributeName` and its `=` a `separator`; an unquoted value after it is an
  *   `attributeValue`, a quoted one a `string`.
  * - `{param}` is a placeholder (`special(variableName)`), inside a quoted value too.
@@ -46,7 +50,11 @@ interface RecipeState {
   named: boolean;
   /** Right after a `|` that chains steps: the next word is a verb. */
   verbNext: boolean;
+  /** In a `set` step: which part of `<name> = <aggregate>` comes next, or `none` past it. */
+  setNext: SetPart;
 }
+
+type SetPart = 'none' | 'name' | 'equals' | 'aggregate';
 
 const VERB = /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*/u;
 const IDENTIFIER = /^[A-Za-z_][\w-]*/u;
@@ -79,7 +87,7 @@ function readWord(stream: StringStream): void {
  * A line that is no step, read by its first word with the indentation left out: a comment, a
  * description, or a header word. The completion asks it too, so the two cannot disagree.
  */
-export const NOT_A_STEP = /^(?:#|\||(?:recipe|param|apply|every)(?=\s|$))/u;
+export const NOT_A_STEP = /^(?:#|\||(?:recipe|param|const|apply|every)(?=\s|$))/u;
 
 /** Whether the `|` at the stream's position chains two steps, by the parser's own rule. */
 function atChainBar(stream: StringStream): boolean {
@@ -100,7 +108,8 @@ function lineStart(stream: StringStream, state: RecipeState): string | null {
     state.line = 'header';
     return 'definitionKeyword';
   }
-  if (stream.match(/^param(?=\s|$)/u)) {
+  // `const` is written as `param` is, `const <name> = <value>` (TYTO-727, ADR 0199).
+  if (stream.match(/^(?:param|const)(?=\s|$)/u)) {
     state.line = 'param';
     return 'definitionKeyword';
   }
@@ -110,9 +119,31 @@ function lineStart(stream: StringStream, state: RecipeState): string | null {
     return 'definitionKeyword';
   }
   state.line = 'step';
-  if (stream.match(VERB)) return 'variableName.function';
+  if (stream.match(VERB)) return verbToken(stream, state);
   readWord(stream);
   return null;
+}
+
+/** A verb just read: `set` says its name, `=` and aggregate come next (TYTO-727). */
+function verbToken(stream: StringStream, state: RecipeState): string {
+  state.setNext = stream.current() === 'set' ? 'name' : 'none';
+  return 'variableName.function';
+}
+
+/** The next part of `set <name> = <aggregate>`, or `undefined` when the text is not that. */
+function setPart(stream: StringStream, state: RecipeState): string | undefined {
+  const part = state.setNext;
+  state.setNext = 'none';
+  if (part === 'name' && stream.match(IDENTIFIER)) {
+    state.setNext = 'equals';
+    return 'propertyName';
+  }
+  if (part === 'equals' && stream.eat('=')) {
+    state.setNext = 'aggregate';
+    return 'separator';
+  }
+  if (part === 'aggregate' && stream.match(IDENTIFIER)) return 'keyword';
+  return undefined;
 }
 
 function headerRest(stream: StringStream): string | null {
@@ -138,7 +169,11 @@ function paramRest(stream: StringStream, state: RecipeState): string | null {
 function stepRest(stream: StringStream, state: RecipeState): string | null {
   if (state.verbNext) {
     state.verbNext = false;
-    if (stream.match(VERB)) return 'variableName.function';
+    if (stream.match(VERB)) return verbToken(stream, state);
+  }
+  if (state.setNext !== 'none') {
+    const part = setPart(stream, state);
+    if (part !== undefined) return part;
   }
   if (stream.match(PLACEHOLDER)) return 'variableName.special';
   if (state.quoted) {
@@ -182,6 +217,7 @@ function token(stream: StringStream, state: RecipeState): string | null {
     state.paramNamed = false;
     state.named = false;
     state.verbNext = false;
+    state.setNext = 'none';
   }
   if (!state.quoted && stream.eatSpace()) {
     state.afterEquals = false;
@@ -211,6 +247,7 @@ export const recipeLanguage = StreamLanguage.define<RecipeState>({
     paramNamed: false,
     named: false,
     verbNext: false,
+    setNext: 'none',
   }),
   token,
   copyState: (state) => ({ ...state }),

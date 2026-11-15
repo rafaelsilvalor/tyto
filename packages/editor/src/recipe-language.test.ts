@@ -24,6 +24,7 @@ const named = tagHighlighter([
   { tag: tags.special(tags.variableName), class: 'placeholder' },
   { tag: tags.url, class: 'data' },
   { tag: tags.separator, class: 'separator' },
+  { tag: tags.keyword, class: 'aggregate' },
 ]);
 
 const spans = (source: string): [string, string][] => {
@@ -234,5 +235,50 @@ describe('a | that chains steps on one line (TYTO-712)', () => {
 
   it('chains nothing on a header line', () => {
     expect(verbs('recipe a | b\nparam p = x | y\n')).toEqual([]);
+  });
+});
+
+describe('const and set (TYTO-727)', () => {
+  it('colours a const line as a param line', () => {
+    expect(spans('const team = "Platform"\n')).toEqual([
+      ['const', 'keyword'],
+      ['team', 'param'],
+      ['=', 'separator'],
+      ['"Platform"', 'string'],
+    ]);
+  });
+
+  it("colours a set step's name, its = and its aggregate, written with blanks or not", () => {
+    expect(spans('set last_due = max due\n')).toEqual([
+      ['set', 'verb'],
+      ['last_due', 'param'],
+      ['=', 'separator'],
+      ['max', 'aggregate'],
+    ]);
+    expect(spans('set n=count\n')).toEqual([
+      ['set', 'verb'],
+      ['n', 'param'],
+      ['=', 'separator'],
+      ['count', 'aggregate'],
+    ]);
+  });
+
+  it('colours a set chained after a |, and the step after it as a step again', () => {
+    expect(spans('where a = 1 | set n = count | where b = {n}\n')).toEqual([
+      ['where', 'verb'],
+      ['|', 'separator'],
+      ['set', 'verb'],
+      ['n', 'param'],
+      ['=', 'separator'],
+      ['count', 'aggregate'],
+      ['|', 'separator'],
+      ['where', 'verb'],
+      ['{n}', 'placeholder'],
+    ]);
+  });
+
+  it('control: a word after another verb is no set name, and set inside a step is no verb', () => {
+    expect(spans('sort due desc\n')).toEqual([['sort', 'verb']]);
+    expect(spans('where kind = set\n')).toEqual([['where', 'verb']]);
   });
 });

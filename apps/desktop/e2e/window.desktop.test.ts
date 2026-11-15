@@ -1103,6 +1103,12 @@ describe('switching the language', () => {
     'recipe.cell.openTab',
     'recipe.view.tab',
     'recipe.view.empty',
+    // TYTO-727: what a block's `set` steps set and their notes, drawn only in the header of a
+    // recipe's result once a run set a value; `recipe-cell-view.test.ts` paints all three in
+    // both languages.
+    'recipe.cell.named',
+    'recipe.cell.named.empty',
+    'recipe.cell.note',
     // TYTO-378: drawn only under a plan cell; `recipe-plan-view.test.ts` paints them in both
     // languages, and `recipe-notebook.desktop.test.ts` clicks Apply in the real window.
     'recipe.plan.apply',

@@ -57,6 +57,40 @@ No nível de cima a aba oferece as três seções, `rules`, `rewrites` e `lookup
 
 Na receita, digitar `@./` oferece os arquivos de vocabulário ao lado dela, e depois do `#` do arquivo as tabelas que ele guarda, como `/rules/kinds`. Só arquivos da própria pasta da receita, ou abaixo dela, são lidos para isso.
 
+## Dar nome a valores com const e set
+
+Uma receita pode dar nome a um valor uma vez e usá-lo em qualquer passo abaixo como `{nome}`, do jeito que usa um `param`. Há dois jeitos de dar nome a um valor, e `param`, `const` e `set` dividem um único conjunto de nomes: um nome declarado duas vezes é recusado com `E_RECIPE_SYNTAX`.
+
+**`const`** dá nome a um valor escrito na receita. Ele vai no cabeçalho, ao lado das linhas `param`, e todos os passos podem lê-lo:
+
+```
+recipe semanal
+const time = Plataforma
+where time = {time}
+```
+
+Ao contrário de um `param`, um `const` não recebe valor de fora: `--param time=…` na linha de comando, ou `run semanal time=…` em outra receita, é recusado com `E_RECIPE_PARAM`.
+
+**`set`** é um passo que calcula um valor a partir da tabela na linha dele. Ele se escreve `set <nome> = <agregado> <coluna>`:
+
+```
+set ultimo_prazo = max due
+where due = {ultimo_prazo}
+```
+
+O agregado é um destes:
+
+- `count`: quantas linhas a tabela tem. Ele não leva coluna: `set total = count`.
+- `min` e `max`: o menor e o maior valor da coluna, comparados como números quando todo valor que não está vazio é um número, e como texto, sem ligar para maiúsculas nem acentos, caso contrário.
+- `first` e `last`: o valor da coluna na primeira e na última linha.
+- `sum`: os valores da coluna somados. Um valor que não é número é recusado com `E_RECIPE_ARGUMENTS`, que diz a linha dele.
+
+A tabela passa pelo `set` sem mudar, então o passo seguinte lê as mesmas linhas. Só os passos abaixo de um `set` podem ler o valor dele; usá-lo acima, ou na própria linha do `set`, é recusado com `E_RECIPE_PARAM`. Numa tabela sem linhas, `count` dá 0 e os outros dão um valor vazio, o que o resultado do passo diz.
+
+O resultado do bloco diz cada valor que os passos dele definiram, como _Definido ultimo_prazo = 2026-12-01_, mesmo quando o `set` não é o último passo do bloco (veja [O que um passo mostra](#o-que-um-passo-mostra)).
+
+No editor, `const` tem a cor de uma linha do cabeçalho, e o nome, o `=` e o agregado de um passo `set` têm cada um a sua cor. Digitar `{` num passo oferece os nomes que valem ali: todo `param` e `const`, e cada `set` acima do passo. Depois de `set <nome> = ` o editor oferece os agregados.
+
 ## Quando ela roda
 
 Uma receita roda sozinha, mas nem tudo roda a todo momento:
@@ -78,6 +112,7 @@ Só os passos que mudaram rodam de novo: um passo cuja linha não mudou guarda a
 Embaixo do último passo de cada bloco há uma linha e, depois, a tabela dele. Um bloco de vários passos mostra só o resultado do último (veja [Trabalhar em blocos](#trabalhar-em-blocos)):
 
 - **A linha** diz o que o passo respondeu: _12 linhas · 4 colunas_, um plano (_Plano: 3 a gravar em Pauta_), _Falhou: veja Problemas_ ou por que ele não rodou.
+- **Os valores definidos**: cada valor que um passo `set` do bloco definiu, como _Definido ultimo_prazo = 2026-12-01_, e uma nota quando um deles está vazio. Eles continuam na linha quando o resultado está recolhido. Veja [Dar nome a valores com const e set](#dar-nome-a-valores-com-const-e-set).
 - **A idade**: quando o passo rodou e quão antigos são os dados, como _rodou há 2 min. · dados buscados há 3 h_. A idade dos dados é quando a fonte os buscou, que pode ser bem antes de o passo rodar. As idades vão aumentando enquanto a aba está aberta.
 - **A tabela** mostra as 20 primeiras linhas do passo e quantas ficaram de fora (_mais 30 linhas_). Uma tabela larga rola para o lado dentro do passo. Um valor longo é cortado com reticências; pare o mouse sobre ele para ler inteiro, e sobre o nome de uma coluna para ver o tipo dela.
 
@@ -128,7 +163,7 @@ A aba acompanha a receita: uma nova execução a desenha de novo com as linhas n
 
 ## Trabalhar em blocos
 
-Uma receita se lê em blocos, como um notebook se lê em células. **Uma linha em branco separa um bloco do seguinte**: um bloco são as linhas entre duas linhas em branco, e pode ter vários passos e linhas de comentário `#`. Um bloco só de linhas de comentário é um bloco de **nota**. O cabeçalho (a linha `recipe`, a descrição `|` e as linhas `apply`, `every` e `param` do topo) é um bloco à parte, mesmo sem linha em branco embaixo. Uma linha em branco não pertence a nenhum bloco. O bloco onde está o cursor tem uma barra colorida à esquerda.
+Uma receita se lê em blocos, como um notebook se lê em células. **Uma linha em branco separa um bloco do seguinte**: um bloco são as linhas entre duas linhas em branco, e pode ter vários passos e linhas de comentário `#`. Um bloco só de linhas de comentário é um bloco de **nota**. O cabeçalho (a linha `recipe`, a descrição `|` e as linhas `apply`, `every`, `param` e `const` do topo) é um bloco à parte, mesmo sem linha em branco embaixo. Uma linha em branco não pertence a nenhum bloco. O bloco onde está o cursor tem uma barra colorida à esquerda.
 
 **Um bloco mostra só o resultado do último passo**, embaixo da linha desse passo. Todos os passos do bloco continuam rodando, e o problema de um passo continua marcado na linha dele e listado em Problemas; quando um passo do meio falha, a linha do bloco diz _Pulada: uma célula acima falhou_. Para ver o resultado de um passo do meio, ponha uma linha em branco embaixo dele, o que divide o bloco em dois, ou ponha o cursor nele e rode **Abrir o resultado da célula numa aba**.
 
@@ -316,10 +351,10 @@ Uma linha segurada diz `hold` e não envia nada, e o estado guarda o último val
 tyto recipe run recipes/sync.recipe
 ```
 
-Ele imprime uma linha por passo, com o estado e quantas linhas tem a tabela, e embaixo de um passo que grava, todas as operações do plano, uma por linha: nenhuma fica de fora. Ele não grava nada e não guarda nada na memória da receita, como um salvamento; uma receita com `apply auto` só mostra os planos.
+Ele imprime uma linha por passo, com o estado e quantas linhas tem a tabela, embaixo de um passo `set` o valor que ele definiu (`set ultimo_prazo = "2026-12-01"`) e a nota dele, e embaixo de um passo que grava, todas as operações do plano, uma por linha: nenhuma fica de fora. Ele não grava nada e não guarda nada na memória da receita, como um salvamento; uma receita com `apply auto` só mostra os planos.
 
 - `--json` imprime a resposta inteira como um único documento JSON: todas as linhas de todas as tabelas com a origem de cada uma, todas as operações com a descrição e os dados do plugin para aplicá-las, e todos os problemas com a linha a que apontam. Mande para um arquivo para guardar o plano do dia: `tyto recipe run recipes/sync.recipe --json > plan.json`.
-- `--param <nome>=<valor>` dá a uma das linhas `param` da receita um valor para esta execução; repita para cada uma. Um nome que a receita não declara é um erro.
+- `--param <nome>=<valor>` dá a uma das linhas `param` da receita um valor para esta execução; repita para cada uma. Um nome que a receita não declara é um erro, e o de um `const` também.
 - `--section <plugin>.<chave>=<valor>` define uma chave da seção de um plugin para esta execução, como no [`tyto render`](../command-line/render.md#outras-opcoes). Os passos de uma receita só recebem seções numa pasta confiável, digitadas ou não.
 - `--apply` aplica cada plano uma vez, como um clique em **Aplicar**, e guarda o que a receita guarda. Só roda numa pasta confiável: em qualquer outro lugar é recusado antes de qualquer passo rodar. Uma receita com `apply auto` também aplica uma vez. É assim que a linha de comando envia as requisições de um passo `call`.
 

@@ -425,6 +425,15 @@ const recipeCell = z.object({
     .optional(),
   /** A `run` cell's: the included recipe's cells, sent only when the `run` succeeded. */
   included: z.array(recipeIncludedCell).max(RECIPE_WIRE_LIMITS.included).optional(),
+  /** TYTO-727, ADR 0199: the value a `set` step set, which the steps below read as `{name}`. */
+  named: z
+    .object({
+      name: z.string().max(RECIPE_WIRE_LIMITS.text),
+      value: z.string().max(RECIPE_WIRE_LIMITS.text),
+    })
+    .optional(),
+  /** TYTO-727: a line of the cell's result that is no diagnostic, as why a value is empty. */
+  note: z.string().max(RECIPE_WIRE_LIMITS.text).optional(),
 });
 
 /** Whether a source is trusted; `revoked` is trust taken back while it is open (ADR 0111). */
