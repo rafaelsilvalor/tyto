@@ -85,7 +85,10 @@ function collect(
       case 'text':
         for (const run of node.runs) {
           if (run.kind === 'break') continue;
-          fonts.set(`${run.font.family}|${run.font.source}|${run.font.path ?? ''}`, run.font);
+          const glyphFonts = run.kind === 'formula' ? (run.layout?.glyphs ?? []) : [];
+          for (const font of [run.font, ...glyphFonts.map((glyph) => glyph.font)]) {
+            fonts.set(`${font.family}|${font.source}|${font.path ?? ''}`, font);
+          }
           for (const asset of paintAssets(run.color)) assets.set(asset.id, asset);
         }
         break;

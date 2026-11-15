@@ -90,6 +90,122 @@ export const lineBreakSchema = z.strictObject({
 export type LineBreak = z.infer<typeof lineBreakSchema>;
 
 /**
+ * One element of a formula (ADR 0206): plain text, a stacked fraction, or the super- and
+ * subscripts set after whatever precedes them. A fraction's parts and a script hold the same
+ * elements again, so a fraction may sit in a denominator.
+ *
+ * Written out by hand, as `GroupNode` is, because inference cannot close the recursion.
+ */
+export type MathItem =
+  | { readonly kind: 'text'; readonly text: string }
+  | {
+      readonly kind: 'fraction';
+      readonly numerator: readonly MathItem[];
+      readonly denominator: readonly MathItem[];
+    }
+  | {
+      readonly kind: 'scripts';
+      readonly superscript?: readonly MathItem[] | undefined;
+      readonly subscript?: readonly MathItem[] | undefined;
+    };
+
+export const mathItemSchema: z.ZodType<MathItem> = z.lazy(() =>
+  z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('text'), text: z.string().min(1) }),
+    z.strictObject({
+      kind: z.literal('fraction'),
+      numerator: z.array(mathItemSchema).min(1),
+      denominator: z.array(mathItemSchema).min(1),
+    }),
+    z
+      .strictObject({
+        kind: z.literal('scripts'),
+        superscript: z.array(mathItemSchema).min(1).optional(),
+        subscript: z.array(mathItemSchema).min(1).optional(),
+      })
+      .refine((item) => item.superscript !== undefined || item.subscript !== undefined, {
+        message: 'scripts needs a superscript or a subscript',
+      }),
+  ]),
+);
+
+const nonNegative = z.number().finite().nonnegative();
+
+/**
+ * A piece of a formula's text, placed: `x` from the formula's left edge and `y` the piece's
+ * baseline below the formula's baseline (negative is above it), both in px. Each piece names
+ * the face that draws it, chosen glyph by glyph through the chain of ADR 0168.
+ */
+export const formulaGlyphSchema = z.strictObject({
+  text: z.string().min(1),
+  font: fontRefSchema,
+  size: z.number().finite().positive(),
+  weight: textSpanSchema.shape.weight,
+  style: z.enum(['normal', 'italic']),
+  x: z.number().finite(),
+  y: z.number().finite(),
+});
+export type FormulaGlyph = z.infer<typeof formulaGlyphSchema>;
+
+/** A fraction rule: its top edge `y` px below the formula's baseline, like a glyph's `y`. */
+export const formulaRuleSchema = z.strictObject({
+  x: z.number().finite(),
+  y: z.number().finite(),
+  width: z.number().finite().positive(),
+  thickness: z.number().finite().positive(),
+});
+export type FormulaRule = z.infer<typeof formulaRuleSchema>;
+
+/**
+ * Where everything of a formula goes, as `measureText` decided it (ADR 0206).
+ *
+ * `ascent` and `descent` are the formula's box above and below its baseline. `above` and
+ * `below` are how far that box reaches past the strut of the line it sits on, so a line
+ * holding a fraction is taller by the largest of each; `export-svg` moves its baselines by
+ * them, and `export-html` draws the box and the browser's line box grows by the same.
+ *
+ * `offset` is where the formula starts on its line and `lineWidth` how wide the line is, both
+ * in px: SVG lays nothing out, so `export-svg` places the formula, and centres or right-aligns
+ * a line holding one, from these two numbers instead of measuring the text before it.
+ */
+export const formulaLayoutSchema = z.strictObject({
+  offset: nonNegative,
+  lineWidth: nonNegative,
+  width: nonNegative,
+  ascent: nonNegative,
+  descent: nonNegative,
+  above: nonNegative,
+  below: nonNegative,
+  glyphs: z.array(formulaGlyphSchema),
+  rules: z.array(formulaRuleSchema),
+});
+export type FormulaLayout = z.infer<typeof formulaLayoutSchema>;
+
+/**
+ * A formula: a stacked fraction, super- and subscripts, in the style of the text around it
+ * (ADR 0206). `math` is what the brief wrote; `layout` is what an exporter draws, and is
+ * absent only when the node could not be measured, in which case both exporters draw `text`
+ * in the run's style.
+ *
+ * `text` is the formula's linear reading, `1/(40·10^(−3))` (`linearReading`). It is there
+ * for every reader that takes a run's `text` as plain text — `kind === 'break' ? … : run.text`
+ * is written all over templates in their own repositories — so they keep compiling and read
+ * something sensible, as the AST's `Formula` keeps its `children` (ADR 0206 decision 13).
+ */
+export const formulaRunSchema = z.strictObject({
+  kind: z.literal('formula'),
+  text: z.string().min(1),
+  math: z.array(mathItemSchema).min(1),
+  font: fontRefSchema,
+  size: z.number().finite().positive(),
+  weight: textSpanSchema.shape.weight,
+  style: z.enum(['normal', 'italic']),
+  color: paintSchema,
+  layout: formulaLayoutSchema.optional(),
+});
+export type FormulaRun = z.infer<typeof formulaRunSchema>;
+
+/**
  * A run is a span of styled text or a break between two lines.
  *
  * A break is a node in the list rather than a `
@@ -99,7 +215,11 @@ export type LineBreak = z.infer<typeof lineBreakSchema>;
  * into positioned `<tspan>` elements either way; reading the split off the list is that
  * work done once, in the IR, instead of once per exporter.
  */
-export const textRunSchema = z.discriminatedUnion('kind', [textSpanSchema, lineBreakSchema]);
+export const textRunSchema = z.discriminatedUnion('kind', [
+  textSpanSchema,
+  lineBreakSchema,
+  formulaRunSchema,
+]);
 export type TextRun = z.infer<typeof textRunSchema>;
 
 /**

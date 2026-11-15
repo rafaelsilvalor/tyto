@@ -1,7 +1,10 @@
 # 0206 — A formula is laid out in core and enters the Scene already placed
 
-Status: proposed · 2026-11-15 · TYTO-678 · extends ADR 0168 (the face chain) and ADR 0169
+Status: accepted · 2026-11-15 · TYTO-678 · extends ADR 0168 (the face chain) and ADR 0169
 (operators); beside ADR 0016, ADR 0109 and ADR 0205
+
+The Scene, the layout and both exporters ship in TYTO-678. The brief syntax below ships in
+TYTO-734; until then a formula reaches the Scene only from a template that builds the run.
 
 ## Context
 
@@ -19,7 +22,7 @@ inside; and its SVG carries `<use>`, `style` and `data-*`, which `checkSvgMarkup
 
 ## Decision
 
-### Syntax
+### Syntax (TYTO-734)
 
 1. **A formula is written between two `$` on one line**: `$F = \frac{1}{40·10^{-3}} = 25\ Hz$`.
    Inside it, `\frac{numerator}{denominator}`, `^{superscript}` and `_{subscript}` are the
@@ -47,72 +50,105 @@ inside; and its SVG carries `<use>`, `style` and `data-*`, which `checkSvgMarkup
 
 ### Scene
 
-6. **A formula is a run of its own**, `FormulaRun { kind: 'formula', math, font, size,
-weight, style, color, layout? }`, beside `TextSpan` and `LineBreak`. `math` is the structure
-   (`text`, `fraction { numerator, denominator }`, `scripts { superscript?, subscript? }`, each
-   holding a list of the same). A fraction is not a span with a vertical offset: two spans
-   stacked in one horizontal slot cannot be said in a flow of spans without a negative
-   advance, and both exporters would have to agree about it.
-7. **`layout` is what `measureText` writes, and what the exporters draw**: `width`, `ascent`
-   and `descent` of the formula's box in px from its baseline, a flat list of `glyphs`
-   (`text`, `font`, `size`, `weight`, `style`, `x`, `y`, the baseline of each piece relative
-   to the formula's origin) and a list of `rules` (`x`, `y`, `width`, `thickness`). An
-   exporter positions what it is given and computes nothing, which is the hard rule that
-   whatever must appear in the output enters the IR first.
-8. **Glyphs come from the face chain of ADR 0168.** Each text piece of a formula is split by
+6. **A formula is a run of its own**, `FormulaRun { kind: 'formula', text, math, font, size,
+weight, style, color, layout? }`, beside `TextSpan` and `LineBreak`. `math` is the
+   structure: `text`, `fraction { numerator, denominator }`, `scripts { superscript?,
+subscript? }`, each holding a list of the same. A fraction is not a span with a vertical
+   offset: two spans stacked in one horizontal slot cannot be said in a flow of spans without
+   a negative advance, and both exporters would have to agree about it.
+7. **`text` is the formula's linear reading**, `1/(40·10^(−3))` (`linearReading` in core). It
+   was added while building: `kind === 'break' ? … : run.text` is how templates, the raster
+   tests and `packages/templates` read runs, and a run without `text` would stop them
+   compiling. With it they compile unchanged and read something sensible, the same reason the
+   AST's `Formula` keeps `children` (decision 15). Nothing draws `text` except as the fallback
+   of decision 13.
+8. **`layout` is what `measureText` writes, and what the exporters draw**: the box (`width`,
+   `ascent`, `descent`, px from the formula's baseline), a flat list of `glyphs` (`text`,
+   `font`, `size`, `weight`, `style`, and `x`, `y`: the piece's baseline against the
+   formula's origin, `y` down) and a list of `rules` (`x`, `y` of the top edge, `width`,
+   `thickness`). Also `offset`, where the formula starts on its line, and `lineWidth`, the
+   line's width, so `export-svg` places a formula and aligns a line holding one without
+   measuring the text before it; and `above` and `below` (decision 11). An exporter positions
+   what it is given and computes nothing, which is the hard rule that whatever must appear in
+   the output enters the IR first.
+9. **Glyphs come from the face chain of ADR 0168.** Each text piece of a formula is split by
    `coverRuns` exactly as a span is: the formula's own face first, then Noto Sans Math, then
    Source Sans 3. A formula is drawn in the template's face, and its `·`, `ω` and `⁻` fall
    back exactly as they do in prose.
-9. **The geometry is fixed, in em of the formula's size**: the math axis at 0.25 em above the
-   baseline, a rule 0.06 em thick centred on it, 0.12 em clear above and below the rule, the
-   rule 0.1 em wider than the wider of numerator and denominator on each side, both centred
-   on it. Numerator and denominator keep the formula's size, as on the reference.
-   Super- and subscripts are drawn at 0.7 of the size around them, raised 0.4 em or lowered
-   0.2 em, and 0.45 em and 0.25 em when both are present. Clearance is measured from the ink
-   of the pieces (`Face.ink`, the glyph bounding box fontkit reads), not from the face's
-   ascent, which would leave a fraction a line apart. A face's `MATH` table is not read: one
-   fixed geometry for every face is reproducible by hand, and only Noto Sans Math has one.
-10. **A line holding a formula is as tall as it needs to be.** A line's box is the strut
-    (`lineHeight × the node's largest run`, centred on the face's ascent and descent the way
-    CSS centres it) grown to hold the box of every formula on it. Layout adds the growth to
-    the measured height; `FormulaRun.layout` carries `above` and `below`, the px its own box
-    reaches past the strut, and `export-svg` moves the line's baseline down by the largest
-    `above` and the next line's by the largest `below`. `export-html` draws the formula as an
-    `inline-block` of exactly that box, so the browser's line box grows by the same amount.
-    A paragraph's `space` (ADR 0205) is added as before, on top. Template-kit's rhythm reads
-    the measured height, so it accounts for the taller line with no change of its own.
-11. **Exporters draw the placed pieces.** `export-svg` writes one `<text>` per glyph piece at
-    its `x`/`y` and one `<rect>` per rule, after the line's text. `export-html` writes an
-    inline-block span of the box's size with `vertical-align: -descent`, holding an inline
-    `<svg>` with the same `<text>` and `<rect>` elements, in the document's `@font-face`
-    families. Both draw the same coordinates.
-12. **A formula that could not be laid out** (a node whose face no source holds, the case in
+10. **The geometry is fixed, in em of the formula's size** (`packages/core/src/text/formula.ts`):
+    the math axis at 0.25 em above the baseline, a rule 0.06 em thick centred on it, 0.12 em
+    clear between the rule and the ink of the numerator and of the denominator, the rule 0.1 em
+    wider than the wider of the two on each side, both centred on it. Numerator and denominator
+    keep the formula's size, as on the reference. Super- and subscripts are drawn at 0.7 of the
+    size around them, raised 0.4 em or lowered 0.2 em, and 0.45 em and 0.25 em when both are
+    present. Clearance is measured from the ink of the pieces (`Face.ink`, the glyph bounding
+    box fontkit reads), not from the face's ascent, which would leave a fraction a line apart.
+    A face's `MATH` table is not read: one fixed geometry for every face is reproducible by
+    hand, and only Noto Sans Math has one. Letter spacing does not apply inside a formula.
+11. **A line holding a formula is as tall as it needs to be.** A line's box is the strut,
+    grown to hold the box of every formula on it, as a CSS line box grows to hold an
+    inline-block. The strut is split as Chromium splits it: the reference face's ascent and
+    descent rounded to whole pixels, and half the leading, truncated toward zero, above the
+    ascent. Measured before that rounding was in: Source Sans 3 at 40 px on a 56 px line puts
+    its baseline 41 px down, where the unrounded split said 40.48. Layout adds the growth to
+    the measured height and writes it on every formula of the line as `above` and `below`.
+    `export-svg` moves the line's baseline down by `above` and the next line's by `below`;
+    `export-html` draws the formula as an inline-block of exactly its box, and the browser's
+    line box grows by the same amount. A paragraph's `space` (ADR 0205) is added as before, on
+    top. Template-kit's rhythm reads the measured height, so it spaces a block holding a
+    fraction by its real height with no rule of its own; its `rebreak` reads a formula as one
+    character that is not a space (U+FFFC), so it never breaks inside one either.
+12. **Exporters draw the placed pieces.** `export-svg` writes the line's text with the text
+    after a formula moved on by its width (`dx`), then one `<text>` per piece and one `<rect>`
+    per rule at the IR's coordinates. `export-html` writes an inline-block span the size of the
+    box with `vertical-align: -descent`, holding an inline `<svg>` whose origin is the baseline,
+    with the same `<text>` and `<rect>` elements, in the document's `@font-face` families. A
+    formula painted with a gradient or an image is drawn in one solid colour in HTML and warns
+    `W_EXPORT_APPROXIMATED`; the SVG paints it as it paints a span.
+13. **A formula that could not be laid out** (a node in a face no source holds, the case in
     which `measureText` keeps the brief's lines) has no `layout`, and both exporters draw its
-    linear reading, `1/(40·10⁻³)`, in the run's style. `compile` warns with
-    `W_FORMULA_NOT_LAID_OUT`.
+    `text` in the run's style. `compile` already reports that face as
+    `E_FONT_FACE_UNAVAILABLE` (ADR 0110), so no new diagnostic is needed.
+14. **Core checks what a formula draws in.** `parseScene` requires every face a formula's
+    pieces name in `Scene.fonts` (`E_SCENE_FONT_NOT_DECLARED`), `compile` declares them, and
+    `sceneResources` asks the font source for them. A node holding only a formula is not an
+    empty text.
 
 ### Compatibility
 
-13. **The AST gains `Formula { kind: 'formula', source, math, children, range }`.**
-    `children` is the formula's linear reading as plain text, so every traversal that reads a
-    rich-text value through `children` (`plainText` in `resolve`, `plain` in template-kit,
-    `plainTextOf` in template-lang, `plain` in the CLI's plugin skeleton, and the same pattern
-    in templates in their own repositories) keeps compiling and reads `F = 1/(40·10⁻³) = 25 Hz`.
-14. **`runsOf` turns a `Formula` into a `FormulaRun`** in the style around it, bold, italic and
-    marks included, so `{cor:roxo}$x^2${/}` colours the whole formula.
+15. **The AST gains `Formula { kind: 'formula', source, math, children, range }`
+    (TYTO-734).** `children` is the formula's linear reading as plain text, so every traversal
+    that reads a rich-text value through `children` (`plainText` in `resolve`, `plain` in
+    template-kit, `plainTextOf` in template-lang, `plain` in the CLI's plugin skeleton, and the
+    same pattern in templates in their own repositories) keeps compiling and reads
+    `F = 1/(40·10^(−3)) = 25 Hz`.
+16. **`runsOf` turns a `Formula` into a `FormulaRun`** in the style around it, bold, italic and
+    marks included, so `{cor:roxo}$x^2${/}` colours the whole formula (TYTO-734).
 
 ## Consequences
 
-- A brief can write the reference answer, and it renders stacked in HTML, SVG and the raster
-  that comes from the HTML.
-- `TextRun` gains a member. A template in its own repository that switches on `run.kind`
-  exhaustively stops compiling against the new core until it handles `formula`; one that tests
-  `kind === 'text'` skips formulas. `@tyto/core` takes a minor bump and the changeset says so.
-- The editor does not highlight the new syntax yet: `packages/editor` is another card's.
+- The reference answer renders stacked in HTML, SVG and the raster that comes from the HTML,
+  from a Scene: `packages/export-html` and `packages/export-svg` each keep a fixture laid out
+  by core with the bundled Source Sans 3 and a snapshot of it. A brief can write it once
+  TYTO-734 lands.
+- Measured in Chromium on the two snapshots: every piece and the rule sit at the same `x` in
+  HTML and SVG within 0.01 px. Vertically the HTML is 0.99–1.00 px lower everywhere, the same
+  0.996 px a plain line with no formula shows; that is `export-svg`'s fixed ascent stand-in
+  (0.8 em), older than this ADR. The HTML rule's top sits where layout predicts it, within
+  0.01 px.
+- `TextRun` gains a member. A template that switches on `run.kind` exhaustively stops compiling
+  against the new core until it handles `formula`; one that tests `kind === 'text'` skips
+  formulas, and one that reads `run.text` after excluding breaks reads the linear reading.
+  `@tyto/core` takes a minor bump and its changeset says so.
+- `referenceRun` in `@tyto/core` may now return a `FormulaRun`, whose size is the strut's like
+  a span's.
+- The editor does not highlight the syntax: `packages/editor` is another card's.
 - `\sqrt`, matrices, aligned systems and integrals with limits stay out (TYTO-678's scope).
   Centring a formula on a line of its own is the template's choice.
 - A formula never breaks. One wider than its box overflows, and is reported as any other
   overflow.
+- Text as paths (`export-svg --text-as-paths`) outlines a formula's pieces as it outlines a
+  span, and draws its rules as `<rect>`.
 
 ## Rejected
 
@@ -124,3 +160,6 @@ weight, style, color, layout? }`, beside `TextSpan` and `LineBreak`. `math` is t
 - **`\(…\)` as the delimiter.** `\(` is a line break followed by `(` today (ADR 0016), so it
   would change what existing briefs mean; `$` with Pandoc's rule changes nothing that holds
   money.
+- **Positioning the formula's pieces in HTML with absolutely placed spans.** A span's baseline
+  inside its box depends on the face's metrics again; an inline `<svg>` puts each piece on the
+  baseline the IR gives, as the SVG exporter does.

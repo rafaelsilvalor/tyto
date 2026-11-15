@@ -1,4 +1,4 @@
-import { type TextNode, type TextSpan, fontFaceKey } from '@tyto/core';
+import { type FormulaRun, type TextNode, type TextSpan, fontFaceKey } from '@tyto/core';
 
 import { type Sink, approximated, paintAttributes, paintValue, unsupported } from './defs.js';
 import { attribute, element, escapeXml, svgNumber } from './values.js';
@@ -27,11 +27,36 @@ import { attribute, element, escapeXml, svgNumber } from './values.js';
 const ASCENT = 0.8;
 
 interface Line {
-  readonly runs: readonly TextSpan[];
+  readonly runs: readonly (TextSpan | FormulaRun)[];
   /** The tallest run decides the line, which is what a line box does. */
   readonly size: number;
   /** The px a paragraph boundary puts above this line (ADR 0205); 0 for none. */
   readonly space: number;
+  /** How far the line's formulas reach past its strut, above and below (ADR 0206). */
+  readonly above: number;
+  readonly below: number;
+}
+
+/**
+ * A formula nobody laid out (its face could not be measured) is drawn as its linear reading,
+ * in its own style, as `export-html` draws it (ADR 0206).
+ */
+function asDrawn(run: TextSpan | FormulaRun): TextSpan | FormulaRun {
+  if (run.kind === 'text' || run.layout !== undefined) return run;
+  return {
+    kind: 'text',
+    text: run.text,
+    font: run.font,
+    size: run.size,
+    weight: run.weight,
+    style: run.style,
+    color: run.color,
+  };
+}
+
+/** The total height a line takes: its leading, and what its formulas add (ADR 0206). */
+function lineHeightOf(line: Line, node: TextNode): number {
+  return line.size * node.lineHeight + line.above + line.below;
 }
 
 /**
@@ -40,12 +65,22 @@ interface Line {
  */
 function linesOf(node: TextNode): Line[] {
   const lines: Line[] = [];
-  let current: TextSpan[] = [];
+  let current: (TextSpan | FormulaRun)[] = [];
   let space = 0;
 
   const flush = (): void => {
     const size = current.reduce((tallest, run) => Math.max(tallest, run.size), 0);
-    lines.push({ runs: current, size: size === 0 ? fallbackSize(node) : size, space });
+    // Every formula on a line carries the same growth, the line's (ADR 0206).
+    const layouts = current.flatMap((run) =>
+      run.kind === 'formula' && run.layout !== undefined ? [run.layout] : [],
+    );
+    lines.push({
+      runs: current,
+      size: size === 0 ? fallbackSize(node) : size,
+      space,
+      above: Math.max(0, ...layouts.map((layout) => layout.above)),
+      below: Math.max(0, ...layouts.map((layout) => layout.below)),
+    });
     current = [];
   };
 
@@ -53,7 +88,7 @@ function linesOf(node: TextNode): Line[] {
     if (run.kind === 'break') {
       flush();
       space = run.space ?? 0;
-    } else current.push(run);
+    } else current.push(asDrawn(run));
   }
   flush();
 
@@ -62,7 +97,7 @@ function linesOf(node: TextNode): Line[] {
 
 /** An empty line still takes vertical space, and it takes the text's own leading. */
 function fallbackSize(node: TextNode): number {
-  const first = node.runs.find((run) => run.kind === 'text');
+  const first = node.runs.find((run) => run.kind !== 'break');
   return first === undefined ? 0 : first.size;
 }
 
@@ -117,7 +152,7 @@ function verticalOffset(node: TextNode, lines: readonly Line[], sink: Sink): num
     return 0;
   }
 
-  const total = lines.reduce((sum, line) => sum + line.space + line.size * node.lineHeight, 0);
+  const total = lines.reduce((sum, line) => sum + line.space + lineHeightOf(line, node), 0);
   return node.valign === 'middle' ? (height - total) / 2 : height - total;
 }
 
@@ -137,7 +172,11 @@ function cssFamily(family: string): string {
   return plain ? family : `"${family.replaceAll(/["\\]/gu, (character) => `\\${character}`)}"`;
 }
 
-function runAttributes(run: TextSpan, node: TextNode, sink: Sink): string {
+function runAttributes(
+  run: Pick<TextSpan, 'font' | 'size' | 'weight' | 'style' | 'color' | 'decoration'>,
+  node: TextNode,
+  sink: Sink,
+): string {
   return [
     attribute('font-family', escapeXml(cssFamily(run.font.family))),
     attribute('font-size', svgNumber(run.size)),
@@ -148,7 +187,7 @@ function runAttributes(run: TextSpan, node: TextNode, sink: Sink): string {
   ].join('');
 }
 
-function remember(run: TextSpan, sink: Sink): void {
+function remember(run: Pick<TextSpan, 'font' | 'weight' | 'style'>, sink: Sink): void {
   const face = { font: run.font, weight: run.weight, style: run.style };
   // `core`'s key, so a document's faces deduplicate exactly as `sceneResources` counts
   // them — which is what lets a loader be given the list and the exporter find every entry.
@@ -183,30 +222,55 @@ function textElement(node: TextNode, lines: readonly Line[], sink: Sink): string
   const drawn: string[] = [];
 
   for (const line of lines) {
-    // A paragraph's space first, then half-leading above the glyphs and half below, then the
-    // ascent: the same place a browser puts the first baseline, which is what keeps the two
-    // exports aligned.
+    // A paragraph's space first, then what a formula adds above the line, then half-leading
+    // above the glyphs and half below, then the ascent: the same place a browser puts the
+    // first baseline, which is what keeps the two exports aligned.
     top += line.space;
     const leading = (line.size * node.lineHeight - line.size) / 2;
-    const baseline = top + leading + line.size * ASCENT;
-    top += line.size * node.lineHeight;
+    const baseline = top + line.above + leading + line.size * ASCENT;
+    top += lineHeightOf(line, node);
 
     if (line.runs.length === 0) continue;
 
+    // A line holding a formula starts where core says the line starts, and is drawn from
+    // there: the formula sits at an offset from that start, and the text after it skips the
+    // formula's width with `dx`. SVG measures nothing, so the IR's numbers decide (ADR 0206).
+    const formula = line.runs.find(
+      (run): run is FormulaRun => run.kind === 'formula' && run.layout !== undefined,
+    );
+    const start =
+      formula?.layout === undefined
+        ? x
+        : lineStart(formula.layout.lineWidth, anchorX, anchor, trailing);
+    let skip = 0;
+    const formulas: string[] = [];
     const runs = line.runs
       .map((run) => {
+        if (run.kind === 'formula') {
+          if (run.layout !== undefined) {
+            formulas.push(...formulaElements(run, start + run.layout.offset, baseline, node, sink));
+            skip += run.layout.width;
+          }
+          return '';
+        }
         remember(run, sink);
-        return element('tspan', [runAttributes(run, node, sink)], escapeXml(run.text));
+        const shift = skip === 0 ? '' : attribute('dx', svgNumber(skip));
+        skip = 0;
+        return element('tspan', [shift, runAttributes(run, node, sink)], escapeXml(run.text));
       })
       .join('');
+    if (runs === '') {
+      drawn.push(...formulas);
+      continue;
+    }
 
     drawn.push(
       element(
         'text',
         [
-          attribute('x', svgNumber(x)),
+          attribute('x', svgNumber(formula === undefined ? x : start)),
           attribute('y', svgNumber(baseline)),
-          attribute('text-anchor', anchor),
+          attribute('text-anchor', formula === undefined ? anchor : undefined),
           node.letterSpacing === 0
             ? ''
             : attribute('letter-spacing', svgNumber(node.letterSpacing)),
@@ -217,9 +281,58 @@ function textElement(node: TextNode, lines: readonly Line[], sink: Sink): string
         runs,
       ),
     );
+    // After the line's text, so a formula is drawn over nothing it shares the line with.
+    drawn.push(...formulas);
   }
 
   return drawn.join('');
+}
+
+/** Where a line of `width` starts, for the anchor `anchorOf` chose. */
+function lineStart(
+  width: number,
+  anchorX: number,
+  anchor: string | undefined,
+  trailing: number,
+): number {
+  if (anchor === 'middle') return anchorX + trailing / 2 - width / 2;
+  if (anchor === 'end') return anchorX + trailing - width;
+  return anchorX;
+}
+
+/** A laid-out formula: a `<text>` per piece and a `<rect>` per rule, at the IR's coordinates. */
+function formulaElements(
+  run: FormulaRun,
+  x: number,
+  baseline: number,
+  node: TextNode,
+  sink: Sink,
+): string[] {
+  const layout = run.layout;
+  if (layout === undefined) return [];
+  const glyphs = layout.glyphs.map((glyph) => {
+    remember(glyph, sink);
+    return element(
+      'text',
+      [
+        attribute('x', svgNumber(x + glyph.x)),
+        attribute('y', svgNumber(baseline + glyph.y)),
+        runAttributes({ ...glyph, color: run.color }, node, sink),
+        attribute('xml:space', 'preserve'),
+      ],
+      escapeXml(glyph.text),
+    );
+  });
+  const rules = layout.rules.map((rule) =>
+    element('rect', [
+      attribute('x', svgNumber(x + rule.x)),
+      attribute('y', svgNumber(baseline + rule.y)),
+      attribute('width', svgNumber(rule.width)),
+      attribute('height', svgNumber(rule.thickness)),
+      paintAttributes('fill', run.color, { w: rule.width, h: rule.thickness }, node.id, sink),
+    ]),
+  );
+  return [...glyphs, ...rules];
 }
 
 /**
@@ -249,20 +362,30 @@ function pathElement(node: TextNode, lines: readonly Line[], sink: Sink): string
   for (const line of lines) {
     top += line.space;
     const leading = (line.size * node.lineHeight - line.size) / 2;
-    const baseline = top + leading + line.size * ASCENT;
-    top += line.size * node.lineHeight;
+    const baseline = top + line.above + leading + line.size * ASCENT;
+    top += lineHeightOf(line, node);
 
-    const drawn = line.runs.map((run) => ({
-      run,
-      shape: outline({
-        text: run.text,
-        family: run.font.family,
-        size: run.size,
-        weight: run.weight,
-        style: run.style,
-        letterSpacing: node.letterSpacing,
-      }),
-    }));
+    // A formula's pieces are outlined where its layout puts them, from the pen at the
+    // formula's start (`x`, `y` against the pen and the baseline); its width moves the pen on.
+    const drawn = line.runs.flatMap((run) => {
+      const pieces =
+        run.kind === 'text'
+          ? [{ ...run, x: 0, y: 0, spacing: node.letterSpacing }]
+          : (run.layout?.glyphs ?? []).map((glyph) => ({ ...glyph, color: run.color, spacing: 0 }));
+      return pieces.map((piece, index) => ({
+        run: piece,
+        formula: run.kind === 'formula' ? run : undefined,
+        last: index === pieces.length - 1,
+        shape: outline({
+          text: piece.text,
+          family: piece.font.family,
+          size: piece.size,
+          weight: piece.weight,
+          style: piece.style,
+          letterSpacing: piece.spacing,
+        }),
+      }));
+    });
 
     const missing = drawn.find((item) => item.shape === undefined);
     if (missing !== undefined) {
@@ -275,7 +398,13 @@ function pathElement(node: TextNode, lines: readonly Line[], sink: Sink): string
       return undefined;
     }
 
-    const width = drawn.reduce((sum, item) => sum + (item.shape?.advance ?? 0), 0);
+    const advanceOf = (item: (typeof drawn)[number]): number =>
+      item.formula === undefined
+        ? (item.shape?.advance ?? 0)
+        : item.last
+          ? (item.formula.layout?.width ?? 0)
+          : 0;
+    const width = drawn.reduce((sum, item) => sum + advanceOf(item), 0);
     // `text-anchor` has no meaning for a path, so the line is shifted by hand instead.
     let pen =
       anchor === 'middle' ? anchorX - width / 2 : anchor === 'end' ? anchorX - width : anchorX;
@@ -283,17 +412,39 @@ function pathElement(node: TextNode, lines: readonly Line[], sink: Sink): string
     for (const item of drawn) {
       if (item.shape === undefined) continue;
       const paint = paintValue(item.run.color, { w: width, h: item.run.size }, node.id, sink);
+      if (item.formula !== undefined && item.last) {
+        for (const rule of item.formula.layout?.rules ?? []) {
+          parts.push(
+            element('rect', [
+              attribute('x', svgNumber(pen + rule.x)),
+              attribute('y', svgNumber(baseline + rule.y)),
+              attribute('width', svgNumber(rule.width)),
+              attribute('height', svgNumber(rule.thickness)),
+              paintAttributes(
+                'fill',
+                item.formula.color,
+                { w: rule.width, h: rule.thickness },
+                node.id,
+                sink,
+              ),
+            ]),
+          );
+        }
+      }
       parts.push(
         element('path', [
           attribute('d', item.shape.d),
-          attribute('transform', `translate(${svgNumber(pen)} ${svgNumber(baseline)})`),
+          attribute(
+            'transform',
+            `translate(${svgNumber(pen + item.run.x)} ${svgNumber(baseline + item.run.y)})`,
+          ),
           attribute('fill', paint?.value ?? 'none'),
           paint === undefined || paint.opacity === 1
             ? ''
             : attribute('fill-opacity', svgNumber(paint.opacity)),
         ]),
       );
-      pen += item.shape.advance;
+      pen += advanceOf(item);
     }
   }
 

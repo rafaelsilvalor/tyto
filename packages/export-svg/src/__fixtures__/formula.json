@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "fonts": [{ "family": "Source Sans 3", "source": "bundled" }],
+  "assets": [],
+  "artworks": [
+    {
+      "id": "formula-artwork",
+      "label": "The reference answer with a stacked fraction, and super- and subscripts on a centred line (ADR 0206)",
+      "frames": [
+        {
+          "format": "feed",
+          "size": { "w": 600, "h": 300 },
+          "background": { "kind": "solid", "color": { "r": 250, "g": 250, "b": 250 } },
+          "children": [
+            {
+              "valign": "top",
+              "overflow": "clip",
+              "kind": "text",
+              "id": "reference",
+              "box": { "w": 520 },
+              "align": "left",
+              "lineHeight": 1.4,
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "F = ",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 40,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 20, "g": 20, "b": 40, "a": 1 } }
+                },
+                {
+                  "kind": "formula",
+                  "text": "1/(40·10^(−3))",
+                  "math": [
+                    {
+                      "kind": "fraction",
+                      "numerator": [{ "kind": "text", "text": "1" }],
+                      "denominator": [
+                        { "kind": "text", "text": "40·10" },
+                        { "kind": "scripts", "superscript": [{ "kind": "text", "text": "−3" }] }
+                      ]
+                    }
+                  ],
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 40,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 20, "g": 20, "b": 40, "a": 1 } },
+                  "layout": {
+                    "offset": 55.64,
+                    "lineWidth": 307.672,
+                    "width": 125.312,
+                    "ascent": 41.52,
+                    "descent": 30.68,
+                    "glyphs": [
+                      {
+                        "text": "1",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 40,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 52.716,
+                        "y": -16
+                      },
+                      {
+                        "text": "40·10",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 40,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 4,
+                        "y": 30.2
+                      },
+                      {
+                        "text": "−3",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 28,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 93.48,
+                        "y": 14.2
+                      }
+                    ],
+                    "rules": [{ "x": 0, "y": -11.2, "width": 125.312, "thickness": 2.4 }],
+                    "above": 0.52,
+                    "below": 15.68
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " = 25 Hz",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 40,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 20, "g": 20, "b": 40, "a": 1 } }
+                }
+              ],
+              "transform": { "x": 40, "y": 40 }
+            },
+            {
+              "valign": "top",
+              "overflow": "clip",
+              "kind": "text",
+              "id": "scripts",
+              "box": { "w": 520 },
+              "align": "center",
+              "lineHeight": 1.4,
+              "runs": [
+                {
+                  "kind": "formula",
+                  "text": "E = mc^2",
+                  "math": [
+                    { "kind": "text", "text": "E = mc" },
+                    { "kind": "scripts", "superscript": [{ "kind": "text", "text": "2" }] }
+                  ],
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 40,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 20, "g": 20, "b": 40, "a": 1 } },
+                  "layout": {
+                    "offset": 0,
+                    "lineWidth": 235.112,
+                    "width": 122.276,
+                    "ascent": 34.2,
+                    "descent": 0.48,
+                    "glyphs": [
+                      {
+                        "text": "E = mc",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 40,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 0,
+                        "y": 0
+                      },
+                      {
+                        "text": "2",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 28,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 108.36,
+                        "y": -16
+                      }
+                    ],
+                    "rules": [],
+                    "above": 0,
+                    "below": 0
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " and ",
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 40,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 20, "g": 20, "b": 40, "a": 1 } }
+                },
+                {
+                  "kind": "formula",
+                  "text": "v_0^2",
+                  "math": [
+                    { "kind": "text", "text": "v" },
+                    {
+                      "kind": "scripts",
+                      "superscript": [{ "kind": "text", "text": "2" }],
+                      "subscript": [{ "kind": "text", "text": "0" }]
+                    }
+                  ],
+                  "font": { "family": "Source Sans 3", "source": "bundled" },
+                  "size": 40,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": { "kind": "solid", "color": { "r": 20, "g": 20, "b": 40, "a": 1 } },
+                  "layout": {
+                    "offset": 202.516,
+                    "lineWidth": 235.112,
+                    "width": 32.596,
+                    "ascent": 36.2,
+                    "descent": 10.336,
+                    "glyphs": [
+                      {
+                        "text": "v",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 40,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 0,
+                        "y": 0
+                      },
+                      {
+                        "text": "2",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 28,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 18.68,
+                        "y": -18
+                      },
+                      {
+                        "text": "0",
+                        "font": { "family": "Source Sans 3", "source": "bundled" },
+                        "size": 28,
+                        "weight": 400,
+                        "style": "normal",
+                        "x": 18.68,
+                        "y": 10
+                      }
+                    ],
+                    "rules": [],
+                    "above": 0,
+                    "below": 0
+                  }
+                }
+              ],
+              "transform": { "x": 40, "y": 200 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

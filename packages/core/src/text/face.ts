@@ -33,7 +33,10 @@ interface FontkitFont {
   readonly unitsPerEm: number;
   readonly ascent: number;
   readonly descent: number;
-  layout(text: string): { readonly advanceWidth: number };
+  layout(text: string): {
+    readonly advanceWidth: number;
+    readonly bbox: { readonly minY: number; readonly maxY: number };
+  };
   hasGlyphForCodePoint(codePoint: number): boolean;
 }
 
@@ -57,6 +60,19 @@ export interface Face {
   advance(text: string): number;
   /** Ascent plus descent, in em. The height of the glyph box, which is not the leading. */
   readonly contentHeight: number;
+  /**
+   * The face's ascent and descent (hhea), in em, descent positive: where CSS centres the
+   * strut of a line, so where a formula's box starts to make the line taller (ADR 0206).
+   * Optional so a hand-made face still type-checks; layout splits `contentHeight` 4:1 then.
+   */
+  readonly ascent?: number;
+  readonly descent?: number;
+  /**
+   * How far the ink of `text` reaches above and below the baseline, in em, below positive:
+   * the glyphs' bounding box, which is what a fraction's clearance is measured from (ADR
+   * 0206). `undefined` for text with no ink, such as spaces.
+   */
+  ink?(text: string): { readonly ascent: number; readonly descent: number } | undefined;
   /**
    * Whether the face draws this code point itself, from its `cmap` (TYTO-484, ADR 0168).
    *
@@ -135,6 +151,13 @@ function build(bytes: Uint8Array | undefined): Face | undefined {
     },
     // `descent` is negative in a font's own units, which is why this adds its magnitude.
     contentHeight: (font.ascent - font.descent) / unitsPerEm,
+    ascent: font.ascent / unitsPerEm,
+    descent: -font.descent / unitsPerEm,
+    ink(text: string) {
+      const box = font.layout(text).bbox;
+      if (!Number.isFinite(box.minY) || !Number.isFinite(box.maxY)) return undefined;
+      return { ascent: box.maxY / unitsPerEm, descent: -box.minY / unitsPerEm };
+    },
     has(codePoint: number): boolean {
       return font.hasGlyphForCodePoint(codePoint);
     },
