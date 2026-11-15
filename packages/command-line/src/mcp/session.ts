@@ -17,23 +17,13 @@ import { templateSkeleton } from '../delivery.js';
 import { googleFontsOption } from '../google-fonts.js';
 import { needsRasterizer, outputRequests, unavailableTypes } from '../options.js';
 import {
-  NO_PLUGIN_FILES,
-  type SyncedPluginFiles,
-  leftOutPluginFiles,
-  syncPluginFiles,
-} from '../plugin-files.js';
-import {
-  type LoadedPlugins,
   activateBuiltIns,
   activateInstalled,
-  loadInstalledPlugins,
-  pluginCapabilities,
   reachableExporters,
   withoutRefused,
 } from '../plugins/index.js';
-import { cliSigninCapabilities } from '../signin.js';
 import { environmentRecipeCredentials } from '../recipe-credentials.js';
-import { type RenderContext, loadRenderContext } from '../render-context.js';
+import type { RenderContext } from '../render-context.js';
 import {
   type RenderTaskReport,
   type TaskSources,
@@ -41,8 +31,8 @@ import {
   renderTask,
 } from '../render-task.js';
 import { displayPath } from '../render.js';
-import { installedOption } from '../templates-in-reach.js';
-import { type LocatedDiagnostic, diagnosticsDocument, registerUnplaced } from '../report.js';
+import { pluginsInReach, renderContextInReach } from '../templates-in-reach.js';
+import { type LocatedDiagnostic, diagnosticsDocument } from '../report.js';
 import { optionalSources, projectSections, renderSources } from '../sources.js';
 import { type BriefWorkspace, workspaceOfFolder } from '../workspace.js';
 import { confinedPath } from './confine.js';
@@ -265,56 +255,19 @@ export async function openSession(
   const trust: Trust = workspace?.loaded.trust ?? 'restricted';
   const roots = workspace === undefined ? [cwd] : [cwd, workspace.loaded.folder];
 
-  // As `tyto render` does: the plugin files first, never moving a pinned ref and never asking,
-  // and a restricted folder's own plugin files left out with the reason on stderr.
-  const pluginFilesWorkspace =
-    workspace === undefined
-      ? undefined
-      : { folder: workspace.loaded.folder, trusted: workspace.loaded.trust === 'trusted' };
-  const pluginFiles: SyncedPluginFiles =
-    environment.home === undefined
-      ? NO_PLUGIN_FILES
-      : await syncPluginFiles(
-          {
-            home: environment.home,
-            ...(pluginFilesWorkspace === undefined ? {} : { workspace: pluginFilesWorkspace }),
-            update: false,
-            fetches: true,
-            approval: 'never',
-          },
-          environment,
-        );
-  registerUnplaced(pluginFiles.diagnostics);
-  const leftOut = await leftOutPluginFiles(pluginFilesWorkspace, 'loaded', environment);
-  if (leftOut !== '') environment.console.err(leftOut);
-
-  const loaded: LoadedPlugins = await loadInstalledPlugins(environment.home, {
-    launch: environment.launch,
-    copies: pluginFiles.copies,
-    capabilities: pluginCapabilities(environment.variables, {
-      hostName: 'tyto mcp',
-      signin: cliSigninCapabilities(environment),
-      ...(environment.home === undefined ? {} : { home: environment.home }),
-      workspace:
-        workspace === undefined
-          ? { trust: 'restricted' }
-          : { folder: workspace.loaded.folder, trust: workspace.loaded.trust },
-    }),
-  });
+  // As `tyto render` does, through the same resolver (TYTO-730): the plugin files once, never
+  // moving a pinned ref and never asking, a restricted folder's own left out with the reason on
+  // stderr, and the installed plugins loaded with what they fetched.
+  const reach = await pluginsInReach({ workspace, hostName: 'tyto mcp' }, environment);
+  const { pluginFiles, plugins: loaded } = reach;
+  if (reach.leftOut !== '') environment.console.err(reach.leftOut);
 
   /**
    * Read on every call rather than once: an agent edits a template and asks again, and an
    * answer from the folder as it was at start would be the one thing it cannot see past.
    */
   async function context(): Promise<LoadedContext> {
-    const answer = await loadRenderContext({
-      templatesDirectory: resolve(cwd, 'templates'),
-      projectTemplatesDirectories: project?.templates ?? [],
-      formatsFile: resolve(cwd, 'formats.yaml'),
-      templatesDirectoryIsDefault: true,
-      formatsFileIsDefault: true,
-      ...installedOption(environment, loaded, pluginFiles),
-    });
+    const answer = await renderContextInReach({ workspace, folder: cwd }, reach, environment);
     if (!answer.ok) {
       throw new ToolRefusal(
         diagnosticsDocument([...pluginFiles.diagnostics, ...answer.error])
