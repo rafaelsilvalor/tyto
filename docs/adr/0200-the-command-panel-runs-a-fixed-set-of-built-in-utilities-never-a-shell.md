@@ -143,5 +143,5 @@ sets one for the panel's session (one tab), and `$name` reads it:
 `$name` included.
 
 `alias`, `unalias` and `set` are registry entries that run in a restricted folder: they write the
-person's own settings (`commands:set-alias`, main checking the name and line again) or this
-session, never the folder.
+person's own settings or this session, and `alias --workspace` is refused there by the window and
+again by main (`commands:set-alias`).

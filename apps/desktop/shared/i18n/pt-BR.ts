@@ -800,8 +800,8 @@ export const ptBR: Catalogue = {
   'cli.offer.origin.workspace':
     "Esta linha veio do apelido '{alias}', definido no .tyto/project.json desta pasta de trabalho (aliases).",
   'commandPanel.builtin.alias':
-    "lista os apelidos, ou salva um nas suas configurações: alias nome='linha'",
-  'commandPanel.builtin.unalias': 'remove um apelido seu',
+    "lista os apelidos, ou define um: alias nome='linha', --workspace para os desta pasta",
+  'commandPanel.builtin.unalias': 'remove um apelido seu; --workspace remove um desta pasta',
   'commandPanel.builtin.set': 'lista as variáveis desta sessão, ou define uma: set nome=valor',
   'commandPanel.builtin.variable':
     'uma variável definida nesta sessão (nunca do ambiente; não entre aspas simples)',
@@ -813,16 +813,27 @@ export const ptBR: Catalogue = {
     '{name} não pode ser nome de apelido: letras, dígitos, _ e -, sem começar por dígito ou -.',
   'commandPanel.alias.reserved':
     '{name} é um comando do próprio painel ou o tyto: um apelido não pode ter esse nome.',
-  'commandPanel.alias.usage': "Escreva alias nome='linha', com aspas numa linha que tem espaços.",
-  'commandPanel.unalias.usage': 'Escreva unalias nome.',
+  'commandPanel.alias.usage':
+    "Escreva alias nome='linha', com aspas numa linha que tem espaços; --workspace para os desta pasta.",
+  'commandPanel.unalias.usage': 'Escreva unalias nome; --workspace remove um desta pasta.',
   'commandPanel.alias.inWorkspace':
-    '{name} é um apelido desta pasta de trabalho, definido no .tyto/project.json dela: remova-o lá.',
+    '{name} é um apelido desta pasta de trabalho: unalias --workspace {name} o remove.',
   'commandPanel.alias.saved.user': 'Apelido {name} salvo nas suas configurações.',
+  'commandPanel.alias.saved.workspace':
+    'Apelido {name} salvo no .tyto/project.json desta pasta de trabalho, para todos que a abrirem.',
   'commandPanel.alias.removed.user': 'Apelido {name} removido das suas configurações.',
+  'commandPanel.alias.removed.workspace':
+    'Apelido {name} removido do .tyto/project.json desta pasta de trabalho.',
   'commandPanel.alias.refused.invalid':
     '{name} não foi salvo: o nome ou a linha não serve para um apelido.',
+  'commandPanel.alias.refused.noFolder':
+    '{name} não foi salvo: --workspace precisa de uma pasta de trabalho aberta.',
+  'commandPanel.alias.refused.restricted':
+    '{name} não foi salvo: esta pasta é restrita, e o {where} dela não é escrito pelo painel. Confie nela em Workspace: Manage Trust.',
   'commandPanel.alias.refused.syntax':
     '{name} não foi salvo: o {where} não é JSON válido e não é sobrescrito. Corrija-o antes.',
+  'commandPanel.alias.refused.unwritable':
+    '{name} não foi salvo: não foi possível gravar o {where}.',
   'commandPanel.alias.ignored':
     'O apelido {name} em {where} é ignorado: tem o nome de um comando do painel ou do tyto.',
   'commandPanel.alias.unreadable':

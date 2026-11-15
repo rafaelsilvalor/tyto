@@ -105,6 +105,7 @@ export interface CommandPanelPorts {
   readonly setAlias: (
     name: string,
     body: string | null,
+    workspace: boolean,
   ) => Promise<IpcResponse<'commands:set-alias'>>;
 }
 
@@ -139,8 +140,8 @@ const NO_PORTS: CommandPanelPorts = {
   listById: () => Promise.resolve({ entries: [], more: 0 }),
   read: () => Promise.resolve({ ok: false, reason: 'gone' }),
   writes: NO_WRITES,
-  aliases: () => Promise.resolve({ aliases: [] }),
-  setAlias: () => Promise.resolve({ ok: false, reason: 'invalid' }),
+  aliases: () => Promise.resolve({ aliases: [], workspace: 'none' }),
+  setAlias: () => Promise.resolve({ ok: false, reason: 'no-folder' }),
 };
 
 /** Ctrl+R's state: what is typed in the search, and where the match is in the history. */
@@ -288,7 +289,9 @@ export class CommandPanel extends DockedPanel {
     this.chaining.add(session.id);
     try {
       // TYTO-536: the aliases a step starts with, once, before the registry (ADR 0200).
-      const inForce = await this.ports.aliases().catch((): AliasesInForce => ({ aliases: [] }));
+      const inForce = await this.ports
+        .aliases()
+        .catch((): AliasesInForce => ({ aliases: [], workspace: 'none' }));
       const aliased = expandAliases(expanded.steps, inForce.aliases, (name) => this.reserved(name));
       if (!aliased.ok) {
         sessions.refused(
@@ -490,7 +493,7 @@ export class CommandPanel extends DockedPanel {
       files: this.filesOf(sessionId),
       aliases: {
         list: () => this.ports.aliases(),
-        set: (name, body) => this.ports.setAlias(name, body),
+        set: (name, body, workspace) => this.ports.setAlias(name, body, workspace),
         reserved: (name) => this.reserved(name),
       },
       variables: {

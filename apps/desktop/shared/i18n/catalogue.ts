@@ -1179,9 +1179,14 @@ export interface Catalogue {
   readonly 'commandPanel.unalias.usage': string;
   readonly 'commandPanel.alias.inWorkspace': string;
   readonly 'commandPanel.alias.saved.user': string;
+  readonly 'commandPanel.alias.saved.workspace': string;
   readonly 'commandPanel.alias.removed.user': string;
+  readonly 'commandPanel.alias.removed.workspace': string;
   readonly 'commandPanel.alias.refused.invalid': string;
+  readonly 'commandPanel.alias.refused.noFolder': string;
+  readonly 'commandPanel.alias.refused.restricted': string;
   readonly 'commandPanel.alias.refused.syntax': string;
+  readonly 'commandPanel.alias.refused.unwritable': string;
   readonly 'commandPanel.alias.ignored': string;
   readonly 'commandPanel.alias.unreadable': string;
   readonly 'commandPanel.alias.from': string;
@@ -2009,9 +2014,14 @@ export const CATALOGUE_KEYS = [
   'commandPanel.unalias.usage',
   'commandPanel.alias.inWorkspace',
   'commandPanel.alias.saved.user',
+  'commandPanel.alias.saved.workspace',
   'commandPanel.alias.removed.user',
+  'commandPanel.alias.removed.workspace',
   'commandPanel.alias.refused.invalid',
+  'commandPanel.alias.refused.noFolder',
+  'commandPanel.alias.refused.restricted',
   'commandPanel.alias.refused.syntax',
+  'commandPanel.alias.refused.unwritable',
   'commandPanel.alias.ignored',
   'commandPanel.alias.unreadable',
   'commandPanel.alias.from',

@@ -6611,13 +6611,13 @@ function wireCommandPanel(): void {
     // TYTO-536: the aliases in force, asked for every line, and `alias`'s writes, main checking.
     aliases: async () => {
       const bridge = window.tyto;
-      if (bridge === undefined) return { aliases: [] };
+      if (bridge === undefined) return { aliases: [], workspace: 'none' };
       return bridge['commands:aliases']({});
     },
-    setAlias: async (name, body) => {
+    setAlias: async (name, body, inWorkspace) => {
       const bridge = window.tyto;
-      if (bridge === undefined) return { ok: false, reason: 'invalid' };
-      return bridge['commands:set-alias']({ name, body });
+      if (bridge === undefined) return { ok: false, reason: 'no-folder' };
+      return bridge['commands:set-alias']({ name, body, workspace: inWorkspace });
     },
     cancel: (runId) => {
       void withBridge(async (bridge) => {

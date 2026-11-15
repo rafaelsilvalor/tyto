@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -328,7 +328,7 @@ describe('the hosts call may reach (TYTO-671, ADR 0193 decision 4)', () => {
 });
 
 describe('the command panel aliases of the open folder (TYTO-536)', () => {
-  it("withholds a restricted folder's, and hands them over once it is trusted", async () => {
+  it('withholds and never writes a restricted folder, and writes its own file once trusted', async () => {
     const file = join(work, '.tyto', 'project.json');
     await writeFile(file, '{\n  // ours\n  "aliases": { "entrega": "render --trust" }\n}\n');
     const workspace = createWorkspaceService({
@@ -336,16 +336,18 @@ describe('the command panel aliases of the open folder (TYTO-536)', () => {
       home,
       setTemplateFolders: () => Promise.resolve(),
     });
-    expect(workspace.aliases()).toEqual([]);
+    expect(await workspace.writeAlias('x', 'render')).toEqual({ ok: false, reason: 'no-folder' });
 
     await workspace.open(work);
-    expect(workspace.aliases()).toEqual([]);
+    expect(workspace.aliases()).toEqual({ trust: 'restricted', aliases: [] });
     expect(workspace.state().leftOut).toBe(1);
+    expect(await workspace.writeAlias('x', 'render')).toEqual({ ok: false, reason: 'restricted' });
+    expect(await readFile(file, 'utf8')).not.toContain('"x"');
 
     expect((await workspace.grant('folder')).ok).toBe(true);
-    expect(workspace.aliases()).toEqual([
-      { name: 'entrega', body: 'render --trust', origin: 'folder' },
-    ]);
+    expect(await workspace.writeAlias('x', 'render')).toEqual({ ok: true });
+    expect(await readFile(file, 'utf8')).toContain('// ours');
+    expect(workspace.aliases()?.aliases.map((alias) => alias.name)).toEqual(['entrega', 'x']);
   });
 });
 

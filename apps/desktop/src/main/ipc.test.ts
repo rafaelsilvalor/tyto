@@ -945,7 +945,7 @@ const dependencies = () => {
     },
     offeredRecipes: { take: () => undefined },
     commandAliases: {
-      list: () => ({ aliases: [] }),
+      list: () => ({ aliases: [], workspace: 'none' as const }),
       set: () => Promise.resolve({ ok: true as const }),
     },
     terminals: {

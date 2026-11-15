@@ -25,6 +25,7 @@ import {
 import { PLUGIN_FILE_EXTENSION } from '@tyto/plugin-api';
 
 import type { IpcResponse } from '../../shared/ipc.js';
+import { type AliasWritten, writeWorkspaceAlias } from './command-aliases.js';
 import { type FontsInForce, fontsFor } from './fonts.js';
 
 /**
@@ -132,10 +133,21 @@ export interface WorkspaceService {
    */
   deliveryLayout(): { readonly root: string; readonly delivery: ResolvedDelivery } | undefined;
   /**
-   * The open folder's command panel aliases (TYTO-536), none with nothing open. A restricted
-   * sheet's are already withheld by the resolver, so they never reach the window.
+   * The open folder's command panel aliases and its trust (TYTO-536); `undefined` with nothing
+   * open. A restricted folder's are already withheld by the resolver, so the list is empty.
    */
-  aliases(): readonly ProjectAlias[];
+  aliases():
+    | {
+        readonly trust: 'trusted' | 'restricted' | 'revoked';
+        readonly aliases: readonly ProjectAlias[];
+      }
+    | undefined;
+  /**
+   * `alias --workspace`: one alias written into the open folder's own `.tyto/project.json`, then
+   * the folder read again. Refused with nothing open and in a folder that is not trusted now,
+   * a trust taken back included: a shared folder's file is never written from the panel then.
+   */
+  writeAlias(name: string, body: string | null): Promise<AliasWritten>;
 }
 
 /** The places of the resolved project: what a restricted folder refused is not among them. */
@@ -335,7 +347,19 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
     },
 
     aliases() {
-      return open?.project.aliases ?? [];
+      if (open === undefined) return undefined;
+      return {
+        trust: revoked.folder ? 'revoked' : open.trust,
+        aliases: open.project.aliases,
+      };
+    },
+
+    async writeAlias(name, body) {
+      if (open === undefined) return { ok: false, reason: 'no-folder' };
+      if (open.trust !== 'trusted' || revoked.folder) return { ok: false, reason: 'restricted' };
+      const written = await writeWorkspaceAlias(open.folder, name, body);
+      if (written.ok) await read(open.folder);
+      return written;
     },
 
     deliveryLayout() {

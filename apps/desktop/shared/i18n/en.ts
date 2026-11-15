@@ -790,8 +790,10 @@ export const en: Catalogue = {
     "This line came from your alias '{alias}', defined in your settings (commandAliases).",
   'cli.offer.origin.workspace':
     "This line came from the alias '{alias}', defined in this workspace's .tyto/project.json (aliases).",
-  'commandPanel.builtin.alias': "list aliases, or save one in your settings: alias name='line'",
-  'commandPanel.builtin.unalias': 'remove an alias of yours',
+  'commandPanel.builtin.alias':
+    "list aliases, or define one: alias name='line', --workspace for this folder's",
+  'commandPanel.builtin.unalias':
+    'remove an alias of yours; --workspace removes one of this folder',
   'commandPanel.builtin.set': "list this session's variables, or set one: set name=value",
   'commandPanel.builtin.variable':
     "a variable set in this session (never the environment's; not in single quotes)",
@@ -803,16 +805,26 @@ export const en: Catalogue = {
     "{name} cannot be an alias's name: letters, digits, _ and -, not starting with a digit or -.",
   'commandPanel.alias.reserved':
     '{name} is a command of the panel or tyto itself: an alias cannot take its name.',
-  'commandPanel.alias.usage': "Write alias name='line', quoting a line that has spaces.",
-  'commandPanel.unalias.usage': 'Write unalias name.',
+  'commandPanel.alias.usage':
+    "Write alias name='line', quoting a line that has spaces; add --workspace for this folder's.",
+  'commandPanel.unalias.usage': 'Write unalias name; add --workspace to remove one of this folder.',
   'commandPanel.alias.inWorkspace':
-    "{name} is this workspace's alias, defined in its .tyto/project.json: remove it there.",
+    "{name} is this workspace's alias: unalias --workspace {name} removes it.",
   'commandPanel.alias.saved.user': 'Alias {name} saved in your settings.',
+  'commandPanel.alias.saved.workspace':
+    "Alias {name} saved in this workspace's .tyto/project.json, for everyone who opens it.",
   'commandPanel.alias.removed.user': 'Alias {name} removed from your settings.',
+  'commandPanel.alias.removed.workspace':
+    "Alias {name} removed from this workspace's .tyto/project.json.",
   'commandPanel.alias.refused.invalid':
     '{name} was not saved: its name or its line is not one an alias may have.',
+  'commandPanel.alias.refused.noFolder':
+    '{name} was not saved: --workspace needs a workspace folder open.',
+  'commandPanel.alias.refused.restricted':
+    '{name} was not saved: this folder is restricted, and its {where} is not written from the panel. Trust it with Workspace: Manage Trust.',
   'commandPanel.alias.refused.syntax':
     '{name} was not saved: {where} does not parse, and is not written over. Fix it first.',
+  'commandPanel.alias.refused.unwritable': '{name} was not saved: {where} could not be written.',
   'commandPanel.alias.ignored':
     'The alias {name} in {where} is ignored: it has the name of a command of the panel or tyto.',
   'commandPanel.alias.unreadable':

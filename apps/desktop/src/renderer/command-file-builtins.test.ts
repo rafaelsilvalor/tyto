@@ -79,7 +79,7 @@ const run = (
     registry: PANEL_BUILTINS,
     files,
     aliases: {
-      list: () => Promise.resolve({ aliases: [] }),
+      list: () => Promise.resolve({ aliases: [], workspace: 'none' }),
       set: () => Promise.resolve({ ok: true }),
       reserved: () => false,
     },

@@ -3410,6 +3410,7 @@ export const IPC_CHANNELS = {
    * The command panel's aliases in force (TYTO-536, ADR 0200 note of 2026-11-15): the person's
    * `commandAliases` with the open folder's `aliases` over them, name by name. A restricted
    * folder's are withheld before they reach this answer, so the window never holds one to run.
+   * `workspace` says whether `alias --workspace` may write there.
    */
   'commands:aliases': channel(
     z.object({}),
@@ -3423,24 +3424,27 @@ export const IPC_CHANNELS = {
           }),
         )
         .max(500),
+      workspace: z.enum(['none', 'trusted', 'restricted']),
     }),
   ),
 
   /**
    * `alias` and `unalias` (TYTO-536): one alias set, or removed with `body: null`, in the
-   * person's `commandAliases` setting. **Main checks it again** by the readers' rules: the
-   * window is not the boundary. `syntax` is a `settings.json` that does not parse.
+   * person's settings or, with `workspace`, in the open folder's own `.tyto/project.json`.
+   * **Main checks it again**: the name and body by the readers' rules, and a workspace write
+   * only into a trusted folder that is open; the window is not the boundary.
    */
   'commands:set-alias': channel(
     z.strictObject({
       name: z.string().min(1).max(200),
       body: z.string().max(1000).nullable(),
+      workspace: z.boolean(),
     }),
     z.discriminatedUnion('ok', [
       z.object({ ok: z.literal(true) }),
       z.object({
         ok: z.literal(false),
-        reason: z.enum(['invalid', 'syntax']),
+        reason: z.enum(['invalid', 'no-folder', 'restricted', 'syntax', 'unwritable']),
       }),
     ]),
   ),
