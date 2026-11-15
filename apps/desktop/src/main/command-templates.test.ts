@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -102,7 +103,6 @@ function runner() {
 async function offered(cwd: string): Promise<string[]> {
   const cli = runner();
   const answer = await commandTemplates((argv, folder) => cli.capture(argv, folder), cwd);
-  expect(answer.note).toBeUndefined();
   return answer.templates.map((row) => row.name);
 }
 
@@ -143,11 +143,25 @@ describe("the panel's --template completion", () => {
   );
 
   it(
-    'offers the plugin file templates once the folder is trusted, each one a render finds',
+    'never fetches a plugin file, and offers its templates once a typed command fetched them',
     async () => {
       const trusted = await runner().capture(['trust', 'add', project], project);
       expect(trusted.code, trusted.err).toBe(0);
       const entregas = join(project, 'entregas');
+      const fetched = join(home, 'cache', 'plugin-files');
+
+      // Trusted but not fetched yet: completion leaves it out, says so, and fetches nothing.
+      const cli = runner();
+      const first = await commandTemplates((argv, folder) => cli.capture(argv, folder), entregas);
+      expect(first.templates.map((row) => row.name)).not.toContain('aviso');
+      expect(first.note).toContain('it has not been fetched yet');
+      expect(existsSync(fetched)).toBe(false);
+
+      // A typed `template list` still fetches, as before.
+      const typed = await runner().capture(['template', 'list', '--json'], entregas);
+      expect(typed.code, typed.err).toBe(0);
+      expect(existsSync(fetched)).toBe(true);
+
       const inEntregas = await offered(entregas);
 
       expect(inEntregas).toEqual(expect.arrayContaining(['cartaz', 'aviso', 'aviso-laranja']));

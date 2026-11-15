@@ -3609,8 +3609,8 @@ describe('commands:templates', () => {
       });
       // The working folder is the run's cwd; without one, the open folder; nothing for the rest.
       expect(fake.asked).toEqual([
-        { argv: ['template', 'list', '--json'], cwd: join(work, 'entregas') },
-        { argv: ['template', 'list', '--json'], cwd: undefined },
+        { argv: ['template', 'list', '--json', '--no-sync'], cwd: join(work, 'entregas') },
+        { argv: ['template', 'list', '--json', '--no-sync'], cwd: undefined },
       ]);
     } finally {
       explorer.close();
@@ -3642,6 +3642,11 @@ describe('commands:templates', () => {
       err: ['', 'E_PROJECT_INVALID: bad project.json', ''].join('\n'),
     });
     const garbled = capturing({ code: 0, out: 'not json', err: '' });
+    const leftOut = capturing({
+      code: 0,
+      out: '{"templates":[]}',
+      err: ['aviso.yaml: it has not been fetched yet', ''].join('\n'),
+    });
     const ask = (cli: ReturnType<typeof capturing>['cli']) =>
       guard(
         'commands:templates',
@@ -3655,6 +3660,11 @@ describe('commands:templates', () => {
     await expect(ask(garbled.cli)).resolves.toEqual({
       templates: [],
       note: 'tyto template list --json printed no listing',
+    });
+    // A listing that worked and left something out says what, once, beside its rows.
+    await expect(ask(leftOut.cli)).resolves.toEqual({
+      templates: [],
+      note: 'aviso.yaml: it has not been fetched yet',
     });
   });
 });

@@ -95,7 +95,7 @@ Um apelido é um nome curto para uma linha que você digita muito. `alias entreg
 Uma lista logo abaixo do prompt mostra o que pode vir em seguida, em qualquer ordem dos blocos:
 
 - os comandos, os do próprio painel entre eles, e depois as opções de cada um; depois de `&&`, os comandos de novo;
-- para `--template`, os templates e aliases que um render na pasta do painel pode usar, como o `templates` os lista: com a `templates/` da própria pasta, e sem os arquivos de plugin de uma pasta restrita;
+- para `--template`, os templates e aliases que um render na pasta do painel pode usar, como o `templates` os lista: com a `templates/` da própria pasta, sem os arquivos de plugin de uma pasta restrita, e sem baixar nada: um arquivo de plugin ainda não baixado aparece depois que um comando digitado o baixa, e o painel diz isso uma vez;
 - para `--formats`, os formatos do template já escolhido, da mesma lista;
 - para `--types`, `png`, `jpeg`, `webp` e `svg`;
 - para `plugin enable`, `disable` e `remove`, os plugins instalados;

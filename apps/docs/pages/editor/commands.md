@@ -95,7 +95,7 @@ An alias is a short name for a line you type often. `alias entrega='render --del
 A list right under the prompt shows what can come next, whichever order the runs are in:
 
 - the commands, the panel's own among them, and then each command's options; after `&&`, the commands again;
-- for `--template`, the templates and aliases a render in the panel's folder can use, as `templates` lists them: the folder's own `templates/` included, and a restricted folder's plugin files left out;
+- for `--template`, the templates and aliases a render in the panel's folder can use, as `templates` lists them: the folder's own `templates/` included, a restricted folder's plugin files left out, and nothing fetched: a plugin file not fetched yet is offered once a typed command fetched it, and the panel says so once;
 - for `--formats`, the formats of the template already chosen, from the same list;
 - for `--types`, `png`, `jpeg`, `webp` and `svg`;
 - for `plugin enable`, `disable` and `remove`, the installed plugins;

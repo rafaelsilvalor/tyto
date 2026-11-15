@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -163,6 +164,31 @@ describe('tyto template list', () => {
       for (const name of names) {
         expect(await renderFinds(name), `${name}: ${stderr()}`).toBe(true);
       }
+    },
+    SLOW,
+  );
+
+  // TYTO-729: what the window's completion asks, so a keystroke never reaches the network.
+  it(
+    'fetches nothing with --no-sync, says what it left out, and lists the copy once one is fetched',
+    async () => {
+      const fetched = join(home, 'cache', 'plugin-files');
+
+      const before = await list('--trust', '--no-sync');
+      expect(before.map((row) => row.name)).not.toContain('aviso');
+      expect(stderr()).toContain(
+        'it has not been fetched yet, and tyto template list --no-sync never fetches',
+      );
+      expect(existsSync(fetched)).toBe(false);
+
+      // The typed listing still fetches, as before.
+      const typed = await list('--trust');
+      expect(typed.map((row) => row.name)).toContain('aviso');
+      expect(existsSync(fetched)).toBe(true);
+
+      // And then the copy on this computer counts without fetching.
+      const after = await list('--trust', '--no-sync');
+      expect(after.map((row) => row.name)).toEqual(typed.map((row) => row.name));
     },
     SLOW,
   );

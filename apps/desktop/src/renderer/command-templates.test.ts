@@ -74,6 +74,23 @@ describe('the command panel templates', () => {
     ]);
   });
 
+  it("says an answer's note once per kept answer, not once per completion", async () => {
+    const said: string[] = [];
+    const fake = ports({
+      ask: () => Promise.resolve({ templates: [], note: 'aviso: it has not been fetched yet' }),
+      note: (text) => said.push(text),
+    });
+    const templates = createPanelTemplates(fake.ports);
+
+    await templates.of(['entregas']);
+    await templates.of(['entregas']);
+    await templates.of(['entregas']);
+    expect(said).toEqual(['aviso: it has not been fetched yet']);
+    templates.forget();
+    await templates.of(['entregas']);
+    expect(said).toHaveLength(2);
+  });
+
   it('offers nothing for a folder that is gone, and keeps no failed ask', async () => {
     let fail = true;
     const fake = ports();

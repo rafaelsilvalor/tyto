@@ -6,7 +6,10 @@ import type { CapturedRun } from './cli-runner.js';
  * list --json` prints in the session's working folder, run through the command runner `cli:run`
  * uses. **Not the window's catalogue**: since TYTO-728 that command lists through the resolver
  * `render`, `recipe run` and `delivery new` use, so a name offered here is one a render in that
- * folder accepts, and the folder's trust decides as it does for a typed line.
+ * folder accepts, and the folder's trust decides as it does for a typed line. **With
+ * `--no-sync`**: a completion never reaches the network, so a plugin file whose copy is not on
+ * this computer yet is not offered until a typed command (`template list`, `render`, `plugin
+ * sync`) fetches it; what the listing says about it on stderr comes back as the `note`.
  *
  * Never throws: a run that fails or prints something that is not the listing answers no rows and
  * a note, so completion goes quiet instead of breaking the prompt.
@@ -15,7 +18,7 @@ import type { CapturedRun } from './cli-runner.js';
 export type CommandTemplates = IpcResponse<'commands:templates'>;
 
 /** The words main runs; never the window's, so no refusal or question applies to them. */
-export const TEMPLATE_LIST_WORDS: readonly string[] = ['template', 'list', '--json'];
+export const TEMPLATE_LIST_WORDS: readonly string[] = ['template', 'list', '--json', '--no-sync'];
 
 const MAX_ROWS = 2000;
 
@@ -31,7 +34,8 @@ export async function commandTemplates(
   if (rows === undefined) {
     return { templates: [], note: 'tyto template list --json printed no listing' };
   }
-  return { templates: rows };
+  const said = firstLine(done.err);
+  return said === '' ? { templates: rows } : { templates: rows, note: said };
 }
 
 function firstLine(text: string): string {

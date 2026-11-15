@@ -663,6 +663,10 @@ const panelTemplates = createPanelTemplates({
   get caseless() {
     return pathsCaseless();
   },
+  // Into the session in front, the one whose prompt asked (TYTO-729).
+  note: (text) => {
+    commandSessions.note(commandSessions.active.id, text);
+  },
 });
 
 /**

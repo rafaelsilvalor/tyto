@@ -53,3 +53,4 @@ promo-curso      built-in   grid-1x1, story
 - Ele lê os templates exatamente como o `tyto render` lê naquela pasta: um nome listado é um que o `template:` de um brief pode usar, e um nome que fica de fora é um que o render recusa.
 - Dê uma pasta para listar o que um render nela usaria: `tyto template list entregas`. `--json` mostra as mesmas linhas como um documento só.
 - Numa [pasta em que você não confiou](../editor/workspace-folder.md#uma-pasta-em-que-voce-ainda-nao-confiou) os arquivos de plugin do projeto ficam de fora, como ficam para um render, e uma linha na saída de erro diz isso. `--trust` confia na pasta só nesta execução.
+- Como um render, ele baixa o template de um arquivo de plugin na primeira vez em que ele falta. `--no-sync` não baixa nada: um arquivo de plugin cuja cópia ainda não está neste computador fica de fora, e uma linha na saída de erro diz qual. A aba Comandos completa o `--template` assim, então digitar nunca chega à rede.

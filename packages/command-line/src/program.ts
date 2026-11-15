@@ -299,6 +299,10 @@ export function createProgram(
       'trust the workspace folder and its work profile for this run only; never written to trust.json',
       false,
     )
+    .option(
+      '--no-sync',
+      'fetch nothing: a plugin file whose copy is not on this computer yet is left out, and said so',
+    )
     .action(async (folder: string) => {
       captured.code = await templateListCommand({ ...templateList.opts(), folder }, environment);
     });

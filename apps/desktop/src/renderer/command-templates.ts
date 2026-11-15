@@ -26,6 +26,11 @@ export interface PanelTemplatesPorts {
   /** The open folder's trust as the window last read it, part of what an answer is kept by. */
   readonly trust: () => string;
   readonly caseless: boolean;
+  /**
+   * Says an answer's `note` in the panel: why a listing failed, or what it left out. Once per
+   * kept answer, never per keystroke, since only an ask that was not kept reaches it.
+   */
+  readonly note?: (text: string) => void;
 }
 
 export interface PanelTemplates {
@@ -47,6 +52,7 @@ export function createPanelTemplates(ports: PanelTemplatesPorts): PanelTemplates
     const folder = steps.length === 0 ? null : await ports.folderOf(steps);
     if (folder === undefined) return [];
     const answer = await ports.ask(folder ?? undefined);
+    if (answer.note !== undefined) ports.note?.(answer.note);
     return answer.templates.map((row) => ({
       name: row.name,
       formats: row.formats,
