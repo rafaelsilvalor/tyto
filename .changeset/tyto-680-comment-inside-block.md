@@ -1,6 +1,7 @@
 ---
 '@tyto/brief-lang': minor
 '@tyto/editor': minor
+'@tyto/desktop': patch
 ---
 
 TYTO-680: a comment line inside an indented block is skipped and the block goes on (ADR 0204).
