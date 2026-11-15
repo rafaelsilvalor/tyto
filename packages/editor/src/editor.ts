@@ -30,6 +30,7 @@ import { activeLine } from './active-line.js';
 import { brief } from './brief-language.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
 import { DEFAULT_TAB_SIZE, indentExtension } from './format-brief.js';
+import { hangingIndent } from './hanging-indent.js';
 import { indentGuides } from './indent-guides.js';
 import { stickyScroll } from './sticky-scroll.js';
 import { remeasureText } from './remeasure.js';
@@ -529,6 +530,8 @@ const baseExtensions = (): Extension[] => [
   // whole of it. Where the line actually breaks in the artwork is the IR's answer, not
   // this one (ADR 0016).
   EditorView.lineWrapping,
+  // An indented line keeps its indent on every row it wraps to (TYTO-707).
+  hangingIndent(),
   // Tab indents and Shift+Tab outdents (TYTO-183). CodeMirror binds nothing to Tab on
   // purpose, so a keyboard user can leave the editor with it; binding it takes that away,
   // and CodeMirror's own way back is Escape then Tab, which moves focus on.

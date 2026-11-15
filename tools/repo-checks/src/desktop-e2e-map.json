@@ -693,6 +693,14 @@
       "why": "reviewed: when a .recipe tab runs and the line under each cell (TYTO-377), where Add step writes and which columns its form offers (TYTO-402), and which step of a chained line Edit step and a result tab act on (TYTO-711); the logic is in recipe-notebook.test.ts, and the real window draws the lines and the tables and opens the form"
     },
     {
+      "paths": [
+        "packages/editor/src/hanging-indent.ts",
+        "apps/desktop/e2e/hanging-indent.desktop.test.ts"
+      ],
+      "e2e": ["hanging-indent.desktop.test.ts", "indent-guides.desktop.test.ts"],
+      "why": "reviewed: a wrapped indented line keeps its indent on every row (TYTO-707); the decoration's width is hanging-indent.test.ts's, and only the real window lays out where the continuation rows and the indent guides land"
+    },
+    {
       "paths": ["apps/desktop/e2e/recipe-chained-step.desktop.test.ts"],
       "e2e": ["recipe-chained-step.desktop.test.ts"],
       "why": "reviewed: Edit step on a line that chains steps with | opens the step under the caret (TYTO-711, ADR 0196 note of 2026-11-14); which step an offset picks is recipe-notebook.test.ts's, and only the real window carries the caret to the command and opens the form"
