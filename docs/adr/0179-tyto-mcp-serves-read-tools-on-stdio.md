@@ -148,3 +148,21 @@ rule; ADR 0185 decides what they may write, where, and how a change is shown fir
 The prompts and resources of decision 2 land as `model_brief` and two resources per template,
 its `guide.md` and its example briefs; ADR 0186 decides where they come from and why a
 restricted folder's own template serves neither.
+
+## Amendment — 2026-11-15, TYTO-731
+
+`list_templates` lists what `tyto template list` lists (TYTO-728): its rows are that command's
+(`listedTemplates`), read from the same `templatesInReach` steps the session resolves through
+(TYTO-730). Fields are added and none is renamed or removed:
+
+- **An alias is a row of its own**, under the name a brief writes, with `aliasOf` naming the
+  template it reaches; its `version` and `description` are that template's. Every row also says
+  its `origin` (`workspace`, `built-in` or `plugin`) and, for a plugin's, the `plugin`.
+- **`formats` is corrected, not reshaped.** It is what a render accepts under that name, so a
+  configuration that restricts its formats (ADR 0155) narrows it, on an alias's row and on the
+  template's own when the restricting configuration is the template's `default`. Before, a
+  template's row listed the manifest's formats, and an agent could choose one a render then
+  refused.
+- The guide and example resources (ADR 0186) stay one per template: an alias serves its
+  template's, under the template's name. The `model_brief` prompt that asks an agent to choose
+  lists an alias as `alias → template`.

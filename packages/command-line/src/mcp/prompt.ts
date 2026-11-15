@@ -100,7 +100,7 @@ export function chooseTemplatePrompt(copy: string, templates: readonly TemplateS
       ? ['No template is available in this folder.']
       : templates.map(
           (template) =>
-            `- ${template.name}${template.description === undefined ? '' : ` — ${template.description}`} (formats: ${template.formats.join(', ')})`,
+            `- ${template.name}${template.aliasOf === undefined ? '' : ` → ${template.aliasOf}`}${template.description === undefined ? '' : ` — ${template.description}`} (formats: ${template.formats.join(', ')})`,
         )),
     '',
     '## Next',

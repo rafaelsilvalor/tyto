@@ -163,8 +163,23 @@ describe('the model_brief prompt', () => {
 
   it('lists the templates to choose from when none is named', () => {
     const text = chooseTemplatePrompt('copy', [
-      { name: 'sample', version: '1.0.0', description: 'A sample.', formats: ['feed'] },
+      {
+        name: 'sample',
+        version: '1.0.0',
+        description: 'A sample.',
+        formats: ['feed'],
+        origin: 'workspace',
+      },
+      {
+        name: 'sample-short',
+        version: '1.0.0',
+        description: 'A sample.',
+        formats: ['feed'],
+        origin: 'workspace',
+        aliasOf: 'sample',
+      },
     ]);
     expect(text).toContain('- sample — A sample. (formats: feed)');
+    expect(text).toContain('- sample-short → sample — A sample. (formats: feed)');
   });
 });

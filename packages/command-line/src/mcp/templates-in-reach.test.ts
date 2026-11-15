@@ -3,6 +3,7 @@ import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { PassThrough } from 'node:stream';
 import { promisify } from 'node:util';
 
 import type * as Io from '@tyto/io';
@@ -16,6 +17,7 @@ import { run } from '../program.js';
 import type { ListedTemplate } from '../template-list.js';
 import manifestSource from '../__fixtures__/cartaz.manifest.yaml?raw';
 import templateMarkup from '../__fixtures__/cartaz.html?raw';
+import { chooseTemplatePrompt } from './prompt.js';
 import { type McpSession, openSession } from './session.js';
 
 /**
@@ -136,6 +138,56 @@ async function session(): Promise<McpSession> {
   return opened;
 }
 
+const nameOf = (row: { readonly name: string }): string => row.name;
+
+interface Answer {
+  readonly id?: number;
+  readonly result?: unknown;
+}
+
+/** Runs `tyto mcp` over in-memory stdio, asks each request in turn and returns the answers. */
+async function overStdio(
+  requests: readonly { readonly method: string; readonly params?: object }[],
+): Promise<unknown[]> {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const waiting = new Map<number, (answer: Answer) => void>();
+  let written = '';
+  output.on('data', (chunk: Buffer) => {
+    written += chunk.toString('utf8');
+    let end: number;
+    while ((end = written.indexOf('\n')) >= 0) {
+      const answer = JSON.parse(written.slice(0, end)) as Answer;
+      written = written.slice(end + 1);
+      if (answer.id !== undefined) waiting.get(answer.id)?.(answer);
+    }
+  });
+  const exit = run(['mcp'], { ...environment(), stdio: () => ({ input, output }) });
+  let next = 1;
+  const ask = (method: string, params: object = {}): Promise<Answer> => {
+    const id = next++;
+    const answered = new Promise<Answer>((settle) => waiting.set(id, settle));
+    input.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    return answered;
+  };
+  await ask('initialize', {
+    protocolVersion: '2025-06-18',
+    capabilities: {},
+    clientInfo: { name: 'test', version: '1' },
+  });
+  input.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
+  const results: unknown[] = [];
+  for (const request of requests) results.push((await ask(request.method, request.params)).result);
+  input.end();
+  expect(await exit, stderr()).toBe(EXIT_OK);
+  return results;
+}
+
+/** The names `list_templates` answers, in the order it answers them. */
+async function namesOf(opened: McpSession): Promise<string[]> {
+  return (await opened.listTemplates()).map(nameOf);
+}
+
 /** Whether the session's check of a brief naming `template` found it. */
 async function accepts(opened: McpSession, template: string): Promise<boolean> {
   const answer = await opened.checkBrief({ text: `---\ntemplate: ${template}\n---\n` });
@@ -173,14 +225,8 @@ describe('tyto mcp and tyto template list', () => {
       // The control: a name nobody has is refused, so the comparison can fail.
       expect(refused).toEqual(['nenhum']);
 
-      // The tool's own list is the templates, aliases being rows only of the terminal's.
-      const templates = (await opened.listTemplates()).map((row) => row.name).sort();
-      expect(templates).toEqual(
-        rows
-          .filter((row) => row.aliasOf === undefined)
-          .map((row) => row.name)
-          .sort(),
-      );
+      // The tool lists what the terminal lists, aliases included (TYTO-731).
+      expect(await namesOf(opened)).toEqual(rows.map(nameOf));
     },
     SLOW,
   );
@@ -204,6 +250,76 @@ describe('tyto mcp and tyto template list', () => {
       expect(accepted).toEqual([...names].sort());
       expect(refused).toEqual(leftOut);
       expect(stderr()).toMatch(/plugin-files was not loaded: this folder is restricted/u);
+
+      // The tool lists the same names the terminal does, the left-out aliases absent from both.
+      const offered = await namesOf(opened);
+      expect(offered).toEqual(rows.map(nameOf));
+      expect(offered.filter((offeredName) => leftOut.includes(offeredName))).toEqual([]);
+    },
+    SLOW,
+  );
+
+  it(
+    'list an alias with the template it reaches, and the formats a configuration allows',
+    async () => {
+      // `laranja` is `aviso`'s default and allows the story only, so `aviso` itself narrows too.
+      await writeFile(
+        join(project, '.tyto', 'plugin-files', 'aviso.yaml'),
+        [
+          'version: 1',
+          'templates:',
+          '  aviso:',
+          `    source: { git: '${pathToFileURL(join(scratch, 'repositories', 'pack')).href}', ref: main }`,
+          '    default: laranja',
+          '    configurations:',
+          '      laranja:',
+          '        formats: [story]',
+          '        values:',
+          "          paper: '#ffffff'",
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      await trust();
+      const rows = await listed();
+      const opened = await session();
+      const answered = await opened.listTemplates();
+      const byName = new Map(answered.map((row) => [row.name, row]));
+
+      for (const row of rows) {
+        expect(byName.get(row.name), row.name).toMatchObject({
+          name: row.name,
+          origin: row.origin,
+          formats: row.formats,
+          ...(row.plugin === undefined ? {} : { plugin: row.plugin }),
+          ...(row.aliasOf === undefined ? {} : { aliasOf: row.aliasOf }),
+        });
+      }
+      // The control: the manifest offers two formats, the configuration one.
+      expect(byName.get('aviso')?.formats).toEqual(['story']);
+      expect(byName.get('aviso-laranja')).toMatchObject({
+        aliasOf: 'aviso',
+        formats: ['story'],
+        version: byName.get('aviso')?.version,
+      });
+      expect(byName.get('cartaz')?.aliasOf).toBeUndefined();
+
+      // The prompt that asks an agent to choose names the alias with the template it reaches.
+      const prompt = chooseTemplatePrompt('copy', answered);
+      expect(prompt).toMatch(/^- aviso-laranja → aviso( — .*)? \(formats: story\)$/mu);
+      expect(prompt).toMatch(/^- aviso( — .*)? \(formats: story\)$/mu);
+
+      // Through the protocol: the tool answers the alias, and its template's examples are
+      // served once, under the template's name, never again under the alias's.
+      const [tool, resources] = (await overStdio([
+        { method: 'tools/call', params: { name: 'list_templates', arguments: {} } },
+        { method: 'resources/list' },
+      ])) as [{ content: { text: string }[] }, { resources: { uri: string }[] }];
+      const toolRows = JSON.parse(tool.content[0]?.text ?? '[]') as { name: string }[];
+      expect(toolRows.map(nameOf)).toEqual(rows.map(nameOf));
+      const uris = resources.resources.map((resource) => resource.uri);
+      expect(uris.some((uri) => uri.startsWith('tyto://template/aviso/'))).toBe(true);
+      expect(uris.length).toBe(new Set(uris).size);
     },
     SLOW,
   );

@@ -115,7 +115,7 @@ export function createMcpServer(
       {
         title: 'List templates',
         description:
-          "Every template a brief in this folder can name: the project's, the built-in pack and installed plugins'. Name, version, description and format ids.",
+          "Every template a brief in this folder can name: the project's, the built-in pack and installed plugins', and the aliases plugin files give them. Name, version, description, format ids and origin; an alias's row names the template it reaches in aliasOf.",
         annotations: readOnly,
       },
       () => answering(err, async () => ({ content: [text(await session.listTemplates())] })),
@@ -230,7 +230,10 @@ function registerGuidance(server: McpServer, session: McpSession): void {
   };
 
   async function served(): Promise<readonly Awaited<ReturnType<McpSession['templateGuidance']>>[]> {
-    const templates = await session.listTemplates();
+    // An alias's guide is its template's: listing it again would serve one resource twice.
+    const templates = (await session.listTemplates()).filter(
+      (template) => template.aliasOf === undefined,
+    );
     return Promise.all(templates.map((template) => session.templateGuidance(template.name)));
   }
 
