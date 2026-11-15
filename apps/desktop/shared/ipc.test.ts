@@ -32,6 +32,8 @@ describe('the IPC contract', () => {
       'cli:cancel',
       'cli:commands',
       'cli:open-diagnostic',
+      // TYTO-726: the recipe a refused --apply offered, opened by its run.
+      'cli:open-recipe',
       'cli:run',
       'credentials:delete',
       // TYTO-649: a key file stored from the plugins screen; main picks and reads it.
@@ -237,6 +239,7 @@ describe('the event table', () => {
       // TYTO-495, ADR 0159: what a command prints, and where its run stands.
       'cli:diagnostics',
       'cli:output',
+      'cli:recipe-offered',
       'cli:state',
       'command:run',
       // TYTO-279. The open folder changed on disk; the explorer lists again.

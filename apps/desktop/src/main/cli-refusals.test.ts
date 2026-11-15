@@ -22,12 +22,18 @@ const invocation = (
   options: Record<string, unknown> = {},
 ): CommandInvocation => ({ path, args, options });
 
-function refusals(overrides: Partial<WindowRefusalOptions> = {}) {
+function offers(overrides: Partial<WindowRefusalOptions> = {}) {
   return windowRefusals({
     platform: 'win32',
     queue: () => Promise.resolve({ folder: 'C:\\Fila', autoRun: true }),
     ...overrides,
   });
+}
+
+/** The sentence alone, which is what each rule refuses with; the offers are tested below. */
+function refusals(overrides: Partial<WindowRefusalOptions> = {}) {
+  const refuse = offers(overrides);
+  return async (each: CommandInvocation, cwd: string) => (await refuse(each, cwd))?.message;
 }
 
 describe('--trust', () => {
@@ -212,5 +218,77 @@ describe('recipe run --apply through the command line parser', () => {
     expect(asked).toEqual([]);
     expect(code).toBe(1);
     expect(err).toContain('unknown option');
+  });
+});
+
+/**
+ * TYTO-726: which refusals carry an offer, and what each names. The box and the yes are
+ * `cli-offers.test.ts`; here, only when there is something the window can do instead.
+ */
+describe('the offer a refusal carries', () => {
+  const windowed = (overrides: Partial<WindowRefusalOptions> = {}) =>
+    offers({
+      openFolder: () => 'C:\\work',
+      signins: (plugin) => Promise.resolve(plugin === 'google' ? ['drive'] : ['a', 'b']),
+      ...overrides,
+    });
+
+  it('offers to trust the open folder, and nothing with no folder open', async () => {
+    expect(
+      await windowed()(invocation(['render'], ['a.brief'], { trust: true }), 'C:\\work'),
+    ).toEqual({ message: TRUST_REFUSED, offer: { kind: 'trust', folder: 'C:\\work' } });
+    expect(
+      await windowed({ openFolder: () => null })(
+        invocation(['render'], ['a.brief'], { trust: true }),
+        'C:\\home',
+      ),
+    ).toEqual({ message: TRUST_REFUSED });
+  });
+
+  it("offers a plugin's only sign-in, or the one named, and nothing it does not declare", async () => {
+    const refuse = windowed();
+
+    expect(await refuse(invocation(['signin'], ['google']), 'C:\\w')).toMatchObject({
+      offer: { kind: 'signin', plugin: 'google', id: 'drive', out: false },
+    });
+    expect(await refuse(invocation(['signout'], ['google', 'drive']), 'C:\\w')).toMatchObject({
+      offer: { kind: 'signin', plugin: 'google', id: 'drive', out: true },
+    });
+    // Two sign-ins and none named, an id it does not declare, and --client: the sentence only.
+    expect(await refuse(invocation(['signin'], ['other']), 'C:\\w')).toEqual({
+      message: SIGNIN_REFUSED,
+    });
+    expect(await refuse(invocation(['signin'], ['google', 'mail']), 'C:\\w')).toEqual({
+      message: SIGNIN_REFUSED,
+    });
+    expect(await refuse(invocation(['signin'], ['google'], { client: true }), 'C:\\w')).toEqual({
+      message: SIGNIN_REFUSED,
+    });
+  });
+
+  it("offers the recipe's notebook, by the path the panel resolves", async () => {
+    expect(
+      await windowed()(
+        invocation(['recipe', 'run'], ['flows\\weekly.recipe'], { apply: true }),
+        'C:\\work',
+      ),
+    ).toEqual({
+      message: APPLY_REFUSED,
+      offer: { kind: 'apply', recipe: 'C:\\work\\flows\\weekly.recipe' },
+    });
+  });
+
+  it("offers to turn the queue's auto-run off, naming the queue's folder", async () => {
+    expect(await windowed()(invocation(['watch'], ['c:\\fila']), 'C:\\w')).toEqual({
+      message: WATCH_REFUSED,
+      offer: { kind: 'watch', folder: 'C:\\Fila' },
+    });
+  });
+
+  it('offers nothing for mcp, and sets no origin until aliases exist', async () => {
+    const refusal = await windowed()(invocation(['mcp']), 'C:\\w');
+
+    expect(refusal).toEqual({ message: MCP_REFUSED });
+    expect(refusal?.origin).toBeUndefined();
   });
 });

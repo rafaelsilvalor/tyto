@@ -6979,6 +6979,14 @@ async function load(): Promise<void> {
     bridge.on('cli:state', (pushed) => {
       commandSessions.state(pushed);
     });
+    // A yes in a refused `recipe run --apply`'s box (TYTO-726): main kept the recipe for the
+    // run, and the window opens it as a tab, as it opens a command's Problems row.
+    bridge.on('cli:recipe-offered', (pushed) => {
+      const wanted = nextDocumentId();
+      void bridge['cli:open-recipe']({ documentId: wanted, runId: pushed.runId }).then((opened) => {
+        adopt(opened.document, opened.documentId, wanted);
+      });
+    });
     // What a terminal's shell printed and its end, into its screen (TYTO-497, ADR 0164).
     bridge.on('terminal:output', (pushed) => {
       terminalSessions.output(pushed.terminalId, pushed.data);

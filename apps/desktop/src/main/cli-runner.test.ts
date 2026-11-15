@@ -254,6 +254,29 @@ describe('a question a command asks', () => {
   });
 });
 
+describe('stopping every run', () => {
+  // TYTO-726: the trust a refusal's box grants re-reads the folder, which stops every run.
+  it('spares the run named, and stops the others', async () => {
+    const release: (() => void)[] = [];
+    const { cli, recorded } = runner(
+      () =>
+        new Promise<ExitCode>((done) => {
+          release.push(() => done(0));
+        }),
+    );
+
+    const first = cli.start(['render', 'a']).runId;
+    const second = cli.start(['render', 'b', '--trust']).runId;
+    await settled();
+    cli.cancelAll(second);
+
+    expect(recorded.states.filter((change) => change.state === 'cancelled')).toEqual([
+      { runId: first, state: 'cancelled' },
+    ]);
+    for (const done of release) done();
+  });
+});
+
 describe('a refusal', () => {
   it("is asked with the run's cwd", async () => {
     const asked: string[] = [];
@@ -268,6 +291,31 @@ describe('a refusal', () => {
     await settled();
 
     expect(asked).toEqual(['/work']);
+  });
+
+  // TYTO-726: an offer's box is the run waiting on a question, as a confirm's box is.
+  it('shows its box as the run waiting, with the run it belongs to', async () => {
+    const runs: string[] = [];
+    const { cli, recorded } = runner(() => Promise.resolve(0), {
+      refuse: async (_invocation, _cwd, run) => {
+        runs.push(run.runId);
+        await run.waiting('Trust the folder /work and run the command?', () =>
+          Promise.resolve(false),
+        );
+        return undefined;
+      },
+    });
+
+    const { runId } = cli.start(['render', 'x', '--trust']);
+    await settled();
+
+    expect(runs).toEqual([runId]);
+    expect(recorded.states).toEqual([
+      { runId, state: 'running' },
+      { runId, state: 'waiting', question: 'Trust the folder /work and run the command?' },
+      { runId, state: 'running' },
+      { runId, state: 'finished', code: 0 },
+    ]);
   });
 });
 

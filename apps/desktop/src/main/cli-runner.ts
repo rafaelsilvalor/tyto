@@ -7,6 +7,7 @@ import {
   EXIT_INTERNAL,
   type ExitCode,
   type LocatedDiagnostic,
+  type RefuseAnswer,
   commandTree,
   run as runCommand,
 } from '@tyto/command-line';
@@ -40,14 +41,27 @@ export interface CliStateChange {
   readonly question?: string;
 }
 
+/** The run a refusal is asked for: its id, and the panel's waiting state around a box. */
+export interface RefusalRun {
+  readonly runId: string;
+  waiting<T>(question: string, during: () => Promise<T>): Promise<T>;
+}
+
 /** What a run's environment holds that the runner does not supply itself. */
 export type CliBaseEnvironment = Omit<CliEnvironment, 'console' | 'confirm' | 'refuse'>;
 
 export interface CliRunnerOptions {
   /** A fresh base for each run, so a run started after Open Folder sees the new folder. */
   readonly environment: () => CliBaseEnvironment;
-  /** The window's refusals (`cli-refusals.ts`), asked with the run's `cwd`. */
-  readonly refuse: (invocation: CommandInvocation, cwd: string) => Promise<string | undefined>;
+  /**
+   * The window's refusals (`cli-refusals.ts`), asked with the run's `cwd`. `run` lets a refusal
+   * that offers the window's own way (TYTO-726) show its box as the run waiting on a question.
+   */
+  readonly refuse: (
+    invocation: CommandInvocation,
+    cwd: string,
+    run: RefusalRun,
+  ) => Promise<RefuseAnswer>;
   /** A native yes-or-no box, no being the default and what Escape answers. */
   readonly confirm: (question: string) => Promise<boolean>;
   readonly output: (output: CliOutput) => void;
@@ -94,8 +108,12 @@ export interface CliRunner {
   start(argv: readonly string[]): { readonly runId: string };
   /** Fires the run's signal. Unknown or finished ids are ignored: Stop raced the end. */
   cancel(runId: string): void;
-  /** Every running command, stopped: the app quits or the window opens another folder. */
-  cancelAll(): void;
+  /**
+   * Every running command, stopped: the app quits or the window opens another folder. `except`
+   * spares the run whose own box trusted the folder (TYTO-726): the re-read that trust causes
+   * would otherwise stop the very command it was granted for.
+   */
+  cancelAll(except?: string): void;
   commands(): CommandDescription;
   /** The file a run's Problems row names, while the run is one of the last {@link KEPT_RUNS}. */
   diagnosticPath(runId: string, index: number): string | undefined;
@@ -162,7 +180,17 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
         },
         refuse: (invocation) => {
           entry.path = invocation.path;
-          return options.refuse(invocation, base.cwd);
+          return options.refuse(invocation, base.cwd, {
+            runId,
+            waiting: async (question, during) => {
+              options.state({ runId, state: 'waiting', question });
+              try {
+                return await during();
+              } finally {
+                if (!controller.signal.aborted) options.state({ runId, state: 'running' });
+              }
+            },
+          });
         },
         diagnostics: (items: readonly LocatedDiagnostic[]) => {
           const report = options.diagnostics;
@@ -216,8 +244,8 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
       return { runId };
     },
     cancel,
-    cancelAll() {
-      for (const runId of [...running.keys()]) cancel(runId);
+    cancelAll(except) {
+      for (const runId of [...running.keys()]) if (runId !== except) cancel(runId);
     },
     commands: () => commandTree({ ...options.environment(), console: { out() {}, err() {} } }),
     diagnosticPath: (runId, index) => paths.get(runId)?.[index],

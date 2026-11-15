@@ -99,8 +99,14 @@ export interface CliEnvironment {
    * on the auto-run queue's folder and `recipe run --apply` (ADR 0159 decision 2 and its notes),
    * and those rules are the window's, so they live in `apps/desktop` and not here. An npm install on Windows is refused where the shell
    * would start instead (`shellRefusal`), so no command has to be named for it.
+   *
+   * Two other answers let the window settle a refusal its own way (TYTO-726, ADR 0159 note of
+   * 2026-11-15): `{ without }` runs the command with those options cleared, after the window
+   * did what they asked through its own control, and `{ handled }` prints the sentence and exits
+   * 0 without running the command, because the window already did the job. A terminal passes no
+   * hook, so neither exists there.
    */
-  readonly refuse?: (invocation: CommandInvocation) => Promise<string | undefined>;
+  readonly refuse?: (invocation: CommandInvocation) => Promise<RefuseAnswer>;
   /**
    * Set when this run may not start a shell (ADR 0159 decision 8): the sentence a step that would
    * start one fails with, at that step, before the shell exists. The CLI's one shell is `npm` on
@@ -157,6 +163,21 @@ export interface CliStdio {
 }
 
 /** A command about to run: `['plugin', 'install']`, its arguments and its parsed options. */
+/**
+ * The options a refusal may clear before the command runs (TYTO-726). Only booleans, and only
+ * these: a hook that could clear any option could reshape a command line the person never saw.
+ * `--trust` is the one today, cleared once the window trusted the folder through Workspace: Trust.
+ */
+export const CLEARABLE_OPTIONS = ['trust'] as const;
+export type ClearableOption = (typeof CLEARABLE_OPTIONS)[number];
+
+/** What `refuse` answers: nothing to say, a refusal, options to clear, or a job already done. */
+export type RefuseAnswer =
+  | string
+  | undefined
+  | { readonly without: readonly ClearableOption[] }
+  | { readonly handled: string };
+
 export interface CommandInvocation {
   readonly path: readonly string[];
   readonly args: readonly string[];

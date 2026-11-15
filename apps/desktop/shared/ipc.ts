@@ -3323,6 +3323,16 @@ export const IPC_CHANNELS = {
   'cli:commands': channel(z.object({}), z.object({ tree: commandDescription })),
 
   /**
+   * Opens the recipe a refused `recipe run --apply` offered to open in its notebook (TYTO-726),
+   * **by the run, never by a path**: main kept the recipe when the person said yes in its box,
+   * and answers it once. A run with no recipe kept answers no document.
+   */
+  'cli:open-recipe': channel(
+    z.strictObject({ documentId, runId: z.string().min(1) }),
+    z.object({ document: openDocument.nullable(), documentId: documentId.nullable() }),
+  ),
+
+  /**
    * Opens the file a command's Problems row names (ADR 0159 decision 7), **by the run and the
    * row, never by a path**: main kept the path when the run reported it, and the window never
    * names a file for main to read (ADR 0113). A row whose file no tab opens, or whose run has
@@ -3446,6 +3456,12 @@ export const IPC_EVENTS = {
       )
       .max(500),
   }),
+
+  /**
+   * A yes in a refused `recipe run --apply`'s box (TYTO-726): the window asks `cli:open-recipe`
+   * for the run, as it asks `agent:open` after `agent:act`. The run's id and nothing else.
+   */
+  'cli:recipe-offered': z.object({ runId: z.string().min(1) }),
 
   'cli:state': z.object({
     runId: z.string().min(1),

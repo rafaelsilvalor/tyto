@@ -73,11 +73,13 @@ export const isBusy = (session: CommandSession): boolean =>
 
 /**
  * Whether the window asks for the open folder again after this run: a `trust` command that
- * finished. Main re-reads the folder's trust when the command changes it (ADR 0159 decision 3)
- * but tells the window nothing, so the banner and Manage Trust would show the old answer.
+ * finished, or a line with `--trust`, whose box may have trusted the open folder (TYTO-726).
+ * Main re-reads the folder's trust when either changes it (ADR 0159 decision 3) but tells the
+ * window nothing, so the banner and Manage Trust would show the old answer.
  */
 export const refreshesWorkspace = (session: CommandSession): boolean =>
-  session.state === 'finished' && session.words?.[0] === 'trust';
+  session.state === 'finished' &&
+  (session.words?.[0] === 'trust' || session.words?.includes('--trust') === true);
 
 /** Events for a run whose id `cli:run` has not answered yet are kept for this many runs. */
 const EARLY_RUNS = 20;

@@ -58,6 +58,28 @@ export const ptBR: Catalogue = {
   'pluginFiles.approve.skip': 'Agora não',
   'cli.confirm.yes': 'Sim',
   'cli.confirm.no': 'Não',
+  'cli.offer.trust.message': 'Confiar na pasta {folder} e rodar o comando?',
+  'cli.offer.trust.detail':
+    '--trust confia numa pasta só por uma execução, e a janela não tem essa confiança. Confiar aqui grava a pasta no trust.json, como Pasta de trabalho: gerenciar confiança faz: ela continua confiável em toda execução e janela até você retirar a confiança em Pasta de trabalho: gerenciar confiança ou com tyto trust remove. O comando então roda sem --trust.',
+  'cli.offer.trust.yes': 'Confiar e rodar',
+  'cli.offer.signin.message': 'Entrar em {plugin} ({id}) pela janela?',
+  'cli.offer.signin.detail':
+    'A janela entra como a tela de plugins faz, no seu navegador, e guarda o login junto com os da janela. O tyto signin de um terminal guarda outro, separado, no chaveiro do sistema, e esse não é tocado.',
+  'cli.offer.signin.yes': 'Entrar',
+  'cli.offer.signout.message': 'Sair de {plugin} ({id}) na janela?',
+  'cli.offer.signout.detail':
+    'A janela esquece o próprio login, como o Sair da tela de plugins faz. O login de um terminal no chaveiro do sistema não é tocado.',
+  'cli.offer.signout.yes': 'Sair',
+  'cli.offer.apply.message': 'Abrir {recipe} no caderno?',
+  'cli.offer.apply.detail':
+    'A aba de comandos só planeja. O caderno mostra o plano de cada passo e aplica quando você clica em Aplicar, sob a confiança da pasta e os logins da janela. Abrir não aplica nada.',
+  'cli.offer.apply.yes': 'Abrir o caderno',
+  'cli.offer.watch.message':
+    'Desligar o Renderizar automaticamente do painel da fila e vigiar {folder} aqui?',
+  'cli.offer.watch.detail':
+    'Uma pasta de fila tem um consumidor só. O Renderizar automaticamente fica desligado até você ligá-lo de novo no painel da fila; os arquivos que já estão na fila ficam onde estão.',
+  'cli.offer.watch.yes': 'Desligar e vigiar',
+  'cli.offer.no': 'Cancelar',
   'terminal.quit.message': 'Ainda há um programa rodando em {terminals}. Sair e encerrá-lo?',
   'terminal.quit.quit': 'Sair',
   'terminal.quit.stay': 'Continuar',

@@ -7,9 +7,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { commandTree } from './commands.js';
 import type { CliEnvironment, CommandInvocation } from './environment.js';
-import { EXIT_DIAGNOSTICS, EXIT_OK } from './exit.js';
+import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK } from './exit.js';
 import { fetchPlugin } from './plugins/fetch.js';
-import { run } from './program.js';
+import { clearOptions, run } from './program.js';
+import { Command } from 'commander';
 
 import briefSource from './__fixtures__/cartaz.brief?raw';
 import formatsSource from './__fixtures__/formats.yaml?raw';
@@ -178,6 +179,87 @@ describe("the environment's refusal", () => {
     );
 
     expect(code, stderr()).toBe(EXIT_OK);
+  });
+});
+
+/**
+ * TYTO-726: the window may settle a refusal its own way. `{ handled }` ends the run as done
+ * without the command; `{ without }` clears an allow-listed boolean before the action runs.
+ */
+describe("the environment's other answers", () => {
+  const render = ['render', 'task/brief.brief', '--out', 'task/out', '--types', 'svg', '--trust'];
+
+  it('prints a handled sentence and exits 0 without running the command', async () => {
+    const code = await run(
+      render,
+      environment({ refuse: () => Promise.resolve({ handled: 'Signed in from the window.' }) }),
+    );
+
+    expect(code).toBe(EXIT_OK);
+    expect(out.join('')).toBe('Signed in from the window.\n');
+    expect(stderr()).toBe('');
+    await expect(readdir(join(workspace, 'task', 'out'))).rejects.toThrow();
+  });
+
+  it('runs the command once an allow-listed option is cleared', async () => {
+    const code = await run(
+      render,
+      environment({ refuse: () => Promise.resolve({ without: ['trust'] }) }),
+    );
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await readdir(join(workspace, 'task', 'out'))).not.toHaveLength(0);
+  });
+
+  it('fails, and runs nothing, when asked to clear an option outside the allow-list', async () => {
+    const code = await run(
+      render,
+      environment({
+        // A hook bug the types would catch, cast so the runtime guard is what is tested.
+        // `--folder` is a boolean `render` declares, so only the allow-list stands in the way.
+        refuse: () => Promise.resolve({ without: ['folder'] as unknown as readonly ['trust'] }),
+      }),
+    );
+
+    expect(code).toBe(EXIT_INTERNAL);
+    expect(stderr()).toContain("refuse asked to clear 'folder'");
+    await expect(readdir(join(workspace, 'task', 'out'))).rejects.toThrow();
+  });
+
+  it('fails when the command does not declare the option it is asked to clear', async () => {
+    const code = await run(
+      ['plugin', 'list'],
+      environment({ refuse: () => Promise.resolve({ without: ['trust'] }) }),
+    );
+
+    expect(code).toBe(EXIT_INTERNAL);
+    expect(stderr()).toContain("refuse asked to clear 'trust'");
+  });
+
+  it('runs --trust as typed in a terminal, which passes no hook', async () => {
+    const code = await run(render, environment());
+
+    expect(code, stderr()).toBe(EXIT_OK);
+    expect(await readdir(join(workspace, 'task', 'out'))).not.toHaveLength(0);
+  });
+});
+
+describe('clearOptions', () => {
+  it('hands the action the cleared value, whatever was typed', async () => {
+    const seen: unknown[] = [];
+    const command = new Command('render')
+      .exitOverride()
+      .option('--trust', 'trust', false)
+      .action(function (this: Command) {
+        seen.push(this.opts()['trust']);
+      });
+    command.hook('preAction', (_root, each) => {
+      clearOptions(each, ['trust']);
+    });
+
+    await command.parseAsync(['--trust'], { from: 'user' });
+
+    expect(seen).toEqual([false]);
   });
 });
 

@@ -16,8 +16,11 @@ export type {
   CliSigninSecrets,
   CliRasterizer,
   CliStdio,
+  ClearableOption,
   CommandInvocation,
+  RefuseAnswer,
 } from './environment.js';
+export { CLEARABLE_OPTIONS } from './environment.js';
 export { EXIT_CODES, EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
 export type { LocatedDiagnostic } from './report.js';
 export {

@@ -397,3 +397,36 @@ the panel now reads a line itself before it calls `cli:run`: `&&` between steps,
 history entry, and `*` and `?` expanded inside the workspace through the explorer's listings. It
 also runs a fixed set of built-ins (`clear`, `history`, `help`, `exit`, `last`) from a registry in
 the renderer. `|`, `>`, `;` and `$VAR` still mean nothing.
+
+## Note of 2026-11-15 — a refusal offers the window's own way, in one box (TYTO-726)
+
+The maintainer asked for "a kind of sudo" for the refused commands. There is still no "allow
+anyway": an override would be the only guard once an alias can hold a refused flag (TYTO-536).
+Instead each refusal with a window equivalent offers it in a native box from main (decision 4)
+that names what it acts on, with no as the default and what Escape answers. A yes runs the
+function the window's own control runs; the box adds no privileged path.
+
+| Refused                       | The box offers                                | A yes runs                                                        | Then the command                      |
+| ----------------------------- | --------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------- |
+| `--trust`, with a folder open | trust the open folder, saved in `trust.json`  | the function behind `workspace:trust`                             | runs as typed, without `--trust`      |
+| `signin` / `signout`, one id  | the plugins screen's sign-in or sign-out      | the functions behind `signin:start` / `signin:out`                | does not run; exit 0                  |
+| `recipe run --apply`          | open the recipe's notebook                    | opens the file as a tab (`cli:recipe-offered`, `cli:open-recipe`) | does not run; exit 0, nothing applied |
+| `watch` on the auto-run queue | turn Render automatically off and watch there | the two calls behind `queue:set-auto-run`                         | runs as typed                         |
+| `mcp`, npm install on Windows | nothing                                       | nothing                                                           | refused                               |
+
+Two yeses are stronger than what was typed, and their boxes say so: `--trust` lasted one run and
+was never written, while the window's trust is saved until Manage Trust or `tyto trust remove`
+takes it back; and Render automatically stays off until the queue panel turns it on again.
+
+`--apply` keeps the note of 2026-11-12: the box opens the notebook rather than applying, so Apply
+in the notebook stays the window's one way to apply, under its trust and credential rules.
+
+`@tyto/command-line`'s `environment.refuse` gains two answers besides a sentence: `{ without }`
+clears boolean options before the action, only those in `CLEARABLE_OPTIONS` (`trust` today) and
+only ones the command declares, and anything else is an internal failure rather than a silent
+skip; `{ handled }` prints its sentence and exits 0 without running the command. A terminal
+passes no hook, so it runs `--trust` as before.
+
+The grant re-reads the open folder, which stops running commands; the run whose box granted it
+is spared, and the others still stop. A box can carry an origin, the alias and where it is
+defined, which nothing sets until TYTO-536.

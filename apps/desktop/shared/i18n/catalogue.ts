@@ -119,6 +119,26 @@ export interface Catalogue {
   readonly 'pluginFiles.approve.skip': string;
   readonly 'cli.confirm.yes': string;
   readonly 'cli.confirm.no': string;
+  /**
+   * TYTO-726, ADR 0159 note of 2026-11-15: the native box a refused command offers the window's
+   * own way in. `{folder}`, `{plugin}`, `{id}` and `{recipe}` are filled by `cli-offers.ts`.
+   */
+  readonly 'cli.offer.trust.message': string;
+  readonly 'cli.offer.trust.detail': string;
+  readonly 'cli.offer.trust.yes': string;
+  readonly 'cli.offer.signin.message': string;
+  readonly 'cli.offer.signin.detail': string;
+  readonly 'cli.offer.signin.yes': string;
+  readonly 'cli.offer.signout.message': string;
+  readonly 'cli.offer.signout.detail': string;
+  readonly 'cli.offer.signout.yes': string;
+  readonly 'cli.offer.apply.message': string;
+  readonly 'cli.offer.apply.detail': string;
+  readonly 'cli.offer.apply.yes': string;
+  readonly 'cli.offer.watch.message': string;
+  readonly 'cli.offer.watch.detail': string;
+  readonly 'cli.offer.watch.yes': string;
+  readonly 'cli.offer.no': string;
   readonly 'terminal.quit.message': string;
   readonly 'terminal.quit.quit': string;
   readonly 'terminal.quit.stay': string;
@@ -1261,6 +1281,22 @@ export const CATALOGUE_KEYS = [
   'pluginFiles.approve.skip',
   'cli.confirm.yes',
   'cli.confirm.no',
+  'cli.offer.trust.message',
+  'cli.offer.trust.detail',
+  'cli.offer.trust.yes',
+  'cli.offer.signin.message',
+  'cli.offer.signin.detail',
+  'cli.offer.signin.yes',
+  'cli.offer.signout.message',
+  'cli.offer.signout.detail',
+  'cli.offer.signout.yes',
+  'cli.offer.apply.message',
+  'cli.offer.apply.detail',
+  'cli.offer.apply.yes',
+  'cli.offer.watch.message',
+  'cli.offer.watch.detail',
+  'cli.offer.watch.yes',
+  'cli.offer.no',
   'terminal.quit.message',
   'terminal.quit.quit',
   'terminal.quit.stay',
