@@ -1,0 +1,12 @@
+---
+template: notice
+formats: [grid]
+---
+::titulo Weekly agenda
+
+::lamina
+  ORTHOPAEDICS
+  Monday, 8 pm | Foot care
+
+  ORTHOPAEDICS
+  Tuesday, 8 pm | Back care

@@ -77,8 +77,16 @@ export type TextSpan = z.infer<typeof textSpanSchema>;
  * It carries no styling because it has no glyph: the runs around it decide what the line
  * looks like. Leading, trailing and consecutive breaks are all legal — they are how an
  * author asks for an empty line, and the brief language produces all three (ADR 0016).
+ *
+ * `space` is a paragraph boundary (ADR 0205): px added between this line and the next, on
+ * top of the line advance, so the text grows by exactly that. Absent is no room at all, and
+ * that is how a template that declares no paragraph spacing writes a paragraph — the same
+ * break it wrote before paragraphs existed, so its Scene does not change by a byte.
  */
-export const lineBreakSchema = z.strictObject({ kind: z.literal('break') });
+export const lineBreakSchema = z.strictObject({
+  kind: z.literal('break'),
+  space: z.number().finite().positive().optional(),
+});
 export type LineBreak = z.infer<typeof lineBreakSchema>;
 
 /**

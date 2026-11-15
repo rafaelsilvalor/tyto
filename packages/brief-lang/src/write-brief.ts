@@ -14,9 +14,11 @@ import { parseBrief } from './parse-brief.js';
  * hand them a brief that differs from their sheet with nothing to say so. The recipe can fix
  * the data first with `rewrite`.
  *
- * What the language ignores is not kept: spaces around a line and blank lines inside a value
- * have no meaning in a brief (ADR 0087, ADR 0096). An empty value writes no directive, so the
- * slot keeps the template's default rather than being set to nothing.
+ * What the language ignores is not kept: spaces around a line, and blank lines before the first
+ * line or after the last of a value, have no meaning in a brief (ADR 0087, ADR 0096). A blank
+ * line between two lines is a paragraph (ADR 0205), so it is written as one blank line however
+ * many the value had. An empty value writes no directive, so the slot keeps the template's
+ * default rather than being set to nothing.
  *
  * The written text is parsed back before it is returned, so a value the grammar cannot hold
  * (an unpaired `*`) is a problem naming its slot, and a brief that would not parse is never
@@ -78,7 +80,7 @@ export function writeBrief(brief: BriefToWrite): Result<string, readonly BriefWr
     text +=
       lines.length === 1
         ? `::${slot.name} ${lines[0] ?? ''}\n`
-        : `::${slot.name}\n${lines.map((line) => `  ${line}\n`).join('')}`;
+        : `::${slot.name}\n${lines.map((line) => (line === '' ? '\n' : `  ${line}\n`)).join('')}`;
     written.push({ slot: slot.name, from, to: text.length });
   }
   if (problems.length > 0) return err(problems);
@@ -97,11 +99,20 @@ export function writeBrief(brief: BriefToWrite): Result<string, readonly BriefWr
   return problems.length > 0 ? err(problems) : ok(text);
 }
 
-/** The value's lines, each trimmed, blank ones dropped, a leading `::` or `//` escaped. */
+/**
+ * The value's lines, each trimmed, a leading `::` or `//` escaped. A run of blank lines between
+ * two lines becomes one empty string, a paragraph; blank lines at either end are dropped.
+ */
 function linesOf(value: string): string[] {
-  return value
-    .split(/\r\n|\r|\n/u)
-    .map((line) => line.trim())
-    .filter((line) => line !== '')
-    .map((line) => (line.startsWith('::') || line.startsWith('//') ? `\\${line}` : line));
+  const lines: string[] = [];
+  for (const raw of value.split(/\r\n|\r|\n/u)) {
+    const line = raw.trim();
+    if (line === '') {
+      if (lines.length > 0 && lines[lines.length - 1] !== '') lines.push('');
+      continue;
+    }
+    lines.push(line.startsWith('::') || line.startsWith('//') ? `\\${line}` : line);
+  }
+  if (lines[lines.length - 1] === '') lines.pop();
+  return lines;
 }

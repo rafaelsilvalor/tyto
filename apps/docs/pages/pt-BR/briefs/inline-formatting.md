@@ -8,12 +8,13 @@ O exemplo é para o `notice`, o template do próprio manual. Copie [a pasta dele
 
 <<< @/../examples/briefs/inline-formatting.brief{md}
 
-| Você escreve                       | Você obtém                                           |
-| ---------------------------------- | ---------------------------------------------------- |
-| `**free**`                         | **negrito**                                          |
-| `*children*`                       | _itálico_                                            |
-| uma linha nova num bloco com recuo | uma linha nova na arte                               |
-| `{cor:laranja}this Saturday{/}`    | as palavras na cor que o template chama de `laranja` |
+| Você escreve                          | Você obtém                                           |
+| ------------------------------------- | ---------------------------------------------------- |
+| `**free**`                            | **negrito**                                          |
+| `*children*`                          | _itálico_                                            |
+| uma linha nova num bloco com recuo    | uma linha nova na arte                               |
+| uma linha em branco entre duas linhas | um parágrafo novo                                    |
+| `{cor:laranja}this Saturday{/}`       | as palavras na cor que o template chama de `laranja` |
 
 ## Negrito
 
@@ -24,6 +25,14 @@ Dois asteriscos de cada lado. Num slot que o template já desenha em negrito, co
 Num [bloco com recuo](./directives.md#dois-jeitos-de-escrever-o-texto), cada linha é uma linha na arte, então o título acima tem duas. Uma linha comprida continua quebrando sozinha onde termina a largura do template.
 
 No texto escrito na própria linha da diretiva, uma `\` quebra a linha ali: `::title Free class\this Saturday` são duas linhas. Um bloco não precisa dela — as linhas dele já quebram —, então o Tyto descarta a `\` no fim de uma linha do bloco e avisa com `W_REDUNDANT_BREAK`.
+
+## Parágrafos
+
+Uma linha em branco entre duas linhas de um bloco com recuo começa um parágrafo novo. Várias linhas em branco seguidas continuam sendo um parágrafo só, e uma linha em branco logo abaixo da diretiva ou no fim do bloco não significa nada.
+
+<<< @/../examples/briefs/paragraphs.brief{md}
+
+A distância entre dois parágrafos é escolha do template. Um template que não escolhe nada desenha os parágrafos como linhas comuns, sem espaço a mais, então um brief que já tinha linhas em branco entre os grupos fica exatamente como era. Uma [anotação](./directives.md#anotacoes) (`//`) entre duas linhas não é uma linha em branco e não começa parágrafo.
 
 ## Marcas de cor
 

@@ -41,9 +41,17 @@ export interface Italic {
   readonly range: SourceRange;
 }
 
-/** A hard line break: a trailing `\`, or the boundary between two lines of a block body. */
+/**
+ * A hard line break: a trailing `\`, or the boundary between two lines of a block body.
+ *
+ * `paragraph` marks the boundary a blank line was written in (ADR 0205): the next line starts
+ * a paragraph. It is still one line break; how much room a paragraph takes is the template's
+ * to say (`RunsOptions.paragraphSpacing`), and a template that says nothing draws it as any
+ * other break. Absent, never `false`, so every break written before it reads the same.
+ */
 export interface Break {
   readonly kind: 'break';
+  readonly paragraph?: true;
   readonly range: SourceRange;
 }
 

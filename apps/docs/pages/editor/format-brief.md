@@ -9,7 +9,7 @@ Every step was followed on 2026-10-19 on a development build of Tyto 0.7.0 (comm
 - the text under each `::` block is indented by the same amount — two spaces unless the [`tabSize`](../reference/settings.md#tabsize) setting says otherwise;
 - a [note](../briefs/directives.md#notes-to-yourself) (`//`) among the lines of a block is indented like them; a note between two blocks stays at the start of its line;
 - spaces at the end of a line are removed;
-- several blank lines in a row become one.
+- several blank lines in a row become one, so a [paragraph](../briefs/inline-formatting.md#paragraphs) stays one paragraph.
 
 For example, this brief:
 

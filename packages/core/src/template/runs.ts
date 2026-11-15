@@ -42,6 +42,12 @@ export interface RunsOptions {
   readonly italic?: Partial<RunStyle>;
   /** What `{key:value}` does to the runs it wraps; `undefined` leaves them alone. */
   readonly mark?: (key: string, value: string) => Partial<RunStyle> | undefined;
+  /**
+   * The px a paragraph adds between its lines and the next paragraph's (ADR 0205): a blank
+   * line in the brief's text. Absent, 0 or less is none, and a paragraph boundary is then the
+   * plain `LineBreak` it was before paragraphs existed.
+   */
+  readonly paragraphSpacing?: number;
 }
 
 const BOLD = 700;
@@ -144,6 +150,16 @@ function styled(inline: Inline, style: RunStyle, options: RunsOptions): RunStyle
   }
 }
 
+/** A paragraph boundary carries its room only when the template gave it some. */
+function breakOf(inline: Inline & { kind: 'break' }, spacing: number | undefined): TextRun {
+  return inline.paragraph === true &&
+    spacing !== undefined &&
+    Number.isFinite(spacing) &&
+    spacing > 0
+    ? { kind: 'break', space: spacing }
+    : { kind: 'break' };
+}
+
 function append(target: TextRun[], text: RichText, style: RunStyle, options: RunsOptions): void {
   for (const inline of text) {
     switch (inline.kind) {
@@ -159,7 +175,7 @@ function append(target: TextRun[], text: RichText, style: RunStyle, options: Run
         break;
       }
       case 'break':
-        target.push({ kind: 'break' });
+        target.push(breakOf(inline, options.paragraphSpacing));
         break;
       default:
         append(target, inline.children, styled(inline, style, options), options);

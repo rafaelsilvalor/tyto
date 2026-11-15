@@ -6,6 +6,7 @@ import type { SvgFontFace, SvgResources } from './defs.js';
 import { exportSvg } from './export-svg.js';
 import type { SvgExportOptions } from './svg.js';
 import mappingFixture from './__fixtures__/mapping.json';
+import paragraphsFixture from './__fixtures__/paragraphs.json';
 import promoFixture from './__fixtures__/promo.json';
 import twoIconsFixture from './__fixtures__/two-icons.json';
 
@@ -106,6 +107,12 @@ describe('a scene becomes one SVG document per frame', () => {
 
     await expect(feed).toMatchFileSnapshot('./__snapshots__/promo.feed.svg');
     await expect(story).toMatchFileSnapshot('./__snapshots__/promo.story.svg');
+  });
+
+  it('renders the paragraphs fixture to its committed snapshot (ADR 0205)', async () => {
+    const [feed] = svgOf(sceneOf(paragraphsFixture));
+
+    await expect(feed).toMatchFileSnapshot('./__snapshots__/paragraphs.feed.svg');
   });
 
   it('renders the mapping fixture to its committed snapshot', async () => {

@@ -6,6 +6,7 @@ import type {
   Frame,
   GroupNode,
   ImageNode,
+  LineBreak,
   Matrix,
   Paint,
   RectNode,
@@ -515,11 +516,26 @@ function lineBlockStyle(node: TextNode): string {
   return ` style="margin-right: ${cssLength(-node.letterSpacing)}"`;
 }
 
+/**
+ * A line break, and a paragraph's space after it (ADR 0205).
+ *
+ * The space is an empty block as tall as the space: a block inside the line block ends the
+ * line before it and starts the next one after it, so the text grows by exactly that height
+ * and nothing else moves. The `<br>` stays in front of it, so an empty line before a
+ * paragraph is still drawn — a `<br>` that ends a line box adds none of its own (measured in
+ * Chromium: `A<br><block 24px>B` is 84 px at a 30 px line, `A<br><br><block 24px>B` 114).
+ */
+function breakHtml(run: LineBreak): string {
+  return run.space === undefined
+    ? '<br>'
+    : `<br><span style="display: block; height: ${cssLength(run.space)}"></span>`;
+}
+
 function textHtml(node: TextNode, emit: Emit): string {
   const spans = node.runs
     .map((run) =>
       run.kind === 'break'
-        ? '<br>'
+        ? breakHtml(run)
         : `<span style="${escapeHtml(runDeclarations(run, node.id, emit).join('; '))}">${escapeHtml(run.text)}</span>`,
     )
     .join('');

@@ -37,6 +37,7 @@ write briefs; this document is the grammar for people who change it.
 - **Pictures among a slide's lines** — when that slot also declares `multiple: true`, each `::imagem` after the same `::lamina` adds a picture instead of being refused, and the directive's first line is the path while the indented lines under it continue the slide's body (ADR 0160, amended 2026-10-31). `::lamina` / `  Um` / `::imagem ./a.png` / `  Dois` / `::imagem ./b.png` is one slide: text, picture, text, picture. No grammar changes: the parser already reads those lines as the `::imagem`'s body, and `resolve` splits them at the first line break. Without `multiple`, the lines under an `::imagem` are part of its path, as before.
 - **Adjustments** `{a, b: value}` — only those declared in `manifest.adjustments`. They apply to the slot; on a repeatable slot, to that slide.
 - **Text**: inline Markdown only — `**bold**`, `*italic*`, `\` line break, `{cor:x}text{/}` mark. No headings, lists or links. Every line of an indented block already starts a new line, so a `\` ending a line with another block line after it adds nothing: it is dropped, with `W_REDUNDANT_BREAK` (ADR 0109), and `\\` there leaves one empty line. A `\` in the middle of a line, at the end of an inline body with no block under it, or on the last line of a block still breaks the line.
+- **Paragraphs**: a blank line between two lines of text starts a paragraph; several in a row are one, and one at the start or the end of a block means nothing (ADR 0205). The space between two paragraphs is the template's (`paragraphSpacing`), and 0 when it declares none, so a paragraph is then drawn as any other line break.
 - **Math** is plain Unicode with a space on each side of an operator: `Q = U · A · ΔT`. Glyphs the template's face lacks are drawn in the bundled symbol face (ADR 0168), and a line never starts with a standalone operator: the space before one is not a break, the space after it is (ADR 0169). To keep a whole formula on one line, write its spaces as no-break spaces (U+00A0).
 - **Assets**: a path is read as written, relative to the `.brief` file; when nothing is there, the same path is read from `assets/` beside the brief (ADR 0056). If both exist, the one beside the brief wins, and a path that climbs out of the brief's folder is read from neither. `resolve` confirms existence and computes a hash of the bytes, so the hash is the same whichever folder the file was found in. The CLI, `tyto watch`, the queue, the preview and the export box all follow this rule; only `tyto render --assets <dir>` replaces it, with that one folder and no fallback. A brief in a folder named `editaveis` — a delivery's copy — also reads `../assets`, the delivery's images (ADR 0057).
 - **Comments**: `//` at line start. Inside an indented block, a `//` line at any indent — or at column 0 between two lines of the same block — is skipped and the block goes on (ADR 0204).
@@ -93,11 +94,15 @@ had to answer them.
   the mark, or put it in an indented body, where a mark may lead the line.
 - **No space before the colon**: `{cor: laranja}`, never `{cor : laranja}`. One token of
   lookahead cannot see past a space to tell `:` from `}`.
-- **A blank line has no meaning and does not end an indented block** (ADR 0087). One blank
-  line or several in a row, empty or holding only spaces, anywhere inside a block — between
-  two groups of a `::lamina`, or between the directive and its first body line — is there for
-  whoever reads the brief, and the brief means what it would mean without it. A block ends
-  only at the next line that is not blank and starts back at column 0. An indented line is
+- **A blank line does not end an indented block** (ADR 0087), and **between two lines of
+  text it makes a paragraph** (ADR 0205). One blank line or several in a row, empty or holding
+  only spaces, between two groups of a `::lamina` is one paragraph boundary; between the
+  directive and its first body line, or after the last, it is there for whoever reads the
+  brief and means nothing. A block ends only at the next line that is not blank and starts
+  back at column 0. The grammar does not tell the two apart: `parseBrief` reads the source
+  between two lines of text and marks the `Break` between them `paragraph` when a whole line
+  there is blank — a comment line is not, so a comment between two lines makes no paragraph
+  (ADR 0204). An indented line is
   recognised by the break in front of it, and the token for that indent takes every blank
   line before it along; at the top level a run of blank lines is one token of its own, so a
   line of spaces between two directives is as blank as an empty one. A directive's range
@@ -122,7 +127,7 @@ had to answer them.
   make a body line. **Format Brief** (`formatBrief` in `brief-lang`, Alt+Shift+F in the
   window) rewrites exactly what the language ignores — the indent of each body line to
   `tabSize` spaces, the spaces at the end of a line, a run of blank lines to one, a blank line
-  between a head and its first body line, a final line ending — and nothing inside a line, so
+  between a head with no text of its own and its first body line, a final line ending — and nothing inside a line, so
   the brief compiles to the same Scene. A comment line inside a block is indented like the
   body lines (ADR 0204); a top-level one stays at column 0. It refuses a brief with a syntax
   error.
@@ -249,7 +254,7 @@ the fence is closed.
 BriefAst   { frontmatter: Record<string, unknown>; directives: Directive[]; range }
 Directive  { name; namespace?; adjustments: Adjustment[]; body: RichText; range; nameRange }
 Adjustment { name; value?; range }
-RichText   = Inline[]; Inline = Text{value} | Bold{children} | Italic{children} | Break | Mark{key, value, children}
+RichText   = Inline[]; Inline = Text{value} | Bold{children} | Italic{children} | Break{paragraph?} | Mark{key, value, children}
 ```
 
 `parseBrief` in `packages/brief-lang/src/parse-brief.ts` builds it, returning
@@ -285,8 +290,11 @@ rename. These are the choices that gap forced, and where each one shows.
   directive name rather than one line of text from the next. One `Break` serves both,
   rather than a soft and a hard kind, because nothing downstream would tell them apart:
   the overflow strategies are `clip`, `shrink` and `grow`, all of which change size, and
-  none of which reflows by collapsing a break. A `Break` lands in the IR as its own
-  `TextRun` (ADR 0016); `compile` writes that mapping. A `\` that ends a line with another
+  none of which reflows by collapsing a break. A blank line in front of the second line
+  marks its `Break` `paragraph: true` (ADR 0205) — still one break, which `runsOf` gives the
+  template's `paragraphSpacing` and otherwise writes as the plain `LineBreak` it always
+  was. A `Break` lands in the IR as its own `TextRun` (ADR 0016); `compile` writes that
+  mapping. A `\` that ends a line with another
   block line after it would stack a second `Break` on that one, so `parseBrief` drops it and
   reports `W_REDUNDANT_BREAK` on its range (ADR 0109); it tells the `\` from the boundary's
   own `Break` by the character its range covers.
@@ -305,7 +313,8 @@ rename. These are the choices that gap forced, and where each one shows.
   inserting the missing token, which records where but not what; the enclosing node is the
   what, so an empty error inside `Bold` reports a missing closing `**`.
 - **Comments and blank lines are dropped.** They are how a brief is written, not what it
-  says, and nothing downstream renders them.
+  says, and nothing downstream renders them — except that a blank line between two lines of
+  text survives as the `paragraph` flag on the `Break` between them (ADR 0205).
 - **The frontmatter is parsed but not judged.** `parseBrief` reports YAML that does not
   parse and a block that is not a mapping; a missing `template` or a `formats` of the
   wrong type is `resolve`'s diagnostic to raise, because this stage knows the language and

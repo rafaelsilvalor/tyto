@@ -19,7 +19,9 @@ import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
  * worse than no measurement. Two consequences shape everything below:
  *
  * - A line advances by `lineHeight × the node's largest run`, uniformly, because that is
- *   the block's strut (`docs/ir-schema.md`, TYTO-65). Not by each line's own size.
+ *   the block's strut (`docs/ir-schema.md`, TYTO-65). Not by each line's own size. A
+ *   paragraph boundary (a break with `space`, ADR 0205) adds its space on top, scaled with
+ *   the text when `shrink` acts, so the paragraphs stay apart in proportion.
  * - A break opportunity is a space, and only a space. CSS `break-word` rules, hyphens and
  *   CJK are not implemented; the limit is stated here rather than approximated, since a
  *   wrong break is visible and a missing feature is findable.
@@ -51,7 +53,10 @@ export interface TextMeasurement {
   readonly lines: number;
   /** The widest line, in px, with trailing spaces excluded the way CSS excludes them. */
   readonly width: number;
-  /** `lines × lineHeight × referenceSize`, which is what a browser's block height comes to. */
+  /**
+   * `lines × lineHeight × referenceSize`, plus every paragraph's space, which is what a
+   * browser's block height comes to.
+   */
   readonly height: number;
   /** What every run's size was multiplied by. 1 unless `overflow: 'shrink'` acted. */
   readonly scale: number;
@@ -111,14 +116,16 @@ interface Piece {
 
 interface Line {
   readonly pieces: Piece[];
+  /** The px a paragraph boundary puts above this line, at scale 1 (ADR 0205); 0 for none. */
+  readonly space: number;
   /** Width including trailing spaces, which is where the next token would start. */
   flowing: number;
   /** Width with trailing spaces trimmed, which is what has to fit. */
   visible: number;
 }
 
-function emptyLine(): Line {
-  return { pieces: [], flowing: 0, visible: 0 };
+function emptyLine(space = 0): Line {
+  return { pieces: [], space, flowing: 0, visible: 0 };
 }
 
 function textOf(pieces: readonly Piece[]): string {
@@ -243,7 +250,8 @@ function layoutAt(
     // A word that does not fit starts a line — unless the line is empty, in which case
     // nothing would be gained by moving it and a word longer than its box would loop.
     if (limit !== undefined && line.pieces.length > 0 && line.flowing + visible > limit) {
-      lines.push({ pieces: [...pieces], flowing, visible });
+      // A wrap is no paragraph: the line it starts takes no space above it.
+      lines.push({ pieces: [...pieces], space: 0, flowing, visible });
       return;
     }
 
@@ -255,7 +263,7 @@ function layoutAt(
   for (const run of node.runs) {
     if (run.kind === 'break') {
       flush();
-      lines.push(emptyLine());
+      lines.push(emptyLine(run.space ?? 0));
       continue;
     }
 
@@ -267,12 +275,13 @@ function layoutAt(
   flush();
 
   const leading = node.lineHeight * reference.size * scale;
+  const paragraphs = lines.reduce((sum, line) => sum + scaledSpace(line.space, scale), 0);
 
   return {
     runs: rebuild(lines, scale),
     lines: lines.length,
     width: Math.max(0, ...lines.map((line) => line.visible)),
-    height: lines.length * leading,
+    height: lines.length * leading + paragraphs,
   };
 }
 
@@ -287,7 +296,10 @@ function rebuild(lines: readonly Line[], scale: number): TextRun[] {
   const runs: TextRun[] = [];
 
   lines.forEach((line, index) => {
-    if (index > 0) runs.push({ kind: 'break' });
+    if (index > 0) {
+      const space = scaledSpace(line.space, scale);
+      runs.push(space > 0 ? { kind: 'break', space } : { kind: 'break' });
+    }
 
     // Adjacent pieces of the same run are re-joined first, so a paragraph that did not
     // wrap comes out as the one run it went in as rather than as one run per word.
@@ -312,6 +324,11 @@ function rebuild(lines: readonly Line[], scale: number): TextRun[] {
   });
 
   return runs;
+}
+
+/** A paragraph's space at `scale`, rounded as a size is, for the same byte-identical reason. */
+function scaledSpace(space: number, scale: number): number {
+  return space === 0 ? 0 : Math.round(space * scale * 1000) / 1000;
 }
 
 function scaled(run: TextSpan, text: string, scale: number): TextSpan {

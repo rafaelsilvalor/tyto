@@ -243,6 +243,23 @@ describe.each(corpus.map(([name, source]) => [name, source] as const))(
   },
 );
 
+describe('formatBrief and a paragraph (TYTO-557, ADR 0205)', () => {
+  it('keeps one blank line between two body lines, however many there were', () => {
+    expect(formatted('::lamina\n  Um\n\n \n\n  Dois\n')).toBe('::lamina\n  Um\n\n  Dois\n');
+  });
+
+  it('keeps the blank line under a head with text of its own: it is a paragraph', () => {
+    const text = '::lamina Um\n\n\n  Dois\n';
+    const once = formatted(text);
+    expect(once).toBe('::lamina Um\n\n  Dois\n');
+    expect(meaningOf(once)).toEqual(meaningOf(text));
+  });
+
+  it('still drops the blank line under a head with no text', () => {
+    expect(formatted('::lamina\n\n  Um\n')).toBe('::lamina\n  Um\n');
+  });
+});
+
 describe('formatBriefEdits', () => {
   it('touches only whitespace, so the text of each line keeps its place in the edits', () => {
     const text = '::lamina\n      um  \n\n\n      dois\n';

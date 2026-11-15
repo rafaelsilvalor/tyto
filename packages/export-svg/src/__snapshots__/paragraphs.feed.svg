@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <style>@font-face{font-family:"Inter";font-weight:400;font-style:normal;src:url("data:font/woff2;base64,Inter-400-normal")}@font-face{font-family:"Inter";font-weight:700;font-style:normal;src:url("data:font/woff2;base64,Inter-700-normal")}
+    </style>
+  </defs>
+  <rect width="400" height="400" fill="#fafafa"/>
+  <g id="paragraphs" transform="matrix(1 0 0 1 20 20)">
+    <text x="0" y="47" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="700" fill="#141414">ORTOPEDISTA</tspan></text>
+    <text x="0" y="77" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="400" fill="#141414">10-09 - 20h | Cuidado dos pés</tspan></text>
+    <text x="0" y="131" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="700" fill="#141414">ORTOPEDISTA</tspan></text>
+    <text x="0" y="161" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="400" fill="#141414">11-09 - 20h | Cuidado com a coluna</tspan></text>
+  </g>
+  <g id="control" transform="matrix(1 0 0 1 20 210)">
+    <text x="0" y="46" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="700" fill="#141414">ORTOPEDISTA</tspan></text>
+    <text x="0" y="76" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="400" fill="#141414">10-09 - 20h | Cuidado dos pés</tspan></text>
+    <text x="0" y="106" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="700" fill="#141414">ORTOPEDISTA</tspan></text>
+    <text x="0" y="136" xml:space="preserve"><tspan font-family="Inter" font-size="20" font-weight="400" fill="#141414">11-09 - 20h | Cuidado com a coluna</tspan></text>
+  </g>
+</svg>
