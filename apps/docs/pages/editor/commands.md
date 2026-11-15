@@ -69,7 +69,9 @@ A list right under the prompt shows what can come next, whichever order the runs
 
 ## The output
 
-- It keeps the colours a command prints, and errors are red.
+- Each run's header says how it ended: **✓ 0** in green when it worked, **✗** and the exit code in red when it did not.
+- A line is coloured by what it says, not by where the command wrote it: a problem the command reports is red when it is an error and amber when it is a warning, with its code in bold, and the hint under it is grey. Anything else, such as a question the command asks or what `history` prints, is plain text. The panel's own messages, such as why it refused a line, are grey.
+- A command that prints its own colours keeps them.
 - A place a problem names, such as `cartaz.brief:5:1`, is a link, and so is any brief or text file of the open folder: **click** it to open the file in a tab, at that line.
 - The same problems are listed in [Problems](panels.md#problems), under the command that reported them. The status bar counts them, as does the **PROBLEMS** tab.
 - **Ctrl+F** finds in the output: **Enter** goes to the next match, **Shift+Enter** to the previous one, **Esc** closes.

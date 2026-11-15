@@ -86,17 +86,29 @@ export function withOutput(
 
 const PLAIN: AnsiStyle = {};
 
-/** The scrollback with one of the panel's own lines added, on a line of its own. */
-export function withNote(scrollback: Scrollback, text: string, run?: number): Scrollback {
+/**
+ * The scrollback with a line the panel wrote added, on a line of its own: one of its own
+ * messages as a `note`, or what a built-in printed as `out` (TYTO-725).
+ */
+export function withPanelLine(
+  scrollback: Scrollback,
+  stream: OutputStream,
+  text: string,
+  run?: number,
+): Scrollback {
   return capped(
     [
       ...scrollback.lines,
-      { stream: 'note', runs: [{ text, style: PLAIN }], ...(run === undefined ? {} : { run }) },
+      { stream, runs: [{ text, style: PLAIN }], ...(run === undefined ? {} : { run }) },
     ],
     false,
     scrollback.dropped,
   );
 }
+
+/** The scrollback with one of the panel's own lines added, on a line of its own. */
+export const withNote = (scrollback: Scrollback, text: string, run?: number): Scrollback =>
+  withPanelLine(scrollback, 'note', text, run);
 
 /** Everything in the scrollback as text, one line per line: what Copy copies. */
 export const scrollbackText = (scrollback: Scrollback): string =>
@@ -131,16 +143,20 @@ export interface Piece {
   readonly link?: OutputLink;
   /** The match's place among all of the scrollback's, for marking the current one. */
   readonly match?: number;
+  /** Part of a diagnostic's code (TYTO-725), drawn with weight. */
+  readonly code?: true;
 }
 
 /**
- * A line cut into pieces at every boundary of a style run, a link and a find match, so each
- * piece is drawn with all three. `matches` are this line's, with their index among all.
+ * A line cut into pieces at every boundary of a style run, a link, a find match and a
+ * diagnostic's code, so each piece is drawn with all of them. `matches` are this line's, with
+ * their index among all.
  */
 export function piecesOf(
   runs: readonly AnsiRun[],
   links: readonly LinkSpan[],
   matches: readonly { readonly start: number; readonly end: number; readonly index: number }[],
+  code?: { readonly start: number; readonly end: number },
 ): readonly Piece[] {
   const cuts = new Set<number>();
   let offset = 0;
@@ -149,7 +165,7 @@ export function piecesOf(
     offset += run.text.length;
   }
   cuts.add(offset);
-  for (const span of [...links, ...matches]) {
+  for (const span of [...links, ...matches, ...(code === undefined ? [] : [code])]) {
     cuts.add(span.start);
     cuts.add(span.end);
   }
@@ -170,11 +186,13 @@ export function piecesOf(
     if (run === undefined) break;
     const link = links.find((span) => span.start <= start && end <= span.end)?.link;
     const match = matches.find((span) => span.start <= start && end <= span.end)?.index;
+    const inCode = code !== undefined && code.start <= start && end <= code.end;
     pieces.push({
       text: run.text.slice(start - runStart, end - runStart),
       style: run.style,
       ...(link === undefined ? {} : { link }),
       ...(match === undefined ? {} : { match }),
+      ...(inCode ? { code: true } : {}),
     });
   }
   return pieces;

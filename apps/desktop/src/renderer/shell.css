@@ -2479,12 +2479,27 @@ button.problems__row:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.command-panel__line[data-stream='err'] {
+/*
+ * A line is coloured by what it means, not by the stream it came on (TYTO-725): stderr also
+ * carries questions and notices, and a run that ended ✓ 0 read as failed when every stderr
+ * line was red. Whether the run worked is its header's badge to say. A line the command
+ * coloured itself has no tone, so its own colours show.
+ */
+.command-panel__line[data-tone='error'] {
   color: var(--tyto-error);
 }
 
-.command-panel__line[data-stream='note'] {
+.command-panel__line[data-tone='warning'] {
+  color: var(--tyto-warning);
+}
+
+.command-panel__line[data-tone='hint'],
+.command-panel__line[data-tone='note'] {
   color: var(--tyto-text-muted);
+}
+
+.command-panel__code {
+  font-weight: var(--tyto-weight-strong);
 }
 
 .command-panel__dropped {
@@ -2501,6 +2516,15 @@ button.problems__row:focus-visible {
 
 .command-panel__match {
   background: var(--tyto-selection);
+}
+
+/*
+ * Inside a find match the text is the window's own (TYTO-725): a line's tone or a command's
+ * colour on `selection` read as low as 2.05:1, and the match is what the eye is looking for.
+ * Doubled so it wins over a line's tone and an `ansi-fg-*` class alike.
+ */
+.command-panel__line .command-panel__match {
+  color: var(--tyto-text);
 }
 
 .command-panel__match--current {

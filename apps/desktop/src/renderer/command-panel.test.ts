@@ -595,6 +595,12 @@ describe("the panel's own commands, && and globs (TYTO-535, ADR 0200)", () => {
     expect(headers(harness.element)).toEqual(['history']);
     expect(lines(harness.element)).toEqual(['1  check a.brief', '2  history']);
     expect(harness.element.querySelector('.command-run__badge')?.textContent).toBe('✓ 0');
+    // What it printed is what was asked for: plain output, not one of the panel's notes (TYTO-725).
+    expect(
+      [...harness.element.querySelectorAll<HTMLElement>('.command-panel__line')].map(
+        (line) => line.dataset['tone'],
+      ),
+    ).toEqual(['plain', 'plain']);
   });
 
   it('clears the output with clear or cls, as Ctrl+L does', async () => {
@@ -684,5 +690,57 @@ describe("the panel's own commands, && and globs (TYTO-535, ADR 0200)", () => {
       'touchy does not run in a restricted folder. Trust it with Workspace: Manage Trust.',
     );
     expect(lines(harness.element)).not.toContain('wrote');
+  });
+});
+
+describe('colours by meaning, not by stream (TYTO-725)', () => {
+  const tones = (element: HTMLElement) =>
+    [...element.querySelectorAll<HTMLElement>('.command-panel__line')].map(
+      (line) => `${line.dataset['tone'] ?? '?'}:${line.textContent ?? ''}`,
+    );
+
+  it('leaves the stderr of a run that worked plain, and the header says ✓ 0', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'plugin install ./sample');
+    harness.sessions.output({
+      runId: 'run-1',
+      stream: 'err',
+      text: 'This plugin asks to read files. Install it? [y/N]\n',
+    });
+    harness.sessions.output({ runId: 'run-1', stream: 'out', text: 'Installed sample.\n' });
+    harness.sessions.state({ runId: 'run-1', state: 'finished', code: 0 });
+    await harness.element.updateComplete;
+    expect(tones(harness.element)).toEqual([
+      'plain:This plugin asks to read files. Install it? [y/N]',
+      'plain:Installed sample.',
+    ]);
+    const badge = harness.element.querySelector<HTMLElement>('.command-run__badge')!;
+    expect([badge.dataset['state'], badge.textContent]).toEqual(['ok', '✓ 0']);
+  });
+
+  it('colours a diagnostic by its severity, its code drawn with weight, its hint muted', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'render a.brief');
+    harness.sessions.output({
+      runId: 'run-1',
+      stream: 'err',
+      text: 'a.brief:2:1: warning W_FONT_SUBSTITUTED Used Sans.\n    Install the font.\n',
+    });
+    harness.sessions.state({ runId: 'run-1', state: 'finished', code: 0 });
+    await harness.element.updateComplete;
+    expect(tones(harness.element)).toEqual([
+      'warning:a.brief:2:1: warning W_FONT_SUBSTITUTED Used Sans.',
+      'hint:    Install the font.',
+    ]);
+    const codes = [...harness.element.querySelectorAll('.command-panel__code')];
+    expect(codes.map((code) => code.textContent).join('')).toBe('W_FONT_SUBSTITUTED');
+  });
+
+  it('gives a built-in that failed the same ✗ badge as a run, its lines notes', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'last');
+    const badge = harness.element.querySelector<HTMLElement>('.command-run__badge')!;
+    expect([badge.dataset['state'], badge.textContent]).toEqual(['failed', '✗ 1']);
+    expect(tones(harness.element).every((tone) => tone.startsWith('note:'))).toBe(true);
   });
 });
