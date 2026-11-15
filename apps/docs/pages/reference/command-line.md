@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 23. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 24. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -110,6 +110,27 @@ tyto template new [options] <name>
 | --- | --- | --- |
 | `--out <dir>` | where the folder is created | `"templates"` |
 | `--formats <ids>` | comma-separated format ids the template renders | `["grid"]` |
+
+## tyto template list
+
+list every template a render in the folder can use: name, origin (built-in, plugin, workspace) and formats; aliases name the template they reach
+
+```sh
+tyto template list [options] [folder]
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `[folder]` | a folder inside the workspace a render would run in |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--json` | print a machine-readable document instead of prose |  |
+| `--trust` | trust the workspace folder and its work profile for this run only; never written to trust.json |  |
 
 ## tyto delivery new
 

@@ -71,6 +71,7 @@ describe('the registry', () => {
       'reveal',
       'rm',
       'set',
+      'templates',
       'unalias',
     ]);
   });
@@ -86,6 +87,21 @@ describe('the registry', () => {
     expect(
       PANEL_BUILTINS.entries.filter((entry) => !entry.runsInRestrictedFolder).map((e) => e.name),
     ).toEqual(['new', 'mkdir', 'mv', 'cp', 'rm', 'open', 'reveal']);
+  });
+});
+
+describe('templates', () => {
+  it('runs `tyto template list` with what was typed after it, as a tyto command (TYTO-728)', async () => {
+    const ran: (readonly string[])[] = [];
+    const outcome = await named('templates').run(
+      context({ ran, args: [word('briefs'), word('--json')] }),
+    );
+    expect(outcome).toEqual({ kind: 'acted', ok: true });
+    expect(ran).toEqual([['template', 'list', 'briefs', '--json']]);
+  });
+
+  it('runs in a restricted folder, where the CLI decides what the folder lists', () => {
+    expect(named('templates').runsInRestrictedFolder).toBe(true);
   });
 });
 

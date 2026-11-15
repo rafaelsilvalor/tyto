@@ -22,6 +22,7 @@ import { renderCommand } from './render.js';
 import { signinCommand, signoutCommand } from './signin.js';
 import { withDiagnosticsSink } from './report.js';
 import { templateCheckCommand, templateNewCommand } from './template.js';
+import { templateListCommand } from './template-list.js';
 import { trustAddCommand, trustListCommand, trustRemoveCommand } from './trust.js';
 import { BUILT_IN_TYPES, type ValueDescription, valuesOf } from './value-kinds.js';
 import { watchCommand } from './watch.js';
@@ -285,6 +286,23 @@ export function createProgram(
       captured.code = await templateNewCommand(name, scaffold.opts(), environment);
     });
   valuesOf(scaffold, { '--out': FOLDER, '--formats': { kind: 'formats', list: true } });
+
+  const templateList = template
+    .command('list')
+    .description(
+      'list every template a render in the folder can use: name, origin (built-in, plugin, workspace) and formats; aliases name the template they reach',
+    )
+    .argument('[folder]', 'a folder inside the workspace a render would run in', '.')
+    .option('--json', 'print a machine-readable document instead of prose', false)
+    .option(
+      '--trust',
+      'trust the workspace folder and its work profile for this run only; never written to trust.json',
+      false,
+    )
+    .action(async (folder: string) => {
+      captured.code = await templateListCommand({ ...templateList.opts(), folder }, environment);
+    });
+  valuesOf(templateList, { '<folder>': FOLDER });
 
   /* ------------------------------------------------------------------------- delivery -- */
 

@@ -783,6 +783,8 @@ export const ptBR: Catalogue = {
   'commandPanel.builtin.history.empty': 'Nada foi rodado nesta pasta ainda.',
   'commandPanel.builtin.exit': 'fecha esta sessão',
   'commandPanel.builtin.last': 'roda de novo o último comando tyto',
+  'commandPanel.builtin.templates':
+    'lista os templates que um render nesta pasta pode usar (tyto template list)',
   'commandPanel.builtin.last.none': 'Nenhum comando tyto no histórico para rodar de novo.',
   'commandPanel.builtin.help':
     'lista estes comandos; help <comando> mostra a ajuda de um comando tyto',
