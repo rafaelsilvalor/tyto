@@ -165,5 +165,8 @@ ADR 0073 foresaw and nobody built.
   at most 1,000 characters. Anything else costs that alias alone (`W_PROJECT_KEY_INVALID`).
   Which names the panel keeps for its own commands is the panel's rule (ADR 0200 note of
   2026-11-15), since `@tyto/core` does not know the panel.
-- The window reads this key and does not write it: a person writes a workspace's aliases in
-  the file. `alias` in the panel writes the person's own, in `settings.json`.
+- `alias --workspace` is the window's first write to this file: one member at `aliases.<name>`,
+  edited in place with comments and layout kept, into the open folder's own file only (never a
+  profile's), and refused by main in a folder that is not trusted, and over a file that does not
+  parse. Removing an alias only the profile defines is refused too: a profile is shared by
+  every folder that names it.

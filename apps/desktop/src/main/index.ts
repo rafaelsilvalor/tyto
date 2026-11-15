@@ -2117,9 +2117,10 @@ async function start(): Promise<void> {
     offeredRecipes,
     commandAliases: {
       list: () => aliasesAnswer(userAliases, workspace.aliases()),
-      set: async ({ name, body }) => {
-        // Checked here whatever the window checked: the readers' rules.
+      set: async ({ name, body, workspace: inWorkspace }) => {
+        // Checked here whatever the window checked: the readers' rules, then where it goes.
         if (aliasWriteProblem(name, body) !== undefined) return { ok: false, reason: 'invalid' };
+        if (inWorkspace) return workspace.writeAlias(name, body);
         const next: Record<string, string> = { ...userAliases };
         if (body === null) delete next[name];
         else next[name] = body;

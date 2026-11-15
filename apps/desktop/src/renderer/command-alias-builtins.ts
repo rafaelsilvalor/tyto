@@ -9,9 +9,9 @@ import { VARIABLE_NAME } from './command-aliases.js';
  * `alias`, `unalias` and `set` (TYTO-536, ADR 0200 note of 2026-11-15): the panel's own
  * commands for its aliases and its session's variables.
  *
- * `alias name='line'` writes the person's `commandAliases` setting through `commands:set-alias`,
- * never a file of the window's own. A workspace's aliases are read here, and written by hand in
- * its `.tyto/project.json`.
+ * `alias name='line'` writes the person's `commandAliases` setting; with `--workspace`, the open
+ * folder's own `.tyto/project.json`, which main refuses in a restricted folder whatever this
+ * says. Each write goes through `commands:set-alias`, never a file of the window's own.
  */
 
 /** What the window says the aliases in force are, as `commands:aliases` answers. */
@@ -20,7 +20,11 @@ export type AliasesInForce = IpcResponse<'commands:aliases'>;
 /** What the alias commands reach: main's aliases, and which names the panel keeps for itself. */
 export interface PanelAliasPorts {
   readonly list: () => Promise<AliasesInForce>;
-  readonly set: (name: string, body: string | null) => Promise<IpcResponse<'commands:set-alias'>>;
+  readonly set: (
+    name: string,
+    body: string | null,
+    workspace: boolean,
+  ) => Promise<IpcResponse<'commands:set-alias'>>;
   /** A built-in's name or `tyto`: never an alias's (TYTO-536). */
   readonly reserved: (name: string) => boolean;
 }
@@ -31,11 +35,24 @@ export interface PanelVariables {
   readonly set: (name: string, value: string) => void;
 }
 
+const WORKSPACE_FLAG = '--workspace';
+
 const fill = (text: string, values: Readonly<Record<string, string>>): string =>
   text.replace(/\{(\w+)\}/gu, (whole, name: string) => values[name] ?? whole);
 
 function failed(lines: readonly string[]): BuiltinOutcome {
   return { kind: 'printed', lines, failed: true };
+}
+
+/** The words after the name, with `--workspace` taken out wherever it was typed unquoted. */
+function argumentsOf(context: BuiltinContext): { workspace: boolean; words: readonly string[] } {
+  let workspace = false;
+  const words: string[] = [];
+  for (const word of context.args) {
+    if (!word.quoted && word.text === WORKSPACE_FLAG) workspace = true;
+    else words.push(word.text);
+  }
+  return { workspace, words };
 }
 
 function whereOf(context: BuiltinContext, alias: Pick<PanelAlias, 'definedIn'>): string {
@@ -56,21 +73,32 @@ function nameProblem(context: BuiltinContext, name: string): string | undefined 
 
 const REFUSED_KEYS = {
   invalid: 'commandPanel.alias.refused.invalid',
+  'no-folder': 'commandPanel.alias.refused.noFolder',
+  profile: 'commandPanel.alias.refused.profile',
+  restricted: 'commandPanel.alias.refused.restricted',
   syntax: 'commandPanel.alias.refused.syntax',
+  unwritable: 'commandPanel.alias.refused.unwritable',
 } as const;
 
 async function write(
   context: BuiltinContext,
   name: string,
   body: string | null,
+  workspace: boolean,
 ): Promise<BuiltinOutcome> {
-  const written = await context.aliases.set(name, body);
+  const written = await context.aliases.set(name, body, workspace);
   if (!written.ok) {
-    return failed([
-      fill(context.say(REFUSED_KEYS[written.reason]), { name, where: 'settings.json' }),
-    ]);
+    const where = workspace ? '.tyto/project.json' : 'settings.json';
+    return failed([fill(context.say(REFUSED_KEYS[written.reason]), { name, where })]);
   }
-  const key = body === null ? 'commandPanel.alias.removed.user' : 'commandPanel.alias.saved.user';
+  const key =
+    body === null
+      ? workspace
+        ? 'commandPanel.alias.removed.workspace'
+        : 'commandPanel.alias.removed.user'
+      : workspace
+        ? 'commandPanel.alias.saved.workspace'
+        : 'commandPanel.alias.saved.user';
   return { kind: 'printed', lines: [fill(context.say(key), { name })] };
 }
 
@@ -84,10 +112,11 @@ function listing(context: BuiltinContext, aliases: readonly PanelAlias[]): reado
 const alias: PanelBuiltin = {
   name: 'alias',
   help: 'commandPanel.builtin.alias',
-  // Writing the person's own settings is not the folder's to allow.
+  // Writing the person's own settings is not the folder's to allow; `--workspace` is refused
+  // there, by the window below and by main whatever the window says.
   runsInRestrictedFolder: true,
   run: async (context) => {
-    const words = context.args.map((word) => word.text);
+    const { workspace, words } = argumentsOf(context);
     const inForce = await context.aliases.list();
     const usable = inForce.aliases.filter((each) => !context.aliases.reserved(each.name));
     if (words.length === 0) {
@@ -111,7 +140,11 @@ const alias: PanelBuiltin = {
     const problem = nameProblem(context, name);
     if (problem !== undefined) return failed([problem]);
     if (body.trim() === '') return failed([context.say('commandPanel.alias.usage')]);
-    return write(context, name, body);
+    if (workspace && inForce.workspace !== 'trusted') {
+      const key = inForce.workspace === 'none' ? 'no-folder' : 'restricted';
+      return failed([fill(context.say(REFUSED_KEYS[key]), { name, where: '.tyto/project.json' })]);
+    }
+    return write(context, name, body, workspace);
   },
 };
 
@@ -120,7 +153,7 @@ const unalias: PanelBuiltin = {
   help: 'commandPanel.builtin.unalias',
   runsInRestrictedFolder: true,
   run: async (context) => {
-    const words = context.args.map((word) => word.text);
+    const { workspace, words } = argumentsOf(context);
     const name = words[0];
     if (name === undefined || words.length > 1) {
       return failed([context.say('commandPanel.unalias.usage')]);
@@ -131,10 +164,14 @@ const unalias: PanelBuiltin = {
       return failed([fill(context.say('commandPanel.alias.unknown'), { name })]);
     }
     // The name in force may hide the person's own under the workspace's: say where it is.
-    if (found.definedIn === 'workspace') {
+    if (!workspace && found.definedIn === 'workspace') {
       return failed([fill(context.say('commandPanel.alias.inWorkspace'), { name })]);
     }
-    return write(context, name, null);
+    if (workspace && inForce.workspace !== 'trusted') {
+      const key = inForce.workspace === 'none' ? 'no-folder' : 'restricted';
+      return failed([fill(context.say(REFUSED_KEYS[key]), { name, where: '.tyto/project.json' })]);
+    }
+    return write(context, name, null, workspace);
   },
 };
 

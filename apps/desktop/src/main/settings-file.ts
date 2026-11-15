@@ -62,13 +62,29 @@ function settingEntryOf(entry: JsoncText['entries'][number]): SettingEntry {
  * anywhere.
  */
 export function editSettingsText(text: string, changes: Readonly<Record<string, unknown>>): string {
+  return editJsoncText(
+    text,
+    Object.entries(changes).map(([key, value]) => ({ path: [key], value })),
+  );
+}
+
+/**
+ * The same text with each member at `path` set, or removed where the value is `undefined`, by
+ * {@link editSettingsText}'s rule: only those members change, comments and layout stay. A path
+ * deeper than one key adds the objects it passes through when they are missing, which is how
+ * `alias --workspace` gives `.tyto/project.json` an `aliases` key (TYTO-536).
+ */
+export function editJsoncText(
+  text: string,
+  changes: readonly { readonly path: readonly string[]; readonly value: unknown }[],
+): string {
   const hadBom = text.startsWith(BOM);
   let source = withoutBom(text);
   if (source.trim() === '') source = '{}';
   const eol = source.includes('\r\n') ? '\r\n' : '\n';
 
-  for (const [key, value] of Object.entries(changes)) {
-    const edits = modify(source, [key], value, {
+  for (const { path, value } of changes) {
+    const edits = modify(source, [...path], value, {
       formattingOptions: { insertSpaces: true, tabSize: 2, eol },
     });
     source = applyEdits(source, edits);

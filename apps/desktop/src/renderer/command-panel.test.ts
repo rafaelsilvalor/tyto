@@ -50,7 +50,7 @@ async function mount(
     /** What `cat` reads, by id: the steps joined with `/` (TYTO-537). */
     texts?: Record<string, FileRead>;
     restricted?: boolean;
-    /** The aliases main answers (TYTO-536). */
+    /** The aliases main answers, and the folder's say on `--workspace` (TYTO-536). */
     aliases?: AliasesInForce;
   } = {},
 ): Promise<Harness> {
@@ -127,9 +127,9 @@ async function mount(
       skeletonOf: () => undefined,
       bin: 'Recycle Bin',
     },
-    aliases: () => Promise.resolve(options.aliases ?? { aliases: [] }),
-    setAlias: (name, body) => {
-      harness.aliasWrites.push([name, body]);
+    aliases: () => Promise.resolve(options.aliases ?? { aliases: [], workspace: 'none' }),
+    setAlias: (name, body, workspace) => {
+      harness.aliasWrites.push([name, body, workspace]);
       return Promise.resolve({ ok: true });
     },
   };
@@ -960,6 +960,7 @@ describe('aliases and variables (TYTO-536)', () => {
   };
   const aliases = (...list: [string, string, 'user' | 'workspace'][]): AliasesInForce => ({
     aliases: list.map(([name, body, definedIn]) => ({ name, body, definedIn })),
+    workspace: 'trusted',
   });
 
   it('expands an alias once and runs it with the alias named, keeping the line as typed', async () => {
@@ -1023,11 +1024,33 @@ describe('aliases and variables (TYTO-536)', () => {
     await settle(harness.element);
     await typeAndRun(harness, 'unalias shared');
     await settle(harness.element);
-    expect(harness.aliasWrites).toEqual([['entrega', 'render --delivery']]);
+    expect(harness.aliasWrites).toEqual([['entrega', 'render --delivery', false]]);
     expect(lines(harness.element).slice(-3)).toEqual([
       'Alias entrega saved in your settings.',
       'ls is a command of the panel or tyto itself: an alias cannot take its name.',
-      "shared is this workspace's alias, defined in its .tyto/project.json: remove it there.",
+      "shared is this workspace's alias: unalias --workspace shared removes it.",
+    ]);
+  });
+
+  it('writes --workspace only into a folder that allows it, and removes from there', async () => {
+    const restricted = await mount({ aliases: { aliases: [], workspace: 'restricted' } });
+    await typeAndRun(restricted, "alias --workspace entrega='render --delivery'");
+    await settle(restricted.element);
+    expect(restricted.aliasWrites).toEqual([]);
+    expect(lines(restricted.element).at(-1)).toContain('this folder is restricted');
+
+    const trusted = await mount({ aliases: aliases(['shared', 'check', 'workspace']) });
+    await typeAndRun(trusted, "alias --workspace entrega='render --delivery'");
+    await settle(trusted.element);
+    await typeAndRun(trusted, 'unalias --workspace shared');
+    await settle(trusted.element);
+    expect(trusted.aliasWrites).toEqual([
+      ['entrega', 'render --delivery', true],
+      ['shared', null, true],
+    ]);
+    expect(lines(trusted.element).slice(-2)).toEqual([
+      "Alias entrega saved in this workspace's .tyto/project.json, for everyone who opens it.",
+      "Alias shared removed from this workspace's .tyto/project.json.",
     ]);
   });
 });
