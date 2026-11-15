@@ -1947,6 +1947,71 @@ describe('an isolated template’s reports (ADR 0058)', () => {
   });
 });
 
+describe('an isolated template sees every artwork’s adjustments (ADR 0203)', () => {
+  const ARTWORKS = [
+    { adjustments: { resposta: true } },
+    { adjustments: { continua: true } },
+    { adjustments: { tom: 'escuro' } },
+  ] as const;
+  const CALL: TemplateCall = {
+    format: 'feed',
+    size: { w: 10, h: 10 },
+    idPrefix: 'lamina-2.feed',
+    artwork: { id: 'lamina-2', index: 1, count: 3 },
+    slots: {},
+    adjustments: { continua: true },
+    artworks: ARTWORKS,
+    brand: {},
+  };
+
+  /** Builds once in a real guest with `call`, handing back what it saw as `artworks`. */
+  async function seenWith(call: unknown): Promise<Result<TemplateAnswer, Diagnostics>> {
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      // `format` is the one free string a frame carries back, so what it saw rides in it.
+      build: (_template, context) => ({
+        format: JSON.stringify(context.artworks ?? 'none'),
+        size: context.size,
+        children: [],
+      }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const [registered] = host.registry.templatePacks();
+    const build = registered?.build as unknown as IsolatedPackBuild;
+    return build('demo', call as TemplateCall, [], NO_SHIPPED_FILES);
+  }
+
+  it('crosses to the plugin’s process as the host sent it', async () => {
+    const answer = await seenWith(CALL);
+
+    expect(answer.ok && JSON.parse(answer.value.frame.format)).toEqual(ARTWORKS);
+  });
+
+  it('is still optional, so a host that sends none is answered', async () => {
+    const { artworks: _artworks, ...without } = CALL;
+    const answer = await seenWith(without);
+
+    expect(answer.ok && answer.value.frame.format).toBe('"none"');
+  });
+
+  // The guest checks the call against the schema before the template runs.
+  it('refuses an entry that carries more than adjustments, such as a slide’s slots', async () => {
+    const answer = await seenWith({
+      ...CALL,
+      artworks: [{ adjustments: {}, slots: { texto: 'outro slide' } }],
+    });
+
+    expect(answer.ok ? 'ok' : answer.error[0]?.code).toBe('E_PLUGIN_CALL');
+  });
+});
+
 describe('an isolated template’s files (ADR 0062)', () => {
   const CALL: TemplateCall = {
     format: 'feed',

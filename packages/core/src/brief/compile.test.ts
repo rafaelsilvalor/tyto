@@ -10,7 +10,12 @@ import type { AssetRef } from '../scene/primitives.js';
 import type { Face, FaceCache } from '../text/face.js';
 import type { Frame, Scene } from '../scene/scene.js';
 import { sourceRange } from '../source/range.js';
-import { type DeferredTemplate, type Template, defineTemplate } from '../template/define.js';
+import {
+  type DeferredTemplate,
+  type Template,
+  type TemplateContext,
+  defineTemplate,
+} from '../template/define.js';
 import { TemplateError } from '../template/errors.js';
 import { type TemplateManifest, parseManifest } from '../template/manifest.js';
 import { frame, group, image, text } from '../template/nodes.js';
@@ -250,6 +255,72 @@ describe('three slides in two formats', () => {
     });
 
     expect(counters).toEqual(['1/3', '2/3', '3/3']);
+  });
+});
+
+describe('every artwork’s adjustments, seen from each one (ADR 0203)', () => {
+  // A continuation chain: an answer, then two bare continuations. The third slide can only
+  // tell it is still the answer by walking back past the second, so it needs all of them.
+  const CHAIN: BriefAst = {
+    ...BRIEF,
+    directives: [
+      directive('titulo', textOf('Questão')),
+      directive('slide', textOf('A resposta'), {
+        adjustments: [{ name: 'tom', value: 'escuro', range: AT }],
+      }),
+      directive('slide', textOf('continua'), { adjustments: [{ name: 'destaque', range: AT }] }),
+      directive('slide', textOf('e continua')),
+    ],
+  };
+  const EXPECTED = [
+    { adjustments: { tom: 'escuro' } },
+    { adjustments: { destaque: true } },
+    {
+      adjustments: {},
+    },
+  ];
+
+  function recording(seen: TemplateContext[]): Template {
+    return defineTemplate(MANIFEST, (context) => {
+      seen.push(context);
+      return promoCurso.build(context);
+    });
+  }
+
+  it('hands every call the whole list, in brief order, aligned with artwork.index', async () => {
+    const seen: TemplateContext[] = [];
+    const result = compile(await resolved(CHAIN), recording(seen), { formats: FORMATS });
+
+    expect(result.ok).toBe(true);
+    expect(seen).toHaveLength(6);
+    for (const context of seen) {
+      expect(context.artworks).toEqual(EXPECTED);
+      expect(context.artworks?.[context.artwork.index]?.adjustments).toEqual(context.adjustments);
+    }
+  });
+
+  it('hands a deferred template the same list, which is what crosses to a plugin', async () => {
+    const seen: TemplateContext[] = [];
+    const deferred: DeferredTemplate = {
+      manifest: MANIFEST,
+      buildLater: (context) => {
+        seen.push(context);
+        return Promise.resolve({ ok: true, value: promoCurso.build(context), diagnostics: [] });
+      },
+    };
+
+    const result = await compileDeferred(await resolved(CHAIN), deferred, { formats: FORMATS });
+
+    expect(result.ok).toBe(true);
+    expect(seen.map((context) => context.artworks)).toEqual(Array(6).fill(EXPECTED));
+  });
+
+  it('carries adjustments only, never another slide’s slots', async () => {
+    const seen: TemplateContext[] = [];
+    compile(await resolved(CHAIN), recording(seen), { formats: FORMATS });
+
+    for (const entry of seen[0]?.artworks ?? [])
+      expect(Object.keys(entry)).toEqual(['adjustments']);
   });
 });
 

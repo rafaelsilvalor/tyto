@@ -64,6 +64,21 @@ export interface TemplateContext {
   readonly adjustments: Readonly<Record<string, string | true>>;
 
   /**
+   * Every artwork of the brief, in the order it wrote them, carrying only its adjustments
+   * (ADR 0203). `artworks[artwork.index]` is this one.
+   *
+   * This is how a slide reads where it stands: a bare `{continua}` after an answer is still
+   * the answer, which the slide cannot tell from its own flags. Every artwork and not just
+   * the one before, because a chain of continuations has to walk back past each of them.
+   * Adjustments only — never another slide's slots: a frame draws its own content.
+   *
+   * Optional, because a context built by hand has none. `compile` always sets it, with one
+   * entry when nothing repeats, and it crosses to a template running in its plugin's process
+   * with the call.
+   */
+  readonly artworks?: readonly ArtworkSummary[];
+
+  /**
    * How big `node` will come out once it is laid out — asked before it is placed (ADR 0038).
    *
    * The same `measureText` that `compile` runs on the frame afterwards, against the same
@@ -126,6 +141,15 @@ export interface TemplateContext {
    * crosses to a template running in its plugin's process with the call (TYTO-439).
    */
   readonly values?: TemplateValues;
+}
+
+/**
+ * What a template sees of an artwork that is not necessarily its own (ADR 0203): its
+ * adjustments, flattened the way `context.adjustments` is. An object, so a later need adds a
+ * field here rather than changing what `artworks` holds.
+ */
+export interface ArtworkSummary {
+  readonly adjustments: Readonly<Record<string, string | true>>;
 }
 
 /**
