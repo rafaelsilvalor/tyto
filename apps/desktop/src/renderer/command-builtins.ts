@@ -1,5 +1,7 @@
 import type { CatalogueKey } from '../../shared/i18n/index.js';
+import type { IpcResponse } from '../../shared/ipc.js';
 import { FILE_BUILTINS } from './command-file-builtins.js';
+import { FILE_WRITES } from './command-file-writes.js';
 import type { ListById } from './command-paths.js';
 import { type LineWord, parseCommandLine } from './command-steps.js';
 
@@ -84,6 +86,50 @@ export interface PanelFiles {
   readonly read: (entryId: string) => Promise<FileRead>;
   /** Whether this platform compares names without case. */
   readonly caseless: boolean;
+  /** The Explorer's own writes, for the file commands that change the folder (TYTO-537). */
+  readonly writes: PanelWrites;
+}
+
+/**
+ * What the file commands that write reach (TYTO-537, ADR 0201 decision 5): the Explorer's own
+ * window ports, so a tab follows a move and lets go of a file sent to the bin as it does there.
+ */
+export interface PanelWrites {
+  /** `explorer:create`; `brief` is the skeleton text of `new x.brief --template t`. */
+  readonly create: (
+    parentId: string | null,
+    name: string,
+    kind: 'file' | 'folder',
+    brief?: string,
+  ) => Promise<IpcResponse<'explorer:create'>>;
+  /** `explorer:rename` into the folder `parentId` names: `mv`. */
+  readonly move: (
+    entryId: string,
+    parentId: string | null,
+    name: string,
+  ) => Promise<IpcResponse<'explorer:rename'>>;
+  readonly copy: (
+    entryId: string,
+    parentId: string | null,
+    name: string,
+  ) => Promise<IpcResponse<'explorer:copy'>>;
+  /** How many tabs under an entry hold unsaved text: `rm` asks first only then. */
+  readonly unsavedUnder: (entryId: string) => Promise<number>;
+  /** The Explorer's question before a delete, answered in the window's own box. */
+  readonly confirmRemove: (
+    entry: { readonly name: string; readonly kind: 'folder' | 'brief' | 'file' },
+    unsaved: number,
+  ) => Promise<boolean>;
+  /** `explorer:delete`: the system's bin and nothing else. */
+  readonly remove: (entryId: string) => Promise<IpcResponse<'explorer:delete'>>;
+  /** Opens the file in a tab as the Explorer does; answers whether a tab opened. */
+  readonly open: (entryId: string) => Promise<boolean>;
+  /** Selects the entry in the Explorer, expanding the folders on the way. */
+  readonly reveal: (ids: readonly string[]) => void;
+  /** The skeleton the window writes for a template, or none for a name it does not know. */
+  readonly skeletonOf: (template: string) => string | undefined;
+  /** The system's bin by its name on this platform, for what `rm` says. */
+  readonly bin: string;
 }
 
 export interface PanelBuiltin {
@@ -249,6 +295,7 @@ const help: PanelBuiltin = {
 export const PANEL_BUILTINS = new BuiltinRegistry([
   help,
   ...FILE_BUILTINS,
+  ...FILE_WRITES,
   clear,
   history,
   last,

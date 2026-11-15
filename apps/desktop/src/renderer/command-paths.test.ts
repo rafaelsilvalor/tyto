@@ -59,8 +59,13 @@ describe('walking the steps through the listings', () => {
     await expect(walk(['entregas', 'NOVEMBRO', 'notas.txt'], list, true)).resolves.toEqual({
       found: { kind: 'file', id: 'Entregas/novembro/notas.txt', name: 'notas.txt' },
       steps: ['Entregas', 'novembro', 'notas.txt'],
+      ids: ['Entregas', 'Entregas/novembro', 'Entregas/novembro/notas.txt'],
     });
-    await expect(walk([], list, true)).resolves.toEqual({ found: { kind: 'root' }, steps: [] });
+    await expect(walk([], list, true)).resolves.toEqual({
+      found: { kind: 'root' },
+      steps: [],
+      ids: [],
+    });
   });
 
   it('finds nothing for a missing step, a wrong case where case counts, or a file mid-path', async () => {

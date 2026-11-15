@@ -48,6 +48,7 @@ describe('the IPC contract', () => {
       'dialog:confirm',
       'dialog:save-changes',
       'editor:vim-mode',
+      'explorer:copy',
       'explorer:create',
       'explorer:delete',
       'explorer:image',

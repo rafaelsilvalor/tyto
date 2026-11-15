@@ -318,6 +318,7 @@ export interface IpcDependencies {
     | 'read'
     | 'create'
     | 'rename'
+    | 'copy'
     | 'delete'
     | 'pathOf'
     | 'idsTo'
@@ -852,8 +853,10 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     // place that holds both the explorer and the documents.
     // TYTO-402, ADR 0176: New recipe and New vocabulary write their skeleton through the same
     // create, so an existing file is refused, never replaced.
-    'explorer:create': async ({ documentId, parentId, name, kind, seed }) => {
-      const seeded = seed === undefined || kind !== 'file' ? undefined : seedOf(name, seed);
+    'explorer:create': async ({ documentId, parentId, name, kind, seed, text }) => {
+      const seeded = seed === undefined || kind !== 'file' ? undefined : seedOf(name, seed, text);
+      // Text rides only on a brief's seed: it is never a way to write any other file.
+      if (text !== undefined && seed !== 'brief') return { ok: false, reason: 'invalid' };
       if (seeded !== undefined && !seeded.ok) return seeded;
       const made = await explorer.create(parentId, seeded?.name ?? name, kind, seeded?.text);
       if (!made.ok) return made;
@@ -917,14 +920,19 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       return started.then(({ exportId }) => ({ ok: true, exportId, directory: found.exports }));
     },
 
-    'explorer:rename': async ({ entryId, name }) => {
-      const renamed = await explorer.rename(entryId, name);
+    'explorer:rename': async ({ entryId, name, parentId }) => {
+      const renamed = await explorer.rename(entryId, name, parentId);
       if (!renamed.ok) return renamed;
       return {
         ok: true,
         entry: renamed.entry,
         moved: documents.retargetUnder(renamed.from, renamed.to),
       };
+    },
+
+    'explorer:copy': async ({ entryId, parentId, name }) => {
+      const copied = await explorer.copy(entryId, parentId, name);
+      return copied.ok ? { ok: true, entry: copied.entry } : copied;
     },
 
     'explorer:tabs-under': async ({ entryId }) => {

@@ -188,7 +188,7 @@ import { PANEL_BUILTINS } from './command-builtins.js';
 import { type Completion, type ListedEntry, complete } from './command-completion.js';
 import { joinCommandLine } from './command-words.js';
 import { loadHistory, saveHistory, withHistoryLine } from './command-history.js';
-import { type ExplorerPanel, EXPLORER_PANEL_TAG } from './explorer-panel.js';
+import { type ExplorerPanel, EXPLORER_PANEL_TAG, binOf, deleteQuestion } from './explorer-panel.js';
 import type { RestoredDrafts, TemplateMode } from './template-mode.js';
 import { TEMPLATE_MODE_TAG } from './template-mode-tag.js';
 import {
@@ -3757,6 +3757,24 @@ function pickTemplate(): void {
 }
 
 /**
+ * The skeleton of a new brief for the template `name` among the window's templates, or none for
+ * a name it does not know: what Delivery: New writes, and the command panel's
+ * `new x.brief --template t` (TYTO-537).
+ */
+function templateSkeletonOf(name: string): string | undefined {
+  const template = panel.templates.find((candidate) => candidate.name === name);
+  if (template === undefined) return undefined;
+  return skeletonText(
+    briefSkeleton({
+      name: template.name,
+      formats: template.formats.map((format) => format.id),
+      slots: template.slots,
+      ...(template.configured === undefined ? {} : { configured: template.configured }),
+    }),
+  );
+}
+
+/**
  * "Delivery: New…" (TYTO-489, ADR 0157 §5): the name and a template in the bar, the delivery
  * made by main, its brief opened in a new tab and selected in the explorer. An empty brief opens
  * with the "/" menu, which writes the skeleton of the template chosen there.
@@ -3784,18 +3802,7 @@ function newDelivery(): void {
           ...(declared === undefined ? {} : { title: declared }),
         };
       }),
-    skeletonOf: (name) => {
-      const template = panel.templates.find((candidate) => candidate.name === name);
-      if (template === undefined) return undefined;
-      return skeletonText(
-        briefSkeleton({
-          name: template.name,
-          formats: template.formats.map((format) => format.id),
-          slots: template.slots,
-          ...(template.configured === undefined ? {} : { configured: template.configured }),
-        }),
-      );
-    },
+    skeletonOf: templateSkeletonOf,
     create: async (name, brief) => {
       const bridge = window.tyto;
       if (bridge === undefined) return { ok: false, code: 'no-folder', message: '' };
@@ -4217,6 +4224,90 @@ const wiredExplorerPanels = new WeakSet<ExplorerPanel>();
 const EXPLORER_NO_BRIDGE = { ok: false, reason: 'gone' } as const;
 
 /**
+ * The Explorer's writes (TYTO-352, ADR 0121), shared with the command panel's file commands
+ * (TYTO-537, ADR 0201): a new brief opens through `adopt`, a rename or a move renames the tabs it
+ * moved and keeps their text unsaved, and a delete leaves each tab that held a file there in no
+ * file. One copy of each, whichever side asks.
+ */
+async function explorerCreate(
+  parentId: string | null,
+  name: string,
+  kind: 'file' | 'folder',
+  seed?: IpcRequest<'explorer:create'>['seed'],
+  text?: string,
+): Promise<IpcResponse<'explorer:create'>> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+  const wanted = nextDocumentId();
+  const made = await bridge['explorer:create']({
+    documentId: wanted,
+    parentId,
+    name,
+    kind,
+    ...(seed === undefined ? {} : { seed }),
+    ...(text === undefined ? {} : { text }),
+  });
+  if (made.ok && made.document !== null) adopt(made.document, made.documentId, wanted);
+  return made;
+}
+
+async function explorerRename(
+  entryId: string,
+  name: string,
+  parentId?: string | null,
+): Promise<IpcResponse<'explorer:rename'>> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+  const renamed = await bridge['explorer:rename']({
+    entryId,
+    name,
+    ...(parentId === undefined ? {} : { parentId }),
+  });
+  if (renamed.ok && renamed.moved.length > 0) {
+    workspace = withMovedDocuments(workspace, renamed.moved);
+    repaint();
+  }
+  return renamed;
+}
+
+async function explorerUnsavedUnder(entryId: string): Promise<number> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return 0;
+  const { documentIds } = await bridge['explorer:tabs-under']({ entryId });
+  return documentIds.filter((id) => {
+    const held = documentOf(workspace, id);
+    return held !== undefined && isUnsaved(held);
+  }).length;
+}
+
+async function explorerConfirm(question: IpcRequest<'dialog:confirm'>): Promise<boolean> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return false;
+  return (await bridge['dialog:confirm'](question)).confirmed;
+}
+
+async function explorerRemove(entryId: string): Promise<IpcResponse<'explorer:delete'>> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+  const deleted = await bridge['explorer:delete']({ entryId });
+  if (deleted.ok && deleted.released.length > 0) {
+    workspace = withReleasedDocuments(workspace, deleted.released);
+    repaint();
+  }
+  return deleted;
+}
+
+/** Opens an explorer entry in a tab, as a click there does; answers whether a tab opened. */
+async function explorerOpen(entryId: string): Promise<boolean> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return false;
+  const wanted = nextDocumentId();
+  const opened = await bridge['explorer:open']({ documentId: wanted, entryId });
+  adopt(opened.document, opened.documentId, wanted);
+  return opened.document !== null;
+}
+
+/**
  * The explorer (TYTO-279): what it asks main, and its first tree. A brief opens through `adopt`,
  * like a picked file, so one already in a tab is that tab. A new brief opens the same way, a
  * rename renames the tabs it moved and keeps their text unsaved, and a delete leaves each tab
@@ -4244,54 +4335,11 @@ function wireExplorerPanel(): void {
     openFolder: () => {
       runCommand('workspace.openFolder');
     },
-    create: async (parentId, name, kind, seed) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
-      const wanted = nextDocumentId();
-      const made = await bridge['explorer:create']({
-        documentId: wanted,
-        parentId,
-        name,
-        kind,
-        ...(seed === undefined ? {} : { seed }),
-      });
-      if (made.ok && made.document !== null) adopt(made.document, made.documentId, wanted);
-      return made;
-    },
-    rename: async (entryId, name) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
-      const renamed = await bridge['explorer:rename']({ entryId, name });
-      if (renamed.ok && renamed.moved.length > 0) {
-        workspace = withMovedDocuments(workspace, renamed.moved);
-        repaint();
-      }
-      return renamed;
-    },
-    unsavedUnder: async (entryId) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return 0;
-      const { documentIds } = await bridge['explorer:tabs-under']({ entryId });
-      return documentIds.filter((id) => {
-        const held = documentOf(workspace, id);
-        return held !== undefined && isUnsaved(held);
-      }).length;
-    },
-    confirm: async (question) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return false;
-      return (await bridge['dialog:confirm'](question)).confirmed;
-    },
-    remove: async (entryId) => {
-      const bridge = window.tyto;
-      if (bridge === undefined) return EXPLORER_NO_BRIDGE;
-      const deleted = await bridge['explorer:delete']({ entryId });
-      if (deleted.ok && deleted.released.length > 0) {
-        workspace = withReleasedDocuments(workspace, deleted.released);
-        repaint();
-      }
-      return deleted;
-    },
+    create: (parentId, name, kind, seed) => explorerCreate(parentId, name, kind, seed),
+    rename: (entryId, name) => explorerRename(entryId, name),
+    unsavedUnder: explorerUnsavedUnder,
+    confirm: explorerConfirm,
+    remove: explorerRemove,
     menu: async (x, y, items) => {
       const bridge = window.tyto;
       if (bridge === undefined) return null;
@@ -6589,6 +6637,31 @@ function wireCommandPanel(): void {
       const bridge = window.tyto;
       if (bridge === undefined) return { ok: false, reason: 'gone' };
       return bridge['explorer:read']({ entryId });
+    },
+    // TYTO-537, ADR 0201: the Explorer's own writes, so tabs follow as they do there.
+    writes: {
+      create: (parentId, name, kind, brief) =>
+        brief === undefined
+          ? explorerCreate(parentId, name, kind)
+          : explorerCreate(parentId, name, kind, 'brief', brief),
+      move: (entryId, parentId, name) => explorerRename(entryId, name, parentId),
+      copy: async (entryId, parentId, name) => {
+        const bridge = window.tyto;
+        if (bridge === undefined) return EXPLORER_NO_BRIDGE;
+        return bridge['explorer:copy']({ entryId, parentId, name });
+      },
+      unsavedUnder: explorerUnsavedUnder,
+      confirmRemove: (entry, unsaved) =>
+        explorerConfirm(deleteQuestion(state.locale, state.platform, entry, unsaved)),
+      remove: explorerRemove,
+      open: explorerOpen,
+      reveal: (ids) => {
+        void changeLayout(withPanelOpen(layout, EXPLORER_PANEL, true)).then(() => {
+          elements.explorerPanel?.reveal(ids);
+        });
+      },
+      skeletonOf: templateSkeletonOf,
+      bin: binOf(state.locale, state.platform),
     },
   };
 }

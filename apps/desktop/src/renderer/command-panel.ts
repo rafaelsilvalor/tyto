@@ -28,6 +28,7 @@ import {
   type FileRead,
   type PanelBuiltin,
   type PanelFiles,
+  type PanelWrites,
   PANEL_BUILTINS,
 } from './command-builtins.js';
 import { type ListById, folderId, stepsLabel } from './command-paths.js';
@@ -89,7 +90,22 @@ export interface CommandPanelPorts {
   readonly listById: ListById;
   /** A file's text by the explorer's id (`explorer:read`), for `cat` (TYTO-537). */
   readonly read: (entryId: string) => Promise<FileRead>;
+  /** The Explorer's own writes, for `new`, `mkdir`, `mv`, `cp`, `rm`, `open`, `reveal`. */
+  readonly writes: PanelWrites;
 }
+
+const NO_WRITES: PanelWrites = {
+  create: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  move: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  copy: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  unsavedUnder: () => Promise.resolve(0),
+  confirmRemove: () => Promise.resolve(false),
+  remove: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  open: () => Promise.resolve(false),
+  reveal: () => undefined,
+  skeletonOf: () => undefined,
+  bin: 'bin',
+};
 
 const NO_PORTS: CommandPanelPorts = {
   run: () => Promise.reject(new Error('no bridge')),
@@ -105,6 +121,7 @@ const NO_PORTS: CommandPanelPorts = {
   restricted: () => false,
   listById: () => Promise.resolve({ entries: [], more: 0 }),
   read: () => Promise.resolve({ ok: false, reason: 'gone' }),
+  writes: NO_WRITES,
 };
 
 /** Ctrl+R's state: what is typed in the search, and where the match is in the history. */
@@ -426,6 +443,7 @@ export class CommandPanel extends DockedPanel {
       list: this.ports.listById,
       read: (entryId) => this.ports.read(entryId),
       caseless: this.ports.caseless,
+      writes: this.ports.writes,
     };
   }
 

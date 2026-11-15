@@ -43,6 +43,7 @@ import {
   type ExplorerService,
   type WatchFolder,
   checkEntryName,
+  copyTreeOnDisk,
   createExplorerService,
   ignoredByTheWatcher,
   relativeUnder,
@@ -1040,5 +1041,207 @@ describe('reading a file as text', () => {
     await symlink(outside, join(work, 'slides'), 'junction');
 
     expect(await explorer.read(id)).toEqual({ ok: false, reason: 'gone' });
+  });
+});
+
+/** TYTO-537, ADR 0201: the command panel's `mv` and `cp`, by ids, inside the folder only. */
+describe('moving an entry into another folder', () => {
+  it('moves a file into a folder, keeping its id, and never over a file there', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+    const two = await entryIdOf(explorer, 'slide 2.brief');
+
+    expect(await explorer.rename(two, 'dois.brief', slides)).toMatchObject({
+      ok: true,
+      entry: { id: two, name: 'dois.brief' },
+      from: join(work, 'slide 2.brief'),
+      to: join(work, 'slides', 'dois.brief'),
+    });
+    const ten = await entryIdOf(explorer, 'slide 10.brief');
+    expect(await explorer.rename(ten, 'capa.brief', slides)).toEqual({
+      ok: false,
+      reason: 'exists',
+    });
+    expect(await readFile(join(work, 'slides', 'capa.brief'), 'utf8')).toBe('::a');
+  });
+
+  it('refuses a folder moved into itself or under itself', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+    const extra = await entryIdOf(explorer, 'extra', slides);
+
+    expect(await explorer.rename(slides, 'slides', slides)).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(await explorer.rename(slides, 'slides', extra)).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+  });
+
+  it('refuses an entry that became a junction out after it was listed', async () => {
+    const outside = join(scratch, 'outside');
+    await mkdir(outside);
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+    const assets = await entryIdOf(explorer, 'assets');
+    await rm(join(work, 'slides'), { recursive: true });
+    await symlink(outside, join(work, 'slides'), 'junction');
+
+    expect(await explorer.rename(slides, 'slides', assets)).toEqual({ ok: false, reason: 'gone' });
+    expect(await explorer.copy(slides, assets, 'slides')).toEqual({ ok: false, reason: 'gone' });
+    expect(await readdir(join(work, 'assets'))).toEqual([]);
+  });
+
+  it('refuses a target folder that became a junction out after it was listed', async () => {
+    const outside = join(scratch, 'outside');
+    await mkdir(outside);
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const assets = await entryIdOf(explorer, 'assets');
+    const two = await entryIdOf(explorer, 'slide 2.brief');
+    await rm(join(work, 'assets'), { recursive: true });
+    await symlink(outside, join(work, 'assets'), 'junction');
+
+    expect(await explorer.rename(two, 'slide 2.brief', assets)).toEqual({
+      ok: false,
+      reason: 'gone',
+    });
+    expect(await readdir(outside)).toEqual([]);
+  });
+});
+
+describe('copying an entry', () => {
+  it('copies a file and a folder, and never over what is there', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+    const two = await entryIdOf(explorer, 'slide 2.brief');
+
+    expect(await explorer.copy(two, slides, 'dois.brief')).toMatchObject({
+      ok: true,
+      entry: { name: 'dois.brief', kind: 'brief' },
+      path: join(work, 'slides', 'dois.brief'),
+    });
+    expect(await readFile(join(work, 'slide 2.brief'), 'utf8')).toBe('::a');
+    expect(await explorer.copy(slides, null, 'cópia')).toMatchObject({ ok: true });
+    expect(await readdir(join(work, 'cópia'))).toEqual(['capa.brief', 'dois.brief', 'extra']);
+    expect(await explorer.copy(two, null, 'slide 10.brief')).toEqual({
+      ok: false,
+      reason: 'exists',
+    });
+  });
+
+  // The second guard behind `exists`: a target made between that check and the copy.
+  it('never overwrites a target that appeared after the check, the copy refusing it', async () => {
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: handWatcher().watch,
+      copyTree: async (from, to) => {
+        await writeFile(to, 'theirs');
+        await copyTreeOnDisk(from, to);
+      },
+    });
+    await explorer.setRoot(work);
+
+    expect(
+      await explorer.copy(await entryIdOf(explorer, 'slide 2.brief'), null, 'b.brief'),
+    ).toEqual({ ok: false, reason: 'exists' });
+    expect(await readFile(join(work, 'b.brief'), 'utf8')).toBe('theirs');
+  });
+
+  it('refuses a folder copied into itself or under itself', async () => {
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const slides = await entryIdOf(explorer, 'slides');
+    const extra = await entryIdOf(explorer, 'extra', slides);
+
+    expect(await explorer.copy(slides, slides, 'again')).toEqual({ ok: false, reason: 'invalid' });
+    expect(await explorer.copy(slides, extra, 'again')).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('refuses a folder holding a junction, copying nothing', async () => {
+    const outside = join(scratch, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'secret.txt'), 'out');
+    await symlink(outside, join(work, 'slides', 'extra', 'atalho'), 'junction');
+    const explorer = quiet();
+    await explorer.setRoot(work);
+
+    expect(await explorer.copy(await entryIdOf(explorer, 'slides'), null, 'cópia')).toEqual({
+      ok: false,
+      reason: 'link',
+    });
+    expect(await readdir(work)).not.toContain('cópia');
+  });
+
+  // Where the system copies a link as a link (Linux), the walk of the copy is what refuses it.
+  it('sends the copy to the trash when a link landed in it', async () => {
+    const outside = join(scratch, 'outside');
+    await mkdir(outside);
+    const trashed: string[] = [];
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: handWatcher().watch,
+      trash: async (path) => {
+        trashed.push(path);
+        await rm(path, { recursive: true });
+      },
+      copyTree: async (_from, to) => {
+        await mkdir(to);
+        await symlink(outside, join(to, 'atalho'), 'junction');
+      },
+    });
+    await explorer.setRoot(work);
+
+    expect(await explorer.copy(await entryIdOf(explorer, 'slides'), null, 'cópia')).toEqual({
+      ok: false,
+      reason: 'link',
+    });
+    expect(trashed).toEqual([join(work, 'cópia')]);
+  });
+
+  it('sends the copy to the trash when a junction appeared between the check and the copy', async () => {
+    const outside = join(scratch, 'outside');
+    const bin = join(scratch, 'lixeira');
+    await mkdir(outside);
+    await mkdir(bin);
+    await writeFile(join(outside, 'secret.txt'), 'out');
+    const trashed: string[] = [];
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: handWatcher().watch,
+      trash: async (path) => {
+        trashed.push(path);
+        await rename(path, join(bin, basename(path)));
+      },
+      // The seam: after the walk found no link, `extra` becomes a junction out, then the copy.
+      copyTree: async (from, to) => {
+        await rm(join(from, 'extra'), { recursive: true });
+        await symlink(outside, join(from, 'extra'), 'junction');
+        const { cp: copyOnDisk } = await import('node:fs/promises');
+        await copyOnDisk(from, to, {
+          recursive: true,
+          force: false,
+          errorOnExist: true,
+          dereference: false,
+          verbatimSymlinks: true,
+        });
+      },
+    });
+    await explorer.setRoot(work);
+
+    expect(await explorer.copy(await entryIdOf(explorer, 'slides'), null, 'cópia')).toEqual({
+      ok: false,
+      reason: 'link',
+    });
+    expect(trashed).toEqual([join(work, 'cópia')]);
+    expect(await readdir(work)).not.toContain('cópia');
+    // Copied as a link, never followed: nothing of the outside was written in.
+    expect(await readdir(outside)).toEqual(['secret.txt']);
   });
 });

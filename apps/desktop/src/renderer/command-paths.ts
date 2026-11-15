@@ -73,9 +73,18 @@ export async function walk(
   steps: readonly string[],
   list: ListById,
   caseless: boolean,
-): Promise<{ readonly found: Found; readonly steps: readonly string[] } | undefined> {
+): Promise<
+  | {
+      readonly found: Found;
+      readonly steps: readonly string[];
+      /** The id of every step, top down: what the explorer expands to reveal it. */
+      readonly ids: readonly string[];
+    }
+  | undefined
+> {
   let found: Found = { kind: 'root' };
   const named: string[] = [];
+  const ids: string[] = [];
   for (const step of steps) {
     if (found.kind !== 'root' && found.kind !== 'folder') return undefined;
     const { entries } = await list(found.kind === 'root' ? null : found.id);
@@ -83,8 +92,9 @@ export async function walk(
     if (entry === undefined) return undefined;
     found = { kind: entry.kind, id: entry.id, name: entry.name };
     named.push(entry.name);
+    ids.push(entry.id);
   }
-  return { found, steps: named };
+  return { found, steps: named, ids };
 }
 
 /** The id of the folder `steps` names, `null` for the root, `undefined` when it is not one. */

@@ -1,7 +1,7 @@
 # Commands
 
 ::: info How this page was checked
-Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them. The refusals of `tyto mcp`, `watch` and `recipe run --apply` were added to this list on 2026-11-12 from the window's code and its unit tests, the last one through the command line's own parser, not in the window. The panel's own commands, `&&`, `!N` and patterns were added on 2026-11-15 from the window's code and its unit tests, not in the window. The file commands `ls`, `cd`, `pwd` and `cat`, and completion after them, were added on 2026-11-15 from the window's code and its unit tests; the prompt showing a folder after `cd` was looked at in the window, in the light and dark themes. The boxes a refusal offers were added on 2026-11-15: the ones for `--trust` and `recipe run --apply` were followed in the window, with both answers; the ones for `signin`, `signout` and `watch` come from the window's code and its unit tests.
+Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them. The refusals of `tyto mcp`, `watch` and `recipe run --apply` were added to this list on 2026-11-12 from the window's code and its unit tests, the last one through the command line's own parser, not in the window. The panel's own commands, `&&`, `!N` and patterns were added on 2026-11-15 from the window's code and its unit tests, not in the window. The file commands `ls`, `cd`, `pwd` and `cat`, and completion after them, were added on 2026-11-15 from the window's code and its unit tests; the prompt showing a folder after `cd` was looked at in the window, in the light and dark themes. `new`, `mkdir`, `mv`, `cp`, `rm`, `open` and `reveal` were added the same day from the window's code and its unit tests, not in the window. The boxes a refusal offers were added on 2026-11-15: the ones for `--trust` and `recipe run --apply` were followed in the window, with both answers; the ones for `signin`, `signout` and `watch` come from the window's code and its unit tests.
 :::
 
 The **Commands** tab of the bottom area runs `tyto` commands, the same ones as the [command line](../command-line/index.md), inside the window, and a few commands of its own. Nothing else runs there: not a shell and not another program. For a shell, use the [Terminal](terminal.md) tab.
@@ -35,24 +35,33 @@ Each command you run is a block. Its header shows the command, with its paths cu
 
 ## The panel's own commands
 
-These are not `tyto` commands: the panel answers them itself, and none of them writes a file, so they also run in a [restricted folder](workspace-folder.md). Writing `tyto` first sends the line to the command line instead: `tyto help` is its own help.
+These are not `tyto` commands: the panel answers them itself. Those that only read also run in a [restricted folder](workspace-folder.md); `new`, `mkdir`, `mv`, `cp`, `rm`, `open` and `reveal` do not, and say so. Writing `tyto` first sends the line to the command line instead: `tyto help` is its own help.
 
-| Command          | What it does                                                                                 |
-| ---------------- | -------------------------------------------------------------------------------------------- |
-| `help`           | Lists these commands and the `tyto` commands. `help render` shows the help of `tyto render`. |
-| `clear` or `cls` | Empties the output, as **Clear** and **Ctrl+L** do.                                          |
-| `history`        | Lists the lines run in this workspace folder, numbered from 1.                               |
-| `!N`             | Runs line N of `history` again: `!5` runs the fifth.                                         |
-| `last`           | Runs the last `tyto` command again: not one of these, and not a line with `&&`.              |
-| `exit`           | Closes this session, stopping what it runs.                                                  |
-| `ls`             | Lists the panel's folder, or the folder named: `ls entregas`.                                |
-| `cd`             | Goes to a folder: `cd entregas/novembro`, `cd ..` back one. `cd` alone goes back to the top. |
-| `pwd`            | Prints the full path of the panel's folder.                                                  |
-| `cat`            | Prints a text file: `cat notas.txt`. Up to 256 KB of it, with a line saying it was cut.      |
+| Command          | What it does                                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `help`           | Lists these commands and the `tyto` commands. `help render` shows the help of `tyto render`.                                                                               |
+| `clear` or `cls` | Empties the output, as **Clear** and **Ctrl+L** do.                                                                                                                        |
+| `history`        | Lists the lines run in this workspace folder, numbered from 1.                                                                                                             |
+| `!N`             | Runs line N of `history` again: `!5` runs the fifth.                                                                                                                       |
+| `last`           | Runs the last `tyto` command again: not one of these, and not a line with `&&`.                                                                                            |
+| `exit`           | Closes this session, stopping what it runs.                                                                                                                                |
+| `ls`             | Lists the panel's folder, or the folder named: `ls entregas`.                                                                                                              |
+| `cd`             | Goes to a folder: `cd entregas/novembro`, `cd ..` back one. `cd` alone goes back to the top.                                                                               |
+| `pwd`            | Prints the full path of the panel's folder.                                                                                                                                |
+| `cat`            | Prints a text file: `cat notas.txt`. Up to 256 KB of it, with a line saying it was cut.                                                                                    |
+| `new`            | Makes an empty file: `new notas.txt`. `new cartaz.brief --template story` writes the template's skeleton, as **Delivery: New…** does. A brief or text file opens in a tab. |
+| `mkdir`          | Makes a folder: `mkdir entrega-123`.                                                                                                                                       |
+| `mv`             | Moves or renames: `mv capa.brief entregas` puts it in `entregas`, `mv capa.brief nova.brief` renames it. Open tabs follow.                                                 |
+| `cp`             | Copies a file or a folder, as `mv` names its target.                                                                                                                       |
+| `rm`             | Moves files or folders to the bin: `rm velho.brief rascunhos`.                                                                                                             |
+| `open`           | Opens a brief, recipe or text file in a tab.                                                                                                                               |
+| `reveal`         | Selects a file or folder in the Explorer.                                                                                                                                  |
 
 `ls` lists folders first, each ending in `/`, and every name beside its kind: folder, brief, recipe or file. A brief, a recipe or a text file is a link that opens it in a tab, unless its name has a space.
 
 The file commands only reach inside the open workspace folder. A path that leaves it is refused: `..` above the folder, a path starting with `/`, `C:\`, `\\server` or `~`, and a link or junction that points outside it, which the [Explorer](workspace-folder.md#browse-its-files-the-explorer) does not show either. Each session has its own folder; opening another workspace folder sends every session back to the top. `cat` refuses a file that is not text.
+
+Nothing is replaced: `mv`, `cp`, `new` and `mkdir` refuse a name that is already taken, and say so. `rm` never deletes for good: everything goes to the system's bin, where you can restore it. It asks first only when an open tab under what goes has unsaved changes, and it never removes the workspace folder itself. `cp` refuses a folder that holds a link or junction, and a folder never goes into itself.
 
 ## Several commands in one line
 

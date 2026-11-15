@@ -6,6 +6,7 @@ import {
   type BuiltinOutcome,
   type FileRead,
   type PanelFiles,
+  type PanelWrites,
   PANEL_BUILTINS,
 } from './command-builtins.js';
 import { absoluteFolder } from './command-file-builtins.js';
@@ -57,6 +58,7 @@ function workspace(
       },
       read: (entryId) => Promise.resolve(TEXTS[entryId] ?? { ok: false, reason: 'gone' }),
       caseless: true,
+      writes: {} as PanelWrites,
     },
   };
 }

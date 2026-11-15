@@ -87,8 +87,7 @@ exists: there is no second way to write in the renderer or in main.
 
 - `new <name>` makes an empty file and `mkdir <name>` a folder, with `explorer:create`'s name
   rules, never overwriting anything. `new <name>.brief --template <t>` writes the skeleton the
-  explorer's New Brief and `tyto delivery new -t` write, or the option is left out until that
-  skeleton can be shared.
+  window's Delivery: New writes (see the note below).
 - `mv` and `cp` take a source and a target inside the workspace, never overwriting.
 - `rm` moves an entry to the operating system's bin (`shell.trashItem`) and nothing else: a bin
   that fails leaves the entry where it was, and nothing is ever deleted for good.
@@ -98,9 +97,32 @@ exists: there is no second way to write in the renderer or in main.
 Each still runs no program: ADR 0200 decision 1 holds for everything but the sentence that no
 built-in writes a file, which this decision replaces.
 
+### Note of 2026-11-15: what `mv`, `cp`, `rm` and `new --template` needed in main
+
+The Explorer renames in place only and has no copy, so the second part of TYTO-537 extends its
+main-side service rather than adding a path of its own:
+
+- **`mv`** is `explorer:rename` with an optional `parentId`, the folder it goes into. Main checks
+  the entry's real path and the target folder's at the call, refuses a folder moved into itself
+  or under itself, and keeps the ids, so the tabs follow a move as they follow a rename.
+- **`cp`** is a new strict channel, `explorer:copy {entryId, parentId, name}`, with the same
+  checks. A copy holding a link or a junction is refused: the source is walked first, the copy
+  passes `dereference: false` so a link that appears between the walk and the copy is copied as
+  a link and never followed, and the copy is walked after it. A link found there, or a copy the
+  system refused part of the way through, sends what was copied to the bin and answers `link`.
+  Nothing is overwritten.
+- **`rm`** asks first only when a tab under the entry holds unsaved text, with the Explorer's own
+  question; the bin is the undo. The workspace folder itself is refused, and has no id in main.
+- **`new <name>.brief --template <t>`** writes the skeleton the window already writes for
+  Delivery: New (`briefSkeleton` over the window's templates), through `explorer:create` with
+  `seed: 'brief'` and its text: only a `.brief` name, at most 64 KB, and in the same `wx` write
+  that refuses an existing file. The window can already save a brief's text, so this widens
+  nothing it could not write before.
+
 ## Consequences
 
-- `cli:run` gains `folder`; `explorer:read` is a new channel. Both are strict and take ids.
+- `cli:run` gains `folder` and `explorer:rename` gains `parentId`; `explorer:read` and
+  `explorer:copy` are new channels. All are strict and take ids.
 - The manual's Commands page lists the file commands and says the prompt shows the folder.
 - Completion offers paths after a file command, from the working folder (folders only after
   `cd`), and completes a `tyto` command's paths from there too.

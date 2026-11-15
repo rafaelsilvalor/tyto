@@ -874,6 +874,7 @@
         "apps/desktop/src/renderer/command-builtins.ts",
         "apps/desktop/src/renderer/command-completion.ts",
         "apps/desktop/src/renderer/command-file-builtins.ts",
+        "apps/desktop/src/renderer/command-file-writes.ts",
         "apps/desktop/src/renderer/command-glob.ts",
         "apps/desktop/src/renderer/command-history.ts",
         "apps/desktop/src/renderer/command-links.ts",
