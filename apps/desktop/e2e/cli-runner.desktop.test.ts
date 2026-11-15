@@ -110,6 +110,34 @@ function tyto(argv: readonly string[], cancel = false): Promise<Ended> {
   );
 }
 
+/** What main passed to the box a refused line asked in (TYTO-726). */
+interface AskedBox {
+  readonly message: string;
+  readonly detail: string;
+  readonly buttons: readonly string[];
+  readonly defaultId?: number;
+  readonly cancelId?: number;
+}
+
+/**
+ * Replaces main's native box with one that answers `response` (0 is the offer, 1 is Cancel) and
+ * records what it was asked, from now on. Playwright cannot click a native box; this is how
+ * `agent-window.desktop.test.ts` answers one, and nothing in the app changes for it.
+ */
+async function answerBoxes(response: number): Promise<void> {
+  await app.evaluate(({ dialog }, answer) => {
+    const store = globalThis as { refusalBoxes?: unknown[] };
+    store.refusalBoxes = [];
+    dialog.showMessageBox = ((...args: unknown[]) => {
+      store.refusalBoxes?.push(args.at(-1));
+      return Promise.resolve({ response: answer, checkboxChecked: false });
+    }) as typeof dialog.showMessageBox;
+  }, response);
+}
+
+const boxes = (): Promise<AskedBox[]> =>
+  app.evaluate(() => ((globalThis as { refusalBoxes?: AskedBox[] }).refusalBoxes ?? []).slice());
+
 beforeAll(async () => {
   scratch = mkdtempSync(join(tmpdir(), 'tyto-cli-runner-e2e-'));
   work = join(scratch, 'work');
@@ -177,6 +205,54 @@ describe('a tyto command in the window', () => {
 
     expect(ended.code).toBe(1);
     expect(ended.err).toContain('Workspace: Trust');
+  });
+
+  // TYTO-718: every refusal the window makes, in Electron's main. A refusal that offers the
+  // window's own way asks in a native box first (TYTO-726); answered No, the line stays refused.
+  it('refuses `recipe run --apply` after its box is answered No, and applies nothing', async () => {
+    await answerBoxes(1);
+    const recipe = join(work, 'x.recipe');
+    const ended = await tyto(['recipe', 'run', recipe, '--apply']);
+
+    expect(ended.code).toBe(1);
+    expect(ended.err).toContain('--apply is not available in the window');
+    const asked = await boxes();
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.message).toContain(recipe);
+    expect(asked[0]).toMatchObject({ defaultId: 1, cancelId: 1 });
+  });
+
+  it('refuses `mcp` with the rule and no box', async () => {
+    await answerBoxes(0);
+    const ended = await tyto(['mcp']);
+
+    expect(ended.code).toBe(1);
+    expect(ended.err).toContain('tyto mcp is not available in the window');
+    expect(await boxes()).toEqual([]);
+  });
+
+  it('refuses `signin` and `signout` with the rule, and no box for a plugin not installed', async () => {
+    await answerBoxes(0);
+    for (const command of ['signin', 'signout']) {
+      const ended = await tyto([command, 'no-such-plugin']);
+
+      expect(ended.code, command).toBe(1);
+      expect(ended.err, command).toContain(
+        'tyto signin and tyto signout are not available in the window',
+      );
+    }
+    expect(await boxes()).toEqual([]);
+  });
+
+  it('lets `recipe run` without --apply reach the command', async () => {
+    await answerBoxes(0);
+    const ended = await tyto(['recipe', 'run', join(work, 'x.recipe')]);
+
+    expect(ended.state).toBe('finished');
+    expect(ended.code).not.toBe(0);
+    expect(ended.err).not.toContain('is not available in the window');
+    expect(ended.err).toContain('x.recipe');
+    expect(await boxes()).toEqual([]);
   });
 
   it('stops a watch through cli:cancel', async () => {
