@@ -1,6 +1,12 @@
 import type { IpcEventPayload } from '../../shared/ipc.js';
 import { type AnsiState, freshAnsiState } from './ansi.js';
-import { EMPTY_SCROLLBACK, type Scrollback, withNote, withOutput } from './command-output.js';
+import {
+  EMPTY_SCROLLBACK,
+  type Scrollback,
+  withNote,
+  withOutput,
+  withPanelLine,
+} from './command-output.js';
 import type { CommandProblemRow } from './problems-panel.js';
 
 /**
@@ -196,8 +202,9 @@ export class CommandSessions {
   }
 
   /**
-   * A line the panel answered itself (TYTO-535): a built-in's block, its lines as the panel's
-   * own, ended with `code` as a run would. The session's own state is left as it was: a
+   * A line the panel answered itself (TYTO-535): a built-in's block, ended with `code` as a run
+   * would. What it printed is what the person asked to see, so plain output; a built-in that
+   * failed printed why, which is one of the panel's own notes (TYTO-725). The session's own state is left as it was: a
    * built-in is not the run Stop and the tab's status speak of.
    */
   printed(
@@ -216,7 +223,8 @@ export class CommandSessions {
           { number, line, words: [], startedAt: at, state: 'finished', code },
         ],
         scrollback: lines.reduce(
-          (scrollback, text) => withNote(scrollback, text, number),
+          (scrollback, text) =>
+            withPanelLine(scrollback, code === 0 ? 'out' : 'note', text, number),
           session.scrollback,
         ),
       };

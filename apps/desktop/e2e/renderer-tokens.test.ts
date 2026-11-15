@@ -398,6 +398,8 @@ describe.each(['light', 'dark'] as const)('the %s theme', (name) => {
     ['--tyto-error', '--tyto-surface', 4.5],
     // TYTO-725: the command panel writes a warning diagnostic in `warning` on `surface`.
     ['--tyto-warning', '--tyto-surface', 4.5],
+    // TYTO-725: and a run's ✓ badge in `success` on `surface`.
+    ['--tyto-success', '--tyto-surface', 4.5],
     ['--tyto-syntax-comment', '--tyto-surface', 3],
     ['--tyto-text', '--tyto-selection', 4.5],
     // TYTO-288: an inactive tab's name is muted, and a hovered tab paints `hover` behind it.

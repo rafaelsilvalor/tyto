@@ -595,6 +595,12 @@ describe("the panel's own commands, && and globs (TYTO-535, ADR 0200)", () => {
     expect(headers(harness.element)).toEqual(['history']);
     expect(lines(harness.element)).toEqual(['1  check a.brief', '2  history']);
     expect(harness.element.querySelector('.command-run__badge')?.textContent).toBe('✓ 0');
+    // What it printed is what was asked for: plain output, not one of the panel's notes (TYTO-725).
+    expect(
+      [...harness.element.querySelectorAll<HTMLElement>('.command-panel__line')].map(
+        (line) => line.dataset['tone'],
+      ),
+    ).toEqual(['plain', 'plain']);
   });
 
   it('clears the output with clear or cls, as Ctrl+L does', async () => {

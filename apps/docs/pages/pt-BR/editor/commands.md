@@ -70,7 +70,7 @@ Uma lista logo abaixo do prompt mostra o que pode vir em seguida, em qualquer or
 ## A saída
 
 - O cabeçalho de cada execução diz como ela terminou: **✓ 0** em verde quando deu certo, **✗** e o código de saída em vermelho quando não deu.
-- Uma linha ganha a cor do que ela diz, não de onde o comando a escreveu: um problema que o comando relata sai em vermelho quando é um erro e em âmbar quando é um aviso, com o código em negrito, e a dica embaixo dele sai em cinza. O resto, como uma pergunta que o comando faz, é texto comum. As linhas do próprio painel saem em cinza.
+- Uma linha ganha a cor do que ela diz, não de onde o comando a escreveu: um problema que o comando relata sai em vermelho quando é um erro e em âmbar quando é um aviso, com o código em negrito, e a dica embaixo dele sai em cinza. O resto, como uma pergunta que o comando faz ou o que `history` imprime, é texto comum. As mensagens do próprio painel, como o motivo de ter recusado uma linha, saem em cinza.
 - Um comando que imprime as próprias cores fica com elas.
 - Um lugar que um problema nomeia, como `cartaz.brief:5:1`, é um link, e também qualquer brief ou arquivo de texto da pasta aberta: **clique** nele para abrir o arquivo numa aba, nessa linha.
 - Os mesmos problemas aparecem em [Problemas](panels.md#problemas), sob o comando que os relatou. A barra de status os conta, e a aba **PROBLEMAS** também.

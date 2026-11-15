@@ -86,17 +86,29 @@ export function withOutput(
 
 const PLAIN: AnsiStyle = {};
 
-/** The scrollback with one of the panel's own lines added, on a line of its own. */
-export function withNote(scrollback: Scrollback, text: string, run?: number): Scrollback {
+/**
+ * The scrollback with a line the panel wrote added, on a line of its own: one of its own
+ * messages as a `note`, or what a built-in printed as `out` (TYTO-725).
+ */
+export function withPanelLine(
+  scrollback: Scrollback,
+  stream: OutputStream,
+  text: string,
+  run?: number,
+): Scrollback {
   return capped(
     [
       ...scrollback.lines,
-      { stream: 'note', runs: [{ text, style: PLAIN }], ...(run === undefined ? {} : { run }) },
+      { stream, runs: [{ text, style: PLAIN }], ...(run === undefined ? {} : { run }) },
     ],
     false,
     scrollback.dropped,
   );
 }
+
+/** The scrollback with one of the panel's own lines added, on a line of its own. */
+export const withNote = (scrollback: Scrollback, text: string, run?: number): Scrollback =>
+  withPanelLine(scrollback, 'note', text, run);
 
 /** Everything in the scrollback as text, one line per line: what Copy copies. */
 export const scrollbackText = (scrollback: Scrollback): string =>
