@@ -1,5 +1,40 @@
 # @tyto/editor
 
+## 0.18.0
+
+### Minor Changes
+
+- 69b00fe: TYTO-680: a comment line inside an indented block is skipped and the block goes on (ADR 0204).
+  An indented `//` line is always a comment of its block; a `//` at column 0 is the block's when
+  indented lines follow it, and a top-level comment otherwise. A body line that starts with `//`
+  is written `\//`, and `writeBrief` escapes one. This changes one brief that compiled before: an
+  indented line starting with `//` was body text and is now a comment. Format Brief indents a
+  comment inside a block like its body lines; the editor folds it with the block, counts it in
+  the block's range and offers no completion in front of it.
+- 0c38153: TYTO-712: the recipe editor reads the word after a `|` that chains steps as a verb. It colours
+  it as one and offers verbs there, splitting a line where the parser does, through
+  `chainSegments`, which `@tyto/recipe` now exports.
+- 8700e87: TYTO-727: the recipe editor colours `const` as a header line and a `set` step's name, `=` and
+  aggregate, offers the aggregates after `set <name> = `, and offers the names in scope after a
+  `{`: every `param` and `const`, and each `set` above the step. `@tyto/recipe` exports
+  `SET_AGGREGATES` and `readSet` for it, explains the `set` form's syntax in its help, and rounds a
+  `sum` to 15 significant digits, so `0.1 + 0.2` is `0.3`. `tyto recipe run` prints the value a
+  `set` step set and its note, as text and in `--json`, and `run_recipe` answers both.
+
+### Patch Changes
+
+- Updated dependencies [a232861]
+- Updated dependencies [54bbebf]
+- Updated dependencies [69b00fe]
+- Updated dependencies [0c38153]
+- Updated dependencies [85f200f]
+- Updated dependencies [8700e87]
+- Updated dependencies [917636f]
+  - @tyto/core@0.46.0
+  - @tyto/brief-lang@0.9.0
+  - @tyto/recipe@0.7.0
+  - @tyto/template-lang@0.8.20
+
 ## 0.17.0
 
 ### Minor Changes

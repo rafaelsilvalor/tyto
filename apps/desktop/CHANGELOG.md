@@ -1,5 +1,119 @@
 # @tyto/desktop
 
+## 0.23.0
+
+### Minor Changes
+
+- 56683e2: TYTO-535: the command panel has commands of its own, `help`, `clear` (or `cls`), `history`,
+  `!N`, `last` and `exit`, offered in its completion. `&&` runs the next command only when the one
+  before ended with exit code 0, and `*` and `?` expand to the matching files of the open workspace
+  folder (`render *.brief`), never outside it; a pattern that matches nothing is refused. Every
+  `tyto` command a line runs keeps its own refusals and trust rules (ADR 0200).
+- a232861: The command panel has aliases and variables (TYTO-536). `alias entrega='render --delivery'`
+  saves an alias in the `commandAliases` setting, and `unalias` removes one; a workspace's own
+  aliases, in the new `aliases` key of `.tyto/project.json`, win name by name.
+  An alias expands once and its line is taken literally. `set name=value` sets a variable for the
+  session, read as `$name` inside a word, never in single quotes and never from the environment.
+  A restricted folder's aliases are withheld (`W_PROJECT_ALIASES_WITHHELD`), and a refused line
+  that came from an alias names it, and where it is defined, in its sentence and its box.
+- f2ab35b: `alias --workspace name='line'` and `unalias --workspace name` write the command panel's aliases
+  into the open folder's own `.tyto/project.json` (TYTO-536), under `aliases`, keeping the file's
+  comments and layout and adding the key when it is missing. Main writes only the open folder's
+  file, never a work profile's, and refuses a folder that is not trusted and a file that does not
+  parse.
+- 84fe3a2: The command panel has file commands that read (TYTO-537, ADR 0201): `ls` lists a folder with
+  each name's kind, `cd` moves the panel's folder and the prompt shows it
+  (`tyto entregas/novembro ›`), `pwd` prints it and `cat` prints a text file. `tyto` commands run in
+  that folder, and its paths link from there. Every path stays inside the open workspace folder,
+  checked by main on the explorer's ids, and the four run in a restricted folder.
+- 59519b8: The command panel has file commands that write (TYTO-537, ADR 0201): `new` and `mkdir` make a
+  file or a folder (`new x.brief --template t` writes the template's skeleton), `mv` moves or
+  renames and `cp` copies, never over what is there, `rm` sends to the system's bin only, `open`
+  opens a file in a tab and `reveal` selects it in the Explorer. Each goes through the Explorer's
+  own writes, checked by main at the call; none runs in a restricted folder.
+- d7ab9d4: TYTO-726: a command the panel refuses offers the window's own way in a native box that names
+  what it acts on: `--trust` offers to trust the open folder (saved, as Workspace: Manage Trust
+  does) and then runs the command without it; `signin` and `signout` sign in or out as the
+  plugins screen does; `recipe run --apply` opens the recipe's notebook, applying nothing; and
+  `watch` on the queue folder turns Render automatically off and watches. Cancel is the default;
+  `tyto mcp` stays refused (ADR 0159 note of 2026-11-15).
+- 8700e87: TYTO-727: a block's result says each value its `set` steps set, such as "Set last_due =
+  2026-12-01", and their notes, in the header line a fold keeps, in English and Portuguese.
+- 0ebb9eb: TYTO-728: `tyto template list [folder]` prints every template a render in that folder can use,
+  with its origin (built-in, plugin, workspace) and formats, aliases as rows of their own, and
+  `--json` and `--trust`. It reads the templates through the same steps `tyto render`,
+  `tyto recipe run` and `tyto delivery new --template` now share, so the list and a render never
+  disagree; a restricted folder lists what a restricted render can use and says what it left out.
+  The command panel's `templates` runs it in the session's working folder.
+
+### Patch Changes
+
+- 69b00fe: TYTO-680: a comment line inside an indented block is skipped and the block goes on (ADR 0204).
+  An indented `//` line is always a comment of its block; a `//` at column 0 is the block's when
+  indented lines follow it, and a top-level comment otherwise. A body line that starts with `//`
+  is written `\//`, and `writeBrief` escapes one. This changes one brief that compiled before: an
+  indented line starting with `//` was body text and is now a comment. Format Brief indents a
+  comment inside a block like its body lines; the editor folds it with the block, counts it in
+  the block's range and offers no completion in front of it.
+- 65587b1: TYTO-711: on a recipe line that chains steps with `|`, Edit step opens the step under the
+  cursor and Open cell result in a tab opens that step's result, not the line's first. On the
+  `|` or the blanks around it, the side of the `|` the cursor is on wins; past the last step, the
+  last. A result tab opened on a chained line keeps drawing the step it was opened for.
+- 85f200f: TYTO-714: `decide` with `clear=push` holds the clears of a run that look like a lost read. When
+  the `local=` column is missing or empty on every row while `last` holds values, no clear is
+  pushed and one `W_RECIPE_DECIDE_CLEAR_COLUMN` names the column; when a run would push more
+  clears than the new `clear-limit=<n>|none` (5 when not given), none is pushed and one
+  `W_RECIPE_DECIDE_CLEAR_LIMIT` gives the count. A held clear is a `hold` row whose decided value
+  is the last one, so the state does not advance. The desktop's recipe form gains the
+  `clear-limit` field's Portuguese help, and the user manual a section on syncing a field both
+  ways.
+- 1845237: The command panel colours a line by what it means, not by the stream it came on: a diagnostic
+  takes its severity's colour with its code in bold, its hint is muted, and any other stderr line
+  is plain text, so a run that ended ✓ 0 no longer shows red lines. Text inside a find match is
+  the window's own text colour, and what a built-in such as `history` prints is plain output. The
+  light theme's warning (#a48819 to #7e6813) and success (#4f8a43 to #447639) are darker, so
+  warning text and the ✓ badge read above 5:1 on the panel (TYTO-725).
+- 917636f: TYTO-727: the step form's Portuguese for the new `set` verb.
+- eed88a7: The command panel completes `--template` and `--formats` from `tyto template list --json
+--no-sync` run in the session's working folder (TYTO-729), no longer from the window's
+  template picker: a name it offers is one a render there accepts, the folder's own `templates/`
+  included and a restricted folder's plugin files left out. The answer is kept per working folder
+  and trust, and asked again after a template, plugin, file or trust change, or after a panel
+  run; what the listing left out is said once in the panel.
+
+  `tyto template list --no-sync` fetches nothing: a plugin file whose copy is not on this
+  computer yet is left out, and the error output names it. A plugin folder sync that does not
+  fetch takes the reason it gives (`notFetchedBecause`), `tyto watch`'s by default.
+
+- Updated dependencies [a232861]
+- Updated dependencies [54bbebf]
+- Updated dependencies [54bbebf]
+- Updated dependencies [69b00fe]
+- Updated dependencies [0c38153]
+- Updated dependencies [85f200f]
+- Updated dependencies [d7ab9d4]
+- Updated dependencies [8700e87]
+- Updated dependencies [917636f]
+- Updated dependencies [0ebb9eb]
+- Updated dependencies [eed88a7]
+- Updated dependencies [73b2ed6]
+- Updated dependencies [c8417c2]
+  - @tyto/core@0.46.0
+  - @tyto/plugin-api@0.22.0
+  - @tyto/brief-lang@0.9.0
+  - @tyto/editor@0.18.0
+  - @tyto/recipe@0.7.0
+  - @tyto/command-line@0.9.0
+  - @tyto/io@5.9.0
+  - @tyto/export-html@0.7.22
+  - @tyto/export-svg@2.0.22
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.21
+  - @tyto/pipeline@0.12.18
+  - @tyto/template-lang@0.8.20
+  - @tyto/templates@1.2.16
+  - @tyto/theme-pack@0.1.21
+
 ## 0.22.0
 
 ### Minor Changes
