@@ -7,9 +7,9 @@ import { parseBrief } from './parse-brief.js';
  * `to-brief` hands over one row of a table.
  *
  * The value is brief text, so the inline Markdown a person wrote in a cell (`**urgente**`, a
- * trailing `\`) means what it means in a brief. `\::` is the only escape the language has
- * (ADR 0004), and it is the only one written here: a line of a value starting with `::` would
- * otherwise be read as a directive. **A `{` or a `}` is refused**, never escaped or dropped:
+ * trailing `\`) means what it means in a brief. The language has two escapes, `\::` (ADR 0004)
+ * and `\//` (ADR 0204), and they are the only ones written here: a line of a value starting
+ * with `::` would otherwise be read as a directive, and one starting with `//` as a comment. **A `{` or a `}` is refused**, never escaped or dropped:
  * the language has no literal brace, and silently changing what a person's data says would
  * hand them a brief that differs from their sheet with nothing to say so. The recipe can fix
  * the data first with `rewrite`.
@@ -97,11 +97,11 @@ export function writeBrief(brief: BriefToWrite): Result<string, readonly BriefWr
   return problems.length > 0 ? err(problems) : ok(text);
 }
 
-/** The value's lines, each trimmed, blank ones dropped, a leading `::` escaped. */
+/** The value's lines, each trimmed, blank ones dropped, a leading `::` or `//` escaped. */
 function linesOf(value: string): string[] {
   return value
     .split(/\r\n|\r|\n/u)
     .map((line) => line.trim())
     .filter((line) => line !== '')
-    .map((line) => (line.startsWith('::') ? `\\${line}` : line));
+    .map((line) => (line.startsWith('::') || line.startsWith('//') ? `\\${line}` : line));
 }

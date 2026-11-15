@@ -114,6 +114,20 @@ slots:
     expect(BRIEF.slice(blocks[3]?.from, blocks[3]?.to).endsWith('hoje')).toBe(true);
   });
 
+  it('counts a comment line inside a block as the block’s, up to its end (TYTO-680)', () => {
+    const text = '::lamina\n  Um\n// a\n  Dois\n  // b\n// c\n::lamina\n  Tres';
+    const blocks = blocksIn(text);
+    expect(blocks.map((block) => [lineOf(text, block.from), lineOf(text, block.to)])).toEqual([
+      [1, 5],
+      [7, 8],
+    ]);
+    expect(blocks[0]?.firstText).toBe('Um');
+  });
+
+  it('reads `\\//` in a first line as the `//` it stands for', () => {
+    expect(blocksIn('::lamina\n  \\// Um').map((block) => block.firstText)).toEqual(['// Um']);
+  });
+
   it('keeps the blocks after a line that does not parse yet', () => {
     const broken = BRIEF.replace('::titulo Agenda da **semana**', '::titulo Agenda da **sem');
     const names = blocksIn(broken, AGENDA).map((block) => block.name ?? block.kind);

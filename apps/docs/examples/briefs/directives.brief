@@ -10,4 +10,6 @@ formats: [grid]
 // Or on the lines below it, indented:
 ::subtitulo
   Saturday, 10 am to 4 pm.
+// A note among the lines of a block is skipped, and the block goes on.
   \::free entry is not a directive, because of the backslash.
+  \// is shown as //, not a note.

@@ -129,6 +129,14 @@ describe('completeBrief', () => {
     expect(labelsOf(result)).toEqual(['item', 'titulo', 'tom']);
   });
 
+  it('offers nothing in the indent in front of a comment line inside a block (TYTO-680)', () => {
+    const analysis = analysisOf(CARROSSEL);
+
+    expect(completeAt(`${frontmatter()}::titulo\n  a\n  |// x\n  b\n`, analysis)).toBeNull();
+    expect(completeAt(`${frontmatter()}::titulo\n  a\n|// x\n  b\n`, analysis)).toBeNull();
+    expect(completeAt(`${frontmatter()}::titulo\n  a\n  // x|\n  b\n`, analysis)).toBeNull();
+  });
+
   it('replaces what has been typed of the name, not the :: in front of it', () => {
     const doc = `${frontmatter()}::ti|`;
     const result = completeAt(doc, analysisOf(CARROSSEL));

@@ -209,13 +209,15 @@ describe('Format Brief', () => {
 
   it('refuses a brief with a syntax error, says so, and changes nothing', async () => {
     await page.keyboard.press('Control+End');
-    await page.keyboard.insertText('// fim\n  sem diretiva\n');
+    // An unclosed bold. Not a comment then an indented line: since TYTO-680 that line is the
+    // block's body (ADR 0204), and Format Brief formats it.
+    await page.keyboard.insertText('::titulo **aberto\n');
     await page.keyboard.press('Alt+Shift+F');
     await expect
       .poll(notice, { timeout: 5_000 })
       .toMatch(/^(Format Brief: not formatted|Arrumar brief: nada mudou)/u);
     await shoot('3-refused');
-    await savedAs(`${MESSY}// fim\n  sem diretiva\n`);
+    await savedAs(`${MESSY}::titulo **aberto\n`);
     await page.keyboard.press('Control+z');
     await savedAs(MESSY);
   }, 60_000);

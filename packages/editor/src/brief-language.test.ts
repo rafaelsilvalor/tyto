@@ -37,6 +37,27 @@ describe('the colours come from the grammar', () => {
   });
 });
 
+describe('a comment line inside a block is coloured as a comment (TYTO-680)', () => {
+  const named = tagHighlighter([
+    { tag: tags.lineComment, class: 'comment' },
+    { tag: tags.escape, class: 'escape' },
+  ]);
+
+  it('at column 0 and indented, and `\\//` as an escape', () => {
+    const source = '::lamina\n  Um\n// a\n    // b\n  \\// c\n';
+    const found: [string, string][] = [];
+    highlightTree(briefLanguage.parser.parse(source), named, (from, to, tag) => {
+      found.push([source.slice(from, to), tag]);
+    });
+
+    expect(found).toEqual([
+      ['// a', 'comment'],
+      ['// b', 'comment'],
+      ['\\//', 'escape'],
+    ]);
+  });
+});
+
 describe('folding', () => {
   const stateOf = (doc: string): EditorState =>
     fullyParsed(EditorState.create({ doc, extensions: [briefLanguage] }));
@@ -84,6 +105,26 @@ describe('folding', () => {
     const range = foldable(state, state.doc.line(1).from, state.doc.line(1).to);
 
     expect(doc.slice(range?.from, range?.to)).toBe('\n  um\n\n  dois');
+  });
+
+  it('folds a comment line inside the block with it, at its head or its end (TYTO-680)', () => {
+    const doc = '::a\n// first\n  um\n// middle\n  dois\n  // last\n::b\n';
+    const state = stateOf(doc);
+
+    const range = foldable(state, state.doc.line(1).from, state.doc.line(1).to);
+
+    expect(doc.slice(range?.from, range?.to)).toBe(
+      '\n// first\n  um\n// middle\n  dois\n  // last',
+    );
+  });
+
+  it('leaves a column-0 comment above the next directive out of the fold', () => {
+    const doc = '::a\n  um\n// about b\n::b\n';
+    const state = stateOf(doc);
+
+    const range = foldable(state, state.doc.line(1).from, state.doc.line(1).to);
+
+    expect(doc.slice(range?.from, range?.to)).toBe('\n  um');
   });
 
   it('does not fold a directive whose body is only whitespace', () => {

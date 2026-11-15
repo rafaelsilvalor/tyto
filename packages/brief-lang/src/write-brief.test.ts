@@ -91,6 +91,19 @@ describe('writeBrief', () => {
     expect(back.errors).toEqual([]);
   });
 
+  it('escapes a line starting with //, which would otherwise be a comment (ADR 0204)', () => {
+    const text = textOf(
+      writeBrief({
+        template: 'notice',
+        slots: [{ name: 'titulo', value: 'Um\n// not a note\nDois' }],
+      }),
+    );
+    expect(text).toContain('  Um\n  \\// not a note\n  Dois\n');
+    const back = written(text);
+    expect(back.slots).toEqual({ titulo: 'Um\n// not a note\nDois' });
+    expect(back.errors).toEqual([]);
+  });
+
   it('refuses a brace, naming the slot, rather than changing the data', () => {
     const result = writeBrief({
       template: 'notice',

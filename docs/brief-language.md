@@ -39,8 +39,8 @@ write briefs; this document is the grammar for people who change it.
 - **Text**: inline Markdown only — `**bold**`, `*italic*`, `\` line break, `{cor:x}text{/}` mark. No headings, lists or links. Every line of an indented block already starts a new line, so a `\` ending a line with another block line after it adds nothing: it is dropped, with `W_REDUNDANT_BREAK` (ADR 0109), and `\\` there leaves one empty line. A `\` in the middle of a line, at the end of an inline body with no block under it, or on the last line of a block still breaks the line.
 - **Math** is plain Unicode with a space on each side of an operator: `Q = U · A · ΔT`. Glyphs the template's face lacks are drawn in the bundled symbol face (ADR 0168), and a line never starts with a standalone operator: the space before one is not a break, the space after it is (ADR 0169). To keep a whole formula on one line, write its spaces as no-break spaces (U+00A0).
 - **Assets**: a path is read as written, relative to the `.brief` file; when nothing is there, the same path is read from `assets/` beside the brief (ADR 0056). If both exist, the one beside the brief wins, and a path that climbs out of the brief's folder is read from neither. `resolve` confirms existence and computes a hash of the bytes, so the hash is the same whichever folder the file was found in. The CLI, `tyto watch`, the queue, the preview and the export box all follow this rule; only `tyto render --assets <dir>` replaces it, with that one folder and no fallback. A brief in a folder named `editaveis` — a delivery's copy — also reads `../assets`, the delivery's images (ADR 0057).
-- **Comments**: `//` at line start.
-- **Escape**: `\::` for text starting with `::`.
+- **Comments**: `//` at line start. Inside an indented block, a `//` line at any indent — or at column 0 between two lines of the same block — is skipped and the block goes on (ADR 0204).
+- **Escape**: `\::` for text starting with `::`, `\//` for a body line starting with `//` (ADR 0204).
 - **Plugin directives**: plugins register namespaced directives, `::ai/caption`. Without the plugin ⇒ `E_UNKNOWN_DIRECTIVE`. See _Plugin directives_ below.
 
 ## Plugin directives
@@ -102,6 +102,17 @@ had to answer them.
   line before it along; at the top level a run of blank lines is one token of its own, so a
   line of spaces between two directives is as blank as an empty one. A directive's range
   ends at its last line with text, never on the blank lines its block absorbed.
+- **A comment line inside a block is skipped and does not end it either** (ADR 0204). An
+  indented `//` line is always a comment of the block it is in, even as its last line. A `//`
+  at column 0 is the block's when the block goes on after it: the next line that is neither
+  blank nor another column-0 comment is indented. Otherwise the block ends before it and it
+  is a top-level comment, as before, so a note above a directive belongs to no block. Only
+  the lines after it settle that, so `commentsInBlocks` in `tokens.ts` scans them by hand and
+  hands out `commentBreak` — the line break, blank lines and indent in front of the `//` — and
+  the grammar's own `Comment` follows. The `Comment` node covers the `//` and the rest of its
+  line in both places, so highlighting needs no second rule. In the tree it is a child of the
+  `Directive`, and `parseBrief` reads only `BodyLine`s, so it says nothing and no `Break` is
+  emitted for it. A body line that really starts with `//` is written `\//`.
 - **Spaces and tabs at the end of a line of text have no meaning** (ADR 0096). Nobody can see
   them, so `Profª. Mara Rebeiro  ` means `Profª. Mara Rebeiro`, in an inline body and on every
   line of a block. Only the text a line ends with is trimmed: spaces before a trailing `\`,
@@ -112,14 +123,16 @@ had to answer them.
   window) rewrites exactly what the language ignores — the indent of each body line to
   `tabSize` spaces, the spaces at the end of a line, a run of blank lines to one, a blank line
   between a head and its first body line, a final line ending — and nothing inside a line, so
-  the brief compiles to the same Scene. It refuses a brief with a syntax error.
+  the brief compiles to the same Scene. A comment line inside a block is indented like the
+  body lines (ADR 0204); a top-level one stays at column 0. It refuses a brief with a syntax
+  error.
 - **Frontmatter is taken whole and its YAML is left alone.** The grammar marks the block
   from `---` to `---`; a real YAML parser reads it in `parseBrief`. A grammar that tried
   would be a second, worse YAML. Without a closing fence there is no frontmatter, and every
   line of the block is reported.
 - **`{` in prose has to be part of a mark.** A literal brace in body text is an error.
-  `\::` is the only escape the language has, which is the only one the spec asks for; a
-  general one is a change to the spec, not to the grammar alone.
+  `\::` and `\//` (ADR 0204) are the only escapes the language has; a general one is a
+  change to the spec, not to the grammar alone.
 - **A file whose last line has no break still parses.** The tokenizer supplies a zero-length
   one at end of input rather than leaving an error node on a perfectly good brief.
 - **A line ends on `\n`, on `\r\n` or on a lone `\r`.** A brief is a file a person edits, and
@@ -263,8 +276,8 @@ rename. These are the choices that gap forced, and where each one shows.
   exist only because a `Text` token may not begin with one are merged back into the text
   around them. Ranges stay exact through all three.
 - **A `Text` node carries what the source meant, not what it says.** `\::` arrives as
-  `::`, so its `value` is two characters where its `range` covers three. That is the only
-  place the two lengths differ, and it is what an escape is for.
+  `::` and `\//` as `//`, so its `value` is two characters where its `range` covers three.
+  Those are the only places the two lengths differ, and it is what an escape is for.
 - **The line between two block lines is a `Break`** — the same node a trailing `\`
   produces. The author wrote three lines and means three lines, the language has no other
   way to say so, and concatenating them would glue two words together. No break is emitted

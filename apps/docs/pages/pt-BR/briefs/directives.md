@@ -17,9 +17,15 @@ Os exemplos são para o `notice`, o template do próprio manual. Copie [a pasta 
 
 Uma linha que começa com `//` é uma anotação. O Tyto pula, então ela pode dizer qualquer coisa — quem pediu a arte, o que conferir antes de enviar.
 
+Uma anotação também pode ficar entre as linhas de um bloco, com recuo ou sem, como a do `::subtitulo` acima. Ela é pulada e o bloco continua depois dela: o subtítulo recebe as três linhas de texto. Uma anotação no começo da linha, antes da próxima diretiva, não é de nenhum bloco. O [**Arrumar brief**](../editor/format-brief.md) recua a anotação de dentro de um bloco como as linhas em volta dela.
+
 ## Uma linha que começa com `::` mas não é diretiva
 
 Ponha uma barra invertida na frente: `\::` aparece como `::` e não começa nada.
+
+## Uma linha que começa com `//` mas não é anotação
+
+Ponha uma barra invertida na frente, como no `::`: `\//` aparece como `//`, como na última linha do `::subtitulo` acima.
 
 ## Ajustes
 

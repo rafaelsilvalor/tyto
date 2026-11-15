@@ -17,9 +17,15 @@ The examples are for `notice`, the manual's own template. Copy [its folder](http
 
 A line that starts with `//` is a note. Tyto skips it, so it can say anything — who asked for the artwork, what to check before sending it.
 
+A note can also sit among the lines of a block, indented or not, like the one in `::subtitulo` above. It is skipped and the block goes on after it: the subtitle gets all three lines of text. A note at the start of a line, before the next directive, belongs to no block. [**Format Brief**](../editor/format-brief.md) indents a note inside a block like the lines around it.
+
 ## A line that starts with `::` but is not a directive
 
 Put a backslash in front: `\::` is shown as `::` and starts nothing.
+
+## A line that starts with `//` but is not a note
+
+Put a backslash in front, as for `::`: `\//` is shown as `//`, as in the last line of `::subtitulo` above.
 
 ## Adjustments
 

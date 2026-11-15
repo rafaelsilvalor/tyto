@@ -136,8 +136,14 @@ describe('the rest of the language', () => {
     expect(tagOf('// nota\n::titulo Oi\n', '// nota')).toBe('comment');
   });
 
-  it('styles both escapes', () => {
+  it('styles a comment line inside a block the same way, at column 0 or indented', () => {
+    expect(tagOf('::lamina\n  Um\n// nota\n  Dois\n', '// nota')).toBe('comment');
+    expect(tagOf('::lamina\n  Um\n    // nota\n', '// nota')).toBe('comment');
+  });
+
+  it('styles every escape', () => {
     expect(tagOf('::titulo \\:: literal\n', '\\::')).toBe('escape');
+    expect(tagOf('::lamina\n  \\// literal\n', '\\//')).toBe('escape');
     expect(tagOf('::titulo quebra\\\n', '\\')).toBe('escape');
   });
 });

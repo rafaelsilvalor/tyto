@@ -18,7 +18,7 @@ Directive {
   directiveMark Namespace? Name
   Adjustments?
   InlineBody?
-  BodyLine*
+  (BodyLine | commentBreak Comment)*
   lineEnd
 }
 
@@ -51,6 +51,12 @@ Adjustment { AdjustmentName (valueSep space? AdjustmentValue)? }
 // `BodyLine` says nothing and `parseBrief` drops it.
 BodyLine { blockIndent BlockText? }
 
+// A comment line inside a block is skipped, and the block goes on (TYTO-680, ADR 0204).
+// `commentBreak` is the line break, any blank lines and the indent in front of the `//`, so
+// the `Comment` node is the same one a top-level comment makes and covers only the `//`
+// and what follows it. `tokens.ts` decides when a comment belongs to the block, because
+// at column 0 that depends on the lines after it, and a Lezer token has no lookahead.
+
 InlineBody { headInline bodyInline* }
 
 BlockText { bodyInline+ }
@@ -65,15 +71,17 @@ bodyInline { headInline | Mark }
 // The same limit shows at the seam of two closers: `**bold *italic***` does not parse,
 // because longest match reads the trailing `***` as `**` then `*` and no lookahead could
 // prefer the other split. Write `**bold *italic* **` or reorder the runs (ADR 0015).
-headInline { Text | Space | Bold | Italic | Break | EscapedDirective }
+headInline { Text | Space | Bold | Italic | Break | escape }
 
 Bold { boldMark boldInline+ boldMark }
 
-boldInline { Text | Space | Italic | Break | EscapedDirective }
+boldInline { Text | Space | Italic | Break | escape }
 
 Italic { italicMark italicInline+ italicMark }
 
-italicInline { Text | Space | Bold | Break | EscapedDirective }
+italicInline { Text | Space | Bold | Break | escape }
+
+escape { EscapedDirective | EscapedComment }
 
 Mark { braceOpen MarkName valueSep MarkValue braceClose headInline+ markClose }
 
@@ -91,6 +99,9 @@ BlankLine { newline | blankRun }
 // built-in tokenizer reads the same characters as `space` or `blockIndent`, neither valid
 // at the top level, and a line of spaces stayed an orphan indent.
 @external tokens blankLines from "./tokens.js" { blankRun }
+
+// Ahead of `@tokens` for the same reason: an indented `//` is also a `blockIndent`.
+@external tokens commentsInBlocks from "./tokens.js" { commentBreak }
 
 @tokens {
   directiveMark { "::" }
@@ -128,8 +139,10 @@ BlankLine { newline | blankRun }
   italicMark { "*" }
 
   // A trailing backslash is a hard line break; `\::` is how body text starts with a
-  // literal `::` instead of becoming a directive.
+  // literal `::` instead of becoming a directive, and `\//` with a literal `//` instead of
+  // becoming a comment (ADR 0204).
   EscapedDirective { "\\::" }
+  EscapedComment { "\\//" }
   Break { "\\" }
 
   // Everything that is not markup. It may not begin with a space: at the start of a line
@@ -164,7 +177,7 @@ BlankLine { newline | blankRun }
   @precedence { Namespace, Name }
   @precedence { markClose, braceOpen }
   @precedence { boldMark, italicMark }
-  @precedence { EscapedDirective, Break }
+  @precedence { EscapedDirective, EscapedComment, Break }
   @precedence { Comment, directiveMark, Text }
 }
 

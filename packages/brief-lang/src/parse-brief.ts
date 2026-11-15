@@ -112,7 +112,7 @@ function syntaxDiagnostics(tree: Tree, text: string): Diagnostic[] {
   return found;
 }
 
-/** `Text`, `Space` and `EscapedDirective` all contribute characters; the rest is markup. */
+/** `Text`, `Space` and the two escapes all contribute characters; the rest is markup. */
 function literalOf(text: string, node: SyntaxNode): string | undefined {
   switch (node.name) {
     case 'Text':
@@ -121,6 +121,10 @@ function literalOf(text: string, node: SyntaxNode): string | undefined {
     // `\::` is how a body line starts with a literal `::`; the AST carries what it meant.
     case 'EscapedDirective':
       return '::';
+    // `\//` is how a body line starts with a literal `//` rather than being a comment
+    // (ADR 0204).
+    case 'EscapedComment':
+      return '//';
     default:
       return undefined;
   }

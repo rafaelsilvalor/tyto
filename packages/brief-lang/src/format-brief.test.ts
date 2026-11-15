@@ -195,7 +195,30 @@ describe('formatBrief refuses a brief with a syntax error', () => {
   });
 
   it('an orphan indent, typed in the middle of a good brief', () => {
-    expect(formatBrief('::titulo A\n// x\n  orphan\n').ok).toBe(false);
+    expect(formatBrief('---\ntemplate: x\n---\n// x\n  orphan\n::titulo A\n').ok).toBe(false);
+  });
+});
+
+describe('formatBrief and a comment line inside a block (TYTO-680, ADR 0204)', () => {
+  it('indents it like the body lines around it, from column 0 or any indent', () => {
+    const text = '::lamina\n  Um\n// a\n      // b\n  Dois\n';
+    expect(formatted(text, 4)).toBe('::lamina\n    Um\n    // a\n    // b\n    Dois\n');
+  });
+
+  it('leaves a comment at the top level at column 0', () => {
+    const text = '::lamina\n  Um\n// a\n::lamina\n  Dois\n';
+    expect(formatted(text)).toBe(text);
+  });
+
+  it('drops a blank line between the head and a comment that opens the body', () => {
+    expect(formatted('::lamina\n\n// a\n  Um\n')).toBe('::lamina\n  // a\n  Um\n');
+  });
+
+  it('says the same thing afterwards, and formatting again changes nothing', () => {
+    const text = '::lamina\n  Um\n\n// a\n Dois\n  // b\n// c\n::titulo X\n';
+    const once = formatted(text);
+    expect(meaningOf(once)).toEqual(meaningOf(text));
+    expect(formatted(once)).toBe(once);
   });
 });
 
