@@ -3452,6 +3452,30 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * The templates the command panel completes `--template` and `--formats` with (TYTO-729):
+   * `tyto template list --json` run by main in `folder`, the session's working folder by the
+   * explorer's id, or the open folder when absent. The same folder check as `cli:run`: main
+   * lists nothing for an id outside the open folder. A listing that failed answers no rows and a
+   * `note`, never an error, and the window's own pickers keep `templates:list`. **Strict, and
+   * no words**: main runs only `template list --json`, so this is never a quiet `cli:run`.
+   */
+  'commands:templates': channel(
+    z.strictObject({ folder: explorerEntryId.optional() }),
+    z.object({
+      templates: z
+        .array(
+          z.object({
+            name: z.string().min(1).max(500),
+            formats: z.array(z.string().max(200)).max(200),
+            aliasOf: z.string().max(500).optional(),
+          }),
+        )
+        .max(2000),
+      note: z.string().max(1000).optional(),
+    }),
+  ),
+
+  /**
    * Opens the recipe a refused `recipe run --apply` offered to open in its notebook (TYTO-726),
    * **by the run, never by a path**: main kept the recipe when the person said yes in its box,
    * and answers it once. A run with no recipe kept answers no document.

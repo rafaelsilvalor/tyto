@@ -5,8 +5,8 @@ import type { CommandDescription, CommandValue } from '../../shared/ipc.js';
  * tree (`cli:commands`) and never off a second list.
  *
  * Subcommands and options come from the tree. A value comes from what its definition says it is
- * (`value-kinds.ts` in `@tyto/command-line`): the choices it carries, the window's templates and
- * their formats, the installed plugins, or the files and folders of the open workspace folder,
+ * (`value-kinds.ts` in `@tyto/command-line`): the choices it carries, the templates a render in
+ * the working folder reaches and their formats (TYTO-729), the installed plugins, or the files and folders of the open workspace folder,
  * listed through the explorer's ids (ADR 0113).
  */
 

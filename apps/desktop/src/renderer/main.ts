@@ -183,9 +183,10 @@ import { type CommandSession, CommandSessions, refreshesWorkspace } from './comm
 import { inRunOrder, sectionTitle, shortCommand } from './command-blocks.js';
 import type { CommandsOrder } from '../../shared/command-runs.js';
 import { type OutputLink, commandPathOf, listFolderAt, resolveEntry } from './command-links.js';
-import { stepsOf } from './command-paths.js';
+import { folderId, stepsOf } from './command-paths.js';
 import { PANEL_BUILTINS } from './command-builtins.js';
 import { type Completion, type ListedEntry, complete } from './command-completion.js';
+import { createPanelTemplates } from './command-templates.js';
 import { joinCommandLine } from './command-words.js';
 import { loadHistory, saveHistory, withHistoryLine } from './command-history.js';
 import { type ExplorerPanel, EXPLORER_PANEL_TAG, binOf, deleteQuestion } from './explorer-panel.js';
@@ -634,6 +635,35 @@ let commandProblems: readonly CommandProblems[] = [];
  * removed while it is closed, and a run keeps printing into its tab all the same.
  */
 const commandSessions = new CommandSessions();
+
+/**
+ * What the command panel completes `--template` and `--formats` with (TYTO-729): `tyto template
+ * list` in the session's working folder, kept per folder and trust, never the window's picker.
+ */
+const panelTemplates = createPanelTemplates({
+  ask: async (folder) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return { templates: [] };
+    return bridge['commands:templates'](folder === undefined ? {} : { folder });
+  },
+  folderOf: (steps) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return Promise.resolve(undefined);
+    return folderId(
+      steps,
+      async (entryId) => {
+        const listing = await bridge['explorer:list']({ entryId });
+        return { entries: listing.entries, more: listing.more };
+      },
+      pathsCaseless(),
+    );
+  },
+  trust: () =>
+    workspaceShown === undefined || workspaceShown.folder === null ? 'none' : workspaceShown.trust,
+  get caseless() {
+    return pathsCaseless();
+  },
+});
 
 /**
  * The terminals main has open (TYTO-497, ADR 0164), for the window's life, as the command panel's
@@ -4183,6 +4213,8 @@ function showWorkspace(answer: IpcResponse<'workspace:folder'>): void {
   deliveries.clear();
   workspaceShown = answer;
   useCommandHistoryOf(answer.folder);
+  // Another folder, or its trust or plugin files read again: what a render there reaches too.
+  panelTemplates.forget();
   // Another folder, or the same one trusted now: the last refusal is no longer the answer.
   terminalSessions.forgetRefusal();
   showExportPresets(answer.exportPresets);
@@ -6772,7 +6804,7 @@ function listInWorkspace(segments: readonly string[]): Promise<readonly ListedEn
 
 /**
  * What can come at the caret on the command panel's prompt (TYTO-496): the CLI's tree, and for a
- * value the window's templates, the installed plugins and the open folder's files, listed by the
+ * value the templates a render in the working folder reaches (TYTO-729), the installed plugins and the open folder's files, listed by the
  * explorer's ids.
  */
 async function completeCommand(
@@ -6786,12 +6818,8 @@ async function completeCommand(
   const tree = await commandTree();
   if (tree === undefined) return none;
   return complete(line, caret, tree, {
-    templates: () =>
-      panel.templates.map((template) => ({
-        name: template.name,
-        formats: template.formats.map((format) => format.id),
-        ...(template.alias === undefined ? {} : { aliasOf: template.alias.template }),
-      })),
+    // TYTO-729: what a render in the session's working folder accepts, not the window's picker.
+    templates: () => panelTemplates.of(base),
     plugins: async () => (await bridge['plugins:list']({})).plugins.map((plugin) => plugin.name),
     // From the session's working folder (TYTO-537); a `..` may step back, never above the root.
     list: (segments) => {
@@ -7091,6 +7119,8 @@ async function load(): Promise<void> {
     });
     bridge.on('cli:state', (pushed) => {
       commandSessions.state(pushed);
+      // A command may have made, fetched or trusted what a render reaches (TYTO-729).
+      if (pushed.state === 'finished') panelTemplates.forget();
     });
     // A yes in a refused `recipe run --apply`'s box (TYTO-726): main kept the recipe for the
     // run, and the window opens it as a tab, as it opens a command's Problems row.
@@ -7130,6 +7160,7 @@ async function load(): Promise<void> {
     // folders again. Ignored while it is closed, for the queue's reason.
     bridge.on('explorer:changed', () => {
       elements.explorerPanel?.refresh();
+      panelTemplates.forget();
       // TYTO-366: an image a preview shows is asked again with its version, so main answers
       // `unchanged` from a `stat` unless the file did change.
       refreshImages();
@@ -7138,6 +7169,7 @@ async function load(): Promise<void> {
     // A sync of the plugin files fetched or dropped a pack (TYTO-433): the picker, the "/"
     // menu and the problems panel list again, and every open brief is compiled again.
     bridge.on('templates:changed', () => {
+      panelTemplates.forget();
       void afterTemplatesReread(bridge);
     });
 
@@ -7150,6 +7182,7 @@ async function load(): Promise<void> {
     });
 
     bridge.on('plugins:changed', () => {
+      panelTemplates.forget();
       void readPluginContributions(bridge).catch((cause: unknown) => {
         reportToLog(bridge, cause, 'plugin panels not read again');
       });

@@ -122,9 +122,24 @@ export interface CliRunner {
    * would otherwise stop the very command it was granted for.
    */
   cancelAll(except?: string): void;
+  /**
+   * Runs `argv` in `cwd` with the same `run` and environment as {@link start}, but nothing is
+   * pushed to the window: what it prints comes back whole (TYTO-729). **For words main writes
+   * itself, never the window's**: no refusal is asked and every question is answered no, so it
+   * is only for a command that neither the window refuses nor asks anything, such as
+   * `template list --json`.
+   */
+  capture(argv: readonly string[], cwd?: string): Promise<CapturedRun>;
   commands(): CommandDescription;
   /** The file a run's Problems row names, while the run is one of the last {@link KEPT_RUNS}. */
   diagnosticPath(runId: string, index: number): string | undefined;
+}
+
+/** What a {@link CliRunner.capture} printed, and how it ended. */
+export interface CapturedRun {
+  readonly code: ExitCode;
+  readonly out: string;
+  readonly err: string;
 }
 
 /** The two commands that stop part of the way through (decision 6); the rest run to their end. */
@@ -255,6 +270,31 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
     cancel,
     cancelAll(except) {
       for (const runId of [...running.keys()]) if (runId !== except) cancel(runId);
+    },
+    async capture(argv, cwd) {
+      let out = '';
+      let err = '';
+      const environment: CliEnvironment = {
+        ...options.environment(),
+        ...(cwd === undefined ? {} : { cwd }),
+        console: {
+          out: (text) => {
+            out += text;
+          },
+          err: (text) => {
+            err += text;
+          },
+        },
+        confirm: () => Promise.resolve(false),
+        refuse: () => Promise.resolve(undefined),
+      };
+      const code = await run(argv, environment, new AbortController().signal).catch(
+        (cause: unknown): ExitCode => {
+          err += `tyto: internal failure — ${String(cause)}\n`;
+          return EXIT_INTERNAL;
+        },
+      );
+      return { code, out, err };
     },
     commands: () => commandTree({ ...options.environment(), console: { out() {}, err() {} } }),
     diagnosticPath: (runId, index) => paths.get(runId)?.[index],

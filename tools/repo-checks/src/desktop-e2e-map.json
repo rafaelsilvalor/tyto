@@ -836,10 +836,11 @@
         "apps/desktop/src/main/cli-runner.ts",
         "apps/desktop/src/main/cli-refusals.ts",
         "apps/desktop/src/main/cli-offers.ts",
-        "apps/desktop/src/main/command-aliases.ts"
+        "apps/desktop/src/main/command-aliases.ts",
+        "apps/desktop/src/main/command-templates.ts"
       ],
       "e2e": ["cli-runner.desktop.test.ts"],
-      "why": "reviewed: tyto commands run in main for the window, streamed, stopped and refused (TYTO-495, ADR 0159); a refusal's offer box and its yes through the window's own functions (TYTO-726), unit-tested, every refusal's e2e is TYTO-718"
+      "why": "reviewed: tyto commands run in main for the window, streamed, stopped and refused (TYTO-495, ADR 0159); a refusal's offer box and its yes through the window's own functions (TYTO-726), unit-tested, every refusal's e2e is TYTO-718; the panel's template completion as template list in its folder (TYTO-729), unit-tested over the real runner"
     },
     {
       "paths": [
@@ -887,6 +888,7 @@
         "apps/desktop/src/renderer/command-paths.ts",
         "apps/desktop/src/renderer/command-sessions.ts",
         "apps/desktop/src/renderer/command-steps.ts",
+        "apps/desktop/src/renderer/command-templates.ts",
         "apps/desktop/src/renderer/command-tone.ts",
         "apps/desktop/src/renderer/command-words.ts"
       ],

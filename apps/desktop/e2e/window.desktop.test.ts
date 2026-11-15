@@ -282,6 +282,8 @@ describe('the bridge', () => {
       // TYTO-536: the command panel's aliases in force, and alias's one write, main checking.
       'commands:aliases',
       'commands:set-alias',
+      // TYTO-729: the templates the panel completes, `tyto template list` in its folder.
+      'commands:templates',
       'credentials:delete',
       // TYTO-649: a key file stored from the plugins screen; main picks and reads it, and the
       // answer is an outcome. Exercised by `e2e/credential-file.desktop.test.ts`.
