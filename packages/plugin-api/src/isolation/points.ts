@@ -197,6 +197,15 @@ const templateCallSchema = z.strictObject({
   }),
   slots: z.record(z.string(), z.unknown()),
   adjustments: z.record(z.string(), z.union([z.string(), z.literal(true)])),
+  // Every artwork's adjustments, in brief order (ADR 0203): how a slide reads where it stands.
+  // Adjustments only, so no other slide's content reaches the plugin through it.
+  artworks: z
+    .array(
+      z.strictObject({
+        adjustments: z.record(z.string(), z.union([z.string(), z.literal(true)])),
+      }),
+    )
+    .optional(),
   // Data, so it crosses as it is (ADR 0063): the kit of the template's own brand.
   brand: brandKitSchema,
   // The declared values, resolved by the host (ADR 0153, TYTO-439): an image is the ref the

@@ -13,6 +13,7 @@
 export {
   type Template,
   type TemplateBuild,
+  type ArtworkSummary,
   type TemplateContext,
   type TemplateFiles,
   type TemplateReport,

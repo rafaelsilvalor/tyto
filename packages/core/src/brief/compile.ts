@@ -14,6 +14,7 @@ import { TemplateError } from '../template/errors.js';
 import {
   type DeferredTemplate,
   type Template,
+  type ArtworkSummary,
   type TemplateContext,
   type TemplateFiles,
   type TemplateReport,
@@ -400,7 +401,7 @@ export async function compileDeferred(
         plan,
         format,
         manifest.name,
-        plans.length,
+        summariesOf(plans),
         options,
         measure,
         files,
@@ -460,11 +461,19 @@ function brandKitOf(
   return options.brandKits?.get(brand) ?? noBrandKit;
 }
 
+/**
+ * What every call sees of the whole brief (ADR 0203): each artwork's adjustments, in order,
+ * so `artworks[index]` is the artwork at that index. Adjustments only, never slots.
+ */
+function summariesOf(plans: readonly Plan[]): readonly ArtworkSummary[] {
+  return plans.map((plan) => ({ adjustments: plan.adjustments }));
+}
+
 function contextOf(
   plan: Plan,
   format: string,
   template: string,
-  count: number,
+  artworks: readonly ArtworkSummary[],
   options: CompileOptions,
   measure: TemplateContext['measure'],
   files: TemplateFiles,
@@ -477,9 +486,10 @@ function contextOf(
     // Defined: `undefinedFormats` refused every format the catalogue lacks.
     size: options.formats.sizeOf(format) ?? { w: 0, h: 0 },
     idPrefix: idPrefixOf(plan.id, format),
-    artwork: { id: plan.id, index: plan.index, count },
+    artwork: { id: plan.id, index: plan.index, count: artworks.length },
     slots: plan.slots,
     adjustments: plan.adjustments,
+    artworks,
     measure,
     files,
     brand,
@@ -552,7 +562,7 @@ function compileWith(
         plan,
         format,
         manifest.name,
-        plans.length,
+        summariesOf(plans),
         options,
         measure,
         files,
