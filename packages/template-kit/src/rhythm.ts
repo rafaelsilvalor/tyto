@@ -321,9 +321,16 @@ function withBreakBefore(runs: readonly TextRun[], paragraph: number, piece: num
       continue;
     }
     const start = offset;
-    if (current === paragraph) offset += run.text.length;
+    if (current === paragraph) offset += textOf(run).length;
     if (done || current !== paragraph || cut >= offset) {
       result.push(run);
+      continue;
+    }
+    if (run.kind === 'formula') {
+      // A piece starts only at a word's start, so the cut is in front of the formula.
+      trimLast(result);
+      result.push({ kind: 'break' }, run);
+      done = true;
       continue;
     }
     const at = cut - start;
@@ -345,12 +352,24 @@ function trimLast(runs: TextRun[]): void {
   else runs[runs.length - 1] = { ...last, text };
 }
 
+/**
+ * What a formula reads as when a line is read for its words: one character that is not a
+ * space, so a formula is part of the word around it and never split (ADR 0206), as layout
+ * keeps it. U+FFFC is the character Unicode reserves for an object set in a line of text.
+ */
+const FORMULA_TEXT = '\uFFFC';
+
+/** A run's text as the line reading sees it. */
+function textOf(run: Exclude<TextRun, { kind: 'break' }>): string {
+  return run.kind === 'formula' ? FORMULA_TEXT : run.text;
+}
+
 /** Runs into the text of each line, split at every break. */
 function linesOf(runs: readonly TextRun[]): string[] {
   const lines = [''];
   for (const run of runs) {
     if (run.kind === 'break') lines.push('');
-    else lines[lines.length - 1] += run.text;
+    else lines[lines.length - 1] += textOf(run);
   }
   return lines;
 }

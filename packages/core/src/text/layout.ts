@@ -1,8 +1,10 @@
 import type { FaceCache } from './face.js';
 import { coverRuns } from './fallback.js';
+import { layoutFormula } from './formula.js';
+import type { PlacedFormula } from './formula.js';
 import { isStandaloneOperator } from './operators.js';
 import { inheritOrigin } from './origin.js';
-import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
+import type { FormulaRun, TextNode, TextRun, TextSpan } from '../scene/nodes.js';
 
 /**
  * Where the lines of a text node fall, decided in the IR (ADR 0019).
@@ -25,6 +27,9 @@ import type { TextNode, TextRun, TextSpan } from '../scene/nodes.js';
  * - A break opportunity is a space, and only a space. CSS `break-word` rules, hyphens and
  *   CJK are not implemented; the limit is stated here rather than approximated, since a
  *   wrong break is visible and a missing feature is findable.
+ * - A formula (ADR 0206) is one piece of a word: it never breaks inside, and a line holding
+ *   one is as tall as the strut grown to hold the formula's box, as a CSS line box grows to
+ *   hold an inline-block. The growth enters the IR on the formula, as `above` and `below`.
  * - One space is not a break: the one before a standalone math operator (ADR 0169), so a
  *   formula written `Q = U · A · ΔT` never puts `· ΔT` at the start of a line. A browser
  *   would break there, but only inside a line the IR already found wider than its box: one
@@ -73,11 +78,14 @@ export interface TextMeasurement {
   readonly missing?: readonly string[];
 }
 
-/** The largest run in a node, whose size the strut — and so the leading — comes from. */
-export function referenceRun(node: MeasurableText): TextSpan | undefined {
-  let largest: TextSpan | undefined;
+/**
+ * The largest run in a node, whose size the strut — and so the leading — comes from. A
+ * formula counts, since its size is the size of the text it is set in (ADR 0206).
+ */
+export function referenceRun(node: MeasurableText): TextSpan | FormulaRun | undefined {
+  let largest: TextSpan | FormulaRun | undefined;
   for (const run of node.runs) {
-    if (run.kind !== 'text') continue;
+    if (run.kind === 'break') continue;
     if (largest === undefined || run.size > largest.size) largest = run;
   }
   return largest;
@@ -108,9 +116,9 @@ function tokenize(text: string): Token[] {
   return tokens;
 }
 
-/** A piece of a run: the same styling, a slice of the text. */
+/** A piece of a run: the same styling, a slice of the text. A formula is one piece, text ''. */
 interface Piece {
-  readonly run: TextSpan;
+  readonly run: TextSpan | FormulaRun;
   readonly text: string;
 }
 
@@ -118,6 +126,11 @@ interface Line {
   readonly pieces: Piece[];
   /** The px a paragraph boundary puts above this line, at scale 1 (ADR 0205); 0 for none. */
   readonly space: number;
+  /** How far the line's formulas reach past its strut, above and below (ADR 0206). */
+  above: number;
+  below: number;
+  /** Where each formula on the line starts, px from the line's start. */
+  readonly offsets: Map<FormulaRun, number>;
   /** Width including trailing spaces, which is where the next token would start. */
   flowing: number;
   /** Width with trailing spaces trimmed, which is what has to fit. */
@@ -125,7 +138,7 @@ interface Line {
 }
 
 function emptyLine(space = 0): Line {
-  return { pieces: [], space, flowing: 0, visible: 0 };
+  return { pieces: [], space, flowing: 0, visible: 0, above: 0, below: 0, offsets: new Map() };
 }
 
 function textOf(pieces: readonly Piece[]): string {
@@ -154,7 +167,7 @@ export function measureText(
   // Every run has to be measurable. A node that mixes a bundled face with an unbundled one
   // would wrap half its text on real widths and half on nothing.
   for (const run of node.runs) {
-    if (run.kind !== 'text') continue;
+    if (run.kind === 'break') continue;
     if (
       faces.get({ family: run.font.family, weight: run.weight, style: run.style }) === undefined
     ) {
@@ -189,19 +202,84 @@ export function measureText(
 
   const overflow = node.box.h === undefined ? 0 : Math.max(0, laid.height - node.box.h);
 
-  return { ...laid, scale, overflow, missing: covered.missing };
+  return {
+    ...laid,
+    scale,
+    overflow,
+    missing: [...new Set([...covered.missing, ...(laid.missing ?? [])])],
+  };
+}
+
+/**
+ * The line box's strut around the baseline, in px: what CSS gives a line before anything on
+ * it is taller. The leading is split evenly above the face's ascent and below its descent,
+ * the way Chromium splits it: ascent and descent rounded to whole pixels, and the half above
+ * truncated toward zero. Measured on Source Sans 3 at 40 px with a 56 px line, ascent 40.96
+ * and descent 16: the baseline sits 41 px down, not the 40.48 the unrounded split gives.
+ */
+function strutOf(
+  reference: TextSpan | FormulaRun,
+  faces: FaceCache,
+  leading: number,
+  scale: number,
+): { above: number; below: number } {
+  const face = faces.get({
+    family: reference.font.family,
+    weight: reference.weight,
+    style: reference.style,
+  });
+  const content = face?.contentHeight ?? 1;
+  const ascent = face?.ascent ?? content * 0.8;
+  const descent = face?.descent ?? content * 0.2;
+  const size = reference.size * scale;
+  const top = Math.round(ascent * size);
+  const bottom = Math.round(descent * size);
+  const above = top + Math.trunc((leading - top - bottom) / 2);
+  return { above, below: leading - above };
+}
+
+interface Formulas {
+  readonly placed: Map<FormulaRun, PlacedFormula>;
+  readonly missing: readonly string[];
+}
+
+/** Every formula of the node laid out at `scale`, or `undefined` when one cannot be. */
+function placeFormulas(
+  node: MeasurableText,
+  faces: FaceCache,
+  scale: number,
+): Formulas | undefined {
+  const placed = new Map<FormulaRun, PlacedFormula>();
+  const missing: string[] = [];
+  for (const run of node.runs) {
+    if (run.kind !== 'formula') continue;
+    const laid = layoutFormula({ ...run, size: scaledSize(run.size, scale) }, faces);
+    if (laid === undefined) return undefined;
+    placed.set(run, laid);
+    missing.push(...laid.missing);
+  }
+  return { placed, missing };
+}
+
+function scaledSize(size: number, scale: number): number {
+  return scale === 1 ? size : Math.round(size * scale * 1000) / 1000;
 }
 
 function layoutAt(
   node: MeasurableText,
   faces: FaceCache,
-  reference: TextSpan,
+  reference: TextSpan | FormulaRun,
   scale: number,
-): Omit<TextMeasurement, 'scale' | 'overflow' | 'missing'> {
+): Omit<TextMeasurement, 'scale' | 'overflow'> {
   const lines: Line[] = [emptyLine()];
   const limit = node.box.w;
+  const lineAdvance = node.lineHeight * reference.size * scale;
+  const strut = strutOf(reference, faces, lineAdvance, scale);
+  // `measureText` checked every run's face, so every formula has one to be laid out in.
+  const formulas = placeFormulas(node, faces, scale) ?? { placed: new Map(), missing: [] };
 
-  const widthOf = (run: TextSpan, text: string): number => {
+  const widthOf = (run: TextSpan | FormulaRun, text: string): number => {
+    if (run.kind === 'formula') return formulas.placed.get(run)?.width ?? 0;
     if (text === '') return 0;
     const face = faces.get({ family: run.font.family, weight: run.weight, style: run.style });
     const advance = face === undefined ? 0 : face.advance(text);
@@ -246,24 +324,43 @@ function layoutAt(
     const flowing = leading + widthOf(last.run, last.text);
     const visible = leading + widthOf(last.run, last.text.replace(/ +$/, ''));
 
-    const line = lines[lines.length - 1]!;
+    let line = lines[lines.length - 1]!;
+    let start = line.flowing;
     // A word that does not fit starts a line — unless the line is empty, in which case
     // nothing would be gained by moving it and a word longer than its box would loop.
     if (limit !== undefined && line.pieces.length > 0 && line.flowing + visible > limit) {
       // A wrap is no paragraph: the line it starts takes no space above it.
-      lines.push({ pieces: [...pieces], space: 0, flowing, visible });
-      return;
+      line = { ...emptyLine(), flowing, visible };
+      lines.push(line);
+      start = 0;
+    } else {
+      line.visible = line.flowing + visible;
+      line.flowing += flowing;
     }
-
     line.pieces.push(...pieces);
-    line.visible = line.flowing + visible;
-    line.flowing += flowing;
+
+    // A formula's box past the strut makes its line taller, as an inline-block does in CSS.
+    for (const piece of pieces) {
+      const before = start;
+      start += widthOf(piece.run, piece.text);
+      if (piece.run.kind !== 'formula') continue;
+      line.offsets.set(piece.run, before);
+      const placed = formulas.placed.get(piece.run);
+      if (placed === undefined) continue;
+      line.above = Math.max(line.above, placed.ascent - strut.above);
+      line.below = Math.max(line.below, placed.descent - strut.below);
+    }
   };
 
   for (const run of node.runs) {
     if (run.kind === 'break') {
       flush();
       lines.push(emptyLine(run.space ?? 0));
+      continue;
+    }
+    if (run.kind === 'formula') {
+      // Part of the word around it: `($x$)` is one word, and a formula never breaks.
+      word.push({ run, text: '' });
       continue;
     }
 
@@ -274,14 +371,15 @@ function layoutAt(
   }
   flush();
 
-  const leading = node.lineHeight * reference.size * scale;
   const paragraphs = lines.reduce((sum, line) => sum + scaledSpace(line.space, scale), 0);
+  const growth = lines.reduce((sum, line) => sum + rounded(line.above) + rounded(line.below), 0);
 
   return {
-    runs: rebuild(lines, scale),
+    runs: rebuild(lines, scale, formulas.placed),
     lines: lines.length,
     width: Math.max(0, ...lines.map((line) => line.visible)),
-    height: lines.length * leading + paragraphs,
+    height: lines.length * lineAdvance + paragraphs + growth,
+    missing: formulas.missing,
   };
 }
 
@@ -292,7 +390,11 @@ function layoutAt(
  * out as the one run it went in as rather than as one run per word. An empty line survives
  * as two consecutive breaks, which is how a brief asks for one (ADR 0016).
  */
-function rebuild(lines: readonly Line[], scale: number): TextRun[] {
+function rebuild(
+  lines: readonly Line[],
+  scale: number,
+  formulas: ReadonlyMap<FormulaRun, PlacedFormula>,
+): TextRun[] {
   const runs: TextRun[] = [];
 
   lines.forEach((line, index) => {
@@ -303,7 +405,7 @@ function rebuild(lines: readonly Line[], scale: number): TextRun[] {
 
     // Adjacent pieces of the same run are re-joined first, so a paragraph that did not
     // wrap comes out as the one run it went in as rather than as one run per word.
-    const groups: { run: TextSpan; text: string }[] = [];
+    const groups: { run: TextSpan | FormulaRun; text: string }[] = [];
     for (const piece of line.pieces) {
       const last = groups[groups.length - 1];
       if (last !== undefined && last.run === piece.run) last.text += piece.text;
@@ -314,16 +416,50 @@ function rebuild(lines: readonly Line[], scale: number): TextRun[] {
     // are what the line broke at, they are not drawn, and they would widen a centred line.
     // Trimming every group would glue two runs together — `bold ` + `and` is `bold and`.
     const tail = groups[groups.length - 1];
-    if (tail !== undefined && index < lines.length - 1) {
+    if (tail !== undefined && tail.run.kind === 'text' && index < lines.length - 1) {
       tail.text = tail.text.replace(/ +$/, '');
     }
 
     for (const group of groups) {
-      if (group.text !== '') runs.push(scaled(group.run, group.text, scale));
+      if (group.run.kind === 'formula') runs.push(placedFormula(group.run, line, scale, formulas));
+      else if (group.text !== '') runs.push(scaled(group.run, group.text, scale));
     }
   });
 
   return runs;
+}
+
+/** Px rounded to a thousandth, and never below 0: what a formula adds to its line. */
+function rounded(value: number): number {
+  return value <= 0 ? 0 : Math.round(value * 1000) / 1000;
+}
+
+/**
+ * The formula with its layout, and with the growth of its whole line on it: `export-svg`
+ * reads the line's growth off any formula on the line, and they all agree.
+ */
+function placedFormula(
+  run: FormulaRun,
+  line: Line,
+  scale: number,
+  formulas: ReadonlyMap<FormulaRun, PlacedFormula>,
+): FormulaRun {
+  const placed = formulas.get(run);
+  const replacement: FormulaRun = { ...run, size: scaledSize(run.size, scale) };
+  if (placed !== undefined) {
+    const { missing: _missing, ...layout } = placed;
+    replacement.layout = {
+      offset: Math.round((line.offsets.get(run) ?? 0) * 1000) / 1000,
+      lineWidth: Math.round(line.visible * 1000) / 1000,
+      ...layout,
+      glyphs: [...layout.glyphs],
+      rules: [...layout.rules],
+      above: rounded(line.above),
+      below: rounded(line.below),
+    };
+  }
+  inheritOrigin(run, replacement);
+  return replacement;
 }
 
 /** A paragraph's space at `scale`, rounded as a size is, for the same byte-identical reason. */

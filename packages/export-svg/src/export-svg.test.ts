@@ -6,6 +6,7 @@ import type { SvgFontFace, SvgResources } from './defs.js';
 import { exportSvg } from './export-svg.js';
 import type { SvgExportOptions } from './svg.js';
 import mappingFixture from './__fixtures__/mapping.json';
+import formulaFixture from './__fixtures__/formula.json';
 import paragraphsFixture from './__fixtures__/paragraphs.json';
 import promoFixture from './__fixtures__/promo.json';
 import twoIconsFixture from './__fixtures__/two-icons.json';
@@ -107,6 +108,22 @@ describe('a scene becomes one SVG document per frame', () => {
 
     await expect(feed).toMatchFileSnapshot('./__snapshots__/promo.feed.svg');
     await expect(story).toMatchFileSnapshot('./__snapshots__/promo.story.svg');
+  });
+
+  it('renders the formula fixture to its committed snapshot (ADR 0206)', async () => {
+    const [feed = ''] = svgOf(sceneOf(formulaFixture));
+
+    await expect(feed).toMatchFileSnapshot('./__snapshots__/formula.feed.svg');
+    // The line's baseline moves down by what the fraction adds above it; the numerator, the
+    // rule and the denominator sit at the IR's offsets from it, after `F = ` (55.64 px in),
+    // in the node's own coordinates.
+    const baseline = 0.52 + (40 * 1.4 - 40) / 2 + 40 * 0.8;
+    const at = (value: number): string => String(Math.round(value * 1000) / 1000);
+    expect(feed).toContain(`<text x="${at(55.64 + 52.716)}" y="${at(baseline - 16)}"`);
+    expect(feed).toContain(
+      `<rect x="${at(55.64)}" y="${at(baseline - 11.2)}" width="125.312" height="2.4"`,
+    );
+    expect(feed).toContain(`<tspan dx="125.312"`);
   });
 
   it('renders the paragraphs fixture to its committed snapshot (ADR 0205)', async () => {

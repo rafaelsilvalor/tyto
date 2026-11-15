@@ -232,6 +232,7 @@ export {
 } from './text/layout.js';
 
 export { isStandaloneOperator } from './text/operators.js';
+export { layoutFormula, linearReading } from './text/formula.js';
 
 export type { DirectoryEntry, FileSystem } from './ports/file-system.js';
 
@@ -329,7 +330,12 @@ export {
   type TextAlign,
   type TextNode,
   type TextOverflow,
+  type FormulaGlyph,
+  type FormulaLayout,
+  type FormulaRule,
+  type FormulaRun,
   type LineBreak,
+  type MathItem,
   type TextRun,
   type TextSpan,
   type TextVerticalAlign,
@@ -342,7 +348,9 @@ export {
   textAlignSchema,
   textNodeSchema,
   textOverflowSchema,
+  formulaRunSchema,
   lineBreakSchema,
+  mathItemSchema,
   textRunSchema,
   textSpanSchema,
   textVerticalAlignSchema,

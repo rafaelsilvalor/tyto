@@ -1,4 +1,4 @@
-import type { SceneNode } from './nodes.js';
+import type { SceneNode, TextRun } from './nodes.js';
 import type { Paint } from './primitives.js';
 import type { Artwork, Frame, Scene } from './scene.js';
 import { checkSvgMarkup } from './svg-markup.js';
@@ -96,16 +96,20 @@ function maskProblems(records: readonly NodeRecord[]): Diagnostic[] {
   });
 }
 
+/** Every family a run draws in: a formula's own, and each face its laid-out pieces name. */
+function runFonts(run: TextRun): string[] {
+  if (run.kind === 'break') return [];
+  if (run.kind === 'text') return [run.font.family];
+  return [run.font.family, ...(run.layout?.glyphs ?? []).map((glyph) => glyph.font.family)];
+}
+
 function undeclaredFonts(scene: Scene, records: readonly NodeRecord[]): Diagnostic[] {
   const declared = new Set(scene.fonts.map((font) => font.family));
 
   return records.flatMap(({ node }) => {
     if (node.kind !== 'text') return [];
     const missing = new Set(
-      node.runs
-        .filter((run) => run.kind === 'text')
-        .map((run) => run.font.family)
-        .filter((family) => !declared.has(family)),
+      node.runs.flatMap((run) => runFonts(run)).filter((family) => !declared.has(family)),
     );
     return [...missing].map((family) =>
       diagnostic('E_SCENE_FONT_NOT_DECLARED', { id: node.id, family }),
@@ -146,11 +150,12 @@ function undeclaredAssets(scene: Scene, records: readonly NodeRecord[]): Diagnos
  *
  * Since ADR 0016 a run may be a line break, and a node whose runs are all breaks renders
  * exactly as much as one with no runs at all — nothing. The rule that caught the second
- * now catches both, which is why it asks for a span rather than for a length.
+ * now catches both, which is why it asks for a span rather than for a length. A formula
+ * draws, so a node holding only one is not empty (ADR 0206).
  */
 function emptyText(records: readonly NodeRecord[]): Diagnostic[] {
   return records
-    .filter(({ node }) => node.kind === 'text' && !node.runs.some((run) => run.kind === 'text'))
+    .filter(({ node }) => node.kind === 'text' && node.runs.every((run) => run.kind === 'break'))
     .map(({ node }) => diagnostic('E_SCENE_EMPTY_TEXT', { id: node.id }));
 }
 

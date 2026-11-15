@@ -14,6 +14,10 @@ Group    extends Base { children: Node[] }
 Rect     extends Base { size; radius: [tl,tr,br,bl]; fill?: Paint; stroke?: Stroke }
 Text     extends Base { box: {w?, h?}; runs: TextRun[]; align; valign; lineHeight; letterSpacing; overflow: 'clip'|'shrink'|'grow' }
 TextRun  = TextSpan{kind:'text', text, font: FontRef, size, weight, style, color: Paint, decoration?} | LineBreak{kind:'break', space?}
+         | FormulaRun{kind:'formula', text, math: MathItem[], font, size, weight, style, color, layout?: FormulaLayout}
+MathItem = {kind:'text', text} | {kind:'fraction', numerator: MathItem[], denominator: MathItem[]} | {kind:'scripts', superscript?, subscript?}
+FormulaLayout { offset; lineWidth; width; ascent; descent; above; below;
+                glyphs: {text, font, size, weight, style, x, y}[]; rules: {x, y, width, thickness}[] }   // ADR 0206
 Image    extends Base { asset: AssetRef; size; fit: 'cover'|'contain'|'fill'; position }
 Vector   extends Base { geometry: VectorGeometry; size; fill?; stroke? }
 
@@ -64,6 +68,13 @@ The prose above is the contract; these are the decisions taken while writing the
   break, so a scene without paragraphs and one whose paragraphs are spaced 0 are the same
   bytes. Layout keeps the space on the break it came on through a wrap and scales it with a
   shrink.
+- **A formula is a run, laid out in core and placed in the Scene** (ADR 0206). `math` is
+  the structure; `layout` is what `measureText` decided and what both exporters draw: each
+  piece's baseline and each fraction rule in px against the formula's origin, the formula's
+  box, where it starts on its line (`offset`) and how wide the line is (`lineWidth`), and how
+  far the line grows past its strut (`above`, `below`), the same on every formula of a line.
+  `text` is the linear reading, drawn only when the formula has no `layout`. Every face a
+  piece names must be in `Scene.fonts`, and a node holding only a formula is not empty.
 - **Adjacent runs that would draw the same thing are one run.** `runsOf` merges a run into
   its predecessor when `font`, `size`, `weight`, `style`, `color` and `decoration` all
   match, so a mark the template never declared costs nothing downstream: a sentence split
@@ -147,6 +158,7 @@ per node id or wants hidden nodes counted after all.
 | Text                     | `div` + spans; bundled `@font-face`               | `<text>`+`<tspan>`; font embedded in `<style>` or converted to paths (option) |
 | TextRun `break`          | `<br>`                                            | ends the `<tspan>`; the next one starts at `x` with `dy` of one line          |
 | TextRun `break` `space`  | `<br>` + an empty `display: block` span that tall | the next line's baseline moves down by `space`                                |
+| TextRun `formula`        | inline-block of the box + inline `<svg>` of it    | `<text>` per piece + `<rect>` per rule; the line's text skips it with `dx`    |
 | Vector.svg               | inline `<svg>`, once `checkSvgMarkup` accepts it  | inline (namespaces normalized), once `checkSvgMarkup` accepts it              |
 
 Where the table is silent and a visitor cannot be, ADR 0018 decides: `clip` on a group is

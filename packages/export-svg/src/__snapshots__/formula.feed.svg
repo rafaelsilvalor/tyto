@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300">
+  <defs>
+    <style>@font-face{font-family:"Source Sans 3";font-weight:400;font-style:normal;src:url("data:font/woff2;base64,Source Sans 3-400-normal")}
+    </style>
+  </defs>
+  <rect width="600" height="300" fill="#fafafa"/>
+  <g id="reference" transform="matrix(1 0 0 1 40 40)">
+    <text x="0" y="40.52" xml:space="preserve"><tspan font-family="&quot;Source Sans 3&quot;" font-size="40" font-weight="400" fill="#141428">F = </tspan><tspan dx="125.312" font-family="&quot;Source Sans 3&quot;" font-size="40" font-weight="400" fill="#141428"> = 25 Hz</tspan></text>
+    <text x="108.356" y="24.52" font-family="&quot;Source Sans 3&quot;" font-size="40" font-weight="400" fill="#141428" xml:space="preserve">1</text>
+    <text x="59.64" y="70.72" font-family="&quot;Source Sans 3&quot;" font-size="40" font-weight="400" fill="#141428" xml:space="preserve">40·10</text>
+    <text x="149.12" y="54.72" font-family="&quot;Source Sans 3&quot;" font-size="28" font-weight="400" fill="#141428" xml:space="preserve">−3</text>
+    <rect x="55.64" y="29.32" width="125.312" height="2.4" fill="#141428"/>
+  </g>
+  <g id="scripts" transform="matrix(1 0 0 1 40 200)">
+    <text x="142.444" y="40" xml:space="preserve"><tspan dx="122.276" font-family="&quot;Source Sans 3&quot;" font-size="40" font-weight="400" fill="#141428"> and </tspan></text>
+    <text x="142.444" y="40" font-family="&quot;Source Sans 3&quot;" font-size="40" font-weight="400" fill="#141428" xml:space="preserve">E = mc</text>
+    <text x="250.804" y="24" font-family="&quot;Source Sans 3&quot;" font-size="28" font-weight="400" fill="#141428" xml:space="preserve">2</text>
+    <text x="344.96" y="40" font-family="&quot;Source Sans 3&quot;" font-size="40" font-weight="400" fill="#141428" xml:space="preserve">v</text>
+    <text x="363.64" y="22" font-family="&quot;Source Sans 3&quot;" font-size="28" font-weight="400" fill="#141428" xml:space="preserve">2</text>
+    <text x="363.64" y="50" font-family="&quot;Source Sans 3&quot;" font-size="28" font-weight="400" fill="#141428" xml:space="preserve">0</text>
+  </g>
+</svg>

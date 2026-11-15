@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { exportHtml } from './export-html.js';
 import type { HtmlFontFace, HtmlResources } from './html.js';
+import formulaFixture from './__fixtures__/formula.json';
 import mappingFixture from './__fixtures__/mapping.json';
 import paragraphsFixture from './__fixtures__/paragraphs.json';
 import promoFixture from './__fixtures__/promo.json';
@@ -136,6 +137,28 @@ describe('a scene becomes one self-contained document per frame', () => {
     const [feed] = htmlOf(sceneOf(paragraphsFixture));
 
     await expect(feed).toMatchFileSnapshot('./__snapshots__/paragraphs.feed.html');
+  });
+
+  it('renders the formula fixture to its committed snapshot (ADR 0206)', async () => {
+    const [feed = ''] = htmlOf(sceneOf(formulaFixture));
+
+    await expect(feed).toMatchFileSnapshot('./__snapshots__/formula.feed.html');
+    // The fraction is an inline-block exactly its box, lowered by its descent, and the rule
+    // is drawn where the IR put it: nothing here is measured by the exporter.
+    expect(feed).toContain(
+      'display: inline-block; width: 125.312px; height: 72.2px; vertical-align: -30.68px',
+    );
+    expect(feed).toContain('<rect x="0" y="-11.2" width="125.312" height="2.4"/>');
+  });
+
+  it('draws a formula nobody laid out as its linear reading', () => {
+    const scene = JSON.parse(JSON.stringify(formulaFixture)) as {
+      artworks: { frames: { children: { runs: { kind: string; layout?: unknown }[] }[] }[] }[];
+    };
+    for (const run of scene.artworks[0]?.frames[0]?.children[0]?.runs ?? []) delete run.layout;
+    const [feed = ''] = htmlOf(sceneOf(scene));
+
+    expect(feed).toContain('>1/(40·10^(−3))</span>');
   });
 
   it('renders the mapping fixture to its committed snapshot', async () => {

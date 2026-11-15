@@ -3,6 +3,7 @@ import type {
   AssetRef,
   Diagnostic,
   Effect,
+  FormulaRun,
   Frame,
   GroupNode,
   ImageNode,
@@ -434,10 +435,10 @@ function runDeclarations(run: TextSpan, nodeId: string, emit: Emit): string[] {
  * largest, every line of the node advances by `lineHeight × that size` — one leading per
  * node, which is the one the IR declares (`docs/ir-schema.md`).
  */
-function referenceRun(node: TextNode): TextSpan | undefined {
-  let largest: TextSpan | undefined;
+function referenceRun(node: TextNode): TextSpan | FormulaRun | undefined {
+  let largest: TextSpan | FormulaRun | undefined;
   for (const run of node.runs) {
-    if (run.kind !== 'text') continue;
+    if (run.kind === 'break') continue;
     if (largest === undefined || run.size > largest.size) largest = run;
   }
   return largest;
@@ -531,13 +532,64 @@ function breakHtml(run: LineBreak): string {
     : `<br><span style="display: block; height: ${cssLength(run.space)}"></span>`;
 }
 
+function spanHtml(run: TextSpan, nodeId: string, emit: Emit): string {
+  return `<span style="${escapeHtml(runDeclarations(run, nodeId, emit).join('; '))}">${escapeHtml(run.text)}</span>`;
+}
+
+/** A formula's colour as an SVG fill. A gradient or an image is drawn in a solid colour. */
+function formulaFill(paint: Paint, nodeId: string, emit: Emit): string {
+  if (paint.kind === 'solid') return cssColor(paint.color);
+  approximated(
+    emit,
+    nodeId,
+    `a formula painted with ${paint.kind}`,
+    'a formula is drawn in one solid colour: the first stop of a gradient, black for an image',
+  );
+  const first = paint.kind === 'image' ? undefined : paint.stops[0];
+  return first === undefined ? '#000000' : cssColor(first.color);
+}
+
+/**
+ * A formula, drawn where core placed it (ADR 0206).
+ *
+ * An inline-block exactly the formula's box, so the browser's line box grows by what layout
+ * added to the line, holding an `<svg>` whose user space has its origin on the baseline: every
+ * piece and rule goes at the coordinates the IR gives, as `export-svg` draws them. The block
+ * holds no line of its own, so its baseline is its bottom edge, and `vertical-align` lowers it
+ * by the descent. A formula nobody laid out is drawn as its linear reading.
+ */
+function formulaHtml(run: FormulaRun, nodeId: string, emit: Emit): string {
+  const layout = run.layout;
+  if (layout === undefined) {
+    return spanHtml({ ...run, kind: 'text' }, nodeId, emit);
+  }
+  const height = layout.ascent + layout.descent;
+  const glyphs = layout.glyphs.map((glyph) => {
+    emit.faces.set(fontKey(glyph), { font: glyph.font, weight: glyph.weight, style: glyph.style });
+    const style = glyph.style === 'normal' ? '' : ` font-style="${glyph.style}"`;
+    return `<text x="${cssNumber(glyph.x)}" y="${cssNumber(glyph.y)}" font-family="${escapeHtml(`"${glyph.font.family}"`)}" font-size="${cssNumber(glyph.size)}" font-weight="${cssNumber(glyph.weight)}"${style}>${escapeHtml(glyph.text)}</text>`;
+  });
+  const rules = layout.rules.map(
+    (rule) =>
+      `<rect x="${cssNumber(rule.x)}" y="${cssNumber(rule.y)}" width="${cssNumber(rule.width)}" height="${cssNumber(rule.thickness)}"/>`,
+  );
+  const box = `display: inline-block; width: ${cssLength(layout.width)}; height: ${cssLength(height)}; vertical-align: ${cssLength(-layout.descent)}`;
+  const svg = `<svg width="${cssNumber(layout.width)}" height="${cssNumber(height)}" viewBox="0 ${cssNumber(-layout.ascent)} ${cssNumber(layout.width)} ${cssNumber(height)}" fill="${formulaFill(run.color, nodeId, emit)}" style="display: block; overflow: visible; white-space: pre">${[...glyphs, ...rules].join('')}</svg>`;
+  return `<span class="tyto-formula" style="${box}">${svg}</span>`;
+}
+
 function textHtml(node: TextNode, emit: Emit): string {
   const spans = node.runs
-    .map((run) =>
-      run.kind === 'break'
-        ? breakHtml(run)
-        : `<span style="${escapeHtml(runDeclarations(run, node.id, emit).join('; '))}">${escapeHtml(run.text)}</span>`,
-    )
+    .map((run) => {
+      switch (run.kind) {
+        case 'break':
+          return breakHtml(run);
+        case 'formula':
+          return formulaHtml(run, node.id, emit);
+        case 'text':
+          return spanHtml(run, node.id, emit);
+      }
+    })
     .join('');
   return `<div${lineBlockStyle(node)}>${spans}</div>`;
 }
