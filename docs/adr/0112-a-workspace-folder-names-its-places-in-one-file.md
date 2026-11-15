@@ -168,4 +168,5 @@ ADR 0073 foresaw and nobody built.
 - `alias --workspace` is the window's first write to this file: one member at `aliases.<name>`,
   edited in place with comments and layout kept, into the open folder's own file only (never a
   profile's), and refused by main in a folder that is not trusted, and over a file that does not
-  parse.
+  parse. Removing an alias only the profile defines is refused too: a profile is shared by
+  every folder that names it.

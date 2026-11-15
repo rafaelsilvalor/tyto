@@ -3432,7 +3432,9 @@ export const IPC_CHANNELS = {
    * `alias` and `unalias` (TYTO-536): one alias set, or removed with `body: null`, in the
    * person's settings or, with `workspace`, in the open folder's own `.tyto/project.json`.
    * **Main checks it again**: the name and body by the readers' rules, and a workspace write
-   * only into a trusted folder that is open; the window is not the boundary.
+   * only into a trusted folder that is open; the window is not the boundary. `profile` is an
+   * `unalias --workspace` of an alias only the work profile defines: the profile's file is
+   * never written from the panel.
    */
   'commands:set-alias': channel(
     z.strictObject({
@@ -3444,7 +3446,7 @@ export const IPC_CHANNELS = {
       z.object({ ok: z.literal(true) }),
       z.object({
         ok: z.literal(false),
-        reason: z.enum(['invalid', 'no-folder', 'restricted', 'syntax', 'unwritable']),
+        reason: z.enum(['invalid', 'no-folder', 'profile', 'restricted', 'syntax', 'unwritable']),
       }),
     ]),
   ),

@@ -74,6 +74,7 @@ function nameProblem(context: BuiltinContext, name: string): string | undefined 
 const REFUSED_KEYS = {
   invalid: 'commandPanel.alias.refused.invalid',
   'no-folder': 'commandPanel.alias.refused.noFolder',
+  profile: 'commandPanel.alias.refused.profile',
   restricted: 'commandPanel.alias.refused.restricted',
   syntax: 'commandPanel.alias.refused.syntax',
   unwritable: 'commandPanel.alias.refused.unwritable',

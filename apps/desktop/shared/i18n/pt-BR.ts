@@ -828,6 +828,8 @@ export const ptBR: Catalogue = {
     '{name} não foi salvo: o nome ou a linha não serve para um apelido.',
   'commandPanel.alias.refused.noFolder':
     '{name} não foi salvo: --workspace precisa de uma pasta de trabalho aberta.',
+  'commandPanel.alias.refused.profile':
+    '{name} está definido no perfil de trabalho da pasta, não no .tyto/project.json dela: o painel nunca edita um perfil. Remova-o no arquivo do perfil.',
   'commandPanel.alias.refused.restricted':
     '{name} não foi salvo: esta pasta é restrita, e o {where} dela não é escrito pelo painel. Confie nela em Workspace: Manage Trust.',
   'commandPanel.alias.refused.syntax':

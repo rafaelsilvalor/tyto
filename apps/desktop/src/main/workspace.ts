@@ -146,6 +146,7 @@ export interface WorkspaceService {
    * `alias --workspace`: one alias written into the open folder's own `.tyto/project.json`, then
    * the folder read again. Refused with nothing open and in a folder that is not trusted now,
    * a trust taken back included: a shared folder's file is never written from the panel then.
+   * A work profile's file is never written: removing an alias only it defines is refused.
    */
   writeAlias(name: string, body: string | null): Promise<AliasWritten>;
 }
@@ -357,6 +358,10 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
     async writeAlias(name, body) {
       if (open === undefined) return { ok: false, reason: 'no-folder' };
       if (open.trust !== 'trusted' || revoked.folder) return { ok: false, reason: 'restricted' };
+      // Only the folder's own file is written. An alias the profile alone defines is the
+      // profile's, shared by every folder that names it, and removing it is not this folder's.
+      const inForce = open.project.aliases.find((alias) => alias.name === name);
+      if (body === null && inForce?.origin === 'profile') return { ok: false, reason: 'profile' };
       const written = await writeWorkspaceAlias(open.folder, name, body);
       if (written.ok) await read(open.folder);
       return written;

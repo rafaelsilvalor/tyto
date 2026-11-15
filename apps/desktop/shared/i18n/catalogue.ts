@@ -1184,6 +1184,7 @@ export interface Catalogue {
   readonly 'commandPanel.alias.removed.workspace': string;
   readonly 'commandPanel.alias.refused.invalid': string;
   readonly 'commandPanel.alias.refused.noFolder': string;
+  readonly 'commandPanel.alias.refused.profile': string;
   readonly 'commandPanel.alias.refused.restricted': string;
   readonly 'commandPanel.alias.refused.syntax': string;
   readonly 'commandPanel.alias.refused.unwritable': string;
@@ -2019,6 +2020,7 @@ export const CATALOGUE_KEYS = [
   'commandPanel.alias.removed.workspace',
   'commandPanel.alias.refused.invalid',
   'commandPanel.alias.refused.noFolder',
+  'commandPanel.alias.refused.profile',
   'commandPanel.alias.refused.restricted',
   'commandPanel.alias.refused.syntax',
   'commandPanel.alias.refused.unwritable',

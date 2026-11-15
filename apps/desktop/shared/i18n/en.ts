@@ -820,6 +820,8 @@ export const en: Catalogue = {
     '{name} was not saved: its name or its line is not one an alias may have.',
   'commandPanel.alias.refused.noFolder':
     '{name} was not saved: --workspace needs a workspace folder open.',
+  'commandPanel.alias.refused.profile':
+    "{name} is defined in the folder's work profile, not in its own .tyto/project.json: the panel never edits a profile. Remove it in the profile's file.",
   'commandPanel.alias.refused.restricted':
     '{name} was not saved: this folder is restricted, and its {where} is not written from the panel. Trust it with Workspace: Manage Trust.',
   'commandPanel.alias.refused.syntax':
