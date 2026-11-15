@@ -213,3 +213,41 @@ describe('the recipes a yes offered', () => {
     expect(offered.take('run-3')).toBe('c.recipe');
   });
 });
+
+describe('a refused line that came from an alias (TYTO-536)', () => {
+  const { actions } = recorder();
+
+  it('names the alias and where it is defined, in the sentence and in the box', async () => {
+    const boxes: { readonly detail: string }[] = [];
+    const settled = await settleRefusal(
+      {
+        message: TRUST_REFUSED,
+        offer: TRUST,
+        origin: { alias: 'entrega', definedIn: 'workspace' },
+      },
+      (box) => {
+        boxes.push(box);
+        return Promise.resolve(false);
+      },
+      actions,
+      en,
+    );
+    expect(settled).toBe(
+      `${TRUST_REFUSED} The line came from the alias 'entrega', defined in the workspace's ` +
+        '.tyto/project.json (aliases).',
+    );
+    expect(
+      boxes[0]?.detail.endsWith(
+        "This line came from the alias 'entrega', defined in this workspace's .tyto/project.json (aliases).",
+      ),
+    ).toBe(true);
+  });
+
+  it('says a user alias is in the settings, with or without a box, in both languages', async () => {
+    const origin = { alias: 'pub', definedIn: 'user' } as const;
+    expect(await settleRefusal({ message: MCP_REFUSED, origin }, answer(true), actions, en)).toBe(
+      `${MCP_REFUSED} The line came from the alias 'pub', defined in your settings (commandAliases).`,
+    );
+    expect(offerBox(WATCH, pt, origin).detail).toContain("seu apelido 'pub'");
+  });
+});

@@ -72,6 +72,11 @@ export interface CommandSession {
    * ADR 0201) changes only this value; the prompt shows it.
    */
   readonly workingFolder: readonly string[];
+  /**
+   * The variables `set` gave this session (TYTO-536), which `$name` reads: the panel's own,
+   * never the environment's, and gone when the tab closes.
+   */
+  readonly variables: ReadonlyMap<string, string>;
 }
 
 /** A run that is going: Stop applies, and the tab may not start another. */
@@ -156,6 +161,7 @@ export class CommandSessions {
       diagnostics: [],
       runs: [],
       workingFolder: [],
+      variables: new Map(),
     };
     this.list = [...this.list, session];
     this.activeId = session.id;
@@ -201,6 +207,14 @@ export class CommandSessions {
   /** `cd` (TYTO-537): the session's working folder is now `steps` under the root. */
   changeFolder(id: string, steps: readonly string[]): void {
     this.update(id, (session) => ({ ...session, workingFolder: [...steps] }));
+  }
+
+  /** `set name=value` (TYTO-536): a variable of this session, which `$name` reads. */
+  setVariable(id: string, name: string, value: string): void {
+    this.update(id, (session) => ({
+      ...session,
+      variables: new Map([...session.variables, [name, value]]),
+    }));
   }
 
   /** Another workspace folder opened: every session goes back to its root. */

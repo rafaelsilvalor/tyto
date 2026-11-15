@@ -142,7 +142,7 @@ From the command line, `--section` sets one key for one run without editing the 
 
 ## A folder you have not trusted
 
-Every folder starts untrusted. An untrusted folder still opens, previews and exports, but every folder its project file names must be inside it: a name that leads outside — `../shared`, an absolute path, or a shortcut inside the folder that points elsewhere — is left out. Each one left out is listed in the **Problems** panel as `W_PROJECT_PATH_OUTSIDE`, with its line and column in `.tyto/project.json`. Its plugin sections are withheld too.
+Every folder starts untrusted. An untrusted folder still opens, previews and exports, but every folder its project file names must be inside it: a name that leads outside — `../shared`, an absolute path, or a shortcut inside the folder that points elsewhere — is left out. Each one left out is listed in the **Problems** panel as `W_PROJECT_PATH_OUTSIDE`, with its line and column in `.tyto/project.json`. Its plugin sections are withheld too, and so are the [command panel's aliases](commands.md#aliases-and-variables) its file defines under `aliases` (`W_PROJECT_ALIASES_WITHHELD`): none of them runs until you trust the folder.
 
 When something was left out, a strip above the editor says so, with three buttons: **Trust this folder** trusts it and applies what was left out at once, **Show problems** opens the Problems panel, and **Show project** opens the Project panel (below). A folder whose names all stay inside it never shows the strip.
 

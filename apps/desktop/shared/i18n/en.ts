@@ -786,6 +786,44 @@ export const en: Catalogue = {
   'commandPanel.builtin.cd': 'go to a folder of the workspace; cd alone goes back to its root',
   'commandPanel.builtin.pwd': 'print the folder tyto commands run in',
   'commandPanel.builtin.cat': 'print a text file',
+  'cli.offer.origin.user':
+    "This line came from your alias '{alias}', defined in your settings (commandAliases).",
+  'cli.offer.origin.workspace':
+    "This line came from the alias '{alias}', defined in this workspace's .tyto/project.json (aliases).",
+  'commandPanel.builtin.alias': "list aliases, or save one in your settings: alias name='line'",
+  'commandPanel.builtin.unalias': 'remove an alias of yours',
+  'commandPanel.builtin.set': "list this session's variables, or set one: set name=value",
+  'commandPanel.builtin.variable':
+    "a variable set in this session (never the environment's; not in single quotes)",
+  'commandPanel.alias.none': 'No aliases.',
+  'commandPanel.alias.where.user': 'your settings',
+  'commandPanel.alias.where.workspace': 'this workspace',
+  'commandPanel.alias.unknown': 'No alias named {name}.',
+  'commandPanel.alias.badName':
+    "{name} cannot be an alias's name: letters, digits, _ and -, not starting with a digit or -.",
+  'commandPanel.alias.reserved':
+    '{name} is a command of the panel or tyto itself: an alias cannot take its name.',
+  'commandPanel.alias.usage': "Write alias name='line', quoting a line that has spaces.",
+  'commandPanel.unalias.usage': 'Write unalias name.',
+  'commandPanel.alias.inWorkspace':
+    "{name} is this workspace's alias, defined in its .tyto/project.json: remove it there.",
+  'commandPanel.alias.saved.user': 'Alias {name} saved in your settings.',
+  'commandPanel.alias.removed.user': 'Alias {name} removed from your settings.',
+  'commandPanel.alias.refused.invalid':
+    '{name} was not saved: its name or its line is not one an alias may have.',
+  'commandPanel.alias.refused.syntax':
+    '{name} was not saved: {where} does not parse, and is not written over. Fix it first.',
+  'commandPanel.alias.ignored':
+    'The alias {name} in {where} is ignored: it has the name of a command of the panel or tyto.',
+  'commandPanel.alias.unreadable':
+    'The alias {name} cannot be read: its line has an unclosed quote or an empty && at column {column}. Nothing was run.',
+  'commandPanel.alias.from': 'This line came from the alias {name}, defined in {where}.',
+  'commandPanel.variable.unknown':
+    'No variable named {name} in this session: set {name}=value sets one. Nothing was run.',
+  'commandPanel.variable.none': 'No variables in this session.',
+  'commandPanel.variable.badName':
+    "{name} cannot be a variable's name: letters, digits and _, not starting with a digit.",
+  'commandPanel.set.usage': 'Write set name=value, quoting a value that has spaces.',
   'commandPanel.files.noFolder':
     "{name} needs a workspace folder open: the panel's file commands work inside it.",
   'commandPanel.files.outside':

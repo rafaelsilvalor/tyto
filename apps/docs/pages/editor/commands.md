@@ -1,7 +1,7 @@
 # Commands
 
 ::: info How this page was checked
-Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them. The refusals of `tyto mcp`, `watch` and `recipe run --apply` were added to this list on 2026-11-12 from the window's code and its unit tests, the last one through the command line's own parser, not in the window. The panel's own commands, `&&`, `!N` and patterns were added on 2026-11-15 from the window's code and its unit tests, not in the window. The file commands `ls`, `cd`, `pwd` and `cat`, and completion after them, were added on 2026-11-15 from the window's code and its unit tests; the prompt showing a folder after `cd` was looked at in the window, in the light and dark themes. `new`, `mkdir`, `mv`, `cp`, `rm`, `open` and `reveal` were added the same day from the window's code and its unit tests, not in the window. The boxes a refusal offers were added on 2026-11-15: the ones for `--trust` and `recipe run --apply` were followed in the window, with both answers; the ones for `signin`, `signout` and `watch` come from the window's code and its unit tests.
+Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them. The refusals of `tyto mcp`, `watch` and `recipe run --apply` were added to this list on 2026-11-12 from the window's code and its unit tests, the last one through the command line's own parser, not in the window. The panel's own commands, `&&`, `!N` and patterns were added on 2026-11-15 from the window's code and its unit tests, not in the window. The file commands `ls`, `cd`, `pwd` and `cat`, and completion after them, were added on 2026-11-15 from the window's code and its unit tests; the prompt showing a folder after `cd` was looked at in the window, in the light and dark themes. `new`, `mkdir`, `mv`, `cp`, `rm`, `open` and `reveal` were added the same day from the window's code and its unit tests, not in the window. Aliases and variables were added on 2026-11-15 from the window's code and its unit tests, not in the window. The boxes a refusal offers were added on 2026-11-15: the ones for `--trust` and `recipe run --apply` were followed in the window, with both answers; the ones for `signin`, `signout` and `watch` come from the window's code and its unit tests.
 :::
 
 The **Commands** tab of the bottom area runs `tyto` commands, the same ones as the [command line](../command-line/index.md), inside the window, and a few commands of its own. Nothing else runs there: not a shell and not another program. For a shell, use the [Terminal](terminal.md) tab.
@@ -19,7 +19,7 @@ The bottom area shows one tab at a time. Its **×** hides the whole area, and ev
 Type after `tyto ›` and press **Enter**. Writing `tyto` first is optional.
 
 - Words are split on spaces. Put a path with spaces in quotes: `render "Meus briefs/cartaz.brief"`. A quote left open is refused and nothing runs.
-- `|`, `>`, `;`, `$HOME` and `~` mean nothing here. They reach the command as words. `&&`, `!N`, `*` and `?` are read by the panel, as [Several commands in one line](#several-commands-in-one-line) says.
+- `|`, `>`, `;` and `~` mean nothing here. They reach the command as words. `&&`, `!N`, `*` and `?` are read by the panel, as [Several commands in one line](#several-commands-in-one-line) says, and `$name` and aliases as [Aliases and variables](#aliases-and-variables) says.
 - The command runs in the panel's folder: the open [workspace folder](workspace-folder.md), or the folder inside it that `cd` went to, which the prompt shows (`tyto entregas/novembro ›`). A path can be written from there. With no folder open, it runs in your Tyto folder (`~/.tyto`). A folder's trust is the workspace folder's: under a restricted folder, every folder is restricted too.
 - Some commands are refused, with a line saying why:
   - `--trust`, because the window trusts a folder with **Workspace: Manage Trust**. With a folder open, a box offers to trust it there and then run the command without `--trust`. Unlike `--trust`, which lasts one run, this trust is saved: the folder stays trusted until you take it back in **Workspace: Manage Trust** or with `tyto trust remove`;
@@ -56,6 +56,9 @@ These are not `tyto` commands: the panel answers them itself. Those that only re
 | `rm`             | Moves files or folders to the bin: `rm velho.brief rascunhos`.                                                                                                             |
 | `open`           | Opens a brief, recipe or text file in a tab.                                                                                                                               |
 | `reveal`         | Selects a file or folder in the Explorer.                                                                                                                                  |
+| `alias`          | Lists the aliases, or saves one: `alias entrega='render --delivery'`. See [Aliases and variables](#aliases-and-variables).                                                 |
+| `unalias`        | Removes an alias: `unalias entrega`.                                                                                                                                       |
+| `set`            | Lists this session's variables, or sets one: `set brief=cartaz.brief`.                                                                                                     |
 
 `ls` lists folders first, each ending in `/`, and every name beside its kind: folder, brief, recipe or file. A brief, a recipe or a text file is a link that opens it in a tab, unless its name has a space.
 
@@ -67,6 +70,24 @@ Nothing is replaced: `mv`, `cp`, `new` and `mkdir` refuse a name that is already
 
 - `&&` runs the next command only if the one before ended with **✓ 0**: `check cartaz.brief && render cartaz.brief`. Each command is a block of its own. A command refused, stopped or ending with an error stops the line there. While a line runs, the session takes no other.
 - `*` stands for any part of a name, and `?` for one character: `render *.brief` renders every brief of the open folder, and `render entregas/*.brief` those of `entregas`. A pattern looks only inside the open workspace folder and never goes through a `/`: `*` does not match a name starting with `.`, and there is no `**`. A pattern that leads outside the folder (`..`, `/`, `C:\`, `~`), or that matches no file, is refused and nothing in the line runs. Put a word in quotes to keep its `*` as it is.
+
+## Aliases and variables
+
+An alias is a short name for a line you type often. `alias entrega='render --delivery'` saves it, and from then on `entrega cartaz.brief` runs `render --delivery cartaz.brief`: the words after the name go after the alias's line.
+
+- `alias` alone lists the aliases in force, each with where it is defined; `alias entrega` shows one. `unalias entrega` removes it.
+- `alias` saves in your settings (`commandAliases` in `settings.json`), for every folder you open. A folder's own aliases are written in its `.tyto/project.json`, under `aliases`, for everyone who opens that folder: `"aliases": { "entrega": "render --delivery" }`. `unalias` removes only yours.
+- **The folder's alias wins** over yours of the same name. A folder's aliases can also come from its [work profile](workspace-folder.md#work-profiles), the folder's own winning name by name.
+- In a [restricted folder](workspace-folder.md#a-folder-you-have-not-trusted) the folder's aliases are withheld and never run: the strip above the editor counts them, and the Problems panel names them (`W_PROJECT_ALIASES_WITHHELD`). Yours still run.
+- An alias expands once. Its line is taken as written: an alias inside it is not expanded again, and a `$` in it is just a character. Quote a line with spaces when you save it.
+- An alias cannot take the name of the panel's own commands (`ls`, `cd`, `help`, `alias`…) nor `tyto`. One written by hand in a file with such a name is ignored, and the panel says so once.
+- A line an alias made goes through the same refusals as a typed one. When it is refused, the line and the box say which alias it came from and where that alias is defined.
+
+`set brief=cartaz.brief` sets a variable for this session, and `$brief` in a later line reads it: `render $brief`. `set` alone lists them. A variable lives until the session's tab closes, and each tab has its own.
+
+- Only what `set` gave this session is read: `$HOME` and the other variables of your system are not, and a name never set refuses the line, running nothing.
+- `$brief` is read anywhere in a word, and in double quotes: `"entregas/$brief"`. In single quotes it stays as typed: `'$brief'`.
+- A value is always one word: spaces, quotes or `&&` in it are part of the word, never a new command.
 
 ## Complete as you type
 

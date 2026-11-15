@@ -105,6 +105,12 @@ const run = (
     say: (key) => translate('en', key),
     registry: PANEL_BUILTINS,
     files,
+    aliases: {
+      list: () => Promise.resolve({ aliases: [] }),
+      set: () => Promise.resolve({ ok: true }),
+      reserved: () => false,
+    },
+    variables: { all: () => new Map(), set: () => undefined },
   };
   return Promise.resolve(PANEL_BUILTINS.find({ text: name, quoted: false })!.run(context));
 };

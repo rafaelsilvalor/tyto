@@ -142,7 +142,7 @@ Na linha de comando, `--section` define uma chave numa execução sem editar o a
 
 ## Uma pasta em que você ainda não confiou
 
-Toda pasta começa sem confiança. Uma pasta assim abre, mostra a prévia e exporta, mas toda pasta que o arquivo do projeto nomeia precisa estar dentro dela: um nome que leva para fora — `../shared`, um caminho absoluto, ou um atalho dentro da pasta que aponta para outro lugar — fica de fora. Cada um que fica de fora aparece no painel **Problemas** como `W_PROJECT_PATH_OUTSIDE`, com linha e coluna no `.tyto/project.json`. As seções de plugin dela também ficam retidas.
+Toda pasta começa sem confiança. Uma pasta assim abre, mostra a prévia e exporta, mas toda pasta que o arquivo do projeto nomeia precisa estar dentro dela: um nome que leva para fora — `../shared`, um caminho absoluto, ou um atalho dentro da pasta que aponta para outro lugar — fica de fora. Cada um que fica de fora aparece no painel **Problemas** como `W_PROJECT_PATH_OUTSIDE`, com linha e coluna no `.tyto/project.json`. As seções de plugin dela também ficam retidas, e os [apelidos do painel de comandos](commands.md#apelidos-e-variaveis) que o arquivo define em `aliases` também (`W_PROJECT_ALIASES_WITHHELD`): nenhum deles roda até você confiar na pasta.
 
 Quando algo fica de fora, uma faixa acima do editor avisa, com três botões: **Confiar nesta pasta** confia nela e aplica na hora o que tinha ficado de fora, **Mostrar problemas** abre o painel Problemas, e **Mostrar projeto** abre o painel Projeto (abaixo). Uma pasta cujos nomes ficam todos dentro dela nunca mostra a faixa.
 

@@ -190,6 +190,7 @@ non-zero.
 | `W_PROJECT_KEY_INVALID` | warning | no | A project key's value, or one entry of it, is not accepted, so it is left out. |
 | `W_PROJECT_PATH_OUTSIDE` | warning | no | A restricted source's folder key leads outside the source, directly or through a link, so it is left out. |
 | `W_PROJECT_SECTIONS_WITHHELD` | warning | no | A restricted source's plugin sections are withheld from the plugins that would read them. |
+| `W_PROJECT_ALIASES_WITHHELD` | warning | no | A restricted source's command panel aliases are withheld until it is trusted. |
 | `W_PROJECT_PLUGIN_FILES_WITHHELD` | warning | no | A restricted folder's plugin files are neither fetched nor loaded until the folder is trusted. |
 | `W_PROJECT_PROFILE_INVALID` | warning | no | The project file names a work profile in a form Tyto does not accept, so no profile is read. |
 | `W_PROJECT_PROFILE_MISSING` | warning | no | The work profile the project file names is not there, so no profile is read. |
@@ -3353,6 +3354,20 @@ The sections for {plugins} are withheld because this folder is not trusted.
 ```
 
 Parameters: `plugins`
+
+### `W_PROJECT_ALIASES_WITHHELD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0111-nothing-a-source-ships-runs-before-the-person-trusts-it.md`
+
+A restricted source's command panel aliases are withheld until it is trusted.
+
+Only the source's aliases are left out; the person's own still expand.
+
+```
+The aliases {aliases} are withheld because this folder is not trusted.
+```
+
+Parameters: `aliases`
 
 ### `W_PROJECT_PLUGIN_FILES_WITHHELD`
 

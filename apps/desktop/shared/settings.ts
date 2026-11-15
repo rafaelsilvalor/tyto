@@ -2,6 +2,7 @@ import { type ConfigurationContribution, DEFAULT_GALLERY_INDEX } from '@tyto/plu
 import { z } from 'zod';
 
 import { type BriefColumnLook, briefColumnsContribution } from './brief-columns.js';
+import { type CommandAliases, commandAliasesContribution } from './command-aliases.js';
 import { type LineNumbersLook, lineNumbersContribution } from './line-numbers.js';
 import {
   type CommandsOrder,
@@ -457,7 +458,7 @@ export const agentArgsContribution = {
 } satisfies ConfigurationContribution<readonly string[]>;
 
 /**
- * The thirty-five, in the order the settings file is documented in. `theme` checks its ids against
+ * The thirty-six, in the order the settings file is documented in. `theme` checks its ids against
  * `lookup`, which main builds from every theme the plugins registered (TYTO-208); the default
  * knows the built-in two and lets any other id through.
  */
@@ -484,6 +485,7 @@ export function settingContributions(
     lineNumbersContribution,
     commandsOrderContribution,
     commandsFoldOlderRunsContribution,
+    commandAliasesContribution,
     zoomContribution,
     uiFontFamilyContribution,
     uiFontSizeContribution,
@@ -536,6 +538,8 @@ export interface Settings {
   readonly commandsOrder: CommandsOrder;
   /** Whether the command panel folds every run but the newest (TYTO-496). */
   readonly commandsFoldOlderRuns: boolean;
+  /** The person's own command panel aliases, by name (TYTO-536). */
+  readonly commandAliases: CommandAliases;
   /** How far the window is zoomed, in Electron's steps of 1.2 (TYTO-272, ADR 0099). */
   readonly zoom: number;
   /** The face and size of the window's text outside the editor (TYTO-272). */
@@ -585,6 +589,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lineNumbers: lineNumbersContribution.default,
   commandsOrder: commandsOrderContribution.default,
   commandsFoldOlderRuns: commandsFoldOlderRunsContribution.default,
+  commandAliases: commandAliasesContribution.default,
   zoom: zoomContribution.default,
   uiFontFamily: uiFontFamilyContribution.default,
   uiFontSize: uiFontSizeContribution.default,
@@ -607,7 +612,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const DEFAULT_QUEUE_KINDS: readonly string[] = ['png'];
 
 /**
- * The thirty-three out of the resolved values, which already hold every declared key with a value
+ * The thirty-four out of the resolved values, which already hold every declared key with a value
  * its schema accepted or its default (`resolveSettings`).
  */
 export function settingsFrom(values: Readonly<Record<string, unknown>>): Settings {
@@ -633,6 +638,7 @@ export function settingsFrom(values: Readonly<Record<string, unknown>>): Setting
     lineNumbers: pick('lineNumbers'),
     commandsOrder: pick('commandsOrder'),
     commandsFoldOlderRuns: pick('commandsFoldOlderRuns'),
+    commandAliases: pick('commandAliases'),
     zoom: pick('zoom'),
     uiFontFamily: pick('uiFontFamily'),
     uiFontSize: pick('uiFontSize'),

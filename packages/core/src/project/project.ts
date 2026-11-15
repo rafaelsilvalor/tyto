@@ -1,4 +1,5 @@
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
+import { ALIASES_KEY, type SheetAlias, readAliases } from './aliases.js';
 import type { Trust } from '../ports/trust-store.js';
 import type { SourceRange } from '../source/range.js';
 import {
@@ -126,12 +127,24 @@ export interface ResolvedProject {
    */
   readonly callHosts: readonly string[];
   /**
+   * The command panel's aliases (TYTO-536), merged one alias at a time, the later sheet winning,
+   * from trusted sheets only, in name order. Empty when no trusted sheet writes one.
+   */
+  readonly aliases: readonly ProjectAlias[];
+  /**
    * Which kind of sheet each value came from, so the window can say "from the profile" or
    * "from this folder" (TYTO-347). A key no sheet set has no origin.
    */
   readonly origins: ProjectOrigins;
   /** What each sheet had to say, by layer index, so each is printed against its own text. */
   readonly diagnostics: readonly (readonly Diagnostic[])[];
+}
+
+/** One alias the workspace defines, with the sheet it came from. */
+export interface ProjectAlias {
+  readonly name: string;
+  readonly body: string;
+  readonly origin: ProjectLayer['kind'];
 }
 
 export interface ProjectOrigins {
@@ -153,6 +166,7 @@ const KNOWN_KEYS = new Set<string>([
   EXPORT_PRESETS_KEY,
   DELIVERY_KEY,
   RECIPES_KEY,
+  ALIASES_KEY,
 ]);
 
 /** What one sheet sets; a key it does not set, or sets to nothing usable, is absent. */
@@ -165,6 +179,7 @@ interface LayerValues {
   presets?: ReadonlyMap<string, SheetPreset | null>;
   delivery?: SheetDelivery;
   callHosts?: readonly string[];
+  aliases?: ReadonlyMap<string, SheetAlias>;
 }
 
 /**
@@ -186,6 +201,7 @@ export function resolveProject(
   const sectionOrigins: Record<string, ProjectLayer['kind']> = {};
   const presets = new Map<string, { preset: SheetPreset; layer: number }>();
   const deliveries: { delivery: SheetDelivery; kind: ProjectLayer['kind'] }[] = [];
+  const aliases = new Map<string, ProjectAlias>();
   const workspace = workspaceOf(layers);
   const diagnostics = layers.map((layer, index) => {
     const found: Diagnostic[] = [];
@@ -212,6 +228,10 @@ export function resolveProject(
     if (values.delivery !== undefined)
       deliveries.push({ delivery: values.delivery, kind: layer.kind });
     if (values.callHosts !== undefined) merged.callHosts = values.callHosts;
+    // By name, as presets merge: a folder that writes one alias keeps the profile's others.
+    for (const [name, alias] of values.aliases ?? []) {
+      aliases.set(name, { name, body: alias.body, origin: layer.kind });
+    }
     return found;
   });
   const exportPresets: ExportPreset[] = [];
@@ -241,6 +261,7 @@ export function resolveProject(
     exportPresets,
     delivery: mergeDelivery(workspace.root, deliveries),
     callHosts: merged.callHosts ?? [],
+    aliases: [...aliases.values()].sort((left, right) => left.name.localeCompare(right.name)),
     origins: { ...origins, sections: sectionOrigins },
     diagnostics,
   };
@@ -367,6 +388,9 @@ function readLayer(
     } else if (entry.key === RECIPES_KEY) {
       const recipes = readRecipes(entry, layer.trust, found);
       if (recipes?.callHosts !== undefined) values.callHosts = recipes.callHosts;
+    } else if (entry.key === ALIASES_KEY) {
+      const aliases = readAliases(entry, layer.trust, found);
+      if (aliases !== undefined) values.aliases = aliases;
     } else if (entry.key === 'plugins') {
       const sections = sectionsOf(layer, entry, found);
       if (sections !== undefined) values.sections = sections;

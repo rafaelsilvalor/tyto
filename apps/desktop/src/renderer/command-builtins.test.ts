@@ -31,6 +31,12 @@ function context(
     say: (key) => translate('en', key),
     registry: PANEL_BUILTINS,
     files: undefined,
+    aliases: {
+      list: () => Promise.resolve({ aliases: [] }),
+      set: () => Promise.resolve({ ok: true }),
+      reserved: () => false,
+    },
+    variables: { all: () => new Map(), set: () => undefined },
     ...overrides,
   };
 }
@@ -46,6 +52,7 @@ describe('the registry', () => {
 
   it('lists every name and alias for completion, each with its entry', () => {
     expect(PANEL_BUILTINS.names().map((each) => each.name)).toEqual([
+      'alias',
       'cat',
       'cd',
       'clear',
@@ -63,6 +70,8 @@ describe('the registry', () => {
       'pwd',
       'reveal',
       'rm',
+      'set',
+      'unalias',
     ]);
   });
 

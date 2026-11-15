@@ -15,12 +15,20 @@ export interface LineWord {
   readonly text: string;
   /** Some of it was inside quotes: such a word is never a glob nor a built-in's name. */
   readonly quoted: boolean;
+  /**
+   * Where in `text` a `$` was typed outside single quotes (TYTO-536): the only places a session
+   * variable may be read. Absent where there is none, and on every word of an alias body, which
+   * is taken literally.
+   */
+  readonly dollars?: readonly number[];
 }
 
 export interface LineStep {
   readonly words: readonly LineWord[];
   /** The step as typed, trimmed: what its block's header says and what the history keeps. */
   readonly source: string;
+  /** The alias this step was expanded from (TYTO-536), which a refusal of it names. */
+  readonly origin?: { readonly alias: string; readonly definedIn: 'user' | 'workspace' };
 }
 
 export type ParsedLine =
@@ -39,22 +47,30 @@ export function parseCommandLine(line: string): ParsedLine {
   let quoted = false;
   // A word exists once a character or a pair of quotes started it: `""` is an empty argument.
   let started = false;
+  let dollars: number[] = [];
   let quote: '"' | "'" | undefined;
   let quoteAt = 0;
   let stepStart = 0;
 
   const endWord = (): void => {
-    if (started) words.push({ text: word, quoted });
+    if (started) {
+      words.push(dollars.length === 0 ? { text: word, quoted } : { text: word, quoted, dollars });
+    }
     word = '';
     quoted = false;
     started = false;
+    dollars = [];
   };
 
   for (let at = 0; at < line.length; at += 1) {
     const character = line[at] ?? '';
     if (quote !== undefined) {
       if (character === quote) quote = undefined;
-      else word += character;
+      else {
+        // Single quotes keep a `$` as it is, as a shell's do; double quotes let it be read.
+        if (character === '$' && quote === '"') dollars.push(word.length);
+        word += character;
+      }
       continue;
     }
     if (character === '"' || character === "'") {
@@ -77,6 +93,7 @@ export function parseCommandLine(line: string): ParsedLine {
       endWord();
       continue;
     }
+    if (character === '$') dollars.push(word.length);
     word += character;
     started = true;
   }

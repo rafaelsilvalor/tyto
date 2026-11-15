@@ -1163,6 +1163,32 @@ export interface Catalogue {
   readonly 'commandPanel.builtin.cd': string;
   readonly 'commandPanel.builtin.pwd': string;
   readonly 'commandPanel.builtin.cat': string;
+  readonly 'cli.offer.origin.user': string;
+  readonly 'cli.offer.origin.workspace': string;
+  readonly 'commandPanel.builtin.alias': string;
+  readonly 'commandPanel.builtin.unalias': string;
+  readonly 'commandPanel.builtin.set': string;
+  readonly 'commandPanel.builtin.variable': string;
+  readonly 'commandPanel.alias.none': string;
+  readonly 'commandPanel.alias.where.user': string;
+  readonly 'commandPanel.alias.where.workspace': string;
+  readonly 'commandPanel.alias.unknown': string;
+  readonly 'commandPanel.alias.badName': string;
+  readonly 'commandPanel.alias.reserved': string;
+  readonly 'commandPanel.alias.usage': string;
+  readonly 'commandPanel.unalias.usage': string;
+  readonly 'commandPanel.alias.inWorkspace': string;
+  readonly 'commandPanel.alias.saved.user': string;
+  readonly 'commandPanel.alias.removed.user': string;
+  readonly 'commandPanel.alias.refused.invalid': string;
+  readonly 'commandPanel.alias.refused.syntax': string;
+  readonly 'commandPanel.alias.ignored': string;
+  readonly 'commandPanel.alias.unreadable': string;
+  readonly 'commandPanel.alias.from': string;
+  readonly 'commandPanel.variable.unknown': string;
+  readonly 'commandPanel.variable.none': string;
+  readonly 'commandPanel.variable.badName': string;
+  readonly 'commandPanel.set.usage': string;
   readonly 'commandPanel.files.noFolder': string;
   readonly 'commandPanel.files.outside': string;
   readonly 'commandPanel.files.missing': string;
@@ -1967,6 +1993,32 @@ export const CATALOGUE_KEYS = [
   'commandPanel.builtin.cd',
   'commandPanel.builtin.pwd',
   'commandPanel.builtin.cat',
+  'cli.offer.origin.user',
+  'cli.offer.origin.workspace',
+  'commandPanel.builtin.alias',
+  'commandPanel.builtin.unalias',
+  'commandPanel.builtin.set',
+  'commandPanel.builtin.variable',
+  'commandPanel.alias.none',
+  'commandPanel.alias.where.user',
+  'commandPanel.alias.where.workspace',
+  'commandPanel.alias.unknown',
+  'commandPanel.alias.badName',
+  'commandPanel.alias.reserved',
+  'commandPanel.alias.usage',
+  'commandPanel.unalias.usage',
+  'commandPanel.alias.inWorkspace',
+  'commandPanel.alias.saved.user',
+  'commandPanel.alias.removed.user',
+  'commandPanel.alias.refused.invalid',
+  'commandPanel.alias.refused.syntax',
+  'commandPanel.alias.ignored',
+  'commandPanel.alias.unreadable',
+  'commandPanel.alias.from',
+  'commandPanel.variable.unknown',
+  'commandPanel.variable.none',
+  'commandPanel.variable.badName',
+  'commandPanel.set.usage',
   'commandPanel.files.noFolder',
   'commandPanel.files.outside',
   'commandPanel.files.missing',

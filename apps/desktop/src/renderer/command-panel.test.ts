@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
+import type { AliasesInForce } from './command-alias-builtins.js';
 import type { ListedEntry } from './command-completion.js';
 import type { OutputLink } from './command-links.js';
 import { type CommandPanel, type CommandPanelPorts, COMMAND_PANEL_TAG } from './command-panel.js';
@@ -32,6 +33,10 @@ interface Harness {
   readonly folders: (string | undefined)[];
   /** What the file writes asked the Explorer to make (TYTO-537). */
   readonly written: unknown[][];
+  /** The alias each run came from, `undefined` for a typed one (TYTO-536). */
+  readonly origins: unknown[];
+  /** What `alias` and `unalias` asked main to write (TYTO-536). */
+  readonly aliasWrites: unknown[][];
 }
 
 async function mount(
@@ -45,6 +50,8 @@ async function mount(
     /** What `cat` reads, by id: the steps joined with `/` (TYTO-537). */
     texts?: Record<string, FileRead>;
     restricted?: boolean;
+    /** The aliases main answers (TYTO-536). */
+    aliases?: AliasesInForce;
   } = {},
 ): Promise<Harness> {
   document.body.innerHTML = `<${COMMAND_PANEL_TAG}></${COMMAND_PANEL_TAG}>`;
@@ -59,12 +66,15 @@ async function mount(
     history: options.history ?? [],
     folders: [],
     written: [],
+    origins: [],
+    aliasWrites: [],
   };
   let runs = 0;
   const ports: CommandPanelPorts = {
-    run: (words, folder) => {
+    run: (words, folder, origin) => {
       harness.ran.push(words);
       harness.folders.push(folder);
+      harness.origins.push(origin);
       runs += 1;
       return Promise.resolve(`run-${String(runs)}`);
     },
@@ -116,6 +126,11 @@ async function mount(
       reveal: () => undefined,
       skeletonOf: () => undefined,
       bin: 'Recycle Bin',
+    },
+    aliases: () => Promise.resolve(options.aliases ?? { aliases: [] }),
+    setAlias: (name, body) => {
+      harness.aliasWrites.push([name, body]);
+      return Promise.resolve({ ok: true });
     },
   };
   element.locale = options.locale ?? 'en';
@@ -933,5 +948,86 @@ describe('the file commands that write (TYTO-537, ADR 0201)', () => {
     expect(lines(harness.element).at(-1)).toBe(
       'mkdir does not run in a restricted folder. Trust it with Workspace: Manage Trust.',
     );
+  });
+});
+
+describe('aliases and variables (TYTO-536)', () => {
+  const settle = async (element: CommandPanel): Promise<void> => {
+    for (let round = 0; round < 6; round += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await element.updateComplete;
+    }
+  };
+  const aliases = (...list: [string, string, 'user' | 'workspace'][]): AliasesInForce => ({
+    aliases: list.map(([name, body, definedIn]) => ({ name, body, definedIn })),
+  });
+
+  it('expands an alias once and runs it with the alias named, keeping the line as typed', async () => {
+    const harness = await mount({
+      aliases: aliases(['entrega', 'render --delivery', 'workspace']),
+    });
+    await typeAndRun(harness, 'entrega cartaz.brief');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([['render', '--delivery', 'cartaz.brief']]);
+    expect(harness.origins).toEqual([{ alias: 'entrega', definedIn: 'workspace' }]);
+    expect(harness.history).toEqual(['entrega cartaz.brief']);
+  });
+
+  it('names the alias when what it expands to is refused in the window', async () => {
+    const harness = await mount({ restricted: true, aliases: aliases(['mk', 'mkdir x', 'user']) });
+    await typeAndRun(harness, 'mk');
+    await settle(harness.element);
+    expect(lines(harness.element).at(-1)).toBe(
+      'mkdir does not run in a restricted folder. Trust it with Workspace: Manage Trust. ' +
+        'This line came from the alias mk, defined in your settings.',
+    );
+  });
+
+  it('ignores an alias with a built-in name, saying so once, and runs the built-in', async () => {
+    const harness = await mount({
+      history: ['check a.brief'],
+      aliases: aliases(['history', 'render --trust', 'workspace']),
+    });
+    await typeAndRun(harness, 'history');
+    await settle(harness.element);
+    await typeAndRun(harness, 'history');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([]);
+    const said = lines(harness.element).filter((line) => line.includes('is ignored'));
+    expect(said).toEqual([
+      'The alias history in this workspace is ignored: it has the name of a command of the panel or tyto.',
+    ]);
+  });
+
+  it('reads $name from set, never from the environment, and not in single quotes', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'set brief=cartaz.brief');
+    await settle(harness.element);
+    await typeAndRun(harness, "render $brief '$brief'");
+    await settle(harness.element);
+    harness.sessions.state({ runId: 'run-1', state: 'finished', code: 0 });
+    await settle(harness.element);
+    await typeAndRun(harness, 'render $PATH');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([['render', 'cartaz.brief', '$brief']]);
+    expect(lines(harness.element).at(-1)).toBe(
+      'No variable named PATH in this session: set PATH=value sets one. Nothing was run.',
+    );
+  });
+
+  it("writes an alias through main, and refuses a built-in's name without asking", async () => {
+    const harness = await mount({ aliases: aliases(['shared', 'check', 'workspace']) });
+    await typeAndRun(harness, "alias entrega='render --delivery'");
+    await settle(harness.element);
+    await typeAndRun(harness, "alias ls='render --trust'");
+    await settle(harness.element);
+    await typeAndRun(harness, 'unalias shared');
+    await settle(harness.element);
+    expect(harness.aliasWrites).toEqual([['entrega', 'render --delivery']]);
+    expect(lines(harness.element).slice(-3)).toEqual([
+      'Alias entrega saved in your settings.',
+      'ls is a command of the panel or tyto itself: an alias cannot take its name.',
+      "shared is this workspace's alias, defined in its .tyto/project.json: remove it there.",
+    ]);
   });
 });

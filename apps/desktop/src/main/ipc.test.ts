@@ -944,6 +944,10 @@ const dependencies = () => {
       diagnosticPath: () => undefined,
     },
     offeredRecipes: { take: () => undefined },
+    commandAliases: {
+      list: () => ({ aliases: [] }),
+      set: () => Promise.resolve({ ok: true as const }),
+    },
     terminals: {
       open: () => ({ terminalId: 'terminal-1', title: 'bash' }),
       input: () => {},

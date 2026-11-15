@@ -3,7 +3,8 @@
 Status: accepted · 2026-10-21 · TYTO-278 · builds what ADR 0111 asks of the first card, beside
 ADR 0011, ADR 0056, ADR 0057 and ADR 0073; leaves the slot TYTO-347 fills; amended by ADR 0114,
 which replaces the `profile` row of the table below; amended by ADR 0126, which adds
-`exportPresets` and makes a preset's folder the one exception to "it names places and nothing else"; amended by ADR 0157, which adds the `delivery` key
+`exportPresets` and makes a preset's folder the one exception to "it names places and nothing else"; amended by ADR 0157, which adds the `delivery` key; note of 2026-11-15 (TYTO-536) adds
+the `aliases` key
 
 ## Context
 
@@ -146,3 +147,23 @@ remove`; then the window (File ▸ Open Folder, the session, the banner, Manage 
 - Not measured: how many font files a project folder may hold before the first measurement of a
   family slows down. The library opens only files whose name starts with the family (ADR 0037),
   as it does for the machine's folders.
+
+## Note, 2026-11-15 — the `aliases` key (TYTO-536)
+
+The file gains a second key that is not a place: `aliases`, the command panel's aliases a
+workspace shares, `{ "entrega": "render --delivery" }`. The maintainer chose this file for them
+on 2026-11-02, so a work profile can hold them too, rather than the per-folder settings layer
+ADR 0073 foresaw and nobody built.
+
+- **Merged one alias at a time**, the later sheet winning by name, as export presets merge
+  (ADR 0126): a folder that writes one alias keeps the profile's others.
+- **Read only from a trusted sheet.** A restricted sheet's aliases are withheld whole, as its
+  plugin sections are, with `W_PROJECT_ALIASES_WITHHELD` naming them: a shared folder must not put
+  words in a person's command line before it is trusted (ADR 0111). The window counts it among
+  what the trust strip says was left out.
+- A name is letters, digits, `_` and `-`, not starting with a digit or `-`; a body is one line of
+  at most 1,000 characters. Anything else costs that alias alone (`W_PROJECT_KEY_INVALID`).
+  Which names the panel keeps for its own commands is the panel's rule (ADR 0200 note of
+  2026-11-15), since `@tyto/core` does not know the panel.
+- The window reads this key and does not write it: a person writes a workspace's aliases in
+  the file. `alias` in the panel writes the person's own, in `settings.json`.

@@ -4,6 +4,7 @@ import { basename, dirname, join, relative } from 'node:path';
 import {
   type Diagnostic,
   PROFILES_DIRECTORY,
+  type ProjectAlias,
   PROFILE_FILE_NAME,
   type ResolvedDelivery,
   type Result,
@@ -130,6 +131,11 @@ export interface WorkspaceService {
    * `undefined` with nothing open, where the window makes no delivery.
    */
   deliveryLayout(): { readonly root: string; readonly delivery: ResolvedDelivery } | undefined;
+  /**
+   * The open folder's command panel aliases (TYTO-536), none with nothing open. A restricted
+   * sheet's are already withheld by the resolver, so they never reach the window.
+   */
+  aliases(): readonly ProjectAlias[];
 }
 
 /** The places of the resolved project: what a restricted folder refused is not among them. */
@@ -171,6 +177,8 @@ const NOTHING_OPEN: WorkspaceState = {
 const LEFT_OUT: ReadonlySet<string> = new Set([
   'W_PROJECT_PATH_OUTSIDE',
   'W_PROJECT_SECTIONS_WITHHELD',
+  // TYTO-536: a restricted folder's command panel aliases, never run until it is trusted.
+  'W_PROJECT_ALIASES_WITHHELD',
 ]);
 
 const PLACE_KEYS = ['assets', 'templates', 'fonts', 'output'] as const;
@@ -324,6 +332,10 @@ export function createWorkspaceService(options: WorkspaceServiceOptions): Worksp
       if (open === undefined || recipeDirectory === undefined) return undefined;
       if (!isInside(open.folder, recipeDirectory)) return undefined;
       return open.project.callHosts;
+    },
+
+    aliases() {
+      return open?.project.aliases ?? [];
     },
 
     deliveryLayout() {

@@ -330,6 +330,14 @@ export interface IpcDependencies {
   readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands' | 'diagnosticPath'>;
   /** The recipe a refused `--apply`'s box offered to open, once, by run (TYTO-726). */
   readonly offeredRecipes: Pick<OfferedRecipes, 'take'>;
+  /**
+   * The command panel's aliases (TYTO-536): read from the setting and the open folder, and
+   * written by `alias` to one of them, main checking every write (`command-aliases.ts`).
+   */
+  readonly commandAliases: {
+    list: () => IpcResponse<'commands:aliases'>;
+    set: (request: IpcRequest<'commands:set-alias'>) => Promise<IpcResponse<'commands:set-alias'>>;
+  };
   /** The terminals, which main owns and the window only draws and types into (ADR 0164). */
   readonly terminals: Pick<Terminals, 'open' | 'input' | 'resize' | 'kill' | 'list'>;
   /**
@@ -554,6 +562,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
   const {
     askToSave,
     cli,
+    commandAliases,
     offeredRecipes,
     terminals,
     confirm,
@@ -1085,14 +1094,18 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       });
     },
 
-    'cli:run': async ({ argv, folder }) => {
-      if (folder === undefined) return cli.start(argv);
+    'cli:run': async ({ argv, folder, origin }) => {
+      if (folder === undefined) return cli.start(argv, undefined, origin);
       // Checked here, not trusted from the window (ADR 0201): an id main minted for a folder
       // whose real path still lies inside the open one, or the command does not start.
       const cwd = await explorer.folderOf(folder);
       if (cwd === undefined) throw new Error(WORKING_FOLDER_REFUSED);
-      return cli.start(argv, cwd);
+      return cli.start(argv, cwd, origin);
     },
+
+    'commands:aliases': () => Promise.resolve(commandAliases.list()),
+
+    'commands:set-alias': (request) => commandAliases.set(request),
 
     'cli:cancel': ({ runId }) => {
       cli.cancel(runId);
