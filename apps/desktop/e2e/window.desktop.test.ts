@@ -277,6 +277,7 @@ describe('the bridge', () => {
       'cli:cancel',
       'cli:commands',
       'cli:open-diagnostic',
+      'cli:open-recipe',
       'cli:run',
       'credentials:delete',
       // TYTO-649: a key file stored from the plugins screen; main picks and reads it, and the
@@ -601,6 +602,23 @@ describe('switching the language', () => {
     // TYTO-495: the native box a `tyto` command run in the window asks through (ADR 0159).
     'cli.confirm.yes',
     'cli.confirm.no',
+    // TYTO-726: the refusal's offer is a native box, like the confirm above.
+    'cli.offer.trust.message',
+    'cli.offer.trust.detail',
+    'cli.offer.trust.yes',
+    'cli.offer.signin.message',
+    'cli.offer.signin.detail',
+    'cli.offer.signin.yes',
+    'cli.offer.signout.message',
+    'cli.offer.signout.detail',
+    'cli.offer.signout.yes',
+    'cli.offer.apply.message',
+    'cli.offer.apply.detail',
+    'cli.offer.apply.yes',
+    'cli.offer.watch.message',
+    'cli.offer.watch.detail',
+    'cli.offer.watch.yes',
+    'cli.offer.no',
     // TYTO-497, ADR 0164: the Terminal tab is closed until Ctrl+Shift+` opens it and renders its
     // own words, the paste and quit questions are boxes, and its command is the bar's text only;
     // `terminal-panel.test.ts` holds the tab's.

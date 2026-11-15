@@ -58,6 +58,28 @@ export const en: Catalogue = {
   'pluginFiles.approve.skip': 'Not now',
   'cli.confirm.yes': 'Yes',
   'cli.confirm.no': 'No',
+  'cli.offer.trust.message': 'Trust the folder {folder} and run the command?',
+  'cli.offer.trust.detail':
+    '--trust trusts a folder for one run only, and the window has no such trust. Trusting it here saves it in trust.json, as Workspace: Manage Trust does: it stays trusted for every run and window until you take it back in Workspace: Manage Trust or with tyto trust remove. The command then runs without --trust.',
+  'cli.offer.trust.yes': 'Trust and run',
+  'cli.offer.signin.message': 'Sign in to {plugin} ({id}) from the window?',
+  'cli.offer.signin.detail':
+    "The window signs in as the plugins screen does, in your browser, and keeps the sign-in with the window's own. A terminal's tyto signin keeps a separate one in the system keychain, which is not touched.",
+  'cli.offer.signin.yes': 'Sign in',
+  'cli.offer.signout.message': 'Sign out of {plugin} ({id}) in the window?',
+  'cli.offer.signout.detail':
+    "The window forgets its own sign-in, as Sign out on the plugins screen does. A terminal's sign-in in the system keychain is not touched.",
+  'cli.offer.signout.yes': 'Sign out',
+  'cli.offer.apply.message': 'Open {recipe} in its notebook?',
+  'cli.offer.apply.detail':
+    "The command panel only plans. The notebook shows each step's plan and applies it when you click Apply, under the folder's trust and the window's sign-ins. Opening it applies nothing.",
+  'cli.offer.apply.yes': 'Open the notebook',
+  'cli.offer.watch.message':
+    "Turn the queue panel's Render automatically off and watch {folder} here?",
+  'cli.offer.watch.detail':
+    'A queue folder has one consumer. Render automatically stays off until you turn it back on in the queue panel; the files already in the queue stay where they are.',
+  'cli.offer.watch.yes': 'Turn off and watch',
+  'cli.offer.no': 'Cancel',
   'terminal.quit.message': 'A program is still running in {terminals}. Quit and end it?',
   'terminal.quit.quit': 'Quit',
   'terminal.quit.stay': 'Keep running',

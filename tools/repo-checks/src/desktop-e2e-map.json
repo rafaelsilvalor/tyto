@@ -832,9 +832,13 @@
       "why": "reviewed: Delivery: New…, a delivery made in the open folder and its brief opened (TYTO-489); Delivery: Export, the strip's button and the delivery's export (TYTO-490)"
     },
     {
-      "paths": ["apps/desktop/src/main/cli-runner.ts", "apps/desktop/src/main/cli-refusals.ts"],
+      "paths": [
+        "apps/desktop/src/main/cli-runner.ts",
+        "apps/desktop/src/main/cli-refusals.ts",
+        "apps/desktop/src/main/cli-offers.ts"
+      ],
       "e2e": ["cli-runner.desktop.test.ts"],
-      "why": "reviewed: tyto commands run in main for the window, streamed, stopped and refused (TYTO-495, ADR 0159)"
+      "why": "reviewed: tyto commands run in main for the window, streamed, stopped and refused (TYTO-495, ADR 0159); a refusal's offer box and its yes through the window's own functions (TYTO-726), unit-tested, every refusal's e2e is TYTO-718"
     },
     {
       "paths": [

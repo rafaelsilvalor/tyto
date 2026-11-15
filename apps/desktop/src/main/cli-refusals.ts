@@ -55,10 +55,44 @@ export const SIGNIN_REFUSED =
   'tyto signin and tyto signout are not available in the window: the window signs in from the ' +
   'plugins screen (ADR 0194). Sign in there, or run the command in a terminal.';
 
+/**
+ * The window's own way to do what a refused command asked (TYTO-726, ADR 0159 note of
+ * 2026-11-15), offered in a box that names what it acts on. `mcp` has none: the panel has no
+ * standard streams to give an agent.
+ */
+export type RefusalOffer =
+  /** Workspace: Trust for the open folder, then the command without `--trust`. */
+  | { readonly kind: 'trust'; readonly folder: string }
+  /** The plugins screen's sign-in or sign-out for one declared sign-in. */
+  | { readonly kind: 'signin'; readonly plugin: string; readonly id: string; readonly out: boolean }
+  /** The recipe's notebook, whose Apply is the window's one way to apply. */
+  | { readonly kind: 'apply'; readonly recipe: string }
+  /** The queue panel's auto-run switch turned off, then the watch as typed. */
+  | { readonly kind: 'watch'; readonly folder: string };
+
+/**
+ * Where a refused line came from when the person did not type it word for word. Nothing sets it
+ * yet: TYTO-536's aliases will, and the box will name the alias and where it is defined.
+ */
+export interface RefusalOrigin {
+  readonly alias: string;
+  readonly definedIn: 'user' | 'workspace';
+}
+
+export interface WindowRefusal {
+  readonly message: string;
+  readonly offer?: RefusalOffer;
+  readonly origin?: RefusalOrigin;
+}
+
 export interface WindowRefusalOptions {
   readonly platform: NodeJS.Platform;
   /** The queue panel's folder and whether it runs what arrives on its own. */
   readonly queue: () => Promise<{ readonly folder: string | null; readonly autoRun: boolean }>;
+  /** The folder the window has open, the one Workspace: Trust acts on; absent offers no trust. */
+  readonly openFolder?: () => string | null;
+  /** The sign-in ids the installed plugin declares, as the plugins screen lists them. */
+  readonly signins?: (plugin: string) => Promise<readonly string[]>;
 }
 
 /** The same folder, by the platform's rule: Windows paths compare without case. */
@@ -69,17 +103,43 @@ function sameFolder(platform: NodeJS.Platform, cwd: string, typed: string, other
   return platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
+/**
+ * The sign-in a command line names, as `tyto signin` picks it: the id typed, or the plugin's
+ * only one. Anything else is no offer, and the refusal stays a sentence.
+ */
+async function signinOffer(
+  options: WindowRefusalOptions,
+  invocation: CommandInvocation,
+): Promise<RefusalOffer | undefined> {
+  // `--client` types an OAuth client first, which the plugins screen asks for its own way.
+  if (options.signins === undefined || invocation.options['client'] === true) return undefined;
+  const [plugin, typed] = invocation.args;
+  if (plugin === undefined) return undefined;
+  const ids = await options.signins(plugin);
+  const id = typed ?? (ids.length === 1 ? ids[0] : undefined);
+  if (id === undefined || !ids.includes(id)) return undefined;
+  return { kind: 'signin', plugin, id, out: invocation.path[0] === 'signout' };
+}
+
 export function windowRefusals(
   options: WindowRefusalOptions,
-): (invocation: CommandInvocation, cwd: string) => Promise<string | undefined> {
+): (invocation: CommandInvocation, cwd: string) => Promise<WindowRefusal | undefined> {
   return async (invocation, cwd) => {
-    if (invocation.options['trust'] === true) return TRUST_REFUSED;
+    if (invocation.options['trust'] === true) {
+      const folder = options.openFolder?.() ?? null;
+      return folder === null
+        ? { message: TRUST_REFUSED }
+        : { message: TRUST_REFUSED, offer: { kind: 'trust', folder } };
+    }
 
     const [command] = invocation.path;
     const [first] = invocation.args;
 
-    if (command === 'mcp') return MCP_REFUSED;
-    if (command === 'signin' || command === 'signout') return SIGNIN_REFUSED;
+    if (command === 'mcp') return { message: MCP_REFUSED };
+    if (command === 'signin' || command === 'signout') {
+      const offer = await signinOffer(options, invocation);
+      return offer === undefined ? { message: SIGNIN_REFUSED } : { message: SIGNIN_REFUSED, offer };
+    }
 
     // Read off the parsed options, so every spelling commander accepts is one value here. Only
     // the flag applies: without it the run is a save's and `apply auto` stays a plan
@@ -89,7 +149,10 @@ export function windowRefusals(
       invocation.path[1] === 'run' &&
       invocation.options['apply'] === true
     ) {
-      return APPLY_REFUSED;
+      const path = options.platform === 'win32' ? win32 : posix;
+      return first === undefined
+        ? { message: APPLY_REFUSED }
+        : { message: APPLY_REFUSED, offer: { kind: 'apply', recipe: path.resolve(cwd, first) } };
     }
 
     if (command === 'watch' && first !== undefined) {
@@ -99,7 +162,7 @@ export function windowRefusals(
         queue.folder !== null &&
         sameFolder(options.platform, cwd, first, queue.folder)
       ) {
-        return WATCH_REFUSED;
+        return { message: WATCH_REFUSED, offer: { kind: 'watch', folder: queue.folder } };
       }
     }
 

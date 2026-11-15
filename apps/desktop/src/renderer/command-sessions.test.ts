@@ -117,6 +117,16 @@ describe('after a trust command', () => {
     sessions.state({ runId: 'run-2', state: 'finished', code: 0 });
     expect(refreshesWorkspace(sessions.active)).toBe(false);
   });
+
+  it('asks again after a line with --trust, whatever its box was answered', () => {
+    // TYTO-726: a yes trusted the open folder through Workspace: Manage Trust's own function.
+    const sessions = new CommandSessions();
+    const id = sessions.active.id;
+    sessions.started(id, 'render a.brief --trust', ['render', 'a.brief', '--trust'], 'run-1');
+    expect(refreshesWorkspace(sessions.active)).toBe(false);
+    sessions.state({ runId: 'run-1', state: 'finished', code: 1 });
+    expect(refreshesWorkspace(sessions.active)).toBe(true);
+  });
 });
 
 describe('what a line of steps needs (TYTO-535)', () => {

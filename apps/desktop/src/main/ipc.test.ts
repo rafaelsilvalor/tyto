@@ -17,6 +17,7 @@ import { type Credentials } from './credentials.js';
 import { recipeCredentialStore } from './recipe-credentials.js';
 import { type ExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import { OfferedRecipes } from './cli-offers.js';
 import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
 import { type Table, vocabularySkeleton } from '@tyto/recipe';
 
@@ -910,6 +911,7 @@ const dependencies = () => {
       commands: () => ({ name: 'tyto', description: '', arguments: [], options: [], commands: [] }),
       diagnosticPath: () => undefined,
     },
+    offeredRecipes: { take: () => undefined },
     terminals: {
       open: () => ({ terminalId: 'terminal-1', title: 'bash' }),
       input: () => {},
@@ -3247,6 +3249,26 @@ describe('cli:run, cli:cancel and cli:commands', () => {
     // A path is not a way in: the request takes none.
     await expect(
       open({ documentId: 'document-3', runId: 'cli-7', index: 0, path: '/etc/hosts' } as never),
+    ).rejects.toThrow();
+  });
+
+  // TYTO-726: the recipe a refused --apply's box offered opens by run, once, never by a path.
+  it('open the recipe a yes offered, by run and once', async () => {
+    const offered = new OfferedRecipes();
+    offered.keep('cli-9', '/work/flows/weekly.recipe');
+    const handlers = createHandlers({ ...dependencies(), offeredRecipes: offered });
+    const open = guard('cli:open-recipe', handlers['cli:open-recipe']);
+
+    await expect(open({ documentId: 'document-4', runId: 'cli-9' })).resolves.toMatchObject({
+      documentId: 'document-4',
+      document: { path: '/work/flows/weekly.recipe' },
+    });
+    await expect(open({ documentId: 'document-4', runId: 'cli-9' })).resolves.toEqual({
+      document: null,
+      documentId: null,
+    });
+    await expect(
+      open({ documentId: 'document-4', runId: 'cli-9', path: '/etc/hosts' } as never),
     ).rejects.toThrow();
   });
 

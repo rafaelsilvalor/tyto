@@ -39,6 +39,7 @@ import { type LineNumbersLook } from '../../shared/line-numbers.js';
 import { type CommandsOrder } from '../../shared/command-runs.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type CliRunner } from './cli-runner.js';
+import type { OfferedRecipes } from './cli-offers.js';
 import { type Terminals } from './terminal.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
@@ -317,6 +318,8 @@ export interface IpcDependencies {
   readonly delivery: DeliveryService;
   /** `tyto` commands run in main for the window (TYTO-495, ADR 0159). */
   readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands' | 'diagnosticPath'>;
+  /** The recipe a refused `--apply`'s box offered to open, once, by run (TYTO-726). */
+  readonly offeredRecipes: Pick<OfferedRecipes, 'take'>;
   /** The terminals, which main owns and the window only draws and types into (ADR 0164). */
   readonly terminals: Pick<Terminals, 'open' | 'input' | 'resize' | 'kill' | 'list'>;
   /**
@@ -534,6 +537,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
   const {
     askToSave,
     cli,
+    offeredRecipes,
     terminals,
     confirm,
     contextMenu,
@@ -1072,6 +1076,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       if (path === undefined || !opensInTab(path)) {
         return { document: null, documentId: null };
       }
+      return documents.openPath(documentId, path);
+    },
+
+    'cli:open-recipe': async ({ documentId, runId }) => {
+      const path = offeredRecipes.take(runId);
+      if (path === undefined) return { document: null, documentId: null };
       return documents.openPath(documentId, path);
     },
 
