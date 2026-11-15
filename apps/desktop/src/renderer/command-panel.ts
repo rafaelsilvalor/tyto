@@ -22,7 +22,14 @@ import {
   type CommandSessions,
   isBusy,
 } from './command-sessions.js';
-import { splitCommandLine } from './command-words.js';
+import { type BuiltinRegistry, type PanelBuiltin, PANEL_BUILTINS } from './command-builtins.js';
+import { type GlobExpansion, type ListFolder, expandGlob, isGlob } from './command-glob.js';
+import {
+  type ExpandedLine,
+  type LineStep,
+  expandHistory,
+  parseCommandLine,
+} from './command-steps.js';
 import { icon } from './icons.js';
 import { DockedPanel } from './panels.js';
 
@@ -56,6 +63,14 @@ export interface CommandPanelPorts {
   /** The lines run before in this folder, oldest first. */
   readonly history: () => readonly string[];
   readonly remember: (line: string) => void;
+  /** The entries of a folder under the open one, by the explorer's ids: what a glob reads. */
+  readonly list: ListFolder;
+  /** The CLI's first-level commands, for `help` (TYTO-535). */
+  readonly commands: () => Promise<
+    readonly { readonly name: string; readonly description: string }[]
+  >;
+  /** Whether the open folder is restricted: a built-in that writes does not run there. */
+  readonly restricted: () => boolean;
 }
 
 const NO_PORTS: CommandPanelPorts = {
@@ -67,6 +82,9 @@ const NO_PORTS: CommandPanelPorts = {
   caseless: false,
   history: () => [],
   remember: () => undefined,
+  list: () => Promise.resolve(undefined),
+  commands: () => Promise.resolve([]),
+  restricted: () => false,
 };
 
 /** Ctrl+R's state: what is typed in the search, and where the match is in the history. */
@@ -108,6 +126,10 @@ export class CommandPanel extends DockedPanel {
   private chosen = -1;
   /** Counts the questions asked, so an answer to an older line is dropped. */
   private asked = 0;
+  /** The sessions running a line's steps: one line at a time in a tab, as one run is. */
+  private readonly chaining = new Set<string>();
+  /** The panel's own commands (TYTO-535); a test may hand another registry. */
+  builtins: BuiltinRegistry = PANEL_BUILTINS;
 
   constructor() {
     super();
@@ -179,45 +201,170 @@ export class CommandPanel extends DockedPanel {
 
   /* -------------------------------------------------------------------- running -- */
 
-  /** Enter on the input line: the line split into words, refused or run in this tab. */
+  /**
+   * Enter on the input line (TYTO-535, ADR 0200): the line read as steps joined by `&&`, each
+   * `!N` replaced by its history entry, and each step run in turn — a built-in by the panel, any
+   * other as a `tyto` command — until one does not succeed.
+   */
   async submit(line: string): Promise<void> {
     const sessions = this.sessions;
     const session = this.active();
     if (sessions === undefined || session === undefined) return;
     if (line.trim() === '') return;
-    if (isBusy(session)) {
+    if (isBusy(session) || this.chaining.has(session.id)) {
       sessions.note(session.id, this.say('commandPanel.busy'));
       return;
     }
-    const split = splitCommandLine(line);
-    if (!split.ok) {
-      sessions.refused(
-        session.id,
-        line.trim(),
-        this.say('commandPanel.unclosedQuote').replaceAll('{column}', String(split.at + 1)),
-      );
+    const parsed = parseCommandLine(line);
+    const expanded = parsed.ok ? expandHistory(parsed.steps, this.ports.history()) : parsed;
+    if (!expanded.ok) {
+      sessions.refused(session.id, line.trim(), this.lineProblem(expanded));
       return;
     }
-    if (split.words.length === 0) return;
+    if (expanded.steps.length === 0) return;
 
-    this.ports.remember(line.trim());
+    this.ports.remember(expanded.line);
     this.cursor = undefined;
     this.closeSuggestions();
     const input = this.input();
     if (input !== null) input.value = '';
     this.following = true;
+    this.chaining.add(session.id);
     try {
-      const runId = await this.ports.run(split.words);
-      sessions.started(session.id, line.trim(), split.words, runId);
+      // The last step is not waited on: nothing comes after it, and the tab is busy while it
+      // runs, as a single command's is.
+      for (const [index, step] of expanded.steps.entries()) {
+        const next = index < expanded.steps.length - 1;
+        if (!(await this.runStep(session.id, step, next))) break;
+      }
+    } finally {
+      this.chaining.delete(session.id);
+    }
+  }
+
+  /** What a line that cannot be read says, in the block it gets. */
+  private lineProblem(problem: Exclude<ExpandedLine, { ok: true }>): string {
+    switch (problem.problem) {
+      case 'unclosed-quote':
+        return this.say('commandPanel.unclosedQuote').replaceAll(
+          '{column}',
+          String(problem.at + 1),
+        );
+      case 'empty-step':
+        return this.say('commandPanel.emptyStep').replaceAll('{column}', String(problem.at + 1));
+      case 'no-entry':
+        return this.say('commandPanel.noHistoryEntry').replaceAll('{entry}', String(problem.entry));
+    }
+  }
+
+  /**
+   * One step of a line: answers whether it succeeded, which an `&&` after it needs. With `wait`
+   * false a `tyto` command it starts is not waited on, and counts as succeeding once started.
+   */
+  private async runStep(sessionId: string, step: LineStep, wait: boolean): Promise<boolean> {
+    const sessions = this.sessions;
+    if (sessions?.sessions.some((each) => each.id === sessionId) !== true) return false;
+    const builtin = this.builtins.find(step.words[0]);
+    if (builtin !== undefined) return this.runBuiltin(sessionId, step, builtin, wait);
+
+    const typed =
+      step.words[0]?.quoted === false && step.words[0].text === 'tyto'
+        ? step.words.slice(1)
+        : step.words;
+    const words: string[] = [];
+    const session = sessions.sessions.find((each) => each.id === sessionId);
+    for (const word of typed) {
+      if (word.quoted || !isGlob(word.text)) {
+        words.push(word.text);
+        continue;
+      }
+      const expansion = await expandGlob(word.text, session?.workingFolder ?? [], this.ports.list, {
+        caseless: this.ports.caseless,
+        folder: this.ports.folder() !== null,
+      });
+      if (!expansion.ok) {
+        sessions.refused(sessionId, step.source, this.globProblem(expansion));
+        return false;
+      }
+      words.push(...expansion.words);
+    }
+    if (words.length === 0) return true;
+    return this.runTyto(sessionId, step.source, words, wait);
+  }
+
+  private globProblem(problem: Extract<GlobExpansion, { ok: false }>): string {
+    const key: CatalogueKey = `commandPanel.glob.${problem.problem}`;
+    return this.say(key).replaceAll('{pattern}', problem.pattern);
+  }
+
+  /** Runs `words` through `cli:run` in this session, waiting for it to end; true on exit 0. */
+  private async runTyto(
+    sessionId: string,
+    line: string,
+    words: readonly string[],
+    wait: boolean,
+  ): Promise<boolean> {
+    const sessions = this.sessions;
+    if (sessions === undefined) return false;
+    let runId: string;
+    try {
+      runId = await this.ports.run(words);
     } catch (error) {
       sessions.refused(
-        session.id,
-        line.trim(),
+        sessionId,
+        line,
         this.say('commandPanel.refused').replaceAll(
           '{reason}',
           error instanceof Error ? error.message : String(error),
         ),
       );
+      return false;
+    }
+    sessions.started(sessionId, line, words, runId);
+    if (!wait) return true;
+    const ended = await sessions.whenEnded(runId);
+    return ended?.state === 'finished' && ended.code === 0;
+  }
+
+  /** A built-in, in a restricted folder only when it may run there (ADR 0200). */
+  private async runBuiltin(
+    sessionId: string,
+    step: LineStep,
+    builtin: PanelBuiltin,
+    wait: boolean,
+  ): Promise<boolean> {
+    const sessions = this.sessions;
+    if (sessions === undefined) return false;
+    if (!builtin.runsInRestrictedFolder && this.ports.restricted()) {
+      sessions.refused(
+        sessionId,
+        step.source,
+        this.say('commandPanel.builtin.restricted').replaceAll('{name}', builtin.name),
+      );
+      return false;
+    }
+    const outcome = await builtin.run({
+      args: step.words.slice(1),
+      history: () => this.ports.history(),
+      runTyto: (line, words) => this.runTyto(sessionId, line, words, wait),
+      clear: () => {
+        sessions.clear(sessionId);
+      },
+      exit: () => {
+        this.closeSession(sessionId);
+      },
+      commands: () => this.ports.commands(),
+      say: (key) => this.say(key),
+      registry: this.builtins,
+    });
+    switch (outcome.kind) {
+      case 'printed':
+        sessions.printed(sessionId, step.source, outcome.lines, outcome.failed === true ? 1 : 0);
+        return outcome.failed !== true;
+      case 'acted':
+        return outcome.ok;
+      case 'ended':
+        return false;
     }
   }
 

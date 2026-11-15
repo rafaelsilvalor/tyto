@@ -220,3 +220,37 @@ describe('taking a suggestion', () => {
     });
   });
 });
+
+describe("the panel's own commands and && (TYTO-535)", () => {
+  const withBuiltins: CompletionSources = {
+    ...sources,
+    builtins: [
+      { name: 'clear', detail: 'clear the output' },
+      { name: 'history', detail: 'list the lines run' },
+    ],
+  };
+  const own = async (line: string) =>
+    (await complete(line, line.length, tree, withBuiltins)).items.map((item) => item.label);
+
+  it("offers them as a first word, before the CLI's commands, with their help line", async () => {
+    expect(await own('')).toEqual(['clear', 'history', 'render', 'plugin', 'trust']);
+    expect(await own('h')).toEqual(['history']);
+    const items = (await complete('cl', 2, tree, withBuiltins)).items;
+    expect(items[0]?.detail).toBe('clear the output');
+  });
+
+  it('offers none after tyto, which names the CLI', async () => {
+    expect(await own('tyto ')).toEqual(['render', 'plugin', 'trust']);
+  });
+
+  it('starts again after an &&', async () => {
+    expect(await own('render a.brief && ')).toEqual([
+      'clear',
+      'history',
+      'render',
+      'plugin',
+      'trust',
+    ]);
+    expect(await own('history && render --o')).toEqual(['-o, --out <dir>']);
+  });
+});

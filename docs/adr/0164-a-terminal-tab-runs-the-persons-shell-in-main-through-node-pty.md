@@ -295,3 +295,7 @@ plugin panels.
   no that starts the program `agentCommand` names instead of the shell. Main reads that program
   from `settings.json` only, so decision 3 holds: the renderer names no program. A restricted
   folder refuses the agent as decision 5 refuses the shell.
+
+- 2026-11-15 (TYTO-535, ADR 0200): **decision 9's "the panel's guarantees stay true" now reads
+  "`cli:run` runs `tyto`, and the panel runs `tyto` and a fixed set of built-ins of its own".**
+  No built-in starts a program or opens a terminal; what one runs goes through `cli:run`.

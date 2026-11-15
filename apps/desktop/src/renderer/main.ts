@@ -183,7 +183,8 @@ import { type CommandSession, CommandSessions, refreshesWorkspace } from './comm
 import { inRunOrder, sectionTitle, shortCommand } from './command-blocks.js';
 import type { CommandsOrder } from '../../shared/command-runs.js';
 import { type OutputLink, commandPathOf, listFolderAt, resolveEntry } from './command-links.js';
-import { type Completion, complete } from './command-completion.js';
+import { PANEL_BUILTINS } from './command-builtins.js';
+import { type Completion, type ListedEntry, complete } from './command-completion.js';
 import { joinCommandLine } from './command-words.js';
 import { loadHistory, saveHistory, withHistoryLine } from './command-history.js';
 import { type ExplorerPanel, EXPLORER_PANEL_TAG } from './explorer-panel.js';
@@ -6566,6 +6567,15 @@ function wireCommandPanel(): void {
       commandHistory = withHistoryLine(commandHistory, line);
       saveHistory(historyStorage(), commandHistoryFolder ?? null, commandHistory);
     },
+    list: listInWorkspace,
+    commands: async () => {
+      const tree = await commandTree();
+      return (tree?.commands ?? []).map((command) => ({
+        name: command.name,
+        description: command.description,
+      }));
+    },
+    restricted: () => workspaceShown?.trust === 'restricted',
   };
 }
 
@@ -6631,6 +6641,33 @@ function briefCommandPath(): string | undefined {
 /** The CLI's tree, asked once: it does not change while the window runs (ADR 0159). */
 let commandTreeAsked: Promise<IpcResponse<'cli:commands'>['tree'] | undefined> | undefined;
 
+/** The CLI's tree, or `undefined` without a bridge or when main could not give it. */
+function commandTree(): Promise<IpcResponse<'cli:commands'>['tree'] | undefined> {
+  const bridge = window.tyto;
+  if (bridge === undefined) return Promise.resolve(undefined);
+  commandTreeAsked ??= bridge['cli:commands']({}).then(
+    (answer) => answer.tree,
+    () => undefined,
+  );
+  return commandTreeAsked;
+}
+
+/**
+ * The entries of a folder under the open one, by the explorer's ids (ADR 0113): what the command
+ * panel's completion and its globs read (TYTO-496, TYTO-535). `undefined` with no folder open.
+ */
+function listInWorkspace(segments: readonly string[]): Promise<readonly ListedEntry[] | undefined> {
+  const bridge = window.tyto;
+  if (
+    bridge === undefined ||
+    workspaceShown?.folder === null ||
+    workspaceShown?.folder === undefined
+  ) {
+    return Promise.resolve(undefined);
+  }
+  return listFolderAt(segments, (entryId) => bridge['explorer:list']({ entryId }), pathsCaseless());
+}
+
 /**
  * What can come at the caret on the command panel's prompt (TYTO-496): the CLI's tree, and for a
  * value the window's templates, the installed plugins and the open folder's files, listed by the
@@ -6640,11 +6677,7 @@ async function completeCommand(line: string, caret: number): Promise<Completion>
   const bridge = window.tyto;
   const none: Completion = { from: caret, to: caret, items: [] };
   if (bridge === undefined) return none;
-  commandTreeAsked ??= bridge['cli:commands']({}).then(
-    (answer) => answer.tree,
-    () => undefined,
-  );
-  const tree = await commandTreeAsked;
+  const tree = await commandTree();
   if (tree === undefined) return none;
   return complete(line, caret, tree, {
     templates: () =>
@@ -6654,15 +6687,12 @@ async function completeCommand(line: string, caret: number): Promise<Completion>
         ...(template.alias === undefined ? {} : { aliasOf: template.alias.template }),
       })),
     plugins: async () => (await bridge['plugins:list']({})).plugins.map((plugin) => plugin.name),
-    list: (segments) =>
-      workspaceShown?.folder === null || workspaceShown?.folder === undefined
-        ? Promise.resolve(undefined)
-        : listFolderAt(
-            segments,
-            (entryId) => bridge['explorer:list']({ entryId }),
-            pathsCaseless(),
-          ),
+    list: listInWorkspace,
     caseless: pathsCaseless(),
+    builtins: PANEL_BUILTINS.names().map(({ name, entry }) => ({
+      name,
+      detail: translate(state.locale, entry.help),
+    })),
     // Refused before any command starts (`src/main/cli-refusals.ts`, ADR 0159 decision 2): the
     // window trusts a folder through Workspace: Manage Trust only.
     refused: REFUSED_OPTIONS,

@@ -54,6 +54,11 @@ export interface CommandSession {
   readonly diagnostics: readonly CommandProblemRow[];
   /** Every line run here, oldest first; each is a block of the scrollback. */
   readonly runs: readonly CommandRun[];
+  /**
+   * The panel's working folder, as steps under the workspace root (TYTO-535, ADR 0200): what a
+   * glob is expanded against. Always the root today; TYTO-537's `cd` changes only this value.
+   */
+  readonly workingFolder: readonly string[];
 }
 
 /** A run that is going: Stop applies, and the tab may not start another. */
@@ -135,6 +140,7 @@ export class CommandSessions {
       scrollback: EMPTY_SCROLLBACK,
       diagnostics: [],
       runs: [],
+      workingFolder: [],
     };
     this.list = [...this.list, session];
     this.activeId = session.id;
@@ -186,6 +192,60 @@ export class CommandSessions {
         runs: [...session.runs, { number, line, words: [], startedAt: at, state: 'refused' }],
         scrollback: withNote(session.scrollback, reason, number),
       };
+    });
+  }
+
+  /**
+   * A line the panel answered itself (TYTO-535): a built-in's block, its lines as the panel's
+   * own, ended with `code` as a run would. The session's own state is left as it was: a
+   * built-in is not the run Stop and the tab's status speak of.
+   */
+  printed(
+    id: string,
+    line: string,
+    lines: readonly string[],
+    code: number,
+    at: number = Date.now(),
+  ): void {
+    this.update(id, (session) => {
+      const number = (session.runs.at(-1)?.number ?? 0) + 1;
+      return {
+        ...session,
+        runs: [
+          ...session.runs,
+          { number, line, words: [], startedAt: at, state: 'finished', code },
+        ],
+        scrollback: lines.reduce(
+          (scrollback, text) => withNote(scrollback, text, number),
+          session.scrollback,
+        ),
+      };
+    });
+  }
+
+  /**
+   * The run `runId` once it has ended, finished or cancelled; `undefined` when its session was
+   * closed first. What `&&` waits on before the next step (TYTO-535).
+   */
+  whenEnded(runId: string): Promise<CommandRun | undefined> {
+    const look = (): { done: boolean; run?: CommandRun } => {
+      const session = this.byRun(runId);
+      if (session === undefined) return { done: true };
+      const run = session.runs.find((each) => each.runId === runId);
+      if (run === undefined) return { done: true };
+      // Stop sets the session's state, which then ignores the run's later events (`state`).
+      if (session.state === 'cancelled') return { done: true, run: { ...run, state: 'cancelled' } };
+      return run.state === 'finished' ? { done: true, run } : { done: false };
+    };
+    const now = look();
+    if (now.done) return Promise.resolve(now.run);
+    return new Promise((resolve) => {
+      const unsubscribe = this.subscribe(() => {
+        const later = look();
+        if (!later.done) return;
+        unsubscribe();
+        resolve(later.run);
+      });
     });
   }
 
