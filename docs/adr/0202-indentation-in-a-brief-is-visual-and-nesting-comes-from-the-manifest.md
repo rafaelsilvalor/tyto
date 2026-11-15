@@ -1,4 +1,4 @@
-# 0197 — Indentation in a brief is visual, and nesting comes from the manifest
+# 0202 — Indentation in a brief is visual, and nesting comes from the manifest
 
 Status: accepted · 2026-11-13 · TYTO-708, TYTO-709 · extends ADR 0004 and ADR 0087 · builds on
 ADR 0160 (`per`) and ADR 0096 (Format Brief)
