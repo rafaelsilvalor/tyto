@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { type Dirent, type FSWatcher, watch as watchFolder } from 'node:fs';
-import { lstat, mkdir, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 
 import { isInside } from '@tyto/io';
 
 import type { ExplorerPlace } from '../../shared/file-icons.js';
-import type { IpcResponse } from '../../shared/ipc.js';
+import { EXPLORER_READ_MAX, type IpcResponse } from '../../shared/ipc.js';
 import { type ExplorerImage, IMAGE_EXTENSIONS, readExplorerImage } from './explorer-image.js';
 
 /**
@@ -33,6 +33,7 @@ import { type ExplorerImage, IMAGE_EXTENSIONS, readExplorerImage } from './explo
  */
 
 export type ExplorerListing = IpcResponse<'explorer:list'>;
+export type ExplorerRead = IpcResponse<'explorer:read'>;
 export type ExplorerEntry = ExplorerListing['entries'][number];
 
 /** The most entries one folder's listing carries; the rest are counted, not sent. */
@@ -97,6 +98,12 @@ export interface ExplorerService {
    * shows, and otherwise what {@link readExplorerImage} answers.
    */
   image(entryId: string, have: string | undefined): Promise<ExplorerImage>;
+  /**
+   * The text of the file `entryId` names, for the command panel's `cat` (TYTO-537, ADR 0201):
+   * `gone` unless it is still a file whose real path lies inside the root, checked now, and
+   * `folder` for a folder. At most `max` bytes are read; a NUL byte among them answers `binary`.
+   */
+  read(entryId: string, max?: number): Promise<ExplorerRead>;
   /**
    * Makes an empty file or folder called `name` in the folder `parentId` names (`null` is the
    * root). Fails with `exists` rather than replace anything, and with `invalid` for a name
@@ -569,6 +576,22 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       return readExplorerImage(path, have);
     },
 
+    async read(entryId, max = EXPLORER_READ_MAX) {
+      const current = root;
+      const entry = current === undefined ? undefined : entryOf.get(entryId);
+      if (current === undefined || entry === undefined) return GONE_READ;
+      if (entry.kind === 'folder') return { ok: false, reason: 'folder' };
+      let real: string;
+      try {
+        // Resolved now, not when it was listed: the file may have become a link out since.
+        real = await realpath(entry.path);
+      } catch {
+        return GONE_READ;
+      }
+      if (!isInside(current.real, real)) return GONE_READ;
+      return readText(real, max);
+    },
+
     idsTo(path) {
       if (root === undefined) return undefined;
       const inside = relativeUnder(root.folder, path);
@@ -689,6 +712,40 @@ const INVALID = { ok: false, reason: 'invalid' } as const;
 const EXISTS = { ok: false, reason: 'exists' } as const;
 
 /** Whether `folder` is still a folder whose real path lies inside the root's. */
+const GONE_READ: ExplorerRead = { ok: false, reason: 'gone' };
+
+/** At most `max` bytes of `path` as UTF-8 text, or why not (`ExplorerService.read`). */
+async function readText(path: string, max: number): Promise<ExplorerRead> {
+  let handle;
+  try {
+    handle = await open(path, 'r');
+  } catch {
+    return GONE_READ;
+  }
+  try {
+    const stats = await handle.stat();
+    if (stats.isDirectory()) return { ok: false, reason: 'folder' };
+    if (!stats.isFile()) return GONE_READ;
+    const buffer = Buffer.alloc(Math.min(stats.size, max));
+    let filled = 0;
+    while (filled < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, filled, buffer.length - filled, filled);
+      if (bytesRead === 0) break;
+      filled += bytesRead;
+    }
+    const bytes = buffer.subarray(0, filled);
+    if (bytes.includes(0)) return { ok: false, reason: 'binary' };
+    const truncated = stats.size > max;
+    // `stream` on a cut file holds back a character the cut split, rather than a U+FFFD.
+    const text = new TextDecoder('utf-8').decode(bytes, { stream: truncated });
+    return { ok: true, text, truncated };
+  } catch {
+    return GONE_READ;
+  } finally {
+    await handle.close();
+  }
+}
+
 async function folderInside(folder: string, rootReal: string): Promise<boolean> {
   try {
     const real = await realpath(folder);

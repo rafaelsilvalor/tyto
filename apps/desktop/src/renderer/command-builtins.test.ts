@@ -30,6 +30,7 @@ function context(
     commands: () => Promise.resolve([{ name: 'render', description: 'render a brief' }]),
     say: (key) => translate('en', key),
     registry: PANEL_BUILTINS,
+    files: undefined,
     ...overrides,
   };
 }
@@ -45,12 +46,16 @@ describe('the registry', () => {
 
   it('lists every name and alias for completion, each with its entry', () => {
     expect(PANEL_BUILTINS.names().map((each) => each.name)).toEqual([
+      'cat',
+      'cd',
       'clear',
       'cls',
       'exit',
       'help',
       'history',
       'last',
+      'ls',
+      'pwd',
     ]);
   });
 
@@ -61,7 +66,7 @@ describe('the registry', () => {
     );
   });
 
-  it('marks every built-in of this card as safe in a restricted folder: none writes', () => {
+  it('marks every built-in so far as safe in a restricted folder: none writes (ADR 0201)', () => {
     expect(PANEL_BUILTINS.entries.every((entry) => entry.runsInRestrictedFolder)).toBe(true);
   });
 });

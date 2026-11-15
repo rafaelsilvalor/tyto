@@ -105,7 +105,12 @@ const opensInATab = opensInTab;
 const SEVERITIES = new Set(['error', 'warning', 'info']);
 
 export interface CliRunner {
-  start(argv: readonly string[]): { readonly runId: string };
+  /**
+   * Starts `argv` in the open folder, or in `cwd`, a folder main checked lies inside it: the
+   * command panel's working folder (TYTO-537, ADR 0201). The workspace and its trust are still
+   * found from there upwards, so a subfolder of a restricted folder is restricted too.
+   */
+  start(argv: readonly string[], cwd?: string): { readonly runId: string };
   /** Fires the run's signal. Unknown or finished ids are ignored: Stop raced the end. */
   cancel(runId: string): void;
   /**
@@ -157,7 +162,7 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
   };
 
   return {
-    start(argv) {
+    start(argv, cwd) {
       const runId = newId();
       const controller = new AbortController();
       const entry: { readonly controller: AbortController; path: readonly string[] } = {
@@ -165,7 +170,7 @@ export function createCliRunner(options: CliRunnerOptions): CliRunner {
         path: [],
       };
       running.set(runId, entry);
-      const base = options.environment();
+      const base = { ...options.environment(), ...(cwd === undefined ? {} : { cwd }) };
       const write = (stream: 'out' | 'err') => (text: string) => {
         options.output({ runId, stream, text });
       };

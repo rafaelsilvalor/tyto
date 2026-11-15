@@ -1,4 +1,6 @@
 import type { CatalogueKey } from '../../shared/i18n/index.js';
+import { FILE_BUILTINS } from './command-file-builtins.js';
+import type { ListById } from './command-paths.js';
 import { type LineWord, parseCommandLine } from './command-steps.js';
 
 /**
@@ -11,15 +13,29 @@ import { type LineWord, parseCommandLine } from './command-steps.js';
  * a line that starts with `tyto` always does. File commands (TYTO-537) and aliases (TYTO-536)
  * add entries, or a lookup before this one, without touching the line's parser.
  *
- * **A built-in never starts a program and never writes a file.** What one runs, it runs as a
- * `tyto` command through the same port as a typed line, so main's refusals and the folder's
- * trust apply to it exactly as they would (ADR 0159 decisions 2 and 8).
+ * **A built-in never starts a program.** What one runs, it runs as a `tyto` command through the
+ * same port as a typed line, so main's refusals and the folder's trust apply to it exactly as they
+ * would (ADR 0159 decisions 2 and 8). The file commands (`command-file-builtins.ts`, ADR 0201)
+ * reach the workspace only through the explorer's ids, and never outside it.
  */
 
 /** How a built-in ended, which decides whether an `&&` after it goes on. */
 export type BuiltinOutcome =
-  /** It printed these lines, as a block of its own; `failed` ends it as exit code 1. */
-  | { readonly kind: 'printed'; readonly lines: readonly string[]; readonly failed?: boolean }
+  /**
+   * It printed these lines, as a block of its own; `failed` ends it as exit code 1. `notes` come
+   * after them as the panel's own lines (TYTO-725): what `cat` says about a file it cut short.
+   */
+  | {
+      readonly kind: 'printed';
+      readonly lines: readonly string[];
+      readonly notes?: readonly string[];
+      readonly failed?: boolean;
+      /**
+       * The folder, as steps under the root, its relative paths are in: what a name `ls` printed
+       * links to (TYTO-537). The session's working folder when absent.
+       */
+      readonly base?: readonly string[];
+    }
   /** It acted, or ran a `tyto` command that drew its own block; `ok` is how that went. */
   | { readonly kind: 'acted'; readonly ok: boolean }
   /** The session is gone (`exit`): nothing after it runs. */
@@ -44,6 +60,30 @@ export interface BuiltinContext {
   readonly say: (key: CatalogueKey) => string;
   /** Every entry, for `help`. */
   readonly registry: BuiltinRegistry;
+  /** The open workspace folder, for the file commands (TYTO-537); `undefined` with none open. */
+  readonly files: PanelFiles | undefined;
+}
+
+/** What `cat` gets for a file: its text, or why there is none (`explorer:read`). */
+export type FileRead =
+  | { readonly ok: true; readonly text: string; readonly truncated: boolean }
+  | { readonly ok: false; readonly reason: 'gone' | 'folder' | 'binary' };
+
+/**
+ * The workspace as the file commands reach it (TYTO-537, ADR 0201): by the explorer's ids, from
+ * the session's working folder. No path is handed to main.
+ */
+export interface PanelFiles {
+  /** The open workspace folder, absolute: what `pwd` prints the working folder under. */
+  readonly folder: string;
+  /** The session's working folder, as steps under the root (ADR 0200 decision 5). */
+  readonly workingFolder: readonly string[];
+  /** Moves the session's working folder; `cd` is the only built-in that calls it. */
+  readonly changeFolder: (steps: readonly string[]) => void;
+  readonly list: ListById;
+  readonly read: (entryId: string) => Promise<FileRead>;
+  /** Whether this platform compares names without case. */
+  readonly caseless: boolean;
 }
 
 export interface PanelBuiltin {
@@ -53,10 +93,12 @@ export interface PanelBuiltin {
   /** The line `help` and completion show for it. */
   readonly help: CatalogueKey;
   /**
-   * Whether it runs in a restricted folder. Every built-in of TYTO-535 writes nothing, so all of
-   * them do; a `tyto` command one runs keeps its own trust rules either way.
+   * Whether it runs in a restricted folder. One that only reads does (ADR 0201); one that
+   * writes does not. A `tyto` command one runs keeps its own trust rules either way.
    */
   readonly runsInRestrictedFolder: boolean;
+  /** What its arguments are, for completion: paths under the working folder (TYTO-537). */
+  readonly arguments?: 'folder' | 'path';
   readonly run: (context: BuiltinContext) => Promise<BuiltinOutcome> | BuiltinOutcome;
 }
 
@@ -204,4 +246,11 @@ const help: PanelBuiltin = {
 };
 
 /** The panel's built-ins, in the order `help` lists them. */
-export const PANEL_BUILTINS = new BuiltinRegistry([help, clear, history, last, exit]);
+export const PANEL_BUILTINS = new BuiltinRegistry([
+  help,
+  ...FILE_BUILTINS,
+  clear,
+  history,
+  last,
+  exit,
+]);

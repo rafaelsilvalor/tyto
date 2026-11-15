@@ -23,7 +23,14 @@ import {
   type CommandSessions,
   isBusy,
 } from './command-sessions.js';
-import { type BuiltinRegistry, type PanelBuiltin, PANEL_BUILTINS } from './command-builtins.js';
+import {
+  type BuiltinRegistry,
+  type FileRead,
+  type PanelBuiltin,
+  type PanelFiles,
+  PANEL_BUILTINS,
+} from './command-builtins.js';
+import { type ListById, folderId, stepsLabel } from './command-paths.js';
 import { type GlobExpansion, type ListFolder, expandGlob, isGlob } from './command-glob.js';
 import {
   type ExpandedLine,
@@ -50,13 +57,19 @@ import { DockedPanel } from './panels.js';
 export const COMMAND_PANEL_TAG = 'tyto-command-panel';
 
 export interface CommandPanelPorts {
-  /** Starts the words as a run and answers its id; throws when `cli:run` refused them. */
-  readonly run: (words: readonly string[]) => Promise<string>;
+  /**
+   * Starts the words as a run and answers its id; throws when `cli:run` refused them. `folder`
+   * is the explorer id of the folder it runs in, absent for the workspace root (TYTO-537).
+   */
+  readonly run: (words: readonly string[], folder?: string) => Promise<string>;
   readonly cancel: (runId: string) => void;
   /** Opens what a link in a session's output names. */
   readonly open: (session: CommandSession, link: OutputLink) => void;
-  /** What can come at the caret, from the CLI's own tree (`command-completion.ts`). */
-  readonly complete: (line: string, caret: number) => Promise<Completion>;
+  /**
+   * What can come at the caret, from the CLI's own tree (`command-completion.ts`); a path is
+   * completed from `base`, the session's working folder (TYTO-537).
+   */
+  readonly complete: (line: string, caret: number, base: readonly string[]) => Promise<Completion>;
   /** The open workspace folder, absolute, for telling which printed paths are inside it. */
   readonly folder: () => string | null;
   /** Whether this platform compares paths without case. */
@@ -72,6 +85,10 @@ export interface CommandPanelPorts {
   >;
   /** Whether the open folder is restricted: a built-in that writes does not run there. */
   readonly restricted: () => boolean;
+  /** A folder's listing by the explorer's id (`null` is the root): what file commands walk. */
+  readonly listById: ListById;
+  /** A file's text by the explorer's id (`explorer:read`), for `cat` (TYTO-537). */
+  readonly read: (entryId: string) => Promise<FileRead>;
 }
 
 const NO_PORTS: CommandPanelPorts = {
@@ -86,6 +103,8 @@ const NO_PORTS: CommandPanelPorts = {
   list: () => Promise.resolve(undefined),
   commands: () => Promise.resolve([]),
   restricted: () => false,
+  listById: () => Promise.resolve({ entries: [], more: 0 }),
+  read: () => Promise.resolve({ ok: false, reason: 'gone' }),
 };
 
 /** Ctrl+R's state: what is typed in the search, and where the match is in the history. */
@@ -307,9 +326,21 @@ export class CommandPanel extends DockedPanel {
   ): Promise<boolean> {
     const sessions = this.sessions;
     if (sessions === undefined) return false;
+    const steps = sessions.sessions.find((each) => each.id === sessionId)?.workingFolder ?? [];
+    // The working folder by the id main minted for it; main checks that id again (ADR 0201).
+    const folder =
+      steps.length === 0 ? null : await folderId(steps, this.ports.listById, this.ports.caseless);
+    if (folder === undefined) {
+      sessions.refused(
+        sessionId,
+        line,
+        this.say('commandPanel.workingFolderGone').replaceAll('{path}', stepsLabel(steps)),
+      );
+      return false;
+    }
     let runId: string;
     try {
-      runId = await this.ports.run(words);
+      runId = await this.ports.run(words, folder ?? undefined);
     } catch (error) {
       sessions.refused(
         sessionId,
@@ -357,16 +388,45 @@ export class CommandPanel extends DockedPanel {
       commands: () => this.ports.commands(),
       say: (key) => this.say(key),
       registry: this.builtins,
+      files: this.filesOf(sessionId),
     });
     switch (outcome.kind) {
       case 'printed':
-        sessions.printed(sessionId, step.source, outcome.lines, outcome.failed === true ? 1 : 0);
+        sessions.printed(
+          sessionId,
+          step.source,
+          outcome.lines,
+          outcome.failed === true ? 1 : 0,
+          Date.now(),
+          {
+            ...(outcome.notes === undefined ? {} : { notes: outcome.notes }),
+            ...(outcome.base === undefined ? {} : { folder: outcome.base }),
+          },
+        );
         return outcome.failed !== true;
       case 'acted':
         return outcome.ok;
       case 'ended':
         return false;
     }
+  }
+
+  /** The workspace as a file command reaches it from this session, or none with no folder. */
+  private filesOf(sessionId: string): PanelFiles | undefined {
+    const folder = this.ports.folder();
+    const sessions = this.sessions;
+    const session = sessions?.sessions.find((each) => each.id === sessionId);
+    if (folder === null || sessions === undefined || session === undefined) return undefined;
+    return {
+      folder,
+      workingFolder: session.workingFolder,
+      changeFolder: (steps) => {
+        sessions.changeFolder(sessionId, steps);
+      },
+      list: this.ports.listById,
+      read: (entryId) => this.ports.read(entryId),
+      caseless: this.ports.caseless,
+    };
   }
 
   private stop(): void {
@@ -469,7 +529,11 @@ export class CommandPanel extends DockedPanel {
   private async suggest(input: HTMLInputElement, takeOnly = false): Promise<void> {
     const asked = (this.asked += 1);
     const line = input.value;
-    const completion = await this.ports.complete(line, input.selectionStart ?? line.length);
+    const completion = await this.ports.complete(
+      line,
+      input.selectionStart ?? line.length,
+      this.active()?.workingFolder ?? [],
+    );
     if (asked !== this.asked || input.value !== line) return;
     if (takeOnly && completion.items.length === 1) {
       this.completion = completion;
@@ -759,6 +823,7 @@ export class CommandPanel extends DockedPanel {
             diagnostics: session.diagnostics,
             folder: this.ports.folder(),
             caseless: this.ports.caseless,
+            base: session.runs.find((run) => run.number === line.run)?.folder ?? [],
           });
     const pieces = piecesOf(line.runs, links, own, reading.code);
     const drawn = pieces.map((piece) => this.piece(session, piece, this.findCurrent));
@@ -1047,7 +1112,7 @@ export class CommandPanel extends DockedPanel {
       search?.index === undefined ? undefined : this.ports.history()[search.index];
     return html`<div class="command-panel__prompt-line">
         <label class="command-panel__prompt" for="command-panel-input"
-          >${search === undefined ? 'tyto ›' : `${this.say('commandPanel.history.search')} ›`}</label
+          >${search === undefined ? this.promptLabel() : `${this.say('commandPanel.history.search')} ›`}</label
         >
         <input
           id="command-panel-input"
@@ -1080,6 +1145,15 @@ export class CommandPanel extends DockedPanel {
         }
       </div>
       ${this.suggestions()}`;
+  }
+
+  /**
+   * `tyto ›` at the workspace root, `tyto entregas/novembro ›` under it (TYTO-537): where the
+   * next `tyto` command runs is always on the line it is typed on.
+   */
+  private promptLabel(): string {
+    const steps = this.active()?.workingFolder ?? [];
+    return steps.length === 0 ? 'tyto ›' : `tyto ${stepsLabel(steps)} ›`;
   }
 
   /**

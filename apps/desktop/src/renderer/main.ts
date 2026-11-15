@@ -183,6 +183,7 @@ import { type CommandSession, CommandSessions, refreshesWorkspace } from './comm
 import { inRunOrder, sectionTitle, shortCommand } from './command-blocks.js';
 import type { CommandsOrder } from '../../shared/command-runs.js';
 import { type OutputLink, commandPathOf, listFolderAt, resolveEntry } from './command-links.js';
+import { stepsOf } from './command-paths.js';
 import { PANEL_BUILTINS } from './command-builtins.js';
 import { type Completion, type ListedEntry, complete } from './command-completion.js';
 import { joinCommandLine } from './command-words.js';
@@ -6548,10 +6549,12 @@ function wireCommandPanel(): void {
   element.order = commandsOrder;
   element.foldOlderRuns = commandsFoldOlderRuns;
   element.ports = {
-    run: async (words) => {
+    run: async (words, folder) => {
       const bridge = window.tyto;
       if (bridge === undefined) throw new Error('no bridge');
-      return (await bridge['cli:run']({ argv: [...words] })).runId;
+      return (
+        await bridge['cli:run']({ argv: [...words], ...(folder === undefined ? {} : { folder }) })
+      ).runId;
     },
     cancel: (runId) => {
       void withBridge(async (bridge) => {
@@ -6576,6 +6579,17 @@ function wireCommandPanel(): void {
       }));
     },
     restricted: () => workspaceShown?.trust === 'restricted',
+    listById: async (entryId) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { entries: [], more: 0 };
+      const listing = await bridge['explorer:list']({ entryId });
+      return { entries: listing.entries, more: listing.more };
+    },
+    read: async (entryId) => {
+      const bridge = window.tyto;
+      if (bridge === undefined) return { ok: false, reason: 'gone' };
+      return bridge['explorer:read']({ entryId });
+    },
   };
 }
 
@@ -6673,7 +6687,11 @@ function listInWorkspace(segments: readonly string[]): Promise<readonly ListedEn
  * value the window's templates, the installed plugins and the open folder's files, listed by the
  * explorer's ids.
  */
-async function completeCommand(line: string, caret: number): Promise<Completion> {
+async function completeCommand(
+  line: string,
+  caret: number,
+  base: readonly string[],
+): Promise<Completion> {
   const bridge = window.tyto;
   const none: Completion = { from: caret, to: caret, items: [] };
   if (bridge === undefined) return none;
@@ -6687,11 +6705,16 @@ async function completeCommand(line: string, caret: number): Promise<Completion>
         ...(template.alias === undefined ? {} : { aliasOf: template.alias.template }),
       })),
     plugins: async () => (await bridge['plugins:list']({})).plugins.map((plugin) => plugin.name),
-    list: listInWorkspace,
+    // From the session's working folder (TYTO-537); a `..` may step back, never above the root.
+    list: (segments) => {
+      const steps = stepsOf(base, segments.join('/'));
+      return steps.ok ? listInWorkspace(steps.steps) : Promise.resolve(undefined);
+    },
     caseless: pathsCaseless(),
     builtins: PANEL_BUILTINS.names().map(({ name, entry }) => ({
       name,
       detail: translate(state.locale, entry.help),
+      ...(entry.arguments === undefined ? {} : { arguments: entry.arguments }),
     })),
     // Refused before any command starts (`src/main/cli-refusals.ts`, ADR 0159 decision 2): the
     // window trusts a folder through Workspace: Manage Trust only.
@@ -6714,6 +6737,8 @@ function historyStorage(): Storage | undefined {
 function useCommandHistoryOf(folder: string | null): void {
   if (folder === commandHistoryFolder) return;
   commandHistoryFolder = folder;
+  // A working folder is steps under the folder that was open: under another, it names nothing.
+  commandSessions.resetFolders();
   commandHistory = loadHistory(historyStorage(), folder);
 }
 

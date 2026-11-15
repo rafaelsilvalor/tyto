@@ -718,6 +718,12 @@ export const EXPLORER_IMAGE_MAX_BYTES = ASSET_SOURCE_MAX_BYTES;
 /** The longest `data:` URI an image at the ceiling becomes: base64 is four bytes per three. */
 const IMAGE_DATA_URL_MAX = Math.ceil(EXPLORER_IMAGE_MAX_BYTES / 3) * 4 + 64;
 
+/**
+ * The most bytes of a file `explorer:read` reads for the command panel's `cat` (TYTO-537): 256 KB.
+ * UTF-8 spends at least one byte on a character, so the text is at most this many characters.
+ */
+export const EXPLORER_READ_MAX = 256 * 1024;
+
 /** A tab whose file a rename moved, as the window shows it now. */
 const movedDocument = z.object({
   documentId,
@@ -1638,6 +1644,26 @@ export const IPC_CHANNELS = {
     z.discriminatedUnion('ok', [
       z.object({ ok: z.literal(true), released: z.array(documentId) }),
       z.object({ ok: z.literal(false), reason: z.enum(['gone', 'trash-failed']) }),
+    ]),
+  ),
+
+  /**
+   * A file's text, for the command panel's `cat` (TYTO-537, ADR 0201). **Strict, by id, never a
+   * path**, and only a file whose real path lies inside the open folder, checked at the call:
+   * an id main did not mint, or one whose file became a link out since, answers `gone`, and a
+   * folder's id answers `folder`. Text only, never bytes: decoded as UTF-8, a NUL byte answers
+   * `binary`, and past {@link EXPLORER_READ_MAX} bytes the text stops there with `truncated`. It
+   * runs nothing, so it works in a restricted folder (ADR 0111).
+   */
+  'explorer:read': channel(
+    z.strictObject({ entryId: explorerEntryId }),
+    z.discriminatedUnion('ok', [
+      z.object({
+        ok: z.literal(true),
+        text: z.string().max(EXPLORER_READ_MAX),
+        truncated: z.boolean(),
+      }),
+      z.object({ ok: z.literal(false), reason: z.enum(['gone', 'folder', 'binary']) }),
     ]),
   ),
 
@@ -3309,7 +3335,15 @@ export const IPC_CHANNELS = {
    * run's id; what it prints and how it ends arrive on `cli:output` and `cli:state`.
    */
   'cli:run': channel(
-    z.object({ argv: z.array(z.string().max(4096)).max(256) }),
+    z.object({
+      argv: z.array(z.string().max(4096)).max(256),
+      /**
+       * The folder it runs in, by the explorer's id (TYTO-537, ADR 0201): the command panel's
+       * working folder after `cd`. Absent, the open folder. Main runs nothing for an id that is
+       * not a folder whose real path lies inside the open one: the window is not the boundary.
+       */
+      folder: explorerEntryId.optional(),
+    }),
     z.object({ runId: z.string().min(1) }),
   ),
 

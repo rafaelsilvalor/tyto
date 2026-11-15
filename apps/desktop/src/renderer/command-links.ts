@@ -1,4 +1,5 @@
 import { TAB_EXTENSIONS } from '../../shared/file-icons.js';
+import { stepsOf } from './command-paths.js';
 import type { CommandProblemRow } from './problems-panel.js';
 
 /**
@@ -39,6 +40,11 @@ export interface LinkContext {
   readonly folder: string | null;
   /** Windows compares paths without case (`windows-fs-ignores-case`). */
   readonly caseless: boolean;
+  /**
+   * The folder a relative path is in, as steps under the open folder (TYTO-537): the working
+   * folder the run ran in, or the folder `ls` listed. The open folder itself when absent.
+   */
+  readonly base?: readonly string[];
 }
 
 const EXTENSIONS = TAB_EXTENSIONS.map((extension) => extension.slice(1)).join('|');
@@ -105,23 +111,25 @@ const isAbsolute = (path: string): boolean => /^(?:[A-Za-z]:)?[\\/]/u.test(path)
 
 /**
  * The segments of `path` under the open folder, or `undefined` when it is not inside it. A
- * relative path is the run's, whose folder is the open one (ADR 0159 decision 1).
+ * relative path is the run's, in the folder it ran in (`base`, TYTO-537); a `..` in it may step
+ * back, never above the open folder.
  */
 export function segmentsUnder(path: string, context: LinkContext): readonly string[] | undefined {
   if (context.folder === null) return undefined;
+  if (!isAbsolute(path)) {
+    const relative = stepsOf(context.base ?? [], path);
+    return relative.ok && relative.steps.length > 0 ? relative.steps : undefined;
+  }
   const split = (value: string): string[] =>
     value.split(/[\\/]+/u).filter((segment) => segment !== '' && segment !== '.');
-  let segments = split(path);
-  if (isAbsolute(path)) {
-    const folder = split(context.folder);
-    const same = (left: string, right: string): boolean =>
-      context.caseless ? left.toLowerCase() === right.toLowerCase() : left === right;
-    if (folder.length >= segments.length) return undefined;
-    if (!folder.every((segment, index) => same(segment, segments[index] ?? ''))) return undefined;
-    segments = segments.slice(folder.length);
-  }
-  if (segments.length === 0 || segments.includes('..')) return undefined;
-  return segments;
+  const segments = split(path);
+  const folder = split(context.folder);
+  const same = (left: string, right: string): boolean =>
+    context.caseless ? left.toLowerCase() === right.toLowerCase() : left === right;
+  if (folder.length >= segments.length) return undefined;
+  if (!folder.every((segment, index) => same(segment, segments[index] ?? ''))) return undefined;
+  const under = segments.slice(folder.length);
+  return under.includes('..') ? undefined : under;
 }
 
 /** What {@link resolveEntry} lists a folder with: `explorer:list`. */

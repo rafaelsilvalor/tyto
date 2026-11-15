@@ -53,6 +53,7 @@ describe('the IPC contract', () => {
       'explorer:image',
       'explorer:list',
       'explorer:open',
+      'explorer:read',
       'explorer:rename',
       'explorer:tabs-under',
       'export:cancel',

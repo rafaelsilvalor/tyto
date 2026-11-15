@@ -68,6 +68,8 @@ describe('the catalogue', () => {
       'templateMode.slide',
       // TYTO-276's heading over the templates in the "/" menu, for `template.label`'s reason.
       'slash.section.templates',
+      // TYTO-537's `ls` kind for a `.brief`, for `panel.editor`'s reason.
+      'commandPanel.files.kind.brief',
     ]);
   });
 });

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -15,7 +15,7 @@ import {
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { recipeCredentialStore } from './recipe-credentials.js';
-import { type ExplorerService } from './explorer.js';
+import { type ExplorerService, createExplorerService } from './explorer.js';
 import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
 import { OfferedRecipes } from './cli-offers.js';
 import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
@@ -161,6 +161,15 @@ const explorerFiles = () => {
         version: '1:4',
         dataUrl: 'data:image/png;base64,iVBORw==',
       });
+    },
+    // TYTO-537: `cat`'s text, by id only.
+    read: (entryId: string): ReturnType<ExplorerService['read']> => {
+      asked.push(entryId);
+      return Promise.resolve(
+        entryId === 'e-brief'
+          ? { ok: true, text: 'hello', truncated: false }
+          : { ok: false, reason: 'gone' },
+      );
     },
     // TYTO-352: one name already taken, one folder that renames and trashes, and a trash that
     // refuses everything else.
@@ -3272,12 +3281,126 @@ describe('cli:run, cli:cancel and cli:commands', () => {
     ).rejects.toThrow();
   });
 
+  // TYTO-537, ADR 0201 decision 2: the folder is an id main checks itself, at the call.
+  it('run in the folder an id names, and start nothing for one that leads out', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'tyto-ipc-cli-folder-')));
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: () => ({ close: () => undefined }),
+    });
+    try {
+      const work = join(scratch, 'work');
+      const outside = join(scratch, 'outside');
+      mkdirSync(join(work, 'entregas'), { recursive: true });
+      mkdirSync(join(work, 'swapped'));
+      mkdirSync(outside);
+      // A junction on Windows needs no privilege, and is the link a person there would make.
+      symlinkSync(outside, join(work, 'atalho'), 'junction');
+      await explorer.setRoot(work);
+      const listed = await explorer.list(null);
+      const idOf = (name: string) => listed.entries.find((entry) => entry.name === name)?.id;
+      const started: { argv: readonly string[]; cwd: string | undefined }[] = [];
+      const handlers = createHandlers({
+        ...dependencies(),
+        explorer,
+        cli: {
+          start: (argv, cwd) => {
+            started.push({ argv, cwd });
+            return { runId: 'cli-8' };
+          },
+          cancel: () => {},
+          commands: () => ({
+            name: 'tyto',
+            description: '',
+            arguments: [],
+            options: [],
+            commands: [],
+          }),
+          diagnosticPath: () => undefined,
+        },
+      });
+      const run = guard('cli:run', handlers['cli:run']);
+
+      await run({ argv: ['check', 'a.brief'], folder: idOf('entregas')! });
+      // The junction out was never listed, so it has no id to hand.
+      expect(idOf('atalho')).toBeUndefined();
+      // A folder listed inside, then made a junction out: refused when it is used.
+      const swapped = idOf('swapped')!;
+      rmSync(join(work, 'swapped'), { recursive: true });
+      symlinkSync(outside, join(work, 'swapped'), 'junction');
+      await expect(run({ argv: ['check', 'a.brief'], folder: swapped })).rejects.toThrow(
+        /no longer inside the open workspace folder/u,
+      );
+      // An id main never minted.
+      await expect(run({ argv: ['check'], folder: 'not-an-id' })).rejects.toThrow(
+        /no longer inside the open workspace folder/u,
+      );
+      // Without a folder, the open one, as before.
+      await run({ argv: ['check'] });
+
+      expect(started).toEqual([
+        { argv: ['check', 'a.brief'], cwd: join(work, 'entregas') },
+        { argv: ['check'], cwd: undefined },
+      ]);
+    } finally {
+      explorer.close();
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
   it('refuse a command line given as one string', async () => {
     const handlers = createHandlers(dependencies());
 
     await expect(
       guard('cli:run', handlers['cli:run'])({ argv: 'render a.brief' } as never),
     ).rejects.toThrow();
+  });
+});
+
+/** TYTO-537, ADR 0201: `cat` reads text by id, and main checks the id at the call. */
+describe('explorer:read', () => {
+  it('reads a file inside, and answers gone for one whose folder became a junction out', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'tyto-ipc-explorer-read-')));
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: () => ({ close: () => undefined }),
+    });
+    try {
+      const work = join(scratch, 'work');
+      const outside = join(scratch, 'outside');
+      mkdirSync(join(work, 'notas'), { recursive: true });
+      mkdirSync(outside);
+      writeFileSync(join(work, 'notas', 'a.txt'), 'inside');
+      writeFileSync(join(outside, 'a.txt'), 'outside secret');
+      await explorer.setRoot(work);
+      const folder = (await explorer.list(null)).entries.find((entry) => entry.name === 'notas')!;
+      const file = (await explorer.list(folder.id)).entries.find(
+        (entry) => entry.name === 'a.txt',
+      )!;
+      const read = guard(
+        'explorer:read',
+        createHandlers({ ...dependencies(), explorer })['explorer:read'],
+      );
+
+      await expect(read({ entryId: file.id })).resolves.toEqual({
+        ok: true,
+        text: 'inside',
+        truncated: false,
+      });
+      await expect(read({ entryId: folder.id })).resolves.toEqual({ ok: false, reason: 'folder' });
+      // The folder swapped for a junction out after the listing: the same id now reads nothing.
+      rmSync(join(work, 'notas'), { recursive: true });
+      symlinkSync(outside, join(work, 'notas'), 'junction');
+      await expect(read({ entryId: file.id })).resolves.toEqual({ ok: false, reason: 'gone' });
+      await expect(read({ entryId: 'not-an-id' })).resolves.toEqual({ ok: false, reason: 'gone' });
+      // A path is not a way in: the request takes none.
+      await expect(
+        read({ entryId: file.id, path: join(outside, 'a.txt') } as never),
+      ).rejects.toThrow();
+    } finally {
+      explorer.close();
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
 
