@@ -39,6 +39,12 @@ export interface CommandRun {
   readonly startedAt: number;
   readonly state: CliState['state'] | 'refused';
   readonly code?: number;
+  /**
+   * The folder its relative paths are in, as steps under the workspace root (TYTO-537): the
+   * working folder it ran in, or the folder `ls` listed. What its output's links resolve against;
+   * the root when absent.
+   */
+  readonly folder?: readonly string[];
 }
 
 export interface CommandSession {
@@ -62,7 +68,8 @@ export interface CommandSession {
   readonly runs: readonly CommandRun[];
   /**
    * The panel's working folder, as steps under the workspace root (TYTO-535, ADR 0200): what a
-   * glob is expanded against. Always the root today; TYTO-537's `cd` changes only this value.
+   * glob, a file command's path and a `tyto` command's folder are read against. `cd` (TYTO-537,
+   * ADR 0201) changes only this value; the prompt shows it.
    */
   readonly workingFolder: readonly string[];
 }
@@ -191,6 +198,18 @@ export class CommandSessions {
     }));
   }
 
+  /** `cd` (TYTO-537): the session's working folder is now `steps` under the root. */
+  changeFolder(id: string, steps: readonly string[]): void {
+    this.update(id, (session) => ({ ...session, workingFolder: [...steps] }));
+  }
+
+  /** Another workspace folder opened: every session goes back to its root. */
+  resetFolders(): void {
+    if (this.list.every((session) => session.workingFolder.length === 0)) return;
+    this.list = this.list.map((session) => ({ ...session, workingFolder: [] }));
+    this.changed();
+  }
+
   /** A line that never ran, with the reason, as a block of its own (TYTO-496). */
   refused(id: string, line: string, reason: string, at: number = Date.now()): void {
     this.update(id, (session) => {
@@ -215,19 +234,32 @@ export class CommandSessions {
     lines: readonly string[],
     code: number,
     at: number = Date.now(),
+    more: { readonly notes?: readonly string[]; readonly folder?: readonly string[] } = {},
   ): void {
     this.update(id, (session) => {
       const number = (session.runs.at(-1)?.number ?? 0) + 1;
+      const printed = lines.reduce(
+        (scrollback, text) => withPanelLine(scrollback, code === 0 ? 'out' : 'note', text, number),
+        session.scrollback,
+      );
+      const folder = more.folder ?? session.workingFolder;
       return {
         ...session,
         runs: [
           ...session.runs,
-          { number, line, words: [], startedAt: at, state: 'finished', code },
+          {
+            number,
+            line,
+            words: [],
+            startedAt: at,
+            state: 'finished',
+            code,
+            ...(folder.length === 0 ? {} : { folder }),
+          },
         ],
-        scrollback: lines.reduce(
-          (scrollback, text) =>
-            withPanelLine(scrollback, code === 0 ? 'out' : 'note', text, number),
-          session.scrollback,
+        scrollback: (more.notes ?? []).reduce(
+          (scrollback, text) => withNote(scrollback, text, number),
+          printed,
         ),
       };
     });
@@ -303,6 +335,7 @@ export class CommandSessions {
           runId,
           startedAt: at,
           state: 'running',
+          ...(session.workingFolder.length === 0 ? {} : { folder: session.workingFolder }),
         },
       ],
     }));

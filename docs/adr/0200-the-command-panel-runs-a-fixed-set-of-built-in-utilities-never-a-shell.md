@@ -2,7 +2,8 @@
 
 Status: accepted · 2026-11-15 · TYTO-535 · epic E20 · amends ADR 0159 decision 8 (the panel now
 reads `&&`, `!N` and globs itself) and ADR 0164 decision 9 (the panel runs `tyto` and its own
-built-ins) · builds on ADR 0111 and ADR 0113
+built-ins) · builds on ADR 0111 and ADR 0113 · amended by ADR 0201 (file commands touch the
+workspace folder, inside it only)
 
 ## Context
 
@@ -22,7 +23,7 @@ lines. So this decides where the panel's own commands live and what they may do,
 ### 1. The panel runs `tyto` commands and a fixed set of built-ins, never a shell
 
 A built-in is code in the renderer (`command-builtins.ts`). It starts no program, and no built-in
-of this ADR writes a file. What a built-in runs, it runs as a `tyto` command through the same
+of this ADR writes a file (the file commands of ADR 0201 do, inside the workspace folder only). What a built-in runs, it runs as a `tyto` command through the same
 port as a typed line (`cli:run`), so main's refusals (ADR 0159 decision 2) and the folder's trust
 apply exactly as they would. `last` reruns a `tyto` command; `help <command>` runs
 `<command> --help`. No new IPC channel: `cli:run` still takes words, and still never a line.

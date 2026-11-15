@@ -239,6 +239,34 @@ describe("the panel's own commands and && (TYTO-535)", () => {
     expect(items[0]?.detail).toBe('clear the output');
   });
 
+  // TYTO-537: a file command's arguments are paths, a `cd`'s folders only.
+  it('completes a file command with paths, and cd with folders, `..` reaching the list', async () => {
+    const asked: (readonly string[])[] = [];
+    const files: CompletionSources = {
+      ...sources,
+      list: (segments) => {
+        asked.push(segments);
+        return Promise.resolve([
+          { name: 'entregas', kind: 'folder' },
+          { name: 'notas.txt', kind: 'file' },
+        ]);
+      },
+      builtins: [
+        { name: 'cd', detail: 'go', arguments: 'folder' },
+        { name: 'cat', detail: 'print', arguments: 'path' },
+        { name: 'clear', detail: 'clear the output' },
+      ],
+    };
+    const offered = async (line: string) =>
+      (await complete(line, line.length, tree, files)).items.map((item) => item.label);
+
+    expect(await offered('cat ')).toEqual(['entregas/', 'notas.txt']);
+    expect(await offered('cd ')).toEqual(['entregas/']);
+    expect(await offered('cd ../')).toEqual(['entregas/']);
+    expect(asked.at(-1)).toEqual(['..']);
+    expect(await offered('clear ')).toEqual([]);
+  });
+
   it('offers none after tyto, which names the CLI', async () => {
     expect(await own('tyto ')).toEqual(['render', 'plugin', 'trust']);
   });

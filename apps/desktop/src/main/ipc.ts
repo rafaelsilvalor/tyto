@@ -312,7 +312,16 @@ export interface IpcDependencies {
    */
   readonly explorer: Pick<
     ExplorerService,
-    'list' | 'filePath' | 'image' | 'create' | 'rename' | 'delete' | 'pathOf' | 'idsTo' | 'folderOf'
+    | 'list'
+    | 'filePath'
+    | 'image'
+    | 'read'
+    | 'create'
+    | 'rename'
+    | 'delete'
+    | 'pathOf'
+    | 'idsTo'
+    | 'folderOf'
   >;
   /** A new delivery in the open folder (TYTO-489, ADR 0157): planned and written by main. */
   readonly delivery: DeliveryService;
@@ -496,6 +505,13 @@ function wireOutline(setting: SettingOutline): IpcResponse<'settings:outline'>['
       : { members: { options: copy(setting.members.options) } }),
   };
 }
+
+/**
+ * Why `cli:run` did not start a command in the folder the window named (TYTO-537, ADR 0201): the
+ * id names no folder inside the open one any more, or never did.
+ */
+export const WORKING_FOLDER_REFUSED =
+  "The panel's folder is no longer inside the open workspace folder. Type cd to go back to its root.";
 
 /** What crosses the bridge of a diagnostic: the fields the contract names, and no others. */
 const wireDiagnostic = (item: TemplateDiagnostic) => ({
@@ -824,6 +840,7 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
 
     // TYTO-366, ADR 0124: an image for the preview, by id, as bytes main checked.
     // TYTO-274: the image's tab says where it is, as a brief's does (ADR 0086, ADR 0125).
+    'explorer:read': ({ entryId }) => explorer.read(entryId),
     'explorer:image': async ({ entryId, have }) => {
       const answer = await explorer.image(entryId, have);
       const path = explorer.pathOf(entryId);
@@ -1060,7 +1077,14 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
       });
     },
 
-    'cli:run': ({ argv }) => Promise.resolve(cli.start(argv)),
+    'cli:run': async ({ argv, folder }) => {
+      if (folder === undefined) return cli.start(argv);
+      // Checked here, not trusted from the window (ADR 0201): an id main minted for a folder
+      // whose real path still lies inside the open one, or the command does not start.
+      const cwd = await explorer.folderOf(folder);
+      if (cwd === undefined) throw new Error(WORKING_FOLDER_REFUSED);
+      return cli.start(argv, cwd);
+    },
 
     'cli:cancel': ({ runId }) => {
       cli.cancel(runId);

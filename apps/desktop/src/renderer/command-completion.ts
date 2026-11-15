@@ -35,13 +35,23 @@ export interface CompletionSources {
   readonly templates: () =>
     Promise<readonly CompletableTemplate[]> | readonly CompletableTemplate[];
   readonly plugins: () => Promise<readonly string[]> | readonly string[];
-  /** The entries of a folder under the open one, or `undefined` with none open or none there. */
+  /**
+   * The entries of a folder, by its steps from the session's working folder (TYTO-537), `..`
+   * included; `undefined` with none open, none there, or a path that leaves the workspace.
+   */
   readonly list: (segments: readonly string[]) => Promise<readonly ListedEntry[] | undefined>;
   readonly caseless: boolean;
   /** Options the window refuses, which are not offered: a suggestion that always fails. */
   readonly refused?: ReadonlySet<string>;
-  /** The panel's own commands, offered as a first word with their help line (TYTO-535). */
-  readonly builtins?: readonly { readonly name: string; readonly detail: string }[];
+  /**
+   * The panel's own commands, offered as a first word with their help line (TYTO-535); one
+   * whose arguments are paths has them completed as files and folders, or folders (TYTO-537).
+   */
+  readonly builtins?: readonly {
+    readonly name: string;
+    readonly detail: string;
+    readonly arguments?: 'folder' | 'path';
+  }[];
 }
 
 export interface CompletableTemplate {
@@ -119,6 +129,17 @@ export async function complete(
   // After `&&` a new step starts: what comes is read from there (TYTO-535).
   const done = all.slice(all.map((word) => word.text).lastIndexOf('&&') + 1);
   const named = done[0]?.text === 'tyto';
+  const fileCommand = named
+    ? undefined
+    : sources.builtins?.find((each) => done.length > 0 && each.name === done[0]?.text);
+  if (fileCommand !== undefined) {
+    const range = { from: current.start, to: current.end };
+    if (fileCommand.arguments === undefined || current.text.startsWith('-')) {
+      return { ...range, items: [] };
+    }
+    const kind = fileCommand.arguments === 'folder' ? 'folder' : 'file';
+    return { ...range, items: await paths(kind, current, sources) };
+  }
   const words = named ? done.slice(1) : done;
   const used: Option[] = [];
   const valuesTyped = new Map<Option, string>();
@@ -311,7 +332,6 @@ async function paths(
   const folder = word.text.slice(0, cut + 1);
   const prefix = word.text.slice(cut + 1);
   const segments = folder.split(/[\\/]+/u).filter((segment) => segment !== '' && segment !== '.');
-  if (segments.includes('..')) return [];
   const separator = word.text.includes('\\') ? '\\' : '/';
   const entries = (await sources.list(segments)) ?? [];
   const fits = (entry: ListedEntry): boolean =>

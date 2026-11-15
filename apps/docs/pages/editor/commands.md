@@ -1,7 +1,7 @@
 # Commands
 
 ::: info How this page was checked
-Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them. The refusals of `tyto mcp`, `watch` and `recipe run --apply` were added to this list on 2026-11-12 from the window's code and its unit tests, the last one through the command line's own parser, not in the window. The panel's own commands, `&&`, `!N` and patterns were added on 2026-11-15 from the window's code and its unit tests, not in the window. The boxes a refusal offers were added on 2026-11-15: the ones for `--trust` and `recipe run --apply` were followed in the window, with both answers; the ones for `signin`, `signout` and `watch` come from the window's code and its unit tests.
+Every step was followed on 2026-10-30 on a development build of Tyto from the branch that added this page, on Windows 11, in the English window. The Portuguese edition's labels were read from the window's own catalogue, not from a running window. The run blocks and the place of the suggestion list were checked again on 2026-10-31, once this page described them. The refusals of `tyto mcp`, `watch` and `recipe run --apply` were added to this list on 2026-11-12 from the window's code and its unit tests, the last one through the command line's own parser, not in the window. The panel's own commands, `&&`, `!N` and patterns were added on 2026-11-15 from the window's code and its unit tests, not in the window. The file commands `ls`, `cd`, `pwd` and `cat`, and completion after them, were added on 2026-11-15 from the window's code and its unit tests; the prompt showing a folder after `cd` was looked at in the window, in the light and dark themes. The boxes a refusal offers were added on 2026-11-15: the ones for `--trust` and `recipe run --apply` were followed in the window, with both answers; the ones for `signin`, `signout` and `watch` come from the window's code and its unit tests.
 :::
 
 The **Commands** tab of the bottom area runs `tyto` commands, the same ones as the [command line](../command-line/index.md), inside the window, and a few commands of its own. Nothing else runs there: not a shell and not another program. For a shell, use the [Terminal](terminal.md) tab.
@@ -20,7 +20,7 @@ Type after `tyto ›` and press **Enter**. Writing `tyto` first is optional.
 
 - Words are split on spaces. Put a path with spaces in quotes: `render "Meus briefs/cartaz.brief"`. A quote left open is refused and nothing runs.
 - `|`, `>`, `;`, `$HOME` and `~` mean nothing here. They reach the command as words. `&&`, `!N`, `*` and `?` are read by the panel, as [Several commands in one line](#several-commands-in-one-line) says.
-- The command runs in the open [workspace folder](workspace-folder.md), so a path can be written from there. With no folder open, it runs in your Tyto folder (`~/.tyto`).
+- The command runs in the panel's folder: the open [workspace folder](workspace-folder.md), or the folder inside it that `cd` went to, which the prompt shows (`tyto entregas/novembro ›`). A path can be written from there. With no folder open, it runs in your Tyto folder (`~/.tyto`). A folder's trust is the workspace folder's: under a restricted folder, every folder is restricted too.
 - Some commands are refused, with a line saying why:
   - `--trust`, because the window trusts a folder with **Workspace: Manage Trust**. With a folder open, a box offers to trust it there and then run the command without `--trust`. Unlike `--trust`, which lasts one run, this trust is saved: the folder stays trusted until you take it back in **Workspace: Manage Trust** or with `tyto trust remove`;
   - installing an npm package with `plugin install` on Windows, because that would start a shell;
@@ -45,6 +45,14 @@ These are not `tyto` commands: the panel answers them itself, and none of them w
 | `!N`             | Runs line N of `history` again: `!5` runs the fifth.                                         |
 | `last`           | Runs the last `tyto` command again: not one of these, and not a line with `&&`.              |
 | `exit`           | Closes this session, stopping what it runs.                                                  |
+| `ls`             | Lists the panel's folder, or the folder named: `ls entregas`.                                |
+| `cd`             | Goes to a folder: `cd entregas/novembro`, `cd ..` back one. `cd` alone goes back to the top. |
+| `pwd`            | Prints the full path of the panel's folder.                                                  |
+| `cat`            | Prints a text file: `cat notas.txt`. Up to 256 KB of it, with a line saying it was cut.      |
+
+`ls` lists folders first, each ending in `/`, and every name beside its kind: folder, brief, recipe or file. A brief, a recipe or a text file is a link that opens it in a tab, unless its name has a space.
+
+The file commands only reach inside the open workspace folder. A path that leaves it is refused: `..` above the folder, a path starting with `/`, `C:\`, `\\server` or `~`, and a link or junction that points outside it, which the [Explorer](workspace-folder.md#browse-its-files-the-explorer) does not show either. Each session has its own folder; opening another workspace folder sends every session back to the top. `cat` refuses a file that is not text.
 
 ## Several commands in one line
 
@@ -60,7 +68,7 @@ A list right under the prompt shows what can come next, whichever order the runs
 - for `--formats`, the formats of the template already chosen;
 - for `--types`, `png`, `jpeg`, `webp` and `svg`;
 - for `plugin enable`, `disable` and `remove`, the installed plugins;
-- for a brief, a folder or a file, what is in the open folder. A folder ends in `/` and the list goes on inside it.
+- for a brief, a folder or a file, and after `ls` and `cat`, what is in the panel's folder; after `cd`, its folders. A folder ends in `/` and the list goes on inside it.
 
 **Tab** takes the first suggestion, or the only one. **↑** and **↓** choose one and **Enter** takes it. **Esc** closes the list. With nothing chosen, **Enter** runs the line as it is.
 

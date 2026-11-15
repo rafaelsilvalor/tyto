@@ -985,3 +985,60 @@ describe('deleting an entry', () => {
     expect(await readdir(work)).toContain('slide 2.brief');
   });
 });
+
+/** TYTO-537, ADR 0201: the text the command panel's `cat` prints, by id. */
+describe('reading a file as text', () => {
+  it('reads a file whole, without its byte-order mark', async () => {
+    await writeFile(join(work, 'notes.txt'), '\uFEFFolá\r\nmundo\n');
+    const explorer = quiet();
+    await explorer.setRoot(work);
+
+    expect(await explorer.read(await entryIdOf(explorer, 'notes.txt'))).toEqual({
+      ok: true,
+      text: 'olá\r\nmundo\n',
+      truncated: false,
+    });
+  });
+
+  it('refuses a folder, a file with a NUL byte, and an id it did not mint', async () => {
+    await writeFile(join(work, 'blob.bin'), Buffer.from([0x50, 0x4e, 0x00, 0x47]));
+    const explorer = quiet();
+    await explorer.setRoot(work);
+
+    expect(await explorer.read(await entryIdOf(explorer, 'slides'))).toEqual({
+      ok: false,
+      reason: 'folder',
+    });
+    expect(await explorer.read(await entryIdOf(explorer, 'blob.bin'))).toEqual({
+      ok: false,
+      reason: 'binary',
+    });
+    expect(await explorer.read('never-minted')).toEqual({ ok: false, reason: 'gone' });
+  });
+
+  it('stops at the cap, without half of a character the cut split', async () => {
+    // `é` is two bytes: a cap of five cuts the third one in half.
+    await writeFile(join(work, 'long.txt'), 'abéé');
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const id = await entryIdOf(explorer, 'long.txt');
+
+    expect(await explorer.read(id, 5)).toEqual({ ok: true, text: 'abé', truncated: true });
+    expect(await explorer.read(id, 6)).toEqual({ ok: true, text: 'abéé', truncated: false });
+  });
+
+  it('answers gone for a file whose folder became a junction out after it was listed', async () => {
+    const outside = join(scratch, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'capa.brief'), 'secret');
+    const explorer = quiet();
+    await explorer.setRoot(work);
+    const id = await entryIdOf(explorer, 'capa.brief', await entryIdOf(explorer, 'slides'));
+    expect(await explorer.read(id)).toMatchObject({ ok: true, text: '::a' });
+
+    await rm(join(work, 'slides'), { recursive: true });
+    await symlink(outside, join(work, 'slides'), 'junction');
+
+    expect(await explorer.read(id)).toEqual({ ok: false, reason: 'gone' });
+  });
+});

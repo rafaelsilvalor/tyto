@@ -4,7 +4,12 @@ import { describe, expect, it } from 'vitest';
 import type { ListedEntry } from './command-completion.js';
 import type { OutputLink } from './command-links.js';
 import { type CommandPanel, type CommandPanelPorts, COMMAND_PANEL_TAG } from './command-panel.js';
-import { BuiltinRegistry, PANEL_BUILTINS, type PanelBuiltin } from './command-builtins.js';
+import {
+  BuiltinRegistry,
+  type FileRead,
+  PANEL_BUILTINS,
+  type PanelBuiltin,
+} from './command-builtins.js';
 import { type CommandSession, CommandSessions } from './command-sessions.js';
 
 /**
@@ -23,6 +28,8 @@ interface Harness {
   readonly cancelled: string[];
   readonly opened: OutputLink[];
   readonly history: string[];
+  /** The folder id each run was started in, `undefined` for the root (TYTO-537). */
+  readonly folders: (string | undefined)[];
 }
 
 async function mount(
@@ -33,6 +40,8 @@ async function mount(
     complete?: CommandPanelPorts['complete'];
     /** The workspace's folders by their steps joined with `/`, `''` the root (TYTO-535). */
     files?: Record<string, ListedEntry[]>;
+    /** What `cat` reads, by id: the steps joined with `/` (TYTO-537). */
+    texts?: Record<string, FileRead>;
     restricted?: boolean;
   } = {},
 ): Promise<Harness> {
@@ -46,11 +55,13 @@ async function mount(
     cancelled: [],
     opened: [],
     history: options.history ?? [],
+    folders: [],
   };
   let runs = 0;
   const ports: CommandPanelPorts = {
-    run: (words) => {
+    run: (words, folder) => {
       harness.ran.push(words);
+      harness.folders.push(folder);
       runs += 1;
       return Promise.resolve(`run-${String(runs)}`);
     },
@@ -70,6 +81,18 @@ async function mount(
         { name: 'check', description: 'check a brief' },
       ]),
     restricted: () => options.restricted ?? false,
+    // An entry's id is its steps joined with `/`, so a test reads which folder a run got.
+    listById: (entryId) => {
+      const key = entryId ?? '';
+      return Promise.resolve({
+        entries: (options.files?.[key] ?? []).map((entry) => ({
+          ...entry,
+          id: key === '' ? entry.name : `${key}/${entry.name}`,
+        })),
+        more: 0,
+      });
+    },
+    read: (entryId) => Promise.resolve(options.texts?.[entryId] ?? { ok: false, reason: 'gone' }),
   };
   element.locale = options.locale ?? 'en';
   element.sessions = sessions;
@@ -742,5 +765,121 @@ describe('colours by meaning, not by stream (TYTO-725)', () => {
     const badge = harness.element.querySelector<HTMLElement>('.command-run__badge')!;
     expect([badge.dataset['state'], badge.textContent]).toEqual(['failed', '✗ 1']);
     expect(tones(harness.element).every((tone) => tone.startsWith('note:'))).toBe(true);
+  });
+});
+
+describe('the file commands that read (TYTO-537, ADR 0201)', () => {
+  const settle = async (element: CommandPanel): Promise<void> => {
+    for (let round = 0; round < 4; round += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await element.updateComplete;
+    }
+  };
+  const files: Record<string, ListedEntry[]> = {
+    '': [
+      { name: 'entregas', kind: 'folder' },
+      { name: 'capa.brief', kind: 'brief' },
+    ],
+    entregas: [{ name: 'novembro', kind: 'folder' }],
+    'entregas/novembro': [{ name: 'story.brief', kind: 'brief' }],
+  };
+  const label = (element: HTMLElement) => input(element).labels?.[0]?.textContent?.trim();
+
+  it('cd moves the prompt, and a tyto command runs in that folder by its id', async () => {
+    const harness = await mount({ folder: 'C:\\work', files });
+    await typeAndRun(harness, 'cd entregas/novembro');
+    await settle(harness.element);
+    expect(label(harness.element)).toBe('tyto entregas/novembro ›');
+
+    await typeAndRun(harness, 'check story.brief');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([['check', 'story.brief']]);
+    expect(harness.folders).toEqual(['entregas/novembro']);
+
+    harness.sessions.state({ runId: 'run-1', state: 'finished', code: 0 });
+    await typeAndRun(harness, 'cd');
+    await settle(harness.element);
+    expect(label(harness.element)).toBe('tyto ›');
+  });
+
+  it('control: at the root a tyto command names no folder', async () => {
+    const harness = await mount({ folder: 'C:\\work', files });
+    await typeAndRun(harness, 'check capa.brief');
+    await settle(harness.element);
+    expect(harness.folders).toEqual([undefined]);
+  });
+
+  it('refuses a tyto command whose working folder has gone, running nothing', async () => {
+    const shrinking: Record<string, ListedEntry[]> = { ...files };
+    const harness = await mount({ folder: 'C:\\work', files: shrinking });
+    await typeAndRun(harness, 'cd entregas');
+    await settle(harness.element);
+    shrinking[''] = [{ name: 'capa.brief', kind: 'brief' }];
+
+    await typeAndRun(harness, 'check a.brief');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([]);
+    expect(lines(harness.element).at(-1)).toContain(
+      'The folder entregas is no longer in the workspace',
+    );
+  });
+
+  it('ls links a name to the folder it listed, and runs in a restricted folder', async () => {
+    const harness = await mount({ folder: 'C:\\work', files, restricted: true });
+    await typeAndRun(harness, 'cd entregas && ls novembro');
+    await settle(harness.element);
+    expect(lines(harness.element)).toEqual(['story.brief  brief']);
+    harness.element.querySelector<HTMLAnchorElement>('.command-panel__link')!.click();
+    expect(harness.opened).toEqual([
+      { kind: 'path', segments: ['entregas', 'novembro', 'story.brief'] },
+    ]);
+  });
+
+  it('a link a tyto command printed in a subfolder opens the file there', async () => {
+    const harness = await mount({ folder: 'C:\\work', files });
+    await typeAndRun(harness, 'cd entregas');
+    await settle(harness.element);
+    await typeAndRun(harness, 'check x.brief');
+    await settle(harness.element);
+    harness.sessions.output({ runId: 'run-1', stream: 'out', text: 'novembro/story.brief ok\n' });
+    await harness.element.updateComplete;
+    harness.element.querySelector<HTMLAnchorElement>('.command-panel__link')!.click();
+    expect(harness.opened).toEqual([
+      { kind: 'path', segments: ['entregas', 'novembro', 'story.brief'] },
+    ]);
+  });
+
+  it('cat prints the text as output, and the cut as a note of its own', async () => {
+    const texts: Record<string, FileRead> = {
+      'capa.brief': { ok: true, text: '::capa\n', truncated: true },
+    };
+    const harness = await mount({ folder: 'C:\\work', files, texts });
+    await typeAndRun(harness, 'cat capa.brief');
+    await settle(harness.element);
+    const drawn = [...harness.element.querySelectorAll('.command-panel__line')].map((line) => [
+      line.textContent,
+      line.getAttribute('data-stream'),
+    ]);
+    expect(drawn).toEqual([
+      ['::capa', 'out'],
+      ['capa.brief is longer than 256 KB: only its first 256 KB are printed.', 'note'],
+    ]);
+  });
+
+  it('completes a cd with folders from the working folder', async () => {
+    const asked: (readonly string[])[] = [];
+    const harness = await mount({
+      complete: (_line, caret, base) => {
+        asked.push(base);
+        return Promise.resolve({ from: caret, to: caret, items: [] });
+      },
+      folder: '/work',
+      files,
+    });
+    await typeAndRun(harness, 'cd entregas');
+    await settle(harness.element);
+    input(harness.element).value = 'cd n';
+    await press(harness.element, input(harness.element), 'Tab');
+    expect(asked).toEqual([['entregas']]);
   });
 });

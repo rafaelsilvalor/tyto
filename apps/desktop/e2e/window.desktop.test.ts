@@ -306,6 +306,8 @@ describe('the bridge', () => {
       'explorer:image',
       'explorer:list',
       'explorer:open',
+      // TYTO-537, ADR 0201: the text of a file, by id, for the command panel's `cat`.
+      'explorer:read',
       'explorer:rename',
       'explorer:tabs-under',
       'export:cancel',

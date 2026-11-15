@@ -1159,6 +1159,26 @@ export interface Catalogue {
   readonly 'commandPanel.builtin.rerun': string;
   readonly 'commandPanel.builtin.and': string;
   readonly 'commandPanel.builtin.glob': string;
+  readonly 'commandPanel.builtin.ls': string;
+  readonly 'commandPanel.builtin.cd': string;
+  readonly 'commandPanel.builtin.pwd': string;
+  readonly 'commandPanel.builtin.cat': string;
+  readonly 'commandPanel.files.noFolder': string;
+  readonly 'commandPanel.files.outside': string;
+  readonly 'commandPanel.files.missing': string;
+  readonly 'commandPanel.files.notFolder': string;
+  readonly 'commandPanel.files.isFolder': string;
+  readonly 'commandPanel.files.binary': string;
+  readonly 'commandPanel.files.truncated': string;
+  readonly 'commandPanel.files.more': string;
+  readonly 'commandPanel.files.usage.ls': string;
+  readonly 'commandPanel.files.usage.cd': string;
+  readonly 'commandPanel.files.usage.cat': string;
+  readonly 'commandPanel.files.kind.folder': string;
+  readonly 'commandPanel.files.kind.brief': string;
+  readonly 'commandPanel.files.kind.recipe': string;
+  readonly 'commandPanel.files.kind.file': string;
+  readonly 'commandPanel.workingFolderGone': string;
   readonly 'commandPanel.sessions': string;
   readonly 'commandPanel.session': string;
   readonly 'commandPanel.session.new': string;
@@ -1919,6 +1939,26 @@ export const CATALOGUE_KEYS = [
   'commandPanel.builtin.rerun',
   'commandPanel.builtin.and',
   'commandPanel.builtin.glob',
+  'commandPanel.builtin.ls',
+  'commandPanel.builtin.cd',
+  'commandPanel.builtin.pwd',
+  'commandPanel.builtin.cat',
+  'commandPanel.files.noFolder',
+  'commandPanel.files.outside',
+  'commandPanel.files.missing',
+  'commandPanel.files.notFolder',
+  'commandPanel.files.isFolder',
+  'commandPanel.files.binary',
+  'commandPanel.files.truncated',
+  'commandPanel.files.more',
+  'commandPanel.files.usage.ls',
+  'commandPanel.files.usage.cd',
+  'commandPanel.files.usage.cat',
+  'commandPanel.files.kind.folder',
+  'commandPanel.files.kind.brief',
+  'commandPanel.files.kind.recipe',
+  'commandPanel.files.kind.file',
+  'commandPanel.workingFolderGone',
   'commandPanel.sessions',
   'commandPanel.session',
   'commandPanel.session.new',

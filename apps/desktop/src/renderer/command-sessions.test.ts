@@ -163,4 +163,28 @@ describe('what a line of steps needs (TYTO-535)', () => {
   it('starts every tab at the workspace root, the one value cd will change', () => {
     expect(new CommandSessions().active.workingFolder).toEqual([]);
   });
+
+  // TYTO-537: a block remembers the folder it ran in, for its links.
+  it('keeps each tab its own folder, and every run the folder it ran in', () => {
+    const sessions = new CommandSessions();
+    const first = sessions.active.id;
+    const second = sessions.create().id;
+    sessions.changeFolder(first, ['entregas']);
+    sessions.started(first, 'check a', ['check', 'a'], 'run-1');
+    sessions.printed(first, 'ls novembro', ['b.brief  brief'], 0, 5, {
+      folder: ['entregas', 'novembro'],
+      notes: ['… and 2 more'],
+    });
+    sessions.printed(second, 'pwd', ['/w'], 0, 6);
+
+    const one = sessions.sessions.find((session) => session.id === first)!;
+    expect(one.runs.map((run) => run.folder)).toEqual([['entregas'], ['entregas', 'novembro']]);
+    expect(one.scrollback.lines.map((line) => line.stream)).toEqual(['out', 'note']);
+    expect(sessions.sessions.find((session) => session.id === second)?.runs[0]?.folder).toBe(
+      undefined,
+    );
+
+    sessions.resetFolders();
+    expect(sessions.sessions.map((session) => session.workingFolder)).toEqual([[], []]);
+  });
 });
