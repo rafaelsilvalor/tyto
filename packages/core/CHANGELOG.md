@@ -1,5 +1,37 @@
 # @tyto/core
 
+## 0.46.0
+
+### Minor Changes
+
+- a232861: The command panel has aliases and variables (TYTO-536). `alias entrega='render --delivery'`
+  saves an alias in the `commandAliases` setting, and `unalias` removes one; a workspace's own
+  aliases, in the new `aliases` key of `.tyto/project.json`, win name by name.
+  An alias expands once and its line is taken literally. `set name=value` sets a variable for the
+  session, read as `$name` inside a word, never in single quotes and never from the environment.
+  A restricted folder's aliases are withheld (`W_PROJECT_ALIASES_WITHHELD`), and a refused line
+  that came from an alias names it, and where it is defined, in its sentence and its box.
+- 54bbebf: TYTO-679: a template's context carries `artworks`, every artwork of the brief in order with its
+  adjustments (ADR 0203), so a slide can tell where it stands: a bare `{continua}` after an answer
+  can stay an answer. Adjustments only, aligned with `artwork.index`, and optional on the type.
+- 85f200f: TYTO-714: `decide` with `clear=push` holds the clears of a run that look like a lost read. When
+  the `local=` column is missing or empty on every row while `last` holds values, no clear is
+  pushed and one `W_RECIPE_DECIDE_CLEAR_COLUMN` names the column; when a run would push more
+  clears than the new `clear-limit=<n>|none` (5 when not given), none is pushed and one
+  `W_RECIPE_DECIDE_CLEAR_LIMIT` gives the count. A held clear is a `hold` row whose decided value
+  is the last one, so the state does not advance. The desktop's recipe form gains the
+  `clear-limit` field's Portuguese help, and the user manual a section on syncing a field both
+  ways.
+
+### Patch Changes
+
+- 917636f: TYTO-727: a recipe's header takes `const name = value`, a value used as `{name}` that nothing
+  outside the recipe overrides, and the generic verb `set name = <aggregate>` keeps one value
+  computed from the table (`count`, `min`, `max`, `first`, `last` or `sum` of a column) for the
+  steps below it. `param`, `const` and `set` share one set of names, and a `set` name is known only
+  below its step (ADR 0199). The notebook's runner hands a slice the values its reused `set` cells
+  computed, and reruns every cell when a const changes. `E_RECIPE_PARAM`'s summary names the three.
+
 ## 0.45.0
 
 ### Minor Changes

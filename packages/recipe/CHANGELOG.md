@@ -1,5 +1,43 @@
 # @tyto/recipe
 
+## 0.7.0
+
+### Minor Changes
+
+- 0c38153: TYTO-712: the recipe editor reads the word after a `|` that chains steps as a verb. It colours
+  it as one and offers verbs there, splitting a line where the parser does, through
+  `chainSegments`, which `@tyto/recipe` now exports.
+- 85f200f: TYTO-714: `decide` with `clear=push` holds the clears of a run that look like a lost read. When
+  the `local=` column is missing or empty on every row while `last` holds values, no clear is
+  pushed and one `W_RECIPE_DECIDE_CLEAR_COLUMN` names the column; when a run would push more
+  clears than the new `clear-limit=<n>|none` (5 when not given), none is pushed and one
+  `W_RECIPE_DECIDE_CLEAR_LIMIT` gives the count. A held clear is a `hold` row whose decided value
+  is the last one, so the state does not advance. The desktop's recipe form gains the
+  `clear-limit` field's Portuguese help, and the user manual a section on syncing a field both
+  ways.
+- 917636f: TYTO-727: a recipe's header takes `const name = value`, a value used as `{name}` that nothing
+  outside the recipe overrides, and the generic verb `set name = <aggregate>` keeps one value
+  computed from the table (`count`, `min`, `max`, `first`, `last` or `sum` of a column) for the
+  steps below it. `param`, `const` and `set` share one set of names, and a `set` name is known only
+  below its step (ADR 0199). The notebook's runner hands a slice the values its reused `set` cells
+  computed, and reruns every cell when a const changes. `E_RECIPE_PARAM`'s summary names the three.
+
+### Patch Changes
+
+- 8700e87: TYTO-727: the recipe editor colours `const` as a header line and a `set` step's name, `=` and
+  aggregate, offers the aggregates after `set <name> = `, and offers the names in scope after a
+  `{`: every `param` and `const`, and each `set` above the step. `@tyto/recipe` exports
+  `SET_AGGREGATES` and `readSet` for it, explains the `set` form's syntax in its help, and rounds a
+  `sum` to 15 significant digits, so `0.1 + 0.2` is `0.3`. `tyto recipe run` prints the value a
+  `set` step set and its note, as text and in `--json`, and `run_recipe` answers both.
+- Updated dependencies [a232861]
+- Updated dependencies [54bbebf]
+- Updated dependencies [69b00fe]
+- Updated dependencies [85f200f]
+- Updated dependencies [917636f]
+  - @tyto/core@0.46.0
+  - @tyto/brief-lang@0.9.0
+
 ## 0.6.0
 
 ### Minor Changes

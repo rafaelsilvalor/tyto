@@ -1,5 +1,44 @@
 # @tyto/io
 
+## 5.9.0
+
+### Minor Changes
+
+- 917636f: TYTO-727: a recipe's header takes `const name = value`, a value used as `{name}` that nothing
+  outside the recipe overrides, and the generic verb `set name = <aggregate>` keeps one value
+  computed from the table (`count`, `min`, `max`, `first`, `last` or `sum` of a column) for the
+  steps below it. `param`, `const` and `set` share one set of names, and a `set` name is known only
+  below its step (ADR 0199). The notebook's runner hands a slice the values its reused `set` cells
+  computed, and reruns every cell when a const changes. `E_RECIPE_PARAM`'s summary names the three.
+
+### Patch Changes
+
+- eed88a7: The command panel completes `--template` and `--formats` from `tyto template list --json
+--no-sync` run in the session's working folder (TYTO-729), no longer from the window's
+  template picker: a name it offers is one a render there accepts, the folder's own `templates/`
+  included and a restricted folder's plugin files left out. The answer is kept per working folder
+  and trust, and asked again after a template, plugin, file or trust change, or after a panel
+  run; what the listing left out is said once in the panel.
+
+  `tyto template list --no-sync` fetches nothing: a plugin file whose copy is not on this
+  computer yet is left out, and the error output names it. A plugin folder sync that does not
+  fetch takes the reason it gives (`notFetchedBecause`), `tyto watch`'s by default.
+
+- Updated dependencies [a232861]
+- Updated dependencies [54bbebf]
+- Updated dependencies [54bbebf]
+- Updated dependencies [0c38153]
+- Updated dependencies [85f200f]
+- Updated dependencies [8700e87]
+- Updated dependencies [917636f]
+  - @tyto/core@0.46.0
+  - @tyto/plugin-api@0.22.0
+  - @tyto/recipe@0.7.0
+  - @tyto/export-html@0.7.22
+  - @tyto/export-svg@2.0.22
+  - @tyto/pipeline@0.12.18
+  - @tyto/template-lang@0.8.20
+
 ## 5.8.0
 
 ### Minor Changes

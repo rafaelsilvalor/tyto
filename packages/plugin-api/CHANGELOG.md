@@ -1,5 +1,24 @@
 # @tyto/plugin-api
 
+## 0.22.0
+
+### Minor Changes
+
+- 54bbebf: TYTO-679: a template running in its plugin's process receives `artworks`, every artwork's
+  adjustments (ADR 0203), with the call. Each entry holds adjustments alone; a call carrying more
+  is refused before the template runs.
+
+### Patch Changes
+
+- Updated dependencies [a232861]
+- Updated dependencies [54bbebf]
+- Updated dependencies [0c38153]
+- Updated dependencies [85f200f]
+- Updated dependencies [8700e87]
+- Updated dependencies [917636f]
+  - @tyto/core@0.46.0
+  - @tyto/recipe@0.7.0
+
 ## 0.21.0
 
 ### Minor Changes

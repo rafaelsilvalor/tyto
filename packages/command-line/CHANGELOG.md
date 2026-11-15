@@ -1,5 +1,64 @@
 # @tyto/command-line
 
+## 0.9.0
+
+### Minor Changes
+
+- d7ab9d4: TYTO-726: `environment.refuse` may answer `{ without: ['trust'] }`, to run the command with
+  an allow-listed boolean option cleared (`CLEARABLE_OPTIONS`), or `{ handled }`, to print a
+  sentence and exit 0 without running it. An option outside the list, or one the command does
+  not declare, is an internal failure. A terminal passes no hook and behaves as before.
+- 8700e87: TYTO-727: the recipe editor colours `const` as a header line and a `set` step's name, `=` and
+  aggregate, offers the aggregates after `set <name> = `, and offers the names in scope after a
+  `{`: every `param` and `const`, and each `set` above the step. `@tyto/recipe` exports
+  `SET_AGGREGATES` and `readSet` for it, explains the `set` form's syntax in its help, and rounds a
+  `sum` to 15 significant digits, so `0.1 + 0.2` is `0.3`. `tyto recipe run` prints the value a
+  `set` step set and its note, as text and in `--json`, and `run_recipe` answers both.
+- 0ebb9eb: TYTO-728: `tyto template list [folder]` prints every template a render in that folder can use,
+  with its origin (built-in, plugin, workspace) and formats, aliases as rows of their own, and
+  `--json` and `--trust`. It reads the templates through the same steps `tyto render`,
+  `tyto recipe run` and `tyto delivery new --template` now share, so the list and a render never
+  disagree; a restricted folder lists what a restricted render can use and says what it left out.
+  The command panel's `templates` runs it in the session's working folder.
+- eed88a7: The command panel completes `--template` and `--formats` from `tyto template list --json
+--no-sync` run in the session's working folder (TYTO-729), no longer from the window's
+  template picker: a name it offers is one a render there accepts, the folder's own `templates/`
+  included and a restricted folder's plugin files left out. The answer is kept per working folder
+  and trust, and asked again after a template, plugin, file or trust change, or after a panel
+  run; what the listing left out is said once in the panel.
+
+  `tyto template list --no-sync` fetches nothing: a plugin file whose copy is not on this
+  computer yet is left out, and the error output names it. A plugin folder sync that does not
+  fetch takes the reason it gives (`notFetchedBecause`), `tyto watch`'s by default.
+
+- c8417c2: `tyto mcp`'s `list_templates` lists template aliases, as `tyto template list` does: an alias is a
+  row with `aliasOf` naming the template it reaches, every row says its `origin`, and `formats` is
+  what a render accepts under that name, narrowed by a configuration that restricts them.
+
+### Patch Changes
+
+- 73b2ed6: `tyto mcp` resolves templates through the same resolver as `tyto render` and `tyto template list`, so an agent over MCP is offered and refused exactly the templates the terminal is, in the same folder and with the same trust.
+- Updated dependencies [a232861]
+- Updated dependencies [54bbebf]
+- Updated dependencies [54bbebf]
+- Updated dependencies [0c38153]
+- Updated dependencies [85f200f]
+- Updated dependencies [8700e87]
+- Updated dependencies [917636f]
+- Updated dependencies [eed88a7]
+  - @tyto/core@0.46.0
+  - @tyto/plugin-api@0.22.0
+  - @tyto/recipe@0.7.0
+  - @tyto/io@5.9.0
+  - @tyto/export-html@0.7.22
+  - @tyto/export-svg@2.0.22
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.21
+  - @tyto/pipeline@0.12.18
+  - @tyto/raster@0.2.4
+  - @tyto/template-lang@0.8.20
+  - @tyto/templates@1.2.16
+
 ## 0.8.0
 
 ### Minor Changes

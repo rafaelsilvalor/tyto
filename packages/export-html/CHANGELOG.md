@@ -1,5 +1,17 @@
 # @tyto/export-html
 
+## 0.7.22
+
+### Patch Changes
+
+- Updated dependencies [a232861]
+- Updated dependencies [54bbebf]
+- Updated dependencies [54bbebf]
+- Updated dependencies [85f200f]
+- Updated dependencies [917636f]
+  - @tyto/core@0.46.0
+  - @tyto/plugin-api@0.22.0
+
 ## 0.7.21
 
 ### Patch Changes
