@@ -86,6 +86,11 @@ function trimmedEnd(text: string, line: Line): number {
  * The offset each body line's text starts at, keyed by the line's start. Read off the tree —
  * a `BodyLine`'s `BlockText` begins right after its indent — rather than off the text, so a
  * line counts as a body line only where the grammar says it is one.
+ *
+ * A comment line inside a block counts as one of its body lines (TYTO-680, ADR 0204): it is
+ * indented like them, so a column-0 `//` between two body lines is drawn inside the block it
+ * belongs to. A comment at the top level is a `Comment` straight under the brief and stays
+ * where it is.
  */
 function bodyTextStarts(top: SyntaxNode, lines: readonly Line[]): Map<number, number> {
   const starts = new Map<number, number>();
@@ -102,7 +107,10 @@ function bodyTextStarts(top: SyntaxNode, lines: readonly Line[]): Map<number, nu
     return lines[low]?.from ?? 0;
   };
   do {
-    if (cursor.name === 'BlockText') starts.set(lineStartOf(cursor.from), cursor.from);
+    const inBlock =
+      cursor.name === 'BlockText' ||
+      (cursor.name === 'Comment' && cursor.node.parent?.name === 'Directive');
+    if (inBlock) starts.set(lineStartOf(cursor.from), cursor.from);
   } while (cursor.next());
   return starts;
 }
@@ -123,7 +131,8 @@ function frontmatterTrimIsSafe(text: string, node: SyntaxNode, trimmed: string):
 /**
  * The edits that put a brief in its canonical shape, or the syntax errors that stop it.
  *
- * - A body line is indented by exactly `indentUnit` spaces.
+ * - A body line is indented by exactly `indentUnit` spaces, and so is a comment line inside a
+ *   block.
  * - No line ends in spaces or tabs.
  * - A run of blank lines becomes one empty line; none is kept between a directive's head and
  *   its first body line, before the first line or after the last.

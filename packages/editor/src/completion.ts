@@ -300,8 +300,11 @@ const completeBody = (
   const manifest = analysis.manifest;
 
   switch (node.name) {
-    // `::|` — the mark is there and the name is not, so the name goes at the cursor.
+    // `::|` — the mark is there and the name is not, so the name goes at the cursor. The
+    // line break and indent in front of a comment line inside a block are also the
+    // directive's own characters (TYTO-680), and nothing is being named there.
     case 'Directive':
+      if (context.state.sliceDoc(context.pos - 2, context.pos) !== '::') return null;
       return directiveNames(nothingWritten(context), analysis, false);
 
     // `::ti|`. The parent guard matters: a `Name` whose parent is an error node is the

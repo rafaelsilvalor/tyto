@@ -71,7 +71,7 @@ const PLAIN = 'Text';
  * The inlines a column's colour is painted on. A `Space` is the space between an emphasis and
  * the next word, plain text to `parseBrief`; everything else — bold, italic, a mark — is atomic.
  */
-const PAINTED = new Set([PLAIN, 'Space', 'EscapedDirective']);
+const PAINTED = new Set([PLAIN, 'Space', 'EscapedDirective', 'EscapedComment']);
 
 /** A break ends a row, top-level only: one inside bold is inside an atomic inline. */
 const BREAK = 'Break';

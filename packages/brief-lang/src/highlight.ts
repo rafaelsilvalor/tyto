@@ -52,4 +52,5 @@ export const briefHighlighting = styleTags({
   'Italic/...': tags.emphasis,
   Break: tags.escape,
   EscapedDirective: tags.escape,
+  EscapedComment: tags.escape,
 });

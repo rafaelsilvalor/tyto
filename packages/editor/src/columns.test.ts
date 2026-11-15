@@ -81,6 +81,13 @@ describe('the columns of a | line', () => {
     expect(read('::rodape a | b\n')).toEqual({ columns: ['1:a', '2:b'], separators: 1 });
   });
 
+  it('paints an escape as the text it stands for (TYTO-680)', () => {
+    expect(read('::lamina\n  \\// a | \\::b\n')).toEqual({
+      columns: ['1:\\//', '1:a', '2:\\::', '2:b'],
+      separators: 1,
+    });
+  });
+
   it('has no \\| escape: the backslash is a break and the | still splits', () => {
     // `a ` before the break is a row of its own with no `|`: a heading, unpainted.
     expect(read('::lamina\n  a \\| b\n')).toEqual({ columns: ['2:b'], separators: 1 });

@@ -1,6 +1,6 @@
 import { ExternalTokenizer } from '@lezer/lr';
 
-import { Frontmatter, blankRun, virtualNewline } from './brief.parser.terms.js';
+import { Frontmatter, blankRun, commentBreak, virtualNewline } from './brief.parser.terms.js';
 
 /**
  * The two tokens a regular expression cannot recognise, because both depend on where in
@@ -14,6 +14,7 @@ const RETURN = 13;
 const TAB = 9;
 const SPACE = 32;
 const DASH = 45;
+const SLASH = 47;
 
 type Input = { peek: (offset: number) => number };
 
@@ -127,4 +128,72 @@ export const blankLines = new ExternalTokenizer((input) => {
   }
 
   if (end > 0) input.acceptToken(blankRun, end);
+});
+
+/** Past the end of the line holding `offset`, line break included, or at end of input. */
+function nextLineStart(input: Input, offset: number): number {
+  let at = offset;
+  while (input.peek(at) >= 0 && !isLineEnd(input.peek(at))) at += 1;
+  return input.peek(at) < 0 ? at : afterLineEnd(input, at);
+}
+
+/** True when `//` starts at `offset`. */
+function isCommentAt(input: Input, offset: number): boolean {
+  return input.peek(offset) === SLASH && input.peek(offset + 1) === SLASH;
+}
+
+/**
+ * True when the first line from `offset` on that holds something other than a column-0
+ * comment is indented: the block goes on after the comment lines in front of it.
+ */
+function indentedLineFollows(input: Input, offset: number): boolean {
+  let lineStart = offset;
+  for (;;) {
+    let at = lineStart;
+    while (isBlank(input.peek(at))) at += 1;
+    const next = input.peek(at);
+    if (next < 0) return false;
+    if (isLineEnd(next)) {
+      lineStart = afterLineEnd(input, at);
+      continue;
+    }
+    if (at > lineStart) return true;
+    if (!isCommentAt(input, at)) return false;
+    lineStart = nextLineStart(input, at);
+  }
+}
+
+/**
+ * The line break, blank lines and indent in front of a comment line that belongs to the
+ * block above it (TYTO-680, ADR 0204).
+ *
+ * A comment inside a block is skipped and the block goes on, the way a blank line is
+ * (ADR 0087). An indented `//` is always the block's: nothing else can sit at an indent
+ * inside a block. A `//` at column 0 is the block's only when the block goes on after it —
+ * the next line that is neither blank nor another column-0 comment is indented. Otherwise
+ * the block ends at it, and it is the top-level comment it always was, so a comment above
+ * a directive still belongs to nothing. That depends on lines past the token, which is why
+ * this scans by hand.
+ *
+ * The token stops right before the `//`, so the `Comment` that follows is the grammar's own
+ * token and covers the same characters a top-level comment does. It is only asked inside a
+ * directive, where `commentBreak` is valid; anywhere else Lezer skips this tokenizer.
+ */
+export const commentsInBlocks = new ExternalTokenizer((input) => {
+  if (!isLineEnd(input.peek(0))) return;
+
+  let lineStart = afterLineEnd(input, 0);
+  let at: number;
+  for (;;) {
+    at = lineStart;
+    while (isBlank(input.peek(at))) at += 1;
+    const next = input.peek(at);
+    if (next < 0) return;
+    if (!isLineEnd(next)) break;
+    lineStart = afterLineEnd(input, at);
+  }
+
+  if (!isCommentAt(input, at)) return;
+  if (at === lineStart && !indentedLineFollows(input, nextLineStart(input, at))) return;
+  input.acceptToken(commentBreak, at);
 });

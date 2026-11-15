@@ -72,6 +72,12 @@ describe('formatBriefInView', () => {
     expect(undo(editor.view)).toBe(false);
   });
 
+  it('indents a comment line inside a block with the body, at the unit tabSize sets (TYTO-680)', () => {
+    const editor = mount('::lamina\n  Um\n// a\n  Dois\n// b\n::titulo X\n', 4);
+    formatBriefInView(editor.view);
+    expect(editor.getValue()).toBe('::lamina\n    Um\n    // a\n    Dois\n// b\n::titulo X\n');
+  });
+
   it('refuses a brief with a syntax error, and leaves it as it was', () => {
     const broken = '::titulo **aberto\n   corpo   \n';
     const editor = mount(broken);

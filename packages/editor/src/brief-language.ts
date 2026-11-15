@@ -35,13 +35,23 @@ import { blockEnterKeymap } from './block-enter.js';
  * before the next directive — would otherwise be folded into it, and a directive whose only
  * body is such a line would fold over nothing anybody wrote. The sticky header reads these
  * ranges too, so a block that ends at its last word stops pinning there.
+ *
+ * **A comment line inside the block folds with it** (TYTO-680, ADR 0204): it is the block's,
+ * written by the author, so it neither stays out of the fold at the head nor at the end.
  */
 const foldDirectiveBody = (node: SyntaxNode): { from: number; to: number } | null => {
-  const bodyLines = node.getChildren('BodyLine');
-  const first = bodyLines[0];
-  const last = bodyLines.filter((line) => line.getChild('BlockText') !== null).at(-1);
-  if (!first || !last) return null;
-  return { from: first.from, to: last.to };
+  let from: number | undefined;
+  let to: number | undefined;
+  for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+    const isComment = child.name === 'Comment';
+    if (child.name !== 'BodyLine' && !isComment) continue;
+    // A comment's node starts at its `//`; the line break and indent in front of it are an
+    // anonymous token, so the head line ends where the node before the comment does.
+    from ??= isComment ? (child.prevSibling?.to ?? child.from) : child.from;
+    if (isComment || child.getChild('BlockText') !== null) to = child.to;
+  }
+  if (from === undefined || to === undefined) return null;
+  return { from, to };
 };
 
 export const briefLanguage = LRLanguage.define({

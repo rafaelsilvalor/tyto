@@ -43,7 +43,7 @@ export type BlockManifest = Pick<TemplateManifest, 'slots'>;
 export const BLOCK_TEXT_LENGTH = 60;
 
 /** The nodes whose text is words, the leaves of `InlineBody` and `BlockText`. */
-const WORDS = new Set(['Text', 'Space', 'EscapedDirective']);
+const WORDS = new Set(['Text', 'Space', 'EscapedDirective', 'EscapedComment']);
 
 /** The end of the first line in `[from, to)`, before its line break. */
 function lineEndIn(slice: (from: number, to: number) => string, from: number, to: number): number {
@@ -73,6 +73,7 @@ function wordsOf(
       if (!WORDS.has(leaf.name)) collect(leaf);
       else if (leaf.name === 'Space') words += ' ';
       else if (leaf.name === 'EscapedDirective') words += '::';
+      else if (leaf.name === 'EscapedComment') words += '//';
       else words += slice(leaf.from, leaf.to);
     }
   };
@@ -113,8 +114,18 @@ function lastTextEnd(directive: SyntaxNode): number {
   return end;
 }
 
-/** A directive's children that put characters on a line. */
-const TEXT_PARTS = new Set(['Namespace', 'Name', 'Adjustments', 'InlineBody', 'BlockText']);
+/**
+ * A directive's children that put characters on a line. A comment line inside a block is one
+ * of them (TYTO-680, ADR 0204): the block ends at its last line anybody wrote, as its fold does.
+ */
+const TEXT_PARTS = new Set([
+  'Namespace',
+  'Name',
+  'Adjustments',
+  'InlineBody',
+  'BlockText',
+  'Comment',
+]);
 
 /** The frontmatter's first line between the fences that has anything on it: `template: x`. */
 function frontmatterText(
