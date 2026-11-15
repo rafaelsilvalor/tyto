@@ -876,6 +876,7 @@
         "apps/desktop/src/renderer/command-panel.ts",
         "apps/desktop/src/renderer/command-sessions.ts",
         "apps/desktop/src/renderer/command-steps.ts",
+        "apps/desktop/src/renderer/command-tone.ts",
         "apps/desktop/src/renderer/command-words.ts"
       ],
       "e2e": ["command-panel.desktop.test.ts"],

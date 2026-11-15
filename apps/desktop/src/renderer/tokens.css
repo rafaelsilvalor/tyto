@@ -152,7 +152,9 @@
   /* The background of a button that is on (TYTO-248): about 22 % grey, the same in both. */
   --tyto-button-on: rgb(128 128 128 / 22%);
   --tyto-error: #c4473a;
-  --tyto-warning: #a48819;
+  /* Darker than it was (TYTO-725): the command panel writes warnings in it, and #a48819 read
+     3.29:1 on `surface`. Same hue and saturation, lightness 37.1 % to 28.5 %: 5.19:1. */
+  --tyto-warning: #7e6813;
   --tyto-info: #5c78e2;
   --tyto-success: #4f8a43;
   /* Lighter than dark's: at 25 % it turned the light window a muddy grey behind the bar. */

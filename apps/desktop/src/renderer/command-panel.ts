@@ -5,6 +5,7 @@ import type { CatalogueKey } from '../../shared/i18n/index.js';
 import { ansiPresentation } from './ansi.js';
 import { type Completion, accept } from './command-completion.js';
 import { type OutputLink, linksIn } from './command-links.js';
+import { type LineReading, readLines } from './command-tone.js';
 import {
   type FindMatch,
   type OutputLine,
@@ -715,7 +716,8 @@ export class CommandPanel extends DockedPanel {
   }
 
   private piece(session: CommandSession, piece: Piece, current: number): TemplateResult {
-    const { classes, css } = ansiPresentation(piece.style);
+    const { classes: ansi, css } = ansiPresentation(piece.style);
+    const classes = piece.code === true ? `${ansi} command-panel__code`.trim() : ansi;
     const match =
       piece.match === undefined
         ? ''
@@ -745,6 +747,7 @@ export class CommandPanel extends DockedPanel {
     line: OutputLine,
     index: number,
     matches: readonly FindMatch[],
+    reading: LineReading,
   ): TemplateResult {
     const own = matches
       .map((match, position) => ({ ...match, index: position }))
@@ -757,11 +760,13 @@ export class CommandPanel extends DockedPanel {
             folder: this.ports.folder(),
             caseless: this.ports.caseless,
           });
-    const pieces = piecesOf(line.runs, links, own);
+    const pieces = piecesOf(line.runs, links, own, reading.code);
     const drawn = pieces.map((piece) => this.piece(session, piece, this.findCurrent));
-    // On one line, and it has to stay on one: the line is `pre-wrap`, so any whitespace around
-    // the pieces in this template would be drawn as part of what the command printed.
-    return html`<div class="command-panel__line" data-stream=${line.stream}>${drawn}</div>`;
+    // Coloured by what it means, not by its stream (TYTO-725). On one line, and it has to stay
+    // on one: the line is `pre-wrap`, so any whitespace around the pieces in this template
+    // would be drawn as part of what the command printed, so Prettier must not break it.
+    // prettier-ignore
+    return html`<div class="command-panel__line" data-stream=${line.stream} data-tone=${reading.tone}>${drawn}</div>`;
   }
 
   private findBar(total: number): TemplateResult | typeof nothing {
@@ -957,10 +962,22 @@ export class CommandPanel extends DockedPanel {
           ?data-folded=${folded}
         >
           ${this.header(session, block, folded)}
-          ${folded ? nothing : block.lines.map(({ line, index }) => this.line(session, line, index, matches))}
+          ${folded ? nothing : this.blockLines(session, block, matches)}
         </section>`;
       },
     )}`;
+  }
+
+  /** A block's lines, each read for what it means (TYTO-725) against the one before it. */
+  private blockLines(
+    session: CommandSession,
+    block: RunBlock,
+    matches: readonly FindMatch[],
+  ): readonly TemplateResult[] {
+    const readings = readLines(block.lines.map(({ line }) => line));
+    return block.lines.map(({ line, index }, at) =>
+      this.line(session, line, index, matches, readings[at] ?? { tone: 'plain' }),
+    );
   }
 
   /** The words a run's state is said in: on its header's badge, for a screen reader. */
