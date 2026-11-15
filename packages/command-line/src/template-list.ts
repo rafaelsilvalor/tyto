@@ -29,7 +29,15 @@ export interface TemplateListOptions {
   readonly json: boolean;
   /** As on `tyto render`: the workspace trusted for this run only, never written down. */
   readonly trust?: boolean;
+  /**
+   * `--no-sync` (TYTO-729): fetch nothing, and list only the plugin files' copies already on
+   * this computer. What the window's completion asks, so a keystroke never reaches the network.
+   */
+  readonly sync?: boolean;
 }
+
+/** Why `--no-sync` left a source out, after "it has not been fetched yet". */
+export const NO_SYNC_REASON = 'tyto template list --no-sync never fetches';
 
 /** One row: a template, or an alias of one. */
 export interface ListedTemplate {
@@ -107,7 +115,13 @@ export async function templateListCommand(
     shown,
   );
   const reach = await templatesInReach(
-    { workspace, hostName: 'tyto template list', folder, leftOutAs: 'listed' },
+    {
+      workspace,
+      hostName: 'tyto template list',
+      folder,
+      leftOutAs: 'listed',
+      ...(options.sync === false ? { withoutFetching: NO_SYNC_REASON } : {}),
+    },
     environment,
   );
   try {

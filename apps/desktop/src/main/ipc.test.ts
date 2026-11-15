@@ -16,7 +16,13 @@ import {
 import { type Credentials } from './credentials.js';
 import { recipeCredentialStore } from './recipe-credentials.js';
 import { type ExplorerService, createExplorerService } from './explorer.js';
-import { type WindowThemes, createHandlers, guard, registerIpcHandlers } from './ipc.js';
+import {
+  WORKING_FOLDER_REFUSED,
+  type WindowThemes,
+  createHandlers,
+  guard,
+  registerIpcHandlers,
+} from './ipc.js';
 import { OfferedRecipes } from './cli-offers.js';
 import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
 import { type Table, vocabularySkeleton } from '@tyto/recipe';
@@ -941,6 +947,7 @@ const dependencies = () => {
       start: () => ({ runId: 'cli-1' }),
       cancel: () => {},
       commands: () => ({ name: 'tyto', description: '', arguments: [], options: [], commands: [] }),
+      capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
       diagnosticPath: () => undefined,
     },
     offeredRecipes: { take: () => undefined },
@@ -3290,6 +3297,7 @@ describe('cli:run, cli:cancel and cli:commands', () => {
           options: [],
           commands: [],
         }),
+        capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
         diagnosticPath: () => undefined,
       },
     });
@@ -3317,6 +3325,7 @@ describe('cli:run, cli:cancel and cli:commands', () => {
       cli: {
         start: () => ({ runId: 'cli-7' }),
         cancel: () => {},
+        capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
         commands: () => ({
           name: 'tyto',
           description: '',
@@ -3404,6 +3413,7 @@ describe('cli:run, cli:cancel and cli:commands', () => {
             options: [],
             commands: [],
           }),
+          capture: () => Promise.resolve({ code: 0 as const, out: '{"templates":[]}', err: '' }),
           diagnosticPath: () => undefined,
         },
       });
@@ -3542,5 +3552,119 @@ describe('recipe:load', () => {
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
+  });
+});
+
+// TYTO-729: the panel completes --template from `tyto template list --json` in its folder.
+describe('commands:templates', () => {
+  const capturing = (answer: { code: 0 | 1 | 2; out: string; err: string }) => {
+    const asked: { argv: readonly string[]; cwd: string | undefined }[] = [];
+    return {
+      asked,
+      cli: {
+        ...dependencies().cli,
+        capture: (argv: readonly string[], cwd?: string) => {
+          asked.push({ argv, cwd });
+          return Promise.resolve(answer);
+        },
+      },
+    };
+  };
+
+  it('runs template list --json in the folder an id names, and none for one that leads out', async () => {
+    const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'tyto-ipc-templates-')));
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: () => ({ close: () => undefined }),
+    });
+    try {
+      const work = join(scratch, 'work');
+      mkdirSync(join(work, 'entregas'), { recursive: true });
+      await explorer.setRoot(work);
+      const listed = await explorer.list(null);
+      const entregas = listed.entries.find((entry) => entry.name === 'entregas')?.id;
+      const fake = capturing({
+        code: 0,
+        out: JSON.stringify({
+          templates: [
+            { name: 'x', origin: 'project', formats: ['story', 'feed'] },
+            { name: 'y', origin: 'project', formats: ['feed'], aliasOf: 'x' },
+          ],
+        }),
+        err: '',
+      });
+      const handlers = createHandlers({ ...dependencies(), explorer, cli: fake.cli });
+      const ask = guard('commands:templates', handlers['commands:templates']);
+
+      await expect(ask({ folder: entregas! })).resolves.toEqual({
+        templates: [
+          { name: 'x', formats: ['story', 'feed'] },
+          { name: 'y', formats: ['feed'], aliasOf: 'x' },
+        ],
+      });
+      await ask({});
+      await expect(ask({ folder: 'not-an-id' })).resolves.toEqual({
+        templates: [],
+        note: WORKING_FOLDER_REFUSED,
+      });
+      // The working folder is the run's cwd; without one, the open folder; nothing for the rest.
+      expect(fake.asked).toEqual([
+        { argv: ['template', 'list', '--json', '--no-sync'], cwd: join(work, 'entregas') },
+        { argv: ['template', 'list', '--json', '--no-sync'], cwd: undefined },
+      ]);
+    } finally {
+      explorer.close();
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses any words from the window: main runs template list --json and nothing else', async () => {
+    const fake = capturing({ code: 0, out: '{"templates":[]}', err: '' });
+    const ask = guard(
+      'commands:templates',
+      createHandlers({ ...dependencies(), cli: fake.cli })['commands:templates'],
+    );
+
+    for (const extra of [
+      { argv: ['plugin', 'install', 'x'] },
+      { words: ['render', 'a.brief'] },
+      { folder: 'e-1', argv: ['trust', 'add', '.'] },
+    ]) {
+      await expect(ask(extra as never)).rejects.toThrow();
+    }
+    expect(fake.asked).toEqual([]);
+  });
+
+  it('answers no rows and a note, never an error, when the listing failed', async () => {
+    const failed = capturing({
+      code: 1,
+      out: '',
+      err: ['', 'E_PROJECT_INVALID: bad project.json', ''].join('\n'),
+    });
+    const garbled = capturing({ code: 0, out: 'not json', err: '' });
+    const leftOut = capturing({
+      code: 0,
+      out: '{"templates":[]}',
+      err: ['aviso.yaml: it has not been fetched yet', ''].join('\n'),
+    });
+    const ask = (cli: ReturnType<typeof capturing>['cli']) =>
+      guard(
+        'commands:templates',
+        createHandlers({ ...dependencies(), cli })['commands:templates'],
+      )({});
+
+    await expect(ask(failed.cli)).resolves.toEqual({
+      templates: [],
+      note: 'E_PROJECT_INVALID: bad project.json',
+    });
+    await expect(ask(garbled.cli)).resolves.toEqual({
+      templates: [],
+      note: 'tyto template list --json printed no listing',
+    });
+    // A listing that worked and left something out says what, once, beside its rows.
+    await expect(ask(leftOut.cli)).resolves.toEqual({
+      templates: [],
+      note: 'aviso.yaml: it has not been fetched yet',
+    });
   });
 });

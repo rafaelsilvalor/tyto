@@ -40,6 +40,7 @@ import { type CommandsOrder } from '../../shared/command-runs.js';
 import { type Typography, type ZoomStep } from '../../shared/typography.js';
 import { type CliRunner } from './cli-runner.js';
 import type { OfferedRecipes } from './cli-offers.js';
+import { commandTemplates } from './command-templates.js';
 import { type Terminals } from './terminal.js';
 import { type Credentials } from './credentials.js';
 import { credentialAccount } from './installed-plugins.js';
@@ -327,7 +328,7 @@ export interface IpcDependencies {
   /** A new delivery in the open folder (TYTO-489, ADR 0157): planned and written by main. */
   readonly delivery: DeliveryService;
   /** `tyto` commands run in main for the window (TYTO-495, ADR 0159). */
-  readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'commands' | 'diagnosticPath'>;
+  readonly cli: Pick<CliRunner, 'start' | 'cancel' | 'capture' | 'commands' | 'diagnosticPath'>;
   /** The recipe a refused `--apply`'s box offered to open, once, by run (TYTO-726). */
   readonly offeredRecipes: Pick<OfferedRecipes, 'take'>;
   /**
@@ -1106,6 +1107,16 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     'commands:aliases': () => Promise.resolve(commandAliases.list()),
 
     'commands:set-alias': (request) => commandAliases.set(request),
+
+    // TYTO-729: what a render in the panel's folder can use, by the runner `cli:run` uses and
+    // after the same folder check; a folder outside the open one lists nothing, quietly.
+    'commands:templates': async ({ folder }) => {
+      const capture = (argv: readonly string[], cwd?: string) => cli.capture(argv, cwd);
+      if (folder === undefined) return commandTemplates(capture, undefined);
+      const cwd = await explorer.folderOf(folder);
+      if (cwd === undefined) return { templates: [], note: WORKING_FOLDER_REFUSED };
+      return commandTemplates(capture, cwd);
+    },
 
     'cli:cancel': ({ runId }) => {
       cli.cancel(runId);

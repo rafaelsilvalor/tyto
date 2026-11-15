@@ -131,6 +131,7 @@ tyto template list [options] [folder]
 | --- | --- | --- |
 | `--json` | print a machine-readable document instead of prose |  |
 | `--trust` | trust the workspace folder and its work profile for this run only; never written to trust.json |  |
+| `--no-sync` | fetch nothing: a plugin file whose copy is not on this computer yet is left out, and said so |  |
 
 ## tyto delivery new
 

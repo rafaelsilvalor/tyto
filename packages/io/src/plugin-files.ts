@@ -360,6 +360,11 @@ export interface SyncPluginFolderOptions {
    * lock names that are already cached, and writes no lock.
    */
   readonly fetches: boolean;
+  /**
+   * Why a run that does not fetch left a source out, said after "it has not been fetched yet"
+   * (TYTO-729): `tyto template list --no-sync` is not `tyto watch`.
+   */
+  readonly notFetchedBecause?: string;
   readonly onFileRead?: FileReadListener;
   /**
    * Told the file that named a source a fetch or a check failed for, with what it said: those
@@ -482,7 +487,7 @@ export async function syncPluginFolder(options: SyncPluginFolderOptions): Promis
       if (locked === undefined || lockedCopy === undefined) {
         failed(
           source,
-          'it has not been fetched yet, and tyto watch never fetches; run tyto plugin sync',
+          `it has not been fetched yet, and ${options.notFetchedBecause ?? 'tyto watch never fetches'}; run tyto plugin sync`,
         );
       }
       keepLocked();

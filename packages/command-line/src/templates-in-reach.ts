@@ -52,6 +52,12 @@ export interface TemplatesInReachOptions {
   readonly formats?: { readonly file: string; readonly named: boolean };
   /** What `leftOut` says the restricted folder's plugin files were not. */
   readonly leftOutAs?: 'loaded' | 'listed';
+  /**
+   * Fetch nothing (TYTO-729): only the copies already on this computer count, and a source not
+   * fetched yet is left out with this reason, as `tyto watch` leaves one out. Absent, a missing
+   * copy is fetched, as a render fetches it.
+   */
+  readonly withoutFetching?: string;
 }
 
 export interface TemplatesInReach {
@@ -80,7 +86,10 @@ export async function templatesInReach(
             home: environment.home,
             ...(pluginFilesWorkspace === undefined ? {} : { workspace: pluginFilesWorkspace }),
             update: false,
-            fetches: true,
+            fetches: options.withoutFetching === undefined,
+            ...(options.withoutFetching === undefined
+              ? {}
+              : { notFetchedBecause: options.withoutFetching }),
             approval: 'never',
           },
           environment,

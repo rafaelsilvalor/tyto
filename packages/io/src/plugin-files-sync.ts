@@ -64,6 +64,8 @@ export interface PluginFilesSyncOptions {
   readonly update: boolean;
   /** False for `tyto watch`, which only reads copies that already exist. */
   readonly fetches: boolean;
+  /** Why a source was not fetched, when `fetches` is false (`PluginFolderSyncOptions`). */
+  readonly notFetchedBecause?: string;
   /** A built-in's name is never available, as `tyto plugin install` answers. */
   readonly builtInNames: ReadonlySet<string>;
   readonly shown: (path: string) => string;
@@ -155,6 +157,9 @@ async function syncBothFolders(options: PluginFilesSyncOptions): Promise<SyncedP
       shown,
       update: options.update,
       fetches: options.fetches,
+      ...(options.notFetchedBecause === undefined
+        ? {}
+        : { notFetchedBecause: options.notFetchedBecause }),
       onFileRead: (path, source, items) => {
         texts.set(shown(path), source);
         options.onFileRead?.(path, source, items);

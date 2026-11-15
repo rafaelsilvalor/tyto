@@ -38,6 +38,8 @@ describe('the IPC contract', () => {
       // TYTO-536: the command panel's aliases in force, and alias's one write.
       'commands:aliases',
       'commands:set-alias',
+      // TYTO-729: the templates the panel completes, listed by main in its working folder.
+      'commands:templates',
       'credentials:delete',
       // TYTO-649: a key file stored from the plugins screen; main picks and reads it.
       'credentials:import',
@@ -608,6 +610,8 @@ describe('what the contract does not promise', () => {
       'cli:commands',
       // TYTO-536. Nor "which aliases are in force": main reads the setting and the folder.
       'commands:aliases',
+      // TYTO-729. No folder is the open one, as for `cli:run`.
+      'commands:templates',
       // TYTO-497. Nor "which terminals are open": they are main's.
       'terminal:list',
     ];
