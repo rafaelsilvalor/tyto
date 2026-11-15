@@ -389,3 +389,11 @@ a Run (ADR 0170 decision 6), so the panel reads no header. No other command appl
 The panel refuses `tyto signin` and `tyto signout` (`SIGNIN_REFUSED` in
 `apps/desktop/src/main/cli-refusals.ts`): the window signs in from its plugins screen (ADR 0174),
 and the terminal's sign-ins live in a system keychain the window composes no port for (ADR 0194).
+
+## Note of 2026-11-15 — the panel reads `&&`, `!N` and globs, and has built-ins (TYTO-535)
+
+ADR 0200 amends decision 8. `cli:run` still takes words and the panel still starts no shell, but
+the panel now reads a line itself before it calls `cli:run`: `&&` between steps, `!N` for a
+history entry, and `*` and `?` expanded inside the workspace through the explorer's listings. It
+also runs a fixed set of built-ins (`clear`, `history`, `help`, `exit`, `last`) from a registry in
+the renderer. `|`, `>`, `;` and `$VAR` still mean nothing.

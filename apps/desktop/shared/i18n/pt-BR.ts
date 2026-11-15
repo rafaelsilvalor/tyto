@@ -743,6 +743,32 @@ export const ptBR: Catalogue = {
   'command.commandPanel.run': 'Comandos: Executar…',
   'command.commandPanel.renderBrief': 'Comandos: Renderizar este brief',
   'commandPanel.suggestions': 'Sugestões',
+  'commandPanel.emptyStep':
+    'Um && na coluna {column} não tem comando de um dos lados. Nada foi executado.',
+  'commandPanel.noHistoryEntry':
+    'O histórico não tem a entrada {entry}. Digite history para ver os números.',
+  'commandPanel.glob.outside':
+    '{pattern} leva para fora da pasta do projeto; um padrão só lê dentro dela.',
+  'commandPanel.glob.no-folder':
+    '{pattern} precisa de uma pasta de projeto aberta: um padrão só lê dentro dela.',
+  'commandPanel.glob.no-match': 'Nenhum arquivo corresponde a {pattern}. Nada foi executado.',
+  'commandPanel.glob.too-many':
+    '{pattern} corresponde a mais de 1.000 arquivos. Nada foi executado.',
+  'commandPanel.builtin.restricted':
+    '{name} não roda numa pasta restrita. Confie nela em Pasta de trabalho: gerenciar confiança.',
+  'commandPanel.builtin.clear': 'limpa a saída',
+  'commandPanel.builtin.history': 'lista as linhas rodadas nesta pasta, numeradas',
+  'commandPanel.builtin.history.empty': 'Nada foi rodado nesta pasta ainda.',
+  'commandPanel.builtin.exit': 'fecha esta sessão',
+  'commandPanel.builtin.last': 'roda de novo o último comando tyto',
+  'commandPanel.builtin.last.none': 'Nenhum comando tyto no histórico para rodar de novo.',
+  'commandPanel.builtin.help':
+    'lista estes comandos; help <comando> mostra a ajuda de um comando tyto',
+  'commandPanel.builtin.help.panel': 'Comandos do próprio painel:',
+  'commandPanel.builtin.help.tyto': 'Comandos tyto (o tyto pode ficar de fora):',
+  'commandPanel.builtin.rerun': 'roda de novo a entrada N do histórico',
+  'commandPanel.builtin.and': 'roda b só se a terminou com código 0',
+  'commandPanel.builtin.glob': 'casa nomes de arquivo na pasta do projeto (render *.brief)',
   'command.gallery.show': 'Galeria: ver templates e plugins',
   'gallery.heading': 'Galeria',
   'gallery.index': 'Índice',

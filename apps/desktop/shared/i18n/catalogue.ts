@@ -1120,6 +1120,25 @@ export interface Catalogue {
   readonly 'command.commandPanel.renderBrief': string;
   /** TYTO-496. The completion list under the command panel's prompt. */
   readonly 'commandPanel.suggestions': string;
+  readonly 'commandPanel.emptyStep': string;
+  readonly 'commandPanel.noHistoryEntry': string;
+  readonly 'commandPanel.glob.outside': string;
+  readonly 'commandPanel.glob.no-folder': string;
+  readonly 'commandPanel.glob.no-match': string;
+  readonly 'commandPanel.glob.too-many': string;
+  readonly 'commandPanel.builtin.restricted': string;
+  readonly 'commandPanel.builtin.clear': string;
+  readonly 'commandPanel.builtin.history': string;
+  readonly 'commandPanel.builtin.history.empty': string;
+  readonly 'commandPanel.builtin.exit': string;
+  readonly 'commandPanel.builtin.last': string;
+  readonly 'commandPanel.builtin.last.none': string;
+  readonly 'commandPanel.builtin.help': string;
+  readonly 'commandPanel.builtin.help.panel': string;
+  readonly 'commandPanel.builtin.help.tyto': string;
+  readonly 'commandPanel.builtin.rerun': string;
+  readonly 'commandPanel.builtin.and': string;
+  readonly 'commandPanel.builtin.glob': string;
   readonly 'commandPanel.sessions': string;
   readonly 'commandPanel.session': string;
   readonly 'commandPanel.session.new': string;
@@ -1845,6 +1864,25 @@ export const CATALOGUE_KEYS = [
   'command.commandPanel.run',
   'command.commandPanel.renderBrief',
   'commandPanel.suggestions',
+  'commandPanel.emptyStep',
+  'commandPanel.noHistoryEntry',
+  'commandPanel.glob.outside',
+  'commandPanel.glob.no-folder',
+  'commandPanel.glob.no-match',
+  'commandPanel.glob.too-many',
+  'commandPanel.builtin.restricted',
+  'commandPanel.builtin.clear',
+  'commandPanel.builtin.history',
+  'commandPanel.builtin.history.empty',
+  'commandPanel.builtin.exit',
+  'commandPanel.builtin.last',
+  'commandPanel.builtin.last.none',
+  'commandPanel.builtin.help',
+  'commandPanel.builtin.help.panel',
+  'commandPanel.builtin.help.tyto',
+  'commandPanel.builtin.rerun',
+  'commandPanel.builtin.and',
+  'commandPanel.builtin.glob',
   'commandPanel.sessions',
   'commandPanel.session',
   'commandPanel.session.new',

@@ -40,6 +40,8 @@ export interface CompletionSources {
   readonly caseless: boolean;
   /** Options the window refuses, which are not offered: a suggestion that always fails. */
   readonly refused?: ReadonlySet<string>;
+  /** The panel's own commands, offered as a first word with their help line (TYTO-535). */
+  readonly builtins?: readonly { readonly name: string; readonly detail: string }[];
 }
 
 export interface CompletableTemplate {
@@ -113,8 +115,11 @@ export async function complete(
   tree: CommandDescription,
   sources: CompletionSources,
 ): Promise<Completion> {
-  const { done, current } = wordsAt(line, caret);
-  const words = done[0]?.text === 'tyto' ? done.slice(1) : done;
+  const { done: all, current } = wordsAt(line, caret);
+  // After `&&` a new step starts: what comes is read from there (TYTO-535).
+  const done = all.slice(all.map((word) => word.text).lastIndexOf('&&') + 1);
+  const named = done[0]?.text === 'tyto';
+  const words = named ? done.slice(1) : done;
   const used: Option[] = [];
   const valuesTyped = new Map<Option, string>();
   let node = tree;
@@ -164,6 +169,17 @@ export async function complete(
     return { ...range, items: options(node, current.text, used, sources.refused) };
   }
   if (positional === 0 && node.commands.length > 0) {
+    const own =
+      words.length === 0 && !named
+        ? (sources.builtins ?? [])
+            .filter((builtin) => startsWith(builtin.name, current.text))
+            .map((builtin) => ({
+              label: builtin.name,
+              insert: builtin.name,
+              detail: builtin.detail,
+              continues: false,
+            }))
+        : [];
     const items = node.commands
       .filter((command) => startsWith(command.name, current.text))
       .map((command) => ({
@@ -172,7 +188,7 @@ export async function complete(
         detail: command.description,
         continues: false,
       }));
-    return { ...range, items: items.slice(0, SUGGESTION_LIMIT) };
+    return { ...range, items: [...own, ...items].slice(0, SUGGESTION_LIMIT) };
   }
   const argument = node.arguments[positional];
   if (argument === undefined) return none;

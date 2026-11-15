@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
+import type { ListedEntry } from './command-completion.js';
 import type { OutputLink } from './command-links.js';
 import { type CommandPanel, type CommandPanelPorts, COMMAND_PANEL_TAG } from './command-panel.js';
+import { BuiltinRegistry, PANEL_BUILTINS, type PanelBuiltin } from './command-builtins.js';
 import { type CommandSession, CommandSessions } from './command-sessions.js';
 
 /**
@@ -29,6 +31,9 @@ async function mount(
     locale?: 'en' | 'pt-BR';
     folder?: string | null;
     complete?: CommandPanelPorts['complete'];
+    /** The workspace's folders by their steps joined with `/`, `''` the root (TYTO-535). */
+    files?: Record<string, ListedEntry[]>;
+    restricted?: boolean;
   } = {},
 ): Promise<Harness> {
   document.body.innerHTML = `<${COMMAND_PANEL_TAG}></${COMMAND_PANEL_TAG}>`;
@@ -58,6 +63,13 @@ async function mount(
     complete:
       options.complete ??
       ((_line, caret) => Promise.resolve({ from: caret, to: caret, items: [] })),
+    list: (segments) => Promise.resolve(options.files?.[segments.join('/')]),
+    commands: () =>
+      Promise.resolve([
+        { name: 'render', description: 'render a brief' },
+        { name: 'check', description: 'check a brief' },
+      ]),
+    restricted: () => options.restricted ?? false,
   };
   element.locale = options.locale ?? 'en';
   element.sessions = sessions;
@@ -508,5 +520,169 @@ describe('its words', () => {
     expect(input(harness.element).getAttribute('aria-label')).toBe(
       'Digite um comando do tyto e tecle Enter',
     );
+  });
+});
+
+describe("the panel's own commands, && and globs (TYTO-535, ADR 0200)", () => {
+  /** Lets the chain's awaits settle: the run's id, then whatever waits on its end. */
+  const settle = async (element: CommandPanel): Promise<void> => {
+    for (let round = 0; round < 3; round += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await element.updateComplete;
+    }
+  };
+
+  it('runs the next step of an && only after the one before ends with exit code 0', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'check a.brief && render a.brief && check b.brief');
+    expect(harness.ran).toEqual([['check', 'a.brief']]);
+
+    harness.sessions.state({ runId: 'run-1', state: 'finished', code: 0 });
+    await settle(harness.element);
+    expect(harness.ran).toEqual([
+      ['check', 'a.brief'],
+      ['render', 'a.brief'],
+    ]);
+
+    harness.sessions.state({ runId: 'run-2', state: 'finished', code: 1 });
+    await settle(harness.element);
+    expect(harness.ran).toHaveLength(2);
+    expect(headers(harness.element)).toEqual(['check a.brief', 'render a.brief']);
+    // One line typed, one line remembered.
+    expect(harness.history).toEqual(['check a.brief && render a.brief && check b.brief']);
+  });
+
+  it('stops an && at a step that was stopped, and holds the tab while the line goes on', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'render a.brief && check a.brief');
+    // While the first step runs, another line waits: the tab is busy.
+    await typeAndRun(harness, 'check b.brief');
+    expect(harness.ran).toEqual([['render', 'a.brief']]);
+
+    harness.sessions.state({ runId: 'run-1', state: 'cancelled' });
+    await settle(harness.element);
+    expect(harness.ran).toEqual([['render', 'a.brief']]);
+
+    // The line is over: the tab takes the next one.
+    await typeAndRun(harness, 'check b.brief');
+    expect(harness.ran).toEqual([
+      ['render', 'a.brief'],
+      ['check', 'b.brief'],
+    ]);
+  });
+
+  it('reruns history entry N with !N, remembering what it ran', async () => {
+    const harness = await mount({ history: ['check a.brief', 'render b.brief'] });
+    await typeAndRun(harness, '!2');
+    expect(harness.ran).toEqual([['render', 'b.brief']]);
+    expect(headers(harness.element)).toEqual(['render b.brief']);
+    expect(harness.history.at(-1)).toBe('render b.brief');
+  });
+
+  it('refuses a !N the history does not have, running nothing', async () => {
+    const harness = await mount({ history: ['check a.brief'] });
+    await typeAndRun(harness, '!7');
+    expect(harness.ran).toEqual([]);
+    expect(lines(harness.element)).toEqual([
+      'The history has no entry 7. Type history to see the numbers.',
+    ]);
+  });
+
+  it('prints history in a block of its own, without running anything', async () => {
+    const harness = await mount({ history: ['check a.brief'] });
+    await typeAndRun(harness, 'history');
+    expect(harness.ran).toEqual([]);
+    expect(headers(harness.element)).toEqual(['history']);
+    expect(lines(harness.element)).toEqual(['1  check a.brief', '2  history']);
+    expect(harness.element.querySelector('.command-run__badge')?.textContent).toBe('✓ 0');
+  });
+
+  it('clears the output with clear or cls, as Ctrl+L does', async () => {
+    const harness = await mount({ history: ['check a.brief'] });
+    await typeAndRun(harness, 'history');
+    expect(lines(harness.element)).not.toEqual([]);
+    await typeAndRun(harness, 'cls');
+    expect(lines(harness.element)).toEqual([]);
+    expect(headers(harness.element)).toEqual([]);
+  });
+
+  it('closes the session with exit, and nothing after it runs', async () => {
+    const harness = await mount();
+    harness.sessions.create();
+    await harness.element.updateComplete;
+    expect(tabs(harness.element)).toHaveLength(2);
+    await typeAndRun(harness, 'exit && check a.brief');
+    await settle(harness.element);
+    expect(harness.sessions.sessions).toHaveLength(1);
+    expect(harness.ran).toEqual([]);
+  });
+
+  it("lists its own commands and the CLI's with help", async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'help');
+    await settle(harness.element);
+    const text = lines(harness.element);
+    expect(text[0]).toBe("The panel's own commands:");
+    expect(text).toContain('  render      render a brief');
+    expect(harness.ran).toEqual([]);
+  });
+
+  it('sends a line that starts with tyto, or a quoted name, to the CLI', async () => {
+    const harness = await mount();
+    await typeAndRun(harness, 'tyto help');
+    harness.sessions.state({ runId: 'run-1', state: 'finished', code: 0 });
+    await settle(harness.element);
+    await typeAndRun(harness, '"history"');
+    expect(harness.ran).toEqual([['help'], ['history']]);
+  });
+
+  it('expands an unquoted glob over the workspace, and keeps a quoted one as typed', async () => {
+    const harness = await mount({
+      folder: 'C:\\work',
+      files: {
+        '': [
+          { name: 'b.brief', kind: 'brief' },
+          { name: 'a.brief', kind: 'brief' },
+        ],
+      },
+    });
+    await typeAndRun(harness, 'render *.brief "*.brief"');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([['render', 'a.brief', 'b.brief', '*.brief']]);
+    // The header keeps the line as typed, the pattern and not what it became.
+    expect(harness.element.querySelector('.command-run__command')?.getAttribute('title')).toBe(
+      'render *.brief "*.brief"',
+    );
+  });
+
+  it('refuses a glob that matches nothing or leads outside, running nothing', async () => {
+    const harness = await mount({ folder: 'C:\\work', files: { '': [] } });
+    await typeAndRun(harness, 'render *.brief');
+    await settle(harness.element);
+    await typeAndRun(harness, 'render ../*.brief');
+    await settle(harness.element);
+    expect(harness.ran).toEqual([]);
+    expect(lines(harness.element)).toEqual([
+      'No file matches *.brief. Nothing was run.',
+      '../*.brief leads outside the workspace folder; a pattern only reads inside it.',
+    ]);
+  });
+
+  it('refuses a built-in that writes in a restricted folder, and runs one that does not', async () => {
+    const harness = await mount({ restricted: true, history: ['check a.brief'] });
+    const writes: PanelBuiltin = {
+      name: 'touchy',
+      help: 'commandPanel.builtin.clear',
+      runsInRestrictedFolder: false,
+      run: () => ({ kind: 'printed', lines: ['wrote'] }),
+    };
+    harness.element.builtins = new BuiltinRegistry([...PANEL_BUILTINS.entries, writes]);
+    await typeAndRun(harness, 'history && touchy');
+    await settle(harness.element);
+    expect(lines(harness.element)[0]).toBe('1  check a.brief');
+    expect(lines(harness.element).at(-1)).toBe(
+      'touchy does not run in a restricted folder. Trust it with Workspace: Manage Trust.',
+    );
+    expect(lines(harness.element)).not.toContain('wrote');
   });
 });
