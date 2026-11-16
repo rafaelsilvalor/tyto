@@ -79,7 +79,14 @@ export {
   previewBlock,
 } from './brief-blocks.js';
 
-export { type Breadcrumb, breadcrumbAt, breadcrumbOf, directiveLabel } from './breadcrumb.js';
+export {
+  type Breadcrumb,
+  BLOCK_INDENT,
+  BREADCRUMB_CHAIN_SEPARATOR,
+  breadcrumbAt,
+  breadcrumbOf,
+  directiveLabel,
+} from './breadcrumb.js';
 
 export {
   DEFAULT_TAB_SIZE,

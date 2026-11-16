@@ -59,6 +59,14 @@ export interface ResolvedSlot {
    * it reads what it always read.
    */
   readonly blocks?: readonly SlideBlock[];
+  /**
+   * The slots declared `per` this one that its occurrence was given, by name (ADR 0207): the
+   * `::paragrafo` written inside this `::bloco`. Present only when there is one, so a slot
+   * with nothing inside it is the object it was before, and a template written before nesting
+   * reads what it always read. A slide's own slots are not here but flat in
+   * `ResolvedArtwork.slots`, as ADR 0160 put them; this is the second level and below.
+   */
+  readonly slots?: Readonly<Record<string, ResolvedSlot>>;
 }
 
 /**
@@ -89,6 +97,18 @@ interface OpenArtwork {
   readonly slot: ResolvedSlot;
   readonly slots: Record<string, ResolvedSlot>;
   readonly missingRequiredSlots: string[];
+}
+
+/**
+ * An occurrence a later directive may still belong to (ADR 0207): the slide, or a `per` slot
+ * inside it. `children` is where a slot declared `per` this one goes; for the slide it is the
+ * artwork's own `slots`.
+ */
+interface OpenOccurrence {
+  readonly name: string;
+  readonly slot: ResolvedSlot;
+  readonly children: Record<string, ResolvedSlot>;
+  readonly artwork: OpenArtwork;
 }
 
 export interface ResolvedBrief {
@@ -338,6 +358,14 @@ class Resolver {
   /** Each occurrence's body in order, by index; kept only when a slot is `multiple`. */
   private readonly blocks = new Map<number, SlideBlock[]>();
   private readonly placesAmongLines: boolean;
+  /**
+   * The occurrences still open, outermost first: the last slide, then the `per` slot written
+   * last inside it, and so on (ADR 0207). A directive belongs to the nearest one of its
+   * parent; reaching it closes everything opened inside it since.
+   */
+  private open: OpenOccurrence[] = [];
+  /** Every occurrence below the slide, by slot name, for `required` at depth. */
+  private readonly nested = new Map<string, OpenOccurrence[]>();
 
   constructor(
     private readonly manifest: TemplateManifest,
@@ -407,7 +435,9 @@ class Resolver {
 
     if (slot.repeat) {
       const index = this.artworks.length;
-      this.artworks.push({ index, slot: resolved, slots: {}, missingRequiredSlots: [] });
+      const artwork: OpenArtwork = { index, slot: resolved, slots: {}, missingRequiredSlots: [] };
+      this.artworks.push(artwork);
+      this.open = [{ name: candidate.name, slot: resolved, children: artwork.slots, artwork }];
       if (this.placesAmongLines && value.kind === 'rich-text') {
         this.blocks.set(index, textBlocks(value.text));
       }
@@ -433,25 +463,57 @@ class Resolver {
   }
 
   /**
-   * A `per` slot's value goes to the occurrence written last before it (ADR 0160).
+   * A `per` slot's value goes to the nearest open occurrence of the slot it names (ADR 0160,
+   * ADR 0207): for a slide's own slot, the slide written last before it; for one that names
+   * another `per` slot, the `::bloco` written last inside that slide. Reaching the parent
+   * closes what was opened inside it since, so `::lamina` / `::bloco` / `::nota` /
+   * `::paragrafo` has no `bloco` open for the paragraph when `nota` belongs to the slide.
    *
    * Checked after the value, on purpose: a missing file is reported at this line whether or
-   * not the line also has no slide to belong to, so one pass names both problems.
+   * not the line also has no parent to belong to, so one pass names both problems.
    */
   private takeForOccurrence(resolved: ResolvedSlot, owner: string): void {
-    const occurrence = this.ownerOf(resolved, owner);
-    if (occurrence === undefined) return;
-    if (resolved.name in occurrence.slots) {
+    const parent = this.openParent(resolved, owner);
+    if (parent === undefined) return;
+    if (resolved.name in parent.children) {
+      const which =
+        this.open.length === 1 ? `${owner} ${parent.artwork.index + 1}` : `this '${owner}'`;
       this.report(
         badValue(
           resolved.name,
-          `is set more than once for ${owner} ${occurrence.index + 1}, and each '${owner}' takes one`,
+          `is set more than once for ${which}, and each '${owner}' takes one`,
           resolved.range,
         ),
       );
       return;
     }
-    occurrence.slots[resolved.name] = resolved;
+    parent.children[resolved.name] = resolved;
+    const occurrence: OpenOccurrence = {
+      name: resolved.name,
+      slot: resolved,
+      children: {},
+      artwork: parent.artwork,
+    };
+    this.open.push(occurrence);
+    const all = this.nested.get(resolved.name) ?? [];
+    all.push(occurrence);
+    this.nested.set(resolved.name, all);
+  }
+
+  /** The nearest open occurrence of `owner`, with everything opened inside it closed. */
+  private openParent(resolved: ResolvedSlot, owner: string): OpenOccurrence | undefined {
+    for (let index = this.open.length - 1; index >= 0; index -= 1) {
+      const occurrence = this.open[index];
+      if (occurrence?.name !== owner) continue;
+      this.open.length = index + 1;
+      return occurrence;
+    }
+    const problem =
+      this.manifest.slots[owner]?.repeat === true
+        ? `belongs to a '${owner}' and is written after one, and no '${owner}' comes before it`
+        : `belongs to a '${owner}' and is written inside one, and no '${owner}' is open above it`;
+    this.report(badValue(resolved.name, problem, resolved.range));
+    return undefined;
   }
 
   private ownerOf(resolved: ResolvedSlot, owner: string): OpenArtwork | undefined {
@@ -494,6 +556,8 @@ class Resolver {
         ? this.artworks[this.artworks.length - 1]
         : this.ownerOf(resolved, owner);
     if (occurrence === undefined) return;
+    // A picture among the slide's lines is the slide's own: it closes any block open inside it.
+    this.open.length = Math.min(this.open.length, 1);
 
     const blocks = this.blocks.get(occurrence.index) ?? [];
     if (resolved !== undefined) {
@@ -770,7 +834,12 @@ class Resolver {
 
     const rendered = this.options.renderedSlots;
     if (rendered !== undefined) {
-      const perOccurrence = this.artworks.flatMap((artwork) => Object.entries(artwork.slots));
+      const perOccurrence = [
+        ...this.artworks.flatMap((artwork) => Object.entries(artwork.slots)),
+        ...[...this.nested.values()].flatMap((all) =>
+          all.flatMap((occurrence) => Object.entries(occurrence.children)),
+        ),
+      ];
       for (const [name, resolved] of [...this.slots, ...perOccurrence]) {
         if (rendered.includes(name)) continue;
         this.report(
@@ -792,6 +861,10 @@ class Resolver {
    */
   private finishPerOccurrence(name: string, slot: Slot): void {
     if (!slot.required) return;
+    if (slot.per !== undefined && this.manifest.slots[slot.per]?.repeat !== true) {
+      this.finishNested(name, slot.per);
+      return;
+    }
     for (const occurrence of this.artworks) {
       if (name in occurrence.slots) continue;
       occurrence.missingRequiredSlots.push(name);
@@ -805,12 +878,55 @@ class Resolver {
     }
   }
 
+  /**
+   * A required slot below the slide is required inside every occurrence of its parent, and is
+   * reported at that parent's line; the slide holding it is the one whose frames carry the gap
+   * stamp (ADR 0035, ADR 0207). With no parent written there is nothing to be missing it.
+   */
+  private finishNested(name: string, parentName: string): void {
+    for (const parent of this.nested.get(parentName) ?? []) {
+      if (name in parent.children) continue;
+      if (!parent.artwork.missingRequiredSlots.includes(name)) {
+        parent.artwork.missingRequiredSlots.push(name);
+      }
+      this.report(
+        diagnostic(
+          'E_MISSING_REQUIRED_SLOT',
+          { template: this.manifest.name, slot: name },
+          parent.slot.range === undefined ? {} : { range: parent.slot.range },
+        ),
+      );
+    }
+  }
+
+  /** `slot` with the slots declared `per` it attached, all the way down (ADR 0207). */
+  private withNested(slot: ResolvedSlot): ResolvedSlot {
+    const children = this.childrenOf(slot);
+    if (children === undefined) return slot;
+    const slots: Record<string, ResolvedSlot> = {};
+    for (const [name, child] of Object.entries(children)) slots[name] = this.withNested(child);
+    return { ...slot, slots };
+  }
+
+  private childrenOf(slot: ResolvedSlot): Record<string, ResolvedSlot> | undefined {
+    for (const all of this.nested.values()) {
+      for (const occurrence of all) {
+        if (occurrence.slot !== slot) continue;
+        return Object.keys(occurrence.children).length === 0 ? undefined : occurrence.children;
+      }
+    }
+    return undefined;
+  }
+
   build(formats: readonly string[]): ResolvedBrief {
     return {
       template: this.manifest.name,
       formats,
       slots: Object.fromEntries(this.slots),
-      artworks: this.artworks.map((artwork) => {
+      artworks: this.artworks.map((open) => {
+        const slots: Record<string, ResolvedSlot> = {};
+        for (const [name, slot] of Object.entries(open.slots)) slots[name] = this.withNested(slot);
+        const artwork: ResolvedArtwork = { ...open, slots };
         const blocks = this.blocks.get(artwork.index);
         return blocks === undefined ? artwork : { ...artwork, slot: { ...artwork.slot, blocks } };
       }),

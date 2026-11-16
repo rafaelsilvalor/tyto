@@ -26,7 +26,7 @@ Directive {
 // files that way. Rather than let that become an error node at EOF, the tokenizer hands
 // out a zero-length break there, the same trick Lezer's own grammars use for automatic
 // semicolons.
-lineEnd { newline | virtualNewline }
+lineEnd { newline | virtualNewline | directiveIndent }
 
 // The leading space belongs to the adjustment list rather than to the body. After the
 // name both start with the same space token, and one more token settles it: a `{` next
@@ -100,7 +100,7 @@ Space { space }
 // (ADR 0087). `tokens.ts` recognises it, because only looking to the end of each line tells
 // a line of spaces from an indent with no directive above it, which is still an error and
 // still reported at the indent.
-BlankLine { newline | blankRun }
+BlankLine { newline | blankRun | directiveIndent }
 
 // Ahead of `@tokens`, so it is asked first. Declared after, it never fired (measured): the
 // built-in tokenizer reads the same characters as `space` or `blockIndent`, neither valid
@@ -113,6 +113,15 @@ BlankLine { newline | blankRun }
 // Ahead of `@tokens`, so a column-0 text line is a body line before `newline` can end the
 // directive in front of it (TYTO-708).
 @external tokens bodyBreaks from "./tokens.js" { bodyBreak }
+
+// An indented `::` line is a directive like one at column 0 (TYTO-709, ADR 0207): which
+// directive sits inside which is the manifest's to say, never the indent's (ADR 0202).
+// `directiveIndent` is the line break, blank lines and indent in front of the `::`, so it ends
+// the directive above as `newline` would and the next `Directive` starts at its `::`. At the
+// start of a line with no break in front — the first line of the file, or after the
+// frontmatter — it is the indent alone, a `BlankLine`. Ahead of `@tokens`, because the same
+// characters are a `blockIndent` there.
+@external tokens nestedDirectives from "./tokens.js" { directiveIndent }
 
 // A formula, `$…$`, is one token, and so is everything inside it (ADR 0206, TYTO-734): its
 // `\frac` is not a line break and its `{1}` is not a mark. Whether a `$` opens one depends on

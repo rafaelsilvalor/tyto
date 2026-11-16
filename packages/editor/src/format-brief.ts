@@ -3,7 +3,9 @@ import { getIndentUnit, indentUnit } from '@codemirror/language';
 import { type Extension, EditorState } from '@codemirror/state';
 import { type EditorView } from '@codemirror/view';
 import { formatBriefEdits } from '@tyto/brief-lang';
-import { type Diagnostics, type Result, ok } from '@tyto/core';
+import { type Diagnostics, type Result, ok, slotDepth } from '@tyto/core';
+
+import { briefAnalysisField } from './analysis.js';
 
 /**
  * Format Brief in a view (TYTO-297, ADR 0096): `@tyto/brief-lang`'s edits, applied as one
@@ -15,14 +17,18 @@ import { type Diagnostics, type Result, ok } from '@tyto/core';
  * back, never half of it, and never merged with the typing just before.
  *
  * The indent comes from the state — the unit `tabSize` sets through {@link indentExtension} —
- * so what Tab inserts and what this re-indents to cannot disagree.
+ * so what Tab inserts and what this re-indents to cannot disagree. The nesting comes from the
+ * manifest the brief's last analysis named (ADR 0207): each directive is indented by its depth
+ * in the template's tree. With no analysis yet, every directive goes to column 0.
  *
  * `ok(true)` when the text changed, `ok(false)` when it was already in shape, and the syntax
  * errors when the brief cannot be formatted: then nothing is dispatched.
  */
 export function formatBriefInView(view: EditorView): Result<boolean, Diagnostics> {
+  const manifest = view.state.field(briefAnalysisField, false)?.manifest;
   const edits = formatBriefEdits(view.state.doc.toString(), {
     indentUnit: getIndentUnit(view.state),
+    ...(manifest === undefined ? {} : { depthOf: (name: string) => slotDepth(manifest, name) }),
   });
   if (!edits.ok) return edits;
   if (edits.value.length === 0) return ok(false);

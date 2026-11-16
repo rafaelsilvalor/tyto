@@ -1,0 +1,17 @@
+---
+template: aninhado
+formats: [feed]
+---
+::titulo Estrutura
+::lamina
+  Primeira lâmina
+  ::bloco Conceito
+    ::paragrafo
+      Definição em duas linhas,
+      a segunda aqui.
+      ::rodape Fonte: apostila
+::lamina
+  // a comment inside the slide
+  Segunda lâmina
+  ::bloco Resumo
+    ::paragrafo Um parágrafo só.

@@ -26,6 +26,12 @@ Quando o slot aparece como "per lamina · multiple", um slide pode ter quantas i
 
 Escreva `::lamina` com o primeiro parágrafo recuado abaixo dele, depois `::imagem ./grafico.png` com o segundo parágrafo recuado abaixo, depois `::imagem ./foto.png`. Esse slide fica assim: o primeiro parágrafo, o gráfico, o segundo parágrafo, a foto. O próximo `::lamina` começa o slide seguinte. Uma imagem cujo arquivo não existe fica sublinhada na própria linha, e o texto abaixo dela continua pertencendo ao slide.
 
+### Diretivas dentro de diretivas
+
+Alguns templates vão mais fundo: um `::bloco` dentro de um slide, e um `::paragrafo` dentro do bloco. A galeria mostra um slot assim como "per bloco", o que quer dizer que ele pertence ao `::bloco` escrito por último acima dele no mesmo slide.
+
+Quem decide o que fica dentro de quê é o template, não os espaços no começo da linha. Você pode recuar o `::bloco` abaixo do `::lamina` e o `::paragrafo` abaixo do `::bloco` para enxergar a estrutura, ou escrever todas as linhas no começo da linha: a arte sai igual. O [**Format Brief**](../editor/format-brief.md) recua cada diretiva conforme a profundidade que o template dá a ela, então a estrutura aparece sem ninguém contar espaços. Um `::paragrafo` sem `::bloco` acima dele no mesmo slide fica sublinhado. Para começar uma linha de texto com `::`, escreva `\::`.
+
 ## Quantos slides
 
 Um template pode definir um número mínimo e um máximo de slides. A galeria mostra os dois no slot que repete, como "no mínimo" e "no máximo". Um brief sem nenhum `::lamina` gera uma arte com os outros slots — é assim que o `notice` funciona, e outros templates podem exigir pelo menos um.

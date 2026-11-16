@@ -26,6 +26,12 @@ When the slot is listed as "per lamina · multiple", a slide may hold as many pi
 
 Write `::lamina` with the first paragraph indented under it, then `::imagem ./chart.png` with the second paragraph indented under it, then `::imagem ./photo.png`. That slide reads: the first paragraph, the chart, the second paragraph, the photo. The next `::lamina` starts the next slide. A picture whose file is not there is underlined on its own line, and the text under it still belongs to the slide.
 
+### Directives inside directives
+
+Some templates go further down: a `::bloco` inside a slide, and a `::paragrafo` inside the block. The gallery lists such a slot as "per bloco", which means it belongs to the `::bloco` written last above it in the same slide.
+
+The template decides what sits inside what, not the spaces in front of a line. You may indent `::bloco` under `::lamina` and `::paragrafo` under `::bloco` to see the structure, or write every line at the start of the line: the artwork comes out the same. [**Format Brief**](../editor/format-brief.md) indents each directive by how deep the template puts it, so the structure shows without counting spaces. A `::paragrafo` with no `::bloco` above it in the same slide is underlined. To start a line of text with `::`, write `\::`.
+
 ## How many slides
 
 A template can set a smallest and a largest number of slides. The gallery shows both under the repeating slot, as "at least" and "at most". A brief with no `::lamina` at all makes one artwork from the other slots — that is how `notice` works, and other templates may require at least one.

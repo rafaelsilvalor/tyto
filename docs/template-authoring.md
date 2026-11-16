@@ -107,6 +107,15 @@ These are the rules it enforces beyond the shape:
   `per` slot neither repeats nor takes a `default`. Several may belong to one slide
   (`imagem` and `foto`). This replaces numbered slots (`imagem-1` … `imagem-4`) picked with
   an adjustment, which capped the carousel at the number declared.
+- **`per` may name another `per` slot, to any depth** (ADR 0207): with
+  `bloco: { per: lamina }` and `paragrafo: { per: bloco }`, a `::paragrafo` belongs to the
+  `::bloco` open above it in the same slide. The chain must end at the repeatable slot; a cycle
+  or a slot that neither repeats nor declares `per` is a manifest error. The slide's own slots
+  stay flat in `context.slots`; from the second level down a value rides inside its parent, in
+  an optional `slots`: `context.slots.bloco.slots?.paragrafo`. It is absent when nothing was
+  written inside, so a template written before nesting reads what it read. A `required` slot
+  below the slide is required inside every occurrence of its parent. `multiple` is not built
+  below the slide, and a `template.html` template cannot read a nested value yet.
 - **`multiple: true` places several pictures among a slide's lines** (ADR 0160, amended
   2026-10-31): `imagem: { type: image, per: lamina, multiple: true }`. Each `::imagem` after
   the same `::lamina` adds one; its first line is the path and the lines under it continue
@@ -114,7 +123,7 @@ These are the rules it enforces beyond the shape:
   `{ kind: 'text', text, range }` and `{ kind: 'slot', slot }` interleaved — while
   `slots.lamina.value` stays the opening text and `slots.imagem` the first picture.
   `blocks` is present only when the manifest declares a `multiple` slot. Only an `image`
-  slot that declares `per` may say `multiple`.
+  slot whose `per` names the repeatable slot may say `multiple`.
 - **`frontmatterMarks: true` says the template draws marks in a frontmatter value**
   (TYTO-622): `titulo: { type: rich-text, frontmatterMarks: true }` for a template that
   reads `slots.titulo` through template-kit's `richTextOfPlain` when it came from the

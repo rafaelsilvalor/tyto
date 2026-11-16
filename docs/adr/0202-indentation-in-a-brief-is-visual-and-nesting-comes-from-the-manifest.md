@@ -101,3 +101,13 @@ always text. The text-reading editor pieces — Enter, indent guides, vim `ii`/`
 the indent the person wrote (decision 1); the tree-reading ones — folds, `briefBlocks`, sticky
 scroll, completion, Format Brief — treat a column-0 body line as body with no change of their
 own.
+
+## Note, 2026-11-16 — what TYTO-709 built
+
+Decision 3 is in place (ADR 0207): the key is `per:` extended to any depth, not a new `parent:`;
+a directive belongs to the nearest open occurrence of the slot its `per` names; and an indented
+`::` is a directive, with `\::` for the literal. This is the change of meaning the Consequences
+above announced, and its changeset says so. The template receives the tree without a protocol
+bump: a slide's own slots stay flat in `context.slots`, and deeper values ride in an optional
+`slots` on their parent. Decision 5 is in Format Brief through an optional `depthOf`, which the
+editor fills from the manifest of the brief's last analysis.

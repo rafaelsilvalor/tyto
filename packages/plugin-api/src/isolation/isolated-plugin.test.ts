@@ -2012,6 +2012,70 @@ describe('an isolated template sees every artwork’s adjustments (ADR 0203)', (
   });
 });
 
+describe('an isolated template sees the slots nested inside a slide’s own (ADR 0207)', () => {
+  const at = { start: 0, end: 1 };
+  const textOf = (value: string) => ({
+    kind: 'rich-text',
+    text: [{ kind: 'text', value, range: at }],
+  });
+  // `::lamina` / `::bloco A` / `::paragrafo A1` / `::rodape nota`: the slide's own slot is flat
+  // in `slots`, as ADR 0160 put it; the second level and below ride inside it.
+  const SLOTS = {
+    lamina: { name: 'lamina', value: textOf('Um'), adjustments: [], range: at },
+    bloco: {
+      name: 'bloco',
+      value: textOf('A'),
+      adjustments: [],
+      range: at,
+      slots: {
+        paragrafo: {
+          name: 'paragrafo',
+          value: textOf('A1'),
+          adjustments: [],
+          range: at,
+          slots: {
+            rodape: { name: 'rodape', value: textOf('nota'), adjustments: [], range: at },
+          },
+        },
+      },
+    },
+  };
+  const CALL = {
+    format: 'feed',
+    size: { w: 10, h: 10 },
+    idPrefix: 'lamina-1.feed',
+    artwork: { id: 'lamina-1', index: 0, count: 1 },
+    slots: SLOTS,
+    adjustments: {},
+    brand: {},
+  } as unknown as TemplateCall;
+
+  it('crosses to the plugin’s process whole, every level down', async () => {
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      // `format` is the one free string a frame carries back, so what it saw rides in it.
+      build: (_template, context) => ({
+        format: JSON.stringify(context.slots),
+        size: context.size,
+        children: [],
+      }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const [registered] = host.registry.templatePacks();
+    const build = registered?.build as unknown as IsolatedPackBuild;
+    const answer = await build('demo', CALL, [], NO_SHIPPED_FILES);
+
+    expect(answer.ok && JSON.parse(answer.value.frame.format)).toEqual(SLOTS);
+  });
+});
+
 describe('an isolated template’s files (ADR 0062)', () => {
   const CALL: TemplateCall = {
     format: 'feed',

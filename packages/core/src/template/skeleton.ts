@@ -104,10 +104,23 @@ export function briefSkeleton(manifest: SkeletonManifest): string {
 
   const scalars: string[] = [];
   const directives: string[] = [];
-  // A slide's own required slots (ADR 0160) are written under every slide, never on their own.
-  const perOccurrence = Object.entries(manifest.slots).filter(
-    ([name, slot]) => slot.per !== undefined && slot.required && !filled.has(name),
-  );
+  // A slide's own required slots (ADR 0160) are written under every slide, never on their own,
+  // and a required slot below one of them under it, to any depth (ADR 0207). Only a required
+  // parent is written, so a required slot under an optional one is left for the person to add.
+  const requiredInside = (parent: string): [string, Slot][] =>
+    Object.entries(manifest.slots).filter(
+      ([name, slot]) => slot.per === parent && slot.required && !filled.has(name),
+    );
+  const writeInside = (parent: string, depth: number): void => {
+    for (const [own, ownSlot] of requiredInside(parent)) {
+      // `\t` at the start of a snippet line is one indent unit: each level one more, as Format
+      // Brief draws the tree.
+      directives.push(
+        `${'\t'.repeat(depth)}::${own} ${field(take(), ownSlot.type === 'rich-text' ? placeholderOf(own, ownSlot) : scalarOf(own, ownSlot))}`,
+      );
+      writeInside(own, depth + 1);
+    }
+  };
 
   for (const [name, slot] of Object.entries(manifest.slots)) {
     // A slot the configuration fills is not one the brief cannot do without.
@@ -122,11 +135,7 @@ export function briefSkeleton(manifest: SkeletonManifest): string {
             ? `::${name}\n\t${field(take(), name)}`
             : `::${name} ${field(take(), scalarOf(name, slot))}`,
         );
-        for (const [own, ownSlot] of perOccurrence) {
-          directives.push(
-            `::${own} ${field(take(), ownSlot.type === 'rich-text' ? placeholderOf(own, ownSlot) : scalarOf(own, ownSlot))}`,
-          );
-        }
+        writeInside(name, 1);
       }
     } else if (slot.type === 'rich-text') {
       directives.push(`::${name} ${field(take(), placeholderOf(name, slot))}`);
