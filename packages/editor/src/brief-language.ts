@@ -1,9 +1,12 @@
 import { LRLanguage, LanguageSupport, foldNodeProp } from '@codemirror/language';
 import { briefHighlighting, formulaMounts, parser } from '@tyto/brief-lang';
+import { type EditorState } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { type SyntaxNode } from '@lezer/common';
 
 import { blockEnterKeymap } from './block-enter.js';
+import { ancestorsOf, blockIndexBefore, blocksOf, lastNestedIndex } from './brief-blocks.js';
+import { OUTER_BLOCKS, type OuterBlocks } from './sticky-scroll.js';
 
 /**
  * The brief language as CodeMirror sees it.
@@ -39,7 +42,7 @@ import { blockEnterKeymap } from './block-enter.js';
  * **A comment line inside the block folds with it** (TYTO-680, ADR 0204): it is the block's,
  * written by the author, so it neither stays out of the fold at the head nor at the end.
  */
-const foldDirectiveBody = (node: SyntaxNode): { from: number; to: number } | null => {
+const ownBody = (node: SyntaxNode): { from: number; to: number } | null => {
   let from: number | undefined;
   let to: number | undefined;
   for (let child = node.firstChild; child !== null; child = child.nextSibling) {
@@ -54,10 +57,50 @@ const foldDirectiveBody = (node: SyntaxNode): { from: number; to: number } | nul
   return { from, to };
 };
 
+/**
+ * A directive folds over the blocks nested in it too (TYTO-748, ADR 0207).
+ *
+ * The tree is flat — `  ::bloco` is a sibling of the `::lamina` above it — so which blocks a
+ * directive holds comes from the manifest, through `blocksOf` and the analysis the editor last
+ * ran. The fold runs from the end of the head line to the last text of the last block nested
+ * in it, up to the next sibling or ancestor; a `::lamina` with no body of its own but blocks
+ * under it folds too. With nothing nested — no analysis yet, a template that declares no `per`
+ * — it is the directive's own body, exactly as before.
+ */
+const foldDirective = (
+  node: SyntaxNode,
+  state: EditorState,
+): { from: number; to: number } | null => {
+  const own = ownBody(node);
+  const blocks = blocksOf(state);
+  const index = blockIndexBefore(blocks, node.from);
+  const block = blocks[index];
+  if (block === undefined || block.from !== node.from) return own;
+  const last = lastNestedIndex(blocks, index);
+  if (last === index) return own;
+  const end = blocks[last]?.to ?? block.to;
+  return { from: own?.from ?? block.headTo, to: Math.max(end, own?.to ?? end) };
+};
+
+/**
+ * The blocks holding `pos` that the tree does not (TYTO-748): the block at or before it and the
+ * ones it is nested in, by the manifest, outermost first. Sticky scroll reads them beside the
+ * tree's own parents and keeps those whose fold range holds `pos`.
+ */
+const outerBlocks: OuterBlocks = (state, pos) => {
+  const blocks = blocksOf(state);
+  const index = blockIndexBefore(blocks, pos);
+  if (index < 0) return [];
+  return [...ancestorsOf(blocks, index), index].flatMap((at) => {
+    const block = blocks[at];
+    return block === undefined || block.kind !== 'directive' ? [] : [block.from];
+  });
+};
+
 export const briefLanguage = LRLanguage.define({
   name: 'brief',
   parser: parser.configure({
-    props: [briefHighlighting, foldNodeProp.add({ Directive: foldDirectiveBody })],
+    props: [briefHighlighting, foldNodeProp.add({ Directive: foldDirective })],
     // A formula's `\frac`, braces and `$` as nodes of their own, for their colours (TYTO-743).
     // The editor's tree only: `parseBrief` reads the formula with `parseFormula`.
     wrap: formulaMounts,
@@ -65,6 +108,7 @@ export const briefLanguage = LRLanguage.define({
   languageData: {
     // `//` at line start (docs/brief-language.md). The language has no block comment.
     commentTokens: { line: '//' },
+    [OUTER_BLOCKS]: outerBlocks,
   },
 });
 

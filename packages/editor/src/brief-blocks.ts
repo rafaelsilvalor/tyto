@@ -1,5 +1,5 @@
 import { type EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorView, type ViewUpdate } from '@codemirror/view';
 import { type SyntaxNode, type Tree } from '@lezer/common';
 import { parseFormula } from '@tyto/brief-lang';
 import { type TemplateManifest, linearReading, slotDepth, sourceRange } from '@tyto/core';
@@ -276,4 +276,62 @@ export function previewBlock(view: EditorView, from: number): void {
     selection: { anchor: at },
     effects: EditorView.scrollIntoView(at, { y: 'start' }),
   });
+}
+
+/**
+ * The index of the block starting at `from`, or of the last one starting before it; -1 when
+ * none does. The list is in document order, so this is a binary search: the fold gutter asks
+ * for every line on screen.
+ */
+export function blockIndexBefore(blocks: readonly BriefBlock[], from: number): number {
+  let low = 0;
+  let high = blocks.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const block = blocks[middle];
+    if (block !== undefined && block.from <= from) {
+      found = middle;
+      low = middle + 1;
+    } else high = middle - 1;
+  }
+  return found;
+}
+
+/** The indexes of the blocks `index` sits inside, by its `parent` chain, outermost first. */
+export function ancestorsOf(blocks: readonly BriefBlock[], index: number): readonly number[] {
+  const chain: number[] = [];
+  for (let at = blocks[index]?.parent; at !== undefined; at = blocks[at]?.parent) {
+    chain.unshift(at);
+  }
+  return chain;
+}
+
+/**
+ * The index of the last block nested in `index` (TYTO-748): the blocks right after it whose
+ * parent chain reaches it, up to the first that is its sibling or an ancestor's — or a
+ * brief-wide slot written between them, which is nobody's child. `index` itself when nothing
+ * is nested in it, which is every block while the manifest is not known or declares no `per`.
+ */
+export function lastNestedIndex(blocks: readonly BriefBlock[], index: number): number {
+  let last = index;
+  for (let next = index + 1; next < blocks.length; next += 1) {
+    if (!ancestorsOf(blocks, next).includes(index)) break;
+    last = next;
+  }
+  return last;
+}
+
+/**
+ * Whether the manifest the blocks nest by changed between two states (TYTO-748). The analysis
+ * lands on its own transaction, with no new text or tree, and a brief's fold ranges and sticky
+ * rows follow the nesting it brings; the fold gutter and sticky scroll redraw on it. The
+ * analyzer hands the same manifest object back for the same template, so this is true when the
+ * template changes or first becomes known, not on every analysis.
+ */
+export function nestingChanged(update: Pick<ViewUpdate, 'startState' | 'state'>): boolean {
+  return (
+    update.startState.field(briefAnalysisField, false)?.manifest !==
+    update.state.field(briefAnalysisField, false)?.manifest
+  );
 }

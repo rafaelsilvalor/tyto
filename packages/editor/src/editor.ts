@@ -28,6 +28,7 @@ import {
 
 import { activeLine } from './active-line.js';
 import { brief } from './brief-language.js';
+import { nestingChanged } from './brief-blocks.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
 import { DEFAULT_TAB_SIZE, indentExtension } from './format-brief.js';
 import { hangingIndent } from './hanging-indent.js';
@@ -517,7 +518,8 @@ export interface EditorHandle extends EditorPane {
 const baseExtensions = (): Extension[] => [
   highlightActiveLineGutter(),
   activeLine(),
-  foldGutter(),
+  // A brief's folds follow the nesting its analysis brings (TYTO-748), which lands with no edit.
+  foldGutter({ foldingChanged: nestingChanged }),
   historyExtension(),
   // An agent's proposed edit, in every document (TYTO-566): drawn only while one is pending.
   proposals(),
