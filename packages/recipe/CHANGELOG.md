@@ -1,5 +1,18 @@
 # @tyto/recipe
 
+## 0.7.2
+
+### Patch Changes
+
+- Updated dependencies [7ddffdd]
+- Updated dependencies [5bb9f91]
+- Updated dependencies [4c9efc2]
+- Updated dependencies [73070bb]
+- Updated dependencies [5def566]
+- Updated dependencies [39207a9]
+  - @tyto/brief-lang@0.11.0
+  - @tyto/core@0.48.0
+
 ## 0.7.1
 
 ### Patch Changes

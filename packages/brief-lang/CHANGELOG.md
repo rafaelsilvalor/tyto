@@ -1,5 +1,106 @@
 # @tyto/brief-lang
 
+## 0.11.0
+
+### Minor Changes
+
+- 7ddffdd: A text line at column 0 under a directive is a body line of that directive, exactly as if it
+  were indented (TYTO-708, ADR 0202): `::lamina` / `Linha um` / `Linha dois` is one slide with
+  two lines and compiles to the Scene of its indented twin. A blank line between two column-0
+  lines is a paragraph, and a column-0 comment followed by column-0 text stays in the block
+  (ADR 0204, note of 2026-11-16). Text before the first directive is still `E_SYNTAX`. No brief
+  that compiled before changes: a column-0 text line used to be a syntax error.
+
+  `@tyto/core`: new warning `W_LIKELY_DIRECTIVE`, for a column-0 body line that starts with a
+  single `:` and a name (`:titulo X`), which is kept as text.
+
+  `@tyto/editor`: tests pin folds, `briefBlocks`, sticky scroll and completion on a column-0
+  body line (test only). `@tyto/template-kit`: a contract test compiles the unindented brief
+  against its indented twin (test only).
+
+- 5bb9f91: A slot nests inside another by its `per`, to any depth (TYTO-709, ADR 0207). `per` may now
+  name another `per` slot (`paragrafo: { per: bloco }`, `bloco: { per: lamina }`), and a
+  directive belongs to the nearest open occurrence of its parent above it. A template reads a
+  slide's own slots flat in `context.slots`, as before, and deeper values in an optional `slots`
+  on their parent: `context.slots.bloco.slots?.paragrafo`. No protocol bump.
+
+  **Breaking for one rare case:** an indented `::` line is now a directive, exactly as at
+  column 0 (ADR 0202 decision 3). A brief that used an indented `::` as text — 0 of 405 `.brief`
+  files measured on the maintainer's machine — now reads it as a directive, usually
+  `E_UNKNOWN_SLOT`; write `\::` to keep it text. An indented `//` is still a comment.
+
+  `@tyto/core`: `slotDepth` is exported; the manifest refuses a `per` cycle, a `per` chain that
+  does not end at the repeatable slot, and `multiple` below the slide. A new brief's skeleton
+  writes a required nested slot under its required parent, one level deeper.
+
+  `@tyto/brief-lang`: `formatBrief` takes an optional `depthOf` and indents each directive by
+  its depth in the template's tree.
+
+  `@tyto/editor`: Format Brief reads the depth from the analysis's manifest; `briefBlocks` gives
+  each block its `depth` and `parent`; the breadcrumb names the chain
+  (`::lamina 2 › ::bloco › ::paragrafo`) and Go to Block indents a nested label.
+
+  `@tyto/plugin-api`: a test pins that nested slots cross to an isolated template (test only).
+
+- 4c9efc2: A brief writes a formula between two `$`: `$F = \frac{1}{40·10^{-3}} = 25\ Hz$` draws a
+  stacked fraction, `^` a superscript and `_` a subscript (TYTO-734, ADR 0206). Money stays
+  text: a `$` opens a formula only before a character that is not a space and closes one only
+  before a character that is not a digit, so `R$ 50` and `R$50 a R$60` hold none. An unknown
+  command, a bad group or an empty formula is `E_FORMULA_COMMAND`, `E_FORMULA_GROUP` or
+  `E_FORMULA_EMPTY` on the characters at fault, and the formula is drawn as written.
+
+  `@tyto/core`: the AST's `Inline` gains `Formula { kind: 'formula', source, math, children,
+range }`. `children` holds the formula's linear reading as plain text, so a traversal that
+  reads rich text through `children` keeps working; a `switch` over `inline.kind` that is
+  exhaustive stops compiling until it handles `formula`. `runsOf` turns a `Formula` into a
+  `FormulaRun` in the style around it. `layoutFormula` now places a text piece word by word
+  and draws no space, so an HTML document no longer drops the space after a fraction.
+  A fraction now has 0.12 em of room on each side, outside its rule
+  (`FRACTION_SIDE`), so it is 0.24 em wider than before.
+
+  `@tyto/raster`: the visual suite renders the reference formula from a brief (test only).
+  `@tyto/plugin-api`: a test handles the new inline (test only).
+
+- 73070bb: A `$…$` formula is coloured in the editor, part by part (TYTO-743): its text in the literal
+  colour, its `$` and its `^` and `_` in the punctuation's, a command such as `\frac` as a
+  keyword, its braces as brackets and `\ `, `\$`, `\{`, `\}` as escapes. No new colour token.
+
+  `@tyto/brief-lang`: new `formulaMounts`, a `wrap` that mounts a small parser on each `Formula`
+  node and splits it into `FormulaMark`, `FormulaCommand`, `FormulaBrace`, `FormulaScript` and
+  `FormulaEscape`, styled through `briefHighlighting`'s companion table; `formulaText` is the
+  tag of a formula's text. `parser` and `parseBrief` are unchanged: only the editor mounts it.
+
+  `@tyto/editor`: the brief language configures the mount; the theme styles `formulaText` and
+  `tags.operator`; a block's first text, which Go to Block lists, reads a formula
+  as its linear reading, `F = 1/(40·10^(-3)) = 25 Hz`, or as written when it has an error. The
+  sticky header draws a formula on a block's head line coloured, as the line itself is.
+
+### Patch Changes
+
+- 5def566: Several values of a nested slot in one parent (TYTO-746, ADR 0207 note of 2026-11-16).
+  `multiple: true` may now be declared on any `per` slot, at any depth: with
+  `bloco: { per: lamina, multiple: true }`, every `::bloco` in the same slide is a value of its
+  own, with its own body and nested slots, in brief order. A template still reads
+  `context.slots.bloco` as the first one, and iterates every one through its new optional
+  `occurrences` (`slot.occurrences ?? [slot]`). A manifest that declares no `multiple` resolves
+  to exactly what it did. An image slot `per` the repeatable slot keeps ADR 0160's pictures among
+  a slide's lines.
+
+  `@tyto/core`: on a `multiple` slot `max` counts occurrences per parent, and one past it is
+  `E_BAD_SLOT_VALUE` at its own line; `min` on a `multiple` slot, and `multiple` without `per`,
+  are manifest errors. `listsOccurrences` is exported.
+
+  `@tyto/brief-lang`, `@tyto/editor`, `@tyto/plugin-api`: tests only — a fixture with two blocks
+  per slide and two paragraphs per block, the block list, breadcrumb, Go to Block and fold over
+  siblings, and `occurrences` crossing to an isolated template.
+
+- 39207a9: Format Brief keeps a blank line inside a block only where it is a paragraph: a line of text of the block on each side, with comments skipped. A blank line next to a comment with no text on its other side is now dropped.
+- Updated dependencies [7ddffdd]
+- Updated dependencies [5bb9f91]
+- Updated dependencies [4c9efc2]
+- Updated dependencies [5def566]
+  - @tyto/core@0.48.0
+
 ## 0.10.0
 
 ### Minor Changes
