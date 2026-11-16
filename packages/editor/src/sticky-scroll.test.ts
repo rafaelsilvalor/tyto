@@ -60,6 +60,14 @@ describe('the chain of blocks a line is inside', () => {
     expect(headsAt(state, 10)).toEqual(['::lamina']);
   });
 
+  it('names the directive above a body line at column 0 (TYTO-708)', () => {
+    const unindented = stateOf('::lamina\nUm\n\nDois\n::lamina\nTres\n');
+    expect(headsAt(unindented, 2)).toEqual(['::lamina']);
+    expect(headsAt(unindented, 4)).toEqual(['::lamina']);
+    expect(headsAt(unindented, 6)).toEqual(['::lamina']);
+    expect(headsAt(unindented, 5)).toEqual([]);
+  });
+
   it('is outside on the blank line after the block’s last text', () => {
     expect(headsAt(state, 12)).toEqual([]);
   });

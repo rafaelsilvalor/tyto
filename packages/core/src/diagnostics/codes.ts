@@ -1406,6 +1406,19 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // A warning and not an error, because the line is valid: since TYTO-708 a text line at
+  // column 0 is a body line of the directive above (ADR 0202). One that starts with a single
+  // `:` and a name is most likely a directive missing a colon, and reading it as text without
+  // a word would turn a typo into a silent change of the artwork.
+  W_LIKELY_DIRECTIVE: {
+    severity: 'warning',
+    summary:
+      'A body line at column 0 starts with a single `:` and a name, which reads like a directive missing a colon; it is kept as text.',
+    template: "'{line}' is read as text; a directive starts with ::.",
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: 'A warning never replaces a value (ADR 0013).',
+  },
   // A warning and not an error, because nothing is wrong: the run produced the template the
   // user asked for. It exists because "my edit to the built-in did nothing" and "why does
   // mine look different on this machine" are the two questions shadowing will generate, and

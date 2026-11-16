@@ -58,3 +58,13 @@ lost the rest of the slide.
 - A brief that relied on an indented `//` being text now loses that line silently. ADR 0202
   counted 0 of 405 `.brief` files on the maintainer's machine with an indented `//`; briefs on
   other machines were not measured.
+
+## Note, 2026-11-16 — a column-0 text line continues the block (TYTO-708, ADR 0202)
+
+A text line at column 0 is now a body line of the directive above, so "the block goes on" no
+longer needs an indent. Decision 3 reads: a `//` at column 0 belongs to the block when the next
+line that is neither blank nor another column-0 comment is not a `::` directive. `::lamina` /
+`// x` / `Texto` is one lamina with the body `Texto`, and the comment is the lamina's; a
+column-0 comment followed by a directive, or by nothing but blank lines to the end of the
+file, is still a top-level comment. The change is in `blockGoesOn`, the lookahead of
+`commentsInBlocks` in `tokens.ts`. Decisions 1, 2, 4 and 5 stand.

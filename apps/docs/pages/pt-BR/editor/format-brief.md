@@ -6,7 +6,7 @@ Cada passo foi seguido em 2026-10-19 numa versão de desenvolvimento do Tyto 0.7
 
 **Arrumar brief** (**Alt+Shift+F**) acerta os espaços do brief da frente sem mudar o que ele diz:
 
-- o texto de cada bloco `::` fica com o mesmo recuo — dois espaços, a não ser que a configuração [`tabSize`](../reference/settings.md#tabsize) diga outra coisa;
+- o texto de cada bloco `::` fica com o mesmo recuo, inclusive as linhas que você escreveu sem recuo — dois espaços, a não ser que a configuração [`tabSize`](../reference/settings.md#tabsize) diga outra coisa;
 - uma [anotação](../briefs/directives.md#anotacoes) (`//`) entre as linhas de um bloco fica com o recuo delas; uma anotação entre dois blocos fica no começo da linha;
 - os espaços no fim das linhas são removidos;
 - várias linhas em branco seguidas viram uma só, então um [parágrafo](../briefs/inline-formatting.md#paragrafos) continua sendo um parágrafo.

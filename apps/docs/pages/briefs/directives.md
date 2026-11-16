@@ -11,13 +11,19 @@ The examples are for `notice`, the manual's own template. Copy [its folder](http
 ## Two ways to write the text
 
 - **On the same line**, after the name and a space: `::titulo Open day at the library`. Good for a short line.
-- **On the lines below**, indented by two spaces. The text runs until the next line that is not indented. Use it for longer text, and for text that has to break where you say: each line of the block is a line in the artwork.
+- **On the lines below**. The text runs until the next line that starts with `::`. Use it for longer text, and for text that has to break where you say: each line of the block is a line in the artwork.
+
+Indenting the lines below is up to you. `::titulo` with `Open day` on the next line at the start of the line is the same as with `  Open day` indented two spaces: the artwork comes out the same. Indenting only helps you see which lines belong to which directive, and [**Format Brief**](../editor/format-brief.md) indents them all for you. A line you write right after `::titulo Open day` continues that title on a new line.
 
 ## Notes to yourself
 
 A line that starts with `//` is a note. Tyto skips it, so it can say anything — who asked for the artwork, what to check before sending it.
 
 A note can also sit among the lines of a block, indented or not, like the one in `::subtitulo` above. It is skipped and the block goes on after it: the subtitle gets all three lines of text. A note at the start of a line, before the next directive, belongs to no block. [**Format Brief**](../editor/format-brief.md) indents a note inside a block like the lines around it.
+
+## A line that starts with a single `:`
+
+A line under a directive that starts with one colon and a name, like `:titulo Open day`, is most likely a directive missing its second colon. Tyto keeps it as text of the block above and underlines it with a warning, so the typo does not go unnoticed. Add the missing `:` to make it a directive.
 
 ## A line that starts with `::` but is not a directive
 

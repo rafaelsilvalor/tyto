@@ -124,6 +124,16 @@ slots:
     expect(blocks[0]?.firstText).toBe('Um');
   });
 
+  it('counts a body line at column 0 as the block’s (TYTO-708)', () => {
+    const text = '::lamina\nUm\n// a\nDois\n::lamina\nTres';
+    const blocks = blocksIn(text);
+    expect(blocks.map((block) => [lineOf(text, block.from), lineOf(text, block.to)])).toEqual([
+      [1, 4],
+      [5, 6],
+    ]);
+    expect(blocks.map((block) => block.firstText)).toEqual(['Um', 'Tres']);
+  });
+
   it('reads `\\//` in a first line as the `//` it stands for', () => {
     expect(blocksIn('::lamina\n  \\// Um').map((block) => block.firstText)).toEqual(['// Um']);
   });

@@ -79,3 +79,25 @@ structure.
   worth keeping when it no longer means anything.
 - `docs/brief-language.md`, the manual in both editions and the brief-modeller skill still
   teach that a body line is indented; each card updates them as it lands.
+
+## Note, 2026-11-16 — what TYTO-708 built
+
+Decision 2 is in the grammar: `bodyBreaks` in `tokens.ts` hands out `bodyBreak`, the line break
+and blank lines in front of a column-0 line that starts with neither `::` nor `//`, and
+`BodyLine` is `blockIndent BlockText?` or `bodyBreak BlockText`. Three readings it settles, each
+the one the indented twin already had:
+
+- A blank line between two column-0 lines is a paragraph (ADR 0205): `::lamina` / `Linha um` /
+  blank / `Linha dois` is one lamina with two paragraphs.
+- A column-0 line under a head with inline text continues it on a new line: `::titulo Direito`
+  / `Constitucional` is `Direito`, a line break, `Constitucional`.
+- A column-0 comment followed by a column-0 text line is the block's (ADR 0204's note of the
+  same date).
+
+The single `:` of decision 2 is narrowed to a single `:` followed by a letter or `_`, the start
+of a directive name: `:titulo X` warns with `W_LIKELY_DIRECTIVE`, naming the line, while
+`: nota` and `:)` are text with no warning. Only at column 0, as decided; an indented line was
+always text. The text-reading editor pieces — Enter, indent guides, vim `ii`/`ai` — keep reading
+the indent the person wrote (decision 1); the tree-reading ones — folds, `briefBlocks`, sticky
+scroll, completion, Format Brief — treat a column-0 body line as body with no change of their
+own.

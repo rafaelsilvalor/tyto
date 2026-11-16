@@ -155,6 +155,7 @@ non-zero.
 | `E_FORMULA_GROUP` | error | no | A `{…}` in a formula is missing, unclosed, or where no group belongs. |
 | `E_FORMULA_EMPTY` | error | no | A formula (`$$`) or one of its groups (`{}`) holds nothing. |
 | `W_REDUNDANT_BREAK` | warning | no | A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line. |
+| `W_LIKELY_DIRECTIVE` | warning | no | A body line at column 0 starts with a single `:` and a name, which reads like a directive missing a colon; it is kept as text. |
 | `W_BRAND_KIT_SHADOWED` | warning | no | Two plugins contribute a kit for the same brand; the earlier plugin is the one used. |
 | `W_BRAND_KIT_MISSING` | warning | no | A configuration names a brand that no installed brand kit offers. |
 | `W_CONFIGURATION_BRAND_INVALID` | warning | no | A configuration's brand is not spelled as a brand id. |
@@ -2940,6 +2941,20 @@ Every line of an indented block already starts a new line; this \ is not needed.
 ```
 
 Parameters: none
+
+### `W_LIKELY_DIRECTIVE`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A body line at column 0 starts with a single `:` and a name, which reads like a directive missing a colon; it is kept as text.
+
+A warning never replaces a value (ADR 0013).
+
+```
+'{line}' is read as text; a directive starts with ::.
+```
+
+Parameters: `line`
 
 ### `W_BRAND_KIT_SHADOWED`
 

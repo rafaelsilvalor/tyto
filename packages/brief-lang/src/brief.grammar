@@ -49,7 +49,14 @@ Adjustment { AdjustmentName (valueSep space? AdjustmentValue)? }
 // line that is not blank and starts back at column 0. A line holding only spaces is the
 // one case where nothing follows the indent, which is why the text is optional; an empty
 // `BodyLine` says nothing and `parseBrief` drops it.
-BodyLine { blockIndent BlockText? }
+//
+// Indentation never changes what a brief compiles to (TYTO-708, ADR 0202): a text line at
+// column 0 continues the block above exactly as an indented one does. `bodyBreak` is the line
+// break and the blank lines in front of it, handed out by `tokens.ts` only when the line
+// starts with neither `::` nor `//` — telling those apart needs the start of the next line,
+// and a Lezer token has no lookahead. There is no indent to absorb a line of spaces here, so
+// the text is required.
+BodyLine { blockIndent BlockText? | bodyBreak BlockText }
 
 // A comment line inside a block is skipped, and the block goes on (TYTO-680, ADR 0204).
 // `commentBreak` is the line break, any blank lines and the indent in front of the `//`, so
@@ -102,6 +109,10 @@ BlankLine { newline | blankRun }
 
 // Ahead of `@tokens` for the same reason: an indented `//` is also a `blockIndent`.
 @external tokens commentsInBlocks from "./tokens.js" { commentBreak }
+
+// Ahead of `@tokens`, so a column-0 text line is a body line before `newline` can end the
+// directive in front of it (TYTO-708).
+@external tokens bodyBreaks from "./tokens.js" { bodyBreak }
 
 // A formula, `$…$`, is one token, and so is everything inside it (ADR 0206, TYTO-734): its
 // `\frac` is not a line break and its `{1}` is not a mark. Whether a `$` opens one depends on

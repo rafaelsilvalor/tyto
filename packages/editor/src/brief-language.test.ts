@@ -107,6 +107,15 @@ describe('folding', () => {
     expect(doc.slice(range?.from, range?.to)).toBe('\n  um\n\n  dois');
   });
 
+  it('folds a body line at column 0 like an indented one (TYTO-708)', () => {
+    const doc = '::a\num\n\n  dois\ntres\n::b\n';
+    const state = stateOf(doc);
+
+    const range = foldable(state, state.doc.line(1).from, state.doc.line(1).to);
+
+    expect(doc.slice(range?.from, range?.to)).toBe('\num\n\n  dois\ntres');
+  });
+
   it('folds a comment line inside the block with it, at its head or its end (TYTO-680)', () => {
     const doc = '::a\n// first\n  um\n// middle\n  dois\n  // last\n::b\n';
     const state = stateOf(doc);
