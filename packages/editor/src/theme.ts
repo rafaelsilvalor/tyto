@@ -2,6 +2,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { type Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import { formulaText } from '@tyto/brief-lang';
 
 /**
  * The two themes the editor ships with.
@@ -455,6 +456,13 @@ const syntax = (colours: Palette): HighlightStyle =>
     // A recipe's `{param}` placeholder (TYTO-377): text that stands for other text, which the
     // escape colour already means. No new colour token for one construct of one language.
     { tag: tags.special(tags.variableName), color: colours.escape },
+
+    // A brief's `$…$` formula (TYTO-743): its text in the literal colour, so math reads as math;
+    // its `$` (`processingInstruction`), `\frac` (`keyword`), braces (`brace`) and escapes are
+    // the rules above. `^` and `_` are the one new tag, given the punctuation's colour. No new
+    // colour token: a formula is one more construct of one language.
+    { tag: formulaText, color: colours.literal },
+    { tag: tags.operator, color: colours.punctuation },
   ]);
 
 /**

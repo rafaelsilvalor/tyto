@@ -31,7 +31,9 @@ export type {
 
 export { parser } from './brief.parser.js';
 
-export { briefHighlighting } from './highlight.js';
+export { briefHighlighting, formulaText } from './highlight.js';
+
+export { formulaMounts } from './formula-highlight.js';
 
 export { type ParsedFormula, parseFormula } from './formula.js';
 

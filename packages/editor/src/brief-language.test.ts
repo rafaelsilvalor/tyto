@@ -37,6 +37,38 @@ describe('the colours come from the grammar', () => {
   });
 });
 
+describe('a formula is coloured part by part (TYTO-743)', () => {
+  /**
+   * The parts are another parser's nodes, mounted by the `wrap` `briefLanguage` configures. A
+   * language that lost the wrap would still colour the formula as one run of text and break
+   * nothing else, so this reads the spans of the parser CodeMirror actually runs.
+   */
+  const named = tagHighlighter([
+    { tag: tags.keyword, class: 'command' },
+    { tag: tags.brace, class: 'brace' },
+    { tag: tags.operator, class: 'script' },
+  ]);
+
+  it('tags its command, its braces and its script', () => {
+    const source = '::slide $\\frac{1}{x^2}$\n';
+    const found: [string, string][] = [];
+    // From the formula on: the directive's name is a `definitionKeyword`, which `keyword` covers.
+    const start = source.indexOf('$');
+    highlightTree(briefLanguage.parser.parse(source), named, (from, to, tag) => {
+      if (from >= start) found.push([source.slice(from, to), tag]);
+    });
+
+    expect(found).toEqual([
+      ['\\frac', 'command'],
+      ['{', 'brace'],
+      ['}', 'brace'],
+      ['{', 'brace'],
+      ['^', 'script'],
+      ['}', 'brace'],
+    ]);
+  });
+});
+
 describe('a comment line inside a block is coloured as a comment (TYTO-680)', () => {
   const named = tagHighlighter([
     { tag: tags.lineComment, class: 'comment' },

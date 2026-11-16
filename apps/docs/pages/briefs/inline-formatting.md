@@ -61,6 +61,8 @@ The formula is drawn in the template's typeface, size and colour, so a formula i
 
 Inside a formula, `\` belongs to the formula: it is not a line break there. Write `\ ` for a space you want kept after a number (`25\ Hz`), and `\$`, `\{` or `\}` for those characters.
 
+In the editor a formula has a colour of its own, with its `$`, its commands, its braces, its `^` and `_` and its escapes each marked apart, so you see where a formula starts and ends, and where a `$` opened one you did not mean. **Go to Block…** lists each block with its first words, and a formula among them is read on one line: `F = 1/(40·10^(-3)) = 25 Hz`.
+
 ### Prices are not formulas
 
 A `$` opens a formula only when the next character is not a space, and closes it only when the character before it is not a space and the next one is not a digit. That is what keeps money as text: `R$ 50`, `R$ 50 to R$ 60` and `R$50 to R$60` hold no formula. Write every price the same way in a line: in `R$50 and R$ 60` the two `$` pair up and the words between them become a formula, without its `$`.

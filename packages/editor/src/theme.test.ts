@@ -1,6 +1,17 @@
+import { highlightingFor } from '@codemirror/language';
+import { EditorState } from '@codemirror/state';
+import { tags } from '@lezer/highlight';
+import { formulaText } from '@tyto/brief-lang';
 import { describe, expect, it } from 'vitest';
 
-import { palette, panelStyles, panels, themeTokens } from './theme.js';
+import {
+  briefDarkTheme,
+  briefLightTheme,
+  palette,
+  panelStyles,
+  panels,
+  themeTokens,
+} from './theme.js';
 
 /**
  * What can be said about the theme without a browser.
@@ -135,6 +146,30 @@ describe("CodeMirror's own panels, tooltips and diagnostics (TYTO-258)", () => {
     expect(panelStyles['.cm-button:active'].backgroundImage).toBe('none');
     for (const severity of ['error', 'warning', 'info', 'hint'] as const) {
       expect(panelStyles[`.cm-lintRange-${severity}`].backgroundImage).toBe('none');
+    }
+  });
+});
+
+describe('a formula (TYTO-743)', () => {
+  /**
+   * `highlightingFor` answers with the class a theme gives a tag, or null for none: a part the
+   * grammar tags and no rule here styles would show in the plain text colour, silently.
+   */
+  it('gets a style for its text and for every part of its markup, in both themes', () => {
+    const parts = {
+      text: [formulaText],
+      mark: [tags.processingInstruction],
+      command: [tags.keyword],
+      brace: [tags.brace],
+      script: [tags.operator],
+      escape: [tags.escape],
+    };
+    for (const theme of [briefLightTheme, briefDarkTheme]) {
+      const state = EditorState.create({ extensions: theme });
+      const unstyled = Object.entries(parts)
+        .filter(([, tagged]) => highlightingFor(state, tagged) === null)
+        .map(([part]) => part);
+      expect(unstyled).toEqual([]);
     }
   });
 });

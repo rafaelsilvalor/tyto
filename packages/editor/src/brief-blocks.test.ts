@@ -169,6 +169,37 @@ describe('blockAt', () => {
   });
 });
 
+describe("a formula in a block's first text (TYTO-743)", () => {
+  /** Through the editor's own language, which mounts the formula parser inside `Formula`. */
+  const firstTexts = (text: string): (string | undefined)[] =>
+    blocksOf(
+      EditorState.create({ doc: text, extensions: [briefLanguage, briefAnalysisField] }),
+    ).map((block) => block.firstText);
+
+  it('reads as its linear reading, in the editor and through the bare parser alike', () => {
+    const text = '::lamina\n  $F = \\frac{1}{40·10^{-3}} = 25\\ Hz$';
+    const reading = 'F = 1/(40·10^(-3)) = 25 Hz';
+    expect(firstTexts(text)).toEqual([reading]);
+    expect(blocksIn(text).map((block) => block.firstText)).toEqual([reading]);
+  });
+
+  it('reads as written when it has an error, as the render draws it', () => {
+    expect(firstTexts('::titulo a $\\sqrt{2}$')).toEqual(['a $\\sqrt{2}$']);
+  });
+
+  it('is read inside bold and inside a mark', () => {
+    // A word before the mark: braces right after the name are the directive's adjustments.
+    expect(firstTexts('::titulo **a $x^2$**\n::lamina b {cor:azul}$x_1$ ok{/}')).toEqual([
+      'a x^2',
+      'b x_1 ok',
+    ]);
+  });
+
+  it('is read on a column-0 body line it opens (TYTO-708)', () => {
+    expect(firstTexts('::lamina\n$x^2$ sobe')).toEqual(['x^2 sobe']);
+  });
+});
+
 describe('blocksOf', () => {
   const stateOf = (manifest?: TemplateManifest): EditorState => {
     const state = EditorState.create({

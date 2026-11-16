@@ -1,5 +1,5 @@
 import { LRLanguage, LanguageSupport, foldNodeProp } from '@codemirror/language';
-import { briefHighlighting, parser } from '@tyto/brief-lang';
+import { briefHighlighting, formulaMounts, parser } from '@tyto/brief-lang';
 import { keymap } from '@codemirror/view';
 import { type SyntaxNode } from '@lezer/common';
 
@@ -58,6 +58,9 @@ export const briefLanguage = LRLanguage.define({
   name: 'brief',
   parser: parser.configure({
     props: [briefHighlighting, foldNodeProp.add({ Directive: foldDirectiveBody })],
+    // A formula's `\frac`, braces and `$` as nodes of their own, for their colours (TYTO-743).
+    // The editor's tree only: `parseBrief` reads the formula with `parseFormula`.
+    wrap: formulaMounts,
   }),
   languageData: {
     // `//` at line start (docs/brief-language.md). The language has no block comment.
