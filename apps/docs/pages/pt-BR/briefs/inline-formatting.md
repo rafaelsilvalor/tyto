@@ -61,6 +61,8 @@ A fórmula é desenhada na fonte, no tamanho e na cor do template, então uma f�
 
 Dentro de uma fórmula, a `\` é da fórmula: ali ela não quebra a linha. Escreva `\ ` para um espaço que deve ficar depois de um número (`25\ Hz`), e `\$`, `\{` ou `\}` para esses caracteres.
 
+No editor, uma fórmula tem uma cor própria, com o `$`, os comandos, as chaves, o `^` e o `_` e os escapes marcados cada um à parte, para você ver onde uma fórmula começa e termina, e onde um `$` abriu uma que você não queria. O **Ir para bloco…** lista cada bloco com as primeiras palavras, e uma fórmula entre elas é lida em uma linha: `F = 1/(40·10^(-3)) = 25 Hz`.
+
 ### Preços não são fórmulas
 
 Um `$` abre uma fórmula só quando o caractere seguinte não é um espaço, e a fecha só quando o caractere antes dele não é um espaço e o seguinte não é um dígito. É isso que mantém dinheiro como texto: `R$ 50`, `de R$ 50 a R$ 60` e `R$50 a R$60` não têm fórmula. Escreva todos os preços de uma linha do mesmo jeito: em `R$50 e R$ 60` os dois `$` formam um par e as palavras entre eles viram uma fórmula, sem o `$`.

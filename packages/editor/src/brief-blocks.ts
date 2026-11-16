@@ -1,7 +1,8 @@
 import { type EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { type SyntaxNode, type Tree } from '@lezer/common';
-import { type TemplateManifest } from '@tyto/core';
+import { parseFormula } from '@tyto/brief-lang';
+import { type TemplateManifest, linearReading, sourceRange } from '@tyto/core';
 
 import { briefAnalysisField } from './analysis.js';
 import { treeAt } from './syntax.js';
@@ -43,7 +44,17 @@ export type BlockManifest = Pick<TemplateManifest, 'slots'>;
 export const BLOCK_TEXT_LENGTH = 60;
 
 /** The nodes whose text is words, the leaves of `InlineBody` and `BlockText`. */
-const WORDS = new Set(['Text', 'Space', 'EscapedDirective', 'EscapedComment']);
+const WORDS = new Set(['Text', 'Space', 'EscapedDirective', 'EscapedComment', 'Formula']);
+
+/**
+ * A formula as words (TYTO-743): its linear reading, `F = 1/(40·10^(-3)) = 25 Hz`, as the AST
+ * carries it (ADR 0206), so a block whose first line is a formula is not named by nothing. One
+ * with an error is shown as written, as the render draws it.
+ */
+function formulaWords(source: string): string {
+  const parsed = parseFormula(source, sourceRange(0, source.length));
+  return parsed.diagnostics.length > 0 ? source : linearReading(parsed.math);
+}
 
 /** The end of the first line in `[from, to)`, before its line break. */
 function lineEndIn(slice: (from: number, to: number) => string, from: number, to: number): number {
@@ -74,6 +85,7 @@ function wordsOf(
       else if (leaf.name === 'Space') words += ' ';
       else if (leaf.name === 'EscapedDirective') words += '::';
       else if (leaf.name === 'EscapedComment') words += '//';
+      else if (leaf.name === 'Formula') words += formulaWords(slice(leaf.from, leaf.to));
       else words += slice(leaf.from, leaf.to);
     }
   };

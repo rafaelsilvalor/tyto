@@ -1,5 +1,8 @@
 import { styleTags, tags } from '@lezer/highlight';
 
+/** A formula's text, the part of it no markup node covers: one colour for "this is math". */
+export const formulaText = tags.special(tags.content);
+
 /**
  * What each node looks like in the editor (E8.1).
  *
@@ -53,4 +56,23 @@ export const briefHighlighting = styleTags({
   Break: tags.escape,
   EscapedDirective: tags.escape,
   EscapedComment: tags.escape,
+
+  // A formula is one token (ADR 0206); its text is coloured here, and its markup by the
+  // nodes `formula-highlight.ts` mounts inside it in the editor (TYTO-743).
+  Formula: formulaText,
+});
+
+/**
+ * The nodes of a formula's inside (TYTO-743). A separate table, because they are another
+ * parser's nodes: the brief grammar never produces them. Its `Formula` is the mounted tree's
+ * top, which stands in for the brief's `Formula` in the editor's tree, so it carries the same
+ * tag — without one the whole formula would be painted in no colour at all.
+ */
+export const formulaHighlighting = styleTags({
+  Formula: formulaText,
+  FormulaMark: tags.processingInstruction,
+  FormulaCommand: tags.keyword,
+  FormulaBrace: tags.brace,
+  FormulaScript: tags.operator,
+  FormulaEscape: tags.escape,
 });

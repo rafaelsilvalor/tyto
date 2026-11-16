@@ -102,6 +102,14 @@ describe('briefLint', () => {
     expect(editor.view.state.sliceDoc(marker.from, marker.to)).toBe('titlo');
   });
 
+  it('underlines an error inside a formula at the characters at fault (TYTO-743)', async () => {
+    const editor = open(brief('::titulo Lista $a + \\sqrt{2}$', '::item Um'));
+    const { marker } = await waitForMarker(editor, 'E_FORMULA_COMMAND', 2000);
+
+    expect(marker.severity).toBe('error');
+    expect(editor.view.state.sliceDoc(marker.from, marker.to)).toBe('\\sqrt');
+  });
+
   it('puts the hint in the message, where a hover shows it', async () => {
     const editor = open(brief('::titlo Lista', '::item Um'));
     const { marker } = await waitForMarker(editor, 'E_UNKNOWN_SLOT', 2000);
