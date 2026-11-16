@@ -1364,6 +1364,36 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
   },
+  // Three codes and not one, because the fix differs: a command Tyto does not draw, a brace
+  // out of place, and a formula or group with nothing in it (ADR 0206 decision 5, TYTO-734).
+  // Not fatal: the formula is drawn as the text the author wrote, `$` included, so the
+  // artwork still exists and shows exactly what was not understood.
+  E_FORMULA_COMMAND: {
+    severity: 'error',
+    summary:
+      'A formula holds a `\\` command or escape other than `\\frac`, `\\ `, `\\$`, `\\{` and `\\}`.',
+    template:
+      "'{command}' is not something a formula can draw; it knows \\frac, ^ and _, and a \\ before a space, a $ or a brace.",
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: 'The formula is drawn as its source text and the rest of the brief is unaffected.',
+  },
+  E_FORMULA_GROUP: {
+    severity: 'error',
+    summary: 'A `{…}` in a formula is missing, unclosed, or where no group belongs.',
+    template: 'Formula group: {problem}.',
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: 'The formula is drawn as its source text and the rest of the brief is unaffected.',
+  },
+  E_FORMULA_EMPTY: {
+    severity: 'error',
+    summary: 'A formula (`$$`) or one of its groups (`{}`) holds nothing.',
+    template: 'This {part} is empty; write what it should hold.',
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality: 'The formula is drawn as its source text and the rest of the brief is unaffected.',
+  },
   // A warning and not an error, because the brief still means what the author meant: the
   // `\` is dropped and the line breaks once, as every block line does (ADR 0109). It says so
   // because the `\` used to add an empty line, and an author who wrote it for that gets told.

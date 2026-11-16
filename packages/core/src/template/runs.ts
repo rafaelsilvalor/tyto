@@ -1,4 +1,5 @@
 import { run } from './values.js';
+import { linearReading } from '../text/formula.js';
 import { originOf, rememberOrigin } from '../text/origin.js';
 import { unionRanges } from '../source/range.js';
 import type { SourceRange } from '../source/range.js';
@@ -160,6 +161,28 @@ function breakOf(inline: Inline & { kind: 'break' }, spacing: number | undefined
     : { kind: 'break' };
 }
 
+/**
+ * A formula takes the style around it, bold, italic and marks included, so
+ * `{cor:roxo}$x^2${/}` colours the whole formula (ADR 0206 decision 16). It is never merged
+ * with a neighbour: it is a run of its own kind, laid out by `measureText`.
+ */
+function formulaOf(inline: Inline & { kind: 'formula' }, style: RunStyle): TextRun {
+  // `run` turns the style's colour into a `Paint` exactly as it does for a span.
+  const { font, size, weight, style: slant, color } = run(inline.source, style);
+  const produced: TextRun = {
+    kind: 'formula',
+    text: linearReading(inline.math),
+    math: [...inline.math],
+    font,
+    size,
+    weight,
+    style: slant,
+    color,
+  };
+  rememberOrigin(produced, inline.range);
+  return produced;
+}
+
 function append(target: TextRun[], text: RichText, style: RunStyle, options: RunsOptions): void {
   for (const inline of text) {
     switch (inline.kind) {
@@ -176,6 +199,9 @@ function append(target: TextRun[], text: RichText, style: RunStyle, options: Run
       }
       case 'break':
         target.push(breakOf(inline, options.paragraphSpacing));
+        break;
+      case 'formula':
+        target.push(formulaOf(inline, style));
         break;
       default:
         append(target, inline.children, styled(inline, style, options), options);

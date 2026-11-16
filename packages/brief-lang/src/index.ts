@@ -20,6 +20,7 @@ export type {
   Break,
   BriefAst,
   Directive,
+  Formula,
   Frontmatter,
   Inline,
   Italic,
@@ -31,6 +32,8 @@ export type {
 export { parser } from './brief.parser.js';
 
 export { briefHighlighting } from './highlight.js';
+
+export { type ParsedFormula, parseFormula } from './formula.js';
 
 export { parseBrief } from './parse-brief.js';
 

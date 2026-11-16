@@ -71,15 +71,15 @@ bodyInline { headInline | Mark }
 // The same limit shows at the seam of two closers: `**bold *italic***` does not parse,
 // because longest match reads the trailing `***` as `**` then `*` and no lookahead could
 // prefer the other split. Write `**bold *italic* **` or reorder the runs (ADR 0015).
-headInline { Text | Space | Bold | Italic | Break | escape }
+headInline { Text | Space | Bold | Italic | Break | Formula | escape }
 
 Bold { boldMark boldInline+ boldMark }
 
-boldInline { Text | Space | Italic | Break | escape }
+boldInline { Text | Space | Italic | Break | Formula | escape }
 
 Italic { italicMark italicInline+ italicMark }
 
-italicInline { Text | Space | Bold | Break | escape }
+italicInline { Text | Space | Bold | Break | Formula | escape }
 
 escape { EscapedDirective | EscapedComment }
 
@@ -102,6 +102,12 @@ BlankLine { newline | blankRun }
 
 // Ahead of `@tokens` for the same reason: an indented `//` is also a `blockIndent`.
 @external tokens commentsInBlocks from "./tokens.js" { commentBreak }
+
+// A formula, `$…$`, is one token, and so is everything inside it (ADR 0206, TYTO-734): its
+// `\frac` is not a line break and its `{1}` is not a mark. Whether a `$` opens one depends on
+// the characters up to the `$` that closes it, so `tokens.ts` scans by hand. Ahead of
+// `@tokens`, so it is asked before `Text` reads the `$` as a plain character.
+@external tokens formulas from "./tokens.js" { Formula }
 
 @tokens {
   directiveMark { "::" }
@@ -149,7 +155,10 @@ BlankLine { newline | blankRun }
   // that space belongs to `blockIndent`, and the two would be indistinguishable. `\r` is
   // excluded for the same reason `\n` is: it ends a line (see `lineBreak`), so letting it
   // into text would leave half a CRLF inside a Text node.
-  Text { ![ \t*{}\\\n\r] ![*{}\\\n\r]* }
+  //
+  // A `$` may start a Text but never continue one, so every `$` is where a token starts and
+  // `formulas` is asked whether it opens a formula. One that opens nothing is read here.
+  Text { (![ \t*{}\\\n\r$] | "$") ![*{}\\\n\r$]* }
 
   Comment { "//" ![\n\r]* }
 

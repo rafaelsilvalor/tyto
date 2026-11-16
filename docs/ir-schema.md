@@ -73,6 +73,8 @@ The prose above is the contract; these are the decisions taken while writing the
   piece's baseline and each fraction rule in px against the formula's origin, the formula's
   box, where it starts on its line (`offset`) and how wide the line is (`lineWidth`), and how
   far the line grows past its strut (`above`, `below`), the same on every formula of a line.
+  A glyph is one word: a piece's spaces are the room between its glyphs and never part of
+  one, because a `<text>` that starts with a space loses it in an HTML document (TYTO-734).
   `text` is the linear reading, drawn only when the formula has no `layout`. Every face a
   piece names must be in `Scene.fonts`, and a node holding only a formula is not empty.
 - **Adjacent runs that would draw the same thing are one run.** `runsOf` merges a run into

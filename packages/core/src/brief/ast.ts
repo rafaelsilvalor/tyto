@@ -1,3 +1,4 @@
+import type { MathItem } from '../scene/nodes.js';
 import type { SourceRange } from '../source/range.js';
 
 /**
@@ -64,7 +65,25 @@ export interface Mark {
   readonly range: SourceRange;
 }
 
-export type Inline = Text | Bold | Italic | Break | Mark;
+/**
+ * `$F = \frac{1}{40·10^{-3}} = 25\ Hz$` — a formula (ADR 0206, TYTO-734).
+ *
+ * `math` is the structure the exporters draw; `source` is the formula as written, both `$`
+ * included. `children` is its linear reading as one plain text, `F = 1/(40·10^(-3)) = 25 Hz`
+ * (`linearReading`), so every traversal that reads a rich-text value through `children` —
+ * `plainText` in `resolve`, `plain` in template-kit, and the same pattern in templates in
+ * their own repositories — keeps compiling and reads something sensible (decision 15). A
+ * formula with an error never becomes this node: the parser keeps it as its source text.
+ */
+export interface Formula {
+  readonly kind: 'formula';
+  readonly source: string;
+  readonly math: readonly MathItem[];
+  readonly children: RichText;
+  readonly range: SourceRange;
+}
+
+export type Inline = Text | Bold | Italic | Break | Mark | Formula;
 
 export type RichText = readonly Inline[];
 

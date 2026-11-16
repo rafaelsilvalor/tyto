@@ -506,6 +506,9 @@ importers:
       '@types/pngjs':
         specifier: ^6.0.5
         version: 6.0.5
+      '@tyto/brief-lang':
+        specifier: workspace:*
+        version: link:../brief-lang
       '@tyto/core':
         specifier: workspace:*
         version: link:../core

@@ -39,9 +39,10 @@ write briefs; this document is the grammar for people who change it.
 - **Text**: inline Markdown only — `**bold**`, `*italic*`, `\` line break, `{cor:x}text{/}` mark. No headings, lists or links. Every line of an indented block already starts a new line, so a `\` ending a line with another block line after it adds nothing: it is dropped, with `W_REDUNDANT_BREAK` (ADR 0109), and `\\` there leaves one empty line. A `\` in the middle of a line, at the end of an inline body with no block under it, or on the last line of a block still breaks the line.
 - **Paragraphs**: a blank line between two lines of text starts a paragraph; several in a row are one, and one at the start or the end of a block means nothing (ADR 0205). The space between two paragraphs is the template's (`paragraphSpacing`), and 0 when it declares none, so a paragraph is then drawn as any other line break.
 - **Math** is plain Unicode with a space on each side of an operator: `Q = U · A · ΔT`. Glyphs the template's face lacks are drawn in the bundled symbol face (ADR 0168), and a line never starts with a standalone operator: the space before one is not a break, the space after it is (ADR 0169). To keep a whole formula on one line, write its spaces as no-break spaces (U+00A0).
+- **Formula** `$F = \frac{1}{40·10^{-3}} = 25\ Hz$` — a stacked fraction (`\frac{numerator}{denominator}`), a superscript (`^{…}`) and a subscript (`_{…}`), on one line between two `$` (ADR 0206, TYTO-734). `^c` and `_c` take one character without braces, and a group may hold any of the three again. A `$` opens a formula only before a character that is not a space, and closes one only after a character that is not a space and before one that is not a digit (Pandoc's rule), so `R$ 50`, `de R$ 50 a R$ 60` and `R$50 a R$60` hold no formula; a `$` that opens or closes nothing is plain text. Two prices spaced differently on one line, `R$50 e R$ 60`, do pair up into a formula, as in Pandoc. Inside a formula `\` is the formula's: the line break `\`, `\::` and `\//` do not apply there, and its own escapes are `\ ` (a space), `\$`, `\{` and `\}`. Spaces are kept as written, and a formula is one word: it never breaks. An unknown command (`\sqrt`) is `E_FORMULA_COMMAND`, a missing, unclosed or bare `{…}` is `E_FORMULA_GROUP`, and `$$` or `{}` is `E_FORMULA_EMPTY`, each on the characters at fault; the formula is then drawn as its source text, `$` included.
 - **Assets**: a path is read as written, relative to the `.brief` file; when nothing is there, the same path is read from `assets/` beside the brief (ADR 0056). If both exist, the one beside the brief wins, and a path that climbs out of the brief's folder is read from neither. `resolve` confirms existence and computes a hash of the bytes, so the hash is the same whichever folder the file was found in. The CLI, `tyto watch`, the queue, the preview and the export box all follow this rule; only `tyto render --assets <dir>` replaces it, with that one folder and no fallback. A brief in a folder named `editaveis` — a delivery's copy — also reads `../assets`, the delivery's images (ADR 0057).
 - **Comments**: `//` at line start. Inside an indented block, a `//` line at any indent — or at column 0 between two lines of the same block — is skipped and the block goes on (ADR 0204).
-- **Escape**: `\::` for text starting with `::`, `\//` for a body line starting with `//` (ADR 0204).
+- **Escape**: `\::` for text starting with `::`, `\//` for a body line starting with `//` (ADR 0204). Inside a formula, `\ `, `\$`, `\{` and `\}` (ADR 0206).
 - **Plugin directives**: plugins register namespaced directives, `::ai/caption`. Without the plugin ⇒ `E_UNKNOWN_DIRECTIVE`. See _Plugin directives_ below.
 
 ## Plugin directives
@@ -138,6 +139,14 @@ had to answer them.
 - **`{` in prose has to be part of a mark.** A literal brace in body text is an error.
   `\::` and `\//` (ADR 0204) are the only escapes the language has; a general one is a
   change to the spec, not to the grammar alone.
+- **A formula is one token, and `tokens.ts` finds it.** Whether a `$` opens a formula
+  depends on the characters up to the `$` that closes it, and a Lezer token has no
+  lookahead, so the `formulas` external tokenizer scans the line by hand (ADR 0206). Being
+  one token is what keeps `\frac` from being a line break and `{1}` from being a mark. For
+  it to be asked at all, a `Text` token may start with a `$` but never continue past one, so
+  every `$` is where a token starts; `parseBrief` merges the pieces of text back, so the AST
+  is what it was. What is inside is read by `parseFormula` (`formula.ts`), not the grammar:
+  a nested grammar would hand the editor a tree for formulas, and nothing reads one yet.
 - **A file whose last line has no break still parses.** The tokenizer supplies a zero-length
   one at end of input rather than leaving an error node on a perfectly good brief.
 - **A line ends on `\n`, on `\r\n` or on a lone `\r`.** A brief is a file a person edits, and
@@ -196,7 +205,7 @@ is where they showed.
 
 ## Diagnostics
 
-`E_SYNTAX` (from parse); `E_NO_TEMPLATE`, `E_UNKNOWN_TEMPLATE`, `E_UNKNOWN_FORMAT`, `E_FORMAT_NOT_IN_BRIEF`, `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_SLOT_VALUE`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_UNUSED_SLOT` (from resolve); `W_TEXT_OVERFLOW` (from compile). All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
+`E_SYNTAX`, `W_REDUNDANT_BREAK`, `E_FORMULA_COMMAND`, `E_FORMULA_GROUP`, `E_FORMULA_EMPTY` (from parse); `E_NO_TEMPLATE`, `E_UNKNOWN_TEMPLATE`, `E_UNKNOWN_FORMAT`, `E_FORMAT_NOT_IN_BRIEF`, `E_UNKNOWN_SLOT`, `E_UNKNOWN_DIRECTIVE`, `E_MISSING_REQUIRED_SLOT`, `E_BAD_SLOT_VALUE`, `E_BAD_ADJUSTMENT`, `E_ASSET_NOT_FOUND`, `W_UNUSED_SLOT` (from resolve); `W_TEXT_OVERFLOW` (from compile). All carry a `range` for the editor. Messages are English; the editor may localize them later via the code.
 
 ### What the editor shows, and what it cannot
 
@@ -254,7 +263,7 @@ the fence is closed.
 BriefAst   { frontmatter: Record<string, unknown>; directives: Directive[]; range }
 Directive  { name; namespace?; adjustments: Adjustment[]; body: RichText; range; nameRange }
 Adjustment { name; value?; range }
-RichText   = Inline[]; Inline = Text{value} | Bold{children} | Italic{children} | Break{paragraph?} | Mark{key, value, children}
+RichText   = Inline[]; Inline = Text{value} | Bold{children} | Italic{children} | Break{paragraph?} | Mark{key, value, children} | Formula{source, math, children}
 ```
 
 `parseBrief` in `packages/brief-lang/src/parse-brief.ts` builds it, returning
@@ -283,6 +292,13 @@ rename. These are the choices that gap forced, and where each one shows.
 - **A `Text` node carries what the source meant, not what it says.** `\::` arrives as
   `::` and `\//` as `//`, so its `value` is two characters where its `range` covers three.
   Those are the only places the two lengths differ, and it is what an escape is for.
+- **A `Formula` carries its structure and a reading of it** (ADR 0206 decision 15). `math` is
+  the `MathItem` list core lays out, `source` the formula as written with both `$`, and
+  `children` one `Text` holding its linear reading, `F = 1/(40·10^(-3)) = 25 Hz`, so a
+  traversal that reads rich text through `children` (`plainText` in `resolve`, a slot's
+  `max`, templates in their own repositories) keeps working and reads something sensible.
+  A formula with an error never becomes one: it is the `Text` it was written as, and only
+  its first error is reported, since what a reader says after one is a guess.
 - **The line between two block lines is a `Break`** — the same node a trailing `\`
   produces. The author wrote three lines and means three lines, the language has no other
   way to say so, and concatenating them would glue two words together. No break is emitted

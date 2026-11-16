@@ -44,6 +44,31 @@ Um asterisco de cada lado, `*assim*`, é itálico. Itálico dentro do negrito, `
 
 Um template cuja fonte não tem itálico não consegue exportá-lo. O Tyto avisa enquanto você escreve, com `E_FONT_FACE_UNAVAILABLE` nas palavras em itálico no painel de Problemas; a prévia continua desenhando, mas nenhum arquivo é gravado para aquela arte até o itálico sair ou o template mudar.
 
+## Fórmulas
+
+Escreva uma fórmula entre dois `$`. Dentro dela, `\frac{cima}{baixo}` empilha uma fração sobre um traço, `^` sobe um expoente e `_` desce um índice. Cada um recebe um grupo entre chaves, ou um único caractere sem elas: `$x^2$` é o mesmo que `$x^{2}$`. Um grupo pode ter outra fração ou outro expoente, como em `$\frac{1}{10^{3}}$`.
+
+<<< @/../examples/briefs/formulas.brief{md}
+
+| Você escreve                          | Você obtém                                             |
+| ------------------------------------- | ------------------------------------------------------ |
+| `$F = \frac{1}{40·10^{-3}} = 25\ Hz$` | `1` empilhado sobre `40·10⁻³`, com um traço entre eles |
+| `$E = mc^2$`                          | `E = mc²`                                              |
+| `$v_0^2$`                             | `v` com `2` em cima e `0` embaixo                      |
+| `R$ 50 to R$ 60`                      | os preços, como escritos                               |
+
+A fórmula é desenhada na fonte, no tamanho e na cor do template, então uma fórmula dentro de `**…**` ou de uma marca de cor também os recebe. Os espaços dentro dela ficam como você escreveu, e uma fórmula nunca se quebra em duas linhas.
+
+Dentro de uma fórmula, a `\` é da fórmula: ali ela não quebra a linha. Escreva `\ ` para um espaço que deve ficar depois de um número (`25\ Hz`), e `\$`, `\{` ou `\}` para esses caracteres.
+
+### Preços não são fórmulas
+
+Um `$` abre uma fórmula só quando o caractere seguinte não é um espaço, e a fecha só quando o caractere antes dele não é um espaço e o seguinte não é um dígito. É isso que mantém dinheiro como texto: `R$ 50`, `de R$ 50 a R$ 60` e `R$50 a R$60` não têm fórmula. Escreva todos os preços de uma linha do mesmo jeito: em `R$50 e R$ 60` os dois `$` formam um par e as palavras entre eles viram uma fórmula, sem o `$`.
+
+### Quando uma fórmula tem um erro
+
+O Tyto a desenha exatamente como você escreveu, com o `$`, e sublinha a parte que não entendeu: `E_FORMULA_COMMAND` para um comando que não é `\frac` (`\sqrt` não é desenhado), `E_FORMULA_GROUP` para uma chave que falta ou ficou aberta, e `E_FORMULA_EMPTY` para `$$` ou `{}`. O resto do brief não é afetado.
+
 ## Onde a formatação é lida
 
 Só no corpo. No [cabeçalho](./frontmatter.md) um valor é texto simples, e o Tyto avisa com `W_MARKUP_IN_FRONTMATTER` se encontrar formatação ali, a menos que o template declare que desenha `**…**` e `{cor:…}…{/}` naquele campo.
