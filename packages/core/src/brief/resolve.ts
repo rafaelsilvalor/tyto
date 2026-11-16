@@ -9,7 +9,7 @@ import { type SourceRange, sourceRange } from '../source/range.js';
 import type { TemplateConfigurations, TemplateSelection } from '../template/configurations.js';
 import { type BriefDefaults, measured } from '../template/configured-brief.js';
 import type { SuppliedValues } from '../template/declared-values.js';
-import type { Slot, TemplateManifest } from '../template/manifest.js';
+import { type Slot, type TemplateManifest, listsOccurrences } from '../template/manifest.js';
 import type { TemplateRegistry } from '../template/registry.js';
 
 /**
@@ -67,6 +67,15 @@ export interface ResolvedSlot {
    * `ResolvedArtwork.slots`, as ADR 0160 put them; this is the second level and below.
    */
   readonly slots?: Readonly<Record<string, ResolvedSlot>>;
+  /**
+   * Every value a `multiple` list slot was given inside this one parent, in brief order, this
+   * first one included (ADR 0207, note of 2026-11-16): the two `::bloco` of one slide, each with
+   * its own body and its own nested `slots`. The slot itself stays the first, so it reads as a
+   * single value too. Present only on a `multiple` slot that is not ADR 0160's pictures among
+   * a slide's lines, so a template whose manifest declares no `multiple` reads what it always
+   * read. The entries carry no `occurrences` of their own.
+   */
+  readonly occurrences?: readonly ResolvedSlot[];
 }
 
 /**
@@ -366,12 +375,19 @@ class Resolver {
   private open: OpenOccurrence[] = [];
   /** Every occurrence below the slide, by slot name, for `required` at depth. */
   private readonly nested = new Map<string, OpenOccurrence[]>();
+  /**
+   * A `multiple` list slot's values inside one parent, keyed by the first of them — the one
+   * the parent holds under the slot's name (ADR 0207, note of 2026-11-16).
+   */
+  private readonly siblings = new Map<ResolvedSlot, ResolvedSlot[]>();
 
   constructor(
     private readonly manifest: TemplateManifest,
     private readonly options: ResolveOptions,
   ) {
-    this.placesAmongLines = Object.values(manifest.slots).some((slot) => slot.multiple === true);
+    this.placesAmongLines = Object.entries(manifest.slots).some(
+      ([name, slot]) => slot.multiple === true && !listsOccurrences(manifest, name),
+    );
   }
 
   report(problem: Diagnostic): void {
@@ -417,7 +433,11 @@ class Resolver {
       return;
     }
 
-    if (slot.multiple === true && slot.per !== undefined) {
+    if (
+      slot.multiple === true &&
+      slot.per !== undefined &&
+      !listsOccurrences(this.manifest, candidate.name)
+    ) {
       await this.takeAmongLines(candidate, slot, slot.per);
       return;
     }
@@ -475,9 +495,12 @@ class Resolver {
   private takeForOccurrence(resolved: ResolvedSlot, owner: string): void {
     const parent = this.openParent(resolved, owner);
     if (parent === undefined) return;
-    if (resolved.name in parent.children) {
-      const which =
-        this.open.length === 1 ? `${owner} ${parent.artwork.index + 1}` : `this '${owner}'`;
+    const which =
+      this.open.length === 1 ? `${owner} ${parent.artwork.index + 1}` : `this '${owner}'`;
+    const first = parent.children[resolved.name];
+    if (first !== undefined && listsOccurrences(this.manifest, resolved.name)) {
+      if (!this.addSibling(first, resolved, which)) return;
+    } else if (first !== undefined) {
       this.report(
         badValue(
           resolved.name,
@@ -487,7 +510,10 @@ class Resolver {
       );
       return;
     }
-    parent.children[resolved.name] = resolved;
+    if (first === undefined) {
+      parent.children[resolved.name] = resolved;
+      if (listsOccurrences(this.manifest, resolved.name)) this.siblings.set(resolved, [resolved]);
+    }
     const occurrence: OpenOccurrence = {
       name: resolved.name,
       slot: resolved,
@@ -498,6 +524,28 @@ class Resolver {
     const all = this.nested.get(resolved.name) ?? [];
     all.push(occurrence);
     this.nested.set(resolved.name, all);
+  }
+
+  /**
+   * One more value of a `multiple` list slot inside the parent that holds `first`, unless the
+   * manifest's `max` is reached: then it is refused at its own line, as a slot set twice is.
+   */
+  private addSibling(first: ResolvedSlot, resolved: ResolvedSlot, which: string): boolean {
+    const list = this.siblings.get(first) ?? [first];
+    const max = this.manifest.slots[resolved.name]?.max;
+    if (max !== undefined && list.length >= max) {
+      this.report(
+        badValue(
+          resolved.name,
+          `appears more than ${max} times in ${which}, and the manifest allows ${max}`,
+          resolved.range,
+        ),
+      );
+      return false;
+    }
+    list.push(resolved);
+    this.siblings.set(first, list);
+    return true;
   }
 
   /** The nearest open occurrence of `owner`, with everything opened inside it closed. */
@@ -666,7 +714,9 @@ class Resolver {
         // one end unenforced was a rule the manifest accepted and nothing applied
         // (TYTO-67); making it a warning instead would have given one pair three
         // behaviours across two slot kinds.
-        if (!slot.repeat && slot.min !== undefined && drawn.length < slot.min) {
+        // On a `multiple` slot the pair counts occurrences per parent instead (ADR 0207).
+        const countsCharacters = !slot.repeat && slot.multiple !== true;
+        if (countsCharacters && slot.min !== undefined && drawn.length < slot.min) {
           this.report(
             badValue(
               candidate.name,
@@ -677,7 +727,7 @@ class Resolver {
           return undefined;
         }
 
-        if (!slot.repeat && slot.max !== undefined && drawn.length > slot.max) {
+        if (countsCharacters && slot.max !== undefined && drawn.length > slot.max) {
           this.report(
             badValue(
               candidate.name,
@@ -839,6 +889,9 @@ class Resolver {
         ...[...this.nested.values()].flatMap((all) =>
           all.flatMap((occurrence) => Object.entries(occurrence.children)),
         ),
+        ...[...this.siblings.values()].flatMap((list) =>
+          list.slice(1).map((sibling): [string, ResolvedSlot] => [sibling.name, sibling]),
+        ),
       ];
       for (const [name, resolved] of [...this.slots, ...perOccurrence]) {
         if (rendered.includes(name)) continue;
@@ -899,8 +952,21 @@ class Resolver {
     }
   }
 
-  /** `slot` with the slots declared `per` it attached, all the way down (ADR 0207). */
+  /**
+   * `slot` with the slots declared `per` it attached, all the way down (ADR 0207), and, on the
+   * first value of a `multiple` list slot, every value its parent was given beside it.
+   */
   private withNested(slot: ResolvedSlot): ResolvedSlot {
+    const own = this.ownNested(slot);
+    const list = this.siblings.get(slot);
+    if (list === undefined) return own;
+    return {
+      ...own,
+      occurrences: list.map((sibling) => (sibling === slot ? own : this.ownNested(sibling))),
+    };
+  }
+
+  private ownNested(slot: ResolvedSlot): ResolvedSlot {
     const children = this.childrenOf(slot);
     if (children === undefined) return slot;
     const slots: Record<string, ResolvedSlot> = {};

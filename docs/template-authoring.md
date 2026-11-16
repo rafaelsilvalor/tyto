@@ -114,16 +114,27 @@ These are the rules it enforces beyond the shape:
   stay flat in `context.slots`; from the second level down a value rides inside its parent, in
   an optional `slots`: `context.slots.bloco.slots?.paragrafo`. It is absent when nothing was
   written inside, so a template written before nesting reads what it read. A `required` slot
-  below the slide is required inside every occurrence of its parent. `multiple` is not built
-  below the slide, and a `template.html` template cannot read a nested value yet.
+  below the slide is required inside every occurrence of its parent. A `template.html`
+  template cannot read a nested value yet.
+- **`multiple: true` on any other `per` slot makes it a list** (ADR 0207, note of 2026-11-16,
+  TYTO-746): with `bloco: { per: lamina, multiple: true }` and
+  `paragrafo: { per: bloco, multiple: true }`, every `::bloco` in the same slide is a value of
+  its own, with its own body and its own paragraphs, in brief order. `slots.bloco` stays the
+  first one, so it still reads as a single value, and it gains `occurrences`: every `::bloco`
+  of that parent, the first included, each with its own `slots`
+  (`slots.bloco.occurrences[1].slots?.paragrafo?.occurrences`). Iterate
+  `slot.occurrences ?? [slot]`. `occurrences` is present only on such a slot, so a manifest
+  that declares no `multiple` gives the objects it gave before. On a `multiple` slot `max`
+  counts occurrences per parent — one past it is `E_BAD_SLOT_VALUE` at its own line — and
+  `min` is a manifest error; `required` asks for at least one in every parent.
 - **`multiple: true` places several pictures among a slide's lines** (ADR 0160, amended
   2026-10-31): `imagem: { type: image, per: lamina, multiple: true }`. Each `::imagem` after
   the same `::lamina` adds one; its first line is the path and the lines under it continue
   the slide's body. The template reads `slots.lamina.blocks`, the slide's body in order —
   `{ kind: 'text', text, range }` and `{ kind: 'slot', slot }` interleaved — while
   `slots.lamina.value` stays the opening text and `slots.imagem` the first picture.
-  `blocks` is present only when the manifest declares a `multiple` slot. Only an `image`
-  slot whose `per` names the repeatable slot may say `multiple`.
+  `blocks` is present only when the manifest declares such a slot. This meaning belongs to an
+  `image` slot whose `per` names the repeatable slot; every other `multiple` slot is a list.
 - **`frontmatterMarks: true` says the template draws marks in a frontmatter value**
   (TYTO-622): `titulo: { type: rich-text, frontmatterMarks: true }` for a template that
   reads `slots.titulo` through template-kit's `richTextOfPlain` when it came from the

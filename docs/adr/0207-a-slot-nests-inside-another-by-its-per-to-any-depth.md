@@ -94,3 +94,29 @@ the nesting from `blocksOf`, against the manifest of the brief's last analysis, 
 directive's `foldNodeProp`; sticky scroll pins the same chain through the brief language's
 `outerBlocks` data, since the tree is flat; and the fold gutter and sticky rows redraw when
 that manifest changes. Decisions 1 to 6 stand.
+
+## Note, 2026-11-16 — several values of a nested slot in one parent (TYTO-746)
+
+Decision 6 is lifted for every slot but the one ADR 0160 amended. `multiple: true` may be
+declared on any `per` slot, of any type, at any depth. On an `image` slot whose `per` names the
+repeatable slot it keeps ADR 0160's meaning, pictures among the slide's lines, unchanged. On
+every other slot it makes a list: each occurrence inside the same open parent is a value of its
+own, with its own body and its own nested slots, and decision 2's stack already gives each
+sibling the directives written after it, since reaching the parent closes the sibling before.
+
+The template contract does not change, so this is a note and not a new ADR. `slots.bloco` stays
+one `ResolvedSlot`, the first occurrence, as ADR 0160's amendment kept `slots.imagem` the first
+picture, and gains an optional `occurrences`: every occurrence in that parent, in brief order,
+the first included, each with its own `slots` and none with `occurrences` of its own. It is
+present only on a list-kind `multiple` slot, so a manifest that declares no `multiple` resolves
+to the same JSON it did at `origin/main` e9899627 (`nested-without-multiple.test.ts`, seeded by
+that commit's `resolve`). It crosses to an isolated template inside the loose `slots` record;
+`isolated-plugin.test.ts` fails if `templateCallSchema` drops it. Making `slots.bloco` an array
+was rejected: it changes the type of the record every template reads.
+
+Decision 3 holds for a slot without `multiple`. On a `multiple` slot `max` counts occurrences per
+parent, not characters: one past it is `E_BAD_SLOT_VALUE` at its own line and is dropped. `min`
+on a `multiple` slot is a manifest error, since a count below it has no line of its own to be
+reported at. `required` asks for at least one inside every parent. `briefBlocks`, the
+breadcrumb, Go to Block, the fold and Format Brief needed no change: each sibling was already a
+block of its own whose parent is the occurrence open above it.

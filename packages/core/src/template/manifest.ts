@@ -71,10 +71,13 @@ export const slotSchema = z
      */
     per: z.string().min(1).optional(),
     /**
-     * A `per` image slot that takes several values on one slide (ADR 0160, amended
-     * 2026-10-31): each `::imagem` after the same `::lamina` adds one, and the lines written
-     * under it continue the slide's body. Optional rather than defaulted, so a manifest that
-     * never says it parses to the same object it did before.
+     * A `per` slot that takes several values in one occurrence of its parent. On an image slot
+     * whose `per` is the repeatable one it keeps ADR 0160's amended meaning (2026-10-31): each
+     * `::imagem` after the same `::lamina` adds one, and the lines written under it continue
+     * the slide's body. On any other `per` slot it is a list (ADR 0207, note of 2026-11-16):
+     * each `::bloco` inside the same parent adds one, with its own body and its own nested
+     * slots, and `max` counts them per parent. Optional rather than defaulted, so a manifest
+     * that never says it parses to the same object it did before.
      */
     multiple: z.boolean().optional(),
     /**
@@ -119,9 +122,20 @@ export const slotSchema = z
     // set, so `{ type: image, max: 60 }` reads like a rule and enforces nothing. Refused
     // here rather than ignored at `resolve`, where a cap that silently does nothing is the
     // worse of the two.
+    // On a `multiple` slot `max` counts occurrences per parent, whatever the type, and `min`
+    // is not built: a count nobody wrote has no parent line to be reported at yet.
+    if (slot.multiple === true && slot.min !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['min'],
+        message: 'min is not built on a multiple slot; required asks for at least one per parent',
+      });
+    }
+
     if (!slot.repeat && slot.type !== 'rich-text') {
       for (const bound of ['min', 'max'] as const) {
         if (slot[bound] === undefined) continue;
+        if (slot.multiple === true) continue;
         context.addIssue({
           code: 'custom',
           path: [bound],
@@ -345,29 +359,18 @@ export const templateManifestSchema = z
     // A slide's own slot hangs off the one occurrence it follows, so it has to name the slot
     // that has occurrences, and it cannot have one of its own or a value nobody wrote.
     for (const [name, slot] of Object.entries(manifest.slots)) {
-      // Several values sit among a slide's lines, so only a slide's own slot can have them,
-      // and only a picture: its path is one line, which leaves the lines under it free to be
-      // the slide's body.
-      if (slot.multiple === true && (slot.per === undefined || slot.type !== 'image')) {
+      // Several values need a parent to count them in: the slide, or a `per` slot inside it.
+      if (slot.multiple === true && slot.per === undefined) {
         context.addIssue({
           code: 'custom',
           path: ['slots', name, 'multiple'],
-          message: 'multiple is only meaningful on an image slot that declares per',
+          message: 'multiple is only meaningful on a slot that declares per',
         });
       }
       if (slot.per === undefined) continue;
       const chainProblem = perChainProblem(manifest.slots, name);
       if (chainProblem !== undefined) {
         context.addIssue({ code: 'custom', path: ['slots', name, 'per'], message: chainProblem });
-      }
-      // Several pictures sit among a slide's own lines, so a `multiple` slot belongs to the
-      // slide itself; one among a block's lines is not built (ADR 0207).
-      if (slot.multiple === true && manifest.slots[slot.per]?.repeat !== true) {
-        context.addIssue({
-          code: 'custom',
-          path: ['slots', name, 'multiple'],
-          message: `multiple is only built for a slot whose per names the repeatable slot, and '${slot.per}' is not it`,
-        });
       }
       if (slot.repeat) {
         context.addIssue({
@@ -417,6 +420,17 @@ function perChainProblem(
     current = parent;
   }
   return undefined;
+}
+
+/**
+ * Whether `name` is a `multiple` slot read as a list — each occurrence inside the same parent a
+ * value of its own, with its own body (ADR 0207, note of 2026-11-16) — rather than ADR 0160's
+ * pictures among a slide's lines, which stay what an image slot `per` the repeatable one means.
+ */
+export function listsOccurrences(manifest: Pick<TemplateManifest, 'slots'>, name: string): boolean {
+  const slot = manifest.slots[name];
+  if (slot?.multiple !== true || slot.per === undefined) return false;
+  return !(slot.type === 'image' && manifest.slots[slot.per]?.repeat === true);
 }
 
 /**

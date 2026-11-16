@@ -243,7 +243,7 @@ describe('a manifest whose per names another per slot', () => {
     ).toEqual([0, 0, 1, 2, 3]);
   });
 
-  it('refuses a cycle, a dead end and a multiple slot below the slide', () => {
+  it('refuses a cycle and a dead end, and takes a multiple slot below the slide', () => {
     expect(
       manifestProblems(`name: x
 version: 1.0.0
@@ -265,9 +265,6 @@ slots:
         "per names 'titulo', which is not the manifest's repeatable slot nor a slot that belongs to it",
       ),
       expect.stringContaining("per names 'nada'"),
-      expect.stringContaining(
-        "multiple is only built for a slot whose per names the repeatable slot, and 'bloco' is not it",
-      ),
     ]);
   });
 });
