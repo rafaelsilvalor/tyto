@@ -3,6 +3,7 @@
 What changed in each version of the desktop app, newest first. Each page is the text published
 with that release, written in Brazilian Portuguese.
 
+- [Tyto 0.23.1](./desktop-v0.23.1) — the command panel works with files, aliases and variables, and a comment no longer breaks a slide
 - [Tyto 0.22.0](./desktop-v0.22.0) — a recipe reads in blocks, like a notebook, and the command line signs in
 - [Tyto 0.20.0](./desktop-v0.20.0) — an agent panel that talks to Claude, and agents that write briefs
 - [Tyto 0.17.0](./desktop-v0.17.0) — an AI agent works with the open window and proposes edits
