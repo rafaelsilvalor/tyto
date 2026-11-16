@@ -12,7 +12,7 @@ The example is for `notice`, the manual's own template. Copy [its folder](https:
 | ------------------------------- | ---------------------------------------------------- |
 | `**free**`                      | **bold**                                             |
 | `*children*`                    | _italic_                                             |
-| a new line in an indented block | a new line in the artwork                            |
+| a new line in a block           | a new line in the artwork                            |
 | a blank line between two lines  | a new paragraph                                      |
 | `{cor:laranja}this Saturday{/}` | the words in the colour the template calls `laranja` |
 
@@ -22,13 +22,13 @@ Two asterisks on each side. In a slot the template already sets in bold, like `n
 
 ## Line breaks
 
-In an [indented block](./directives.md#two-ways-to-write-the-text), every line is a line in the artwork, so the title above has two. A long line still wraps on its own where the template's width ends.
+In a [block on the lines below](./directives.md#two-ways-to-write-the-text), every line is a line in the artwork, so the title above has two. A long line still wraps on its own where the template's width ends.
 
 In text written on the directive's own line, a `\` breaks the line there: `::title Free class\this Saturday` is two lines. A block does not need it — its lines already break — so Tyto drops a `\` at the end of a block line and warns with `W_REDUNDANT_BREAK`.
 
 ## Paragraphs
 
-A blank line between two lines of an indented block starts a new paragraph. Several blank lines in a row are still one paragraph, and a blank line right under the directive or at the end of the block means nothing.
+A blank line between two lines of a block starts a new paragraph. Several blank lines in a row are still one paragraph, and a blank line right under the directive or at the end of the block means nothing.
 
 <<< @/../examples/briefs/paragraphs.brief{md}
 

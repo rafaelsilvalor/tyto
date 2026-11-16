@@ -12,7 +12,7 @@ O exemplo é para o `notice`, o template do próprio manual. Copie [a pasta dele
 | ------------------------------------- | ---------------------------------------------------- |
 | `**free**`                            | **negrito**                                          |
 | `*children*`                          | _itálico_                                            |
-| uma linha nova num bloco com recuo    | uma linha nova na arte                               |
+| uma linha nova num bloco              | uma linha nova na arte                               |
 | uma linha em branco entre duas linhas | um parágrafo novo                                    |
 | `{cor:laranja}this Saturday{/}`       | as palavras na cor que o template chama de `laranja` |
 
@@ -22,13 +22,13 @@ Dois asteriscos de cada lado. Num slot que o template já desenha em negrito, co
 
 ## Quebras de linha
 
-Num [bloco com recuo](./directives.md#dois-jeitos-de-escrever-o-texto), cada linha é uma linha na arte, então o título acima tem duas. Uma linha comprida continua quebrando sozinha onde termina a largura do template.
+Num [bloco nas linhas de baixo](./directives.md#dois-jeitos-de-escrever-o-texto), cada linha é uma linha na arte, então o título acima tem duas. Uma linha comprida continua quebrando sozinha onde termina a largura do template.
 
 No texto escrito na própria linha da diretiva, uma `\` quebra a linha ali: `::title Free class\this Saturday` são duas linhas. Um bloco não precisa dela — as linhas dele já quebram —, então o Tyto descarta a `\` no fim de uma linha do bloco e avisa com `W_REDUNDANT_BREAK`.
 
 ## Parágrafos
 
-Uma linha em branco entre duas linhas de um bloco com recuo começa um parágrafo novo. Várias linhas em branco seguidas continuam sendo um parágrafo só, e uma linha em branco logo abaixo da diretiva ou no fim do bloco não significa nada.
+Uma linha em branco entre duas linhas de um bloco começa um parágrafo novo. Várias linhas em branco seguidas continuam sendo um parágrafo só, e uma linha em branco logo abaixo da diretiva ou no fim do bloco não significa nada.
 
 <<< @/../examples/briefs/paragraphs.brief{md}
 

@@ -4,6 +4,7 @@ import {
   Formula,
   Frontmatter,
   blankRun,
+  bodyBreak,
   commentBreak,
   virtualNewline,
 } from './brief.parser.terms.js';
@@ -24,6 +25,7 @@ const DASH = 45;
 const SLASH = 47;
 const DIGIT_ZERO = 48;
 const DIGIT_NINE = 57;
+const COLON = 58;
 const BACKSLASH = 92;
 
 type Input = { peek: (offset: number) => number };
@@ -152,24 +154,44 @@ function isCommentAt(input: Input, offset: number): boolean {
   return input.peek(offset) === SLASH && input.peek(offset + 1) === SLASH;
 }
 
-/**
- * True when the first line from `offset` on that holds something other than a column-0
- * comment is indented: the block goes on after the comment lines in front of it.
- */
-function indentedLineFollows(input: Input, offset: number): boolean {
-  let lineStart = offset;
+/** True when `::` starts at `offset`: a directive. */
+function isDirectiveAt(input: Input, offset: number): boolean {
+  return input.peek(offset) === COLON && input.peek(offset + 1) === COLON;
+}
+
+/** The first line from `lineStart` on that is not blank: where it starts, and its first character. */
+interface FilledLine {
+  readonly lineStart: number;
+  readonly at: number;
+}
+
+/** Past blank lines, to the first one holding something; `undefined` when only blank lines are left. */
+function firstFilledLine(input: Input, from: number): FilledLine | undefined {
+  let lineStart = from;
   for (;;) {
     let at = lineStart;
     while (isBlank(input.peek(at))) at += 1;
     const next = input.peek(at);
-    if (next < 0) return false;
-    if (isLineEnd(next)) {
-      lineStart = afterLineEnd(input, at);
-      continue;
-    }
-    if (at > lineStart) return true;
-    if (!isCommentAt(input, at)) return false;
-    lineStart = nextLineStart(input, at);
+    if (next < 0) return undefined;
+    if (!isLineEnd(next)) return { lineStart, at };
+    lineStart = afterLineEnd(input, at);
+  }
+}
+
+/**
+ * True when the block goes on from `offset`: the first line that is neither blank nor a
+ * column-0 comment is not a directive. An indented line always is the block's; since TYTO-708
+ * a column-0 text line is too (ADR 0202), so only a `::` at column 0, or the end of the input,
+ * ends it.
+ */
+function blockGoesOn(input: Input, offset: number): boolean {
+  let from = offset;
+  for (;;) {
+    const line = firstFilledLine(input, from);
+    if (line === undefined) return false;
+    if (line.at > line.lineStart) return true;
+    if (!isCommentAt(input, line.at)) return !isDirectiveAt(input, line.at);
+    from = nextLineStart(input, line.at);
   }
 }
 
@@ -180,10 +202,11 @@ function indentedLineFollows(input: Input, offset: number): boolean {
  * A comment inside a block is skipped and the block goes on, the way a blank line is
  * (ADR 0087). An indented `//` is always the block's: nothing else can sit at an indent
  * inside a block. A `//` at column 0 is the block's only when the block goes on after it —
- * the next line that is neither blank nor another column-0 comment is indented. Otherwise
- * the block ends at it, and it is the top-level comment it always was, so a comment above
- * a directive still belongs to nothing. That depends on lines past the token, which is why
- * this scans by hand.
+ * the next line that is neither blank nor another column-0 comment is not a directive
+ * (ADR 0204's note of 2026-11-16: it read "is indented" until a column-0 text line became a
+ * body line, TYTO-708). Otherwise the block ends at it, and it is the top-level comment it
+ * always was, so a comment above a directive still belongs to nothing. That depends on lines
+ * past the token, which is why this scans by hand.
  *
  * The token stops right before the `//`, so the `Comment` that follows is the grammar's own
  * token and covers the same characters a top-level comment does. It is only asked inside a
@@ -192,20 +215,34 @@ function indentedLineFollows(input: Input, offset: number): boolean {
 export const commentsInBlocks = new ExternalTokenizer((input) => {
   if (!isLineEnd(input.peek(0))) return;
 
-  let lineStart = afterLineEnd(input, 0);
-  let at: number;
-  for (;;) {
-    at = lineStart;
-    while (isBlank(input.peek(at))) at += 1;
-    const next = input.peek(at);
-    if (next < 0) return;
-    if (!isLineEnd(next)) break;
-    lineStart = afterLineEnd(input, at);
-  }
+  const line = firstFilledLine(input, afterLineEnd(input, 0));
+  if (line === undefined || !isCommentAt(input, line.at)) return;
+  if (line.at === line.lineStart && !blockGoesOn(input, nextLineStart(input, line.at))) return;
+  input.acceptToken(commentBreak, line.at);
+});
 
-  if (!isCommentAt(input, at)) return;
-  if (at === lineStart && !indentedLineFollows(input, nextLineStart(input, at))) return;
-  input.acceptToken(commentBreak, at);
+/**
+ * The line break and blank lines in front of a column-0 text line, which continues the block
+ * above it (TYTO-708, ADR 0202 decision 2).
+ *
+ * Indentation never changes what a brief compiles to, so a line that starts with neither
+ * `::` nor `//` is a body line whether it is indented or not. An indented one is the grammar's
+ * `blockIndent`; this hands out the break for the other, and only when the line really starts
+ * at column 0 with something that is neither a directive nor a comment — the start of the next
+ * line, which a Lezer token cannot see. Blank lines in front of it are taken along, as
+ * `blockIndent` takes them, so a blank line between two column-0 lines is the same paragraph
+ * boundary it is between two indented ones (ADR 0205).
+ *
+ * Only asked inside a directive, where `bodyBreak` is valid: text before the first directive
+ * is still the error it was.
+ */
+export const bodyBreaks = new ExternalTokenizer((input) => {
+  if (!isLineEnd(input.peek(0))) return;
+
+  const line = firstFilledLine(input, afterLineEnd(input, 0));
+  if (line === undefined || line.at !== line.lineStart) return;
+  if (isDirectiveAt(input, line.at) || isCommentAt(input, line.at)) return;
+  input.acceptToken(bodyBreak, line.lineStart);
 });
 
 function isDigit(code: number): boolean {

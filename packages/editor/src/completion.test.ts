@@ -137,6 +137,17 @@ describe('completeBrief', () => {
     expect(completeAt(`${frontmatter()}::titulo\n  a\n  // x|\n  b\n`, analysis)).toBeNull();
   });
 
+  it('offers nothing in a body line at column 0, and names after a :: there (TYTO-708)', () => {
+    const analysis = analysisOf(CARROSSEL);
+
+    expect(completeAt(`${frontmatter()}::titulo\nDireito Cons|\n`, analysis)).toBeNull();
+    expect(labelsOf(completeAt(`${frontmatter()}::titulo\nDireito\n::ti|`, analysis))).toEqual([
+      'item',
+      'titulo',
+      'tom',
+    ]);
+  });
+
   it('replaces what has been typed of the name, not the :: in front of it', () => {
     const doc = `${frontmatter()}::ti|`;
     const result = completeAt(doc, analysisOf(CARROSSEL));

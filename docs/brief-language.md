@@ -31,7 +31,8 @@ write briefs; this document is the grammar for people who change it.
 ## Rules
 
 - **Frontmatter**: metadata and scalar slots. `template` is required (or `--template` on the CLI). `formats` defaults come from the manifest; a run's requested formats (`--formats`, the Export dialog) narrow the brief's list and never widen it (ADR 0107). A scalar on a rich-text slot is one run of plain text, and inline markup in it is `W_MARKUP_IN_FRONTMATTER`, unless the slot declares `frontmatterMarks` and the markup is the subset its template draws — see below.
-- **Slot directive** `::name value` — inline value to end of line, or an indented block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
+- **Slot directive** `::name value` — inline value to end of line, or a block on the following lines. The name must exist in the template manifest (`E_UNKNOWN_SLOT`).
+- **Indentation is visual** (ADR 0202, TYTO-708): every line under a directive that starts with neither `::` nor `//` is part of its block, indented or at column 0, and a brief compiles to the same Scene either way. `::lamina` / `Linha um` / `Linha dois` is one slide with two lines, as `::lamina` / `  Linha um` / `  Linha dois` is; a blank line between two column-0 lines is a paragraph, as between two indented ones; and `::titulo Direito` / `Constitucional` is `Direito`, a line break, `Constitucional`. Text before the first directive is still an error. A column-0 line that starts with a single `:` and a name (`:titulo X`) is most likely a directive missing a colon: it is kept as text and warned about with `W_LIKELY_DIRECTIVE`, naming the line.
 - **Repeatable directive** (`::lamina`) — each occurrence becomes an `Artwork`. The manifest declares which slot is `repeat`.
 - **A slide's own slot** (`::imagem` after a `::lamina`) — a slot the manifest declares `per: lamina` belongs to the occurrence written last before it, so each slide carries its own picture (ADR 0160). One per slide; before any `::lamina`, a second one for the same slide, or in the frontmatter, it is `E_BAD_SLOT_VALUE`. A `required` one is required on every slide, and `E_MISSING_REQUIRED_SLOT` points at the slide that lacks it. An image resolves like any other: same folders, same `E_ASSET_NOT_FOUND`, at that line.
 - **Pictures among a slide's lines** — when that slot also declares `multiple: true`, each `::imagem` after the same `::lamina` adds a picture instead of being refused, and the directive's first line is the path while the indented lines under it continue the slide's body (ADR 0160, amended 2026-10-31). `::lamina` / `  Um` / `::imagem ./a.png` / `  Dois` / `::imagem ./b.png` is one slide: text, picture, text, picture. No grammar changes: the parser already reads those lines as the `::imagem`'s body, and `resolve` splits them at the first line break. Without `multiple`, the lines under an `::imagem` are part of its path, as before.
@@ -41,7 +42,7 @@ write briefs; this document is the grammar for people who change it.
 - **Math** is plain Unicode with a space on each side of an operator: `Q = U · A · ΔT`. Glyphs the template's face lacks are drawn in the bundled symbol face (ADR 0168), and a line never starts with a standalone operator: the space before one is not a break, the space after it is (ADR 0169). To keep a whole formula on one line, write its spaces as no-break spaces (U+00A0).
 - **Formula** `$F = \frac{1}{40·10^{-3}} = 25\ Hz$` — a stacked fraction (`\frac{numerator}{denominator}`), a superscript (`^{…}`) and a subscript (`_{…}`), on one line between two `$` (ADR 0206, TYTO-734). `^c` and `_c` take one character without braces, and a group may hold any of the three again. A `$` opens a formula only before a character that is not a space, and closes one only after a character that is not a space and before one that is not a digit (Pandoc's rule), so `R$ 50`, `de R$ 50 a R$ 60` and `R$50 a R$60` hold no formula; a `$` that opens or closes nothing is plain text. Two prices spaced differently on one line, `R$50 e R$ 60`, do pair up into a formula, as in Pandoc. Inside a formula `\` is the formula's: the line break `\`, `\::` and `\//` do not apply there, and its own escapes are `\ ` (a space), `\$`, `\{` and `\}`. Spaces are kept as written, and a formula is one word: it never breaks. An unknown command (`\sqrt`) is `E_FORMULA_COMMAND`, a missing, unclosed or bare `{…}` is `E_FORMULA_GROUP`, and `$$` or `{}` is `E_FORMULA_EMPTY`, each on the characters at fault; the formula is then drawn as its source text, `$` included.
 - **Assets**: a path is read as written, relative to the `.brief` file; when nothing is there, the same path is read from `assets/` beside the brief (ADR 0056). If both exist, the one beside the brief wins, and a path that climbs out of the brief's folder is read from neither. `resolve` confirms existence and computes a hash of the bytes, so the hash is the same whichever folder the file was found in. The CLI, `tyto watch`, the queue, the preview and the export box all follow this rule; only `tyto render --assets <dir>` replaces it, with that one folder and no fallback. A brief in a folder named `editaveis` — a delivery's copy — also reads `../assets`, the delivery's images (ADR 0057).
-- **Comments**: `//` at line start. Inside an indented block, a `//` line at any indent — or at column 0 between two lines of the same block — is skipped and the block goes on (ADR 0204).
+- **Comments**: `//` at line start. Inside a block, a `//` line at any indent — or at column 0 between two lines of the same block — is skipped and the block goes on (ADR 0204).
 - **Escape**: `\::` for text starting with `::`, `\//` for a body line starting with `//` (ADR 0204). Inside a formula, `\ `, `\$`, `\{` and `\}` (ADR 0206).
 - **Plugin directives**: plugins register namespaced directives, `::ai/caption`. Without the plugin ⇒ `E_UNKNOWN_DIRECTIVE`. See _Plugin directives_ below.
 
@@ -99,19 +100,19 @@ had to answer them.
   text it makes a paragraph** (ADR 0205). One blank line or several in a row, empty or holding
   only spaces, between two groups of a `::lamina` is one paragraph boundary; between the
   directive and its first body line, or after the last, it is there for whoever reads the
-  brief and means nothing. A block ends only at the next line that is not blank and starts
-  back at column 0. The grammar does not tell the two apart: `parseBrief` reads the source
+  brief and means nothing. A block ends only at the next `::` at column 0 (ADR 0202). The grammar does not tell the two apart: `parseBrief` reads the source
   between two lines of text and marks the `Break` between them `paragraph` when a whole line
   there is blank — a comment line is not, so a comment between two lines makes no paragraph
   (ADR 0204). An indented line is
   recognised by the break in front of it, and the token for that indent takes every blank
-  line before it along; at the top level a run of blank lines is one token of its own, so a
+  line before it along; `bodyBreak`, the break in front of a column-0 body line, takes them
+  the same way; at the top level a run of blank lines is one token of its own, so a
   line of spaces between two directives is as blank as an empty one. A directive's range
   ends at its last line with text, never on the blank lines its block absorbed.
 - **A comment line inside a block is skipped and does not end it either** (ADR 0204). An
   indented `//` line is always a comment of the block it is in, even as its last line. A `//`
   at column 0 is the block's when the block goes on after it: the next line that is neither
-  blank nor another column-0 comment is indented. Otherwise the block ends before it and it
+  blank nor another column-0 comment is not a `::` directive (ADR 0204, amended 2026-11-16). Otherwise the block ends before it and it
   is a top-level comment, as before, so a note above a directive belongs to no block. Only
   the lines after it settle that, so `commentsInBlocks` in `tokens.ts` scans them by hand and
   hands out `commentBreak` — the line break, blank lines and indent in front of the `//` — and
@@ -124,10 +125,13 @@ had to answer them.
   line of a block. Only the text a line ends with is trimmed: spaces before a trailing `\`,
   between words, or inside bold or a mark stay where they are — unless that `\` is dropped as
   redundant (ADR 0109), which leaves the spaces at the end of the line, and they go.
-- **How far a body line is indented has no meaning either**: two spaces, six or a tab all
-  make a body line. **Format Brief** (`formatBrief` in `brief-lang`, Alt+Shift+F in the
+- **Whether and how far a body line is indented has no meaning either** (ADR 0087, ADR
+  0202): none, two spaces, six or a tab all make a body line. A column-0 one cannot be told
+  from a directive or a comment by a regular token, so `bodyBreaks` in `tokens.ts` looks at
+  the start of the next line and hands out `bodyBreak` only when it is neither `::` nor `//`;
+  `BodyLine` is `blockIndent BlockText?` or `bodyBreak BlockText`. **Format Brief** (`formatBrief` in `brief-lang`, Alt+Shift+F in the
   window) rewrites exactly what the language ignores — the indent of each body line to
-  `tabSize` spaces, the spaces at the end of a line, a run of blank lines to one, a blank line
+  `tabSize` spaces, a column-0 one included, the spaces at the end of a line, a run of blank lines to one, a blank line
   between a head with no text of its own and its first body line, a final line ending — and nothing inside a line, so
   the brief compiles to the same Scene. A comment line inside a block is indented like the
   body lines (ADR 0204); a top-level one stays at column 0. It refuses a brief with a syntax

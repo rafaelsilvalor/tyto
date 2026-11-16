@@ -11,13 +11,19 @@ Os exemplos são para o `notice`, o template do próprio manual. Copie [a pasta 
 ## Dois jeitos de escrever o texto
 
 - **Na mesma linha**, depois do nome e de um espaço: `::titulo Open day at the library`. Bom para uma linha curta.
-- **Nas linhas de baixo**, com recuo de dois espaços. O texto vai até a próxima linha sem recuo. Use para texto mais longo e para texto que precisa quebrar onde você quer: cada linha do bloco é uma linha na arte.
+- **Nas linhas de baixo**. O texto vai até a próxima linha que começa com `::`. Use para texto mais longo e para texto que precisa quebrar onde você quer: cada linha do bloco é uma linha na arte.
+
+O recuo das linhas de baixo é escolha sua. `::titulo` com `Open day` na linha seguinte, no começo da linha, é o mesmo que com `  Open day` recuado dois espaços: a arte sai igual. O recuo só ajuda a ver quais linhas são de qual diretiva, e o [**Arrumar brief**](../editor/format-brief.md) recua todas para você. Uma linha escrita logo depois de `::titulo Open day` continua esse título numa linha nova.
 
 ## Anotações
 
 Uma linha que começa com `//` é uma anotação. O Tyto pula, então ela pode dizer qualquer coisa — quem pediu a arte, o que conferir antes de enviar.
 
 Uma anotação também pode ficar entre as linhas de um bloco, com recuo ou sem, como a do `::subtitulo` acima. Ela é pulada e o bloco continua depois dela: o subtítulo recebe as três linhas de texto. Uma anotação no começo da linha, antes da próxima diretiva, não é de nenhum bloco. O [**Arrumar brief**](../editor/format-brief.md) recua a anotação de dentro de um bloco como as linhas em volta dela.
+
+## Uma linha que começa com um `:` só
+
+Uma linha abaixo de uma diretiva que começa com um dois-pontos e um nome, como `:titulo Open day`, quase sempre é uma diretiva sem o segundo dois-pontos. O Tyto mantém a linha como texto do bloco de cima e a sublinha com um aviso, para o erro de digitação não passar despercebido. Ponha o `:` que falta para ela virar diretiva.
 
 ## Uma linha que começa com `::` mas não é diretiva
 

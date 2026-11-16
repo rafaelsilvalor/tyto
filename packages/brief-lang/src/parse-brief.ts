@@ -310,6 +310,29 @@ function blankLineBetween(text: string, from: number, to: number): boolean {
   return lines.slice(1, -1).some((line) => /^[ \t]*$/u.test(line));
 }
 
+/** A single `:` and a name: `:titulo X`, not `: nota`, `:)` or `::titulo`. */
+const SINGLE_COLON_NAME = /^:[a-zA-Z_]/u;
+
+/**
+ * A column-0 body line that starts with a single `:` and a name (TYTO-708, ADR 0202 decision 2).
+ *
+ * Since a text line at column 0 continues the block above, `:titulo X` is no longer a syntax
+ * error: it is text. It is most likely a directive missing a colon, though, and a typo that
+ * silently became part of the slide above is worse than one that stops the render, so it is
+ * kept as text and warned about, with the line in the message. Only at column 0: an indented
+ * line has always been text, and nobody types a directive at an indent by mistake. The first
+ * character before the text is a line break exactly when the line starts at column 0.
+ */
+function warnLikelyDirective(blockText: SyntaxNode, text: string, diagnostics: Diagnostic[]): void {
+  const before = text[blockText.from - 1];
+  if (before !== '\n' && before !== '\r') return;
+  const line = text.slice(blockText.from, blockText.to);
+  if (!SINGLE_COLON_NAME.test(line)) return;
+  diagnostics.push(
+    diagnostic('W_LIKELY_DIRECTIVE', { line: snippet(line) }, { range: rangeOf(blockText) }),
+  );
+}
+
 function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): RichText {
   const body: Inline[] = [];
   // Where the last line with text ended, to look for a blank line before the next one.
@@ -345,6 +368,7 @@ function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): Rich
           range: sourceRange(child.from, child.from + (isCrLf ? 2 : 1)),
         });
       }
+      warnLikelyDirective(blockText, text, diagnostics);
       appendInlines(body, children(blockText), text, diagnostics);
       trimLineEnd(body);
       lineEnd = blockText.to;
