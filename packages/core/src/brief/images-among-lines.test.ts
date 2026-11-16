@@ -285,15 +285,14 @@ describe('compiling pictures among the lines', () => {
 });
 
 describe('a manifest that declares multiple', () => {
-  it('accepts it on a per image slot only', () => {
+  // A `per` rich-text slot may be `multiple` too since TYTO-746, read as a list rather than
+  // among the slide's lines (nested-slots.test.ts); without `per` it has no parent to count in.
+  it('accepts it on a per slot only', () => {
     expect(
       manifestProblems(`${BASE}  imagem: { type: image, per: lamina, multiple: true }
   foto: { type: image, multiple: true }
   texto: { type: rich-text, per: lamina, multiple: true }
 `),
-    ).toEqual([
-      expect.stringContaining('multiple is only meaningful on an image slot that declares per'),
-      expect.stringContaining('multiple is only meaningful on an image slot that declares per'),
-    ]);
+    ).toEqual([expect.stringContaining('multiple is only meaningful on a slot that declares per')]);
   });
 });

@@ -1,0 +1,18 @@
+---
+template: listas
+formats: [feed]
+---
+::lamina
+  Primeira lâmina
+  ::bloco Conceito
+    ::paragrafo Definição.
+    ::paragrafo
+      Exemplo em duas linhas,
+      a segunda aqui.
+  ::bloco Resumo
+    ::paragrafo Um.
+    ::paragrafo Dois.
+::lamina
+  Segunda lâmina
+  ::bloco Só
+    ::paragrafo Único.

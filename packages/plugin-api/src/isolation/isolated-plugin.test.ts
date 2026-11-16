@@ -2076,6 +2076,62 @@ describe('an isolated template sees the slots nested inside a slide’s own (ADR
   });
 });
 
+describe('an isolated template sees every occurrence of a multiple slot (TYTO-746)', () => {
+  const at = { start: 0, end: 1 };
+  const slot = (name: string, value: string, extra: object = {}) => ({
+    name,
+    value: { kind: 'rich-text', text: [{ kind: 'text', value, range: at }] },
+    adjustments: [],
+    range: at,
+    ...extra,
+  });
+  // Two `::bloco` in one slide, two `::paragrafo` in each: the slide holds the first block, and
+  // it lists both under `occurrences`, each with its own paragraphs (ADR 0207, 2026-11-16 note).
+  const paragraphs = (first: string, second: string) => {
+    const one = slot('paragrafo', first);
+    return { paragrafo: { ...one, occurrences: [one, slot('paragrafo', second)] } };
+  };
+  const blockA = slot('bloco', 'A', { slots: paragraphs('A1', 'A2') });
+  const blockB = slot('bloco', 'B', { slots: paragraphs('B1', 'B2') });
+  const SLOTS = {
+    lamina: slot('lamina', 'Um'),
+    bloco: { ...blockA, occurrences: [blockA, blockB] },
+  };
+  const CALL = {
+    format: 'feed',
+    size: { w: 10, h: 10 },
+    idPrefix: 'lamina-1.feed',
+    artwork: { id: 'lamina-1', index: 0, count: 1 },
+    slots: SLOTS,
+    adjustments: {},
+    brand: {},
+  } as unknown as TemplateCall;
+
+  it('crosses to the plugin’s process with occurrences, every level down', async () => {
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      build: (_template, context) => ({
+        format: JSON.stringify(context.slots),
+        size: context.size,
+        children: [],
+      }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const [registered] = host.registry.templatePacks();
+    const build = registered?.build as unknown as IsolatedPackBuild;
+    const answer = await build('demo', CALL, [], NO_SHIPPED_FILES);
+
+    expect(answer.ok && JSON.parse(answer.value.frame.format)).toEqual(SLOTS);
+  });
+});
+
 describe('an isolated template’s files (ADR 0062)', () => {
   const CALL: TemplateCall = {
     format: 'feed',

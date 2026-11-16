@@ -32,6 +32,8 @@ Alguns templates vão mais fundo: um `::bloco` dentro de um slide, e um `::parag
 
 Quem decide o que fica dentro de quê é o template, não os espaços no começo da linha. Você pode recuar o `::bloco` abaixo do `::lamina` e o `::paragrafo` abaixo do `::bloco` para enxergar a estrutura, ou escrever todas as linhas no começo da linha: a arte sai igual. O [**Format Brief**](../editor/format-brief.md) recua cada diretiva conforme a profundidade que o template dá a ela, então a estrutura aparece sem ninguém contar espaços. Um `::paragrafo` sem `::bloco` acima dele no mesmo slide fica sublinhado. Para começar uma linha de texto com `::`, escreva `\::`.
 
+Quando a galeria mostra um slot como "multiple", você pode escrevê-lo mais de uma vez dentro do mesmo pai: dois `::bloco` num slide, cada um com as suas linhas de `::paragrafo`, saem na ordem em que você os escreveu. Cada `::paragrafo` vai para o `::bloco` escrito por último acima dele. Se o template define um número máximo, o que passar dele fica sublinhado na própria linha. Um slot sem "multiple" continua aceitando um por pai, e o segundo fica sublinhado.
+
 ## Quantos slides
 
 Um template pode definir um número mínimo e um máximo de slides. A galeria mostra os dois no slot que repete, como "no mínimo" e "no máximo". Um brief sem nenhum `::lamina` gera uma arte com os outros slots — é assim que o `notice` funciona, e outros templates podem exigir pelo menos um.

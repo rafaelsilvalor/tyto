@@ -1,0 +1,196 @@
+{
+  "template": "aninhado",
+  "formats": [
+    "feed"
+  ],
+  "slots": {
+    "titulo": {
+      "name": "titulo",
+      "value": {
+        "kind": "rich-text",
+        "text": [
+          {
+            "kind": "text",
+            "value": "T",
+            "range": {
+              "start": 10,
+              "end": 15
+            }
+          }
+        ]
+      },
+      "adjustments": [],
+      "range": {
+        "start": 10,
+        "end": 15
+      }
+    }
+  },
+  "artworks": [
+    {
+      "index": 0,
+      "slot": {
+        "name": "lamina",
+        "value": {
+          "kind": "rich-text",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Um",
+              "range": {
+                "start": 20,
+                "end": 25
+              }
+            }
+          ]
+        },
+        "adjustments": [],
+        "range": {
+          "start": 20,
+          "end": 25
+        }
+      },
+      "slots": {
+        "bloco": {
+          "name": "bloco",
+          "value": {
+            "kind": "rich-text",
+            "text": [
+              {
+                "kind": "text",
+                "value": "A",
+                "range": {
+                  "start": 30,
+                  "end": 35
+                }
+              }
+            ]
+          },
+          "adjustments": [],
+          "range": {
+            "start": 30,
+            "end": 35
+          },
+          "slots": {
+            "paragrafo": {
+              "name": "paragrafo",
+              "value": {
+                "kind": "rich-text",
+                "text": [
+                  {
+                    "kind": "text",
+                    "value": "A1",
+                    "range": {
+                      "start": 40,
+                      "end": 45
+                    }
+                  }
+                ]
+              },
+              "adjustments": [],
+              "range": {
+                "start": 40,
+                "end": 45
+              }
+            }
+          }
+        },
+        "nota": {
+          "name": "nota",
+          "value": {
+            "kind": "rich-text",
+            "text": [
+              {
+                "kind": "text",
+                "value": "N",
+                "range": {
+                  "start": 50,
+                  "end": 55
+                }
+              }
+            ]
+          },
+          "adjustments": [],
+          "range": {
+            "start": 50,
+            "end": 55
+          }
+        }
+      },
+      "missingRequiredSlots": []
+    },
+    {
+      "index": 1,
+      "slot": {
+        "name": "lamina",
+        "value": {
+          "kind": "rich-text",
+          "text": [
+            {
+              "kind": "text",
+              "value": "Dois",
+              "range": {
+                "start": 60,
+                "end": 65
+              }
+            }
+          ]
+        },
+        "adjustments": [],
+        "range": {
+          "start": 60,
+          "end": 65
+        }
+      },
+      "slots": {
+        "bloco": {
+          "name": "bloco",
+          "value": {
+            "kind": "rich-text",
+            "text": [
+              {
+                "kind": "text",
+                "value": "B",
+                "range": {
+                  "start": 70,
+                  "end": 75
+                }
+              }
+            ]
+          },
+          "adjustments": [],
+          "range": {
+            "start": 70,
+            "end": 75
+          },
+          "slots": {
+            "paragrafo": {
+              "name": "paragrafo",
+              "value": {
+                "kind": "rich-text",
+                "text": [
+                  {
+                    "kind": "text",
+                    "value": "B1",
+                    "range": {
+                      "start": 80,
+                      "end": 85
+                    }
+                  }
+                ]
+              },
+              "adjustments": [],
+              "range": {
+                "start": 80,
+                "end": 85
+              }
+            }
+          }
+        }
+      },
+      "missingRequiredSlots": []
+    }
+  ],
+  "assets": [],
+  "missingRequiredSlots": []
+}

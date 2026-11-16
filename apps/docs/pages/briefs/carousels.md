@@ -32,6 +32,8 @@ Some templates go further down: a `::bloco` inside a slide, and a `::paragrafo` 
 
 The template decides what sits inside what, not the spaces in front of a line. You may indent `::bloco` under `::lamina` and `::paragrafo` under `::bloco` to see the structure, or write every line at the start of the line: the artwork comes out the same. [**Format Brief**](../editor/format-brief.md) indents each directive by how deep the template puts it, so the structure shows without counting spaces. A `::paragrafo` with no `::bloco` above it in the same slide is underlined. To start a line of text with `::`, write `\::`.
 
+When the gallery lists a slot as "multiple", you may write it more than once inside the same parent: two `::bloco` in one slide, each with its own `::paragrafo` lines, come out in the order you wrote them. Each `::paragrafo` goes to the `::bloco` written last above it. If the template sets a largest number, the one past it is underlined on its own line. A slot without "multiple" still takes one per parent, and a second one is underlined.
+
 ## How many slides
 
 A template can set a smallest and a largest number of slides. The gallery shows both under the repeating slot, as "at least" and "at most". A brief with no `::lamina` at all makes one artwork from the other slots — that is how `notice` works, and other templates may require at least one.

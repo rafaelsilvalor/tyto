@@ -250,6 +250,7 @@ export {
   adjustmentTypeSchema,
   declaredValueSchema,
   declaredValueTypeSchema,
+  listsOccurrences,
   manifestFaceSchema,
   parseManifest,
   slotDepth,
