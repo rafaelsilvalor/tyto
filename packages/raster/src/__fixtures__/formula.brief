@@ -1,0 +1,8 @@
+---
+template: formula-reference
+formats: [feed]
+---
+// The reference answer of ADR 0206, and money that must stay text (TYTO-734).
+::resposta
+  $F = \frac{1}{40·10^{-3}} = 25\ Hz$
+  de R$ 50 a R$ 60, $E = mc^2$ e $v_0^2$

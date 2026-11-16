@@ -12,11 +12,13 @@ import {
   type SourceRange,
   diagnostic,
   fromPartial,
+  linearReading,
   sortDiagnostics,
   sourceRange,
 } from '@tyto/core';
 
 import { parser } from './brief.parser.js';
+import { parseFormula } from './formula.js';
 import { parseFrontmatter } from './frontmatter.js';
 
 /**
@@ -151,7 +153,40 @@ function pushText(target: Inline[], value: string, from: number, to: number): vo
   target.push({ kind: 'text', value, range: sourceRange(from, to) });
 }
 
-function appendInlines(target: Inline[], nodes: Iterable<SyntaxNode>, text: string): void {
+/**
+ * A `$…$` token as a `Formula`, or as the text it was written as when it has an error
+ * (ADR 0206 decision 5): the author sees exactly what was not understood, and the error
+ * points at the characters at fault.
+ */
+function appendFormula(
+  target: Inline[],
+  node: SyntaxNode,
+  text: string,
+  diagnostics: Diagnostic[],
+): void {
+  const range = rangeOf(node);
+  const source = sliceOf(text, node);
+  const parsed = parseFormula(text, range);
+  if (parsed.diagnostics.length > 0) {
+    diagnostics.push(...parsed.diagnostics);
+    pushText(target, source, node.from, node.to);
+    return;
+  }
+  target.push({
+    kind: 'formula',
+    source,
+    math: parsed.math,
+    children: [{ kind: 'text', value: linearReading(parsed.math), range }],
+    range,
+  });
+}
+
+function appendInlines(
+  target: Inline[],
+  nodes: Iterable<SyntaxNode>,
+  text: string,
+  diagnostics: Diagnostic[],
+): void {
   for (const node of nodes) {
     const literal = literalOf(text, node);
     if (literal !== undefined) {
@@ -164,12 +199,15 @@ function appendInlines(target: Inline[], nodes: Iterable<SyntaxNode>, text: stri
       case 'Italic':
         target.push({
           kind: node.name === 'Bold' ? 'bold' : 'italic',
-          children: inlinesOf(children(node), text),
+          children: inlinesOf(children(node), text, diagnostics),
           range: rangeOf(node),
         });
         break;
       case 'Break':
         target.push({ kind: 'break', range: rangeOf(node) });
+        break;
+      case 'Formula':
+        appendFormula(target, node, text, diagnostics);
         break;
       case 'Mark': {
         const key = node.getChild('MarkName');
@@ -181,6 +219,7 @@ function appendInlines(target: Inline[], nodes: Iterable<SyntaxNode>, text: stri
           children: inlinesOf(
             [...children(node)].filter((child) => child !== key && child !== value),
             text,
+            diagnostics,
           ),
           range: rangeOf(node),
         });
@@ -194,9 +233,9 @@ function appendInlines(target: Inline[], nodes: Iterable<SyntaxNode>, text: stri
   }
 }
 
-function inlinesOf(nodes: Iterable<SyntaxNode>, text: string): RichText {
+function inlinesOf(nodes: Iterable<SyntaxNode>, text: string, diagnostics: Diagnostic[]): RichText {
   const inlines: Inline[] = [];
-  appendInlines(inlines, nodes, text);
+  appendInlines(inlines, nodes, text, diagnostics);
   return inlines;
 }
 
@@ -282,7 +321,7 @@ function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): Rich
       // The space after the directive name lives inside the body, because after the name
       // both readings start with the same token and only a `{` tells them apart.
       if (parts[0]?.name === 'Space') parts.shift();
-      appendInlines(body, parts, text);
+      appendInlines(body, parts, text, diagnostics);
       trimLineEnd(body);
       if (body.length > 0) lineEnd = child.to;
     } else if (child.name === 'BodyLine') {
@@ -306,7 +345,7 @@ function bodyOf(node: SyntaxNode, text: string, diagnostics: Diagnostic[]): Rich
           range: sourceRange(child.from, child.from + (isCrLf ? 2 : 1)),
         });
       }
-      appendInlines(body, children(blockText), text);
+      appendInlines(body, children(blockText), text, diagnostics);
       trimLineEnd(body);
       lineEnd = blockText.to;
     }

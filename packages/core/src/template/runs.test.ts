@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { runsOf } from './runs.js';
 import { font } from './values.js';
-import type { RichText } from '../brief/ast.js';
+import type { Inline, RichText } from '../brief/ast.js';
+import type { MathItem } from '../scene/nodes.js';
 import { originOf } from '../text/origin.js';
 import { sourceRange } from '../source/range.js';
 
@@ -277,5 +278,57 @@ describe('the edges', () => {
 
   it('drops an empty text node rather than emitting a run that draws nothing', () => {
     expect(shape([{ kind: 'text', value: '', range: AT }])).toEqual([]);
+  });
+});
+
+describe('a formula (ADR 0206 decision 16, TYTO-734)', () => {
+  const SQUARE: MathItem[] = [
+    { kind: 'text', text: 'x' },
+    { kind: 'scripts', superscript: [{ kind: 'text', text: '2' }] },
+  ];
+  const FORMULA_AT = sourceRange(4, 9);
+  const formula = (): Inline => ({
+    kind: 'formula',
+    source: '$x^2$',
+    math: SQUARE,
+    children: [{ kind: 'text', value: 'x^2', range: FORMULA_AT }],
+    range: FORMULA_AT,
+  });
+
+  it('becomes a formula run in the style around it, bold and marks included', () => {
+    const runs = runsOf(
+      [
+        ...plain('a '),
+        {
+          kind: 'mark',
+          key: 'cor',
+          value: 'roxo',
+          children: [{ kind: 'bold', children: [formula()], range: AT }],
+          range: AT,
+        },
+      ],
+      BASE,
+      { mark: (key, value) => (key === 'cor' && value === 'roxo' ? { color: '#663399' } : {}) },
+    );
+
+    expect(runs).toEqual([
+      expect.objectContaining({ kind: 'text', text: 'a ' }),
+      {
+        kind: 'formula',
+        text: 'x^2',
+        math: SQUARE,
+        font: inter,
+        size: 48,
+        weight: 700,
+        style: 'normal',
+        color: { kind: 'solid', color: { r: 102, g: 51, b: 153, a: 1 } },
+      },
+    ]);
+    expect(originOf(runs[1] ?? { kind: 'break' })).toEqual(FORMULA_AT);
+  });
+
+  it('is never merged into the text beside it', () => {
+    const runs = runsOf([...plain('a'), formula(), ...plain('b')], BASE);
+    expect(runs.map((run) => run.kind)).toEqual(['text', 'formula', 'text']);
   });
 });

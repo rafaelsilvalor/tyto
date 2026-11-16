@@ -103,15 +103,22 @@ export function layoutFormula(
         style: piece.style,
       });
       const ink = face?.ink?.(piece.text) ?? NO_INK;
-      box.glyphs.push({
-        text: piece.text,
-        font: piece.font,
-        size,
-        weight: piece.weight,
-        style: piece.style,
-        x: box.width,
-        y: 0,
-      });
+      // One glyph per word, at the advance of what comes before it, and none for a space: a
+      // space is where the next word starts, never a character to draw. A `<text>` that
+      // starts with a space loses it in an HTML document — measured in Chromium on
+      // `$F = \frac{1}{2} = 25\ Hz$`, the ` = 25 Hz` after the fraction was drawn 1 px from
+      // the rule in HTML and 9 px from it in SVG (TYTO-734) — so the space never reaches one.
+      for (const word of piece.text.matchAll(/[^ \t]+/gu)) {
+        box.glyphs.push({
+          text: word[0],
+          font: piece.font,
+          size,
+          weight: piece.weight,
+          style: piece.style,
+          x: box.width + (face?.advance(piece.text.slice(0, word.index)) ?? 0) * size,
+          y: 0,
+        });
+      }
       box.width += (face?.advance(piece.text) ?? 0) * size;
       box.ascent = Math.max(box.ascent, ink.ascent * size);
       box.descent = Math.max(box.descent, ink.descent * size);

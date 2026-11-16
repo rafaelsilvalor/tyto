@@ -19,6 +19,8 @@ function plain(body: RichText): string {
           return `*${plain(inline.children)}*`;
         case 'mark':
           return plain(inline.children);
+        case 'formula':
+          return inline.source;
       }
     })
     .join('');

@@ -112,6 +112,24 @@ describe('layoutFormula', () => {
     expect(both?.glyphs.map(({ y }) => y)).toEqual([0, -4.5, 2.5]);
   });
 
+  it('places text word by word and draws no space, so no exporter can drop one (TYTO-734)', () => {
+    // `F = ` before a fraction and ` = 25 Hz` after it, as a brief writes them inside `$…$`.
+    const laid = layoutFormula(formula([text('F = '), ONE_OVER_FORTY, text(' = 25  Hz')]), faces);
+
+    expect(laid?.glyphs.map(({ text: t, x, y }) => ({ t, x, y }))).toEqual([
+      { t: 'F', x: 0, y: 0 },
+      { t: '=', x: 10, y: 0 },
+      { t: '1', x: 23.5, y: -4 },
+      { t: '40', x: 21, y: 6 },
+      // The fraction ends at 32; its leading space moves ` = ` on by half an em.
+      { t: '=', x: 37, y: 0 },
+      { t: '25', x: 47, y: 0 },
+      // Two spaces written are two spaces of room.
+      { t: 'Hz', x: 67, y: 0 },
+    ]);
+    expect(laid?.width).toBe(77);
+  });
+
   it('is undefined when the formula face is not available', () => {
     expect(
       layoutFormula(

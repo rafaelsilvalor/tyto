@@ -61,6 +61,7 @@ export type {
   Break,
   BriefAst,
   Directive,
+  Formula,
   Frontmatter,
   Inline,
   Italic,

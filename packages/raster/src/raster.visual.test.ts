@@ -14,6 +14,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createPlaywrightRasterizer } from './playwright.js';
 import type { RasterFormat } from './rasterizer.js';
 
+import { compileFormulaBrief, readFormulaBrief } from './__fixtures__/formula-brief.js';
 import alphaFixture from './__fixtures__/alpha.json';
 import shadowFixture from './__fixtures__/shadow.json';
 import shapesFixture from './__fixtures__/shapes.json';
@@ -300,6 +301,24 @@ const SHADOW = documentsOf(shadowFixture);
 const TEXT = documentsOf(textFixture, true);
 
 /**
+ * The reference formula of ADR 0206 as a brief writes it (TYTO-734), compiled here rather
+ * than kept as a Scene: the pixels then cover the syntax, the layout in core and the HTML
+ * exporter together, and a stacked fraction that moved shows up as the rule and the
+ * numerator moving. Glyphs, so keyed on the platform like `text.feed`.
+ */
+async function formulaFixture(): Promise<Scene> {
+  const compiled = await compileFormulaBrief(readFormulaBrief());
+  if (!compiled.ok) throw new Error(compiled.error.map((item) => item.message).join('; '));
+  return compiled.value;
+}
+
+// `compile` numbers artworks; the reference file is named for what it holds.
+const FORMULA = documentsOf(await formulaFixture(), true).map((document) => ({
+  ...document,
+  name: document.name.replace(/^artwork-1\./u, 'formula.'),
+}));
+
+/**
  * `<artwork>.<format>.png`, or `<artwork>.<format>.<platform>.png` for a fixture with
  * glyphs in it.
  *
@@ -432,7 +451,7 @@ describe('reference renders', () => {
   // Titled by the reference file rather than the fixture: for a per-platform fixture those
   // are different names, and the failing test should say which file it compared against.
   it.each(
-    [...SHAPES, ...ALPHA, ...SPREAD, ...TEXT].map(
+    [...SHAPES, ...ALPHA, ...SPREAD, ...TEXT, ...FORMULA].map(
       (document) => [referenceFile(document), document] as const,
     ),
   )('%s matches its committed reference', async (_file, document) => {

@@ -1,6 +1,12 @@
 import { ExternalTokenizer } from '@lezer/lr';
 
-import { Frontmatter, blankRun, commentBreak, virtualNewline } from './brief.parser.terms.js';
+import {
+  Formula,
+  Frontmatter,
+  blankRun,
+  commentBreak,
+  virtualNewline,
+} from './brief.parser.terms.js';
 
 /**
  * The two tokens a regular expression cannot recognise, because both depend on where in
@@ -13,8 +19,12 @@ const NEWLINE = 10;
 const RETURN = 13;
 const TAB = 9;
 const SPACE = 32;
+const DOLLAR = 36;
 const DASH = 45;
 const SLASH = 47;
+const DIGIT_ZERO = 48;
+const DIGIT_NINE = 57;
+const BACKSLASH = 92;
 
 type Input = { peek: (offset: number) => number };
 
@@ -196,4 +206,45 @@ export const commentsInBlocks = new ExternalTokenizer((input) => {
   if (!isCommentAt(input, at)) return;
   if (at === lineStart && !indentedLineFollows(input, nextLineStart(input, at))) return;
   input.acceptToken(commentBreak, at);
+});
+
+function isDigit(code: number): boolean {
+  return code >= DIGIT_ZERO && code <= DIGIT_NINE;
+}
+
+/**
+ * A formula, `$…$`, as one token (ADR 0206 decisions 2 and 3, TYTO-734).
+ *
+ * Pandoc's rule, on one line: a `$` opens a formula only when the character after it is not a
+ * space, and a later `$` closes it only when the character before it is not a space and the
+ * character after it is not a digit. That is what keeps money plain: `R$ 50` opens nothing, and
+ * in `R$50 a R$60` the second `$` is followed by a digit, so nothing closes the first. A `\`
+ * inside takes the character after it along, so `\$` never closes the formula. `$$` is a
+ * formula with nothing in it, which `parseBrief` reports.
+ *
+ * Inside, everything belongs to the formula: the grammar sees one token, so a `\` there is
+ * not a line break and a `{` is not a mark. Where nothing closes, no token is produced and the
+ * `$` is plain text, as it always was.
+ */
+export const formulas = new ExternalTokenizer((input) => {
+  if (input.next !== DOLLAR) return;
+  const first = input.peek(1);
+  if (first < 0 || isBlank(first) || isLineEnd(first)) return;
+
+  let offset = 1;
+  for (;;) {
+    const code = input.peek(offset);
+    if (code < 0 || isLineEnd(code)) return;
+    if (code === BACKSLASH) {
+      const escaped = input.peek(offset + 1);
+      if (escaped < 0 || isLineEnd(escaped)) return;
+      offset += 2;
+      continue;
+    }
+    if (code === DOLLAR && !isBlank(input.peek(offset - 1)) && !isDigit(input.peek(offset + 1))) {
+      input.acceptToken(Formula, offset + 1);
+      return;
+    }
+    offset += 1;
+  }
 });

@@ -1,0 +1,9 @@
+---
+template: notice
+formats: [grid]
+---
+::titulo
+  Answer: $F = \frac{1}{40·10^{-3}} = 25\ Hz$
+
+::subtitulo
+  Tickets from R$ 50 to R$ 60. Energy is $E = mc^2$, speed $v_0^2$.

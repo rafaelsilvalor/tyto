@@ -151,6 +151,9 @@ non-zero.
 | `W_SLOT_OVER_CONFIGURED_LIMIT` | warning | no | A slot runs past the editor rule of the configuration the brief reached. |
 | `W_UNUSED_SLOT` | warning | no | The brief sets a slot the chosen template never renders. |
 | `W_MARKUP_IN_FRONTMATTER` | warning | no | A frontmatter scalar on a rich-text slot contains what looks like inline markup. |
+| `E_FORMULA_COMMAND` | error | no | A formula holds a `\` command or escape other than `\frac`, `\ `, `\$`, `\{` and `\}`. |
+| `E_FORMULA_GROUP` | error | no | A `{…}` in a formula is missing, unclosed, or where no group belongs. |
+| `E_FORMULA_EMPTY` | error | no | A formula (`$$`) or one of its groups (`{}`) holds nothing. |
 | `W_REDUNDANT_BREAK` | warning | no | A line of a directive body ends in a `\` and another line of its indented block follows, which already starts a new line. |
 | `W_BRAND_KIT_SHADOWED` | warning | no | Two plugins contribute a kit for the same brand; the earlier plugin is the one used. |
 | `W_BRAND_KIT_MISSING` | warning | no | A configuration names a brand that no installed brand kit offers. |
@@ -368,6 +371,9 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_OUTPUT_FILE_BLOCKED` | no | Depends on the file, and nothing that is drawn is lost. The copied brief: the delivery is not opened, so nothing is rendered. An artwork file: that one artifact is missing and the others are written. `template.txt` or an image in `assets/`: the artwork is written and that file is not. `result.json`: the artwork is written and no report is. |
 | `E_FONT_FACE_UNAVAILABLE` | no | The frame is still built and previewed, with the text laid out from the lines the brief wrote; it is an error because the export is certain to fail, and saying so while the brief is written is the point. |
 | `E_TEMPLATE_ALIAS_TAKEN` | no | Only that alias is missing; the template of that name renders as before. |
+| `E_FORMULA_COMMAND` | no | The formula is drawn as its source text and the rest of the brief is unaffected. |
+| `E_FORMULA_GROUP` | no | The formula is drawn as its source text and the rest of the brief is unaffected. |
+| `E_FORMULA_EMPTY` | no | The formula is drawn as its source text and the rest of the brief is unaffected. |
 | `E_SETTINGS_SYNTAX` | no | Every key that parsed still applies and the rest fall back to their defaults. |
 | `E_KEYBINDINGS_SYNTAX` | no | The last file that read without one stays in effect, and the built-in keys stay bound. |
 | `E_SNIPPETS_SYNTAX` | no | The last file that read without one stays in effect. |
@@ -1924,6 +1930,48 @@ Alias '{alias}' in plugin file '{file}' is the name of a template, so the alias 
 ```
 
 Parameters: `alias`, `file`
+
+### `E_FORMULA_COMMAND`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A formula holds a `\` command or escape other than `\frac`, `\ `, `\$`, `\{` and `\}`.
+
+The formula is drawn as its source text and the rest of the brief is unaffected.
+
+```
+'{command}' is not something a formula can draw; it knows \frac, ^ and _, and a \ before a space, a $ or a brace.
+```
+
+Parameters: `command`
+
+### `E_FORMULA_GROUP`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A `{…}` in a formula is missing, unclosed, or where no group belongs.
+
+The formula is drawn as its source text and the rest of the brief is unaffected.
+
+```
+Formula group: {problem}.
+```
+
+Parameters: `problem`
+
+### `E_FORMULA_EMPTY`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A formula (`$$`) or one of its groups (`{}`) holds nothing.
+
+The formula is drawn as its source text and the rest of the brief is unaffected.
+
+```
+This {part} is empty; write what it should hold.
+```
+
+Parameters: `part`
 
 ### `E_SETTINGS_SYNTAX`
 

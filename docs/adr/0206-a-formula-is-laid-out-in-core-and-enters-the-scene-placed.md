@@ -163,3 +163,29 @@ subscript? }`, each holding a list of the same. A fraction is not a span with a 
 - **Positioning the formula's pieces in HTML with absolutely placed spans.** A span's baseline
   inside its box depends on the face's metrics again; an inline `<svg>` puts each piece on the
   baseline the IR gives, as the SVG exporter does.
+
+## Note, 2026-11-16 — the syntax as built (TYTO-734)
+
+The syntax shipped as decisions 1 to 5 say. Where building it had to choose, it chose this:
+
+- **`Formula.source` is the formula as written, both `$` included**, and its `children` are
+  `linearReading(math)` as one `Text`: `F = 1/(40·10^(-3)) = 25 Hz`. The `-` stays the
+  hyphen the brief wrote; decision 15's `−` was the U+2212 TYTO-678's hand-built fixture
+  used. Nothing in a formula turns `-` into a minus sign.
+- **A bare group, `${a}$`, is `E_FORMULA_GROUP`.** A group belongs after `\frac`, `^` or
+  `_`; LaTeX's invisible grouping would draw nothing here, so it is refused rather than
+  dropped. `\` before anything that is not a letter or one of the four escapes (`\,`) is
+  `E_FORMULA_COMMAND`, the same as an unknown name.
+- **One error per formula.** The first is reported; after it the reader is guessing, and
+  `\frac{}{2}` read on past the empty group would also call `{2}` a group out of place.
+- **A glyph is one word (decision 8).** `layoutFormula` places each run of non-space
+  characters of a text piece at the advance of what comes before it, and draws no space.
+  Measured in Chromium on the reference brief, the ` = 25 Hz` after the fraction sat 1 px
+  from the rule in HTML and 9 px from it in SVG: an HTML document drops the leading space of
+  an SVG `<text>` (`white-space: pre` on the `<svg>` did not keep it). With one word per
+  glyph both exporters draw the same columns. Widths and the line's layout are unchanged:
+  the piece's advance is still measured whole.
+- **Pandoc's rule pairs two prices spaced differently.** In `R$50 e R$ 60` the first `$` has
+  a digit after it and the second a letter before it and a space after, so the two make the
+  formula `$50 e R$`. That is decision 2 read literally, and Pandoc reads it the same way;
+  the manual tells authors to write every price of a line the same way.
