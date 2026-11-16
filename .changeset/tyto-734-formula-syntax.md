@@ -1,6 +1,7 @@
 ---
 '@tyto/brief-lang': minor
 '@tyto/core': minor
+'@tyto/plugin-api': patch
 '@tyto/raster': patch
 ---
 
@@ -19,3 +20,4 @@ exhaustive stops compiling until it handles `formula`. `runsOf` turns a `Formula
 and draws no space, so an HTML document no longer drops the space after a fraction.
 
 `@tyto/raster`: the visual suite renders the reference formula from a brief (test only).
+`@tyto/plugin-api`: a test handles the new inline (test only).

@@ -37,6 +37,9 @@ function shouted(inline: Inline): ExpandedInline {
       return { kind: inline.kind, children: inline.children.map(shouted) };
     case 'mark':
       return { ...inline, children: inline.children.map(shouted) };
+    // A plugin's expansion has no formula of its own (TYTO-734); this one never meets one.
+    case 'formula':
+      return { kind: 'text', value: inline.source };
   }
 }
 
