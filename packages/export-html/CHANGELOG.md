@@ -1,5 +1,16 @@
 # @tyto/export-html
 
+## 0.8.1
+
+### Patch Changes
+
+- Updated dependencies [7ddffdd]
+- Updated dependencies [5bb9f91]
+- Updated dependencies [4c9efc2]
+- Updated dependencies [5def566]
+  - @tyto/core@0.48.0
+  - @tyto/plugin-api@0.22.2
+
 ## 0.8.0
 
 ### Minor Changes
