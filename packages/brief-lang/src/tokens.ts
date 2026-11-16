@@ -6,6 +6,7 @@ import {
   blankRun,
   bodyBreak,
   commentBreak,
+  directiveIndent,
   virtualNewline,
 } from './brief.parser.terms.js';
 
@@ -180,17 +181,17 @@ function firstFilledLine(input: Input, from: number): FilledLine | undefined {
 
 /**
  * True when the block goes on from `offset`: the first line that is neither blank nor a
- * column-0 comment is not a directive. An indented line always is the block's; since TYTO-708
- * a column-0 text line is too (ADR 0202), so only a `::` at column 0, or the end of the input,
- * ends it.
+ * column-0 comment is not a directive. Since TYTO-708 a column-0 text line is the block's
+ * (ADR 0202), and since TYTO-709 an indented `::` is a directive (ADR 0207), so only a `::`
+ * at any indent, or the end of the input, ends it.
  */
 function blockGoesOn(input: Input, offset: number): boolean {
   let from = offset;
   for (;;) {
     const line = firstFilledLine(input, from);
     if (line === undefined) return false;
-    if (line.at > line.lineStart) return true;
-    if (!isCommentAt(input, line.at)) return !isDirectiveAt(input, line.at);
+    if (isDirectiveAt(input, line.at)) return false;
+    if (line.at > line.lineStart || !isCommentAt(input, line.at)) return true;
     from = nextLineStart(input, line.at);
   }
 }
@@ -243,6 +244,33 @@ export const bodyBreaks = new ExternalTokenizer((input) => {
   if (line === undefined || line.at !== line.lineStart) return;
   if (isDirectiveAt(input, line.at) || isCommentAt(input, line.at)) return;
   input.acceptToken(bodyBreak, line.lineStart);
+});
+
+/**
+ * The line break, blank lines and indent in front of an indented `::`, which is a directive
+ * like one at column 0 (TYTO-709, ADR 0207; ADR 0202 decision 3).
+ *
+ * Inside a directive it ends that directive, as `newline` does, and the next one starts at its
+ * `::`: the grammar stays a flat list of directives, and which one sits inside which is
+ * `resolve`'s to say from the manifest. At the start of a line with no break in front of it —
+ * the first line of the file, or the line after the frontmatter, whose token takes the break —
+ * it is the indent alone, read as a blank line. Only an indent counts: a `::` at column 0 is
+ * the grammar's own `newline` and `directiveMark`, as it always was. `\::` is not `::`, so an
+ * escaped one is still text.
+ */
+export const nestedDirectives = new ExternalTokenizer((input) => {
+  if (isLineEnd(input.peek(0))) {
+    const line = firstFilledLine(input, afterLineEnd(input, 0));
+    if (line === undefined || line.at === line.lineStart) return;
+    if (!isDirectiveAt(input, line.at)) return;
+    input.acceptToken(directiveIndent, line.at);
+    return;
+  }
+  const atLineStart = input.pos === 0 || isLineEnd(input.peek(-1));
+  if (!atLineStart || !isBlank(input.peek(0))) return;
+  let at = 0;
+  while (isBlank(input.peek(at))) at += 1;
+  if (isDirectiveAt(input, at)) input.acceptToken(directiveIndent, at);
 });
 
 function isDigit(code: number): boolean {

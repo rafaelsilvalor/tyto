@@ -20,9 +20,36 @@ export type Breadcrumb =
   | { readonly kind: 'directive'; readonly label: string };
 
 /** `::lamina 2`, `::titulo`, `::ai/caption`: how a directive block is named wherever it is listed. */
-export function directiveLabel(block: Pick<BriefBlock, 'name' | 'ordinal'>): string {
+export function directiveLabel(block: Pick<BriefBlock, 'name' | 'ordinal' | 'depth'>): string {
+  return BLOCK_INDENT.repeat(block.depth ?? 0) + plainLabel(block);
+}
+
+/** `::lamina 2`, with no indent: one part of a breadcrumb. */
+function plainLabel(block: Pick<BriefBlock, 'name' | 'ordinal'>): string {
   const ordinal = block.ordinal === undefined ? '' : ` ${String(block.ordinal)}`;
   return `::${block.name ?? ''}${ordinal}`;
+}
+
+/**
+ * What a nested block's label starts with, once per level (ADR 0207): an em space, which HTML
+ * does not collapse, so "Go to Block" draws the tree as VS Code's outline does.
+ */
+export const BLOCK_INDENT = ' ';
+
+/** Between the blocks of a breadcrumb's chain, as the window writes its other parts. */
+export const BREADCRUMB_CHAIN_SEPARATOR = ' › ';
+
+/** The block and every block it sits inside, outermost first. */
+function chainOf(blocks: readonly BriefBlock[], block: BriefBlock): BriefBlock[] {
+  const chain = [block];
+  let at = block.parent;
+  while (at !== undefined && chain.length <= blocks.length) {
+    const parent = blocks[at];
+    if (parent === undefined) break;
+    chain.unshift(parent);
+    at = parent.parent;
+  }
+  return chain;
 }
 
 /**
@@ -66,7 +93,10 @@ export function breadcrumbAt(
 ): Breadcrumb | undefined {
   const block = blockAt(blocks, pos);
   if (block === undefined) return undefined;
-  if (block.kind === 'directive') return { kind: 'directive', label: directiveLabel(block) };
+  if (block.kind === 'directive') {
+    const label = chainOf(blocks, block).map(plainLabel).join(BREADCRUMB_CHAIN_SEPARATOR);
+    return { kind: 'directive', label };
+  }
   const key = keyAbove(block, pos, slice);
   return key === undefined ? { kind: 'frontmatter' } : { kind: 'frontmatter', key };
 }

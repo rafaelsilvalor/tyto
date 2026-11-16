@@ -313,10 +313,13 @@ describe('completeBrief', () => {
     expect(result).toBeNull();
   });
 
-  it('does not read :: in an indented body line as a directive', () => {
-    const result = completeAt(`${frontmatter()}::item\n  ::|`, analysisOf(CARROSSEL));
+  // An indented `::` is a directive like one at column 0 (TYTO-709, ADR 0207).
+  it('offers the same slot names after an indented :: as after one at column 0', () => {
+    const nested = completeAt(`${frontmatter()}::item\n  ::|`, analysisOf(CARROSSEL));
+    const top = completeAt(`${frontmatter()}::item\n::|`, analysisOf(CARROSSEL));
 
-    expect(result).toBeNull();
+    expect(labelsOf(nested)).not.toEqual([]);
+    expect(labelsOf(nested)).toEqual(labelsOf(top));
   });
 
   it('does not read :: inside an inline body as a directive', () => {

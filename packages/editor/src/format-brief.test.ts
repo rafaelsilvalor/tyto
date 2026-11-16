@@ -3,8 +3,10 @@ import { indentMore, undo } from '@codemirror/commands';
 import { getIndentUnit } from '@codemirror/language';
 import { Compartment, EditorSelection } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import { parseManifest } from '@tyto/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { briefAnalysisField, setBriefAnalysis } from './analysis.js';
 import { type EditorHandle, createEditor } from './editor.js';
 import { formatBriefInView, indentExtension } from './format-brief.js';
 import { indentLevels, unitChanged } from './indent-guides.js';
@@ -43,6 +45,42 @@ describe('formatBriefInView', () => {
     expect(editor.getValue()).toBe('::lamina\n  ORTOPEDISTA\n  Profª. Mara Rebeiro\n\n  Segunda\n');
     expect(undo(editor.view)).toBe(true);
     expect(editor.getValue()).toBe(MESSY);
+  });
+
+  // ADR 0207: the nesting comes from the manifest of the brief's last analysis.
+  it('indents each directive by its depth in the manifest the analysis named', () => {
+    const manifest = parseManifest(
+      [
+        'name: aninhado',
+        'version: 1.0.0',
+        'formats: [feed]',
+        'slots:',
+        '  lamina: { type: rich-text, repeat: true }',
+        '  bloco: { type: rich-text, per: lamina }',
+        '  paragrafo: { type: rich-text, per: bloco }',
+        '',
+      ].join('\n'),
+      'manifest.yaml',
+    );
+    if (!manifest.ok) throw new Error('fixture manifest does not parse');
+    const flat = '::lamina\nUm\n::bloco A\n::paragrafo\nA1\n';
+    const parent = document.createElement('div');
+    document.body.append(parent);
+    handle = createEditor(parent, { doc: flat, extensions: [briefAnalysisField] });
+    const editor = handle;
+    formatBriefInView(editor.view);
+    expect(editor.getValue()).toBe('::lamina\n  Um\n::bloco A\n::paragrafo\n  A1\n');
+
+    editor.view.dispatch({
+      effects: setBriefAnalysis.of({
+        source: editor.getValue(),
+        diagnostics: [],
+        templates: ['aninhado'],
+        manifest: manifest.value,
+      }),
+    });
+    formatBriefInView(editor.view);
+    expect(editor.getValue()).toBe('::lamina\n  Um\n  ::bloco A\n    ::paragrafo\n      A1\n');
   });
 
   it('keeps the caret on the character it was on', () => {

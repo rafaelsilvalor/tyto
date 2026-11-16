@@ -252,6 +252,7 @@ export {
   declaredValueTypeSchema,
   manifestFaceSchema,
   parseManifest,
+  slotDepth,
   slotSchema,
   slotTypeSchema,
   templateManifestSchema,

@@ -25,6 +25,13 @@ import { parseBrief } from './parse-brief.js';
 export interface FormatOptions {
   /** Spaces a body line is indented by. The desktop's `tabSize` setting; 2 by default. */
   readonly indentUnit?: number;
+  /**
+   * How deep a directive sits in the template's tree, by the name the brief writes (ADR 0207):
+   * `slotDepth` over the brief's manifest. Each directive is indented by that many units and its
+   * body lines one more, so the nesting shows. Absent, every directive is at column 0, which is
+   * what a brief whose template is not known has always looked like.
+   */
+  readonly depthOf?: (name: string) => number;
 }
 
 /**
@@ -104,6 +111,39 @@ function bodyTextStarts(top: SyntaxNode, lines: readonly Line[]): Map<number, nu
   return starts;
 }
 
+/**
+ * How many indent units each line that is not blank gets, keyed by the line's start: a
+ * directive's head line its depth in the template's tree, its body and comment lines one more
+ * (ADR 0207). A top-level comment is not here and stays where it is.
+ */
+function indentLevels(
+  top: SyntaxNode,
+  text: string,
+  lines: readonly Line[],
+  depthOf: (name: string) => number,
+): Map<number, number> {
+  const levels = new Map<number, number>();
+  for (let directive = top.firstChild; directive !== null; directive = directive.nextSibling) {
+    if (directive.name !== 'Directive') continue;
+    const namespace = directive.getChild('Namespace');
+    const name = directive.getChild('Name');
+    const written =
+      (namespace === null ? '' : text.slice(namespace.from, namespace.to)) +
+      (name === null ? '' : text.slice(name.from, name.to));
+    const depth = Math.max(0, Math.trunc(depthOf(written)));
+    levels.set(lineStartOf(lines, directive.from), depth);
+    for (let child = directive.firstChild; child !== null; child = child.nextSibling) {
+      if (child.name === 'BodyLine') {
+        const body = child.getChild('BlockText');
+        if (body !== null) levels.set(lineStartOf(lines, body.from), depth + 1);
+      } else if (child.name === 'Comment') {
+        levels.set(lineStartOf(lines, child.from), depth + 1);
+      }
+    }
+  }
+  return levels;
+}
+
 /** The start of the line `offset` is on. Lines are sorted; a binary search keeps it linear. */
 function lineStartOf(lines: readonly Line[], offset: number): number {
   let low = 0;
@@ -148,8 +188,9 @@ function frontmatterTrimIsSafe(text: string, node: SyntaxNode, trimmed: string):
 /**
  * The edits that put a brief in its canonical shape, or the syntax errors that stop it.
  *
- * - A body line is indented by exactly `indentUnit` spaces, and so is a comment line inside a
- *   block.
+ * - A directive is indented by `indentUnit` spaces for each level it sits below the top of the
+ *   template's tree (`depthOf`, ADR 0207), and its body lines one level more; a comment line
+ *   inside a block is indented like them.
  * - No line ends in spaces or tabs.
  * - A run of blank lines becomes one empty line; none is kept between a directive's head and
  *   its first body line (unless the head has text of its own: then it is a paragraph, ADR
@@ -175,6 +216,11 @@ export function formatBriefEdits(
   const frontmatter = top.getChild('Frontmatter');
   const lines = linesOf(text);
   const bodyStarts = bodyTextStarts(top, lines);
+  const levels = indentLevels(top, text, lines, options.depthOf ?? (() => 0));
+  const headStarts = new Map<number, number>();
+  for (let node = top.firstChild; node !== null; node = node.nextSibling) {
+    if (node.name === 'Directive') headStarts.set(lineStartOf(lines, node.from), node.from);
+  }
   const textHeads = headsWithText(top, text, lines);
   const edits: TextEdit[] = [];
   const replace = (from: number, to: number, insert: string): void => {
@@ -240,8 +286,10 @@ export function formatBriefEdits(
       continue;
     }
 
-    const bodyStart = bodyStarts.get(line.from);
-    if (bodyStart !== undefined) replace(line.from, bodyStart, unit);
+    const textStart = bodyStarts.get(line.from) ?? headStarts.get(line.from);
+    if (textStart !== undefined) {
+      replace(line.from, textStart, unit.repeat(levels.get(line.from) ?? 0));
+    }
     replace(trimmedEnd(text, line), line.end, '');
     // The last line with text gets a line ending too: blank lines after it are removed whole,
     // so it is the line the file ends with.

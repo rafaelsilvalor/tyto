@@ -64,8 +64,10 @@ export const slotSchema = z
     /** Each occurrence becomes an `Artwork`; at most one slot in a manifest may repeat. */
     repeat: z.boolean().default(false),
     /**
-     * The repeatable slot this one belongs to (ADR 0160): `imagem: { type: image, per: lamina }`
-     * takes one value per slide, written as `::imagem` after that slide's `::lamina`.
+     * The slot this one belongs to (ADR 0160): `imagem: { type: image, per: lamina }` takes one
+     * value per slide, written as `::imagem` after that slide's `::lamina`. It may also name
+     * another `per` slot, to any depth (ADR 0207): `paragrafo: { per: bloco }` belongs to the
+     * `::bloco` open above it. The chain ends at the repeatable slot.
      */
     per: z.string().min(1).optional(),
     /**
@@ -354,12 +356,17 @@ export const templateManifestSchema = z
         });
       }
       if (slot.per === undefined) continue;
-      const owner = manifest.slots[slot.per];
-      if (owner?.repeat !== true) {
+      const chainProblem = perChainProblem(manifest.slots, name);
+      if (chainProblem !== undefined) {
+        context.addIssue({ code: 'custom', path: ['slots', name, 'per'], message: chainProblem });
+      }
+      // Several pictures sit among a slide's own lines, so a `multiple` slot belongs to the
+      // slide itself; one among a block's lines is not built (ADR 0207).
+      if (slot.multiple === true && manifest.slots[slot.per]?.repeat !== true) {
         context.addIssue({
           code: 'custom',
-          path: ['slots', name, 'per'],
-          message: `per names '${slot.per}', which is not the manifest's repeatable slot`,
+          path: ['slots', name, 'multiple'],
+          message: `multiple is only built for a slot whose per names the repeatable slot, and '${slot.per}' is not it`,
         });
       }
       if (slot.repeat) {
@@ -379,6 +386,56 @@ export const templateManifestSchema = z
     }
   });
 export type TemplateManifest = z.infer<typeof templateManifestSchema>;
+
+interface PerLink {
+  readonly repeat?: boolean | undefined;
+  readonly per?: string | undefined;
+}
+
+/**
+ * Why `name`'s chain of `per` does not end at the repeatable slot, or `undefined` when it does
+ * (ADR 0160, ADR 0207). Each link names a slot that repeats or itself declares `per`; a name
+ * seen twice is a cycle, which would leave a directive with no slide to belong to.
+ */
+function perChainProblem(
+  slots: Readonly<Record<string, PerLink>>,
+  name: string,
+): string | undefined {
+  const seen = [name];
+  let current = slots[name];
+  while (current?.per !== undefined) {
+    const parentName = current.per;
+    const parent = slots[parentName];
+    if (parent === undefined || (parent.repeat !== true && parent.per === undefined)) {
+      return `per names '${parentName}', which is not the manifest's repeatable slot nor a slot that belongs to it`;
+    }
+    if (seen.includes(parentName)) {
+      return `per makes a cycle: ${[...seen, parentName].join(' → ')}`;
+    }
+    if (parent.repeat === true) return undefined;
+    seen.push(parentName);
+    current = parent;
+  }
+  return undefined;
+}
+
+/**
+ * How deep `name` sits in the manifest's tree: 0 for a slot with no `per`, 1 for one whose
+ * `per` names the repeatable slot, one more for each link below that (ADR 0207). Format Brief
+ * indents a directive by it, and the editor's block list nests by it. A chain that does not end
+ * at the repeatable slot — a manifest the schema refuses — stops at the slot it last reached.
+ */
+export function slotDepth(manifest: Pick<TemplateManifest, 'slots'>, name: string): number {
+  let depth = 0;
+  const seen = new Set<string>();
+  let current = manifest.slots[name];
+  while (current?.per !== undefined && !seen.has(current.per)) {
+    seen.add(current.per);
+    depth += 1;
+    current = manifest.slots[current.per];
+  }
+  return depth;
+}
 
 /**
  * Parses a `manifest.yaml` and reports every problem in it, each at the key that caused it.

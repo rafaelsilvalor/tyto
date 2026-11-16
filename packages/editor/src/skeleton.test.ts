@@ -148,17 +148,52 @@ slots:
         '::lamina',
         '\tlamina',
         '',
-        '::imagem ./imagem.png',
+        '\t::imagem ./imagem.png',
         '',
         '::lamina',
         '\tlamina',
         '',
-        '::imagem ./imagem.png',
+        '\t::imagem ./imagem.png',
         '',
         '',
       ].join('\n'),
     );
     expect(fieldNumbers(skeleton)).toEqual([1, 2, 3, 4, 0]);
+  });
+
+  // ADR 0207: a required slot below a required one is written under it, a level deeper.
+  it('writes a required slot nested under a required one, and none under an optional one', () => {
+    const skeleton = briefSkeleton(
+      manifestOf(`
+name: aninhado
+version: 1.0.0
+formats: [feed]
+slots:
+  lamina: { type: rich-text, repeat: true, min: 1 }
+  bloco: { type: rich-text, per: lamina, required: true }
+  paragrafo: { type: rich-text, per: bloco, required: true }
+  nota: { type: rich-text, per: lamina }
+  rodape: { type: rich-text, per: nota, required: true }
+`),
+    );
+
+    expect(skeletonText(skeleton)).toBe(
+      [
+        '---',
+        'template: aninhado',
+        'formats: [feed]',
+        '---',
+        '',
+        '::lamina',
+        '\tlamina',
+        '',
+        '\t::bloco bloco',
+        '',
+        '\t\t::paragrafo paragrafo',
+        '',
+        '',
+      ].join('\n'),
+    );
   });
 
   it('escapes braces, which would otherwise start a field', () => {

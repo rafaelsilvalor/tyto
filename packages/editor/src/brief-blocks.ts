@@ -2,14 +2,14 @@ import { type EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { type SyntaxNode, type Tree } from '@lezer/common';
 import { parseFormula } from '@tyto/brief-lang';
-import { type TemplateManifest, linearReading, sourceRange } from '@tyto/core';
+import { type TemplateManifest, linearReading, slotDepth, sourceRange } from '@tyto/core';
 
 import { briefAnalysisField } from './analysis.js';
 import { treeAt } from './syntax.js';
 
 /**
- * A brief's blocks as one flat list (TYTO-296, ADR 0095): the frontmatter and every top-level
- * directive, in document order. "Go to Block" lists it; the breadcrumb (TYTO-273, ADR 0098)
+ * A brief's blocks as one list (TYTO-296, ADR 0095): the frontmatter and every directive, in
+ * document order, each with the block it sits inside when the manifest nests it (ADR 0207). "Go to Block" lists it; the breadcrumb (TYTO-273, ADR 0098)
  * names the block the cursor is in from it.
  *
  * **It reads the Lezer tree and not `parseBrief`**, because `parseBrief` hands back no AST at all
@@ -35,9 +35,20 @@ export interface BriefBlock {
   readonly to: number;
   /** The first words of its text, markup left out and runs of space collapsed; none when empty. */
   readonly firstText?: string;
+  /**
+   * How deep the manifest nests it (ADR 0207): 1 for a slot whose `per` names the repeatable
+   * slot, one more for each level below. Absent at the top, and while the manifest is not known.
+   */
+  readonly depth?: number;
+  /**
+   * The index, in the same list, of the block it belongs to: the nearest open occurrence of the
+   * slot its `per` names, as `resolve` attaches it. Absent at the top and for one with no such
+   * block open, which `resolve` reports.
+   */
+  readonly parent?: number;
 }
 
-/** As much of a manifest as the ordinals need. */
+/** As much of a manifest as the ordinals and the nesting need. */
 export type BlockManifest = Pick<TemplateManifest, 'slots'>;
 
 /** How much of a block's first text is kept: enough to tell two `::lamina` apart. */
@@ -153,8 +164,10 @@ function frontmatterText(
  * The blocks of the brief `tree` was parsed from, in document order.
  *
  * `slice` reads the text the tree was parsed from, so this is as happy with `parser.parse(text)`
- * as with an editor's state. Only the top level is read — the brief has no nested blocks today —
- * and an error node is looked through, which is what keeps the blocks after a broken line.
+ * as with an editor's state. The tree is flat — an indented `::` is a sibling of the one above it
+ * (ADR 0207) — so nesting comes from the manifest, by the rule `resolve` follows: a `per` slot
+ * belongs to the nearest open block of the slot it names, and reaching that block closes the ones
+ * opened inside it. An error node is looked through, which keeps the blocks after a broken line.
  */
 export function briefBlocks(
   tree: Tree,
@@ -163,6 +176,8 @@ export function briefBlocks(
 ): readonly BriefBlock[] {
   const blocks: BriefBlock[] = [];
   const seen = new Map<string, number>();
+  /** The blocks still open, outermost first, by name and index. */
+  let open: { readonly name: string; readonly index: number }[] = [];
   tree.iterate({
     enter: (ref) => {
       if (ref.type.isTop || ref.type.isError) return true;
@@ -185,12 +200,26 @@ export function briefBlocks(
           slice(nameNode.from, nameNode.to);
         const count = (seen.get(name) ?? 0) + 1;
         seen.set(name, count);
-        const repeats = namespace === null && manifest?.slots[name]?.repeat === true;
+        const slot = namespace === null ? manifest?.slots[name] : undefined;
+        const repeats = slot?.repeat === true;
+        const index = blocks.length;
+        let parent: number | undefined;
+        if (repeats) open = [{ name, index }];
+        else if (slot?.per !== undefined) {
+          const at = open.map((entry) => entry.name).lastIndexOf(slot.per);
+          if (at >= 0) {
+            parent = open[at]?.index;
+            open = [...open.slice(0, at + 1), { name, index }];
+          }
+        }
+        const depth = manifest === undefined || slot === undefined ? 0 : slotDepth(manifest, name);
         const firstText = firstTextOf(node, slice);
         blocks.push({
           kind: 'directive',
           name,
           ...(repeats ? { ordinal: count } : {}),
+          ...(depth > 0 ? { depth } : {}),
+          ...(parent === undefined ? {} : { parent }),
           from: node.from,
           headTo: lineEndIn(slice, node.from, node.to),
           to: lineEndIn(slice, lastTextEnd(node), node.to),

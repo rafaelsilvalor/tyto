@@ -55,7 +55,8 @@ function messy(source: string, variant: number): string {
   const lines = source.replace(/\n$/u, '').split('\n');
   const fenceEnd = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
   const indents = ['      ', '\t', '   ', ' \t '];
-  const isBody = (line: string | undefined) => line !== undefined && /^[ \t]+\S/u.test(line);
+  // An indented `::` is a directive, not a body line (ADR 0207).
+  const isBody = (line: string | undefined) => line !== undefined && /^[ \t]+(?!::)\S/u.test(line);
   const out: string[] = [];
   for (const [index, line] of lines.entries()) {
     if (index <= fenceEnd) {
