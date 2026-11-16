@@ -84,3 +84,13 @@ Paragraphs are not this card's: a blank line between two lines of text is one (A
   value from HTML is not built, as ADR 0160 left `blocks` unread there.
 - No production template nests yet; the fixture is a test template (ADR 0151). The first that
   does writes its manifest with `per` chains and reads `slots.<parent>.slots`.
+
+## Note, 2026-11-16 — a fold covers the blocks nested in it (TYTO-748)
+
+Decision 7's last sentence reads: a block's range stays its own lines; its fold now covers its
+nested descendants up to the next sibling or ancestor, and a brief with no nesting folds as
+before. A `::lamina` with no body of its own but blocks under it folds too. The editor reads
+the nesting from `blocksOf`, against the manifest of the brief's last analysis, in the
+directive's `foldNodeProp`; sticky scroll pins the same chain through the brief language's
+`outerBlocks` data, since the tree is flat; and the fold gutter and sticky rows redraw when
+that manifest changes. Decisions 1 to 6 stand.

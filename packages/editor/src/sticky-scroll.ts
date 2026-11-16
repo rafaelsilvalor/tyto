@@ -4,6 +4,7 @@ import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view';
 import { type SyntaxNode } from '@lezer/common';
 import { highlightTree } from '@lezer/highlight';
 
+import { nestingChanged } from './brief-blocks.js';
 import { wasRemeasured } from './remeasure.js';
 import { treeAt, treeChanged } from './syntax.js';
 import { monoFont, palette, panels } from './theme.js';
@@ -15,9 +16,9 @@ import { monoFont, palette, panels } from './theme.js';
  * **Which blocks come from the grammar's fold ranges, not from the text's indent.** A brief's
  * `::lamina` folds to its head line, a template's element to its opening tag, a CSS rule to its
  * selector; whatever the language says folds is what can pin, and a language that folds
- * nothing (the JSON tabs) pins nothing. Nothing here assumes a depth: in a brief today a
- * directive's body is text, so at most one line pins, and the template mode's nested elements
- * stack. A brief that one day nests blocks stacks the same way with no change here.
+ * nothing (the JSON tabs) pins nothing. Nothing here assumes a depth: the template mode's nested
+ * elements stack, and so do a brief's blocks nested by its manifest (ADR 0207), which its flat
+ * tree does not hold and the language names under `OUTER_BLOCKS` (TYTO-748).
  *
  * Drawn as an absolutely positioned layer inside `view.dom`, starting where the scroller starts
  * (under the find panel, which is a top panel) and stopping short of the scrollbar. Not a
@@ -37,18 +38,54 @@ export interface StickyBlock {
 }
 
 /**
+ * The language data key under which a language names the blocks holding a position that its
+ * tree does not (TYTO-748): a brief's tree is flat, and `::lamina` holds the `  ::bloco` under it
+ * only by the manifest (ADR 0207). The value gives the head positions of candidate blocks; each
+ * still pins only if its fold range holds the position, like a parent from the tree.
+ */
+export const OUTER_BLOCKS = 'outerBlocks';
+
+/** What a language puts under {@link OUTER_BLOCKS}: candidate block heads, outermost first. */
+export type OuterBlocks = (state: EditorState, pos: number) => readonly number[];
+
+/** The node starting at `from` that folds, from the innermost there outwards; none if none. */
+function foldingNodeAt(state: EditorState, from: number): SyntaxNode | null {
+  for (let node: SyntaxNode | null = treeAt(state, from).resolveInner(from, 1); node !== null;) {
+    if (node.from !== from) return null;
+    if (node.type.prop(foldNodeProp) !== undefined) return node;
+    node = node.parent;
+  }
+  return null;
+}
+
+/**
  * Every block holding `pos` whose head line is above `pos`'s line, outermost first.
  *
  * From the innermost node at `pos` up through its parents, every node with a `foldNodeProp`
- * whose range contains `pos`. A block that is folded is left out: its body is not on screen,
- * so nothing below its head can be inside it.
+ * whose range contains `pos`, and the blocks the language names under {@link OUTER_BLOCKS}. A
+ * block that is folded is left out: its body is not on screen, so nothing below its head can be
+ * inside it.
  */
 export function stickyChain(state: EditorState, pos: number): readonly StickyBlock[] {
   const line = state.doc.lineAt(pos).number;
   const folded = foldedRanges(state);
   const blocks: StickyBlock[] = [];
   const innermost = treeAt(state, pos).resolveInner(pos, 1);
+  const candidates: SyntaxNode[] = [];
   for (let node: SyntaxNode | null = innermost; node !== null; node = node.parent) {
+    candidates.push(node);
+  }
+  const outer = state.languageDataAt<OuterBlocks>(OUTER_BLOCKS, pos)[0];
+  for (const from of outer?.(state, pos) ?? []) {
+    const node = foldingNodeAt(state, from);
+    if (
+      node !== null &&
+      !candidates.some((known) => known.from === node.from && known.type === node.type)
+    ) {
+      candidates.push(node);
+    }
+  }
+  for (const node of candidates) {
     const fold = node.type.prop(foldNodeProp);
     if (fold === undefined) continue;
     const range = fold(node, state);
@@ -62,7 +99,9 @@ export function stickyChain(state: EditorState, pos: number): readonly StickyBlo
     if (isFolded) continue;
     blocks.push({ line: head.number, from: head.from, end: range.to });
   }
-  return blocks.reverse();
+  // Outermost first: a block holding another starts before it. Stable, so a node and its
+  // parent starting at the same place keep the tree's order, parent first.
+  return blocks.reverse().sort((a, b) => a.from - b.from);
 }
 
 /** At most this many rows, VS Code's default, and never more than a third of the pane. */
@@ -218,7 +257,10 @@ class StickyScroll {
       // and when the background parse lands the transaction carries the new tree alone: no
       // text, viewport, geometry or selection change. Without this the rows stay missing until
       // the next scroll.
-      treeChanged(update.startState, update.state)
+      treeChanged(update.startState, update.state) ||
+      // A brief's analysis brought the manifest its blocks nest by (TYTO-748): the fold ranges
+      // the rows read changed with no other change.
+      nestingChanged(update)
     ) {
       this.schedule();
     }
