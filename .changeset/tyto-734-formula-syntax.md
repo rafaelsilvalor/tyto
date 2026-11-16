@@ -18,6 +18,8 @@ reads rich text through `children` keeps working; a `switch` over `inline.kind` 
 exhaustive stops compiling until it handles `formula`. `runsOf` turns a `Formula` into a
 `FormulaRun` in the style around it. `layoutFormula` now places a text piece word by word
 and draws no space, so an HTML document no longer drops the space after a fraction.
+A fraction now has 0.12 em of room on each side, outside its rule
+(`FRACTION_SIDE`), so it is 0.24 em wider than before.
 
 `@tyto/raster`: the visual suite renders the reference formula from a brief (test only).
 `@tyto/plugin-api`: a test handles the new inline (test only).

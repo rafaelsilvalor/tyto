@@ -85,10 +85,11 @@ subscript? }`, each holding a list of the same. A fraction is not a span with a 
     box fontkit reads), not from the face's ascent, which would leave a fraction a line apart.
     A face's `MATH` table is not read: one fixed geometry for every face is reproducible by
     hand, and only Noto Sans Math has one. Letter spacing does not apply inside a formula.
-    _2026-11-16 (TYTO-734):_ a fraction has no side bearing of its own. Measured on the
-    reference brief at 40 px, the ink of the `=` before it is 8 px from the rule and the rule
-    9 px from the `=` after it; 0.12 em on each side (13 px and 13 px) was proposed, and
-    Rafael kept the geometry as it is.
+    _2026-11-16 (TYTO-734):_ a fraction has 0.12 em of room on each side, outside its rule
+    (`FRACTION_SIDE`, TeX's `\nulldelimiterspace`): the rule and both parts move in by it.
+    Measured on the reference brief at 40 px, the ink of the `=` before the fraction was 8 px
+    from the rule and the rule 9 px from the `=` after it, closer than the words on the line
+    (10 px); with the room it is 13 px and 13 px. Rafael's choice.
 11. **A line holding a formula is as tall as it needs to be.** A line's box is the strut,
     grown to hold the box of every formula on it, as a CSS line box grows to hold an
     inline-block. The strut is split as Chromium splits it: the reference face's ascent and

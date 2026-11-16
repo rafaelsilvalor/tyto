@@ -20,6 +20,12 @@ export const RULE_THICKNESS = 0.06;
 export const RULE_CLEARANCE = 0.12;
 /** How far the rule runs past the wider of numerator and denominator, on each side. */
 export const RULE_OVERHANG = 0.1;
+/**
+ * Room on each side of a fraction, outside its rule: TeX's `\nulldelimiterspace` (1.2 pt at
+ * 10 pt). Without it the rule sat 8 px from an `=` before it and 9 px from one after it at
+ * 40 px, closer than the words around it; Rafael chose 13 and 13 (TYTO-734, ADR 0206).
+ */
+export const FRACTION_SIDE = 0.12;
 /** A script's size against the size it is set after. */
 export const SCRIPT_SCALE = 0.7;
 /** A superscript's baseline above, and a subscript's below, the baseline around them. */
@@ -142,16 +148,22 @@ export function layoutFormula(
     const width = Math.max(numerator.width, denominator.width) + 2 * RULE_OVERHANG * size;
     const ruleTop = -(MATH_AXIS * size + thickness / 2);
     const clearance = RULE_CLEARANCE * size;
-    box.width = width;
-    box.rules.push({ x: 0, y: ruleTop, width, thickness });
+    const side = FRACTION_SIDE * size;
+    box.width = width + 2 * side;
+    box.rules.push({ x: side, y: ruleTop, width, thickness });
     box.ascent = -ruleTop;
     box.descent = Math.max(0, ruleTop + thickness);
     // The numerator's ink ends `clearance` above the rule; the denominator's starts as far below.
-    place(box, numerator, (width - numerator.width) / 2, ruleTop - clearance - numerator.descent);
+    place(
+      box,
+      numerator,
+      side + (width - numerator.width) / 2,
+      ruleTop - clearance - numerator.descent,
+    );
     place(
       box,
       denominator,
-      (width - denominator.width) / 2,
+      side + (width - denominator.width) / 2,
       ruleTop + thickness + clearance + denominator.ascent,
     );
     return box;

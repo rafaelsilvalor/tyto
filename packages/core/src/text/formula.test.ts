@@ -13,7 +13,7 @@ import { parseScene } from '../scene/scene.js';
  * Half an em a character, an ascent of 0.8 and a descent of 0.2, and ink 0.7 em tall sitting
  * on the baseline, like a digit. At 10px every number below is one a reader can redo by hand:
  * the axis at 2.5, a rule 0.6 thick from 2.8 to 2.2 above the baseline, 1.2 of clearance on
- * either side of it and 1 of overhang.
+ * either side of it, 1 of overhang and 1.2 of room outside the rule on each side.
  */
 const EVEN: Face = {
   advance: (text) => [...text].length * 0.5,
@@ -82,14 +82,14 @@ describe('layoutFormula', () => {
     const laid = layoutFormula(formula([ONE_OVER_FORTY]), faces);
 
     expect(laid).toEqual({
-      width: 12,
+      width: 14.4,
       ascent: 11,
       descent: 6,
       glyphs: [
-        { text: '1', font: FONT, size: 10, weight: 400, style: 'normal', x: 3.5, y: -4 },
-        { text: '40', font: FONT, size: 10, weight: 400, style: 'normal', x: 1, y: 6 },
+        { text: '1', font: FONT, size: 10, weight: 400, style: 'normal', x: 4.7, y: -4 },
+        { text: '40', font: FONT, size: 10, weight: 400, style: 'normal', x: 2.2, y: 6 },
       ],
-      rules: [{ x: 0, y: -2.8, width: 12, thickness: 0.6 }],
+      rules: [{ x: 1.2, y: -2.8, width: 12, thickness: 0.6 }],
       missing: [],
     });
   });
@@ -119,15 +119,16 @@ describe('layoutFormula', () => {
     expect(laid?.glyphs.map(({ text: t, x, y }) => ({ t, x, y }))).toEqual([
       { t: 'F', x: 0, y: 0 },
       { t: '=', x: 10, y: 0 },
-      { t: '1', x: 23.5, y: -4 },
-      { t: '40', x: 21, y: 6 },
-      // The fraction ends at 32; its leading space moves ` = ` on by half an em.
-      { t: '=', x: 37, y: 0 },
-      { t: '25', x: 47, y: 0 },
+      { t: '1', x: 24.7, y: -4 },
+      { t: '40', x: 22.2, y: 6 },
+      // The fraction, side room included, ends at 34.4; its leading space moves ` = ` on by
+      // half an em.
+      { t: '=', x: 39.4, y: 0 },
+      { t: '25', x: 49.4, y: 0 },
       // Two spaces written are two spaces of room.
-      { t: 'Hz', x: 67, y: 0 },
+      { t: 'Hz', x: 69.4, y: 0 },
     ]);
-    expect(laid?.width).toBe(77);
+    expect(laid?.width).toBe(79.4);
   });
 
   it('is undefined when the formula face is not available', () => {
@@ -153,7 +154,7 @@ describe('a formula in a line', () => {
     expect(measured?.height).toBe(17);
     expect(formulasOf(measured?.runs ?? [])[0]?.layout).toMatchObject({
       offset: 20,
-      lineWidth: 57,
+      lineWidth: 59.4,
       above: 1,
       below: 1,
     });
@@ -176,13 +177,16 @@ describe('a formula in a line', () => {
       'text',
     ]);
     expect(measured?.height).toBe(3 * 15 + 2);
-    expect(formulasOf(measured?.runs ?? [])[0]?.layout).toMatchObject({ offset: 5, lineWidth: 22 });
+    expect(formulasOf(measured?.runs ?? [])[0]?.layout).toMatchObject({
+      offset: 5,
+      lineWidth: 24.4,
+    });
   });
 
   it('measures a node that holds only a formula, with the formula as its strut', () => {
     const measured = measureText(node([formula([ONE_OVER_FORTY])]), faces);
     expect(measured?.height).toBe(17);
-    expect(measured?.width).toBe(12);
+    expect(measured?.width).toBe(14.4);
   });
 
   it('scales with a shrink, and the scaled layout is the one in the IR', () => {
@@ -193,7 +197,7 @@ describe('a formula in a line', () => {
     const run = formulasOf(measured?.runs ?? [])[0];
     expect(measured?.scale).toBeLessThan(1);
     expect(run?.size).toBe(Math.round(10 * (measured?.scale ?? 1) * 1000) / 1000);
-    expect(run?.layout?.width).toBeLessThan(12);
+    expect(run?.layout?.width).toBeLessThan(14.4);
     expect(measured?.height).toBeLessThanOrEqual(13);
   });
 
