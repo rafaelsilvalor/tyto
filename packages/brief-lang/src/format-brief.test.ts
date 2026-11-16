@@ -261,6 +261,55 @@ describe('formatBrief and a paragraph (TYTO-557, ADR 0205)', () => {
   });
 });
 
+/**
+ * TYTO-749: inside a block a blank line is kept only where `parseBrief` reads a paragraph — a
+ * line of text of the block above it and one below, with comments skipped (ADR 0204, ADR 0205).
+ * A comment is not text, so it neither makes a blank line a paragraph nor stops one being one.
+ */
+describe('formatBrief, a blank line and a comment (TYTO-749)', () => {
+  it('keeps the blank line under a head with text and above a comment: Um and Dois are two paragraphs', () => {
+    // The card's example. `parseBrief` marks the break before `Dois` a paragraph (ADR 0205
+    // decision 4: a blank line beside a comment still makes one), so the line stays; on
+    // origin/main the output was the same.
+    const text = '::titulo Um\n\n  // nota\n  Dois\n';
+    expect(formatted(text)).toBe(text);
+    expect(meaningOf(formatted(text))).toEqual(meaningOf(text));
+  });
+
+  it('keeps the blank line under a head with text: it is a paragraph', () => {
+    expect(formatted('::titulo Um\n\n  Dois\n')).toBe('::titulo Um\n\n  Dois\n');
+  });
+
+  it('keeps one blank line in each run around a comment between two lines of text', () => {
+    const text = '::titulo\n  Um\n\n\n  // nota\n\n\n  Dois\n';
+    expect(formatted(text)).toBe('::titulo\n  Um\n\n  // nota\n\n  Dois\n');
+    expect(meaningOf(formatted(text))).toEqual(meaningOf(text));
+  });
+
+  it('drops the blank line between a comment and the first line of text under a head with none', () => {
+    // On origin/main the blank line stayed: the line above it was a comment, which the old rule
+    // counted as a body line, though there is no text above it for a paragraph to follow.
+    const text = '::titulo\n  // nota\n\n  Dois\n';
+    expect(formatted(text)).toBe('::titulo\n  // nota\n  Dois\n');
+    expect(meaningOf(formatted(text))).toEqual(meaningOf(text));
+  });
+
+  it('drops the blank line under a head with no text and above a comment', () => {
+    expect(formatted('::titulo\n\n  // nota\n  Dois\n')).toBe('::titulo\n  // nota\n  Dois\n');
+  });
+
+  it('drops the blank line before a comment that ends the block: no text follows it', () => {
+    const text = '::titulo\n  Um\n\n  // nota\n::corpo Dois\n';
+    expect(formatted(text)).toBe('::titulo\n  Um\n  // nota\n::corpo Dois\n');
+    expect(meaningOf(formatted(text))).toEqual(meaningOf(text));
+  });
+
+  it('still keeps the blank line between two blocks', () => {
+    const text = '::titulo\n  Um\n\n::corpo Dois\n';
+    expect(formatted(text)).toBe(text);
+  });
+});
+
 describe('formatBriefEdits', () => {
   it('touches only whitespace, so the text of each line keeps its place in the edits', () => {
     const text = '::lamina\n      um  \n\n\n      dois\n';

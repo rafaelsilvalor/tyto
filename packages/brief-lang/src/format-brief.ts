@@ -156,20 +156,43 @@ function lineStartOf(lines: readonly Line[], offset: number): number {
   return lines[low]?.from ?? 0;
 }
 
+interface BlockLines {
+  /** The directive each head, body and comment line belongs to, keyed by the line's start. */
+  readonly owner: Map<number, SyntaxNode>;
+  /** The starts of the lines of each directive that carry text, in order. */
+  readonly textLines: Map<SyntaxNode, number[]>;
+}
+
 /**
- * The starts of the head lines that carry text of their own (`::lamina Um`). A blank line
- * between such a head and its first body line is a paragraph (ADR 0205), so it is kept like any
- * other blank line between two lines of text.
+ * Which directive each line belongs to, and which of its lines are text: a head with text of
+ * its own (`::lamina Um`) and every body line. A comment line belongs to its block but is not
+ * text — it is skipped as if it were not there (ADR 0204). A blank line inside a block is a
+ * paragraph exactly when a line of text of the same block stands on each side of it (ADR 0205),
+ * which is the rule `parseBrief` marks a `Break` `paragraph` by.
  */
-function headsWithText(top: SyntaxNode, text: string, lines: readonly Line[]): Set<number> {
-  const heads = new Set<number>();
-  const cursor = top.cursor();
-  do {
-    if (cursor.name === 'InlineBody' && !isBlankText(text.slice(cursor.from, cursor.to))) {
-      heads.add(lineStartOf(lines, cursor.from));
+function blockLinesOf(top: SyntaxNode, text: string, lines: readonly Line[]): BlockLines {
+  const owner = new Map<number, SyntaxNode>();
+  const textLines = new Map<SyntaxNode, number[]>();
+  for (let directive = top.firstChild; directive !== null; directive = directive.nextSibling) {
+    if (directive.name !== 'Directive') continue;
+    const starts: number[] = [];
+    const head = lineStartOf(lines, directive.from);
+    owner.set(head, directive);
+    const inline = directive.getChild('InlineBody');
+    if (inline !== null && !isBlankText(text.slice(inline.from, inline.to))) starts.push(head);
+    for (let child = directive.firstChild; child !== null; child = child.nextSibling) {
+      const body = child.name === 'BodyLine' ? child.getChild('BlockText') : null;
+      if (body !== null) {
+        const start = lineStartOf(lines, body.from);
+        owner.set(start, directive);
+        starts.push(start);
+      } else if (child.name === 'Comment') {
+        owner.set(lineStartOf(lines, child.from), directive);
+      }
     }
-  } while (cursor.next());
-  return heads;
+    textLines.set(directive, starts);
+  }
+  return { owner, textLines };
 }
 
 /**
@@ -192,9 +215,9 @@ function frontmatterTrimIsSafe(text: string, node: SyntaxNode, trimmed: string):
  *   template's tree (`depthOf`, ADR 0207), and its body lines one level more; a comment line
  *   inside a block is indented like them.
  * - No line ends in spaces or tabs.
- * - A run of blank lines becomes one empty line; none is kept between a directive's head and
- *   its first body line (unless the head has text of its own: then it is a paragraph, ADR
- *   0205), before the first line or after the last.
+ * - A run of blank lines becomes one empty line. Inside a block one is kept only where it is a
+ *   paragraph, between two of the block's lines of text with comments skipped (ADR 0205); so
+ *   none under a head with no text of its own. None before the first line or after the last.
  * - The frontmatter is left byte for byte, but for the spaces its lines end with.
  * - Every line ends in the file's own line ending, and the last line ends in one too.
  */
@@ -221,7 +244,7 @@ export function formatBriefEdits(
   for (let node = top.firstChild; node !== null; node = node.nextSibling) {
     if (node.name === 'Directive') headStarts.set(lineStartOf(lines, node.from), node.from);
   }
-  const textHeads = headsWithText(top, text, lines);
+  const blocks = blockLinesOf(top, text, lines);
   const edits: TextEdit[] = [];
   const replace = (from: number, to: number, insert: string): void => {
     if (text.slice(from, to) !== insert) edits.push({ from, to, insert });
@@ -252,17 +275,22 @@ export function formatBriefEdits(
     while (after < lines.length && blank(lines[after]!)) after += 1;
     // Nothing above it (and no frontmatter), or nothing below it.
     if (before < 0 || after >= lines.length) return false;
-    // Between a head and its first body line: the line above is not a body line and the one
-    // below is. A head with text of its own is a line of text, and the blank line a paragraph.
+    // Inside a block — the lines on both sides are the same directive's, the one below a body
+    // or comment line — it is kept only as a paragraph: a line of text of that block above it
+    // and one below, with comments skipped (ADR 0204, ADR 0205). So none stays under a head
+    // with no text, beside a comment that has no text past it, or at the block's end.
     const below = lines[after]!;
     const above = lines[before]!;
+    const block = blocks.owner.get(below.from);
     if (
+      block !== undefined &&
       bodyStarts.has(below.from) &&
-      !bodyStarts.has(above.from) &&
       !inFrontmatter(above) &&
-      !textHeads.has(above.from)
+      blocks.owner.get(above.from) === block
     ) {
-      return false;
+      const own = blocks.textLines.get(block) ?? [];
+      const here = lines[index]!.from;
+      return own.some((start) => start < here) && own.some((start) => start > here);
     }
     return true;
   };
