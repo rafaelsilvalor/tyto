@@ -1,5 +1,24 @@
 # @tyto/command-line
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [d52b7b7]
+- Updated dependencies [052247d]
+  - @tyto/core@0.47.0
+  - @tyto/export-html@0.8.0
+  - @tyto/export-svg@2.1.0
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.22
+  - @tyto/io@5.9.1
+  - @tyto/pipeline@0.12.19
+  - @tyto/plugin-api@0.22.1
+  - @tyto/raster@0.2.4
+  - @tyto/recipe@0.7.1
+  - @tyto/template-lang@0.8.21
+  - @tyto/templates@1.2.17
+
 ## 0.9.0
 
 ### Minor Changes

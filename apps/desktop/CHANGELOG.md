@@ -1,5 +1,32 @@
 # @tyto/desktop
 
+## 0.23.1
+
+### Patch Changes
+
+- 1bb6287: An indented line the editor wraps on screen keeps its indent on every row it takes (hanging
+  indent): each continuation row starts under the first character of the line's text, a tab
+  counting as `tabSize` columns. Briefs, JSON tabs and template buffers alike; a line at column 0
+  wraps as before (TYTO-707). The desktop gains the end-to-end suite that measures it.
+- Updated dependencies [d52b7b7]
+- Updated dependencies [052247d]
+- Updated dependencies [1bb6287]
+  - @tyto/core@0.47.0
+  - @tyto/brief-lang@0.10.0
+  - @tyto/export-html@0.8.0
+  - @tyto/export-svg@2.1.0
+  - @tyto/editor@0.19.0
+  - @tyto/command-line@0.9.1
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.22
+  - @tyto/io@5.9.1
+  - @tyto/pipeline@0.12.19
+  - @tyto/plugin-api@0.22.1
+  - @tyto/recipe@0.7.1
+  - @tyto/template-lang@0.8.21
+  - @tyto/templates@1.2.17
+  - @tyto/theme-pack@0.1.22
+
 ## 0.23.0
 
 ### Minor Changes
