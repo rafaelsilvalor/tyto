@@ -196,6 +196,12 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.to-brief.field.slots.help':
     'Pares slot:coluna, separados por vírgula, ou uma referência de dados.',
 
+  'recipe.verb.to-delivery.summary':
+    'Planeja uma pasta de entrega por linha, com a sua ficha, escrita ao Aplicar.',
+  'recipe.verb.to-delivery.field.name.help': 'A coluna que dá nome à pasta de cada entrega.',
+  'recipe.verb.to-delivery.field.fields.help':
+    'Pares campo:coluna (key, link, formats, stem, copy, due, ship), ou uma referência de dados.',
+
   'recipe.verb.call.summary':
     'Planeja um POST por linha para um host permitido, enviado ao Aplicar.',
   'recipe.verb.call.field.url.help':

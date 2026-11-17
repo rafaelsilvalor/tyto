@@ -194,6 +194,12 @@ export type { RecipeState } from '@tyto/recipe';
 export type { BriefFolder, ToBriefPorts } from '@tyto/recipe';
 
 /**
+ * The ports `to-delivery` plans and applies through, named here for the same reason: the host's
+ * workspace adapter implements a port from this package (ADR 0210).
+ */
+export type { DeliveryLayout, DeliveryPlace, ToDeliveryPorts } from '@tyto/recipe';
+
+/**
  * The ports `call` plans and sends through, named here for the same reason: the host's adapter
  * implements a port from this package (ADR 0193).
  */

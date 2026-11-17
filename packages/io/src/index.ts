@@ -170,6 +170,8 @@ export {
   workspaceBriefPorts,
 } from './workspace-briefs.js';
 
+export { type WorkspaceDeliveryOptions, workspaceDeliveryPorts } from './workspace-deliveries.js';
+
 export {
   INCLUDED_RECIPE_MAX_BYTES,
   type KeptTable,
