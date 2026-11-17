@@ -448,6 +448,65 @@ describe('Apply on a plan cell (TYTO-378)', () => {
     }
     process.stdout.write(`[TYTO-378] marks after Apply: ${JSON.stringify(after)}\n`);
   }, 30_000);
+
+  // TYTO-766, ADR 0208: one block, the action in its middle. Before this card the block drew only
+  // its last step, the `select`, and the plan and its Apply were nowhere on screen.
+  it('shows a plan in the middle of a block under its own line, and applies it', async () => {
+    const middlePath = join(scratch, 'recipes', 'middle.recipe');
+    writeFileSync(
+      middlePath,
+      ['recipe middle', 'example.pull count=3', `${MARK} checked`, 'select title', ''].join('\n'),
+    );
+    await app?.evaluate(({ dialog }, chosen) => {
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
+    }, middlePath);
+    await run('editor.open');
+    // Opened and held until Run: one block, so one line, the last step's.
+    await expect
+      .poll(async () => (await cells()).map((cell) => cell.summary), { timeout: 15_000 })
+      .toEqual(['Fetches on save or Run']);
+    await run('recipe.run');
+    // Two results for one block: the plan under the action's line, then the block's last step.
+    // The source's table stays hidden, as ADR 0196 says.
+    await expect
+      .poll(async () => (await cells()).map((cell) => cell.summary), { timeout: 15_000 })
+      .toEqual(['3 rows · 2 columns', '3 rows · 1 column']);
+    // Each result is a block widget, a child of `.cm-content`: the line just above it is the
+    // step it belongs to.
+    const drawnUnder = await page.evaluate(() =>
+      [...document.querySelectorAll('#editor .recipe-cell')].map((cell) => {
+        let widget: Element | null = cell;
+        while (widget !== null && !widget.parentElement?.classList.contains('cm-content')) {
+          widget = widget.parentElement;
+        }
+        let above = widget?.previousElementSibling ?? null;
+        while (above !== null && !above.classList.contains('cm-line')) {
+          above = above.previousElementSibling;
+        }
+        return above?.textContent ?? '';
+      }),
+    );
+    expect(drawnUnder).toEqual(['example.mark checked', 'select title']);
+    expect((await planLines()).buttons).toEqual(['Apply', 'Run from here', 'Open in a tab']);
+    expect((await planLines()).lines.map((line) => line.description)).toEqual([
+      "Mark EX-1 as 'checked'",
+      "Mark EX-2 as 'checked'",
+      "Mark EX-3 as 'checked'",
+    ]);
+
+    await page.locator('#editor .recipe-cell [data-action="apply"]').click();
+    await expect
+      .poll(async () => (await planLines()).summary, { timeout: 15_000 })
+      .toBe('3 applied');
+    const shots = process.env['TYTO_RECIPE_NOTEBOOK_SHOTS'];
+    if (shots !== undefined) {
+      mkdirSync(shots, { recursive: true });
+      await page.screenshot({ path: join(shots, 'recipe-notebook-middle-plan.png') });
+    }
+    process.stdout.write(
+      `[TYTO-766] middle plan: ${JSON.stringify({ cells: await cells(), drawnUnder })}\n`,
+    );
+  }, 30_000);
 });
 
 describe("a run cell's included cells (TYTO-449)", () => {

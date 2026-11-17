@@ -110,3 +110,6 @@ Read in the code on `origin/main` (`cdaabe01`) before deciding:
   first being 0, so a tab opened from a block's toolbar on a chained line draws its last step's
   cell; when the line holds fewer cells after a run, the tab has no result rather than another
   step's. Run from here still starts at the cursor line's first step.
+- 2026-11-17 (TYTO-766, ADR 0208): **decision 2 is amended: a plan is never hidden.** A step in
+  the middle of a block that answered a plan is drawn under its own line, with its own Apply;
+  the block's last step's result is still the one under the last line.
