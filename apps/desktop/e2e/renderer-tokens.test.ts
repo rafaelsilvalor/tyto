@@ -257,6 +257,8 @@ describe('the type ramp derives from two bases (TYTO-272, ADR 0099)', () => {
     const css = withoutComments(read(TOKEN_FILE));
     const block = /:root,\s*\[data-font-area\]\s*\{([^}]*)\}/u.exec(css)?.[1] ?? '';
     expect([...declarations(block).keys()].sort()).toEqual([
+      // TYTO-767: a recipe block's head is one line of small text, so it follows the area's ramp.
+      '--tyto-notebook-head',
       '--tyto-pane-header-block',
       '--tyto-pane-strip-block',
       '--tyto-text-lg',

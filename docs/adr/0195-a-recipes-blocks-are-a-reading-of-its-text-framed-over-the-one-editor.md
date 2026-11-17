@@ -190,3 +190,7 @@ marker, run all and run from here on the toolbar; (C) command mode; (D) drag to 
   mid-drag scrolls the pane 300 px as it does with no drag, and the drop line stays at the
   pointer (377 px for a pointer at 362), where without it the line went off with the text, to
   63 px.
+- 2026-11-17 (TYTO-767, ADR 0209): **a block is drawn as a notebook cell.** A box in a layer of
+  its own outlines each block with its results, a step block opens with a head that holds its
+  counter and toolbar, notes have no box, and blocks stand further apart. The band behind the
+  lines stays; the left bar and the hairline over the first line move to the box.

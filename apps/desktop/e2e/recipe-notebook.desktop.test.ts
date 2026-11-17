@@ -487,6 +487,44 @@ describe('Apply on a plan cell (TYTO-378)', () => {
       }),
     );
     expect(drawnUnder).toEqual(['example.mark checked', 'select title']);
+    // TYTO-767, ADR 0209: one block is one cell. Its box runs from its head to the bottom of its
+    // last result, the plan in the middle inside it; its head holds the toolbar, above the text.
+    // The boxes and toolbars are layers, drawn on CodeMirror's next measure after the results.
+    await expect
+      .poll(() => page.locator('#editor .cm-notebook-box--step').count(), { timeout: 15_000 })
+      .toBe(1);
+    const cell = await page.evaluate(() => {
+      const rect = (element: Element | null | undefined) => element?.getBoundingClientRect();
+      const boxes = [...document.querySelectorAll('#editor .cm-notebook-box--step')];
+      const box = rect(boxes[0]);
+      const results = [...document.querySelectorAll('#editor .recipe-cell')].map(rect);
+      const first = rect(
+        [...document.querySelectorAll('#editor .cm-line')].find(
+          (line) => line.textContent === 'example.pull count=3',
+        ),
+      );
+      const toolbar = rect(document.querySelectorAll('#editor .cm-notebook-toolbar')[1]);
+      const text = first === undefined ? undefined : first.bottom - 20;
+      return {
+        measured: { box, results, first, toolbar },
+        boxes: boxes.length,
+        holdsResults: results.every(
+          (result) =>
+            box !== undefined &&
+            result !== undefined &&
+            result.top >= box.top - 1 &&
+            result.bottom <= box.bottom + 1,
+        ),
+        toolbarInHead:
+          box !== undefined &&
+          toolbar !== undefined &&
+          text !== undefined &&
+          toolbar.top >= box.top - 1 &&
+          toolbar.bottom <= text + 1,
+      };
+    });
+    process.stdout.write(`[TYTO-767] cell: ${JSON.stringify(cell)}\n`);
+    expect(cell).toMatchObject({ boxes: 1, holdsResults: true, toolbarInHead: true });
     expect((await planLines()).buttons).toEqual(['Apply', 'Run from here', 'Open in a tab']);
     expect((await planLines()).lines.map((line) => line.description)).toEqual([
       "Mark EX-1 as 'checked'",

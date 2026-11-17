@@ -68,6 +68,13 @@ export interface BlockHost {
   readonly addStep: (view: EditorView, slot: StepSlot) => void;
 }
 
+/** Where each step block starts (TYTO-767): the blocks that open with a head. */
+export function headedBlockStarts(text: string): readonly number[] {
+  return recipeBlocks(text)
+    .filter((block) => block.kind === 'step')
+    .map((block) => block.from);
+}
+
 /** The frames a recipe's pane draws: one per block, the header's with no toolbar. */
 export function recipeFrames(view: EditorView, host: BlockHost): readonly NotebookFrame[] {
   const text = view.state.doc.toString();
@@ -102,6 +109,8 @@ export function recipeFrames(view: EditorView, host: BlockHost): readonly Notebo
       insertable: true,
       // Dragged by its grip (TYTO-676, fourth pull request); a header never moves.
       movable: true,
+      // TYTO-767, ADR 0209: a step block opens with a head that holds its counter and toolbar.
+      headed: block.kind === 'step',
       ...(mark === undefined ? {} : { marker: markerOf(mark, locale) }),
     };
   });
@@ -271,7 +280,11 @@ function toolbarOf(
   locale: Locale,
 ): HTMLElement {
   const toolbar = document.createElement('span');
-  toolbar.className = 'recipe-block-toolbar';
+  // TYTO-767: a step block's toolbar sits in its head, a note's beside its first line.
+  toolbar.className =
+    shape.kind === 'step'
+      ? 'recipe-block-toolbar recipe-block-toolbar--head'
+      : 'recipe-block-toolbar';
   toolbar.setAttribute('role', 'toolbar');
   const add = (action: BlockAction, glyph: string, key: CatalogueKey, enabled = true): void => {
     const made = toolbarButton(action, glyph, translate(locale, key));
