@@ -448,6 +448,21 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       'sink',
     ),
     form(
+      'to-delivery',
+      'Plans one delivery folder per row with its record, written on Apply.',
+      'to-delivery name=folder fields=key:key,due:due,formats:formats',
+      [
+        named('name', 'column', true, "The column naming each delivery's folder."),
+        named(
+          'fields',
+          'list',
+          true,
+          'field:column pairs (key, link, formats, stem, copy, due, ship), or a data reference.',
+        ),
+      ],
+      'sink',
+    ),
+    form(
       'call',
       'Plans one POST per row to an allowed host, sent on Apply.',
       'call url=https://hooks.example.com/run token=routine body=@./call.json#/routine',

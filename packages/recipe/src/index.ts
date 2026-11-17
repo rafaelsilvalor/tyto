@@ -90,6 +90,8 @@ export {
 } from './call.js';
 export type { BriefFolder, ToBriefPorts } from './to-brief.js';
 export { TO_BRIEF_PLAN_LIMITS, TO_BRIEF_WRITE, briefFolder } from './to-brief.js';
+export type { DeliveryLayout, DeliveryPlace, ToDeliveryPorts } from './to-delivery.js';
+export { TO_DELIVERY_PLAN_LIMITS, TO_DELIVERY_WRITE } from './to-delivery.js';
 export { GENERIC_VERBS, createDerivationRegistry, createVerbRegistry } from './registry.js';
 export type { Cell, RecipeRun, RunOptions } from './run.js';
 export { runRecipe } from './run.js';
