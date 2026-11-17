@@ -1,5 +1,23 @@
 # @tyto/editor
 
+## 0.21.0
+
+### Minor Changes
+
+- c06b892: A recipe block is drawn as a notebook cell: a box around its lines and every result under them,
+  a head at the top of a step block that holds its counter and buttons, notes with no box, and more
+  space between blocks. The editor's notebook frames gain `headed` and `headedLinesOf` (ADR 0209).
+
+### Patch Changes
+
+- Updated dependencies [560d12e]
+- Updated dependencies [2d49c56]
+- Updated dependencies [2683219]
+  - @tyto/core@0.49.0
+  - @tyto/recipe@0.8.0
+  - @tyto/brief-lang@0.11.1
+  - @tyto/template-lang@0.8.23
+
 ## 0.20.0
 
 ### Minor Changes
