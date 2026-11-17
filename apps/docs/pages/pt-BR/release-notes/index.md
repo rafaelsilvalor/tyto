@@ -3,6 +3,7 @@
 O que mudou em cada versão do aplicativo, da mais nova para a mais antiga. Cada página é o texto
 publicado com aquela versão.
 
+- [Tyto 0.24.1](./desktop-v0.24.1) — as pastas recentes atravessam a atualização, e uma receita mantém uma pasta de entrega por linha
 - [Tyto 0.23.2](./desktop-v0.23.2) — o brief escreve fração, dispensa o recuo e aninha tags pelo template
 - [Tyto 0.23.1](./desktop-v0.23.1) — o painel Comandos mexe em arquivos, tem apelidos e variáveis, e um comentário não quebra mais a lâmina
 - [Tyto 0.22.0](./desktop-v0.22.0) — uma receita em blocos, como um notebook, e login pela linha de comando
