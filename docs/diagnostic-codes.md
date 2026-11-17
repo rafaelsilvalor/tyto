@@ -215,6 +215,7 @@ non-zero.
 | `E_RECIPE_PLAN` | error | no | An action or a sink planned a write it did not declare, miscounted its plan, or passed a ceiling. |
 | `E_RECIPE_APPLY` | error | no | An Apply was refused before any write: the shown plan holds a write its verb no longer declares, or the verb cannot apply. |
 | `E_RECIPE_BRIEF` | error | no | 'to-brief' cannot plan its briefs: an unknown template or slot, a value brief text cannot hold, two rows with one file name, or a folder it may not write. |
+| `E_RECIPE_DELIVERY` | error | no | 'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write. |
 | `E_RECIPE_CALL` | error | no | 'call' cannot plan its requests: an address that is not https, a host the workspace's project does not allow, a credential not stored on this machine, or a body too large. |
 | `E_RECIPE_VERB` | error | no | A verb a plugin contributes could not do its work, in its own words. |
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
@@ -393,6 +394,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_PLAN` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_APPLY` | no | Nothing of that plan is written, and no recipe state is committed. |
 | `E_RECIPE_BRIEF` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
+| `E_RECIPE_DELIVERY` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_CALL` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is sent. |
 | `E_RECIPE_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
@@ -2222,6 +2224,20 @@ That cell has no plan and the cells after it do not run; earlier cells keep thei
 
 ```
 'to-brief' {problem}.
+```
+
+Parameters: `problem`
+
+### `E_RECIPE_DELIVERY`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0210-a-delivery-may-exist-without-a-brief-and-a-record-says-what-it-is.md`
+
+'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write.
+
+That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.
+
+```
+'to-delivery' {problem}.
 ```
 
 Parameters: `problem`

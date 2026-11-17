@@ -2003,6 +2003,18 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
   },
+  // `to-delivery` checks its arguments and the workspace before it plans; a row it cannot write
+  // is refused in the cell's note instead, and the other rows still plan (ADR 0210).
+  E_RECIPE_DELIVERY: {
+    severity: 'error',
+    summary:
+      "'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write.",
+    template: "'to-delivery' {problem}.",
+    spec: 'docs/adr/0210-a-delivery-may-exist-without-a-brief-and-a-record-says-what-it-is.md',
+    fatal: false,
+    fatality:
+      'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
+  },
   // `call` checks its address, its credential and its body before it plans, so a request to a
   // host the workspace did not allow is never shown, let alone sent (ADR 0193).
   E_RECIPE_CALL: {
