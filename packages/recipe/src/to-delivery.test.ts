@@ -508,3 +508,87 @@ describe('to-delivery inbound= (ADR 0211)', () => {
     expect(shown?.count).toBe(1);
   });
 });
+
+describe('to-delivery keep= (ADR 0211 note of 2026-11-17)', () => {
+  const KEEP = 'to-delivery name=folder fields=key:key,due:due,copy:copy keep=copy';
+  const ROWS = (copy: string, due = '2026-11-20') =>
+    tasks(
+      ['folder', 'due', 'copy'],
+      [
+        ['mca-1_aula', due, copy],
+        ['mca-2_simulado', '2026-11-21', 'https://docs.example/2'],
+      ],
+    );
+
+  async function linked(line: string): Promise<FakeWorkspace> {
+    const workspace = new FakeWorkspace();
+    const first = await plan(line, workspace, ROWS('https://docs.example/1'));
+    await apply(first.verbs, first.plan);
+    return workspace;
+  }
+
+  it('keeps the link of an orphan row, plans no write and warns in the note', async () => {
+    const workspace = await linked(KEEP);
+    const before = workspace.files.get(RECORD);
+    const later = await plan(KEEP, workspace, ROWS(''));
+    expect(later.problems).toEqual([]);
+    expect(later.plan?.count).toBe(0);
+    expect(later.note).toBe("Kept 1 value whose cell came back empty: row 'T-0' copy.");
+    expect(workspace.files.get(RECORD)).toBe(before);
+    const again = await plan(KEEP, workspace, ROWS(''));
+    expect(again.plan?.count).toBe(0);
+    expect(again.note).toBe(later.note);
+  });
+
+  it('says kept: copy (source empty) on a line written for another field', async () => {
+    const workspace = await linked(KEEP);
+    const later = await plan(KEEP, workspace, ROWS('', '2026-11-25'));
+    expect(descriptions(later.plan)).toEqual([
+      ['T-0', 'entregas/mca-1_aula: updates due; kept: copy (source empty)'],
+    ]);
+    await apply(later.verbs, later.plan);
+    expect(JSON.parse(workspace.files.get(RECORD) ?? '')).toMatchObject({
+      copy: 'https://docs.example/1',
+      due: '2026-11-25',
+      written: { copy: 'https://docs.example/1', due: '2026-11-25' },
+    });
+  });
+
+  it('clears the link as before without keep=', async () => {
+    const line = 'to-delivery name=folder fields=key:key,due:due,copy:copy';
+    const workspace = await linked(line);
+    const later = await plan(line, workspace, ROWS(''));
+    expect(later.note).toBeUndefined();
+    expect(descriptions(later.plan)).toEqual([['T-0', 'entregas/mca-1_aula: updates copy']]);
+  });
+
+  it("refuses 'key', an inbound field, an unknown or unmapped field, at the argument", async () => {
+    const workspace = new FakeWorkspace();
+    const STATUS = tasks(['folder', 'status', 'copy'], [['mca-1_aula', 'todo', 'x']]);
+    const cases: [string, string][] = [
+      [
+        'to-delivery name=folder fields=key:key keep=key',
+        "'to-delivery' never keeps 'key': a row without one is refused.",
+      ],
+      [
+        'to-delivery name=folder fields=key:key,state:status inbound=state:row keep=state',
+        "'to-delivery' cannot keep 'state', which is declared inbound; name it in keep= or inbound=, not both.",
+      ],
+      [
+        'to-delivery name=folder fields=key:key keep=colour',
+        "'to-delivery' has no field 'colour' to keep; a record has key, link, formats, stem, copy, due, ship, state.",
+      ],
+    ];
+    for (const [line, message] of cases) {
+      const refused = await plan(line, workspace, STATUS);
+      expect(refused.plan).toBeUndefined();
+      expect(refused.problems[0]?.message).toBe(message);
+      const source = ['recipe deliveries', line].join('\n');
+      const range = refused.problems[0]?.range;
+      expect(source.slice(range?.start, range?.end)).toMatch(/^keep=/u);
+    }
+    const unmapped = await plan('to-delivery name=folder fields=key:key keep=copy', workspace);
+    expect(unmapped.problems[0]?.message).toContain("keeps 'copy' but does not map it");
+    expect(workspace.writes).toEqual([]);
+  });
+});

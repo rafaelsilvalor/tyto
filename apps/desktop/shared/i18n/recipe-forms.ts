@@ -203,6 +203,8 @@ const PT_BR: Readonly<Record<string, string>> = {
     'Pares campo:coluna (key, link, formats, stem, copy, due, ship), ou uma referência de dados.',
   'recipe.verb.to-delivery.field.inbound.help':
     'Pares campo:vencedor para campos que um valor de fora pode mudar, vencedor record ou row.',
+  'recipe.verb.to-delivery.field.keep.help':
+    'Campos mapeados cuja célula vazia mantém o valor da ficha em vez de apagá-lo.',
 
   'recipe.verb.deliveries.summary':
     'Lê cada ficha de entrega na pasta de entregas do projeto como uma linha.',
