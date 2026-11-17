@@ -1,5 +1,12 @@
 # @tyto/templates
 
+## 1.2.20
+
+### Patch Changes
+
+- @tyto/template-kit@0.12.3
+  - @tyto/house-style@0.5.15
+
 ## 1.2.19
 
 ### Patch Changes
