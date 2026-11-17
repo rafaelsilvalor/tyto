@@ -914,6 +914,62 @@ describe("a block's result", () => {
       expect(status).not.toHaveProperty('notes');
     }
   });
+
+  // TYTO-766, ADR 0208: a plan in the middle of a block is drawn under its own line.
+  const planned = (index: number, line: number, target: string): Cell => ({
+    index,
+    line,
+    status: 'ok',
+    diagnostics: [],
+    table: table(2, 3),
+    plan: {
+      target,
+      count: 2,
+      operations: [{ write: 'transition', rowKey: 'TTA-1', description: 'transition TTA-1' }],
+      planId: index + 10,
+      applicable: true,
+    },
+  });
+  const SYNC = [
+    'recipe sync',
+    '',
+    'acme.rows',
+    'acme.transition to-column=target',
+    'select key, status',
+    'acme.sync',
+    '',
+  ].join('\n');
+
+  it("draws a middle step's plan under its own line, then the block's last step", () => {
+    const cells = [cell(0, 3), planned(1, 4, 'tracker'), cell(2, 5), planned(3, 6, 'sheet')];
+    const drawn = blockResults(SYNC, cellStatuses(SYNC, answer(1, cells), 'en'));
+    expect(drawn.map((status) => [status.index, status.at, status.text])).toEqual([
+      [1, SYNC.indexOf('acme.transition'), '2 rows · 3 columns'],
+      [3, SYNC.indexOf('acme.sync'), '2 rows · 3 columns'],
+    ]);
+    // The middle status is the cell itself: its plan, and so its Apply, are drawn from it.
+    expect(drawn[0]?.cell.plan?.planId).toBe(11);
+  });
+
+  it('control: a middle step with a table and no plan stays hidden', () => {
+    const cells = [cell(0, 3), cell(1, 4), cell(2, 5), planned(3, 6, 'sheet')];
+    const drawn = blockResults(SYNC, cellStatuses(SYNC, answer(1, cells), 'en'));
+    expect(drawn.map((status) => status.index)).toEqual([3]);
+  });
+
+  it("draws a plan on a chained line before the line's last step's result", () => {
+    const text = ['recipe sync', '', 'acme.transition to-column=target | select key', ''].join(
+      '\n',
+    );
+    const drawn = blockResults(
+      text,
+      cellStatuses(text, answer(1, [planned(0, 3, 'tracker'), cell(1, 3)]), 'en'),
+    );
+    expect(drawn.map((status) => [status.index, status.at])).toEqual([
+      [0, text.indexOf('acme')],
+      [1, text.indexOf('acme')],
+    ]);
+  });
 });
 
 describe('a line that chains steps with | (TYTO-706)', () => {

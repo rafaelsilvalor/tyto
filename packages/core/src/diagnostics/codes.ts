@@ -2003,6 +2003,30 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
   },
+  // `to-delivery` checks its arguments and the workspace before it plans; a row it cannot write
+  // is refused in the cell's note instead, and the other rows still plan (ADR 0210).
+  E_RECIPE_DELIVERY: {
+    severity: 'error',
+    summary:
+      "'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write.",
+    template: "'to-delivery' {problem}.",
+    spec: 'docs/adr/0210-a-delivery-may-exist-without-a-brief-and-a-record-says-what-it-is.md',
+    fatal: false,
+    fatality:
+      'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
+  },
+  // `deliveries` reads the records back as rows only inside a trusted workspace; a record it
+  // cannot read is a warning, and the other folders still read (ADR 0211).
+  E_RECIPE_DELIVERIES: {
+    severity: 'error',
+    summary:
+      "'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace.",
+    template: "'deliveries' {problem}.",
+    spec: 'docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
+  },
   // `call` checks its address, its credential and its body before it plans, so a request to a
   // host the workspace did not allow is never shown, let alone sent (ADR 0193).
   E_RECIPE_CALL: {
@@ -2299,6 +2323,16 @@ export const diagnosticCodes = {
     spec: 'docs/adr/0128-a-recipe-is-a-closed-vocabulary-notebook-and-plugins-contribute-verbs.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  // TYTO-771: one unreadable record leaves its delivery out of the table, never the others.
+  W_RECIPE_DELIVERY_RECORD: {
+    severity: 'warning',
+    summary:
+      "'deliveries' left a delivery out of its table: its record is not one, its folder could not be read, or another folder has its key.",
+    template: "'deliveries' left out {folder}: {problem}.",
+    spec: 'docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md',
+    fatal: false,
+    fatality: 'The other deliveries are still read; nothing is written.',
   },
   // TYTO-714: with clear=push, a sheet read that lost a column reads as every cell cleared. The
   // run holds those clears instead of clearing the remote side, and says which column.

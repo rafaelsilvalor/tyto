@@ -8,7 +8,9 @@ import type { Cell } from './run.js';
 import type { ApplyOutcome, RecipeState, StateWrite } from './state.js';
 import type { Table } from './table.js';
 import { type CallPorts, callVerb } from './call.js';
+import { deliveriesVerb } from './deliveries.js';
 import { type ToBriefPorts, toBriefVerb } from './to-brief.js';
+import { type ToDeliveryPorts, toDeliveryVerb } from './to-delivery.js';
 import { genericVerbs } from './verbs.js';
 import type { ViewOptionValue, ViewSpecs } from './views.js';
 
@@ -151,6 +153,8 @@ export const GENERIC_VERBS = [
   'set',
   'warn',
   'to-brief',
+  'to-delivery',
+  'deliveries',
   'call',
 ] as const;
 
@@ -214,6 +218,10 @@ function createRegistry<Entry>(
  * workspace and the recipe the run belongs to. Without it `to-brief` is still in the vocabulary
  * and says this host writes no briefs.
  *
+ * `deliveries` lends `to-delivery` the workspace's delivery layout and files (ADR 0210), bound
+ * the same way; without it `to-delivery` says this host writes no deliveries. The source
+ * `deliveries` reads the records back through the same ports (ADR 0211), and says so too.
+ *
  * `calls` lends `call` the workspace's allowed hosts, the machine's stored credentials and the
  * network (ADR 0193), bound the same way. Without it `call` still plans, and its Apply says this
  * host sends no requests.
@@ -226,12 +234,15 @@ export function createVerbRegistry(options: VerbRegistryOptions = {}): VerbRegis
   );
   for (const [name, verb] of Object.entries(genericVerbs)) registry.entries.set(name, verb);
   registry.entries.set('to-brief', toBriefVerb(options.briefs));
+  registry.entries.set('to-delivery', toDeliveryVerb(options.deliveries));
+  registry.entries.set('deliveries', deliveriesVerb(options.deliveries));
   registry.entries.set('call', callVerb(options.calls));
   return registry;
 }
 
 export interface VerbRegistryOptions {
   readonly briefs?: ToBriefPorts | undefined;
+  readonly deliveries?: ToDeliveryPorts | undefined;
   readonly calls?: CallPorts | undefined;
 }
 

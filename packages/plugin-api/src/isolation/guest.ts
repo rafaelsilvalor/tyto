@@ -5,6 +5,7 @@ import {
   type PluginCacheEntry,
   type PluginCacheListing,
   type PluginCacheStored,
+  type WorkspaceEntry,
   hostCache,
   hostCredentials,
   hostSignin,
@@ -46,6 +47,8 @@ import {
   windowToolResultSchema,
   windowToolsSchema,
   workspaceBytesSchema,
+  workspaceEntrySchema,
+  workspaceListingSchema,
 } from './protocol.js';
 
 /**
@@ -317,6 +320,16 @@ export function runGuest(
       workspaceWrite: async (path, bytes) => {
         await request('workspaceWrite', [path, bytes], storedSchema);
       },
+      workspaceReadPart: async (path, offset, length) =>
+        (await request(
+          'workspaceReadPart',
+          [path, offset, length],
+          workspaceBytesSchema,
+        )) as Uint8Array,
+      workspaceStat: async (path) =>
+        (await request('workspaceStat', [path], workspaceEntrySchema)) as WorkspaceEntry,
+      workspaceList: async (path) =>
+        (await request('workspaceList', [path], workspaceListingSchema)) as WorkspaceEntry[],
     }),
     process: hostProcess(async (name, args) => {
       const { id, cwd } = (await request(

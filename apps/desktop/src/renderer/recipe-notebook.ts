@@ -911,17 +911,25 @@ function counted(
  * A value a `set` step set is the one thing of a hidden step the block's result still shows
  * (TYTO-727, ADR 0199): the drawn status carries every step's of its block, with their notes,
  * since a `set` in the middle of a block is the usual place for one.
+ *
+ * A plan is never hidden (TYTO-766, ADR 0208): a step in the middle of a block that answered one
+ * is drawn under its own line, with its operations and its own Apply, since a plan nobody can see
+ * cannot be read before it is applied (ADR 0129). A step on a chained line shares the line, so
+ * its plan is drawn there too, before the line's last step's result.
  */
 export function blockResults(text: string, statuses: readonly CellStatus[]): readonly CellStatus[] {
   const shown: CellStatus[] = [];
   for (const block of recipeBlocks(text)) {
     const steps = block.steps;
     if (steps === undefined) continue;
-    const drawn = statuses.find((status) => status.index === steps.last);
-    if (drawn === undefined) continue;
     const inBlock = statuses.filter(
       (status) => status.index >= steps.first && status.index <= steps.last,
     );
+    shown.push(
+      ...inBlock.filter((status) => status.index < steps.last && status.cell.plan !== undefined),
+    );
+    const drawn = statuses.find((status) => status.index === steps.last);
+    if (drawn === undefined) continue;
     const named = inBlock.flatMap((status) => status.named ?? []);
     const notes = inBlock.flatMap((status) => status.notes ?? []);
     shown.push({

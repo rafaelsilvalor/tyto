@@ -16,6 +16,7 @@ import {
   type RecipeRegistries,
   type RecipeState,
   type ToBriefPorts,
+  type ToDeliveryPorts,
   recipeRegistriesOf,
 } from '@tyto/plugin-api';
 import {
@@ -37,6 +38,7 @@ import {
 import { isInside } from '../contain.js';
 import { type RecipeStateOptions, recipeStateStore } from '../recipe-state.js';
 import { workspaceBriefPorts } from '../workspace-briefs.js';
+import { workspaceDeliveryPorts } from '../workspace-deliveries.js';
 import { type RecipeCredentials, type RecipeFetch, recipeCallPorts } from './recipe-calls.js';
 import { type WorkspaceDataOptions, workspaceDataResolver } from '../workspace-data.js';
 
@@ -97,6 +99,8 @@ export interface RecipeRegistryRequest {
   readonly now?: (() => string) | undefined;
   /** TYTO-380, ADR 0172: `to-brief`'s ports, bound to this run's workspace and recipe. */
   readonly briefs?: ToBriefPorts | undefined;
+  /** TYTO-755, ADR 0210: `to-delivery`'s ports, bound to this run's workspace. */
+  readonly deliveries?: ToDeliveryPorts | undefined;
   /** TYTO-671, ADR 0193: `call`'s ports, bound to this run's workspace. */
   readonly calls?: CallPorts | undefined;
 }
@@ -310,6 +314,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         refresh: request.refresh,
         ...(request.now === undefined ? {} : { now: request.now }),
         ...(request.briefs === undefined ? {} : { briefs: request.briefs }),
+        ...(request.deliveries === undefined ? {} : { deliveries: request.deliveries }),
         ...(request.calls === undefined ? {} : { calls: request.calls }),
       }));
   const stateOf = options.state ?? recipeStateStore;
@@ -359,6 +364,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
           place.trust === 'trusted' ? options.sectionFor(directory, plugin) : undefined,
         refresh: request.fresh === true,
         briefs: briefsFor(place, directory, options.templates),
+        deliveries: deliveriesFor(place, options.home),
         calls: callsFor(place, directory, options.calls),
       });
       const steps = recipe.steps;
@@ -564,6 +570,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       refresh: false,
       now,
       briefs: briefsFor(place, directory, options.templates, now),
+      deliveries: deliveriesFor(place, options.home, now),
       calls: callsFor(place, directory, options.calls, now),
     });
     const answer = await applyCell({
@@ -892,6 +899,22 @@ function briefsFor(
     recipeFolder: inWorkspace ? directory : undefined,
     trust: () => trust,
     template: templates,
+    ...(now === undefined ? {} : { now }),
+  });
+}
+
+/**
+ * `to-delivery`'s ports (ADR 0210), bound to the recipe's workspace as main answers it now, as
+ * `to-brief`'s are. Lent whatever the host's templates: a delivery needs no template. A recipe in
+ * no workspace still gets ports, whose folder is nowhere, so the verb says where it may write.
+ */
+function deliveriesFor(place: RecipePlace, home: string, now?: () => string): ToDeliveryPorts {
+  const inWorkspace = place.trust !== 'none' && place.folder !== undefined;
+  const trust = place.trust === 'trusted' ? 'trusted' : 'restricted';
+  return workspaceDeliveryPorts({
+    workspaceFolder: inWorkspace ? place.folder : undefined,
+    trust: () => trust,
+    home,
     ...(now === undefined ? {} : { now }),
   });
 }

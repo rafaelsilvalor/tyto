@@ -65,9 +65,11 @@ import {
  * since a recipe `transform` call carries `refresh` on a run without cache, a field the strict
  * `transform` schema of a guest on 24 would refuse (ADR 0148, TYTO-681); 26 since a recipe
  * verb's argument may carry `description`, a field the strict `recipe-verb` schema of a host on
- * 25 would refuse (ADR 0135, note of 2026-11-12, TYTO-687).
+ * 25 would refuse (ADR 0135, note of 2026-11-12, TYTO-687); 27 since a plugin may read a
+ * workspace file in parts, and stat and list the folder, three requests a host on 26 would
+ * refuse as unknown capabilities (ADR 0212, TYTO-768).
  */
-export const RPC_PROTOCOL_VERSION = 26;
+export const RPC_PROTOCOL_VERSION = 27;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -246,6 +248,9 @@ const requestedCapabilitySchema = z.enum([
   'cacheList',
   'workspaceRead',
   'workspaceWrite',
+  'workspaceReadPart',
+  'workspaceStat',
+  'workspaceList',
   'signinAccessToken',
   'processStart',
   'processWrite',
@@ -346,6 +351,9 @@ export const cacheKeyArgsSchema = z.tuple([z.string()]);
 export const cachePutArgsSchema = z.tuple([z.string(), bytesSchema]);
 export const workspaceReadArgsSchema = z.tuple([z.string()]);
 export const workspaceWriteArgsSchema = z.tuple([z.string(), bytesSchema]);
+/** Path, offset, length (ADR 0212); whole numbers and the ceiling are `checkedCapabilities`'. */
+export const workspaceReadPartArgsSchema = z.tuple([z.string(), z.number(), z.number()]);
+export const workspacePathArgsSchema = z.tuple([z.string()]);
 
 /** `host.cache.get`'s answer; `null` is a miss, because a JSON channel drops `undefined`. */
 export const cacheEntrySchema = z.union([
@@ -361,6 +369,14 @@ export const cacheListingSchema = z.array(
   }),
 );
 export const workspaceBytesSchema = bytesSchema;
+/** `host.workspace.stat`'s answer, and each of `list`'s (ADR 0212). */
+export const workspaceEntrySchema = z.strictObject({
+  name: z.string(),
+  kind: z.enum(['file', 'folder']),
+  size: z.number().int().nonnegative(),
+  modifiedAt: z.string().min(1),
+});
+export const workspaceListingSchema = z.array(workspaceEntrySchema);
 
 /**
  * `host.signin.accessToken` (ADR 0174): the id goes out, the access token comes back, and that

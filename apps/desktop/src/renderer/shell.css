@@ -1006,24 +1006,58 @@ tyto-preview-pane[hidden] {
    at the left, brighter on the block holding the caret, so the eye reads blocks and the text
    stays text. The toolbar sits at the right of the block's first line, beside the text and
    never in it, always shown (TYTO-377: a person sees what a block offers before reaching for it). */
+/* TYTO-767, ADR 0209: the lines keep the band (a cell's input area); the bar and the outline are
+   the block's box, drawn over the lines and every result under them, so a block reads as one
+   cell. The line's border stays, transparent, to keep the text where it was. */
 .cm-notebook-frame {
   position: relative;
-  border-left: var(--tyto-focus-width) solid var(--tyto-border);
+  border-left: var(--tyto-focus-width) solid transparent;
   background: var(--tyto-surface-raised);
-}
-
-.cm-notebook-frame--active {
-  border-left-color: var(--tyto-accent);
 }
 
 /* Command mode (TYTO-676, ADR 0195 decision 7): the selected block is marked on its whole band,
    as Jupyter marks the selected cell, since there is no caret in it to show where keys go. Scoped
    to the editor's lines so it wins over CodeMirror's active-line colour, which stays on the
-   caret's line while focus is away from the text; a ring in the accent colour beside it. */
+   caret's line while focus is away from the text; its box carries the accent ring. */
 .cm-editor .cm-line.cm-notebook-frame--selected {
-  border-left-color: var(--tyto-accent);
   background: var(--tyto-selection);
-  box-shadow: inset 0 0 0 var(--tyto-hairline-width) var(--tyto-accent);
+}
+
+/* A block's box (TYTO-767): an outline from its first line to its last result, a thicker bar at
+   the left, in the accent colour on the block holding the caret and all round in command mode. */
+.cm-notebook-boxes > .cm-notebook-box {
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-left-width: var(--tyto-focus-width);
+  border-radius: var(--tyto-radius-sm);
+}
+
+.cm-notebook-boxes > .cm-notebook-box--active {
+  border-left-color: var(--tyto-accent);
+}
+
+.cm-notebook-boxes > .cm-notebook-box--selected {
+  border-color: var(--tyto-accent);
+}
+
+.cm-notebook-boxes > .cm-notebook-box--dragged {
+  opacity: 0.45;
+}
+
+/* The header is the recipe's title, not a cell; a note is prose, as a notebook's text cell is,
+   drawn with no box. Command mode still rings the note it selected: keys go there. */
+.cm-notebook-boxes > .cm-notebook-box--header {
+  display: none;
+}
+
+.cm-notebook-boxes > .cm-notebook-box--note:not(.cm-notebook-box--selected) {
+  display: none;
+}
+
+/* The blank lines between two blocks stand taller, so blocks part as a notebook's cells do. The
+   padding is in the line, which CodeMirror measures, so the heights stay true. */
+.cm-editor .cm-line.cm-notebook-gap {
+  padding-top: var(--tyto-space-3);
+  padding-bottom: var(--tyto-space-3);
 }
 
 /* The command target is a layer beside the text: focused, it shows nothing of its own. */
@@ -1033,9 +1067,46 @@ tyto-preview-pane[hidden] {
 
 .cm-notebook-frame--first {
   padding-right: 9rem;
-  /* A hairline over each block's first line parts two blocks with no blank line between them.
-     A shadow, not a border: it adds no height, so CodeMirror's line measures stay true. */
-  box-shadow: inset 0 var(--tyto-hairline-width) 0 var(--tyto-border);
+}
+
+/* A step block's head (TYTO-767, ADR 0209): a strip above its first line, inside its box, that
+   holds the counter (in the gutter, at the top of the line) and the toolbar (placed at the top
+   of the line), so neither sits beside the text. Padding in the line, which CodeMirror
+   measures; the strip itself is drawn by the box. */
+.cm-editor .cm-line.cm-notebook-frame--headed {
+  padding-top: var(--tyto-notebook-head);
+  padding-right: 0;
+}
+
+.cm-notebook-boxes > .cm-notebook-box--step::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--tyto-notebook-head);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-sm) var(--tyto-radius-sm) 0 0;
+  background: var(--tyto-surface);
+  content: '';
+}
+
+/* A step block's toolbar sits in the middle of its head's height. */
+.recipe-block-toolbar--head {
+  height: var(--tyto-notebook-head);
+  align-items: center;
+}
+
+/* The counter sits in the head, at the top of the padded line's gutter element; the line number
+   goes down with the text it numbers. */
+.cm-notebook-gutter .recipe-block-count {
+  display: inline-flex;
+  height: var(--tyto-notebook-head);
+  align-items: center;
+}
+
+.cm-lineNumbers .cm-gutterElement.cm-notebook-headed {
+  box-sizing: border-box;
+  padding-top: var(--tyto-notebook-head);
 }
 
 /* A note reads as prose, not as a step (TYTO-676, second pull request): the window's own font,

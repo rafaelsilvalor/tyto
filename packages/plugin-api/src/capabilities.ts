@@ -51,6 +51,37 @@ export const PLUGIN_CACHE_KEY_LIMIT_BYTES = 1024;
  */
 export const PLUGIN_FILE_LIMIT_BYTES = 32 * 1024 * 1024;
 
+/**
+ * The part size a plugin reading a big workspace file is advised to ask for (ADR 0212): 8 MiB,
+ * a multiple of the 256 KiB step a resumable upload expects, and a quarter of the ceiling on
+ * one part, so the plugin and the wire each hold one part at a time.
+ */
+export const PLUGIN_FILE_PART_BYTES = 8 * 1024 * 1024;
+
+/**
+ * The most entries `host.workspace.list` answers for one folder (ADR 0212). A folder holding
+ * more is refused rather than cut short, because a list missing entries reads as a whole one.
+ */
+export const PLUGIN_FOLDER_LIST_LIMIT = 10_000;
+
+/**
+ * One file or folder of the open workspace, as `host.workspace.stat` and `list` describe it
+ * (ADR 0212). `size` is in bytes, `0` for a folder; `modifiedAt` is ISO 8601 from the host's
+ * clock. `name` is the last segment of the path as asked, `''` for the folder itself.
+ */
+export interface WorkspaceEntry {
+  readonly name: string;
+  readonly kind: 'file' | 'folder';
+  readonly size: number;
+  readonly modifiedAt: string;
+}
+
+/** A part of a file to read: `length` bytes from `offset`, both whole numbers of bytes. */
+export interface WorkspaceFilePart {
+  readonly offset: number;
+  readonly length: number;
+}
+
 /** One cache entry, as `host.cache.get` answers it. `storedAt` is the host's clock, ISO 8601. */
 export interface PluginCacheEntry {
   readonly bytes: Uint8Array;
@@ -168,6 +199,24 @@ export interface HostCapabilities {
   workspaceRead?(plugin: string, path: string): Promise<Uint8Array>;
   /** Writes the file whole, creating its folders, replacing one that is there. */
   workspaceWrite?(plugin: string, path: string, bytes: Uint8Array): Promise<void>;
+  /**
+   * At most `length` bytes of a file of any size from `offset`, already checked to be whole and
+   * `length` at most {@link PLUGIN_FILE_LIMIT_BYTES} (ADR 0212): shorter at the end of the
+   * file, empty past it. The adapter holds only the part in memory.
+   */
+  workspaceReadPart?(
+    plugin: string,
+    path: string,
+    offset: number,
+    length: number,
+  ): Promise<Uint8Array>;
+  /** What the path names; `''` is the folder itself (ADR 0212). */
+  workspaceStat?(plugin: string, path: string): Promise<WorkspaceEntry>;
+  /**
+   * One folder's entries, no deeper; `''` is the folder itself (ADR 0212). A link that leaves
+   * the workspace is left out, and one that stays in is described by what it leads to.
+   */
+  workspaceList?(plugin: string, path: string): Promise<readonly WorkspaceEntry[]>;
 
   /**
    * A current access token for the plugin's sign-in `id`, already allowed (ADR 0174), or
@@ -343,6 +392,9 @@ export interface PluginCapabilities {
   cacheList(prefix: string): Promise<readonly PluginCacheListing[]>;
   workspaceRead(path: string): Promise<Uint8Array>;
   workspaceWrite(path: string, bytes: Uint8Array): Promise<void>;
+  workspaceReadPart(path: string, offset: number, length: number): Promise<Uint8Array>;
+  workspaceStat(path: string): Promise<WorkspaceEntry>;
+  workspaceList(path: string): Promise<readonly WorkspaceEntry[]>;
   signinAccessToken(id: string): Promise<string>;
   storageGet(key: string): Promise<unknown>;
   storageSet(key: string, value: unknown): Promise<void>;
@@ -386,10 +438,23 @@ export interface HostCache {
 /**
  * `host.workspace`: the open folder's files, at a path relative to it, through the host
  * (ADR 0138). `workspace:read` and `workspace:write` in the manifest; a restricted folder
- * answers `E_WORKSPACE_FILE_RESTRICTED`.
+ * answers `E_WORKSPACE_FILE_RESTRICTED`. `stat` and `list` sit under `workspace:read`
+ * (ADR 0212).
  */
 export interface HostWorkspace {
-  read(path: string): Promise<Uint8Array>;
+  /**
+   * The whole file, at most {@link PLUGIN_FILE_LIMIT_BYTES}; or, given a part, at most
+   * `part.length` bytes from `part.offset` of a file of any size (ADR 0212), shorter at its
+   * end and empty past it. Read a big file in parts of {@link PLUGIN_FILE_PART_BYTES}.
+   */
+  read(path: string, part?: WorkspaceFilePart): Promise<Uint8Array>;
+  /** The file or folder the path names, with its size and when it last changed. */
+  stat(path: string): Promise<WorkspaceEntry>;
+  /**
+   * The entries of one folder, `''` (the default) being the open folder itself, sorted by
+   * name, at most {@link PLUGIN_FOLDER_LIST_LIMIT}. Walk deeper by listing each folder.
+   */
+  list(path?: string): Promise<readonly WorkspaceEntry[]>;
   /** Writes bytes, or a string as UTF-8; resolves to `null`. Never into `.tyto/`. */
   write(path: string, value: Uint8Array | string): Promise<null>;
 }
@@ -418,10 +483,18 @@ export function hostCache(
 
 /** The `host.workspace` both sides of the isolation boundary hand a plugin. */
 export function hostWorkspace(
-  checked: Pick<PluginCapabilities, 'workspaceRead' | 'workspaceWrite'>,
+  checked: Pick<
+    PluginCapabilities,
+    'workspaceRead' | 'workspaceWrite' | 'workspaceReadPart' | 'workspaceStat' | 'workspaceList'
+  >,
 ): HostWorkspace {
   return {
-    read: (path) => checked.workspaceRead(path),
+    read: (path, part) =>
+      part === undefined
+        ? checked.workspaceRead(path)
+        : checked.workspaceReadPart(path, part.offset, part.length),
+    stat: (path) => checked.workspaceStat(path),
+    list: (path = '') => checked.workspaceList(path),
     write: async (path, value) => {
       await checked.workspaceWrite(path, bytesOf(value));
       return null;
@@ -788,6 +861,54 @@ export function checkedCapabilities(
       await capabilities.workspaceWrite(plugin, relative, bytes);
     },
 
+    async workspaceReadPart(path, offset, length) {
+      if (!allowsWorkspace(permissions, 'read')) {
+        return refuse(workspacePermission(plugin, 'read', path));
+      }
+      const relative = workspacePath(path, 'read');
+      if (typeof relative !== 'string') return refuse(workspaceRefusal(plugin, path, relative));
+      const refused = partProblem(offset, length);
+      if (refused !== undefined) return refuse(workspaceRefusal(plugin, path, refused));
+      if (capabilities?.workspaceReadPart === undefined) {
+        return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
+      }
+      const bytes = await capabilities.workspaceReadPart(plugin, relative, offset, length);
+      // The line a misbehaving adapter cannot cross: never more than the part asked for.
+      if (bytes.length > length) {
+        const answered = `the host answered ${String(bytes.length)} bytes for a part of ${String(length)}`;
+        return refuse(workspaceRefusal(plugin, path, answered));
+      }
+      return bytes;
+    },
+
+    async workspaceStat(path) {
+      if (!allowsWorkspace(permissions, 'read')) {
+        return refuse(workspacePermission(plugin, 'stat', path));
+      }
+      const relative = workspaceFolderPath(path);
+      if (typeof relative !== 'string') return refuse(workspaceRefusal(plugin, path, relative));
+      if (capabilities?.workspaceStat === undefined) {
+        return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
+      }
+      return capabilities.workspaceStat(plugin, relative);
+    },
+
+    async workspaceList(path) {
+      if (!allowsWorkspace(permissions, 'read')) {
+        return refuse(workspacePermission(plugin, 'list', path));
+      }
+      const relative = workspaceFolderPath(path);
+      if (typeof relative !== 'string') return refuse(workspaceRefusal(plugin, path, relative));
+      if (capabilities?.workspaceList === undefined) {
+        return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
+      }
+      const entries = await capabilities.workspaceList(plugin, relative);
+      if (entries.length > PLUGIN_FOLDER_LIST_LIMIT) {
+        return refuse(workspaceRefusal(plugin, path, tooManyEntries(entries.length)));
+      }
+      return entries;
+    },
+
     async signinAccessToken(id) {
       if (typeof id !== 'string') throw new TypeError('a sign-in id must be a string.');
       if (!allowsSignin(permissions, id)) {
@@ -829,6 +950,8 @@ function cacheKeyProblem(key: string): string | undefined {
   return undefined;
 }
 
+const FOLDER_ITSELF = 'the path names the folder itself';
+
 /** A refusal of the lexical kind, so the caller can tell it from a cleaned path. */
 interface PathProblem {
   readonly problem: string;
@@ -855,12 +978,54 @@ export function workspacePath(path: string, access: WorkspaceAccess): string | P
   const segments = slashed.split('/').filter((segment) => segment !== '' && segment !== '.');
   if (segments.includes('..')) return { problem: 'the path leaves the folder' };
   const [first] = segments;
-  if (first === undefined) return { problem: 'the path names the folder itself' };
+  if (first === undefined) return { problem: FOLDER_ITSELF };
   // Windows drops a trailing dot or space and ignores case, so `.TYTO.` is the same folder.
   if (access === 'write' && first.replace(/[. ]+$/u, '').toLowerCase() === '.tyto') {
     return { problem: 'it is inside .tyto/, which only Tyto writes' };
   }
   return segments.join('/');
+}
+
+/**
+ * A path for `stat` and `list`, which may name the open folder itself: `''`, `.` and the like
+ * clean to `''`. Everything else is {@link workspacePath}'s to check.
+ */
+export function workspaceFolderPath(path: string): string | PathProblem {
+  if (typeof path !== 'string') throw new TypeError('a workspace path must be a string.');
+  if (path === '') return '';
+  const relative = workspacePath(path, 'read');
+  if (typeof relative !== 'string' && relative.problem === FOLDER_ITSELF) return '';
+  return relative;
+}
+
+/** Why a part is refused, or `undefined` when its offset and length are whole and in bounds. */
+function partProblem(offset: number, length: number): string | undefined {
+  if (!Number.isSafeInteger(offset) || offset < 0) {
+    return 'the offset must be a whole number of bytes, zero or more';
+  }
+  if (!Number.isSafeInteger(length) || length < 0) {
+    return 'the length must be a whole number of bytes, zero or more';
+  }
+  if (length > PLUGIN_FILE_LIMIT_BYTES) {
+    return `the part is ${String(length)} bytes; the ceiling is ${String(PLUGIN_FILE_LIMIT_BYTES)}`;
+  }
+  return undefined;
+}
+
+/** The refusal of a folder over {@link PLUGIN_FOLDER_LIST_LIMIT}, shared with the adapter. */
+export function tooManyEntries(count: number): string {
+  return `the folder holds ${String(count)} entries or more; the ceiling is ${String(PLUGIN_FOLDER_LIST_LIMIT)}`;
+}
+
+function workspacePermission(
+  plugin: string,
+  call: 'read' | 'stat' | 'list',
+  path: string,
+): Diagnostic {
+  return diagnostic('E_PERMISSION', {
+    plugin,
+    capability: `host.workspace.${call}('${path}') (workspace:read)`,
+  });
 }
 
 function cacheRefusal(plugin: string, key: string, problem: string): Diagnostic {

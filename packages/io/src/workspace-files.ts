@@ -1,11 +1,15 @@
-import { mkdir, readFile, stat } from 'node:fs/promises';
+import type { Stats } from 'node:fs';
+import { lstat, mkdir, open, opendir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
 
 import { type Trust, diagnostic } from '@tyto/core';
 import {
   type HostCapabilities,
   PLUGIN_FILE_LIMIT_BYTES,
+  PLUGIN_FOLDER_LIST_LIMIT,
   PluginCapabilityError,
+  type WorkspaceEntry,
+  tooManyEntries,
 } from '@tyto/plugin-api';
 
 import { isMissing } from './real-paths.js';
@@ -27,6 +31,11 @@ import { confineToWorkspace } from './workspace-confine.js';
  * a link inside the folder that lands outside is refused; and a write is refused when the
  * real path's first segment is `.tyto`, which a link can reach as well as a name. A write
  * creates the folders it needs inside the workspace and lands whole, renamed into place.
+ *
+ * A part (ADR 0212) is read through an open handle at its offset into a buffer the size of
+ * the part, so a 100 MB file never sits in memory whole. `list` follows each link it meets
+ * through the same confinement and leaves out one that leads away, rather than refusing the
+ * whole folder for it.
  */
 
 export interface WorkspaceFilesOptions {
@@ -37,7 +46,10 @@ export interface WorkspaceFilesOptions {
 }
 
 export type WorkspaceFilePorts = Required<
-  Pick<HostCapabilities, 'workspaceRead' | 'workspaceWrite'>
+  Pick<
+    HostCapabilities,
+    'workspaceRead' | 'workspaceWrite' | 'workspaceReadPart' | 'workspaceStat' | 'workspaceList'
+  >
 >;
 
 function refuse(plugin: string, path: string, problem: string): never {
@@ -51,6 +63,19 @@ function overCeiling(size: number): string {
 /** `.tyto`, as Windows resolves a name: without case and without trailing dots or spaces. */
 export function isTytoFolder(segment: string): boolean {
   return segment.replace(/[. ]+$/u, '').toLowerCase() === '.tyto';
+}
+
+/** The last segment of a path as the plugin asked for it, `''` for the folder itself. */
+function nameOf(path: string): string {
+  return path.split('/').at(-1) ?? '';
+}
+
+/** An entry for a file or a folder, or `undefined` for anything else (a socket, a device). */
+function entryOf(name: string, found: Stats): WorkspaceEntry | undefined {
+  const modifiedAt = found.mtime.toISOString();
+  if (found.isFile()) return { name, kind: 'file', size: found.size, modifiedAt };
+  if (found.isDirectory()) return { name, kind: 'folder', size: 0, modifiedAt };
+  return undefined;
 }
 
 export function workspaceFiles(options: WorkspaceFilesOptions): WorkspaceFilePorts {
@@ -82,6 +107,16 @@ export function workspaceFiles(options: WorkspaceFilesOptions): WorkspaceFilePor
       if (isTytoFolder(first)) refuse(plugin, path, 'it is inside .tyto/, which only Tyto writes');
     }
     return confined;
+  }
+
+  /** `stat` of a located path, with a missing one refused as the plugin's mistake. */
+  async function statOf(plugin: string, path: string, real: string): Promise<Stats> {
+    try {
+      return await stat(real);
+    } catch (cause) {
+      if (isMissing(cause)) refuse(plugin, path, 'no such file or folder');
+      throw cause;
+    }
   }
 
   return {
@@ -116,6 +151,59 @@ export function workspaceFiles(options: WorkspaceFilesOptions): WorkspaceFilePor
       // Inside the folder by the check above: the part that did not exist yet is no link.
       await mkdir(dirname(real), { recursive: true });
       await writeEntry(real, bytes);
+    },
+
+    async workspaceReadPart(plugin, path, offset, length) {
+      const { real } = await locate(plugin, path, 'read');
+      const found = await statOf(plugin, path, real);
+      if (!found.isFile()) refuse(plugin, path, 'it names a folder, not a file');
+      // Sized by what the file holds from the offset, so a short file costs no 32 MiB buffer.
+      const wanted = Math.max(0, Math.min(length, found.size - offset));
+      if (wanted === 0) return new Uint8Array(0);
+      const handle = await open(real, 'r');
+      try {
+        const buffer = new Uint8Array(wanted);
+        const { bytesRead } = await handle.read(buffer, 0, wanted, offset);
+        // The file may have shrunk since `stat`; what was read is what crosses.
+        return bytesRead === wanted ? buffer : buffer.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
+      }
+    },
+
+    async workspaceStat(plugin, path) {
+      const { real } = await locate(plugin, path, 'read');
+      const entry = entryOf(nameOf(path), await statOf(plugin, path, real));
+      if (entry === undefined) refuse(plugin, path, 'it is neither a file nor a folder');
+      return entry;
+    },
+
+    async workspaceList(plugin, path) {
+      const { real, realFolder } = await locate(plugin, path, 'read');
+      if (!(await statOf(plugin, path, real)).isDirectory()) {
+        refuse(plugin, path, 'it names a file, not a folder');
+      }
+      const entries: WorkspaceEntry[] = [];
+      for await (const dirent of await opendir(real)) {
+        // One past the ceiling is enough to know the folder is over it.
+        if (entries.length === PLUGIN_FOLDER_LIST_LIMIT) {
+          refuse(plugin, path, tooManyEntries(PLUGIN_FOLDER_LIST_LIMIT + 1));
+        }
+        const inside = join(real, dirent.name);
+        let found: Stats | undefined = await lstat(inside).catch(() => undefined);
+        if (found?.isSymbolicLink() === true) {
+          // Confined like a read of the link would be; one that leads away, or nowhere, is
+          // left out. Both paths are real, so only the check after `realpath` can refuse.
+          const confined = await confineToWorkspace(realFolder, inside, { follow: 'existing' });
+          found =
+            'refused' in confined ? undefined : await stat(confined.real).catch(() => undefined);
+        }
+        const entry = found === undefined ? undefined : entryOf(dirent.name, found);
+        if (entry !== undefined) entries.push(entry);
+      }
+      return entries.sort((one, other) =>
+        one.name < other.name ? -1 : one.name > other.name ? 1 : 0,
+      );
     },
   };
 }

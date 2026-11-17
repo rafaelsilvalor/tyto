@@ -254,6 +254,11 @@
     var(--tyto-pane-header-height),
     calc(var(--tyto-text-xs) * var(--tyto-line-height) + 2 * var(--tyto-space-1))
   );
+  /* A recipe block's head (TYTO-767, ADR 0209): one line of small text and its padding, so it
+     grows with the text and the buttons it holds always fit. */
+  --tyto-notebook-head: calc(
+    var(--tyto-text-sm) * var(--tyto-line-height) + 2 * var(--tyto-space-3)
+  );
 }
 
 @media (prefers-color-scheme: dark) {

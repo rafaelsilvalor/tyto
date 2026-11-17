@@ -194,6 +194,13 @@ export type { RecipeState } from '@tyto/recipe';
 export type { BriefFolder, ToBriefPorts } from '@tyto/recipe';
 
 /**
+ * The ports `to-delivery` plans and applies through, and `deliveries` reads through (ADR 0211),
+ * named here for the same reason: the host's workspace adapter implements a port from this
+ * package (ADR 0210).
+ */
+export type { DeliveryLayout, DeliveryListing, DeliveryPlace, ToDeliveryPorts } from '@tyto/recipe';
+
+/**
  * The ports `call` plans and sends through, named here for the same reason: the host's adapter
  * implements a port from this package (ADR 0193).
  */
@@ -237,11 +244,15 @@ export {
   type HostWorkspace,
   PLUGIN_CACHE_KEY_LIMIT_BYTES,
   PLUGIN_FILE_LIMIT_BYTES,
+  PLUGIN_FILE_PART_BYTES,
+  PLUGIN_FOLDER_LIST_LIMIT,
   type PluginCacheEntry,
   type PluginCacheListing,
   type PluginCacheStored,
   type PluginCapabilities,
   type WorkspaceAccess,
+  type WorkspaceEntry,
+  type WorkspaceFilePart,
   PluginCapabilityError,
   allowsCredential,
   allowsHost,
@@ -255,6 +266,8 @@ export {
   hostSignin,
   hostWorkspace,
   namesHost,
+  tooManyEntries,
+  workspaceFolderPath,
   workspacePath,
 } from './capabilities.js';
 // The host side of browser sign-in (ADR 0174), shared by the hosts that compose it (TYTO-683).

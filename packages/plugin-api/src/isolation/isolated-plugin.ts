@@ -5,6 +5,7 @@ import {
   type HostCapabilities,
   type HostFetchInit,
   PluginCapabilityError,
+  type WorkspaceEntry,
   checkedCapabilities,
 } from '../capabilities.js';
 import type { Disposable, Logger, Plugin, PluginHost } from '../host.js';
@@ -30,7 +31,9 @@ import {
   fetchArgsSchema,
   guestMessageSchema,
   signinArgsSchema,
+  workspacePathArgsSchema,
   workspaceReadArgsSchema,
+  workspaceReadPartArgsSchema,
   workspaceWriteArgsSchema,
   helloMessageSchema,
   processIdArgsSchema,
@@ -137,6 +140,11 @@ const NO_LOG: Logger = {
   warn: () => undefined,
   error: () => undefined,
 };
+
+/** A workspace entry rebuilt field by field, so an adapter's extra keys never cross. */
+function entryOf({ name, kind, size, modifiedAt }: WorkspaceEntry): WorkspaceEntry {
+  return { name, kind, size, modifiedAt };
+}
 
 function failure(name: string, problem: string): Diagnostics {
   return [diagnostic('E_PLUGIN_ACTIVATE', { plugin: name, problem })];
@@ -464,6 +472,9 @@ export function connectIsolatedPlugin(
         cacheList: 'host.cache.list',
         workspaceRead: 'host.workspace.read',
         workspaceWrite: 'host.workspace.write',
+        workspaceReadPart: 'host.workspace.read',
+        workspaceStat: 'host.workspace.stat',
+        workspaceList: 'host.workspace.list',
       }[capability];
       const parse = <T>(schema: z.ZodType<T>): T => {
         const args = schema.safeParse(raw);
@@ -504,6 +515,16 @@ export function connectIsolatedPlugin(
           const [path, bytes] = parse(workspaceWriteArgsSchema);
           await capabilities.workspaceWrite(path, bytes);
           return null;
+        }
+        case 'workspaceReadPart': {
+          const [path, offset, length] = parse(workspaceReadPartArgsSchema);
+          return capabilities.workspaceReadPart(path, offset, length);
+        }
+        case 'workspaceStat':
+          return entryOf(await capabilities.workspaceStat(parse(workspacePathArgsSchema)[0]));
+        case 'workspaceList': {
+          const listed = await capabilities.workspaceList(parse(workspacePathArgsSchema)[0]);
+          return listed.map(entryOf);
         }
       }
     }

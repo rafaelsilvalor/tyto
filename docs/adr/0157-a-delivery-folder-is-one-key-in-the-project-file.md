@@ -3,7 +3,9 @@
 Status: accepted · 2026-10-30 · TYTO-488 · amends ADR 0057 (the export box and an export preset
 no longer write `editaveis/` or `assets/`), adds a row to ADR 0111's table and a key to ADR
 0112's file; builds on ADR 0054, ADR 0114, ADR 0126 and ADR 0155 · decision 6 amended by ADR 0161
-(2026-10-30, TYTO-499: a delivery's export copies the brief's images into its `assets/`)
+(2026-10-30, TYTO-499: a delivery's export copies the brief's images into its `assets/`) ·
+amended by ADR 0210 (2026-11-17, TYTO-755: a delivery may exist without a brief, and its record
+at `editaveis/delivery.json` says what it is)
 
 ## Context
 

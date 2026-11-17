@@ -1,4 +1,11 @@
-import { type Extension, Facet, RangeSetBuilder, StateEffect, StateField } from '@codemirror/state';
+import {
+  type EditorState,
+  type Extension,
+  Facet,
+  RangeSetBuilder,
+  StateEffect,
+  StateField,
+} from '@codemirror/state';
 import {
   Decoration,
   type DecorationSet,
@@ -8,6 +15,7 @@ import {
   ViewPlugin,
   type ViewUpdate,
   gutter,
+  gutterLineClass,
   layer,
 } from '@codemirror/view';
 
@@ -67,6 +75,12 @@ export interface NotebookFrame {
   readonly marker?: NotebookMarker;
   /** Whether the block may be dragged, and dropped above: it gets a grip. */
   readonly movable?: boolean;
+  /**
+   * Whether the block has a head (TYTO-767): its first line carries `cm-notebook-frame--headed`,
+   * and so does that line's element in the line-number gutter, so the host can open a strip
+   * above the text and keep the number beside the text, not in the strip.
+   */
+  readonly headed?: boolean;
 }
 
 /** A frame's gutter mark: its text, a class for how it looks, and what it says on hover. */
@@ -88,6 +102,11 @@ export interface NotebookFramesOptions {
   readonly move?: (view: EditorView, from: number, before: number | 'end') => void;
   /** What a grip says on hover and to a screen reader. */
   readonly gripLabel?: (view: EditorView) => string;
+  /**
+   * Where each headed block starts, from the text alone (TYTO-767): those lines' elements in
+   * every gutter carry `cm-notebook-headed`. Absent, no gutter line is marked.
+   */
+  readonly headedLinesOf?: (state: EditorState) => readonly number[];
 }
 
 /** Reads the frames again: the host's own state changed what a toolbar shows. */
@@ -153,15 +172,26 @@ function decorate(view: EditorView, frames: readonly NotebookFrame[]): Decoratio
   const selected = view.state.field(selectedField, false) ?? null;
   const dragged = frames[view.state.field(dragField, false)?.from ?? -1];
   const builder = new RangeSetBuilder<Decoration>();
+  // TYTO-767: the blank lines between two frames carry `cm-notebook-gap`, so the host can part
+  // two blocks by more than a line; frames come in order, so the classes are added in order.
+  let previousLast = 0;
   for (const frame of frames) {
     if (!fits(frame, doc.length)) continue;
     const first = doc.lineAt(frame.from);
     const last = doc.lineAt(frame.to);
+    for (let number = previousLast + 1; previousLast > 0 && number < first.number; number += 1) {
+      const gap = doc.line(number);
+      builder.add(gap.from, gap.from, Decoration.line({ class: 'cm-notebook-gap' }));
+    }
+    previousLast = last.number;
     const active = caret >= first.number && caret <= last.number;
     const chosen = selected !== null && selected >= first.from && selected <= last.to;
     for (let number = first.number; number <= last.number; number += 1) {
       const classes = ['cm-notebook-frame', `cm-notebook-frame--${frame.kind}`];
       if (number === first.number) classes.push('cm-notebook-frame--first');
+      if (number === first.number && frame.headed === true) {
+        classes.push('cm-notebook-frame--headed');
+      }
       if (number === last.number) classes.push('cm-notebook-frame--last');
       if (active) classes.push('cm-notebook-frame--active');
       if (chosen) classes.push('cm-notebook-frame--selected');
@@ -175,6 +205,12 @@ function decorate(view: EditorView, frames: readonly NotebookFrame[]): Decoratio
 
 const fits = (frame: NotebookFrame, length: number): boolean =>
   frame.from >= 0 && frame.to <= length && frame.from <= frame.to;
+
+/** The class a headed frame's first line carries in every gutter (TYTO-767). */
+class HeadedLine extends GutterMarker {
+  override elementClass = 'cm-notebook-headed';
+}
+const headedLine = new HeadedLine();
 
 /** The frames as read after the last edit, and their line classes. */
 const framesPlugin = ViewPlugin.fromClass(
@@ -208,6 +244,22 @@ const framesPlugin = ViewPlugin.fromClass(
   },
   { decorations: (plugin) => plugin.decorations },
 );
+
+/**
+ * The gutter class on each headed block's first line (TYTO-767), from the state alone: a gutter's
+ * line classes cannot come from a view plugin, so the host says where its headed blocks start
+ * ({@link NotebookFramesOptions.headedLinesOf}).
+ */
+const headedGutterLines = gutterLineClass.compute(['doc', framesOptions], (state) => {
+  const starts = state.facet(framesOptions)?.headedLinesOf?.(state) ?? [];
+  const builder = new RangeSetBuilder<GutterMarker>();
+  for (const at of [...starts].sort((left, right) => left - right)) {
+    if (at < 0 || at > state.doc.length) continue;
+    const line = state.doc.lineAt(at);
+    builder.add(line.from, line.from, headedLine);
+  }
+  return builder.finish();
+});
 
 /** One toolbar in the layer: which frame it is, what it shows, and where it goes. */
 class ToolbarMarker implements LayerMarker {
@@ -395,10 +447,118 @@ const insertLayer = layer({
 });
 
 /**
+ * One block drawn as a notebook's cell (TYTO-767, ADR 0209): a box behind the text from the top
+ * of its first line to the bottom of the last result drawn under its last line, results in the
+ * middle of the block included, so a block reads as one shape. Classes say which block holds the
+ * caret, which one command mode selected and which one is dragged, as the line classes do.
+ */
+class BoxMarker implements LayerMarker {
+  constructor(
+    readonly index: number,
+    readonly kind: string,
+    readonly states: string,
+    readonly left: number,
+    readonly top: number,
+    readonly height: number,
+  ) {}
+
+  eq(other: BoxMarker): boolean {
+    return (
+      other.index === this.index &&
+      other.kind === this.kind &&
+      other.states === this.states &&
+      other.left === this.left &&
+      other.top === this.top &&
+      other.height === this.height
+    );
+  }
+
+  draw(): HTMLElement {
+    const box = document.createElement('div');
+    this.place(box);
+    return box;
+  }
+
+  update(dom: HTMLElement, previous: LayerMarker): boolean {
+    if (!(previous instanceof BoxMarker)) return false;
+    this.place(dom);
+    return true;
+  }
+
+  private place(box: HTMLElement): void {
+    box.className = ['cm-notebook-box', `cm-notebook-box--${this.kind}`, this.states]
+      .filter((part) => part !== '')
+      .join(' ');
+    box.dataset['notebookFrame'] = String(this.index);
+    box.style.left = `${String(this.left)}px`;
+    box.style.top = `${String(this.top)}px`;
+    box.style.height = `${String(this.height)}px`;
+  }
+}
+
+/**
+ * Each block's box, in the layer's coordinates. Its top is its first line's element and its
+ * bottom the boundary below its last line ({@link boundaryBelow}): past every result drawn there.
+ * A block outside the viewport has no element to read and is not drawn.
+ */
+function boxMarkers(view: EditorView): readonly LayerMarker[] {
+  const frames = view.plugin(framesPlugin)?.frames ?? [];
+  const { doc, selection } = view.state;
+  const scroller = view.scrollDOM;
+  const box = scroller.getBoundingClientRect();
+  const baseTop = box.top - scroller.scrollTop;
+  const left = view.contentDOM.getBoundingClientRect().left - box.left + scroller.scrollLeft;
+  const { from, to } = view.viewport;
+  const caret = doc.lineAt(selection.main.head).number;
+  const selected = view.state.field(selectedField, false) ?? null;
+  const dragged = view.state.field(dragField, false)?.from ?? -1;
+  const markers: LayerMarker[] = [];
+  frames.forEach((frame, index) => {
+    if (!fits(frame, doc.length) || frame.to < from || frame.from > to) return;
+    const first = doc.lineAt(frame.from);
+    const last = doc.lineAt(frame.to);
+    const top = lineTop(view, first.from);
+    const bottom = boundaryBelow(view, last.from);
+    const states = [
+      caret >= first.number && caret <= last.number ? 'cm-notebook-box--active' : '',
+      selected !== null && selected >= first.from && selected <= last.to
+        ? 'cm-notebook-box--selected'
+        : '',
+      index === dragged ? 'cm-notebook-box--dragged' : '',
+    ]
+      .filter((state) => state !== '')
+      .join(' ');
+    markers.push(new BoxMarker(index, frame.kind, states, left, top - baseTop, bottom - top));
+  });
+  return markers;
+}
+
+/**
+ * Over the text, since the lines paint their own background: the box is an outline with no fill
+ * and lets every click through, so it draws the shape and takes nothing from the text.
+ */
+const boxLayer = layer({
+  above: true,
+  class: 'cm-notebook-boxes',
+  markers: boxMarkers,
+  update: (update) =>
+    update.docChanged ||
+    update.selectionSet ||
+    update.viewportChanged ||
+    update.heightChanged ||
+    update.geometryChanged ||
+    refreshed(update) ||
+    update.startState.field(selectedField, false) !== update.state.field(selectedField, false) ||
+    update.startState.field(dragField, false) !== update.state.field(dragField, false),
+});
+
+/**
  * The layer spans the visible width and lets a click through to the text, but not on a toolbar,
  * which sits at its right edge.
  */
 const toolbarTheme = EditorView.baseTheme({
+  '.cm-notebook-boxes': { pointerEvents: 'none', width: '100%' },
+  '.cm-notebook-boxes > .cm-notebook-box': { right: 0, boxSizing: 'border-box' },
   '.cm-notebook-toolbars': { pointerEvents: 'none', width: '100%' },
   '.cm-notebook-toolbars > .cm-notebook-toolbar': { pointerEvents: 'auto', right: 0 },
   '.cm-notebook-inserts': { pointerEvents: 'none', width: '100%' },
@@ -853,9 +1013,13 @@ export function notebookFrames(options: NotebookFramesOptions): Extension {
     framesPlugin,
     gripGutter,
     markerGutter,
+    headedGutterLines,
     toolbarLayer,
     insertLayer,
     dropLayer,
+    // Last of the layers over the text: CodeMirror stacks them in the order given, so the boxes
+    // go under the toolbars, the "+" and the drop line (measured: first given, z-index 150).
+    boxLayer,
     dragCanceller,
     toolbarTheme,
     dragTheme,

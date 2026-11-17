@@ -1,0 +1,564 @@
+import {
+  DELIVERY_RECORD_FIELDS,
+  DELIVERY_RECORD_FILE,
+  DELIVERY_RECORD_FOLDER,
+  DELIVERY_WRITABLE_FIELDS,
+  type DeliveryFieldValue,
+  type DeliveryInboundWinner,
+  type DeliveryInboundWinners,
+  type DeliveryRecord,
+  type DeliveryRecordMerge,
+  type DeliveryWritableField,
+  type Diagnostic,
+  type Result,
+  type SourceRange,
+  deliveryFormatsText,
+  deliveryNameOf,
+  diagnostic,
+  err,
+  isDeliveryDue,
+  mergeDeliveryRecord,
+  ok,
+  parseDeliveryFormats,
+  readDeliveryRecord,
+  writeDeliveryRecord,
+} from '@tyto/core';
+import { z } from 'zod';
+
+import type { NamedArgument } from './ast.js';
+import { resolveColumn } from './columns.js';
+import { isDataReference, readDataArgument } from './data.js';
+import {
+  PLAN_LIMITS,
+  type Plan,
+  type PlanLimits,
+  type PlannedOperation,
+  checkPlan,
+} from './plan.js';
+import type { Verb, VerbContext, VerbResult } from './registry.js';
+import type { AppliedOperation, ApplyOutcome } from './state.js';
+import { argumentsProblem, locate, refuseNamed, requireTable } from './support.js';
+import { type Column, type Row, cellText } from './table.js';
+
+/**
+ * `to-delivery name=<column> fields=<field>:<column>,…` (ADR 0210): a sink that keeps one
+ * delivery folder per row, with its record at `editaveis/delivery.json`, under the project's
+ * `delivery.parent` (ADR 0157). No `into=`: only the project decides where a delivery lives.
+ *
+ * Running it writes nothing: it answers a plan of one `record` per folder that needs a write,
+ * `<folder>: new` or `<folder>: updates due, link`, and a row whose record would not change has
+ * no operation, so a second run over the same rows plans none. Apply writes exactly what the
+ * plan showed (ADR 0129, ADR 0170). A record already on disk is merged field by field
+ * (`mergeDeliveryRecord`): a field a person edited is kept.
+ *
+ * A row whose folder name cannot be one folder's (ADR 0157 §4), or whose values the record cannot
+ * hold, is **refused, never rewritten**, and named in the cell's note; the other rows still plan.
+ * A recipe that needs such a name changes it with `rewrite` before this step.
+ *
+ * `inbound=<field>:<winner>,…` (ADR 0211) declares the fields an outside value may change, a
+ * sheet's status say, each with the side that wins when both the record and the row changed
+ * since the last run: `record` or `row`. The winner is required. `state` may be mapped only when
+ * it is declared inbound, and every inbound field must be mapped in `fields=`.
+ */
+export interface ToDeliveryPorts {
+  /**
+   * Whether the running recipe is in a workspace and whether that workspace is restricted,
+   * asked on every run and every Apply. `undefined` when it is in no workspace.
+   */
+  folder(): DeliveryPlace | undefined;
+  /** The project's delivery layout as it reads now, relative to the workspace. */
+  layout(): Promise<Result<DeliveryLayout, readonly Diagnostic[]>>;
+  /**
+   * The folders directly inside a workspace folder, by name, each with its record's text
+   * (`editaveis/delivery.json`) when it has one, which `deliveries` reads back as rows
+   * (ADR 0211). Hidden folders and `.tyto` are not listed. A folder the host may not read, a
+   * link out of the workspace say, comes back with the reason instead of its record.
+   */
+  list(parent: string): Promise<Result<readonly DeliveryListing[], readonly Diagnostic[]>>;
+  /** A file's text at a workspace path, or `undefined` when there is none. */
+  read(path: string): Promise<Result<string | undefined, readonly Diagnostic[]>>;
+  /** A digest of the file at a workspace path, of the host's choice; `undefined` when absent. */
+  stat(path: string): Promise<Result<string | undefined, readonly Diagnostic[]>>;
+  /** Makes a folder at a workspace path, and the ones above it; one already there is fine. */
+  make(path: string): Promise<Result<void, readonly Diagnostic[]>>;
+  /** Writes the file. The host confines the path to the workspace again. */
+  write(path: string, text: string): Promise<Result<void, readonly Diagnostic[]>>;
+  /** The host's clock as ISO 8601 in UTC, which stamps an applied write; the system's if absent. */
+  now?(): string;
+}
+
+export interface DeliveryPlace {
+  /** A restricted folder (ADR 0111) reads, and never writes. */
+  readonly restricted: boolean;
+}
+
+export interface DeliveryLayout {
+  /** `delivery.parent`, relative to the workspace and `/`-separated; `''` at its root. */
+  readonly parent: string;
+  /** `delivery.folders`, made inside every delivery, relative to it. */
+  readonly folders: readonly string[];
+}
+
+export interface DeliveryListing {
+  /** The folder's name. */
+  readonly name: string;
+  /** The folder, relative to the workspace and `/`-separated. */
+  readonly path: string;
+  /** The record's text; absent when the folder has no record. */
+  readonly record?: string;
+  /** Why the folder could not be read; absent when it could. */
+  readonly problem?: string;
+}
+
+/** The kind of write `to-delivery` declares, and the only one its plans hold. */
+export const TO_DELIVERY_WRITE = 'record';
+
+/** A thousand records of a few hundred bytes: well inside what ADR 0170 budgets for a plan. */
+export const TO_DELIVERY_PLAN_LIMITS: PlanLimits = {
+  ...PLAN_LIMITS,
+  maxOperations: 1000,
+  maxPayloadBytes: 16 * 1024,
+};
+
+/** How many refused rows the note names, so a broken column is not a thousand lines. */
+const REPORTED = 8;
+
+const NAMES = ['name', 'fields', 'inbound'] as const;
+const FIELD_MAP = z.record(z.string(), z.string());
+const WINNERS: readonly DeliveryInboundWinner[] = ['record', 'row'];
+
+/** One record of a shown plan, as Apply writes it. */
+interface RecordWrite {
+  readonly rowKey: string;
+  /** The folders to make first, the delivery's own first; relative to the workspace. */
+  readonly folders: readonly string[];
+  readonly path: string;
+  readonly text: string;
+  /** The digest the record had when the plan was made; `null` when there was none. */
+  readonly before: string | null;
+}
+
+/** Every plan a `to-delivery` answered, by the plan object the runner keeps (ADR 0170). */
+const shownRecords = new WeakMap<Plan, readonly RecordWrite[]>();
+
+export function toDeliveryVerb(ports: ToDeliveryPorts | undefined): Verb {
+  return {
+    kind: 'sink',
+    run: (context) => planDeliveries(context, ports),
+    apply: (plan) => applyDeliveries(plan, ports),
+  };
+}
+
+function refuse(problem: string, range: SourceRange): VerbResult {
+  return err([diagnostic('E_RECIPE_DELIVERY', { problem }, { range })]);
+}
+
+async function planDeliveries(
+  context: VerbContext,
+  ports: ToDeliveryPorts | undefined,
+): Promise<VerbResult> {
+  const named = refuseNamed(context, [...NAMES]);
+  if (named !== undefined) return named;
+  const table = requireTable(context);
+  if (!table.ok) return table;
+  if (ports === undefined) {
+    return refuse('cannot run here: this host writes no deliveries', context.written.verbRange);
+  }
+  const [extra] = context.step.positional;
+  if (extra !== undefined) {
+    return argumentsProblem(
+      context,
+      `takes no bare word, and '${extra.value}' is one`,
+      extra.range,
+    );
+  }
+  const at = locate(context);
+  const argument: Partial<Record<(typeof NAMES)[number], NamedArgument>> = {};
+  for (const written of context.step.named) {
+    const name = written.name as (typeof NAMES)[number];
+    if (argument[name] !== undefined) {
+      return argumentsProblem(context, `was given '${name}=' twice`, at(written.range));
+    }
+    argument[name] = written;
+  }
+  const { name, fields, inbound } = argument;
+  if (name === undefined || fields === undefined) {
+    return argumentsProblem(context, 'needs name=<column> fields=<field>:<column>,…');
+  }
+
+  const where = ports.folder();
+  if (where === undefined) {
+    return refuse('writes only inside a workspace, and this recipe is in none', at(name.range));
+  }
+  if (where.restricted) {
+    return refuse('writes nothing in a restricted folder; trust the folder first', at(name.range));
+  }
+
+  const winners = inbound === undefined ? ok(new Map()) : await readInbound(context, inbound);
+  if (!winners.ok) return winners;
+  const mapping = await readFields(context, fields, winners.value);
+  if (!mapping.ok) return mapping;
+  const columns: { readonly field: DeliveryWritableField; readonly column: Column }[] = [];
+  for (const [field, written] of mapping.value) {
+    const column = resolveColumn(table.value, written, at(fields.range), context.aliases);
+    if (!column.ok) return column;
+    columns.push({ field, column: column.value });
+  }
+  const nameColumn = resolveColumn(table.value, name.value, at(name.range), context.aliases);
+  if (!nameColumn.ok) return nameColumn;
+
+  const layout = await ports.layout();
+  if (!layout.ok) return err(layout.error.map((found) => ({ ...found, range: at(name.range) })));
+  const parent = layout.value.parent;
+  const inside = [...layout.value.folders];
+  if (!inside.includes(DELIVERY_RECORD_FOLDER)) inside.push(DELIVERY_RECORD_FOLDER);
+
+  const refused: string[] = [];
+  const operations: PlannedOperation[] = [];
+  const stated: RecordWrite[] = [];
+  const taken = new Map<string, string>();
+  for (const row of table.value.rows) {
+    const folderName = deliveryNameOf(cellText(row.values[nameColumn.value.name]));
+    if (!folderName.ok) {
+      refused.push(`row '${row.key}': ${messages(folderName.error)}`);
+      continue;
+    }
+    const folder = parent === '' ? folderName.value : `${parent}/${folderName.value}`;
+    // Folded, since the file systems a workspace lives on mostly ignore case.
+    const first = taken.get(folder.toLowerCase());
+    if (first !== undefined) {
+      refused.push(`row '${row.key}': '${folder}' is row '${first}''s folder too`);
+      continue;
+    }
+    taken.set(folder.toLowerCase(), row.key);
+    const incoming = incomingOf(row, columns);
+    if (!incoming.ok) {
+      refused.push(`row '${row.key}': ${incoming.error}`);
+      continue;
+    }
+
+    const path = `${folder}/${DELIVERY_RECORD_FOLDER}/${DELIVERY_RECORD_FILE}`;
+    const before = await ports.stat(path);
+    if (!before.ok) return err(before.error.map((found) => ({ ...found, range: at(name.range) })));
+    let onDisk: DeliveryRecord | undefined;
+    if (before.value !== undefined) {
+      const text = await ports.read(path);
+      if (!text.ok) return err(text.error.map((found) => ({ ...found, range: at(name.range) })));
+      if (text.value !== undefined) {
+        const record = readDeliveryRecord(text.value);
+        if (!record.ok) {
+          refused.push(`row '${row.key}': ${path} ${record.error}; fix or remove it first`);
+          continue;
+        }
+        onDisk = record.value;
+      }
+    }
+    const merged = mergeDeliveryRecord(onDisk, incoming.value, winners.value);
+    if (!merged.changed) continue;
+    const write: RecordWrite = {
+      rowKey: row.key,
+      folders: [folder, ...inside.map((item) => `${folder}/${item}`)],
+      path,
+      text: writeDeliveryRecord(merged.record),
+      before: before.value ?? null,
+    };
+    stated.push(write);
+    operations.push({
+      write: TO_DELIVERY_WRITE,
+      rowKey: row.key,
+      description: `${folder}: ${describeMerge(merged)}`,
+      payload: { path, text: write.text, before: write.before },
+    });
+  }
+
+  const plan: Plan = {
+    target: `deliveries in ${parent === '' ? 'the workspace' : parent}`,
+    operations,
+    count: operations.length,
+  };
+  const checked = checkPlan(
+    plan,
+    { verb: 'to-delivery', writes: [TO_DELIVERY_WRITE], table: table.value },
+    TO_DELIVERY_PLAN_LIMITS,
+  );
+  if (!checked.ok) return checked;
+  shownRecords.set(checked.value, stated);
+  return ok({
+    table: table.value,
+    plan: checked.value,
+    ...(refused.length === 0 ? {} : { note: refusedNote(refused) }),
+  });
+}
+
+/** The refused rows, named, so the person sees which rows the plan leaves out and why. */
+function refusedNote(refused: readonly string[]): string {
+  const named = refused.slice(0, REPORTED).join('; ');
+  const more = refused.length - REPORTED;
+  return `Refused ${String(refused.length)} of the rows, never rewritten: ${named}${
+    more > 0 ? `; and ${String(more)} more` : ''
+  }.`;
+}
+
+/** One row's mapped values, as the record holds them, or why the record cannot hold them. */
+function incomingOf(
+  row: Row,
+  columns: readonly { readonly field: DeliveryWritableField; readonly column: Column }[],
+): Result<Map<DeliveryWritableField, DeliveryFieldValue | undefined>, string> {
+  const incoming = new Map<DeliveryWritableField, DeliveryFieldValue | undefined>();
+  for (const { field, column } of columns) {
+    const text = cellText(row.values[column.name]).trim();
+    if (text === '') {
+      if (field === 'key') return err(`column '${column.name}' gives no key`);
+      incoming.set(field, undefined);
+      continue;
+    }
+    if (field === 'formats') {
+      const formats = parseDeliveryFormats(text);
+      if (!formats.ok) return err(`column '${column.name}' ${formats.error}`);
+      incoming.set(field, formats.value);
+    } else if (field === 'due' && !isDeliveryDue(text)) {
+      return err(`column '${column.name}' gives '${text}', which is not an ISO date`);
+    } else {
+      incoming.set(field, text);
+    }
+  }
+  return ok(incoming);
+}
+
+/** A problem with an argument's shape, at the argument. */
+function argumentProblem(context: VerbContext, argument: NamedArgument, text: string) {
+  return err([
+    diagnostic(
+      'E_RECIPE_ARGUMENTS',
+      { verb: context.step.verb, problem: text },
+      { range: locate(context)(argument.range) },
+    ),
+  ]);
+}
+
+/** A field the record will not take from a recipe, at the argument. */
+function fieldRefused(context: VerbContext, argument: NamedArgument, text: string) {
+  return err([
+    diagnostic('E_RECIPE_DELIVERY', { problem: text }, { range: locate(context)(argument.range) }),
+  ]);
+}
+
+/**
+ * `<name>:<value>,…` or `@./file.json#/pointer`, as pairs in order. A pair written without its
+ * value has `''` there, for the caller to name; `reads` says what the pairs are.
+ */
+async function readPairs(
+  context: VerbContext,
+  argument: NamedArgument,
+  reads: string,
+): Promise<Result<[string, string][], readonly Diagnostic[]>> {
+  if (isDataReference(argument.value)) {
+    const read = await readDataArgument(context, argument, FIELD_MAP);
+    if (!read.ok) return read;
+    return ok(Object.entries(read.value).map(([name, value]) => [name, value.trim()]));
+  }
+  const pairs: [string, string][] = [];
+  for (const entry of argument.value.split(',')) {
+    const [name, value = '', ...rest] = entry.split(':').map((part) => part.trim());
+    if (name === undefined || name === '' || rest.length > 0) {
+      return argumentProblem(context, argument, `reads ${reads}, and '${entry.trim()}' is not one`);
+    }
+    pairs.push([name, value]);
+  }
+  return ok(pairs);
+}
+
+/**
+ * `inbound=state:row,due:record` or `inbound=@./fields.json#/inbound` (ADR 0211), as field →
+ * winner. The winner is required: no rule decides it for the recipe.
+ */
+async function readInbound(
+  context: VerbContext,
+  argument: NamedArgument,
+): Promise<Result<Map<DeliveryWritableField, DeliveryInboundWinner>, readonly Diagnostic[]>> {
+  const pairs = await readPairs(context, argument, 'inbound fields as <field>:<winner>');
+  if (!pairs.ok) return pairs;
+  const winners = new Map<DeliveryWritableField, DeliveryInboundWinner>();
+  for (const [field, winner] of pairs.value) {
+    if (!isWritableField(field)) {
+      return fieldRefused(
+        context,
+        argument,
+        `has no field '${field}' to take inbound; a record has ${DELIVERY_WRITABLE_FIELDS.join(', ')}`,
+      );
+    }
+    if (field === 'key') {
+      return fieldRefused(context, argument, "never takes 'key' inbound: it names the delivery");
+    }
+    if (winner === '') {
+      return argumentProblem(
+        context,
+        argument,
+        `gives no winner for the inbound field '${field}'; write ${field}:record or ${field}:row`,
+      );
+    }
+    if (!(WINNERS as readonly string[]).includes(winner)) {
+      return argumentProblem(
+        context,
+        argument,
+        `reads the winner of '${field}' as record or row, and '${winner}' is neither`,
+      );
+    }
+    if (winners.has(field)) {
+      return argumentProblem(context, argument, `declares '${field}' inbound twice`);
+    }
+    winners.set(field, winner as DeliveryInboundWinner);
+  }
+  return ok(winners);
+}
+
+/** `fields=key:key,due:due` or `fields=@./fields.json#/task`, as field → column, in order. */
+async function readFields(
+  context: VerbContext,
+  argument: NamedArgument,
+  winners: DeliveryInboundWinners,
+): Promise<Result<ReadonlyMap<DeliveryWritableField, string>, readonly Diagnostic[]>> {
+  const pairs = await readPairs(context, argument, 'fields as <field>:<column>');
+  if (!pairs.ok) return pairs;
+  const mapping = new Map<DeliveryWritableField, string>();
+  for (const [field, column] of pairs.value) {
+    if (column === '') {
+      return argumentProblem(
+        context,
+        argument,
+        `reads fields as <field>:<column>, and '${field}' is not one`,
+      );
+    }
+    if (field === 'state' && !winners.has('state')) {
+      return fieldRefused(context, argument, "never writes 'state', which is the person's");
+    }
+    if (!isWritableField(field)) {
+      return fieldRefused(
+        context,
+        argument,
+        `has no field '${field}'; a record has ${DELIVERY_RECORD_FIELDS.join(', ')}`,
+      );
+    }
+    if (mapping.has(field)) {
+      return argumentProblem(context, argument, `fills the field '${field}' twice`);
+    }
+    mapping.set(field, column);
+  }
+  if (!mapping.has('key')) {
+    return argumentProblem(context, argument, "needs the field 'key', the tracker's key");
+  }
+  for (const field of winners.keys()) {
+    if (!mapping.has(field)) {
+      return argumentProblem(
+        context,
+        argument,
+        `declares '${field}' inbound but does not map it; add ${field}:<column>`,
+      );
+    }
+  }
+  return ok(mapping);
+}
+
+function isWritableField(field: string): field is DeliveryWritableField {
+  return (DELIVERY_WRITABLE_FIELDS as readonly string[]).includes(field);
+}
+
+/**
+ * What the plan says of one folder: `new`, the fields it updates, those it keeps as a person's
+ * edit, and how each inbound field both sides changed was settled (ADR 0211), e.g.
+ * `updates state (both changed; row wins over 'doing')`.
+ */
+function describeMerge(merged: DeliveryRecordMerge): string {
+  if (merged.created) return 'new';
+  const settled = (field: DeliveryWritableField) => {
+    const conflict = merged.conflicts.find((found) => found.field === field);
+    return conflict === undefined
+      ? field
+      : `${field} (both changed; ${conflict.winner} wins over ${quoted(conflict.lost)})`;
+  };
+  const parts: string[] = [];
+  if (merged.updated.length > 0) parts.push(`updates ${merged.updated.map(settled).join(', ')}`);
+  const keeps = merged.based.filter((field) =>
+    merged.conflicts.some((found) => found.field === field),
+  );
+  if (keeps.length > 0) parts.push(`keeps ${keeps.map(settled).join(', ')}`);
+  const agreed = merged.based.filter((field) => !keeps.includes(field));
+  if (agreed.length > 0) parts.push(`already holds ${agreed.join(', ')} from the row`);
+  if (merged.kept.length > 0) {
+    parts.push(`kept: ${merged.kept.map((field) => `${field} (edited)`).join(', ')}`);
+  }
+  return parts.join('; ');
+}
+
+function quoted(value: DeliveryFieldValue | null): string {
+  if (value === null) return 'an empty value';
+  return `'${typeof value === 'string' ? value : deliveryFormatsText(value)}'`;
+}
+
+/**
+ * Apply (ADR 0170): the records of a plan a `to-delivery` answered, written one by one, each
+ * after its folders. A folder in no workspace or restricted since the plan refuses the whole
+ * Apply before any write. A record whose digest is not the one the plan read changed since, and
+ * that write fails while the others still run: the person approved the merge they saw.
+ */
+async function applyDeliveries(
+  plan: Plan,
+  ports: ToDeliveryPorts | undefined,
+): Promise<Result<ApplyOutcome, readonly Diagnostic[]>> {
+  const refuseApply = (problem: string) =>
+    err([diagnostic('E_RECIPE_APPLY', { verb: 'to-delivery', problem })]);
+  const shown = shownRecords.get(plan);
+  if (shown === undefined) {
+    return refuseApply('no to-delivery answered that plan in this session; run its cell again');
+  }
+  if (ports === undefined) return refuseApply('this host writes no deliveries');
+  const where = ports.folder();
+  if (where === undefined) return refuseApply('the recipe is in no workspace any more');
+  if (where.restricted) return refuseApply('its folder is restricted; trust it first');
+
+  const now = ports.now ?? (() => new Date().toISOString());
+  const operations: AppliedOperation[] = [];
+  for (const write of shown) {
+    const failed = (reason: string): AppliedOperation => ({
+      rowKey: write.rowKey,
+      status: 'failed',
+      reason,
+    });
+    const current = await ports.stat(write.path);
+    if (!current.ok) {
+      operations.push(failed(`could not read ${write.path}: ${messages(current.error)}`));
+      continue;
+    }
+    if ((current.value ?? null) !== write.before) {
+      operations.push(failed(`${write.path} changed since the plan`));
+      continue;
+    }
+    const made = await makeAll(ports, write.folders);
+    if (made !== undefined) {
+      operations.push(failed(made));
+      continue;
+    }
+    const written = await ports.write(write.path, write.text);
+    operations.push(
+      written.ok
+        ? { rowKey: write.rowKey, status: 'applied', appliedAt: now() }
+        : failed(`could not write ${write.path}: ${messages(written.error)}`),
+    );
+  }
+  return ok({ operations });
+}
+
+async function makeAll(
+  ports: ToDeliveryPorts,
+  folders: readonly string[],
+): Promise<string | undefined> {
+  for (const folder of folders) {
+    const made = await ports.make(folder);
+    if (!made.ok) return `could not make ${folder}: ${messages(made.error)}`;
+  }
+  return undefined;
+}
+
+function messages(found: readonly Diagnostic[]): string {
+  return found.map((item) => item.message.replace(/\.$/u, '')).join('; ') || 'no reason given';
+}

@@ -15,6 +15,7 @@ import {
   type SourcePage,
   type Table,
   type ToBriefPorts,
+  type ToDeliveryPorts,
   type CallPorts,
   type Verb,
   type VerbContext,
@@ -343,6 +344,12 @@ export interface RecipeRegistryOptions {
    */
   readonly briefs?: ToBriefPorts;
   /**
+   * The workspace's delivery layout and files lent to the generic `to-delivery` (ADR 0210),
+   * bound the same way, which `deliveries` also reads through (ADR 0211). Without them both say
+   * the host has no deliveries.
+   */
+  readonly deliveries?: ToDeliveryPorts;
+  /**
    * The workspace's allowed hosts, the machine's recipe credentials and the network, lent to the
    * generic `call` (ADR 0193), bound the same way. Without them `call` plans and its Apply says
    * the host sends no requests.
@@ -366,7 +373,11 @@ export function recipeRegistriesOf(
   const sectionOf = options.sectionOf ?? (() => undefined);
   const refresh = options.refresh === true;
   const now = options.now ?? (() => new Date().toISOString());
-  const ownVerbs = createVerbRegistry({ briefs: options.briefs, calls: options.calls });
+  const ownVerbs = createVerbRegistry({
+    briefs: options.briefs,
+    deliveries: options.deliveries,
+    calls: options.calls,
+  });
   const ownDerivations = createDerivationRegistry();
   const contributedVerb = (name: string) =>
     contributions.ownedRecipeVerbs().find((owned) => owned.verb.id === name);
