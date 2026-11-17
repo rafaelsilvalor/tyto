@@ -459,8 +459,21 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           true,
           'field:column pairs (key, link, formats, stem, copy, due, ship), or a data reference.',
         ),
+        named(
+          'inbound',
+          'list',
+          false,
+          'field:winner pairs for fields an outside value may change, winner record or row.',
+        ),
       ],
       'sink',
+    ),
+    form(
+      'deliveries',
+      "Reads every delivery record under the project's delivery folder as one row each.",
+      'deliveries',
+      [],
+      'source',
     ),
     form(
       'call',

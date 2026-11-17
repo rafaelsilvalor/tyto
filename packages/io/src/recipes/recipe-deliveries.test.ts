@@ -140,5 +140,27 @@ describe('to-delivery through the recipe runner (TYTO-755)', () => {
     const again = await run();
     expect(again.cells[1]?.diagnostics).toEqual([]);
     expect(again.cells[1]?.plan?.count).toBe(0);
+
+    // TYTO-771, ADR 0211: the folder is the source. `deliveries` reads the three records back,
+    // and writing them again through a transform plans nothing.
+    const fromFolder = await runner.run({
+      documentId: 'tab-2',
+      text: [
+        'recipe from-folder',
+        'deliveries',
+        'where key != MCA-9',
+        'to-delivery name=folder fields=key:key,due:due,formats:formats',
+        '',
+      ].join('\n'),
+      path: join(workspace, 'recipes', 'from-folder.recipe'),
+      explicit: true,
+    });
+    expect(fromFolder.cells.flatMap((found) => found.diagnostics)).toEqual([]);
+    expect(fromFolder.cells[0]?.table?.rows.map((row) => row.key)).toEqual([
+      'MCA-1',
+      'MCA-2',
+      'MCA-3',
+    ]);
+    expect(fromFolder.cells[2]?.plan?.count).toBe(0);
   });
 });

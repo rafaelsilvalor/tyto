@@ -8,7 +8,12 @@ import type { Plan } from './plan.js';
 import { createDerivationRegistry, createVerbRegistry } from './registry.js';
 import { runRecipe } from './run.js';
 import type { Table } from './table.js';
-import type { DeliveryLayout, DeliveryPlace, ToDeliveryPorts } from './to-delivery.js';
+import type {
+  DeliveryLayout,
+  DeliveryListing,
+  DeliveryPlace,
+  ToDeliveryPorts,
+} from './to-delivery.js';
 
 /** A workspace in memory: path → text, its digest the text itself, every write recorded. */
 class FakeWorkspace implements ToDeliveryPorts {
@@ -24,6 +29,25 @@ class FakeWorkspace implements ToDeliveryPorts {
   layout() {
     const layout: DeliveryLayout = { parent: this.parent, folders: ['assets', 'editaveis'] };
     return Promise.resolve(ok(layout));
+  }
+  /** Folders the host may not read, by path, with the reason. */
+  readonly unreadable = new Map<string, string>();
+  list(parent: string) {
+    const prefix = parent === '' ? '' : `${parent}/`;
+    const names = new Set<string>();
+    for (const path of [...this.folders, ...this.files.keys()]) {
+      if (!path.startsWith(prefix)) continue;
+      const [name] = path.slice(prefix.length).split('/');
+      if (name !== undefined && name !== '') names.add(name);
+    }
+    const listed: DeliveryListing[] = [...names].sort().map((name) => {
+      const path = `${prefix}${name}`;
+      const problem = this.unreadable.get(path);
+      if (problem !== undefined) return { name, path, problem };
+      const record = this.files.get(`${path}/editaveis/delivery.json`);
+      return record === undefined ? { name, path } : { name, path, record };
+    });
+    return Promise.resolve(ok(listed));
   }
   read(path: string) {
     return Promise.resolve(ok(this.files.get(path)));
@@ -293,5 +317,194 @@ describe('to-delivery', () => {
     expect(problems[0]?.message).toBe(
       "'to-delivery' cannot run here: this host writes no deliveries.",
     );
+  });
+});
+
+/** Three folders written by `to-delivery` from `TASKS`, applied. */
+async function threeFolders(): Promise<FakeWorkspace> {
+  const workspace = new FakeWorkspace();
+  const first = await plan(LINE, workspace);
+  await apply(first.verbs, first.plan);
+  return workspace;
+}
+
+/** A recipe of several lines with no input table, as a source starts one. */
+async function runLines(lines: readonly string[], ports: ToDeliveryPorts | undefined) {
+  const recipe = parseRecipe(['recipe deliveries', ...lines].join('\n'));
+  if (!recipe.ok) throw new Error(recipe.error.map(({ message }) => message).join('\n'));
+  const verbs = createVerbRegistry({ deliveries: ports });
+  const result = await runRecipe(recipe.value, {
+    input: undefined,
+    verbs,
+    derivations: createDerivationRegistry(),
+    resolveRecipe: () => Promise.resolve(err([])),
+  });
+  if (!result.ok) throw new Error('the run must start');
+  return { verbs, cells: result.value.cells };
+}
+
+describe('deliveries (ADR 0211)', () => {
+  it('reads one row per record, keyed by its key, with the folder and its path', async () => {
+    const workspace = await threeFolders();
+    workspace.folders.add('entregas/rascunho');
+    workspace.files.set('entregas/zz_broken/editaveis/delivery.json', '{"version":1}');
+    const { cells } = await runLines(['deliveries'], workspace);
+    const [cell] = cells;
+    expect(cell?.table?.rows.map((row) => row.key)).toEqual(['T-0', 'T-1', 'T-2']);
+    expect(cell?.table?.columns.map((column) => column.name)).toEqual([
+      'folder',
+      'path',
+      'key',
+      'link',
+      'formats',
+      'stem',
+      'copy',
+      'due',
+      'ship',
+      'state',
+    ]);
+    expect(cell?.table?.rows[0]?.values).toMatchObject({
+      folder: 'mca-1_aula',
+      path: 'entregas/mca-1_aula',
+      formats: 'feed:3,story:1',
+      due: '2026-11-20',
+      stem: null,
+      state: null,
+    });
+    expect(cell?.note).toBe('Read 3 deliveries; 1 folder has no record and was skipped.');
+    expect(cell?.diagnostics.map((found) => [found.code, found.message])).toEqual([
+      [
+        'W_RECIPE_DELIVERY_RECORD',
+        "'deliveries' left out entregas/zz_broken: its record is not a delivery record (key: Invalid input: expected string, received undefined).",
+      ],
+    ]);
+  });
+
+  it('names a folder the host could not read and a key another folder holds, and reads on', async () => {
+    const workspace = await threeFolders();
+    workspace.unreadable.set('entregas/mca-2_simulado', 'it leads out of the workspace');
+    const copy = workspace.files.get(RECORD) ?? '';
+    workspace.files.set('entregas/mca-9_copia/editaveis/delivery.json', copy);
+    const { cells } = await runLines(['deliveries'], workspace);
+    expect(cells[0]?.table?.rows.map((row) => row.key)).toEqual(['T-0', 'T-2']);
+    expect(cells[0]?.diagnostics.map((found) => found.message)).toEqual([
+      "'deliveries' left out entregas/mca-2_simulado: it leads out of the workspace.",
+      "'deliveries' left out entregas/mca-9_copia: its key 'T-0' is entregas/mca-1_aula's too.",
+    ]);
+  });
+
+  it('plans nothing when its rows go back through to-delivery, transformed or not', async () => {
+    const workspace = await threeFolders();
+    const { cells } = await runLines(
+      [
+        'deliveries',
+        'where key != T-9',
+        'to-delivery name=folder fields=key:key,due:due,formats:formats,link:link',
+      ],
+      workspace,
+    );
+    expect(cells.flatMap((cell) => cell.diagnostics)).toEqual([]);
+    expect(cells.at(-1)?.plan?.count).toBe(0);
+  });
+
+  it('refuses an argument, a host without ports and a restricted folder', async () => {
+    const extra = await runLines(['deliveries into=entregas'], new FakeWorkspace());
+    expect(extra.cells[0]?.diagnostics[0]?.code).toBe('E_RECIPE_ARGUMENTS');
+    const none = await runLines(['deliveries'], undefined);
+    expect(none.cells[0]?.diagnostics[0]?.message).toBe(
+      "'deliveries' cannot run here: this host reads no deliveries.",
+    );
+    const restricted = new FakeWorkspace();
+    restricted.where = { restricted: true };
+    const refused = await runLines(['deliveries'], restricted);
+    expect(refused.cells[0]?.diagnostics[0]?.message).toBe(
+      "'deliveries' reads nothing in a restricted folder; trust the folder first.",
+    );
+  });
+});
+
+describe('to-delivery inbound= (ADR 0211)', () => {
+  const INBOUND = (winner: string) =>
+    `to-delivery name=folder fields=key:key,state:status inbound=state:${winner}`;
+  const STATUS = (status: string) => tasks(['folder', 'status'], [['mca-1_aula', status]]);
+
+  /** A record whose state came in as `todo`, then set on disk to `onDisk`. */
+  async function synced(winner: string, onDisk: string): Promise<FakeWorkspace> {
+    const workspace = new FakeWorkspace();
+    const first = await plan(INBOUND(winner), workspace, STATUS('todo'));
+    await apply(first.verbs, first.plan);
+    const record = JSON.parse(workspace.files.get(RECORD) ?? '') as Record<string, unknown>;
+    workspace.files.set(RECORD, JSON.stringify({ ...record, state: onDisk }, null, 2));
+    return workspace;
+  }
+
+  it('lets a declared status from a fixed table into the record', async () => {
+    const workspace = await synced('row', 'todo');
+    const later = await plan(INBOUND('row'), workspace, STATUS('doing'));
+    expect(later.problems).toEqual([]);
+    expect(descriptions(later.plan)).toEqual([['T-0', 'entregas/mca-1_aula: updates state']]);
+    await apply(later.verbs, later.plan);
+    expect(JSON.parse(workspace.files.get(RECORD) ?? '')).toMatchObject({ state: 'doing' });
+    expect((await plan(INBOUND('row'), workspace, STATUS('doing'))).plan?.count).toBe(0);
+  });
+
+  it('refuses an undeclared status in the plan', async () => {
+    const refused = await plan(
+      'to-delivery name=folder fields=key:key,state:status',
+      new FakeWorkspace(),
+      STATUS('doing'),
+    );
+    expect(refused.plan).toBeUndefined();
+    expect(refused.problems[0]?.message).toBe(
+      "'to-delivery' never writes 'state', which is the person's.",
+    );
+  });
+
+  it('lets the row win a status both changed, and says what it overwrote', async () => {
+    const workspace = await synced('row', 'doing');
+    const later = await plan(INBOUND('row'), workspace, STATUS('review'));
+    expect(descriptions(later.plan)).toEqual([
+      ['T-0', "entregas/mca-1_aula: updates state (both changed; row wins over 'doing')"],
+    ]);
+  });
+
+  it('lets the record win a status both changed, and logs it once', async () => {
+    const workspace = await synced('record', 'doing');
+    const later = await plan(INBOUND('record'), workspace, STATUS('review'));
+    expect(descriptions(later.plan)).toEqual([
+      ['T-0', "entregas/mca-1_aula: keeps state (both changed; record wins over 'review')"],
+    ]);
+    await apply(later.verbs, later.plan);
+    expect(JSON.parse(workspace.files.get(RECORD) ?? '')).toMatchObject({ state: 'doing' });
+    expect((await plan(INBOUND('record'), workspace, STATUS('review'))).plan?.count).toBe(0);
+  });
+
+  it('refuses an inbound field without its winner, or not mapped in fields=', async () => {
+    const workspace = new FakeWorkspace();
+    const bare = await plan(
+      'to-delivery name=folder fields=key:key,state:status inbound=state',
+      workspace,
+      STATUS('doing'),
+    );
+    expect(bare.problems[0]?.message).toBe(
+      "'to-delivery' gives no winner for the inbound field 'state'; write state:record or state:row.",
+    );
+    const unmapped = await plan(
+      'to-delivery name=folder fields=key:key inbound=due:row',
+      workspace,
+      STATUS('doing'),
+    );
+    expect(unmapped.problems[0]?.message).toContain("declares 'due' inbound but does not map it");
+  });
+
+  it('reads the inbound fields from a data file', async () => {
+    const { plan: shown, problems } = await plan(
+      'to-delivery name=folder fields=key:key,state:status inbound=@./fields.json#/inbound',
+      new FakeWorkspace(),
+      STATUS('doing'),
+      { './fields.json': { inbound: { state: 'row' } } },
+    );
+    expect(problems).toEqual([]);
+    expect(shown?.count).toBe(1);
   });
 });

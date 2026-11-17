@@ -98,6 +98,42 @@ describe('workspaceDeliveryPorts', () => {
     expect(ports(() => 'trusted', false).folder()).toBeUndefined();
   });
 
+  it('lists the folders under a parent with their records, each confined on its own', async () => {
+    const record = '{"version":1,"key":"T-1"}\n';
+    await mkdir(join(workspace, 'entregas', 'mca-1', 'editaveis'), { recursive: true });
+    await writeFile(join(workspace, 'entregas', 'mca-1', 'editaveis', 'delivery.json'), record);
+    await mkdir(join(workspace, 'entregas', 'rascunho'), { recursive: true });
+    await mkdir(join(workspace, 'entregas', '.oculta', 'editaveis'), { recursive: true });
+    await writeFile(join(workspace, 'entregas', 'solto.txt'), 'not a folder');
+    await mkdir(join(outside, 'editaveis'), { recursive: true });
+    await writeFile(join(outside, 'editaveis', 'delivery.json'), record);
+    await symlink(
+      outside,
+      join(workspace, 'entregas', 'fora'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    const listed = await ports().list('entregas');
+    expect(listed.ok && listed.value).toEqual([
+      {
+        name: 'fora',
+        path: 'entregas/fora',
+        problem: 'it leads out of the workspace through a link',
+      },
+      { name: 'mca-1', path: 'entregas/mca-1', record },
+      { name: 'rascunho', path: 'entregas/rascunho' },
+    ]);
+    expect(await ports().list('nada')).toMatchObject({ ok: true, value: [] });
+  });
+
+  it('lists nothing in a restricted folder, and never out of the workspace', async () => {
+    await mkdir(join(workspace, 'entregas', 'mca-1'), { recursive: true });
+    const restricted = await ports(() => 'restricted').list('entregas');
+    expect(restricted.ok ? '' : restricted.error[0]?.message).toContain('restricted folder');
+    const climbed = await ports().list('../elsewhere');
+    expect(climbed.ok ? '' : climbed.error[0]?.message).toContain('outside the workspace');
+  });
+
   it('refuses to make a folder where a file is', async () => {
     await writeFile(join(workspace, 'entregas'), 'a file', 'utf8');
     const made = await ports().make('entregas');
