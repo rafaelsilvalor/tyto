@@ -59,6 +59,11 @@ import { type Column, type Row, cellText } from './table.js';
  * sheet's status say, each with the side that wins when both the record and the row changed
  * since the last run: `record` or `row`. The winner is required. `state` may be mapped only when
  * it is declared inbound, and every inbound field must be mapped in `fields=`.
+ *
+ * `keep=<field>,…` (ADR 0211, note of 2026-11-17) names mapped fields whose empty cell leaves the
+ * record's value, and its base, as they are, instead of clearing it: a source that goes blank,
+ * an orphan link say. The step's note names every value so kept, on every run, and a plan line
+ * written for another reason says `kept: copy (source empty)`. Never `key`, never an inbound field.
  */
 export interface ToDeliveryPorts {
   /**
@@ -123,7 +128,7 @@ export const TO_DELIVERY_PLAN_LIMITS: PlanLimits = {
 /** How many refused rows the note names, so a broken column is not a thousand lines. */
 const REPORTED = 8;
 
-const NAMES = ['name', 'fields', 'inbound'] as const;
+const NAMES = ['name', 'fields', 'inbound', 'keep'] as const;
 const FIELD_MAP = z.record(z.string(), z.string());
 const WINNERS: readonly DeliveryInboundWinner[] = ['record', 'row'];
 
@@ -181,7 +186,7 @@ async function planDeliveries(
     }
     argument[name] = written;
   }
-  const { name, fields, inbound } = argument;
+  const { name, fields, inbound, keep } = argument;
   if (name === undefined || fields === undefined) {
     return argumentsProblem(context, 'needs name=<column> fields=<field>:<column>,…');
   }
@@ -198,6 +203,11 @@ async function planDeliveries(
   if (!winners.ok) return winners;
   const mapping = await readFields(context, fields, winners.value);
   if (!mapping.ok) return mapping;
+  const kept =
+    keep === undefined
+      ? ok(new Set<DeliveryWritableField>())
+      : readKeep(context, keep, mapping.value, winners.value);
+  if (!kept.ok) return kept;
   const columns: { readonly field: DeliveryWritableField; readonly column: Column }[] = [];
   for (const [field, written] of mapping.value) {
     const column = resolveColumn(table.value, written, at(fields.range), context.aliases);
@@ -214,6 +224,8 @@ async function planDeliveries(
   if (!inside.includes(DELIVERY_RECORD_FOLDER)) inside.push(DELIVERY_RECORD_FOLDER);
 
   const refused: string[] = [];
+  const held: string[] = [];
+  let heldValues = 0;
   const operations: PlannedOperation[] = [];
   const stated: RecordWrite[] = [];
   const taken = new Map<string, string>();
@@ -253,7 +265,11 @@ async function planDeliveries(
         onDisk = record.value;
       }
     }
-    const merged = mergeDeliveryRecord(onDisk, incoming.value, winners.value);
+    const merged = mergeDeliveryRecord(onDisk, incoming.value, winners.value, kept.value);
+    if (merged.held.length > 0) {
+      held.push(`row '${row.key}' ${merged.held.join(', ')}`);
+      heldValues += merged.held.length;
+    }
     if (!merged.changed) continue;
     const write: RecordWrite = {
       rowKey: row.key,
@@ -283,11 +299,27 @@ async function planDeliveries(
   );
   if (!checked.ok) return checked;
   shownRecords.set(checked.value, stated);
+  const notes = [
+    ...(held.length === 0 ? [] : [heldNote(held, heldValues)]),
+    ...(refused.length === 0 ? [] : [refusedNote(refused)]),
+  ];
   return ok({
     table: table.value,
     plan: checked.value,
-    ...(refused.length === 0 ? {} : { note: refusedNote(refused) }),
+    ...(notes.length === 0 ? {} : { note: notes.join(' ') }),
   });
+}
+
+/**
+ * The values `keep=` held while their cell came back empty, by row, on every run and whether or
+ * not the record is written: the warning that a source went blank.
+ */
+function heldNote(held: readonly string[], values: number): string {
+  const named = held.slice(0, REPORTED).join('; ');
+  const more = held.length - REPORTED;
+  return `Kept ${String(values)} ${values === 1 ? 'value' : 'values'} whose cell came back empty: ${named}${
+    more > 0 ? `; and ${String(more)} more rows` : ''
+  }.`;
 }
 
 /** The refused rows, named, so the person sees which rows the plan leaves out and why. */
@@ -459,6 +491,54 @@ async function readFields(
   return ok(mapping);
 }
 
+/**
+ * `keep=copy,link`: the mapped fields whose empty cell keeps the record's value. Never `key`,
+ * which names the delivery, and never a field declared inbound, whose base means something else.
+ */
+function readKeep(
+  context: VerbContext,
+  argument: NamedArgument,
+  mapping: ReadonlyMap<DeliveryWritableField, string>,
+  winners: DeliveryInboundWinners,
+): Result<Set<DeliveryWritableField>, readonly Diagnostic[]> {
+  const kept = new Set<DeliveryWritableField>();
+  for (const entry of argument.value.split(',')) {
+    const field = entry.trim();
+    if (field === '') {
+      return argumentProblem(context, argument, 'reads fields as <field>,…, and one is empty');
+    }
+    if (!isWritableField(field)) {
+      return fieldRefused(
+        context,
+        argument,
+        `has no field '${field}' to keep; a record has ${DELIVERY_WRITABLE_FIELDS.join(', ')}`,
+      );
+    }
+    if (field === 'key') {
+      return fieldRefused(context, argument, "never keeps 'key': a row without one is refused");
+    }
+    if (winners.has(field)) {
+      return fieldRefused(
+        context,
+        argument,
+        `cannot keep '${field}', which is declared inbound; name it in keep= or inbound=, not both`,
+      );
+    }
+    if (!mapping.has(field)) {
+      return argumentProblem(
+        context,
+        argument,
+        `keeps '${field}' but does not map it; add ${field}:<column> to fields=`,
+      );
+    }
+    if (kept.has(field)) {
+      return argumentProblem(context, argument, `keeps '${field}' twice`);
+    }
+    kept.add(field);
+  }
+  return ok(kept);
+}
+
 function isWritableField(field: string): field is DeliveryWritableField {
   return (DELIVERY_WRITABLE_FIELDS as readonly string[]).includes(field);
 }
@@ -484,9 +564,11 @@ function describeMerge(merged: DeliveryRecordMerge): string {
   if (keeps.length > 0) parts.push(`keeps ${keeps.map(settled).join(', ')}`);
   const agreed = merged.based.filter((field) => !keeps.includes(field));
   if (agreed.length > 0) parts.push(`already holds ${agreed.join(', ')} from the row`);
-  if (merged.kept.length > 0) {
-    parts.push(`kept: ${merged.kept.map((field) => `${field} (edited)`).join(', ')}`);
-  }
+  const held = [
+    ...merged.kept.map((field) => `${field} (edited)`),
+    ...merged.held.map((field) => `${field} (source empty)`),
+  ];
+  if (held.length > 0) parts.push(`kept: ${held.join(', ')}`);
   return parts.join('; ');
 }
 

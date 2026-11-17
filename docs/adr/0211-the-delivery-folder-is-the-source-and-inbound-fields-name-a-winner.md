@@ -126,3 +126,24 @@ project's `delivery.parent` points at, synced by the provider's own client.
   `delivery.parent`.
 - **Reading every level below the parent.** A delivery is one folder under the parent
   (ADR 0157); a deeper `editaveis/` belongs to something else.
+
+## Note, 2026-11-17 — a field may be kept when its cell comes back empty (TYTO-774)
+
+A recipe-owned field whose source goes blank, a copy link the tracker no longer resolves say,
+was cleared from the record with no word in the plan: an empty cell enters the three-way merge
+as an empty value, and a field nobody edited takes it. `to-delivery` gains `keep=<field>,…`:
+
+- For a named field, an empty incoming cell leaves the record's value **and its base** as they
+  are, whatever the value is, a person's edit included. `mergeDeliveryRecord` names such fields
+  in `held`. A non-empty cell merges three ways as before; a record with no value has nothing to
+  keep.
+- The warning is the step's note, on every run, written or not, such as
+  `Kept 1 value whose cell came back empty: row 'T-0' copy.` A plan line written for another
+  field says `kept: copy (source empty)`. A row whose record does not change still plans no
+  write: Apply only writes.
+- `keep=` refuses `key`, a field also named in `inbound=` (an inbound field's base is the last
+  outside value, §3, and holding it would mean something else), a field `fields=` does not map,
+  and an unknown field, each at the argument.
+
+Without `keep=`, nothing changes. No new ADR: the merge's base and its rules stay those of §3
+and ADR 0210.

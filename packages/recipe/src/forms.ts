@@ -465,6 +465,12 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           false,
           'field:winner pairs for fields an outside value may change, winner record or row.',
         ),
+        named(
+          'keep',
+          'list',
+          false,
+          "Mapped fields whose empty cell keeps the record's value instead of clearing it.",
+        ),
       ],
       'sink',
     ),

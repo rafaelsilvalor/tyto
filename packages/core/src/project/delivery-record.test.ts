@@ -231,3 +231,80 @@ describe('mergeDeliveryRecord with declared inbound fields (ADR 0211)', () => {
     });
   });
 });
+
+describe('mergeDeliveryRecord with kept fields (keep=, ADR 0211 note of 2026-11-17)', () => {
+  const linked = incoming({ key: 'T-1', copy: 'https://docs.example/copy-1', due: '2026-11-20' });
+  const created = () => read(writeDeliveryRecord(mergeDeliveryRecord(undefined, linked).record));
+
+  it('leaves a kept field and its base alone when its cell comes back empty', () => {
+    const before = created();
+    const later = mergeDeliveryRecord(
+      before,
+      incoming({ key: 'T-1', copy: undefined, due: '2026-11-20' }),
+      new Map(),
+      new Set(['copy']),
+    );
+    expect(later).toMatchObject({ changed: false, held: ['copy'], updated: [], kept: [] });
+    expect(later.record).toEqual(before);
+  });
+
+  it('holds the field while it still writes the others', () => {
+    const later = mergeDeliveryRecord(
+      created(),
+      incoming({ key: 'T-1', copy: undefined, due: '2026-11-25' }),
+      new Map(),
+      new Set(['copy']),
+    );
+    expect(later).toMatchObject({ changed: true, held: ['copy'], updated: ['due'] });
+    expect(later.record.copy).toBe('https://docs.example/copy-1');
+    expect(later.record.written).toMatchObject({
+      copy: 'https://docs.example/copy-1',
+      due: '2026-11-25',
+    });
+  });
+
+  it('reports a hand-edited value held by keep= as held, not edited', () => {
+    const edited = read(writeDeliveryRecord({ ...created(), copy: 'https://docs.example/mine' }));
+    const later = mergeDeliveryRecord(
+      edited,
+      incoming({ key: 'T-1', copy: undefined, due: '2026-11-20' }),
+      new Map(),
+      new Set(['copy']),
+    );
+    expect(later).toMatchObject({ changed: false, held: ['copy'], kept: [] });
+  });
+
+  it('clears the field as before when it is not kept', () => {
+    const later = mergeDeliveryRecord(
+      created(),
+      incoming({ key: 'T-1', copy: undefined, due: '2026-11-20' }),
+      new Map(),
+      new Set(['due']),
+    );
+    expect(later).toMatchObject({ changed: true, held: [], updated: ['copy'] });
+    expect('copy' in later.record).toBe(false);
+    expect(later.record.written).toMatchObject({ copy: null });
+  });
+
+  it('merges a non-empty value of a kept field three ways as before', () => {
+    const later = mergeDeliveryRecord(
+      created(),
+      incoming({ key: 'T-1', copy: 'https://docs.example/copy-2', due: '2026-11-20' }),
+      new Map(),
+      new Set(['copy']),
+    );
+    expect(later).toMatchObject({ changed: true, held: [], updated: ['copy'] });
+    expect(later.record.copy).toBe('https://docs.example/copy-2');
+  });
+
+  it('holds nothing when the record has no value to keep', () => {
+    const fresh = mergeDeliveryRecord(
+      undefined,
+      incoming({ key: 'T-1', copy: undefined }),
+      new Map(),
+      new Set(['copy']),
+    );
+    expect(fresh).toMatchObject({ created: true, held: [] });
+    expect('copy' in fresh.record).toBe(false);
+  });
+});

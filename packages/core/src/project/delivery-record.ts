@@ -171,6 +171,11 @@ export interface DeliveryRecordMerge {
   readonly updated: readonly DeliveryWritableField[];
   /** The fields a person edited since the recipe last wrote them, which keep the person's value. */
   readonly kept: readonly DeliveryWritableField[];
+  /**
+   * Fields the recipe asked to keep (`keep=`) whose incoming value is empty while the record
+   * holds one: value and base stay as they are (ADR 0211, note of 2026-11-17).
+   */
+  readonly held: readonly DeliveryWritableField[];
   /** Declared inbound fields both sides changed, each settled by its winner (ADR 0211). */
   readonly conflicts: readonly DeliveryConflict[];
   /**
@@ -203,11 +208,17 @@ export interface DeliveryRecordMerge {
  * - the outside value is the base: the record moved alone, and is kept;
  * - neither: both changed, the winner decides, and the merge names the conflict. When the
  *   record wins, the base still moves to the outside value, so the next run sees nothing new.
+ *
+ * **A kept field** (`keep`) whose incoming value is empty while the record holds a value is left
+ * alone, value and base, and named in `held`: a source that goes blank, an orphan link say, must
+ * not clear what the record already knows. Checked before the edit rule, so a value a person
+ * edited is reported as held too. Never combined with `winners` for the same field.
  */
 export function mergeDeliveryRecord(
   onDisk: DeliveryRecord | undefined,
   incoming: IncomingDeliveryFields,
   winners: DeliveryInboundWinners = new Map(),
+  keep: ReadonlySet<DeliveryWritableField> = new Set(),
 ): DeliveryRecordMerge {
   if (onDisk === undefined) {
     const record: Record<string, unknown> = { version: DELIVERY_RECORD_VERSION };
@@ -224,6 +235,7 @@ export function mergeDeliveryRecord(
       created: true,
       updated: [...incoming.keys()],
       kept: [],
+      held: [],
       conflicts: [],
       based: [],
       changed: true,
@@ -235,6 +247,7 @@ export function mergeDeliveryRecord(
   const values = new Map<string, unknown>();
   const updated: DeliveryWritableField[] = [];
   const kept: DeliveryWritableField[] = [];
+  const held: DeliveryWritableField[] = [];
   const conflicts: DeliveryConflict[] = [];
   const based: DeliveryWritableField[] = [];
   for (const [field, value] of incoming) {
@@ -250,6 +263,10 @@ export function mergeDeliveryRecord(
       base[field] = next;
       based.push(field);
     };
+    if (next === null && current !== null && keep.has(field)) {
+      held.push(field);
+      continue;
+    }
     const winner = winners.get(field);
     if (winner === undefined) {
       if (same(current, next)) continue;
@@ -272,7 +289,16 @@ export function mergeDeliveryRecord(
     }
   }
   if (updated.length === 0 && based.length === 0) {
-    return { record: onDisk, created: false, updated, kept, conflicts, based, changed: false };
+    return {
+      record: onDisk,
+      created: false,
+      updated,
+      kept,
+      held,
+      conflicts,
+      based,
+      changed: false,
+    };
   }
 
   // The disk's own order, a new field before `written`, which stays last.
@@ -295,6 +321,7 @@ export function mergeDeliveryRecord(
     created: false,
     updated,
     kept,
+    held,
     conflicts,
     based,
     changed: true,
