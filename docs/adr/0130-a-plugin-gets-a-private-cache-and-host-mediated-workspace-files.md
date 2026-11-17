@@ -38,3 +38,8 @@ the precedent.
   what lets ADR 0129's plan describe it.
 - The cache has no ceiling yet. Buraqueira's `.cache/` has no expiry and lives with it; a
   ceiling is a later card if a measured cache grows.
+
+## Note, 2026-11-17 — reading in parts and listing (TYTO-768)
+
+ADR 0212 amends decision 2: a plugin may also read a workspace file in parts, of any size, and
+stat and list the folder, all through the host and confined the same way.

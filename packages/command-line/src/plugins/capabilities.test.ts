@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { type Server, createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -98,6 +98,33 @@ describe('the cache and the workspace files of each command (ADR 0138)', () => {
     );
     expect(await refusal(checked.workspaceRead('table.csv'))).toBe(
       "Plugin 'jira' could not use workspace file 'table.csv': no workspace folder is open.",
+    );
+  });
+
+  it('reads a part, stats and lists the brief’s workspace (ADR 0212)', async () => {
+    const folder = join(home, 'workspace');
+    await mkdir(join(folder, 'entrega'), { recursive: true });
+    await writeFile(join(folder, 'entrega', 'capa.psd'), 'abcdef');
+    const checked = checkedCapabilities(
+      'drive',
+      ['workspace:read'],
+      pluginCapabilities(
+        {},
+        { hostName: 'tyto render', home, workspace: { folder, trust: 'trusted' } },
+      ),
+    );
+    expect(
+      new TextDecoder().decode(await checked.workspaceReadPart('entrega/capa.psd', 4, 8)),
+    ).toBe('ef');
+    expect(await checked.workspaceStat('entrega/capa.psd')).toMatchObject({ size: 6 });
+    expect((await checked.workspaceList('entrega')).map(({ name }) => name)).toEqual(['capa.psd']);
+    const watch = checkedCapabilities(
+      'drive',
+      ['workspace:read'],
+      pluginCapabilities({}, { hostName: 'tyto watch', home }),
+    );
+    expect(await refusal(watch.workspaceList(''))).toBe(
+      "Plugin 'drive' could not use workspace file '': tyto watch gives plugins no workspace files.",
     );
   });
 
