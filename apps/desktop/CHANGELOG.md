@@ -1,5 +1,28 @@
 # @tyto/desktop
 
+## 0.24.1
+
+### Patch Changes
+
+- fa80c22: The recent folders survive an update (TYTO-558): a new version's first run brings
+  `recent-folders.json` from the version before when the person chooses **Bring them**, as it
+  already brought the recent files. Until now every update started the title bar's folder list
+  empty, so it looked as if it kept only the last folder opened.
+- 37ecddd: A plugin with `workspace:read` can read a workspace file of any size in parts with
+  `host.workspace.read(path, { offset, length })`, and stat and list the open folder with
+  `host.workspace.stat(path)` and `host.workspace.list(path)` (ADR 0212). The plugin protocol is
+  now 27.
+- Updated dependencies [37ecddd]
+  - @tyto/plugin-api@0.24.0
+  - @tyto/io@5.11.0
+  - @tyto/command-line@0.9.4
+  - @tyto/export-html@0.8.3
+  - @tyto/export-svg@2.1.3
+  - @tyto/google-fonts@0.1.25
+  - @tyto/pipeline@0.12.22
+  - @tyto/theme-pack@0.1.25
+  - @tyto/templates@1.2.20
+
 ## 0.24.0
 
 ### Minor Changes
