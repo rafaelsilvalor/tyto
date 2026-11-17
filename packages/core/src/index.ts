@@ -211,6 +211,25 @@ export {
 } from './project/delivery.js';
 
 export {
+  DELIVERY_RECORD_FIELDS,
+  DELIVERY_RECORD_FILE,
+  DELIVERY_RECORD_FOLDER,
+  DELIVERY_RECORD_VERSION,
+  type DeliveryFieldValue,
+  type DeliveryFormatCount,
+  type DeliveryRecord,
+  type DeliveryRecordField,
+  type DeliveryRecordMerge,
+  type IncomingDeliveryFields,
+  deliveryRecordSchema,
+  isDeliveryDue,
+  mergeDeliveryRecord,
+  parseDeliveryFormats,
+  readDeliveryRecord,
+  writeDeliveryRecord,
+} from './project/delivery-record.js';
+
+export {
   PROFILES_DIRECTORY,
   PROFILE_FILE_NAME,
   type ProfileReference,
