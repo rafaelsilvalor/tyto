@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { EditorSelection, EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorView, lineNumbers } from '@codemirror/view';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -177,6 +177,78 @@ describe('a notebook framed over the editor (TYTO-676)', () => {
     const drawn = await toolbars(on);
     expect(builds).toBe(before + 3);
     expect(drawn.map((toolbar) => toolbar.textContent)).toEqual(['folded', 'folded', 'folded']);
+  });
+});
+
+// TYTO-767, ADR 0209: a block drawn as a notebook's cell.
+describe('a block as a cell (TYTO-767)', () => {
+  const headedOpen = (): EditorView => {
+    view = new EditorView({
+      state: EditorState.create({
+        doc: DOC,
+        extensions: [
+          lineNumbers(),
+          notebookFrames({
+            framesOf: (on) =>
+              framesOf(on, () => 'tools').map((frame) => ({
+                ...frame,
+                headed: frame.kind === 'step',
+              })),
+            headedLinesOf: (state) => [state.doc.line(3).from, state.doc.line(5).from],
+          }),
+        ],
+      }),
+      parent: document.body,
+    });
+    return view;
+  };
+
+  it('marks the blank lines between two blocks as a gap, and no other line', () => {
+    const on = open();
+    expect(
+      [...on.contentDOM.querySelectorAll('.cm-line')].map((line) =>
+        line.classList.contains('cm-notebook-gap'),
+      ),
+    ).toEqual([false, false, false, true, false]);
+  });
+
+  it("marks a headed block's first line, in the text and in every gutter", () => {
+    const on = headedOpen();
+    expect(lines(on).map(([, classes]) => classes.includes('--headed'))).toEqual([
+      false,
+      false,
+      true,
+      false,
+      true,
+    ]);
+    const numbered = [...on.dom.querySelectorAll('.cm-lineNumbers .cm-gutterElement')]
+      .filter((element) => element.classList.contains('cm-notebook-headed'))
+      .map((element) => element.textContent);
+    expect(numbered).toEqual(['3', '5']);
+  });
+
+  it('control: with no headedLinesOf, no gutter line is marked', () => {
+    const on = open();
+    expect(on.dom.querySelectorAll('.cm-notebook-headed')).toHaveLength(0);
+  });
+
+  it('draws one box per block over the text, by kind, the caret block marked', async () => {
+    const on = open();
+    on.dispatch({ selection: EditorSelection.cursor(on.state.doc.line(5).from) });
+    await new Promise((done) => setTimeout(done, 50));
+    const boxes = [...on.dom.querySelectorAll<HTMLElement>('.cm-notebook-box')];
+    expect(boxes.every((box) => !on.contentDOM.contains(box))).toBe(true);
+    expect(
+      boxes.map((box) => [
+        box.dataset['notebookFrame'],
+        box.classList.contains('cm-notebook-box--step') ? 'step' : 'note',
+        box.classList.contains('cm-notebook-box--active'),
+      ]),
+    ).toEqual([
+      ['0', 'note', false],
+      ['1', 'step', false],
+      ['2', 'step', true],
+    ]);
   });
 });
 

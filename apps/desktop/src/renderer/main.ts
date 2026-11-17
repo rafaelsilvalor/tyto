@@ -141,6 +141,7 @@ import {
   type BlockHost,
   dropBlock,
   gripLabel,
+  headedBlockStarts,
   insertControl,
   recipeFrames,
 } from './recipe-blocks-view.js';
@@ -869,6 +870,8 @@ const appFileAssists: AppFileAssists = {
       insert: (view) => insertControl(view, recipeBlockHost, state.locale),
       move: dropBlock,
       gripLabel: () => gripLabel(state.locale),
+      // TYTO-767: a step block has a head; the gutter keeps its number beside the text.
+      headedLinesOf: (editorState) => headedBlockStarts(editorState.doc.toString()),
     }),
   ],
   // A vocabulary's (TYTO-402, ADR 0176): its sections and fields, and what a key is, from main.
