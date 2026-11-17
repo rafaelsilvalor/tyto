@@ -61,7 +61,20 @@ the older folder, which keeps its copy either way.
 saved yet, and an update that left it behind would be the one quit that lost them. It counts
 towards "has records" in both folders and is checked as JSON like the others.
 
+**`recent-folders.json` travels too** (TYTO-558): TYTO-487 added the title bar's folder list
+without adding it here, so every update started the list empty — on the maintainer's machine
+0.11.0 to 0.14.2 each held one or two folders of its own. It counts towards "has records" in both
+folders and is checked as JSON like the others.
+
 **`logs/` never travels.** A log is that build's record of its own failures.
+
+**Every name in a version folder is decided, and a test holds it** (TYTO-558). `IMPORTED_RECORDS`
+lists what travels and `RECORDS_LEFT_BEHIND` what does not, each with its reason: `logs/`, and
+`DevToolsActivePort`, which Chromium writes for a debugging port and which is true only while that
+process runs. `credentials/` travels under its own checkbox, below. `previous-version.test.ts`
+reads `src/main/index.ts` with the TypeScript parser, collects every name joined onto
+`app.getPath('userData')`, and fails on one in neither list — so the next record added to the
+folder cannot miss the import the way the recent folders did.
 
 **What the answer means.** Either answer writes `import.json` into the new folder —
 `{ "from": "0.3.3", "answer": "imported" | "declined", "credentials": false }` — and that file is

@@ -175,7 +175,7 @@ export const en: Catalogue = {
   'schedule.notification.failed': 'A step failed',
   'import.message': 'Bring your settings from version {version}?',
   'import.detail':
-    'The templates folder, where the panels were, the recent files, your keyboard shortcuts and the tabs you had open. Version {version} keeps its own copy either way, and this question will not come back.',
+    'The templates folder, where the panels were, the recent files and folders, your keyboard shortcuts and the tabs you had open. Version {version} keeps its own copy either way, and this question will not come back.',
   'import.credentials': 'Also bring the saved sign-ins',
   'import.confirm': 'Bring them',
   'import.decline': 'Start fresh',

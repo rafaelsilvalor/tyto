@@ -25,7 +25,7 @@ Toda chave é opcional, e o arquivo também: uma pasta sem ele abre sem nada dec
 
 A barra de título tem um botão depois de **Ajuda** com o nome da pasta aberta, ou _Sem pasta_. Clique nele, ou rode **Abrir pasta recente…** na barra de comandos ou no menu **Arquivo**, para ver as pastas que você abriu antes, a mais recente primeiro, com o lugar de cada uma. Digite para filtrar a lista por nome ou lugar, mova com as setas e aperte **Enter** para abrir a pasta destacada; **Esc** fecha a lista. A pasta aberta aparece na lista marcada como _aberta_. **Abrir pasta local…**, no pé da lista, é o **Arquivo ▸ Abrir pasta…**.
 
-Uma pasta escolhida aqui abre exatamente como pelo **Arquivo ▸ Abrir pasta…**: na mesma janela, no lugar da pasta aberta agora, e confiável só se você já tiver confiado nela. A lista guarda as últimas dez pastas, e uma pasta que não está mais no disco fica de fora. O id do comando é `workspace.openRecent`, então o `keybindings.json` pode pô-lo numa tecla.
+Uma pasta escolhida aqui abre exatamente como pelo **Arquivo ▸ Abrir pasta…**: na mesma janela, no lugar da pasta aberta agora, e confiável só se você já tiver confiado nela. A lista guarda as últimas dez pastas, e uma pasta que não está mais no disco fica de fora. Uma versão nova traz a lista da anterior quando você escolhe **Trazer** na primeira vez que ela abre ([onde o Tyto guarda as suas coisas](../get-started/install.md#onde-o-tyto-guarda-as-suas-coisas)). O id do comando é `workspace.openRecent`, então o `keybindings.json` pode pô-lo numa tecla.
 
 ### Cada pasta guarda as suas abas
 

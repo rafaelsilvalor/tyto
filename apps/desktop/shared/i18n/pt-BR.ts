@@ -176,7 +176,7 @@ export const ptBR: Catalogue = {
   'schedule.notification.failed': 'Um passo falhou',
   'import.message': 'Trazer suas configurações da versão {version}?',
   'import.detail':
-    'A pasta de templates, a posição dos painéis, os arquivos recentes, seus atalhos de teclado e as abas que estavam abertas. A versão {version} continua com a cópia dela de qualquer jeito, e esta pergunta não volta.',
+    'A pasta de templates, a posição dos painéis, os arquivos e as pastas recentes, seus atalhos de teclado e as abas que estavam abertas. A versão {version} continua com a cópia dela de qualquer jeito, e esta pergunta não volta.',
   'import.credentials': 'Trazer também os acessos salvos',
   'import.confirm': 'Trazer',
   'import.decline': 'Começar do zero',

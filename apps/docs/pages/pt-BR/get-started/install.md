@@ -29,7 +29,7 @@ A janela abre no idioma do computador — inglês ou português do Brasil — e 
 
 ## Onde o Tyto guarda as suas coisas
 
-Configurações, atalhos de teclado, trechos, a posição dos painéis, os arquivos recentes e os logs ficam numa pasta própria de **cada versão**:
+Configurações, atalhos de teclado, trechos, a posição dos painéis, os arquivos e as pastas recentes e os logs ficam numa pasta própria de **cada versão**:
 
 | Sistema | Pasta                                         |
 | ------- | --------------------------------------------- |

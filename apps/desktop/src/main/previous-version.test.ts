@@ -1,14 +1,19 @@
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
+import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { fileCredentialStore } from './credential-store.js';
 import { type SafeStorage, createCredentials } from './credentials.js';
 import { fileLayoutStore } from './layout-store.js';
 import {
+  CREDENTIALS_FOLDER,
+  IMPORTED_RECORDS,
   IMPORT_RECORD,
+  RECORDS_LEFT_BEHIND,
   type ImportAnswer,
   type ImportLog,
   type ImportOffer,
@@ -17,7 +22,7 @@ import {
   offerPreviousVersion,
   parseVersion,
 } from './previous-version.js';
-import { fileRecentFiles } from './recent-files.js';
+import { fileRecentFiles, fileRecentFolders } from './recent-files.js';
 import { fileSessionStore } from './session-store.js';
 import { DEFAULT_SETTINGS } from '../../shared/settings.js';
 import { fileSettingsStore } from './settings-store.js';
@@ -76,6 +81,9 @@ const seedOlder = async (version: string): Promise<string> => {
   const recent = fileRecentFiles(join(path, 'recent-files.json'));
   await recent.remember({ path: join('D:', 'work', 'a.brief'), name: 'a.brief' });
   await recent.remember({ path: join('D:', 'work', 'b.brief'), name: 'b.brief' });
+  const folders = fileRecentFolders(join(path, 'recent-folders.json'));
+  await folders.remember({ path: join('D:', 'work', 'promo'), name: 'promo' });
+  await folders.remember({ path: join('D:', 'work', 'aprovados'), name: 'aprovados' });
   mkdirSync(join(path, 'logs'), { recursive: true });
   writeFileSync(join(path, 'logs', 'tyto.log'), 'a line from that build\n');
   return path;
@@ -202,6 +210,12 @@ describe('saying yes', () => {
     );
     expect(await fileRecentFiles(join(newer, 'recent-files.json')).list()).toEqual(
       await fileRecentFiles(join(older, 'recent-files.json')).list(),
+    );
+    // TYTO-558: the title bar's folder list, which every update before it started empty.
+    const recentFolders = await fileRecentFolders(join(newer, 'recent-folders.json')).list();
+    expect(recentFolders.map((entry) => entry.name)).toEqual(['aprovados', 'promo']);
+    expect(recentFolders).toEqual(
+      await fileRecentFolders(join(older, 'recent-folders.json')).list(),
     );
     // Neither record is the default, so the comparisons above are not two defaults agreeing.
     expect(await fileSettingsStore(join(newer, 'settings.json')).read()).toEqual({
@@ -445,7 +459,7 @@ describe('a broken older folder', () => {
 
     expect(outcome.kind).toBe('imported');
     if (outcome.kind !== 'imported') return;
-    expect(outcome.copied).toEqual(['recent-files.json']);
+    expect(outcome.copied).toEqual(['recent-files.json', 'recent-folders.json']);
     expect(outcome.diagnostics.map((item) => [item.code, item.severity])).toEqual([
       ['W_IMPORT_SKIPPED', 'warning'],
       ['W_IMPORT_SKIPPED', 'warning'],
@@ -488,5 +502,51 @@ describe('a broken older folder', () => {
     });
 
     expect(outcome).toEqual({ kind: 'not-offered' });
+  });
+});
+
+describe('what a version folder holds (TYTO-558)', () => {
+  /**
+   * Every name the composition root joins onto `app.getPath('userData')`, read off its syntax
+   * tree: the files the running app reads and writes in a version folder. TypeScript's parser
+   * and not a regex, so a path named in a comment is not counted.
+   */
+  const namesJoinedOntoUserData = (): string[] => {
+    const path = join(dirname(fileURLToPath(import.meta.url)), 'index.ts');
+    const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest);
+    const names: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.getText(source) === 'join' &&
+        node.arguments[0]?.getText(source) === "app.getPath('userData')"
+      ) {
+        const name = node.arguments[1];
+        if (name === undefined || !ts.isStringLiteral(name)) {
+          throw new Error(`a userData path the test cannot read: ${node.getText(source)}`);
+        }
+        names.push(name.text);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    return names;
+  };
+
+  it('finds the records it is meant to find', () => {
+    // The control: a scan that found nothing would pass the next test with nothing checked.
+    expect(namesJoinedOntoUserData()).toEqual(
+      expect.arrayContaining(['settings.json', 'recent-folders.json', 'logs', 'credentials']),
+    );
+  });
+
+  it('either carries each one across an update or says why not', () => {
+    const decided = new Set<string>([
+      ...IMPORTED_RECORDS,
+      CREDENTIALS_FOLDER,
+      ...Object.keys(RECORDS_LEFT_BEHIND),
+    ]);
+    const undecided = namesJoinedOntoUserData().filter((name) => !decided.has(name));
+    expect(undecided).toEqual([]);
   });
 });
