@@ -1,5 +1,54 @@
 # @tyto/desktop
 
+## 0.24.0
+
+### Minor Changes
+
+- c06b892: A recipe block is drawn as a notebook cell: a box around its lines and every result under them,
+  a head at the top of a step block that holds its counter and buttons, notes with no box, and more
+  space between blocks. The editor's notebook frames gain `headed` and `headedLinesOf` (ADR 0209).
+- 05dc38a: A recipe block shows the plan of every step that writes, not only its last step's result. An
+  action in the middle of a block, such as a transition between a source and a sheet sync, draws
+  its plan under its own line with its own Apply, so no write is left hidden (ADR 0208).
+- 560d12e: `deliveries` reads every delivery record under the project's `delivery.parent` back as one row
+  per delivery, keyed by the record's key, with `formats` as the text `to-delivery` reads, so a
+  recipe that writes the rows back plans nothing (ADR 0211). A record that does not read is a
+  `W_RECIPE_DELIVERY_RECORD` warning naming its folder. `to-delivery` takes
+  `inbound=<field>:<winner>,…`, the fields an outside value may change, each with a required
+  winner, `record` or `row`; `state` may be mapped only when it is declared inbound. In
+  `@tyto/core`, `mergeDeliveryRecord` takes the winners and names each both-changed field it
+  settles; `@tyto/io`'s `workspaceDeliveryPorts` gains `list`; `@tyto/plugin-api` re-exports
+  `DeliveryListing`; the window gains the step forms' Portuguese.
+- 2683219: `to-delivery name=<column> fields=<field>:<column>,…` keeps one delivery folder per row under the
+  project's `delivery.parent`, with `assets/`, `editaveis/` and its record at
+  `editaveis/delivery.json` (ADR 0210). It plans one operation per folder that changes, keeps a
+  field a person edited, plans nothing on a second run over the same rows, and names a refused row
+  in the cell's note. `@tyto/plugin-api` re-exports `ToDeliveryPorts`; `@tyto/io` gains
+  `workspaceDeliveryPorts`, which the shared recipe runner lends to every host; the window gains the
+  step form's Portuguese.
+
+### Patch Changes
+
+- Updated dependencies [c06b892]
+- Updated dependencies [560d12e]
+- Updated dependencies [2d49c56]
+- Updated dependencies [2683219]
+  - @tyto/editor@0.21.0
+  - @tyto/core@0.49.0
+  - @tyto/recipe@0.8.0
+  - @tyto/plugin-api@0.23.0
+  - @tyto/io@5.10.0
+  - @tyto/brief-lang@0.11.1
+  - @tyto/command-line@0.9.3
+  - @tyto/export-html@0.8.2
+  - @tyto/export-svg@2.1.2
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.24
+  - @tyto/pipeline@0.12.21
+  - @tyto/template-lang@0.8.23
+  - @tyto/templates@1.2.19
+  - @tyto/theme-pack@0.1.24
+
 ## 0.23.2
 
 ### Patch Changes
