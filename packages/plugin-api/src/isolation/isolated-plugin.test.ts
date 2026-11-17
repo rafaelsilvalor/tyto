@@ -1362,6 +1362,60 @@ describe('host.cache and host.workspace across the boundary (ADR 0138)', () => {
     expect([...files]).toEqual([]);
   });
 
+  it('reads a part, stats and lists across the boundary, rebuilding each entry (ADR 0212)', async () => {
+    const reached: string[] = [];
+    const entry = {
+      name: 'capa.psd',
+      kind: 'file',
+      size: 3,
+      modifiedAt: '2026-11-17T12:00:00.000Z',
+      path: '/secret',
+    } as never;
+    const capabilities: HostCapabilities = {
+      ...storing().capabilities,
+      workspaceReadPart: (_plugin, path, offset, length) => {
+        reached.push(`part ${path} ${String(offset)} ${String(length)}`);
+        return Promise.resolve(new Uint8Array([7, 8, 9]));
+      },
+      workspaceStat: () => Promise.resolve(entry),
+      workspaceList: (_plugin, path) => {
+        reached.push(`list '${path}'`);
+        return Promise.resolve([entry]);
+      },
+    };
+    const answer = await answerOf(
+      async (host) => {
+        const part = await host.workspace.read('entrega/capa.psd', { offset: 16, length: 3 });
+        const found = await host.workspace.stat('entrega/capa.psd');
+        const listed = await host.workspace.list();
+        const over = await host.workspace
+          .read('entrega/capa.psd', { offset: 0, length: PLUGIN_FILE_LIMIT_BYTES + 1 })
+          .then(
+            () => 'ok',
+            (cause: { code: string }) => cause.code,
+          );
+        return JSON.stringify([part instanceof Uint8Array, Array.from(part), found, listed, over]);
+      },
+      { permissions: ['workspace:read'], capabilities },
+    );
+
+    const rebuilt = {
+      name: 'capa.psd',
+      kind: 'file',
+      size: 3,
+      modifiedAt: '2026-11-17T12:00:00.000Z',
+    };
+    // No `path` crossed: each entry was rebuilt field by field on the host's side.
+    expect(JSON.parse(String(answer))).toEqual([
+      true,
+      [7, 8, 9],
+      rebuilt,
+      [rebuilt],
+      'E_WORKSPACE_FILE',
+    ]);
+    expect(reached).toEqual(['part entrega/capa.psd 16 3', "list ''"]);
+  });
+
   it('refuses a cache entry over the ceiling on the host side, whatever the guest sends', async () => {
     const { cache, capabilities } = storing();
     const answer = await answerOf(

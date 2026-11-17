@@ -185,6 +185,34 @@ describe("a plugin's cache and workspace files on the desktop (ADR 0138)", () =>
     expect(new TextDecoder().decode(await checked.workspaceRead('data/a.csv'))).toBe('two');
   });
 
+  it('reads a part, stats and lists in the folder open now, and refuses all three restricted (ADR 0212)', async () => {
+    await writeFile(join(first, 'capa.psd'), 'abcdef');
+    await mkdir(join(first, 'entrega'));
+    await writeFile(join(second, 'outra.psd'), 'x');
+    const { open, files } = window({ folder: first, trust: 'trusted' });
+    const checked = checkedCapabilities(
+      'drive',
+      ['workspace:read'],
+      desktopCapabilities(keychain(), noNetwork, files),
+    );
+
+    expect(new TextDecoder().decode(await checked.workspaceReadPart('capa.psd', 2, 3))).toBe('cde');
+    expect(await checked.workspaceStat('capa.psd')).toMatchObject({ kind: 'file', size: 6 });
+    expect((await checked.workspaceList('')).map(({ name, kind }) => `${name} ${kind}`)).toEqual([
+      'capa.psd file',
+      'entrega folder',
+    ]);
+    open.folder = second;
+    expect((await checked.workspaceList('')).map(({ name }) => name)).toEqual(['outra.psd']);
+
+    open.trust = 'restricted';
+    expect(await refusal(checked.workspaceReadPart('outra.psd', 0, 1))).toBe(
+      'E_WORKSPACE_FILE_RESTRICTED',
+    );
+    expect(await refusal(checked.workspaceStat('outra.psd'))).toBe('E_WORKSPACE_FILE_RESTRICTED');
+    expect(await refusal(checked.workspaceList(''))).toBe('E_WORKSPACE_FILE_RESTRICTED');
+  });
+
   it('asks for the trust on every call: restricted refuses, trusted and revoked let it through', async () => {
     const { open, files } = window({ folder: first, trust: 'restricted' });
     const checked = checkedCapabilities(

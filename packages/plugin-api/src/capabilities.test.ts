@@ -7,8 +7,11 @@ import {
   type HostCapabilities,
   PLUGIN_CACHE_KEY_LIMIT_BYTES,
   PLUGIN_FILE_LIMIT_BYTES,
+  PLUGIN_FILE_PART_BYTES,
+  PLUGIN_FOLDER_LIST_LIMIT,
   type PluginCacheEntry,
   PluginCapabilityError,
+  type WorkspaceEntry,
   allowsHost,
   checkedCapabilities,
   workspacePath,
@@ -707,5 +710,164 @@ describe('host.signin in process', () => {
     });
 
     expect(await seen).toBe('access-token E_PERMISSION');
+  });
+});
+
+describe('host.workspace parts, stat and list (ADR 0212)', () => {
+  const entry: WorkspaceEntry = {
+    name: 'cover.png',
+    kind: 'file',
+    size: 12,
+    modifiedAt: '2026-11-17T12:00:00.000Z',
+  };
+
+  /** A host whose part, stat and list ports record what reached them. */
+  function walking(overrides: Partial<HostCapabilities> = {}) {
+    const reached: string[] = [];
+    const capabilities: HostCapabilities = {
+      ...recording().capabilities,
+      workspaceReadPart: (plugin, path, offset, length) => {
+        reached.push(`part ${plugin} ${path} ${String(offset)} ${String(length)}`);
+        return Promise.resolve(new Uint8Array(Math.min(length, 3)));
+      },
+      workspaceStat: (plugin, path) => {
+        reached.push(`stat ${plugin} '${path}'`);
+        return Promise.resolve(entry);
+      },
+      workspaceList: (plugin, path) => {
+        reached.push(`list ${plugin} '${path}'`);
+        return Promise.resolve([entry]);
+      },
+      ...overrides,
+    };
+    return { reached, capabilities };
+  }
+
+  it('sits under workspace:read: without it each is E_PERMISSION and nothing is reached', async () => {
+    const { reached, capabilities } = walking();
+    const checked = checkedCapabilities('drive', ['workspace:write'], capabilities);
+
+    expect(await codeOf(checked.workspaceReadPart('a.psd', 0, 8))).toBe('E_PERMISSION');
+    await expect(checked.workspaceStat('a.psd')).rejects.toThrow(
+      "host.workspace.stat('a.psd') (workspace:read)",
+    );
+    await expect(checked.workspaceList('')).rejects.toThrow(
+      "host.workspace.list('') (workspace:read)",
+    );
+    expect(reached).toEqual([]);
+  });
+
+  it('hands the adapter a cleaned path, and the folder itself as an empty one', async () => {
+    const { reached, capabilities } = walking();
+    const checked = checkedCapabilities('drive', ['workspace:read'], capabilities);
+
+    expect(await checked.workspaceReadPart('./entrega\\capa.psd', 16, 8)).toHaveLength(3);
+    expect(await checked.workspaceStat('entrega/')).toEqual(entry);
+    expect(await checked.workspaceList('')).toEqual([entry]);
+    await checked.workspaceList('.');
+    await checked.workspaceStat('./');
+    expect(reached).toEqual([
+      'part drive entrega/capa.psd 16 8',
+      "stat drive 'entrega'",
+      "list drive ''",
+      "list drive ''",
+      "stat drive ''",
+    ]);
+  });
+
+  it('refuses a part over the ceiling, a negative or broken offset, and a broken length', async () => {
+    const { reached, capabilities } = walking();
+    const checked = checkedCapabilities('drive', ['workspace:read'], capabilities);
+
+    expect(await codeOf(checked.workspaceReadPart('a.psd', 0, PLUGIN_FILE_LIMIT_BYTES))).toBe(
+      'resolved',
+    );
+    await expect(
+      checked.workspaceReadPart('a.psd', 0, PLUGIN_FILE_LIMIT_BYTES + 1),
+    ).rejects.toThrow('the part is 33554433 bytes; the ceiling is 33554432.');
+    const offset = 'the offset must be a whole number of bytes, zero or more.';
+    await expect(checked.workspaceReadPart('a.psd', -1, 8)).rejects.toThrow(offset);
+    await expect(checked.workspaceReadPart('a.psd', 1.5, 8)).rejects.toThrow(offset);
+    await expect(checked.workspaceReadPart('a.psd', Number.NaN, 8)).rejects.toThrow(offset);
+    await expect(checked.workspaceReadPart('a.psd', 0, -8)).rejects.toThrow(
+      'the length must be a whole number of bytes, zero or more.',
+    );
+    expect(reached).toEqual([`part drive a.psd 0 ${String(PLUGIN_FILE_LIMIT_BYTES)}`]);
+  });
+
+  it('refuses `..` and an absolute path for a part, a stat and a list, before the adapter', async () => {
+    const { reached, capabilities } = walking();
+    const checked = checkedCapabilities('drive', ['workspace:read'], capabilities);
+
+    for (const path of ['../fora', 'entrega/../../fora', '/etc', 'C:\\Users']) {
+      expect(await codeOf(checked.workspaceReadPart(path, 0, 1))).toBe('E_WORKSPACE_FILE');
+      expect(await codeOf(checked.workspaceStat(path))).toBe('E_WORKSPACE_FILE');
+      expect(await codeOf(checked.workspaceList(path))).toBe('E_WORKSPACE_FILE');
+    }
+    expect(reached).toEqual([]);
+  });
+
+  it('refuses an adapter that answers more than the part, or a folder over the list ceiling', async () => {
+    const { capabilities } = walking({
+      workspaceReadPart: (_plugin, _path, _offset, length) =>
+        Promise.resolve(new Uint8Array(length + 1)),
+      workspaceList: () =>
+        Promise.resolve(Array.from({ length: PLUGIN_FOLDER_LIST_LIMIT + 1 }, () => entry)),
+    });
+    const checked = checkedCapabilities('drive', ['workspace:read'], capabilities);
+
+    await expect(checked.workspaceReadPart('a.psd', 0, 8)).rejects.toThrow(
+      'the host answered 9 bytes for a part of 8.',
+    );
+    await expect(checked.workspaceList('')).rejects.toThrow(
+      `the folder holds 10001 entries or more; the ceiling is ${String(PLUGIN_FOLDER_LIST_LIMIT)}.`,
+    );
+  });
+
+  it('answers E_WORKSPACE_FILE on a host without the ports, naming the host', async () => {
+    const checked = checkedCapabilities('drive', ['workspace:read'], {
+      ...recording().capabilities,
+      hostName: 'tyto watch',
+    });
+
+    await expect(checked.workspaceList('')).rejects.toThrow(
+      "Plugin 'drive' could not use workspace file '': tyto watch gives plugins no workspace files.",
+    );
+    expect(await codeOf(checked.workspaceStat('a.psd'))).toBe('E_WORKSPACE_FILE');
+    expect(await codeOf(checked.workspaceReadPart('a.psd', 0, 1))).toBe('E_WORKSPACE_FILE');
+  });
+
+  it('hands a plugin read with a part, stat and list in process', async () => {
+    const { reached, capabilities } = walking();
+    const host = createPluginHost({ capabilities });
+    let seen: Promise<string> | undefined;
+    host.activate({
+      id: 'drive',
+      manifest: {
+        name: 'drive',
+        version: '1.0.0',
+        engine: '>=0.1',
+        contributes: ['exporter'],
+        permissions: ['workspace:read'],
+      },
+      activate: (inner) => {
+        seen = (async () => {
+          const part = await inner.workspace.read('a.psd', {
+            offset: PLUGIN_FILE_PART_BYTES,
+            length: PLUGIN_FILE_PART_BYTES,
+          });
+          const found = await inner.workspace.stat('a.psd');
+          const listed = await inner.workspace.list();
+          return `${String(part.length)} ${found.kind} ${listed.map(({ name }) => name).join()}`;
+        })();
+      },
+    });
+
+    expect(await seen).toBe('3 file cover.png');
+    expect(reached).toEqual([
+      `part drive a.psd ${String(PLUGIN_FILE_PART_BYTES)} ${String(PLUGIN_FILE_PART_BYTES)}`,
+      "stat drive 'a.psd'",
+      "list drive ''",
+    ]);
   });
 });

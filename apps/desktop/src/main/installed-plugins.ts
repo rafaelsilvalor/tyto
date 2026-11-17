@@ -108,7 +108,10 @@ export interface DesktopPluginFiles {
   readonly workspace: () => Pick<WorkspaceState, 'folder' | 'trust'>;
 }
 
-/** The six ports of ADR 0138, the three of ADR 0191, and the name their refusals give. */
+/**
+ * The six ports of ADR 0138, the three of ADR 0191, the three of ADR 0212, and the name their
+ * refusals give.
+ */
 export type DesktopPluginFilePorts = Required<
   Pick<
     HostCapabilities,
@@ -122,6 +125,9 @@ export type DesktopPluginFilePorts = Required<
     | 'storageDelete'
     | 'workspaceRead'
     | 'workspaceWrite'
+    | 'workspaceReadPart'
+    | 'workspaceStat'
+    | 'workspaceList'
   >
 >;
 

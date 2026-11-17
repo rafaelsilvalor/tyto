@@ -141,3 +141,11 @@ The age the notebook shows is not this record's `storedAt`: a cache entry stays 
 plugin, and nothing of it reaches a verb's result. ADR 0148 decision 8 shows the host's `ranAt`
 for the cell and the oldest `fetchedAt` among its rows instead, both from the host or the
 row's provenance, never from the plugin's clock.
+
+## Note, 2026-11-17 — parts, stat and list, and the listing sentence reversed (TYTO-768)
+
+ADR 0212 adds `host.workspace.read(path, { offset, length })`, `stat(path)` and `list(path)`,
+three requests and protocol 27, all under `workspace:read`. It reverses the sentence above that
+"listing a person's folder to a plugin is a wider grant than any known connector needs": reading
+any path by name is already a wider grant than seeing names, and TYTO-759 must walk a local
+delivery folder to upload it. The 32 MiB ceiling still bounds one message, so one part.

@@ -703,7 +703,7 @@ interface PluginHost {
   credentials(key: string): Promise<string>;    // credentials:<key> only; env in the CLI, safeStorage on desktop
   fetch(url, init?): Promise<HostFetchResponse>; // net:<host> only; redirects not followed
   cache: HostCache;                             // private, no permission; get/put/delete/list (ADR 0138)
-  workspace: HostWorkspace;                     // workspace:read / workspace:write; read/write (ADR 0138)
+  workspace: HostWorkspace;                     // workspace:read / workspace:write; read/write (ADR 0138), parts/stat/list (ADR 0212)
   signin: HostSignin;                           // signin:<id>; accessToken(id), never a browser (ADR 0174)
   log: Logger; events: TypedEmitter<HostEvents>;
 }
@@ -755,11 +755,21 @@ On disk a record is `<home>/data/plugins/<name>/storage/<sha256(key)>.json`, und
 
 ### `host.cache` and `host.workspace` (ADR 0138)
 
-| Permission        | Allows                                                   |
-| ----------------- | -------------------------------------------------------- |
-| none              | `host.cache.get`, `.put`, `.delete`, `.list`             |
-| `workspace:read`  | `host.workspace.read(path)`, relative to the open folder |
-| `workspace:write` | `host.workspace.write(path, bytes)`, never into `.tyto/` |
+| Permission        | Allows                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| none              | `host.cache.get`, `.put`, `.delete`, `.list`                                                 |
+| `workspace:read`  | `host.workspace.read(path)`, `.read(path, { offset, length })`, `.stat(path)`, `.list(path)` |
+| `workspace:write` | `host.workspace.write(path, bytes)`, never into `.tyto/`                                     |
+
+**A big file is read in parts, and a folder is listed one level at a time** (ADR 0212).
+`read(path, { offset, length })` answers at most `length` bytes from `offset` of a file of any
+size, shorter at its end and empty past it; `length` is at most 32 MiB, and the advised part is
+`PLUGIN_FILE_PART_BYTES` (8 MiB, a multiple of a resumable upload's 256 KiB step). `stat(path)`
+answers `{ name, kind: 'file' | 'folder', size, modifiedAt }`, a folder's size `0` and
+`modifiedAt` from the host's clock; `list(path = '')` answers one folder's entries in that shape,
+sorted by name, `''` being the open folder. A folder of more than `PLUGIN_FOLDER_LIST_LIMIT`
+(10,000) entries is refused, never cut short. A link that leads out of the folder is left out of a
+listing and refused by name; one that stays in is described by what it leads to.
 
 **The cache is the plugin's own**, kept by the host outside every workspace and keyed by the plugin's name and a key it chooses, so it needs no permission and works in a restricted folder. `get(key)` resolves to `{ bytes, storedAt }` or `undefined`; `put(key, bytes | string)` to `{ storedAt }`; `delete(key)` to whether there was an entry; `list(prefix = '')` to `{ key, storedAt, size }[]`. `storedAt` is ISO 8601 from the host's clock, never the plugin's. A key is a non-empty string of at most **1 KiB in UTF-8** (`PLUGIN_CACHE_KEY_LIMIT_BYTES`) and an entry at most **32 MiB** (`PLUGIN_FILE_LIMIT_BYTES`); either refused is `E_PLUGIN_CACHE`. The cache as a whole has no ceiling.
 
