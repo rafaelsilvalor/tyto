@@ -1,5 +1,14 @@
 # @tyto/plugin-api
 
+## 0.24.0
+
+### Minor Changes
+
+- 37ecddd: A plugin with `workspace:read` can read a workspace file of any size in parts with
+  `host.workspace.read(path, { offset, length })`, and stat and list the open folder with
+  `host.workspace.stat(path)` and `host.workspace.list(path)` (ADR 0212). The plugin protocol is
+  now 27.
+
 ## 0.23.0
 
 ### Minor Changes
