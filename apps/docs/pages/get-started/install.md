@@ -29,7 +29,7 @@ The window opens in your computer's language — English or Brazilian Portuguese
 
 ## Where Tyto keeps your things
 
-Settings, keyboard shortcuts, snippets, the layout of the panels, recent files and logs are in a folder of their own for **each version**:
+Settings, keyboard shortcuts, snippets, the layout of the panels, recent files and folders, and logs are in a folder of their own for **each version**:
 
 | System  | Folder                                         |
 | ------- | ---------------------------------------------- |

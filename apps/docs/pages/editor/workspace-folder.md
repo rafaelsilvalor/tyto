@@ -25,7 +25,7 @@ Every key is optional, and so is the file: a folder without one opens with nothi
 
 The title bar has a button after **Help** with the open folder's name, or _No folder_. Click it, or run **Open Recent Folder…** from the command bar or the **File** menu, to list the folders you opened before, newest first, with where each one is. Type to filter the list by name or place, move with the arrow keys and press **Enter** to open the highlighted folder; **Esc** closes the list. The open folder is listed and marked _open_. **Open Local Folder…** at the foot is **File ▸ Open Folder…**.
 
-A folder chosen here opens exactly as **File ▸ Open Folder…** opens it: in the same window, replacing the folder open now, and trusted only if you trusted it before. The list keeps the last ten folders, and a folder that is no longer on disk is left out. `workspace.openRecent` is the command's id, so `keybindings.json` can put it on a key.
+A folder chosen here opens exactly as **File ▸ Open Folder…** opens it: in the same window, replacing the folder open now, and trusted only if you trusted it before. The list keeps the last ten folders, and a folder that is no longer on disk is left out. A new version brings the list from the one before when you choose **Bring them** on its first run ([where Tyto keeps your things](../get-started/install.md#where-tyto-keeps-your-things)). `workspace.openRecent` is the command's id, so `keybindings.json` can put it on a key.
 
 ### Each folder keeps its tabs
 

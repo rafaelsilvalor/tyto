@@ -35,17 +35,36 @@ import { readSettingsText } from './settings-file.js';
  * `session.json` joined in TYTO-113 (ADR 0080): it holds the tabs and the drafts nobody saved
  * yet, and an update that left it behind would be the one quit that lost them.
  *
- * `logs/` is not among them: a log is a record of *that* build's failures, and one carried
- * into a new version would date a report about this one with lines from the last.
+ * `recent-folders.json` joined in TYTO-558: TYTO-487 added the file and not the line here, so
+ * every update started the title bar's folder list empty and it looked as if it kept only the
+ * last folder opened.
+ *
+ * What is written in a version folder and does *not* travel is {@link RECORDS_LEFT_BEHIND};
+ * `previous-version.test.ts` reads the composition root and fails on a file in neither list.
  */
 export const IMPORTED_RECORDS = [
   'settings.json',
   'layout.json',
   'recent-files.json',
+  'recent-folders.json',
   'keybindings.json',
   'snippets.json',
   'session.json',
 ] as const;
+
+/**
+ * The names in a version folder that are deliberately not brought across, each with why.
+ *
+ * **A list and not a comment**, because a comment is what TYTO-487 missed: a file added to the
+ * folder now has to land here or in {@link IMPORTED_RECORDS} before the test passes.
+ */
+export const RECORDS_LEFT_BEHIND: Readonly<Record<string, string>> = {
+  // A log is a record of *that* build's failures, and one carried into a new version would
+  // date a report about this one with lines from the last.
+  logs: 'a log belongs to the build that wrote it',
+  // Chromium writes it for a debugging port; main only reads it to show the port (TYTO-651).
+  DevToolsActivePort: "Chromium's, and true only while that process runs",
+};
 
 /** The ciphertext folder `credential-store.ts` writes, brought across only when asked. */
 export const CREDENTIALS_FOLDER = 'credentials';
