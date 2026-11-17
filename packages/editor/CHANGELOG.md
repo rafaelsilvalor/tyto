@@ -1,5 +1,15 @@
 # @tyto/editor
 
+## 0.21.1
+
+### Patch Changes
+
+- Updated dependencies [fb4d987]
+  - @tyto/core@0.50.0
+  - @tyto/recipe@0.9.0
+  - @tyto/brief-lang@0.11.2
+  - @tyto/template-lang@0.8.24
+
 ## 0.21.0
 
 ### Minor Changes
