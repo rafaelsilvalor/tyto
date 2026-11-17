@@ -47,7 +47,7 @@ describe('the step picker (TYTO-402)', () => {
     const groups = pickerGroups(CATALOG, '');
 
     expect(groups.map((group) => group.kind)).toEqual(['source', 'transform', 'action', 'sink']);
-    expect(groups[0]?.verbs.map((verb) => verb.name)).toEqual(['acme.pull']);
+    expect(groups[0]?.verbs.map((verb) => verb.name)).toEqual(['acme.pull', 'deliveries']);
     expect(pickerOrder(groups)).toHaveLength(CATALOG.length);
   });
 

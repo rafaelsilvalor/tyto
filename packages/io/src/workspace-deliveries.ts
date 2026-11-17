@@ -1,7 +1,10 @@
-import { mkdir, readFile, stat } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { mkdir, readFile, readdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
 import {
+  DELIVERY_RECORD_FILE,
+  DELIVERY_RECORD_FOLDER,
   type Diagnostic,
   type Result,
   type Trust,
@@ -10,7 +13,12 @@ import {
   err,
   ok,
 } from '@tyto/core';
-import type { DeliveryLayout, DeliveryPlace, ToDeliveryPorts } from '@tyto/plugin-api';
+import type {
+  DeliveryLayout,
+  DeliveryListing,
+  DeliveryPlace,
+  ToDeliveryPorts,
+} from '@tyto/plugin-api';
 
 import { fsTrustStore } from './fs-trust-store.js';
 import { isMissing } from './real-paths.js';
@@ -32,6 +40,10 @@ import { loadWorkspace } from './workspace.js';
  *
  * The digest is the same SHA-256 of the bytes `to-brief` compares, so "changed since the plan"
  * means the record's bytes changed.
+ *
+ * `list` is what `deliveries` reads the records back through (ADR 0211): the folders directly
+ * under `delivery.parent`, hidden ones and `.tyto` left out, each record read through its own
+ * confinement, in a trusted folder only, as every other call.
  */
 
 export interface WorkspaceDeliveryOptions {
@@ -113,9 +125,61 @@ export function workspaceDeliveryPorts(options: WorkspaceDeliveryOptions): ToDel
     }
   }
 
+  /**
+   * One folder's record for `list`: its text, nothing when it has none, or why it may not be
+   * read. Each folder is confined on its own, so a link out of the workspace is one folder's
+   * problem and the others still read.
+   */
+  async function recordOf(
+    path: string,
+  ): Promise<{ readonly record?: string; readonly problem?: string }> {
+    const confined = await confineToWorkspace(
+      workspaceFolder ?? '',
+      join(workspaceFolder ?? '', path, DELIVERY_RECORD_FOLDER, DELIVERY_RECORD_FILE),
+      { follow: 'nearest' },
+    );
+    if ('refused' in confined) {
+      return {
+        problem:
+          confined.refused === 'outside'
+            ? 'it is outside the workspace'
+            : 'it leads out of the workspace through a link',
+      };
+    }
+    try {
+      return { record: await readFile(confined.real, 'utf8') };
+    } catch (cause) {
+      if (isMissing(cause)) return {};
+      return { problem: `its record cannot be read: ${describe(cause)}` };
+    }
+  }
+
   return {
     folder,
     layout,
+
+    async list(parent) {
+      const real = await locate(parent);
+      if (!real.ok) return real;
+      let entries: Dirent[];
+      try {
+        entries = await readdir(real.value, { withFileTypes: true });
+      } catch (cause) {
+        if (isMissing(cause)) return ok([]);
+        return refuse(`cannot list '${parent}': ${describe(cause)}`);
+      }
+      const names = entries
+        .filter((entry) => entry.isDirectory() || entry.isSymbolicLink())
+        .map((entry) => entry.name)
+        .filter((name) => !name.startsWith('.') && !isTytoFolder(name))
+        .sort();
+      const listed: DeliveryListing[] = [];
+      for (const name of names) {
+        const path = parent === '' ? name : `${parent}/${name}`;
+        listed.push({ name, path, ...(await recordOf(path)) });
+      }
+      return ok(listed);
+    },
 
     async read(path) {
       const bytes = await bytesOf(path);

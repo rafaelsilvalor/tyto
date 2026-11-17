@@ -126,6 +126,12 @@ TYTO-401 lands in four pull requests: this record, the port and the verbs `last`
    is cleared only when `last_done_at` is set, that is, when the flow remembered writing it; a
    stamp a person typed stays. The stamp verb lands in the third pull request.
 
+> **Note of 2026-11-17 (ADR 0211, TYTO-771).** A delivery's data, and the base its declared
+> inbound fields are merged against, live in the delivery record inside its folder, not in
+> this machine-local state, so they travel with a synced cloud folder. This state stays for
+> recipe memory that is not delivery data. Several machines writing one folder is the cloud
+> phase and is not designed.
+
 ## Consequences
 
 - The sync reads as a recipe: `last sync`, then `decide`, then the actions, then

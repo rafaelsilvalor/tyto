@@ -112,7 +112,12 @@ nothing.
   `kept` only beside a field it does update.
 - A delivery folder whose `assets/` was deleted after its record was written is not given a new
   one until the record changes.
-- Not decided: how the check and the ship read the record and `state`; later cards of E29.
+- ~~Not decided: how the check and the ship read the record and `state`; later cards of E29.~~
+
+  > **Amended by ADR 0211 (TYTO-771, 2026-11-17).** They read it through `deliveries`, a
+  > source that reads every record under `delivery.parent` back as one row per delivery. A
+  > recipe may also declare inbound fields with `inbound=<field>:<winner>`, `state` among them,
+  > whose base is the last value that came from outside; a field not declared keeps §5.
 
 ## Rejected
 

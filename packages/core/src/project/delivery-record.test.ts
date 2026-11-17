@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   type DeliveryFieldValue,
+  type DeliveryInboundWinners,
   type DeliveryRecord,
   type DeliveryRecordField,
+  type DeliveryWritableField,
+  deliveryFormatsText,
   mergeDeliveryRecord,
   parseDeliveryFormats,
   readDeliveryRecord,
@@ -150,5 +153,81 @@ describe('mergeDeliveryRecord', () => {
     const formats = incoming({ key: 'T-1', formats: [{ format: 'feed', count: 3 }] });
     const created = read(writeDeliveryRecord(mergeDeliveryRecord(undefined, formats).record));
     expect(mergeDeliveryRecord(created, formats).changed).toBe(false);
+  });
+});
+
+describe('mergeDeliveryRecord with declared inbound fields (ADR 0211)', () => {
+  type Values = Partial<Record<DeliveryWritableField, DeliveryFieldValue | undefined>>;
+  const bring = (values: Values) =>
+    new Map(Object.entries(values) as [DeliveryWritableField, DeliveryFieldValue][]);
+  const rowWins: DeliveryInboundWinners = new Map([['state', 'row']]);
+  const recordWins: DeliveryInboundWinners = new Map([['state', 'record']]);
+
+  /** A record the recipe wrote with `state: todo` from outside, then set on disk to `state`. */
+  function synced(state: string): DeliveryRecord {
+    const created = mergeDeliveryRecord(undefined, bring({ key: 'T-1', state: 'todo' }), rowWins);
+    return read(writeDeliveryRecord({ ...created.record, state }));
+  }
+
+  it('lets the outside value in when only the outside changed', () => {
+    const outside = bring({ key: 'T-1', state: 'doing' });
+    const merged = mergeDeliveryRecord(synced('todo'), outside, rowWins);
+    expect(merged).toMatchObject({ changed: true, updated: ['state'], conflicts: [] });
+    expect(merged.record.state).toBe('doing');
+    expect(merged.record.written).toMatchObject({ state: 'doing' });
+  });
+
+  it("keeps the record's value when only the record changed", () => {
+    const outside = bring({ key: 'T-1', state: 'todo' });
+    const merged = mergeDeliveryRecord(synced('done'), outside, rowWins);
+    expect(merged).toMatchObject({ changed: false, kept: ['state'], conflicts: [] });
+  });
+
+  it('lets the row win a field both changed, and names what it overwrote', () => {
+    const outside = bring({ key: 'T-1', state: 'review' });
+    const merged = mergeDeliveryRecord(synced('doing'), outside, rowWins);
+    expect(merged.conflicts).toEqual([{ field: 'state', winner: 'row', lost: 'doing' }]);
+    expect(merged.record.state).toBe('review');
+    expect(merged.record.written).toMatchObject({ state: 'review' });
+  });
+
+  it('lets the record win, and moves the base once so the next run sees no conflict', () => {
+    const outside = bring({ key: 'T-1', state: 'review' });
+    const merged = mergeDeliveryRecord(synced('doing'), outside, recordWins);
+    expect(merged).toMatchObject({ changed: true, updated: [], based: ['state'] });
+    expect(merged.conflicts).toEqual([{ field: 'state', winner: 'record', lost: 'review' }]);
+    expect(merged.record.state).toBe('doing');
+    expect(merged.record.written).toMatchObject({ state: 'review' });
+    const again = mergeDeliveryRecord(
+      read(writeDeliveryRecord(merged.record)),
+      outside,
+      recordWins,
+    );
+    expect(again).toMatchObject({ changed: false, conflicts: [], kept: ['state'] });
+  });
+
+  it('moves only the base when both sides already agree', () => {
+    const outside = bring({ key: 'T-1', state: 'done' });
+    const merged = mergeDeliveryRecord(synced('done'), outside, rowWins);
+    expect(merged).toMatchObject({ changed: true, updated: [], based: ['state'], conflicts: [] });
+    const again = mergeDeliveryRecord(read(writeDeliveryRecord(merged.record)), outside, rowWins);
+    expect(again.changed).toBe(false);
+  });
+
+  it('control: without a declaration the same both-changed field is kept as an edit', () => {
+    const merged = mergeDeliveryRecord(synced('doing'), bring({ key: 'T-1', state: 'review' }));
+    expect(merged).toMatchObject({ changed: false, kept: ['state'], conflicts: [] });
+  });
+
+  it('writes formats as text that reads back as the same formats', () => {
+    const formats = [
+      { format: 'feed', count: 3 },
+      { format: 'story', count: 1 },
+    ];
+    expect(deliveryFormatsText(formats)).toBe('feed:3,story:1');
+    expect(parseDeliveryFormats(deliveryFormatsText(formats))).toMatchObject({
+      ok: true,
+      value: formats,
+    });
   });
 });

@@ -14,8 +14,9 @@ import { type Result, err, ok } from '../result/result.js';
  * still that one takes the new value, and one that differs was edited and is kept. That base is
  * what lets a due date changed in the tracker still reach a record nobody touched.
  *
- * `state` is the person's: the recipe never maps it and never writes it. A key the schema does
- * not know is kept as it was, so a record a newer Tyto or a person extended survives this one.
+ * `state` is the person's: the recipe never writes it unless the recipe declares it inbound
+ * (ADR 0211). A key the schema does not know is kept as it was, so a record a newer Tyto or a
+ * person extended survives this one.
  */
 
 export const DELIVERY_RECORD_VERSION = 1;
@@ -36,6 +37,31 @@ export const DELIVERY_RECORD_FIELDS = [
 ] as const;
 
 export type DeliveryRecordField = (typeof DELIVERY_RECORD_FIELDS)[number];
+
+/**
+ * The fields a recipe may bring into a record: the ones it maps, and `state` when the recipe
+ * declares it inbound (ADR 0211), in the order a new record holds them.
+ */
+export const DELIVERY_WRITABLE_FIELDS = [...DELIVERY_RECORD_FIELDS, 'state'] as const;
+
+export type DeliveryWritableField = (typeof DELIVERY_WRITABLE_FIELDS)[number];
+
+/**
+ * Who wins a declared inbound field when both the record and the outside value changed since
+ * the last run (ADR 0211): the record in the folder, or the row the recipe brings.
+ */
+export type DeliveryInboundWinner = 'record' | 'row';
+
+/** The fields a recipe declared inbound, each with the side that wins when both changed. */
+export type DeliveryInboundWinners = ReadonlyMap<DeliveryWritableField, DeliveryInboundWinner>;
+
+/** A declared inbound field both sides changed: who won, and the value that lost. */
+export interface DeliveryConflict {
+  readonly field: DeliveryWritableField;
+  readonly winner: DeliveryInboundWinner;
+  /** The value that did not enter: the record's when the row wins, the row's otherwise. */
+  readonly lost: DeliveryFieldValue | null;
+}
 
 export interface DeliveryFormatCount {
   readonly format: string;
@@ -102,6 +128,11 @@ export function parseDeliveryFormats(text: string): Result<DeliveryFormatCount[]
   return ok(formats);
 }
 
+/** Formats as a cell writes them, `feed:3,story:1`, which `parseDeliveryFormats` reads back. */
+export function deliveryFormatsText(formats: readonly DeliveryFormatCount[]): string {
+  return formats.map(({ format, count }) => `${format}:${String(count)}`).join(',');
+}
+
 /** A record read from disk: the file's text as a record, or why it is not one. */
 export function readDeliveryRecord(text: string): Result<DeliveryRecord, string> {
   let parsed: unknown;
@@ -127,7 +158,7 @@ export function writeDeliveryRecord(record: DeliveryRecord): string {
  * `undefined` for an empty cell, which leaves the field out of a new record.
  */
 export type IncomingDeliveryFields = ReadonlyMap<
-  DeliveryRecordField,
+  DeliveryWritableField,
   DeliveryFieldValue | undefined
 >;
 
@@ -137,9 +168,16 @@ export interface DeliveryRecordMerge {
   /** True when no record was on disk. */
   readonly created: boolean;
   /** The fields the recipe changes, in the order it maps them. */
-  readonly updated: readonly DeliveryRecordField[];
+  readonly updated: readonly DeliveryWritableField[];
   /** The fields a person edited since the recipe last wrote them, which keep the person's value. */
-  readonly kept: readonly DeliveryRecordField[];
+  readonly kept: readonly DeliveryWritableField[];
+  /** Declared inbound fields both sides changed, each settled by its winner (ADR 0211). */
+  readonly conflicts: readonly DeliveryConflict[];
+  /**
+   * Declared inbound fields whose value stays and whose base alone moves to the outside value:
+   * the record already agrees with it, or the record won a conflict.
+   */
+  readonly based: readonly DeliveryWritableField[];
   /** Whether the file must be written at all. */
   readonly changed: boolean;
 }
@@ -155,15 +193,26 @@ export interface DeliveryRecordMerge {
  * A field with no base counts as last written empty, so a field a person filled by hand before
  * the recipe mapped it is theirs. Fields the recipe does not map, `state`, and keys the schema
  * does not know are left as they are.
+ *
+ * **A declared inbound field (ADR 0211)** is one whose value may come back from outside, a
+ * sheet's status say, and `winners` names the side that wins it. Its base is the last value that
+ * came from outside, **whether or not it entered**, so a conflict is settled once:
+ *
+ * - the record already holds the outside value: it stays, and the base catches up;
+ * - the record is the base: the outside value enters;
+ * - the outside value is the base: the record moved alone, and is kept;
+ * - neither: both changed, the winner decides, and the merge names the conflict. When the
+ *   record wins, the base still moves to the outside value, so the next run sees nothing new.
  */
 export function mergeDeliveryRecord(
   onDisk: DeliveryRecord | undefined,
   incoming: IncomingDeliveryFields,
+  winners: DeliveryInboundWinners = new Map(),
 ): DeliveryRecordMerge {
   if (onDisk === undefined) {
     const record: Record<string, unknown> = { version: DELIVERY_RECORD_VERSION };
     const written: Record<string, unknown> = {};
-    for (const field of DELIVERY_RECORD_FIELDS) {
+    for (const field of DELIVERY_WRITABLE_FIELDS) {
       if (!incoming.has(field)) continue;
       const value = incoming.get(field);
       if (value !== undefined) record[field] = value;
@@ -175,6 +224,8 @@ export function mergeDeliveryRecord(
       created: true,
       updated: [...incoming.keys()],
       kept: [],
+      conflicts: [],
+      based: [],
       changed: true,
     };
   }
@@ -182,23 +233,46 @@ export function mergeDeliveryRecord(
   const disk = onDisk as Readonly<Record<string, unknown>>;
   const base: Record<string, unknown> = { ...(onDisk.written ?? {}) };
   const values = new Map<string, unknown>();
-  const updated: DeliveryRecordField[] = [];
-  const kept: DeliveryRecordField[] = [];
+  const updated: DeliveryWritableField[] = [];
+  const kept: DeliveryWritableField[] = [];
+  const conflicts: DeliveryConflict[] = [];
+  const based: DeliveryWritableField[] = [];
   for (const [field, value] of incoming) {
     const next = value ?? null;
     const current = disk[field] ?? null;
     const last = base[field] ?? null;
-    if (same(current, next)) continue;
-    if (same(current, last)) {
+    const enter = () => {
       values.set(field, next);
       base[field] = next;
       updated.push(field);
-    } else {
+    };
+    const moveBase = () => {
+      base[field] = next;
+      based.push(field);
+    };
+    const winner = winners.get(field);
+    if (winner === undefined) {
+      if (same(current, next)) continue;
+      if (same(current, last)) enter();
+      else kept.push(field);
+      continue;
+    }
+    if (same(current, next)) {
+      if (!same(last, next)) moveBase();
+    } else if (same(current, last)) {
+      enter();
+    } else if (same(next, last)) {
       kept.push(field);
+    } else if (winner === 'row') {
+      conflicts.push({ field, winner, lost: current as DeliveryFieldValue | null });
+      enter();
+    } else {
+      conflicts.push({ field, winner, lost: next });
+      moveBase();
     }
   }
-  if (updated.length === 0) {
-    return { record: onDisk, created: false, updated, kept, changed: false };
+  if (updated.length === 0 && based.length === 0) {
+    return { record: onDisk, created: false, updated, kept, conflicts, based, changed: false };
   }
 
   // The disk's own order, a new field before `written`, which stays last.
@@ -216,7 +290,15 @@ export function mergeDeliveryRecord(
     if (!(key in disk) && value !== null) record[key] = value;
   }
   record['written'] = base;
-  return { record: record as DeliveryRecord, created: false, updated, kept, changed: true };
+  return {
+    record: record as DeliveryRecord,
+    created: false,
+    updated,
+    kept,
+    conflicts,
+    based,
+    changed: true,
+  };
 }
 
 function same(left: unknown, right: unknown): boolean {

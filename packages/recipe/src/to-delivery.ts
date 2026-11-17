@@ -2,12 +2,17 @@ import {
   DELIVERY_RECORD_FIELDS,
   DELIVERY_RECORD_FILE,
   DELIVERY_RECORD_FOLDER,
+  DELIVERY_WRITABLE_FIELDS,
   type DeliveryFieldValue,
+  type DeliveryInboundWinner,
+  type DeliveryInboundWinners,
   type DeliveryRecord,
-  type DeliveryRecordField,
+  type DeliveryRecordMerge,
+  type DeliveryWritableField,
   type Diagnostic,
   type Result,
   type SourceRange,
+  deliveryFormatsText,
   deliveryNameOf,
   diagnostic,
   err,
@@ -49,6 +54,11 @@ import { type Column, type Row, cellText } from './table.js';
  * A row whose folder name cannot be one folder's (ADR 0157 §4), or whose values the record cannot
  * hold, is **refused, never rewritten**, and named in the cell's note; the other rows still plan.
  * A recipe that needs such a name changes it with `rewrite` before this step.
+ *
+ * `inbound=<field>:<winner>,…` (ADR 0211) declares the fields an outside value may change, a
+ * sheet's status say, each with the side that wins when both the record and the row changed
+ * since the last run: `record` or `row`. The winner is required. `state` may be mapped only when
+ * it is declared inbound, and every inbound field must be mapped in `fields=`.
  */
 export interface ToDeliveryPorts {
   /**
@@ -58,6 +68,13 @@ export interface ToDeliveryPorts {
   folder(): DeliveryPlace | undefined;
   /** The project's delivery layout as it reads now, relative to the workspace. */
   layout(): Promise<Result<DeliveryLayout, readonly Diagnostic[]>>;
+  /**
+   * The folders directly inside a workspace folder, by name, each with its record's text
+   * (`editaveis/delivery.json`) when it has one, which `deliveries` reads back as rows
+   * (ADR 0211). Hidden folders and `.tyto` are not listed. A folder the host may not read, a
+   * link out of the workspace say, comes back with the reason instead of its record.
+   */
+  list(parent: string): Promise<Result<readonly DeliveryListing[], readonly Diagnostic[]>>;
   /** A file's text at a workspace path, or `undefined` when there is none. */
   read(path: string): Promise<Result<string | undefined, readonly Diagnostic[]>>;
   /** A digest of the file at a workspace path, of the host's choice; `undefined` when absent. */
@@ -82,6 +99,17 @@ export interface DeliveryLayout {
   readonly folders: readonly string[];
 }
 
+export interface DeliveryListing {
+  /** The folder's name. */
+  readonly name: string;
+  /** The folder, relative to the workspace and `/`-separated. */
+  readonly path: string;
+  /** The record's text; absent when the folder has no record. */
+  readonly record?: string;
+  /** Why the folder could not be read; absent when it could. */
+  readonly problem?: string;
+}
+
 /** The kind of write `to-delivery` declares, and the only one its plans hold. */
 export const TO_DELIVERY_WRITE = 'record';
 
@@ -95,8 +123,9 @@ export const TO_DELIVERY_PLAN_LIMITS: PlanLimits = {
 /** How many refused rows the note names, so a broken column is not a thousand lines. */
 const REPORTED = 8;
 
-const NAMES = ['name', 'fields'] as const;
+const NAMES = ['name', 'fields', 'inbound'] as const;
 const FIELD_MAP = z.record(z.string(), z.string());
+const WINNERS: readonly DeliveryInboundWinner[] = ['record', 'row'];
 
 /** One record of a shown plan, as Apply writes it. */
 interface RecordWrite {
@@ -152,7 +181,7 @@ async function planDeliveries(
     }
     argument[name] = written;
   }
-  const { name, fields } = argument;
+  const { name, fields, inbound } = argument;
   if (name === undefined || fields === undefined) {
     return argumentsProblem(context, 'needs name=<column> fields=<field>:<column>,…');
   }
@@ -165,9 +194,11 @@ async function planDeliveries(
     return refuse('writes nothing in a restricted folder; trust the folder first', at(name.range));
   }
 
-  const mapping = await readFields(context, fields);
+  const winners = inbound === undefined ? ok(new Map()) : await readInbound(context, inbound);
+  if (!winners.ok) return winners;
+  const mapping = await readFields(context, fields, winners.value);
   if (!mapping.ok) return mapping;
-  const columns: { readonly field: DeliveryRecordField; readonly column: Column }[] = [];
+  const columns: { readonly field: DeliveryWritableField; readonly column: Column }[] = [];
   for (const [field, written] of mapping.value) {
     const column = resolveColumn(table.value, written, at(fields.range), context.aliases);
     if (!column.ok) return column;
@@ -222,12 +253,8 @@ async function planDeliveries(
         onDisk = record.value;
       }
     }
-    const merged = mergeDeliveryRecord(onDisk, incoming.value);
+    const merged = mergeDeliveryRecord(onDisk, incoming.value, winners.value);
     if (!merged.changed) continue;
-    const kept =
-      merged.kept.length === 0
-        ? ''
-        : `; kept: ${merged.kept.map((field) => `${field} (edited)`).join(', ')}`;
     const write: RecordWrite = {
       rowKey: row.key,
       folders: [folder, ...inside.map((item) => `${folder}/${item}`)],
@@ -239,9 +266,7 @@ async function planDeliveries(
     operations.push({
       write: TO_DELIVERY_WRITE,
       rowKey: row.key,
-      description: merged.created
-        ? `${folder}: new`
-        : `${folder}: updates ${merged.updated.join(', ')}${kept}`,
+      description: `${folder}: ${describeMerge(merged)}`,
       payload: { path, text: write.text, before: write.before },
     });
   }
@@ -277,9 +302,9 @@ function refusedNote(refused: readonly string[]): string {
 /** One row's mapped values, as the record holds them, or why the record cannot hold them. */
 function incomingOf(
   row: Row,
-  columns: readonly { readonly field: DeliveryRecordField; readonly column: Column }[],
-): Result<Map<DeliveryRecordField, DeliveryFieldValue | undefined>, string> {
-  const incoming = new Map<DeliveryRecordField, DeliveryFieldValue | undefined>();
+  columns: readonly { readonly field: DeliveryWritableField; readonly column: Column }[],
+): Result<Map<DeliveryWritableField, DeliveryFieldValue | undefined>, string> {
+  const incoming = new Map<DeliveryWritableField, DeliveryFieldValue | undefined>();
   for (const { field, column } of columns) {
     const text = cellText(row.values[column.name]).trim();
     if (text === '') {
@@ -300,60 +325,174 @@ function incomingOf(
   return ok(incoming);
 }
 
+/** A problem with an argument's shape, at the argument. */
+function argumentProblem(context: VerbContext, argument: NamedArgument, text: string) {
+  return err([
+    diagnostic(
+      'E_RECIPE_ARGUMENTS',
+      { verb: context.step.verb, problem: text },
+      { range: locate(context)(argument.range) },
+    ),
+  ]);
+}
+
+/** A field the record will not take from a recipe, at the argument. */
+function fieldRefused(context: VerbContext, argument: NamedArgument, text: string) {
+  return err([
+    diagnostic('E_RECIPE_DELIVERY', { problem: text }, { range: locate(context)(argument.range) }),
+  ]);
+}
+
+/**
+ * `<name>:<value>,…` or `@./file.json#/pointer`, as pairs in order. A pair written without its
+ * value has `''` there, for the caller to name; `reads` says what the pairs are.
+ */
+async function readPairs(
+  context: VerbContext,
+  argument: NamedArgument,
+  reads: string,
+): Promise<Result<[string, string][], readonly Diagnostic[]>> {
+  if (isDataReference(argument.value)) {
+    const read = await readDataArgument(context, argument, FIELD_MAP);
+    if (!read.ok) return read;
+    return ok(Object.entries(read.value).map(([name, value]) => [name, value.trim()]));
+  }
+  const pairs: [string, string][] = [];
+  for (const entry of argument.value.split(',')) {
+    const [name, value = '', ...rest] = entry.split(':').map((part) => part.trim());
+    if (name === undefined || name === '' || rest.length > 0) {
+      return argumentProblem(context, argument, `reads ${reads}, and '${entry.trim()}' is not one`);
+    }
+    pairs.push([name, value]);
+  }
+  return ok(pairs);
+}
+
+/**
+ * `inbound=state:row,due:record` or `inbound=@./fields.json#/inbound` (ADR 0211), as field →
+ * winner. The winner is required: no rule decides it for the recipe.
+ */
+async function readInbound(
+  context: VerbContext,
+  argument: NamedArgument,
+): Promise<Result<Map<DeliveryWritableField, DeliveryInboundWinner>, readonly Diagnostic[]>> {
+  const pairs = await readPairs(context, argument, 'inbound fields as <field>:<winner>');
+  if (!pairs.ok) return pairs;
+  const winners = new Map<DeliveryWritableField, DeliveryInboundWinner>();
+  for (const [field, winner] of pairs.value) {
+    if (!isWritableField(field)) {
+      return fieldRefused(
+        context,
+        argument,
+        `has no field '${field}' to take inbound; a record has ${DELIVERY_WRITABLE_FIELDS.join(', ')}`,
+      );
+    }
+    if (field === 'key') {
+      return fieldRefused(context, argument, "never takes 'key' inbound: it names the delivery");
+    }
+    if (winner === '') {
+      return argumentProblem(
+        context,
+        argument,
+        `gives no winner for the inbound field '${field}'; write ${field}:record or ${field}:row`,
+      );
+    }
+    if (!(WINNERS as readonly string[]).includes(winner)) {
+      return argumentProblem(
+        context,
+        argument,
+        `reads the winner of '${field}' as record or row, and '${winner}' is neither`,
+      );
+    }
+    if (winners.has(field)) {
+      return argumentProblem(context, argument, `declares '${field}' inbound twice`);
+    }
+    winners.set(field, winner as DeliveryInboundWinner);
+  }
+  return ok(winners);
+}
+
 /** `fields=key:key,due:due` or `fields=@./fields.json#/task`, as field → column, in order. */
 async function readFields(
   context: VerbContext,
   argument: NamedArgument,
-): Promise<Result<ReadonlyMap<DeliveryRecordField, string>, readonly Diagnostic[]>> {
-  const at = locate(context);
-  const problem = (text: string) =>
-    err([
-      diagnostic(
-        'E_RECIPE_ARGUMENTS',
-        { verb: context.step.verb, problem: text },
-        { range: at(argument.range) },
-      ),
-    ]);
-  const refuseField = (text: string) =>
-    err([diagnostic('E_RECIPE_DELIVERY', { problem: text }, { range: at(argument.range) })]);
-  let pairs: [string, string][];
-  if (isDataReference(argument.value)) {
-    const read = await readDataArgument(context, argument, FIELD_MAP);
-    if (!read.ok) return read;
-    pairs = Object.entries(read.value);
-  } else {
-    pairs = [];
-    for (const entry of argument.value.split(',')) {
-      const [field, column, ...rest] = entry.split(':').map((part) => part.trim());
-      if (
-        field === undefined ||
-        field === '' ||
-        column === undefined ||
-        column === '' ||
-        rest.length > 0
-      ) {
-        return problem(`reads fields as <field>:<column>, and '${entry.trim()}' is not one`);
-      }
-      pairs.push([field, column]);
+  winners: DeliveryInboundWinners,
+): Promise<Result<ReadonlyMap<DeliveryWritableField, string>, readonly Diagnostic[]>> {
+  const pairs = await readPairs(context, argument, 'fields as <field>:<column>');
+  if (!pairs.ok) return pairs;
+  const mapping = new Map<DeliveryWritableField, string>();
+  for (const [field, column] of pairs.value) {
+    if (column === '') {
+      return argumentProblem(
+        context,
+        argument,
+        `reads fields as <field>:<column>, and '${field}' is not one`,
+      );
     }
-  }
-  const mapping = new Map<DeliveryRecordField, string>();
-  for (const [field, column] of pairs) {
-    if (field === 'state') return refuseField("never writes 'state', which is the person's");
-    if (!isRecordField(field)) {
-      return refuseField(
+    if (field === 'state' && !winners.has('state')) {
+      return fieldRefused(context, argument, "never writes 'state', which is the person's");
+    }
+    if (!isWritableField(field)) {
+      return fieldRefused(
+        context,
+        argument,
         `has no field '${field}'; a record has ${DELIVERY_RECORD_FIELDS.join(', ')}`,
       );
     }
-    if (mapping.has(field)) return problem(`fills the field '${field}' twice`);
+    if (mapping.has(field)) {
+      return argumentProblem(context, argument, `fills the field '${field}' twice`);
+    }
     mapping.set(field, column);
   }
-  if (!mapping.has('key')) return problem("needs the field 'key', the tracker's key");
+  if (!mapping.has('key')) {
+    return argumentProblem(context, argument, "needs the field 'key', the tracker's key");
+  }
+  for (const field of winners.keys()) {
+    if (!mapping.has(field)) {
+      return argumentProblem(
+        context,
+        argument,
+        `declares '${field}' inbound but does not map it; add ${field}:<column>`,
+      );
+    }
+  }
   return ok(mapping);
 }
 
-function isRecordField(field: string): field is DeliveryRecordField {
-  return (DELIVERY_RECORD_FIELDS as readonly string[]).includes(field);
+function isWritableField(field: string): field is DeliveryWritableField {
+  return (DELIVERY_WRITABLE_FIELDS as readonly string[]).includes(field);
+}
+
+/**
+ * What the plan says of one folder: `new`, the fields it updates, those it keeps as a person's
+ * edit, and how each inbound field both sides changed was settled (ADR 0211), e.g.
+ * `updates state (both changed; row wins over 'doing')`.
+ */
+function describeMerge(merged: DeliveryRecordMerge): string {
+  if (merged.created) return 'new';
+  const settled = (field: DeliveryWritableField) => {
+    const conflict = merged.conflicts.find((found) => found.field === field);
+    return conflict === undefined
+      ? field
+      : `${field} (both changed; ${conflict.winner} wins over ${quoted(conflict.lost)})`;
+  };
+  const parts: string[] = [];
+  if (merged.updated.length > 0) parts.push(`updates ${merged.updated.map(settled).join(', ')}`);
+  const keeps = merged.based.filter((field) =>
+    merged.conflicts.some((found) => found.field === field),
+  );
+  if (keeps.length > 0) parts.push(`keeps ${keeps.map(settled).join(', ')}`);
+  const agreed = merged.based.filter((field) => !keeps.includes(field));
+  if (agreed.length > 0) parts.push(`already holds ${agreed.join(', ')} from the row`);
+  if (merged.kept.length > 0) {
+    parts.push(`kept: ${merged.kept.map((field) => `${field} (edited)`).join(', ')}`);
+  }
+  return parts.join('; ');
+}
+
+function quoted(value: DeliveryFieldValue | null): string {
+  if (value === null) return 'an empty value';
+  return `'${typeof value === 'string' ? value : deliveryFormatsText(value)}'`;
 }
 
 /**

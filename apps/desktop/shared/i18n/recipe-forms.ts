@@ -201,6 +201,11 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.to-delivery.field.name.help': 'A coluna que dá nome à pasta de cada entrega.',
   'recipe.verb.to-delivery.field.fields.help':
     'Pares campo:coluna (key, link, formats, stem, copy, due, ship), ou uma referência de dados.',
+  'recipe.verb.to-delivery.field.inbound.help':
+    'Pares campo:vencedor para campos que um valor de fora pode mudar, vencedor record ou row.',
+
+  'recipe.verb.deliveries.summary':
+    'Lê cada ficha de entrega na pasta de entregas do projeto como uma linha.',
 
   'recipe.verb.call.summary':
     'Planeja um POST por linha para um host permitido, enviado ao Aplicar.',

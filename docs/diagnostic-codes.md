@@ -216,6 +216,7 @@ non-zero.
 | `E_RECIPE_APPLY` | error | no | An Apply was refused before any write: the shown plan holds a write its verb no longer declares, or the verb cannot apply. |
 | `E_RECIPE_BRIEF` | error | no | 'to-brief' cannot plan its briefs: an unknown template or slot, a value brief text cannot hold, two rows with one file name, or a folder it may not write. |
 | `E_RECIPE_DELIVERY` | error | no | 'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write. |
+| `E_RECIPE_DELIVERIES` | error | no | 'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace. |
 | `E_RECIPE_CALL` | error | no | 'call' cannot plan its requests: an address that is not https, a host the workspace's project does not allow, a credential not stored on this machine, or a body too large. |
 | `E_RECIPE_VERB` | error | no | A verb a plugin contributes could not do its work, in its own words. |
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
@@ -245,6 +246,7 @@ non-zero.
 | `W_RECIPE_LOCAL_UNREAD` | warning | no | A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty. |
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
 | `W_RECIPE_WARN` | warning | no | A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed. |
+| `W_RECIPE_DELIVERY_RECORD` | warning | no | 'deliveries' left a delivery out of its table: its record is not one, its folder could not be read, or another folder has its key. |
 | `W_RECIPE_DECIDE_CLEAR_COLUMN` | warning | no | A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run. |
 | `W_RECIPE_DECIDE_CLEAR_LIMIT` | warning | no | A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them. |
 | `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
@@ -395,6 +397,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_APPLY` | no | Nothing of that plan is written, and no recipe state is committed. |
 | `E_RECIPE_BRIEF` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_DELIVERY` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
+| `E_RECIPE_DELIVERIES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_CALL` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is sent. |
 | `E_RECIPE_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
@@ -2242,6 +2245,20 @@ That cell has no plan and the cells after it do not run; earlier cells keep thei
 
 Parameters: `problem`
 
+### `E_RECIPE_DELIVERIES`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md`
+
+'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written.
+
+```
+'deliveries' {problem}.
+```
+
+Parameters: `problem`
+
 ### `E_RECIPE_CALL`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0193-call-sends-one-request-per-row-to-a-host-the-workspace-allows.md`
@@ -3629,6 +3646,20 @@ A warning never replaces a value (ADR 0013).
 ```
 
 Parameters: `subject`, `message`
+
+### `W_RECIPE_DELIVERY_RECORD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md`
+
+'deliveries' left a delivery out of its table: its record is not one, its folder could not be read, or another folder has its key.
+
+The other deliveries are still read; nothing is written.
+
+```
+'deliveries' left out {folder}: {problem}.
+```
+
+Parameters: `folder`, `problem`
 
 ### `W_RECIPE_DECIDE_CLEAR_COLUMN`
 

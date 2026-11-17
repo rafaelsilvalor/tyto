@@ -345,7 +345,8 @@ export interface RecipeRegistryOptions {
   readonly briefs?: ToBriefPorts;
   /**
    * The workspace's delivery layout and files lent to the generic `to-delivery` (ADR 0210),
-   * bound the same way. Without them `to-delivery` says the host writes no deliveries.
+   * bound the same way, which `deliveries` also reads through (ADR 0211). Without them both say
+   * the host has no deliveries.
    */
   readonly deliveries?: ToDeliveryPorts;
   /**
