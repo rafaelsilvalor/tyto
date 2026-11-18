@@ -3,6 +3,7 @@
 What changed in each version of the desktop app, newest first. Each page is the text published
 with that release, written in Brazilian Portuguese.
 
+- [Tyto 0.24.3](./desktop-v0.24.3) — a lone asterisk is just an asterisk, and a delivery record keeps the fields you declare
 - [Tyto 0.24.1](./desktop-v0.24.1) — recent folders survive an update, and a recipe keeps a delivery folder per row
 - [Tyto 0.23.2](./desktop-v0.23.2) — a brief writes a stacked fraction, needs no indent, and nests tags by the template
 - [Tyto 0.23.1](./desktop-v0.23.1) — the command panel works with files, aliases and variables, and a comment no longer breaks a slide
