@@ -107,6 +107,37 @@ describe('the delivery key', () => {
     expect(codes(empty.diagnostics[0])).toEqual(['W_PROJECT_KEY_INVALID']);
   });
 
+  it('reads sizes by format name, keeps the good entries and names each refused one', () => {
+    const resolved = resolveProject([
+      sheet('profile', { sizes: { feed: '1080x1080' } }),
+      sheet('folder', {
+        sizes: { feed: '1080x1350', story: ' 1080 × 1920 ', reel: 'big', zero: '0x10', n: 3 },
+      }),
+    ]);
+    expect(resolved.delivery.sizes).toEqual({
+      feed: { w: 1080, h: 1350 },
+      story: { w: 1080, h: 1920 },
+    });
+    expect(resolved.delivery.origins.sizes).toBe('folder');
+    expect(codes(resolved.diagnostics[1])).toEqual([
+      'W_PROJECT_KEY_INVALID',
+      'W_PROJECT_KEY_INVALID',
+      'W_PROJECT_KEY_INVALID',
+    ]);
+    expect(resolved.diagnostics[1]?.[0]?.message).toContain("'reel'");
+  });
+
+  it('falls through to the sheet before when sizes is not an object or keeps nothing', () => {
+    const resolved = resolveProject([
+      sheet('profile', { sizes: { feed: '1080x1350' } }),
+      sheet('folder', { sizes: ['1080x1350'] }),
+    ]);
+    expect(resolved.delivery.sizes).toEqual({ feed: { w: 1080, h: 1350 } });
+    expect(codes(resolved.diagnostics[1])).toEqual(['W_PROJECT_KEY_INVALID']);
+    const none = resolveProject([sheet('folder', { sizes: {} })]);
+    expect(none.delivery.sizes).toBeUndefined();
+  });
+
   it('confines parent to the workspace for a trusted sheet too', () => {
     const resolved = resolveProject([sheet('folder', { parent: '../elsewhere' }, 'trusted')]);
     expect(resolved.delivery.parent).toBe(WORKSPACE);
