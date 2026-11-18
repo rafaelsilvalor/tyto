@@ -1,5 +1,26 @@
 # @tyto/core
 
+## 0.51.0
+
+### Minor Changes
+
+- a73ab4e: A delivery record keeps the fields a recipe declares (ADR 0213): any name in
+  `to-delivery fields=` outside the fixed set is a text field, stored in the
+  record's `fields` map with its base in `written.fields`, merged like a fixed
+  field and taken by `keep=` and `inbound=`. A name `deliveries` already gives
+  as a column is refused at the argument, and one two edits from a fixed field
+  warns. `deliveries` adds declared fields as columns, alphabetical, after the
+  fixed ones. `to-delivery create=no` updates only folders that exist and names
+  the rows it skipped. The desktop's recipe form shows `create=` in Portuguese.
+- 1134d6e: The one-image table shares its width by reading every cell of a column: from the minimums, the
+  leftover goes where it makes the table shortest, so one long cell in a row held tall by another
+  column no longer takes the room. A `::tabela` line with no `|` that starts with `*` is a note,
+  set small under the table; a `\` inside a row is a line break in that cell. A long
+  parenthesised phrase may break, its last word never alone, and a dash stays with the word
+  before it. A title the author broke into lines keeps exactly those
+  lines, set smaller until each fits whole. In briefs, a lone `*` nothing on its line closes is a literal asterisk (ADR 0214),
+  and a `Break` the author typed carries `typed: true`.
+
 ## 0.50.0
 
 ### Minor Changes
