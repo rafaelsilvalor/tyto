@@ -192,6 +192,7 @@
         "apps/desktop/src/renderer/explorer-tree.ts"
       ],
       "e2e": [
+        "delivery-check.desktop.test.ts",
         "explorer-image.desktop.test.ts",
         "explorer-write.desktop.test.ts",
         "explorer.desktop.test.ts",
@@ -201,7 +202,15 @@
         "window.desktop.test.ts",
         "workspace.desktop.test.ts"
       ],
-      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, its new, rename and delete (TYTO-352), New recipe, New vocabulary and Load recipe (TYTO-402), and the image a click shows in the preview (TYTO-366); its channels are in the bridge's list"
+      "why": "reviewed: the explorer's listing, watcher and panel (TYTO-279), set by every workspace folder opened, its new, rename and delete (TYTO-352), New recipe, New vocabulary and Load recipe (TYTO-402), the image a click shows in the preview (TYTO-366), and a delivery folder's badge (TYTO-757); its channels are in the bridge's list"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/delivery-checks.ts",
+        "apps/desktop/e2e/delivery-check.desktop.test.ts"
+      ],
+      "e2e": ["delivery-check.desktop.test.ts"],
+      "why": "reviewed: each delivery's exports checked against its record after the watcher's burst, and the Explorer's badge (TYTO-757, ADR 0215)"
     },
     {
       "paths": ["apps/desktop/src/main/export.ts"],
