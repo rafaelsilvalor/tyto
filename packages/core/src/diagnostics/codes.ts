@@ -2334,6 +2334,29 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The other deliveries are still read; nothing is written.',
   },
+  // TYTO-776: a declared field two edits from a fixed one is likely a slip, and would otherwise
+  // be written silently as a new field next to the one the recipe meant.
+  W_RECIPE_DELIVERY_FIELD_NEAR: {
+    severity: 'warning',
+    summary:
+      "'to-delivery' declares a field whose name is two edits or fewer from a fixed field's, which may be a slip.",
+    template: "'{field}' is declared as a new field; did you mean '{fixed}'?",
+    spec: 'docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md',
+    fatal: false,
+    fatality: 'The field is still declared and written; a name may be close to a fixed one.',
+  },
+  // TYTO-776: a record written by hand before declared fields may hold another shape under
+  // `fields`; it still reads, and the warning says why its declared columns are empty.
+  W_RECIPE_DELIVERY_FIELDS_UNREAD: {
+    severity: 'warning',
+    summary:
+      "'deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields.",
+    template:
+      "'deliveries' read {folder} without its declared fields: its 'fields' is not a map of text.",
+    spec: 'docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md',
+    fatal: false,
+    fatality: 'The delivery is still read, with its fixed fields; nothing is written.',
+  },
   // TYTO-714: with clear=push, a sheet read that lost a column reads as every cell cleared. The
   // run holds those clears instead of clearing the remote side, and says which column.
   W_RECIPE_DECIDE_CLEAR_COLUMN: {

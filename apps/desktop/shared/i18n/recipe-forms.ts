@@ -200,11 +200,13 @@ const PT_BR: Readonly<Record<string, string>> = {
     'Planeja uma pasta de entrega por linha, com a sua ficha, escrita ao Aplicar.',
   'recipe.verb.to-delivery.field.name.help': 'A coluna que dá nome à pasta de cada entrega.',
   'recipe.verb.to-delivery.field.fields.help':
-    'Pares campo:coluna (key, link, formats, stem, copy, due, ship), ou uma referência de dados.',
+    'Pares campo:coluna (key, link, formats, stem, copy, due, ship, ou um campo de texto declarado), ou uma referência de dados.',
   'recipe.verb.to-delivery.field.inbound.help':
     'Pares campo:vencedor para campos que um valor de fora pode mudar, vencedor record ou row.',
   'recipe.verb.to-delivery.field.keep.help':
     'Campos mapeados cuja célula vazia mantém o valor da ficha em vez de apagá-lo.',
+  'recipe.verb.to-delivery.field.create.help':
+    'Se uma linha cuja pasta de entrega não existe a cria.',
 
   'recipe.verb.deliveries.summary':
     'Lê cada ficha de entrega na pasta de entregas do projeto como uma linha.',

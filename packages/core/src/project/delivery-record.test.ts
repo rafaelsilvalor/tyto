@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type DeliveryFieldName,
   type DeliveryFieldValue,
   type DeliveryInboundWinners,
   type DeliveryRecord,
   type DeliveryRecordField,
   type DeliveryWritableField,
+  declaredFieldProblem,
   deliveryFormatsText,
+  isDeclaredFieldMap,
   mergeDeliveryRecord,
+  nearFixedField,
   parseDeliveryFormats,
   readDeliveryRecord,
   writeDeliveryRecord,
@@ -306,5 +310,123 @@ describe('mergeDeliveryRecord with kept fields (keep=, ADR 0211 note of 2026-11-
     );
     expect(fresh).toMatchObject({ created: true, held: [] });
     expect('copy' in fresh.record).toBe(false);
+  });
+});
+
+describe('declared fields (ADR 0213)', () => {
+  const bring = (values: Record<string, DeliveryFieldValue | undefined>) =>
+    new Map(Object.entries(values) as [DeliveryFieldName, DeliveryFieldValue | undefined][]);
+  const first = bring({ key: 'T-1', due: '2026-11-20', description: 'Cover, three slides' });
+  const created = () => read(writeDeliveryRecord(mergeDeliveryRecord(undefined, first).record));
+
+  it('creates a record with declared fields in their own map, their base in written.fields', () => {
+    expect(mergeDeliveryRecord(undefined, first).record).toEqual({
+      version: 1,
+      key: 'T-1',
+      due: '2026-11-20',
+      fields: { description: 'Cover, three slides' },
+      written: {
+        key: 'T-1',
+        due: '2026-11-20',
+        fields: { description: 'Cover, three slides' },
+      },
+    });
+  });
+
+  it('changes nothing when the same declared values come again', () => {
+    expect(mergeDeliveryRecord(created(), first)).toMatchObject({ changed: false, updated: [] });
+  });
+
+  it('carries a changed declared value, and keeps one a person edited', () => {
+    const edited = read(
+      writeDeliveryRecord({ ...created(), fields: { description: 'Cover only, by hand' } }),
+    );
+    const changed = bring({ key: 'T-1', due: '2026-11-20', description: 'Cover, four slides' });
+    expect(mergeDeliveryRecord(created(), changed)).toMatchObject({
+      updated: ['description'],
+      record: { fields: { description: 'Cover, four slides' } },
+    });
+    expect(mergeDeliveryRecord(edited, changed)).toMatchObject({
+      changed: false,
+      kept: ['description'],
+    });
+  });
+
+  it('removes the map when its last declared value is emptied, and keeps the base', () => {
+    const emptied = mergeDeliveryRecord(
+      created(),
+      bring({ key: 'T-1', due: '2026-11-20', description: undefined }),
+    );
+    expect(emptied.record).toEqual({
+      version: 1,
+      key: 'T-1',
+      due: '2026-11-20',
+      written: { key: 'T-1', due: '2026-11-20', fields: { description: null } },
+    });
+  });
+
+  it('holds a kept declared field, and lets an inbound one name its winner', () => {
+    const held = mergeDeliveryRecord(
+      created(),
+      bring({ key: 'T-1', due: '2026-11-20', description: undefined }),
+      new Map(),
+      new Set(['description']),
+    );
+    expect(held).toMatchObject({ changed: false, held: ['description'] });
+
+    const assigned = bring({ key: 'T-1', assignee: 'ana' });
+    const winners: DeliveryInboundWinners = new Map([['assignee', 'record']]);
+    const synced = read(
+      writeDeliveryRecord({
+        ...mergeDeliveryRecord(undefined, assigned, winners).record,
+        fields: { assignee: 'bruno' },
+      }),
+    );
+    const both = mergeDeliveryRecord(synced, bring({ key: 'T-1', assignee: 'carla' }), winners);
+    expect(both.conflicts).toEqual([{ field: 'assignee', winner: 'record', lost: 'carla' }]);
+    expect(both.record).toMatchObject({
+      fields: { assignee: 'bruno' },
+      written: { fields: { assignee: 'carla' } },
+    });
+  });
+
+  it('reads a record written before ADR 0213, with no fields map, and merges it', () => {
+    const old = read('{"version":1,"key":"T-1","due":"2026-11-20","written":{"key":"T-1"}}');
+    const merged = mergeDeliveryRecord(old, bring({ key: 'T-1', description: 'New' }));
+    expect(merged.record).toEqual({
+      version: 1,
+      key: 'T-1',
+      due: '2026-11-20',
+      fields: { description: 'New' },
+      written: { key: 'T-1', fields: { description: 'New' } },
+    });
+  });
+
+  it('reads a hand-made fields that is not a map of text, and keeps it untouched', () => {
+    const odd = read('{"version":1,"key":"T-1","fields":["a","b"],"written":{"key":"T-1"}}');
+    expect(isDeclaredFieldMap(odd.fields)).toBe(false);
+    expect(isDeclaredFieldMap({ description: 'x' })).toBe(true);
+    const merged = mergeDeliveryRecord(odd, bring({ key: 'T-2' }));
+    expect(merged.record).toMatchObject({ key: 'T-2', fields: ['a', 'b'] });
+  });
+
+  it('refuses a name a delivery row already has, or that is not lowercase', () => {
+    for (const name of ['folder', 'path', 'key', 'link', 'formats', 'state', 'due']) {
+      expect(declaredFieldProblem(name)).toMatch(/column every delivery already has/u);
+    }
+    for (const name of ['Description', 'my field', '_x', 'tag.x', '']) {
+      expect(declaredFieldProblem(name)).toMatch(/is not a field name/u);
+    }
+    expect(declaredFieldProblem('assignee')).toBeUndefined();
+    expect(declaredFieldProblem('file-name_2')).toBeUndefined();
+  });
+
+  it('names the fixed field a declared name is two edits or fewer from', () => {
+    expect(nearFixedField('lnik')).toBe('link');
+    expect(nearFixedField('formts')).toBe('formats');
+    expect(nearFixedField('shipp')).toBe('ship');
+    expect(nearFixedField('description')).toBeUndefined();
+    expect(nearFixedField('variante')).toBeUndefined();
+    expect(nearFixedField('assignee')).toBeUndefined();
   });
 });

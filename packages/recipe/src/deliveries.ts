@@ -6,6 +6,7 @@ import {
   deliveryFormatsText,
   diagnostic,
   err,
+  isDeclaredFieldMap,
   ok,
   readDeliveryRecord,
 } from '@tyto/core';
@@ -31,6 +32,11 @@ import type { ToDeliveryPorts } from './to-delivery.js';
  * is a warning naming the folder, and the other deliveries still read; a folder without a record
  * is not a delivery yet, and the note counts it. It reads only in a trusted workspace, through
  * the same ports `to-delivery` writes through.
+ *
+ * Fields a recipe declared (ADR 0213) come after the fixed columns, one text column per name any
+ * record read holds, in alphabetical order; a record without one gives an empty cell. A record
+ * whose `fields` is not a map of text, written by hand before ADR 0213, still reads, without
+ * declared fields, and a warning names its folder.
  */
 
 /** The columns, in order: where the delivery is, then the record's fields. */
@@ -81,7 +87,8 @@ async function readDeliveries(
   const warnings: Diagnostic[] = [];
   const leftOut = (folder: string, problem: string) =>
     warnings.push(diagnostic('W_RECIPE_DELIVERY_RECORD', { folder, problem }, { range: at }));
-  const rows: Row[] = [];
+  const found: { readonly row: Row; readonly fields: Readonly<Record<string, string>> }[] = [];
+  const declared = new Set<string>();
   const keys = new Map<string, string>();
   let withoutRecord = 0;
   for (const entry of listed.value) {
@@ -104,14 +111,38 @@ async function readDeliveries(
       continue;
     }
     keys.set(record.value.key, entry.path);
-    rows.push({
+    let fields: Readonly<Record<string, string>> = {};
+    if (isDeclaredFieldMap(record.value.fields)) {
+      fields = record.value.fields;
+      for (const field of Object.keys(fields)) declared.add(field);
+    } else if (record.value.fields !== undefined) {
+      warnings.push(
+        diagnostic('W_RECIPE_DELIVERY_FIELDS_UNREAD', { folder: entry.path }, { range: at }),
+      );
+    }
+    const row: Row = {
       key: record.value.key,
       values: valuesOf(entry.name, entry.path, record.value),
       provenance: { source: 'deliveries', id: entry.path, fetchedAt },
-    });
+    };
+    found.push({ row, fields });
   }
 
-  const table: Table = { columns: DELIVERY_COLUMNS, rows };
+  // Declared fields after the fixed columns, alphabetical, so a column keeps its place across runs.
+  const names = [...declared].sort();
+  const rows = found.map(({ row, fields }): Row => {
+    if (names.length === 0) return row;
+    const values: Record<string, CellValue> = { ...row.values };
+    for (const field of names) values[field] = fields[field] ?? null;
+    return { ...row, values };
+  });
+  const table: Table = {
+    columns: [
+      ...DELIVERY_COLUMNS,
+      ...names.map((field): Column => ({ name: field, type: 'text', origin: 'deliveries' })),
+    ],
+    rows,
+  };
   const note =
     withoutRecord === 0
       ? undefined
