@@ -1,5 +1,30 @@
 # @tyto/desktop
 
+## 0.24.2
+
+### Patch Changes
+
+- fb4d987: `to-delivery` gains `keep=<field>,…`: for the named fields an empty incoming cell leaves the
+  record's value and its base as they are, the step's note warns on every run, and a plan line
+  written for another field says `kept: copy (source empty)`. `mergeDeliveryRecord` takes the kept
+  fields and names them in `held`. The desktop's recipe form shows the option's help in Portuguese.
+- Updated dependencies [fb4d987]
+  - @tyto/core@0.50.0
+  - @tyto/recipe@0.9.0
+  - @tyto/brief-lang@0.11.2
+  - @tyto/command-line@0.9.5
+  - @tyto/editor@0.21.1
+  - @tyto/export-html@0.8.4
+  - @tyto/export-svg@2.1.4
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.26
+  - @tyto/io@5.11.1
+  - @tyto/pipeline@0.12.23
+  - @tyto/plugin-api@0.24.1
+  - @tyto/template-lang@0.8.24
+  - @tyto/templates@1.2.21
+  - @tyto/theme-pack@0.1.26
+
 ## 0.24.1
 
 ### Patch Changes
