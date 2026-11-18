@@ -216,7 +216,8 @@ non-zero.
 | `E_RECIPE_APPLY` | error | no | An Apply was refused before any write: the shown plan holds a write its verb no longer declares, or the verb cannot apply. |
 | `E_RECIPE_BRIEF` | error | no | 'to-brief' cannot plan its briefs: an unknown template or slot, a value brief text cannot hold, two rows with one file name, or a folder it may not write. |
 | `E_RECIPE_DELIVERY` | error | no | 'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write. |
-| `E_RECIPE_DELIVERIES` | error | no | 'deliveries' or 'with-deliveries' cannot read the delivery records: a wrong argument, a host that reads none, a recipe in no trusted workspace, or a column it would add that the table already has. |
+| `E_RECIPE_DELIVERIES` | error | no | 'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace. |
+| `E_RECIPE_WITH_DELIVERIES` | error | no | 'with-deliveries' cannot bring the delivery records: the host reads none, the recipe is in no trusted workspace, or the table already has a column it would add. |
 | `E_RECIPE_CALL` | error | no | 'call' cannot plan its requests: an address that is not https, a host the workspace's project does not allow, a credential not stored on this machine, or a body too large. |
 | `E_RECIPE_VERB` | error | no | A verb a plugin contributes could not do its work, in its own words. |
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
@@ -400,6 +401,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_BRIEF` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_DELIVERY` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_DELIVERIES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
+| `E_RECIPE_WITH_DELIVERIES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_CALL` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is sent. |
 | `E_RECIPE_VERB` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_NO_TABLE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
@@ -2251,15 +2253,29 @@ Parameters: `problem`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md`
 
-'deliveries' or 'with-deliveries' cannot read the delivery records: a wrong argument, a host that reads none, a recipe in no trusted workspace, or a column it would add that the table already has.
+'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace.
 
 That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written.
 
 ```
-'{verb}' {problem}.
+'deliveries' {problem}.
 ```
 
-Parameters: `verb`, `problem`
+Parameters: `problem`
+
+### `E_RECIPE_WITH_DELIVERIES`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md`
+
+'with-deliveries' cannot bring the delivery records: the host reads none, the recipe is in no trusted workspace, or the table already has a column it would add.
+
+That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written.
+
+```
+'with-deliveries' {problem}.
+```
+
+Parameters: `problem`
 
 ### `E_RECIPE_CALL`
 

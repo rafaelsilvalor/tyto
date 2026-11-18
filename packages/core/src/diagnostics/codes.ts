@@ -2016,14 +2016,25 @@ export const diagnosticCodes = {
       'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
   },
   // `deliveries` reads the records back as rows only inside a trusted workspace; a record it
-  // cannot read is a warning, and the other folders still read (ADR 0211). `with-deliveries`
-  // reads them beside rows already there, through the same checks (TYTO-779).
+  // cannot read is a warning, and the other folders still read (ADR 0211).
   E_RECIPE_DELIVERIES: {
     severity: 'error',
     summary:
-      "'deliveries' or 'with-deliveries' cannot read the delivery records: a wrong argument, a host that reads none, a recipe in no trusted workspace, or a column it would add that the table already has.",
-    template: "'{verb}' {problem}.",
+      "'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace.",
+    template: "'deliveries' {problem}.",
     spec: 'docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md',
+    fatal: false,
+    fatality:
+      'That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
+  },
+  // `with-deliveries` reads the same records beside rows already there, through the same checks,
+  // and refuses to shadow a column the table has (TYTO-779, ADR 0213's note of 2026-11-18).
+  E_RECIPE_WITH_DELIVERIES: {
+    severity: 'error',
+    summary:
+      "'with-deliveries' cannot bring the delivery records: the host reads none, the recipe is in no trusted workspace, or the table already has a column it would add.",
+    template: "'with-deliveries' {problem}.",
+    spec: 'docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md',
     fatal: false,
     fatality:
       'That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written.',

@@ -883,7 +883,7 @@ describe('with-deliveries (TYTO-779)', () => {
     const { problems } = await bring('with-deliveries by=pasta', workspace, input);
     expect(problems.map((found) => [found.code, found.message])).toEqual([
       [
-        'E_RECIPE_DELIVERIES',
+        'E_RECIPE_WITH_DELIVERIES',
         "'with-deliveries' would add 'record_due', which this table already has; select it away first.",
       ],
     ]);

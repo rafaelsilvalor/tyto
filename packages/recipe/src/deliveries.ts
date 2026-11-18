@@ -81,7 +81,13 @@ function refuse(
   problem: string,
   range: SourceRange,
 ): Result<never, readonly Diagnostic[]> {
-  return err([diagnostic('E_RECIPE_DELIVERIES', { verb: context.step.verb, problem }, { range })]);
+  // Each verb its own code: a handler reads the code, and `with-deliveries` refuses for one more
+  // reason than `deliveries` does.
+  const found =
+    context.step.verb === 'with-deliveries'
+      ? diagnostic('E_RECIPE_WITH_DELIVERIES', { problem }, { range })
+      : diagnostic('E_RECIPE_DELIVERIES', { problem }, { range });
+  return err([found]);
 }
 
 /** One record read: its folder, its row's cells and its declared fields. */

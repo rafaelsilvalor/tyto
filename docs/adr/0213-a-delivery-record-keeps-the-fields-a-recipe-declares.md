@@ -115,11 +115,13 @@ record's columns after the row's own.
   fields, then the declared fields any record read holds, alphabetical, as §3 orders them.
   `record_folder` is the folder matched, empty only when the row has none, so a recipe tells a
   missing folder from an empty field. A table that already has one of these names is refused
-  with `E_RECIPE_DELIVERIES` at `by=` rather than shadowed.
+  with `E_RECIPE_WITH_DELIVERIES` at `by=` rather than shadowed. The transform gives the
+  source's refusals (no host, no workspace, a restricted folder) under that code too, so a
+  handler tells the two verbs apart by the code.
 - **The cell is read as a folder name as `to-delivery name=` reads it, and matched with case
   folded**, as `create=no` matches (§4). Two folders one fold apart are one folder where case
   is ignored: the first listed is matched, and `W_RECIPE_DELIVERY_RECORD` names the other.
 - **One `list` per run, and no other port call.** The `list` port already returns each
   folder's record text, so no folder is read again. It never writes.
-- `E_RECIPE_DELIVERIES`, `W_RECIPE_DELIVERY_RECORD` and `W_RECIPE_DELIVERY_FIELDS_UNREAD` now
-  name the verb that reported them instead of always saying `deliveries`.
+- `W_RECIPE_DELIVERY_RECORD` and `W_RECIPE_DELIVERY_FIELDS_UNREAD` now name the verb that
+  reported them instead of always saying `deliveries`.
