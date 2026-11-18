@@ -1042,6 +1042,14 @@ export interface Catalogue {
   readonly 'explorer.empty': string;
   readonly 'explorer.more': string;
   /**
+   * TYTO-757, ADR 0215. A delivery folder's badge: its exports checked against its record. The
+   * state names the badge for a screen reader and heads its tooltip, under which each problem
+   * is listed as the check wrote it.
+   */
+  readonly 'explorer.delivery.ready': string;
+  readonly 'explorer.delivery.incomplete': string;
+  readonly 'explorer.delivery.inProgress': string;
+  /**
    * TYTO-352, ADR 0121. The explorer's context menu, the delete question and the line under the
    * name field. `{bin}` is the system's trash, by the platform's name in English and *Lixeira*
    * in Portuguese on all three; `{name}`, `{count}` and `{reason}` are filled by the panel.
@@ -1901,6 +1909,9 @@ export const CATALOGUE_KEYS = [
   'explorer.none',
   'explorer.empty',
   'explorer.more',
+  'explorer.delivery.ready',
+  'explorer.delivery.incomplete',
+  'explorer.delivery.inProgress',
   'explorer.menu.newFile',
   'explorer.menu.newFolder',
   'explorer.menu.rename',

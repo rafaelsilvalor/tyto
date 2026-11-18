@@ -3884,6 +3884,26 @@ tyto-gallery-dialog[open] {
 }
 
 /*
+ * TYTO-757, ADR 0215: a delivery folder's badge, its exports checked against its record. At the
+ * row's end, past the name, which gives way first; the colour carries the state and the
+ * tooltip the words. TYTO-755 adds the record's state to the same element.
+ */
+.explorer__delivery {
+  flex: none;
+  margin-inline-start: auto;
+  padding-inline-start: var(--tyto-space-3);
+  color: var(--tyto-text-muted);
+}
+
+.explorer__delivery[data-delivery-check='ready'] {
+  color: var(--tyto-success);
+}
+
+.explorer__delivery[data-delivery-check='incomplete'] {
+  color: var(--tyto-error);
+}
+
+/*
  * TYTO-352: the name field of a new or renamed entry, in the name's place, and the line a
  * refused name or a failed delete leaves under the row. The row grows to hold the line.
  */
