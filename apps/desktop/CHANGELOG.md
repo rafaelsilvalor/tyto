@@ -1,5 +1,34 @@
 # @tyto/desktop
 
+## 0.24.4
+
+### Patch Changes
+
+- 99e90f3: A recipe brings each row's delivery record beside its own columns with
+  `with-deliveries by=<column>` (TYTO-779, ADR 0213): the folder the column
+  names, matched whatever its case, gives its record's fields as `record_`
+  columns, `record_link` a link; `record_folder` is empty where the row has no
+  folder, and so is every other brought cell. It reads the folders once per run
+  and writes nothing; it refuses with `E_RECIPE_WITH_DELIVERIES`, and the two
+  delivery warnings name the verb that reported them.
+  The desktop's recipe form shows the new verb in Portuguese.
+- Updated dependencies [99e90f3]
+  - @tyto/core@0.51.1
+  - @tyto/recipe@0.11.0
+  - @tyto/plugin-api@0.24.3
+  - @tyto/brief-lang@0.12.1
+  - @tyto/command-line@0.9.7
+  - @tyto/editor@0.21.3
+  - @tyto/export-html@0.8.6
+  - @tyto/export-svg@2.1.6
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.28
+  - @tyto/io@5.11.3
+  - @tyto/pipeline@0.12.25
+  - @tyto/template-lang@0.8.26
+  - @tyto/templates@1.2.23
+  - @tyto/theme-pack@0.1.28
+
 ## 0.24.3
 
 ### Patch Changes
