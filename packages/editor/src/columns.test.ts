@@ -70,11 +70,20 @@ describe('the columns of a | line', () => {
     expect(inside).toEqual([]);
   });
 
-  it('restarts at a \\ hard break', () => {
+  it('does not restart at a \\ typed inside the line: it is a break inside a cell (TYTO-783)', () => {
     expect(read('::lamina\n  a | b \\ c | d\n')).toEqual({
-      columns: ['1:a', '2:b', '1:c', '2:d'],
+      columns: ['1:a', '2:b', '2:c', '3:d'],
       separators: 2,
     });
+  });
+
+  it('keeps the words after a \\ in their column, as the table header of the request', () => {
+    expect(read('::tabela\n  Concurso | Status | Vagas\\previstas | Salários previstos\n')).toEqual(
+      {
+        columns: ['1:Concurso', '2:Status', '3:Vagas', '3:previstas', '4:Salários previstos'],
+        separators: 3,
+      },
+    );
   });
 
   it('reads an inline body like a body line', () => {
@@ -89,7 +98,7 @@ describe('the columns of a | line', () => {
   });
 
   it('has no \\| escape: the backslash is a break and the | still splits', () => {
-    // `a ` before the break is a row of its own with no `|`: a heading, unpainted.
-    expect(read('::lamina\n  a \\| b\n')).toEqual({ columns: ['2:b'], separators: 1 });
+    // The break stays inside the first cell, so `a` is column 1 and `b` column 2.
+    expect(read('::lamina\n  a \\| b\n')).toEqual({ columns: ['1:a', '2:b'], separators: 1 });
   });
 });

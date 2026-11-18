@@ -70,3 +70,7 @@ carry `cm-brief-column-separator`, `cm-brief-column-even` or `cm-brief-column-cy
   draws nothing. The template mode is not told the setting.
 - If the language ever gains an escape for `|`, or `fields()` starts splitting inside emphasis,
   this module has to change with it; the two readings are kept in step by hand.
+
+## Note of 2026-11-18
+
+A `\` typed inside a line no longer restarts the columns (TYTO-783). Since TYTO-775 the one-image table keeps a typed break inside its cell (`Break.typed`, ADR 0214), so the editor reads a body line or an inline body as one row and paints the words after a `\` in their own column. Columns still restart on every line of a block.
