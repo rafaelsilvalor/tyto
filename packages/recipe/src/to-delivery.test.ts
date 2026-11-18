@@ -922,4 +922,120 @@ describe('with-deliveries (TYTO-779)', () => {
       "'with-deliveries' reads nothing in a restricted folder; trust the folder first.",
     );
   });
+
+  describe('fields= (TYTO-784)', () => {
+    const FIXED = ['folder', 'path', 'key', 'link', 'formats', 'stem', 'copy', 'due', 'ship'];
+    const names = (table: Table | undefined) => table?.columns.map((column) => column.name);
+
+    it('gives a listed field no record holds an empty column a later compose reads', async () => {
+      const workspace = await threeFolders();
+      const { table, problems } = await bring(
+        'with-deliveries by=pasta fields=description\ncompose shown="[{record_description|}]"',
+        workspace,
+      );
+      expect(problems).toEqual([]);
+      expect(names(table)?.slice(-2)).toEqual(['record_description', 'shown']);
+      expect(table?.rows.map((row) => row.values['record_description'])).toEqual([
+        null,
+        null,
+        null,
+        null,
+      ]);
+      expect(table?.rows.map((row) => row.values['shown'])).toEqual(['[]', '[]', '[]', '[]']);
+    });
+
+    it('gives the listed columns on a first run with no record at all', async () => {
+      const empty = new FakeWorkspace();
+      const source = await bring('deliveries fields=variante,description', empty, null);
+      expect(source.problems).toEqual([]);
+      expect(names(source.table)).toEqual([...FIXED, 'state', 'description', 'variante']);
+      expect(source.table?.rows).toEqual([]);
+      const brought = await bring('with-deliveries by=pasta fields=variante', empty);
+      expect(brought.problems).toEqual([]);
+      expect(names(brought.table)?.slice(-2)).toEqual(['record_state', 'record_variante']);
+      expect(brought.table?.rows.map((row) => row.values['record_variante'])).toEqual([
+        null,
+        null,
+        null,
+        null,
+      ]);
+    });
+
+    it('merges the listed fields with those the records hold, alphabetical', async () => {
+      const workspace = await described();
+      const source = await bring('deliveries fields=variante,assignee', workspace, null);
+      expect(names(source.table)?.slice(-3)).toEqual(['assignee', 'description', 'variante']);
+      expect(source.table?.rows.map((row) => row.values['description'])).toEqual([
+        'Cover, three slides',
+        null,
+      ]);
+      const brought = await bring('with-deliveries by=pasta fields=variante,assignee', workspace);
+      expect(names(brought.table)?.slice(-3)).toEqual([
+        'record_assignee',
+        'record_description',
+        'record_variante',
+      ]);
+      const listedAndHeld = await bring('deliveries fields=description', workspace, null);
+      expect(names(listedAndHeld.table)?.slice(-2)).toEqual(['state', 'description']);
+    });
+
+    it('refuses a column a listed field would add that the table already has', async () => {
+      const input = tasks(['pasta', 'record_variante'], [['mca-1_aula', 'x']]);
+      const { problems } = await bring(
+        'with-deliveries by=pasta fields=variante',
+        new FakeWorkspace(),
+        input,
+      );
+      expect(problems.map((found) => [found.code, found.message])).toEqual([
+        [
+          'E_RECIPE_WITH_DELIVERIES',
+          "'with-deliveries' would add 'record_variante', which this table already has; select it away first.",
+        ],
+      ]);
+    });
+
+    it('refuses a fixed or invalid name at fields=, under the verb its own code', async () => {
+      const workspace = await described();
+      const refused = async (line: string, input: Table | null = PULLED) => {
+        const [found] = (await bring(line, workspace, input)).problems;
+        const text = `recipe deliveries\n${line}`;
+        return [
+          found?.code,
+          found?.message,
+          text.slice(found?.range?.start, found?.range?.end).split('=')[0],
+        ];
+      };
+      expect(await refused('with-deliveries by=pasta fields=key')).toEqual([
+        'E_RECIPE_WITH_DELIVERIES',
+        "'with-deliveries' cannot list a declared field: 'key' is a column every delivery already has, so it cannot be declared.",
+        'fields',
+      ]);
+      expect(await refused('deliveries fields=description,folder', null)).toEqual([
+        'E_RECIPE_DELIVERIES',
+        "'deliveries' cannot list a declared field: 'folder' is a column every delivery already has, so it cannot be declared.",
+        'fields',
+      ]);
+      expect(await refused('deliveries fields=Variante', null)).toEqual([
+        'E_RECIPE_DELIVERIES',
+        "'deliveries' cannot list a declared field: 'Variante' is not a field name; a declared field is lowercase letters, digits, _ and -.",
+        'fields',
+      ]);
+      expect((await refused('deliveries fields=a,,b', null)).slice(0, 2)).toEqual([
+        'E_RECIPE_ARGUMENTS',
+        "'deliveries' reads fields as <field>,…, and one is empty.",
+      ]);
+      expect((await refused('with-deliveries by=pasta fields=a,a')).slice(0, 2)).toEqual([
+        'E_RECIPE_ARGUMENTS',
+        "'with-deliveries' lists the field 'a' twice.",
+      ]);
+      expect((await refused('deliveries fields=a fields=b', null)).slice(0, 2)).toEqual([
+        'E_RECIPE_ARGUMENTS',
+        "'deliveries' was given 'fields=' twice.",
+      ]);
+      expect((await refused('deliveries entregas', null)).slice(0, 2)).toEqual([
+        'E_RECIPE_ARGUMENTS',
+        "'deliveries' takes no bare word: the project's delivery.parent says where deliveries are.",
+      ]);
+    });
+  });
 });

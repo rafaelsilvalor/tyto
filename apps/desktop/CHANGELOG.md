@@ -1,5 +1,33 @@
 # @tyto/desktop
 
+## 0.24.6
+
+### Patch Changes
+
+- 0057d72: `deliveries` and `with-deliveries` take `fields=<name>,…` (TYTO-784, ADR 0213): the declared
+  fields a recipe lists always have their columns, empty when no record holds them, merged in
+  alphabetical order with the ones the records hold, so a step that reads one runs on the first
+  run. A fixed or invalid name is refused at `fields=` under the verb's own code, and
+  `with-deliveries` refuses a table that already has a `record_` column a listed name would add.
+  The two codes' summaries say so, and the desktop's recipe form shows the new field in
+  Portuguese.
+- Updated dependencies [0057d72]
+  - @tyto/recipe@0.12.0
+  - @tyto/core@0.51.2
+  - @tyto/command-line@0.9.8
+  - @tyto/editor@0.21.5
+  - @tyto/io@5.11.4
+  - @tyto/plugin-api@0.24.4
+  - @tyto/brief-lang@0.12.2
+  - @tyto/export-html@0.8.7
+  - @tyto/export-svg@2.1.7
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.29
+  - @tyto/pipeline@0.12.26
+  - @tyto/template-lang@0.8.27
+  - @tyto/templates@1.2.24
+  - @tyto/theme-pack@0.1.29
+
 ## 0.24.5
 
 ### Patch Changes
