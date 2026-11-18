@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 
-import { type Diagnostics, hasErrors } from '@tyto/core';
+import { type Diagnostics, catalogueSizes, hasErrors } from '@tyto/core';
 import {
   type RecipeFetch,
   type RecipePlace,
@@ -204,6 +204,8 @@ export async function recipeRunCommand(
       clock: () => systemClock,
       templates: (name) =>
         Promise.resolve(registry.get(configurations.select(name)?.template ?? name)),
+      // TYTO-757, ADR 0215: the sizes a format name `delivery.sizes` leaves out is checked at.
+      formatSizes: () => Promise.resolve(catalogueSizes(context.value.formats)),
       // TYTO-671, ADR 0193 decision 5: `call` sends only under `--apply`, which runs only in a
       // trusted folder; the list is the trusted workspace's, the credentials the environment's.
       calls: {

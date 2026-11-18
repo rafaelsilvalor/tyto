@@ -381,6 +381,40 @@ describe('tyto recipe run', () => {
     expect(document.cells[1]).not.toHaveProperty('note');
   });
 
+  it("checks a delivery's exports at the sizes of the project's formats.yaml (ADR 0215)", async () => {
+    await trust();
+    await writeFile(
+      join(workspace, 'formats.yaml'),
+      ['feed:', '  w: 1080', '  h: 1350', ''].join('\n'),
+    );
+    const delivery = join(workspace, 'mca-1');
+    await mkdir(join(delivery, 'editaveis'), { recursive: true });
+    await writeFile(
+      join(delivery, 'editaveis', 'delivery.json'),
+      JSON.stringify({ version: 1, key: 'MCA-1', formats: [{ format: 'feed', count: 1 }] }),
+    );
+    await writeFile(join(delivery, 'editaveis', 'arte.psd'), 'psd');
+    const header = Buffer.alloc(33);
+    header.writeUInt32BE(0x89_50_4e_47, 0);
+    header.writeUInt32BE(0x0d_0a_1a_0a, 4);
+    header.writeUInt32BE(13, 8);
+    header.write('IHDR', 12, 'latin1');
+    header.writeUInt32BE(1080, 16);
+    header.writeUInt32BE(1350, 20);
+    await writeFile(join(delivery, 'feed.png'), header);
+    await writeFile(
+      join(workspace, 'recipes', 'check.recipe'),
+      ['recipe check', 'deliveries', 'set state = first check', ''].join('\n'),
+    );
+
+    const code = await recipeRunCommand('recipes/check.recipe', {}, environment(), {
+      contributions: verbs(newSink()),
+    });
+    expect(err).toBe('');
+    expect(code).toBe(EXIT_OK);
+    expect(out).toContain('  set state = "ready"\n');
+  });
+
   it('exits 1 when a cell failed, and says why on stderr', async () => {
     await trust();
     await writeFile(join(workspace, 'recipes', 'broken.recipe'), 'recipe broken\nnope.verb\n');

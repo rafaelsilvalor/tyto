@@ -411,7 +411,9 @@ describe('declared fields (ADR 0213)', () => {
   });
 
   it('refuses a name a delivery row already has, or that is not lowercase', () => {
-    for (const name of ['folder', 'path', 'key', 'link', 'formats', 'state', 'due']) {
+    const taken = ['folder', 'path', 'key', 'link', 'formats', 'state', 'due'];
+    // The check of a delivery's exports (ADR 0215) gives every row these too.
+    for (const name of [...taken, 'check', 'check_problems', 'found_formats']) {
       expect(declaredFieldProblem(name)).toMatch(/column every delivery already has/u);
     }
     for (const name of ['Description', 'my field', '_x', 'tag.x', '']) {

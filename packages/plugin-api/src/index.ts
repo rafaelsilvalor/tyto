@@ -201,6 +201,13 @@ export type { BriefFolder, ToBriefPorts } from '@tyto/recipe';
 export type { DeliveryLayout, DeliveryListing, DeliveryPlace, ToDeliveryPorts } from '@tyto/recipe';
 
 /**
+ * An image's shape in the words a delivery's check writes (ADR 0215): `4:5`, `wide`, `?`. A
+ * plugin that counts shapes on a remote folder reads them through these, so a recipe maps an
+ * export found there and one found in the delivery folder through one vocabulary table.
+ */
+export { ASPECT_RATIOS, ASPECT_TOLERANCE, aspectOf, aspectsText } from '@tyto/core';
+
+/**
  * The ports `call` plans and sends through, named here for the same reason: the host's adapter
  * implements a port from this package (ADR 0193).
  */

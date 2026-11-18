@@ -1,5 +1,6 @@
 import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import { type Result, err, ok } from '../result/result.js';
+import type { Size } from '../scene/primitives.js';
 import type { SourceRange } from '../source/range.js';
 import { isAbsolutePath, isInsidePath, resolvePath } from './paths.js';
 import { problemWithFolderName } from './profile.js';
@@ -12,7 +13,8 @@ import type { ProjectEntry, ProjectLayer, ProjectNode } from './project.js';
  * A delivery is one folder per piece of work, named after its ticket, holding the brief, its
  * images and the final artwork. The key says where those folders are made (`parent`), which
  * folders every new one gets (`folders`), where its brief is kept (`brief`) and where its
- * artwork is written (`exports`), plus what it exports (`formats`, `types`, read by TYTO-490).
+ * artwork is written (`exports`), plus what it exports (`formats`, `types`, read by TYTO-490)
+ * and the pixel size each format name is checked at when its exports land (`sizes`, ADR 0215).
  *
  * Every subkey is optional and **merged one at a time**, the later sheet winning (ADR 0112), so
  * a folder that writes only `exports` keeps its profile's `folders`. Unlike a preset (ADR 0126),
@@ -45,9 +47,17 @@ export const BUILT_IN_DELIVERY = {
   exports: '.',
 } as const;
 
-const DELIVERY_KEYS = new Set(['parent', 'folders', 'brief', 'exports', 'formats', 'types']);
+const DELIVERY_KEYS = new Set([
+  'parent',
+  'folders',
+  'brief',
+  'exports',
+  'formats',
+  'types',
+  'sizes',
+]);
 
-type Subkey = 'parent' | 'folders' | 'brief' | 'exports' | 'formats' | 'types';
+type Subkey = 'parent' | 'folders' | 'brief' | 'exports' | 'formats' | 'types' | 'sizes';
 
 /** The delivery layout in force, every subkey answered. */
 export interface ResolvedDelivery {
@@ -63,6 +73,11 @@ export interface ResolvedDelivery {
   readonly formats?: readonly string[];
   /** Which exporters, when a sheet says; otherwise `png`, as for a preset. */
   readonly types?: readonly string[];
+  /**
+   * The pixel size each format name's exports are checked at (ADR 0215), when a sheet says;
+   * a name it leaves out falls back to the workspace's format catalogue.
+   */
+  readonly sizes?: Readonly<Record<string, Size>>;
   /** Which kind of sheet set each subkey; a subkey only the built-in answers has none. */
   readonly origins: Readonly<Partial<Record<Subkey, ProjectLayer['kind']>>>;
 }
@@ -75,6 +90,7 @@ export interface SheetDelivery {
   exports?: string;
   formats?: readonly string[];
   types?: readonly string[];
+  sizes?: Readonly<Record<string, Size>>;
 }
 
 export interface DeliveryReading {
@@ -117,6 +133,7 @@ export function mergeDelivery(
     exports: merged.exports ?? builtIn.exports,
     ...(merged.formats === undefined ? {} : { formats: merged.formats }),
     ...(merged.types === undefined ? {} : { types: merged.types }),
+    ...(merged.sizes === undefined ? {} : { sizes: merged.sizes }),
     origins,
   };
 }
@@ -213,7 +230,33 @@ export function readDelivery(
       read[field] = names;
     }
   }
+
+  if ('sizes' in fields) {
+    const sizes = sizesOf(fields['sizes']);
+    if (sizes === undefined) refuse('sizes', 'is not an object of <format>: "<width>x<height>"');
+    else if (Object.keys(sizes).length > 0) read.sizes = sizes;
+  }
   return read;
+
+  /**
+   * `{ "feed": "1080x1350" }` as sizes, one diagnostic per entry refused and the others kept;
+   * `undefined` when the value is not an object at all.
+   */
+  function sizesOf(written: unknown): Record<string, Size> | undefined {
+    if (typeof written !== 'object' || written === null || Array.isArray(written)) return undefined;
+    const node = member('sizes')?.value;
+    const kept: Record<string, Size> = {};
+    for (const [name, text] of Object.entries(written as Record<string, unknown>)) {
+      const size = typeof text === 'string' ? deliverySizeOf(text) : undefined;
+      if (name.trim() === '' || size === undefined) {
+        const named = node?.members?.find((item) => item.key === name);
+        refuse('sizes', `has '${name}', which is not "<width>x<height>"`, named?.value?.range);
+      } else {
+        kept[name] = size;
+      }
+    }
+    return kept;
+  }
 
   /**
    * A list, keeping what `accept` accepts with one diagnostic per entry it refuses;
@@ -237,6 +280,17 @@ export function readDelivery(
     });
     return kept.length === 0 && written.length > 0 ? undefined : kept;
   }
+}
+
+const SIZE_TEXT = /^\s*(\d+)\s*[x×]\s*(\d+)\s*$/u;
+
+/** `1080x1350` (or `1080×1350`) as a size in pixels, or `undefined` when it is not one. */
+export function deliverySizeOf(written: string): Size | undefined {
+  const match = SIZE_TEXT.exec(written);
+  if (match === null) return undefined;
+  const w = Number(match[1]);
+  const h = Number(match[2]);
+  return w > 0 && h > 0 ? { w, h } : undefined;
 }
 
 /**

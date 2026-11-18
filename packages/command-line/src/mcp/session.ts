@@ -5,6 +5,7 @@ import {
   type Diagnostics,
   type Trust,
   builtInDelivery,
+  catalogueSizes,
   deliveryOfBrief,
   planDelivery,
 } from '@tyto/core';
@@ -374,6 +375,8 @@ export async function openSession(
           const current = (await context()).value;
           return current.registry.get(current.configurations.select(name)?.template ?? name);
         },
+        // TYTO-757, ADR 0215: the sizes a format name `delivery.sizes` leaves out is checked at.
+        formatSizes: async () => catalogueSizes((await context()).value.formats),
         // TYTO-671, ADR 0193 decision 8: `call` plans against the workspace's list and the
         // credentials in the environment, and sends nothing: an agent previews a dispatch and
         // never carries one out (ADR 0185).

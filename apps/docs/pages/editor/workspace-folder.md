@@ -94,6 +94,18 @@ The `delivery` key says where and how, and every part of it is optional:
 
 The values shown for `folders`, `brief` and `exports` are what applies when the key is left out. `parent` is relative to the open folder; the other three are relative to the delivery and must stay inside it. `exports` is where a delivery's export writes its artwork, and `formats` and `types` (lists of sizes and file types) are what it exports, when they are written; left out, the brief's own sizes as PNG.
 
+`sizes` says how many pixels each format name of a delivery record is, so a recipe's [`deliveries`](recipes.md#check-each-delivery-s-exports) step can check the images exported into a delivery against what its record owes:
+
+```jsonc
+{
+  "delivery": {
+    "sizes": { "feed": "1080x1350", "story": "1080x1920" },
+  },
+}
+```
+
+A size is the width, an `x` and the height, in pixels. A name `sizes` leaves out is looked up in the project's `formats.yaml`, the sizes templates render at. An entry that is not a size is listed in **Problems** and left out; the others still apply.
+
 A work profile can hold a `delivery` too, and a campaign is a work profile: the folder's own `delivery` overrides one part at a time, so a folder that writes only `"exports": "final"` keeps the profile's `folders`. A profile's `parent` is still relative to the open folder. A delivery always stays inside the open folder, trusted or not: a `parent` that leads outside is listed as `W_PROJECT_PATH_OUTSIDE` and the one before it applies. A part that is not accepted is listed in **Problems** and the one before it, or the one shown above, applies.
 
 ## Browse its files: the Explorer

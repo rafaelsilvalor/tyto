@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { Trust } from '@tyto/core';
+import type { Size, Trust } from '@tyto/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { workspaceDeliveryPorts } from './workspace-deliveries.js';
@@ -33,26 +33,134 @@ async function project(delivery: unknown): Promise<void> {
   await writeFile(join(workspace, '.tyto', 'project.json'), JSON.stringify({ delivery }), 'utf8');
 }
 
-function ports(trust: () => Trust = () => 'trusted', inWorkspace = true) {
+function ports(
+  trust: () => Trust = () => 'trusted',
+  inWorkspace = true,
+  formatSizes?: () => Promise<Readonly<Record<string, Size>>>,
+) {
   return workspaceDeliveryPorts({
     workspaceFolder: inWorkspace ? workspace : undefined,
     trust,
     home: join(scratch, 'home'),
+    ...(formatSizes === undefined ? {} : { formatSizes }),
   });
+}
+
+/** A PNG header that states `width` by `height`: all `imageSize` reads. */
+function png(width: number, height: number): Buffer {
+  const bytes = Buffer.alloc(33);
+  bytes.writeUInt32BE(0x89_50_4e_47, 0);
+  bytes.writeUInt32BE(0x0d_0a_1a_0a, 4);
+  bytes.writeUInt32BE(13, 8);
+  bytes.write('IHDR', 12, 'latin1');
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  return bytes;
+}
+
+/**
+ * A JPEG whose frame header comes after `metadata` bytes of APP1 segments, as a camera's or an
+ * editor's long metadata puts it: past the head the port reads first.
+ */
+function jpeg(width: number, height: number, metadata: number): Buffer {
+  const parts = [Buffer.from([0xff, 0xd8])];
+  for (let left = metadata; left > 0; left -= 60_000) {
+    const length = Math.min(left, 60_000);
+    const segment = Buffer.alloc(4 + length);
+    segment.writeUInt16BE(0xff_e1, 0);
+    segment.writeUInt16BE(length + 2, 2);
+    parts.push(segment);
+  }
+  const frame = Buffer.alloc(19);
+  frame.writeUInt16BE(0xff_c0, 0);
+  frame.writeUInt16BE(17, 2);
+  frame[4] = 8;
+  frame.writeUInt16BE(height, 5);
+  frame.writeUInt16BE(width, 7);
+  parts.push(frame);
+  return Buffer.concat(parts);
 }
 
 describe('workspaceDeliveryPorts', () => {
   it('reads delivery.parent and folders from the project file, again on every call', async () => {
     const lent = ports();
     const built = await lent.layout();
-    expect(built.ok && built.value).toEqual({ parent: '', folders: ['assets', 'editaveis'] });
+    expect(built.ok && built.value).toEqual({
+      parent: '',
+      folders: ['assets', 'editaveis'],
+      exports: '.',
+      sizes: {},
+    });
 
     await project({ parent: 'entregas', folders: ['assets', 'editaveis', 'refs'] });
     const read = await lent.layout();
     expect(read.ok && read.value).toEqual({
       parent: 'entregas',
       folders: ['assets', 'editaveis', 'refs'],
+      exports: '.',
+      sizes: {},
     });
+  });
+
+  it("lays delivery.sizes over the host's format catalogue, name by name (ADR 0215)", async () => {
+    await project({ exports: 'final', sizes: { feed: '1080x1350' } });
+    const lent = ports(undefined, true, () =>
+      Promise.resolve({ feed: { w: 1080, h: 1080 }, story: { w: 1080, h: 1920 } }),
+    );
+    const read = await lent.layout();
+    expect(read.ok && read.value).toMatchObject({
+      exports: 'final',
+      sizes: { feed: { w: 1080, h: 1350 }, story: { w: 1080, h: 1920 } },
+    });
+  });
+
+  it("lists each record's exported images by header size and its editables (ADR 0215)", async () => {
+    const delivery = join(workspace, 'entregas', 'mca-1');
+    await mkdir(join(delivery, 'editaveis'), { recursive: true });
+    await mkdir(join(delivery, 'final', 'old'), { recursive: true });
+    await writeFile(join(delivery, 'editaveis', 'delivery.json'), '{"version":1,"key":"T-1"}');
+    await writeFile(join(delivery, 'editaveis', 'arte.psd'), 'psd');
+    await writeFile(join(delivery, 'final', 'feed.PNG'), png(1080, 1350));
+    await writeFile(join(delivery, 'final', 'story.jpg'), jpeg(1080, 1920, 300_000));
+    await writeFile(join(delivery, 'final', 'broken.png'), 'not a png');
+    await writeFile(join(delivery, 'final', 'notes.txt'), 'not an image');
+    await writeFile(join(delivery, 'final', '.hidden.png'), png(1, 1));
+    await writeFile(join(delivery, 'final', 'old', 'nested.png'), png(1, 1));
+    await mkdir(join(workspace, 'entregas', 'rascunho', 'final'), { recursive: true });
+    await writeFile(join(workspace, 'entregas', 'rascunho', 'final', 'x.png'), png(1, 1));
+
+    const listed = await ports().list('entregas', 'final');
+    expect(listed.ok && listed.value).toEqual([
+      {
+        name: 'mca-1',
+        path: 'entregas/mca-1',
+        record: '{"version":1,"key":"T-1"}',
+        images: [
+          { name: 'broken.png' },
+          { name: 'feed.PNG', size: { w: 1080, h: 1350 } },
+          { name: 'story.jpg', size: { w: 1080, h: 1920 } },
+        ],
+        editables: 1,
+      },
+      { name: 'rascunho', path: 'entregas/rascunho' },
+    ]);
+    const unasked = await ports().list('entregas');
+    expect(unasked.ok && unasked.value[0]).toEqual({
+      name: 'mca-1',
+      path: 'entregas/mca-1',
+      record: '{"version":1,"key":"T-1"}',
+    });
+  });
+
+  it('reads no image through a link out of the workspace', async () => {
+    const delivery = join(workspace, 'entregas', 'mca-1');
+    await mkdir(join(delivery, 'editaveis'), { recursive: true });
+    await writeFile(join(delivery, 'editaveis', 'delivery.json'), '{"version":1,"key":"T-1"}');
+    await writeFile(join(outside, 'feed.png'), png(1080, 1350));
+    await symlink(outside, join(delivery, 'final'), 'junction');
+    const listed = await ports().list('entregas', 'final');
+    expect(listed.ok && listed.value[0]?.images).toEqual([]);
+    expect(listed.ok && listed.value[0]?.editables).toBe(0);
   });
 
   it('makes folders, writes, reads back and digests a record', async () => {
