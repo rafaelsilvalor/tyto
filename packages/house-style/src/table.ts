@@ -28,7 +28,8 @@
  * 2. **Row heights.** Each cell is measured at its column's width (ADR 0038), so a row is as
  *    tall as its most-wrapped cell. A `\` the author typed in a cell is a line it always has.
  * 3. **The title** is the largest size, up to `TITLE.perBody × s`, that sets it in at most
- *    `TITLE.maxLines` lines — so neither the title nor the table dwarfs the other.
+ *    `TITLE.maxLines` lines — so neither the title nor the table dwarfs the other. A title the
+ *    author broke into lines keeps exactly those lines, each whole (`titleLineLimit`).
  * 4. **The notes**, the `*` lines, are set under the table at `NOTE.perBody × s`, and their
  *    height is part of what has to fit.
  *
@@ -622,8 +623,18 @@ function rowHeights(
   ];
 }
 
-/** The largest title size up to its share of `size` that sets in `TITLE.maxLines` lines. */
-function titleSizeFor(
+/**
+ * The most lines the title may take (TYTO-775). A title the author broke into lines keeps
+ * exactly those: each must fit whole, and the size comes down until it does. One left
+ * unbroken may wrap to `TITLE.maxLines`. When even the floor cannot fit a line whole, it is
+ * drawn at the floor and wraps.
+ */
+export function titleLineLimit(title: readonly string[]): number {
+  return title.length > 1 ? title.length : TITLE.maxLines;
+}
+
+/** The largest title size up to its share of `size` that sets in {@link titleLineLimit} lines. */
+export function titleSizeFor(
   title: readonly string[],
   size: number,
   width: number,
@@ -637,10 +648,11 @@ function titleSizeFor(
   let low = look.titleFloor;
   let high = ceiling;
   let best = look.titleFloor;
+  const limit = titleLineLimit(title);
   while (low <= high) {
     const middle = Math.floor((low + high) / 2);
     const measured = measureTitle(title, middle, width, measure, look);
-    if (measured === undefined || measured.lines <= TITLE.maxLines) {
+    if (measured === undefined || measured.lines <= limit) {
       best = middle;
       low = middle + 1;
     } else {
@@ -659,7 +671,7 @@ function titleHeightAt(
 ): number {
   if (title.length === 0) return 0;
   const measured = measureTitle(title, size, width, measure, look);
-  return measured?.height ?? TITLE.maxLines * TITLE.lineHeight * size;
+  return measured?.height ?? titleLineLimit(title) * TITLE.lineHeight * size;
 }
 
 /** When nothing can measure: equal columns, the approved art's sizes, and guessed heights. */
