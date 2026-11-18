@@ -772,3 +772,154 @@ describe('to-delivery create= (ADR 0213)', () => {
     );
   });
 });
+
+describe('with-deliveries (TYTO-779)', () => {
+  /** Counts the port calls, so a test can hold the verb to one `list` and no `read`. */
+  class CountingWorkspace extends FakeWorkspace {
+    lists = 0;
+    reads = 0;
+    override list(parent: string) {
+      this.lists += 1;
+      return super.list(parent);
+    }
+    override read(path: string) {
+      this.reads += 1;
+      return super.read(path);
+    }
+  }
+
+  async function described(): Promise<CountingWorkspace> {
+    const workspace = new CountingWorkspace();
+    const rows = tasks(
+      ['folder', 'due', 'task'],
+      [
+        ['mca-1_aula', '2026-11-20', 'Cover, three slides'],
+        ['mca-2_simulado', '2026-11-21', ''],
+      ],
+    );
+    const first = await plan(
+      'to-delivery name=folder fields=key:key,due:due,link:link,description:task',
+      workspace,
+      { ...rows, columns: [...rows.columns, { name: 'link', type: 'link', origin: 'test' }] },
+    );
+    await apply(first.verbs, first.plan);
+    workspace.lists = 0;
+    workspace.reads = 0;
+    return workspace;
+  }
+
+  /** Rows from elsewhere, keyed by their own key, naming a folder in `pasta`. */
+  const PULLED = tasks(
+    ['pasta', 'summary'],
+    [
+      ['MCA-1_AULA', 'Aula'],
+      ['mca-2_simulado', 'Simulado'],
+      ['mca-7_nova', 'Nova'],
+      ['', 'Sem pasta'],
+    ],
+  );
+
+  async function bring(
+    line: string,
+    ports: ToDeliveryPorts | undefined,
+    input: Table | null = PULLED,
+  ) {
+    const recipe = parseRecipe(['recipe deliveries', line].join('\n'));
+    if (!recipe.ok) throw new Error(recipe.error.map(({ message }) => message).join('\n'));
+    const result = await runRecipe(recipe.value, {
+      input: input ?? undefined,
+      verbs: createVerbRegistry({ deliveries: ports }),
+      derivations: createDerivationRegistry(),
+      resolveRecipe: () => Promise.resolve(err([])),
+    });
+    if (!result.ok) throw new Error('the run must start');
+    const cell = result.value.cells.at(-1);
+    return {
+      table: cell?.table,
+      note: cell?.note,
+      problems: result.value.cells.flatMap((found) => found.diagnostics),
+    };
+  }
+
+  it("brings each row's record beside its columns, and empty cells where no folder is", async () => {
+    const workspace = await described();
+    const { table, note, problems } = await bring('with-deliveries by=pasta', workspace);
+    expect(problems).toEqual([]);
+    expect(table?.rows.map((row) => row.key)).toEqual(['T-0', 'T-1', 'T-2', 'T-3']);
+    expect(table?.columns.map((column) => [column.name, column.type])).toEqual([
+      ['key', 'text'],
+      ['pasta', 'text'],
+      ['summary', 'text'],
+      ['record_folder', 'text'],
+      ['record_path', 'text'],
+      ['record_key', 'text'],
+      ['record_link', 'link'],
+      ['record_formats', 'text'],
+      ['record_stem', 'text'],
+      ['record_copy', 'text'],
+      ['record_due', 'text'],
+      ['record_ship', 'text'],
+      ['record_state', 'text'],
+      ['record_description', 'text'],
+    ]);
+    const cells = (name: string) => table?.rows.map((row) => row.values[name]);
+    expect(cells('record_description')).toEqual(['Cover, three slides', null, null, null]);
+    expect(cells('record_folder')).toEqual(['mca-1_aula', 'mca-2_simulado', null, null]);
+    expect(cells('record_key')).toEqual(['T-0', 'T-1', null, null]);
+    expect(cells('record_due')).toEqual(['2026-11-20', '2026-11-21', null, null]);
+    expect(cells('summary')).toEqual(['Aula', 'Simulado', 'Nova', 'Sem pasta']);
+    expect(note).toBe("2 of 4 rows have no delivery record: 'T-2', 'T-3'.");
+  });
+
+  it('reads the records from one list per run, and no file', async () => {
+    const workspace = await described();
+    await bring('with-deliveries by=pasta', workspace);
+    expect([workspace.lists, workspace.reads, workspace.writes.length]).toEqual([1, 0, 2]);
+  });
+
+  it('refuses a column it would add that the table already has', async () => {
+    const workspace = await described();
+    const input = tasks(['pasta', 'Record_Due'], [['mca-1_aula', 'x']]);
+    const { problems } = await bring('with-deliveries by=pasta', workspace, input);
+    expect(problems.map((found) => [found.code, found.message])).toEqual([
+      [
+        'E_RECIPE_WITH_DELIVERIES',
+        "'with-deliveries' would add 'record_due', which this table already has; select it away first.",
+      ],
+    ]);
+  });
+
+  it('matches the first of two folders one case apart, and names the other', async () => {
+    const workspace = await described();
+    const copy = (workspace.files.get(RECORD) ?? '').replace('"T-0"', '"T-5"');
+    workspace.files.set('entregas/MCA-1_aula/editaveis/delivery.json', copy);
+    const { table, problems } = await bring('with-deliveries by=pasta', workspace);
+    expect(table?.rows[0]?.values['record_folder']).toBe('MCA-1_aula');
+    expect(problems.map((found) => found.message)).toEqual([
+      "'with-deliveries' left out entregas/mca-1_aula: its name differs from entregas/MCA-1_aula's only in case.",
+    ]);
+  });
+
+  it('refuses a missing or stray argument, an unknown column, no table and no ports', async () => {
+    const workspace = await described();
+    const message = async (line: string) => (await bring(line, workspace)).problems[0]?.message;
+    expect(await message('with-deliveries')).toBe(
+      "'with-deliveries' needs by=<column>, the column naming each delivery folder.",
+    );
+    expect(await message('with-deliveries pasta')).toBe(
+      "'with-deliveries' takes no bare word, and 'pasta' is one.",
+    );
+    expect(await message('with-deliveries by=pasta into=x')).toContain("does not take 'into='");
+    expect(await message('with-deliveries by=nada')).toContain("'nada'");
+    expect((await bring('with-deliveries by=pasta', workspace, null)).problems[0]?.code).toBe(
+      'E_RECIPE_NO_TABLE',
+    );
+    expect((await bring('with-deliveries by=pasta', undefined)).problems[0]?.message).toBe(
+      "'with-deliveries' cannot run here: this host reads no deliveries.",
+    );
+    workspace.where = { restricted: true };
+    expect(await message('with-deliveries by=pasta')).toBe(
+      "'with-deliveries' reads nothing in a restricted folder; trust the folder first.",
+    );
+  });
+});

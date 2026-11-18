@@ -211,6 +211,11 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.deliveries.summary':
     'Lê cada ficha de entrega na pasta de entregas do projeto como uma linha.',
 
+  'recipe.verb.with-deliveries.summary':
+    'Traz a ficha de entrega de cada linha para o lado das suas colunas, como colunas record_.',
+  'recipe.verb.with-deliveries.field.by.help':
+    'A coluna que dá o nome da pasta de entrega de cada linha.',
+
   'recipe.verb.call.summary':
     'Planeja um POST por linha para um host permitido, enviado ao Aplicar.',
   'recipe.verb.call.field.url.help':
