@@ -1,5 +1,13 @@
 # @tyto/google-fonts
 
+## 0.1.29
+
+### Patch Changes
+
+- Updated dependencies [0057d72]
+  - @tyto/core@0.51.2
+  - @tyto/plugin-api@0.24.4
+
 ## 0.1.28
 
 ### Patch Changes
