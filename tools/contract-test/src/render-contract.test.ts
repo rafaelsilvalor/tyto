@@ -27,6 +27,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
  * code, and SVG exercises all three with no browser. Pixels are `@tyto/raster`'s subject.
  */
 
+/**
+ * Each test spawns the CLI and waits for it (TYTO-787). With an empty home a render takes about
+ * 0.7 s on an idle machine, but on CI's `check` job, which runs every package's typecheck,
+ * lint, tests and build at once, the same test was measured at 3.1–6.0 s across six commits that
+ * did not touch the render path, and failed at Vitest's default of 5 s. Over three times the
+ * worst measured.
+ */
+const SPAWN_TIMEOUT_MS = 20_000;
+
 const CLI = fileURLToPath(new URL('../../../apps/cli/dist/index.js', import.meta.url));
 const FIXTURE = fileURLToPath(new URL('./fixture', import.meta.url));
 const SCHEMA = fileURLToPath(new URL('../../../docs/render-result.schema.json', import.meta.url));
@@ -103,7 +112,7 @@ function expectValid(document: unknown): void {
   ).toBe(true);
 }
 
-describe('a task folder rendered by the binary', () => {
+describe('a task folder rendered by the binary', { timeout: SPAWN_TIMEOUT_MS }, () => {
   it('exits 0 and writes the folder the contract describes', async () => {
     const { code, stderr } = await tyto(
       'render',
@@ -149,7 +158,7 @@ describe('a task folder rendered by the binary', () => {
   });
 });
 
-describe('a task that fails', () => {
+describe('a task that fails', { timeout: SPAWN_TIMEOUT_MS }, () => {
   beforeEach(async () => {
     await writeFile(
       join(workspace, 'task', 'bad.brief'),
@@ -181,7 +190,7 @@ describe('a task that fails', () => {
   });
 });
 
-describe('what the contract says about the command line', () => {
+describe('what the contract says about the command line', { timeout: SPAWN_TIMEOUT_MS }, () => {
   it('exits 1 for a flag that does not exist, and writes no result.json', async () => {
     // Documented: a refused command line is exit 1 because the same invocation will fail
     // again, and no run started, so there is nothing to report in a file.
