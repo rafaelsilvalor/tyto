@@ -12,7 +12,8 @@ import { firstWindow } from './first-window.js';
 
 /**
  * The columns of a `|` line through the real window (TYTO-298, ADR 0097): each `|` that splits a
- * line is marked, a `|` inside bold is not, a `\` break restarts the count, and an inline body
+ * line is marked, a `|` inside bold is not, a `\` typed inside a line keeps the count going (a
+ * break inside a cell, TYTO-783), and an inline body
  * gets columns too; each of the `briefColumns` looks paints the theme's colours, emphasis keeps
  * its own, and a save of `settings.json` changes the look with no restart. Read from the DOM, by
  * each mark's class, text and computed colour.
@@ -201,7 +202,7 @@ describe("the columns of a brief's | lines", () => {
     });
   });
 
-  it('mutes the even columns in alternate, restarting at the break, never inside bold', async () => {
+  it('mutes the even columns in alternate, counting on past a break, never inside bold', async () => {
     await apply('tyto-dark', 'alternate');
     await expect
       .poll(shape, { timeout: 15_000 })
@@ -209,7 +210,7 @@ describe("the columns of a brief's | lines", () => {
         'separator:| even:15 a 19/09',
         'separator:| even:Farmacologia Geral separator:|',
         'separator:| separator:|',
-        'separator:| even:Serviço Social separator:| even:Ética profissional separator:|',
+        'separator:| even:Serviço Social even:18/09 - 19:00 separator:| separator:| even:Profª. Norma Castilhos',
         'separator:| even:Saúde Coletiva separator:| separator:| even:extra',
         'separator:| even:Boas Práticas separator:|',
       ]);
@@ -232,7 +233,7 @@ describe("the columns of a brief's | lines", () => {
         'cycle-1:AGENDA DA SEMANA separator:| cycle-2:15 a 19/09',
         'cycle-1:16/09 - 14:00 separator:| cycle-2:Farmacologia Geral separator:| cycle-3:Profª. Marcela Rocha',
         'cycle-1:17/09 - 14:00 separator:| separator:| cycle-3:Profª. Selma Barroso',
-        'cycle-1:15/09 - 19:00 separator:| cycle-2:Serviço Social cycle-1:18/09 - 19:00 separator:| cycle-2:Ética profissional separator:| cycle-3:Profª. Norma Castilhos',
+        'cycle-1:15/09 - 19:00 separator:| cycle-2:Serviço Social cycle-2:18/09 - 19:00 separator:| cycle-3:Ética profissional separator:| cycle-1:Profª. Norma Castilhos',
         'cycle-1:19/09 - 08:00 separator:| cycle-2:Saúde Coletiva separator:| cycle-3:Prof. Ricardo Lemos separator:| cycle-1:extra',
         'cycle-1:23/08 - 19:00 separator:| cycle-2:Boas Práticas separator:| cycle-3:Profª. Alice Moreno',
       ]);

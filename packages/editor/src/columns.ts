@@ -24,8 +24,9 @@ import { palette, panels } from './theme.js';
  *   atomic to `fields()` and join whichever column is open. **They keep their own colour, too:**
  *   a column's colour is painted on its plain text only, so emphasis looks the same in every
  *   column and in every style;
- * - columns restart on every line of a block, and at a `\` hard break, which is the same
- *   `Break` the line between two body lines is;
+ * - columns restart on every line of a block, and **not** at a `\` typed inside a line: since
+ *   TYTO-775 a table row keeps a typed break inside its cell (`Break.typed`, ADR 0214), so the
+ *   words after it stay in their column (TYTO-783);
  * - there is no `\|` escape, because the language has none;
  * - an inline body — text on the directive's own line — is a line like any other.
  *
@@ -73,9 +74,6 @@ const PLAIN = 'Text';
  */
 const PAINTED = new Set([PLAIN, 'Space', 'EscapedDirective', 'EscapedComment']);
 
-/** A break ends a row, top-level only: one inside bold is inside an atomic inline. */
-const BREAK = 'Break';
-
 function childrenOf(node: SyntaxNode): SyntaxNode[] {
   const children: SyntaxNode[] = [];
   for (let child = node.firstChild; child !== null; child = child.nextSibling) {
@@ -84,14 +82,13 @@ function childrenOf(node: SyntaxNode): SyntaxNode[] {
   return children;
 }
 
-/** The rows of one line holder: its top-level inlines, cut at each top-level `Break`. */
+/**
+ * The row of one line holder: its top-level inlines. A `\` typed inside the line is a break
+ * inside a cell, not the end of the row (TYTO-783), so it neither cuts the row nor is painted.
+ */
 function rowsOf(holder: SyntaxNode): SyntaxNode[][] {
-  const rows: SyntaxNode[][] = [[]];
-  for (const child of childrenOf(holder)) {
-    if (child.name === BREAK) rows.push([]);
-    else rows[rows.length - 1]!.push(child);
-  }
-  return rows.filter((row) => row.length > 0);
+  const row = childrenOf(holder);
+  return row.length > 0 ? [row] : [];
 }
 
 /** One row's separators and columns, or nothing when it has no top-level `|`. */
