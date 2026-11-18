@@ -2020,7 +2020,7 @@ export const diagnosticCodes = {
   E_RECIPE_DELIVERIES: {
     severity: 'error',
     summary:
-      "'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace.",
+      "'deliveries' cannot read the delivery records: the host reads none, the recipe is in no trusted workspace, or fields= lists a name a declared field cannot have.",
     template: "'deliveries' {problem}.",
     spec: 'docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md',
     fatal: false,
@@ -2032,7 +2032,7 @@ export const diagnosticCodes = {
   E_RECIPE_WITH_DELIVERIES: {
     severity: 'error',
     summary:
-      "'with-deliveries' cannot bring the delivery records: the host reads none, the recipe is in no trusted workspace, or the table already has a column it would add.",
+      "'with-deliveries' cannot bring the delivery records: the host reads none, the recipe is in no trusted workspace, fields= lists a name a declared field cannot have, or the table already has a column it would add.",
     template: "'with-deliveries' {problem}.",
     spec: 'docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md',
     fatal: false,

@@ -5,6 +5,7 @@ import {
   type Result,
   type SourceRange,
   deliveryFormatsText,
+  declaredFieldProblem,
   deliveryNameOf,
   diagnostic,
   err,
@@ -33,8 +34,8 @@ import type { ToDeliveryPorts } from './to-delivery.js';
  * `delivery.parent` back as one row per delivery, so the folder, on this machine or in a synced
  * cloud folder, is where a recipe's rows come from, and a sheet is a report written from them.
  *
- * It takes no argument: only the project decides where deliveries live (ADR 0157, ADR 0210). It
- * reads one level, `<parent>/<folder>/editaveis/delivery.json`. Each row is keyed by the record's
+ * Only the project decides where deliveries live (ADR 0157, ADR 0210), so no argument says where.
+ * It reads one level, `<parent>/<folder>/editaveis/delivery.json`. Each row is keyed by the record's
  * `key` and holds the folder's name and workspace path beside the record's fields; `formats`
  * comes back as `feed:3,story:1`, the text `to-delivery` reads, so a recipe that reads the
  * records and writes them back plans nothing.
@@ -45,7 +46,9 @@ import type { ToDeliveryPorts } from './to-delivery.js';
  * the same ports `to-delivery` writes through.
  *
  * Fields a recipe declared (ADR 0213) come after the fixed columns, one text column per name any
- * record read holds, in alphabetical order; a record without one gives an empty cell. A record
+ * record read holds, in alphabetical order; a record without one gives an empty cell.
+ * `fields=<name>,…` (TYTO-784) names declared fields whose columns exist even when no record
+ * holds them yet, as on a recipe's first run, so a later step that reads one runs. A record
  * whose `fields` is not a map of text, written by hand before ADR 0213, still reads, without
  * declared fields, and a warning names its folder.
  *
@@ -90,12 +93,65 @@ function refuse(
   return err([found]);
 }
 
+/** `E_RECIPE_ARGUMENTS` typed for a helper whose success is not a verb's. */
+function argumentsRefused(
+  context: VerbContext,
+  problem: string,
+  range: SourceRange,
+): Result<never, readonly Diagnostic[]> {
+  return err([diagnostic('E_RECIPE_ARGUMENTS', { verb: context.step.verb, problem }, { range })]);
+}
+
 /** One record read: its folder, its row's cells and its declared fields. */
 interface Found {
   readonly name: string;
   readonly path: string;
   readonly values: Readonly<Record<string, CellValue>>;
   readonly fields: Readonly<Record<string, string>>;
+}
+
+/**
+ * `fields=description,variante`: declared fields whose columns always exist, merged with those
+ * the records hold (TYTO-784). A name a declared field may not have, a fixed column's included,
+ * is refused under the verb's own code, by the rules `to-delivery` declares by (ADR 0213).
+ */
+function readListedFields(
+  context: VerbContext,
+  written: NamedArgument | undefined,
+): Result<readonly string[], readonly Diagnostic[]> {
+  if (written === undefined) return ok([]);
+  const range = locate(context)(written.range);
+  const listed: string[] = [];
+  for (const entry of written.value.split(',')) {
+    const name = entry.trim();
+    if (name === '') {
+      return argumentsRefused(context, 'reads fields as <field>,…, and one is empty', range);
+    }
+    const problem = declaredFieldProblem(name);
+    if (problem !== undefined) {
+      return refuse(context, `cannot list a declared field: ${problem}`, range);
+    }
+    if (listed.includes(name)) {
+      return argumentsRefused(context, `lists the field '${name}' twice`, range);
+    }
+    listed.push(name);
+  }
+  return ok(listed);
+}
+
+/** The one `fields=` a verb was given, or the diagnostic for a second one. */
+function fieldsArgument(
+  context: VerbContext,
+): Result<NamedArgument | undefined, readonly Diagnostic[]> {
+  let fields: NamedArgument | undefined;
+  for (const written of context.step.named) {
+    if (written.name !== 'fields') continue;
+    if (fields !== undefined) {
+      return argumentsRefused(context, "was given 'fields=' twice", locate(context)(written.range));
+    }
+    fields = written;
+  }
+  return ok(fields);
 }
 
 interface Read {
@@ -115,6 +171,7 @@ async function readRecords(
   context: VerbContext,
   ports: ToDeliveryPorts | undefined,
   at: SourceRange,
+  wanted: readonly string[],
 ): Promise<Result<Read, readonly Diagnostic[]>> {
   if (ports === undefined) {
     return refuse(context, 'cannot run here: this host reads no deliveries', at);
@@ -140,7 +197,7 @@ async function readRecords(
   const leftOut = (folder: string, problem: string) =>
     warnings.push(diagnostic('W_RECIPE_DELIVERY_RECORD', { verb, folder, problem }, { range: at }));
   const found: Found[] = [];
-  const declared = new Set<string>();
+  const declared = new Set<string>(wanted);
   const keys = new Map<string, string>();
   let withoutRecord = 0;
   for (const entry of listed.value) {
@@ -179,7 +236,8 @@ async function readRecords(
       fields,
     });
   }
-  // Declared fields after the fixed columns, alphabetical, so a column keeps its place across runs.
+  // Declared fields after the fixed columns, alphabetical, so a column keeps its place across runs
+  // and a listed one sits where it will sit once a record holds it.
   return ok({ found, declared: [...declared].sort(), warnings, withoutRecord });
 }
 
@@ -187,15 +245,21 @@ async function readDeliveries(
   context: VerbContext,
   ports: ToDeliveryPorts | undefined,
 ): Promise<VerbResult> {
-  const [extra] = [...context.step.named, ...context.step.positional];
+  const named = refuseNamed(context, ['fields']);
+  if (named !== undefined) return named;
+  const [extra] = context.step.positional;
   if (extra !== undefined) {
     return argumentsProblem(
       context,
-      "takes no argument: the project's delivery.parent says where deliveries are",
-      extra.range,
+      "takes no bare word: the project's delivery.parent says where deliveries are",
+      locate(context)(extra.range),
     );
   }
-  const read = await readRecords(context, ports, context.written.verbRange);
+  const fields = fieldsArgument(context);
+  if (!fields.ok) return fields;
+  const listed = readListedFields(context, fields.value);
+  if (!listed.ok) return listed;
+  const read = await readRecords(context, ports, context.written.verbRange, listed.value);
   if (!read.ok) return read;
   const { found, declared, warnings, withoutRecord } = read.value;
 
@@ -234,13 +298,14 @@ async function readDeliveries(
  * The cell is read as a folder name the way `to-delivery name=` reads it, and matched with case
  * folded, as `to-delivery create=no` matches, since the file systems a workspace lives on mostly
  * ignore case. A row whose cell is empty, is no folder name, or names no folder with a record
- * gets empty cells, and the note names it. It reads, and never writes.
+ * gets empty cells, and the note names it. It reads, and never writes. `fields=<name>,…` brings
+ * `record_<name>` whether or not a record holds that field, as `deliveries fields=` does.
  */
 async function bringDeliveries(
   context: VerbContext,
   ports: ToDeliveryPorts | undefined,
 ): Promise<VerbResult> {
-  const named = refuseNamed(context, ['by']);
+  const named = refuseNamed(context, ['by', 'fields']);
   if (named !== undefined) return named;
   const [extra] = context.step.positional;
   if (extra !== undefined) {
@@ -253,6 +318,7 @@ async function bringDeliveries(
   const at = locate(context);
   let by: NamedArgument | undefined;
   for (const written of context.step.named) {
+    if (written.name !== 'by') continue;
     if (by !== undefined) {
       return argumentsProblem(context, "was given 'by=' twice", at(written.range));
     }
@@ -265,8 +331,13 @@ async function bringDeliveries(
   if (!table.ok) return table;
   const column = resolveColumn(table.value, by.value, at(by.range), context.aliases);
   if (!column.ok) return column;
+  const fields = fieldsArgument(context);
+  if (!fields.ok) return fields;
+  const listed = readListedFields(context, fields.value);
+  if (!listed.ok) return listed;
 
-  const read = await readRecords(context, ports, at(by.range));
+  // The listed names are among `declared`, so the clash check below counts them too.
+  const read = await readRecords(context, ports, at(by.range), listed.value);
   if (!read.ok) return read;
   const { found, declared } = read.value;
   const warnings = [...read.value.warnings];
