@@ -492,6 +492,12 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       'source',
     ),
     form(
+      'with-deliveries',
+      "Brings each row's delivery record beside its columns, as record_ columns.",
+      'with-deliveries by=folder',
+      [named('by', 'column', true, "The column naming each row's delivery folder.")],
+    ),
+    form(
       'call',
       'Plans one POST per row to an allowed host, sent on Apply.',
       'call url=https://hooks.example.com/run token=routine body=@./call.json#/routine',

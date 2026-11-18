@@ -98,3 +98,28 @@ is), and a row whose folder is not there plans nothing. The note counts and name
   without deciding for it.
 - **A port that asks whether a folder exists.** `list` already answers it once per run, where a
   port would ask once per row.
+
+## Note, 2026-11-18: `with-deliveries` reads the records beside other rows (TYTO-779)
+
+A recipe whose rows come from a tracker could not see each row's record: `deliveries` is a
+source and replaces the table. **`with-deliveries by=<column>` is a transform** that, for each
+row, finds the delivery folder its `<column>` names under `delivery.parent` and adds the
+record's columns after the row's own.
+
+- **Its own verb, not `deliveries by=`.** A verb has one kind whatever its arguments: the
+  registry, the step forms and the step picker each read one kind per verb name, and no verb
+  changes kind today. A `deliveries` that is a source without `by=` and a transform with it
+  would be the first exception in all three.
+- **Every brought column is a `deliveries` column with `record_` before it**, of the same kind,
+  so `record_link` is a link and the rest are text: `record_folder`, `record_path`, the fixed
+  fields, then the declared fields any record read holds, alphabetical, as §3 orders them.
+  `record_folder` is the folder matched, empty only when the row has none, so a recipe tells a
+  missing folder from an empty field. A table that already has one of these names is refused
+  with `E_RECIPE_DELIVERIES` at `by=` rather than shadowed.
+- **The cell is read as a folder name as `to-delivery name=` reads it, and matched with case
+  folded**, as `create=no` matches (§4). Two folders one fold apart are one folder where case
+  is ignored: the first listed is matched, and `W_RECIPE_DELIVERY_RECORD` names the other.
+- **One `list` per run, and no other port call.** The `list` port already returns each
+  folder's record text, so no folder is read again. It never writes.
+- `E_RECIPE_DELIVERIES`, `W_RECIPE_DELIVERY_RECORD` and `W_RECIPE_DELIVERY_FIELDS_UNREAD` now
+  name the verb that reported them instead of always saying `deliveries`.

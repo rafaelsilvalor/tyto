@@ -2016,12 +2016,13 @@ export const diagnosticCodes = {
       'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
   },
   // `deliveries` reads the records back as rows only inside a trusted workspace; a record it
-  // cannot read is a warning, and the other folders still read (ADR 0211).
+  // cannot read is a warning, and the other folders still read (ADR 0211). `with-deliveries`
+  // reads them beside rows already there, through the same checks (TYTO-779).
   E_RECIPE_DELIVERIES: {
     severity: 'error',
     summary:
-      "'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace.",
-    template: "'deliveries' {problem}.",
+      "'deliveries' or 'with-deliveries' cannot read the delivery records: a wrong argument, a host that reads none, a recipe in no trusted workspace, or a column it would add that the table already has.",
+    template: "'{verb}' {problem}.",
     spec: 'docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md',
     fatal: false,
     fatality:
@@ -2328,8 +2329,8 @@ export const diagnosticCodes = {
   W_RECIPE_DELIVERY_RECORD: {
     severity: 'warning',
     summary:
-      "'deliveries' left a delivery out of its table: its record is not one, its folder could not be read, or another folder has its key.",
-    template: "'deliveries' left out {folder}: {problem}.",
+      "'deliveries' or 'with-deliveries' left a delivery out: its record is not one, its folder could not be read, or another folder has its key or its name.",
+    template: "'{verb}' left out {folder}: {problem}.",
     spec: 'docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md',
     fatal: false,
     fatality: 'The other deliveries are still read; nothing is written.',
@@ -2350,9 +2351,9 @@ export const diagnosticCodes = {
   W_RECIPE_DELIVERY_FIELDS_UNREAD: {
     severity: 'warning',
     summary:
-      "'deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields.",
+      "'deliveries' or 'with-deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields.",
     template:
-      "'deliveries' read {folder} without its declared fields: its 'fields' is not a map of text.",
+      "'{verb}' read {folder} without its declared fields: its 'fields' is not a map of text.",
     spec: 'docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md',
     fatal: false,
     fatality: 'The delivery is still read, with its fixed fields; nothing is written.',

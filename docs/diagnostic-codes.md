@@ -216,7 +216,7 @@ non-zero.
 | `E_RECIPE_APPLY` | error | no | An Apply was refused before any write: the shown plan holds a write its verb no longer declares, or the verb cannot apply. |
 | `E_RECIPE_BRIEF` | error | no | 'to-brief' cannot plan its briefs: an unknown template or slot, a value brief text cannot hold, two rows with one file name, or a folder it may not write. |
 | `E_RECIPE_DELIVERY` | error | no | 'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write. |
-| `E_RECIPE_DELIVERIES` | error | no | 'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace. |
+| `E_RECIPE_DELIVERIES` | error | no | 'deliveries' or 'with-deliveries' cannot read the delivery records: a wrong argument, a host that reads none, a recipe in no trusted workspace, or a column it would add that the table already has. |
 | `E_RECIPE_CALL` | error | no | 'call' cannot plan its requests: an address that is not https, a host the workspace's project does not allow, a credential not stored on this machine, or a body too large. |
 | `E_RECIPE_VERB` | error | no | A verb a plugin contributes could not do its work, in its own words. |
 | `E_RECIPE_NO_TABLE` | error | no | A verb that reads a table runs before any cell produced one. |
@@ -246,9 +246,9 @@ non-zero.
 | `W_RECIPE_LOCAL_UNREAD` | warning | no | A template's 'local' filter found cells that are not an ISO-8601 instant with a zone, and left them empty. |
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
 | `W_RECIPE_WARN` | warning | no | A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed. |
-| `W_RECIPE_DELIVERY_RECORD` | warning | no | 'deliveries' left a delivery out of its table: its record is not one, its folder could not be read, or another folder has its key. |
+| `W_RECIPE_DELIVERY_RECORD` | warning | no | 'deliveries' or 'with-deliveries' left a delivery out: its record is not one, its folder could not be read, or another folder has its key or its name. |
 | `W_RECIPE_DELIVERY_FIELD_NEAR` | warning | no | 'to-delivery' declares a field whose name is two edits or fewer from a fixed field's, which may be a slip. |
-| `W_RECIPE_DELIVERY_FIELDS_UNREAD` | warning | no | 'deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields. |
+| `W_RECIPE_DELIVERY_FIELDS_UNREAD` | warning | no | 'deliveries' or 'with-deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields. |
 | `W_RECIPE_DECIDE_CLEAR_COLUMN` | warning | no | A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run. |
 | `W_RECIPE_DECIDE_CLEAR_LIMIT` | warning | no | A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them. |
 | `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
@@ -2251,15 +2251,15 @@ Parameters: `problem`
 
 **Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md`
 
-'deliveries' cannot read the delivery records: it was given an argument, the host reads none, or the recipe is in no trusted workspace.
+'deliveries' or 'with-deliveries' cannot read the delivery records: a wrong argument, a host that reads none, a recipe in no trusted workspace, or a column it would add that the table already has.
 
 That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written.
 
 ```
-'deliveries' {problem}.
+'{verb}' {problem}.
 ```
 
-Parameters: `problem`
+Parameters: `verb`, `problem`
 
 ### `E_RECIPE_CALL`
 
@@ -3653,15 +3653,15 @@ Parameters: `subject`, `message`
 
 **Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0211-the-delivery-folder-is-the-source-and-inbound-fields-name-a-winner.md`
 
-'deliveries' left a delivery out of its table: its record is not one, its folder could not be read, or another folder has its key.
+'deliveries' or 'with-deliveries' left a delivery out: its record is not one, its folder could not be read, or another folder has its key or its name.
 
 The other deliveries are still read; nothing is written.
 
 ```
-'deliveries' left out {folder}: {problem}.
+'{verb}' left out {folder}: {problem}.
 ```
 
-Parameters: `folder`, `problem`
+Parameters: `verb`, `folder`, `problem`
 
 ### `W_RECIPE_DELIVERY_FIELD_NEAR`
 
@@ -3681,15 +3681,15 @@ Parameters: `field`, `fixed`
 
 **Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md`
 
-'deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields.
+'deliveries' or 'with-deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields.
 
 The delivery is still read, with its fixed fields; nothing is written.
 
 ```
-'deliveries' read {folder} without its declared fields: its 'fields' is not a map of text.
+'{verb}' read {folder} without its declared fields: its 'fields' is not a map of text.
 ```
 
-Parameters: `folder`
+Parameters: `verb`, `folder`
 
 ### `W_RECIPE_DECIDE_CLEAR_COLUMN`
 
