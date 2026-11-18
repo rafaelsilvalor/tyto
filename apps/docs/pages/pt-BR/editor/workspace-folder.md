@@ -94,6 +94,18 @@ A chave `delivery` diz onde e como, e cada parte dela é opcional:
 
 Os valores mostrados para `folders`, `brief` e `exports` são os que valem quando a chave é omitida. `parent` é relativo à pasta aberta; os outros três são relativos à entrega e precisam ficar dentro dela. `exports` é onde a exportação de uma entrega grava as artes, e `formats` e `types` (listas de tamanhos e de tipos de arquivo) são o que ela exporta, quando escritos; omitidos, os tamanhos do próprio brief em PNG.
 
+`sizes` diz quantos pixels tem cada nome de formato de uma ficha de entrega, para o passo [`deliveries`](recipes.md#conferir-os-exports-de-cada-entrega) de uma receita conferir as imagens exportadas para uma entrega contra o que a ficha pede:
+
+```jsonc
+{
+  "delivery": {
+    "sizes": { "feed": "1080x1350", "story": "1080x1920" },
+  },
+}
+```
+
+Um tamanho é a largura, um `x` e a altura, em pixels. Um nome que o `sizes` deixa de fora é procurado no `formats.yaml` do projeto, os tamanhos em que os templates renderizam. Uma entrada que não é um tamanho aparece em **Problemas** e fica de fora; as outras continuam valendo.
+
 Um perfil de trabalho também pode ter um `delivery`, e uma campanha é um perfil de trabalho: o `delivery` da própria pasta substitui uma parte de cada vez, então uma pasta que escreve só `"exports": "final"` mantém as `folders` do perfil. O `parent` de um perfil continua relativo à pasta aberta. Uma entrega sempre fica dentro da pasta aberta, confiável ou não: um `parent` que leva para fora aparece como `W_PROJECT_PATH_OUTSIDE` e vale o anterior. Uma parte que não é aceita aparece em **Problemas** e vale a anterior, ou a mostrada acima.
 
 ## Ver os arquivos dela: o Explorador

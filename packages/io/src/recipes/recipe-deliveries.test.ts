@@ -163,4 +163,61 @@ describe('to-delivery through the recipe runner (TYTO-755)', () => {
     ]);
     expect(fromFolder.cells[2]?.plan?.count).toBe(0);
   });
+
+  it("checks each delivery's exports against its record, sizes from the catalogue (ADR 0215)", async () => {
+    await writeFile(
+      join(workspace, '.tyto', 'project.json'),
+      JSON.stringify({ delivery: { parent: 'entregas', sizes: { story: '1080x1920' } } }),
+      'utf8',
+    );
+    const folder = join(workspace, 'entregas', 'mca-1_aula');
+    await mkdir(join(folder, 'editaveis'), { recursive: true });
+    await writeFile(
+      join(folder, 'editaveis', 'delivery.json'),
+      JSON.stringify({
+        version: 1,
+        key: 'MCA-1',
+        formats: [
+          { format: 'feed', count: 1 },
+          { format: 'story', count: 1 },
+        ],
+      }),
+    );
+    await writeFile(join(folder, 'editaveis', 'arte.psd'), 'psd');
+    await writeFile(join(folder, 'feed.png'), header(1080, 1350));
+    await writeFile(join(folder, 'story.png'), header(1080, 1920));
+    const runner = createRecipeRunner({
+      contributions: contributions(),
+      placeOf: () => Promise.resolve({ trust: 'trusted', folder: workspace }),
+      sectionFor: () => undefined,
+      home: join(scratch, 'home'),
+      clock: () => clock,
+      formatSizes: () => Promise.resolve({ feed: { w: 1080, h: 1350 }, story: { w: 9, h: 9 } }),
+    });
+    const read = await runner.run({
+      documentId: 'tab-3',
+      text: ['recipe check', 'deliveries', ''].join('\n'),
+      path: join(workspace, 'recipes', 'check.recipe'),
+      explicit: true,
+    });
+    expect(read.cells[0]?.diagnostics).toEqual([]);
+    const row = read.cells[0]?.table?.rows[0]?.values;
+    expect([row?.['check'], row?.['check_problems'], row?.['found_formats']]).toEqual([
+      'ready',
+      null,
+      '4:5:1,9:16:1',
+    ]);
+  });
 });
+
+/** A PNG header that states `width` by `height`: all the check reads of it. */
+function header(width: number, height: number): Buffer {
+  const bytes = Buffer.alloc(33);
+  bytes.writeUInt32BE(0x89_50_4e_47, 0);
+  bytes.writeUInt32BE(0x0d_0a_1a_0a, 4);
+  bytes.writeUInt32BE(13, 8);
+  bytes.write('IHDR', 12, 'latin1');
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  return bytes;
+}

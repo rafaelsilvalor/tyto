@@ -5,12 +5,14 @@ import {
   DELIVERY_WRITABLE_FIELDS,
   type DeliveryFieldName,
   type DeliveryFieldValue,
+  type DeliveryImage,
   type DeliveryInboundWinner,
   type DeliveryInboundWinners,
   type DeliveryRecord,
   type DeliveryRecordMerge,
   type Diagnostic,
   type Result,
+  type Size,
   type SourceRange,
   declaredFieldProblem,
   deliveryFormatsText,
@@ -91,8 +93,15 @@ export interface ToDeliveryPorts {
    * (`editaveis/delivery.json`) when it has one, which `deliveries` reads back as rows
    * (ADR 0211). Hidden folders and `.tyto` are not listed. A folder the host may not read, a
    * link out of the workspace say, comes back with the reason instead of its record.
+   *
+   * Given `exports`, the layout's exports folder relative to each delivery, a folder with a
+   * record also comes with the images at that folder's root and how many editables sit beside
+   * the record, which `deliveries` checks the record against (ADR 0215).
    */
-  list(parent: string): Promise<Result<readonly DeliveryListing[], readonly Diagnostic[]>>;
+  list(
+    parent: string,
+    exports?: string,
+  ): Promise<Result<readonly DeliveryListing[], readonly Diagnostic[]>>;
   /** A file's text at a workspace path, or `undefined` when there is none. */
   read(path: string): Promise<Result<string | undefined, readonly Diagnostic[]>>;
   /** A digest of the file at a workspace path, of the host's choice; `undefined` when absent. */
@@ -115,6 +124,13 @@ export interface DeliveryLayout {
   readonly parent: string;
   /** `delivery.folders`, made inside every delivery, relative to it. */
   readonly folders: readonly string[];
+  /** `delivery.exports`, relative to each delivery; `.` is its root. The root when absent. */
+  readonly exports?: string;
+  /**
+   * The pixel size each format name is checked at (ADR 0215): `delivery.sizes` over the host's
+   * format catalogue. None known when absent.
+   */
+  readonly sizes?: Readonly<Record<string, Size>>;
 }
 
 export interface DeliveryListing {
@@ -126,6 +142,10 @@ export interface DeliveryListing {
   readonly record?: string;
   /** Why the folder could not be read; absent when it could. */
   readonly problem?: string;
+  /** The images at the root of its exports folder, when `list` was given one (ADR 0215). */
+  readonly images?: readonly DeliveryImage[];
+  /** How many files besides the record sit in the record's folder, beside `images`. */
+  readonly editables?: number;
 }
 
 /** The kind of write `to-delivery` declares, and the only one its plans hold. */

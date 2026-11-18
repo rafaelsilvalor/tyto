@@ -207,10 +207,26 @@ export {
   builtInDelivery,
   deliveryNameOf,
   deliveryOfBrief,
+  deliverySizeOf,
   planDelivery,
 } from './project/delivery.js';
 
 export {
+  ASPECT_RATIOS,
+  ASPECT_TOLERANCE,
+  DELIVERY_CHECK_STATES,
+  type DeliveryCheck,
+  type DeliveryCheckInput,
+  type DeliveryCheckState,
+  type DeliveryImage,
+  aspectOf,
+  aspectsText,
+  catalogueSizes,
+  checkDelivery,
+} from './project/delivery-check.js';
+
+export {
+  DELIVERY_CHECK_COLUMNS,
   DELIVERY_RECORD_FIELDS,
   DELIVERY_RECORD_FILE,
   DELIVERY_RECORD_FOLDER,

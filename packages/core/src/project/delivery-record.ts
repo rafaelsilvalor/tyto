@@ -47,11 +47,22 @@ export const DELIVERY_WRITABLE_FIELDS = [...DELIVERY_RECORD_FIELDS, 'state'] as 
 export type DeliveryWritableField = (typeof DELIVERY_WRITABLE_FIELDS)[number];
 
 /**
- * The column names `deliveries` gives every row (ADR 0211): where the delivery is, then the
- * record's fixed fields. None of them may name a declared field (ADR 0213), or a declared
- * column would shadow one of these.
+ * The columns `deliveries` gives every row from the check of its exports (ADR 0215): the state,
+ * its problems, and the shapes found.
  */
-export const DELIVERY_ROW_COLUMNS = ['folder', 'path', ...DELIVERY_WRITABLE_FIELDS] as const;
+export const DELIVERY_CHECK_COLUMNS = ['check', 'check_problems', 'found_formats'] as const;
+
+/**
+ * The column names `deliveries` gives every row (ADR 0211): where the delivery is, the record's
+ * fixed fields, then the check of its exports (ADR 0215). None of them may name a declared field
+ * (ADR 0213), or a declared column would shadow one of these.
+ */
+export const DELIVERY_ROW_COLUMNS = [
+  'folder',
+  'path',
+  ...DELIVERY_WRITABLE_FIELDS,
+  ...DELIVERY_CHECK_COLUMNS,
+] as const;
 
 /**
  * A field a merge is given: a fixed one, or any other name, which is a field the recipe declared
