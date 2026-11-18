@@ -78,15 +78,19 @@ bodyInline { headInline | Mark }
 // The same limit shows at the seam of two closers: `**bold *italic***` does not parse,
 // because longest match reads the trailing `***` as `**` then `*` and no lookahead could
 // prefer the other split. Write `**bold *italic* **` or reorder the runs (ADR 0015).
-headInline { Text | Space | Bold | Italic | Break | Formula | escape }
+//
+// A lone `*` that nothing on its line closes is a literal asterisk, `LiteralStar` (ADR 0213):
+// `R$ 4.143,06*` and a footnote line `*Valores de referência` are text, not an italic run left
+// open. Whether a later `*` closes it needs the rest of the line, so `tokens.ts` decides.
+headInline { Text | Space | Bold | Italic | Break | Formula | LiteralStar | escape }
 
 Bold { boldMark boldInline+ boldMark }
 
-boldInline { Text | Space | Italic | Break | Formula | escape }
+boldInline { Text | Space | Italic | Break | Formula | LiteralStar | escape }
 
 Italic { italicMark italicInline+ italicMark }
 
-italicInline { Text | Space | Bold | Break | Formula | escape }
+italicInline { Text | Space | Bold | Break | Formula | LiteralStar | escape }
 
 escape { EscapedDirective | EscapedComment }
 
@@ -128,6 +132,9 @@ BlankLine { newline | blankRun | directiveIndent }
 // the characters up to the `$` that closes it, so `tokens.ts` scans by hand. Ahead of
 // `@tokens`, so it is asked before `Text` reads the `$` as a plain character.
 @external tokens formulas from "./tokens.js" { Formula }
+
+// Ahead of `@tokens`, so a `*` nothing closes is a `LiteralStar` before `italicMark` reads it.
+@external tokens literalStars from "./tokens.js" { LiteralStar }
 
 @tokens {
   directiveMark { "::" }

@@ -25,3 +25,7 @@ Recovery on the `***` case got noisier, and that is the price of the one line. T
 The AST has to hold the nesting. `Bold` and `Italic` carry `children: Inline[]`, not a string — the sketch in `docs/brief-language.md` said `children` only for `Mark`, which could not have represented `**a *b* c**` even before this change. E3.2 builds that.
 
 The Scene IR needed nothing. A `TextRun` already carries `weight` and `style` independently, so bold-italic text was always representable; what was missing was a way for a brief author to ask for it.
+
+## Note of 2026-11-18
+
+ADR 0213 makes a lone `*` that nothing on its line closes a literal asterisk. A `*` with a partner on its line still opens and closes italic exactly as decided here; the `***` limit stands, and recovery on it now leaves one error node at the end of the line instead of four.

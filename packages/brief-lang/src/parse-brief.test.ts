@@ -334,7 +334,12 @@ describe('what a directive says', () => {
 
   it('reads a trailing backslash as a break', () => {
     const [directive] = astOf('line-break.brief', lineBreak).directives;
-    expect(directive?.body.at(-1)).toEqual({ kind: 'break', range: { start: 26, end: 27 } });
+    // `typed`: the author wrote it, as against a block line's end (a table row reads that).
+    expect(directive?.body.at(-1)).toEqual({
+      kind: 'break',
+      typed: true,
+      range: { start: 26, end: 27 },
+    });
   });
 
   it('decodes an escaped marker to the text it stands for', () => {

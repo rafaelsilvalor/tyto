@@ -21,13 +21,16 @@
  * 1. **Column widths.** A column can never be narrower than its widest unbreakable piece
  *    (`table-text.ts` decides what a piece is) plus its padding: that is its `min`. Its
  *    `natural` is its widest cell on one line. If every column fits at its natural width, the
- *    leftover is shared equally. If not, every column starts at its `min` and the leftover
- *    goes to each in proportion to how much it still wants (`natural − min`) — the columns
- *    that would wrap most get the most room. If even the `min`s do not fit, `s` fails.
+ *    leftover is shared equally. If even the `min`s do not fit, `s` fails. Otherwise every
+ *    column starts at its `min` and the leftover is spent **where it makes the table shortest**
+ *    (see {@link columnWidths}): the whole column is read, every cell of it, so a column with
+ *    one long cell in a row that is tall anyway gives way to a column whose every cell wraps.
  * 2. **Row heights.** Each cell is measured at its column's width (ADR 0038), so a row is as
- *    tall as its most-wrapped cell.
+ *    tall as its most-wrapped cell. A `\` the author typed in a cell is a line it always has.
  * 3. **The title** is the largest size, up to `TITLE.perBody × s`, that sets it in at most
  *    `TITLE.maxLines` lines — so neither the title nor the table dwarfs the other.
+ * 4. **The notes**, the `*` lines, are set under the table at `NOTE.perBody × s`, and their
+ *    height is part of what has to fit.
  *
  * The **fit loop** is a binary search for the largest `s` between `BODY.floor` and
  * `BODY.ceiling` whose title and table fit the room between the brand row and the signature.
@@ -65,6 +68,7 @@ import {
   SIGNATURE_INK,
   HEADER,
   INK,
+  NOTE,
   ON_ACCENT,
   OPTICAL_DROP,
   PAGE,
@@ -102,6 +106,7 @@ export function oneImageTable(own: TableBrand): TemplateBuild {
 
     const titleBlock = drawTitle(title, plan, width, brand.accent);
     const tableBlock = drawTable(table, glued, plan, brand.accent, look);
+    const notesBlock = drawNotes(table.notes, plan, width, look);
     // The title stands under the brand row and the table a fixed gap under the title. Whatever
     // room the fit leaves goes to the foot: centring the table in it made the gap grow with
     // every table that fits by its width rather than its height.
@@ -116,6 +121,9 @@ export function oneImageTable(own: TableBrand): TemplateBuild {
         at(PAGE.side, PAGE.top, drawLogo(context.brand, BRAND_ROW.logo, oneInk(brand.accent))),
         at(PAGE.side, regionTop, titleBlock),
         at(PAGE.side, tableY, tableBlock),
+        ...(notesBlock === undefined
+          ? []
+          : [at(PAGE.side, tableY + tableBlock.height + plan.notesGap, notesBlock)]),
         at(PAGE.side, regionBottom, drawSignature(context.brand, width, look)),
       ],
     });
@@ -230,17 +238,17 @@ function roleStyle(role: Role, look: TableLook): RoleStyle {
   }
 }
 
-/** A cell's words as a text node's options, at a size. */
+/** A cell's words as a text node's options, at a size; each `\n` in them a line break. */
 function cellText(words: string, role: Role, size: number, look: TableLook) {
   const style = roleStyle(role, look);
+  const runStyle = { font: FACE, size, weight: style.weight, color: style.color };
+  const [first = '', ...rest] = (style.upper ? words.toLocaleUpperCase('pt-BR') : words).split(
+    '\n',
+  );
   return {
     runs: [
-      run(style.upper ? words.toLocaleUpperCase('pt-BR') : words, {
-        font: FACE,
-        size,
-        weight: style.weight,
-        color: style.color,
-      }),
+      run(first, runStyle),
+      ...rest.flatMap((line) => [lineBreak(), run(line, runStyle)]),
     ] as NonEmpty<TextRun>,
     lineHeight: style.lineHeight,
     letterSpacing: style.tracking * size,
@@ -282,7 +290,12 @@ export interface TablePlan {
   readonly widths: readonly number[];
   /** The header's height, then each body row's, in px. */
   readonly heights: readonly number[];
-  /** Title, gap and table: what has to fit the room. */
+  /** The notes' size, and their height under the table: 0 when there are none. */
+  readonly noteSize: number;
+  readonly notesHeight: number;
+  /** Table → notes, in px: 0 when there are none. */
+  readonly notesGap: number;
+  /** Title, gap, table and notes: what has to fit the room. */
   readonly height: number;
   /** Whether nothing could measure, and every cell shrinks into a guessed box. */
   readonly unmeasured: boolean;
@@ -308,6 +321,7 @@ function fit(
     const heights = rowHeights(table, glued, widths, size, measure, look);
     const titleSize = titleSizeFor(title, size, width, measure, look);
     const titleHeight = titleHeightAt(title, titleSize, width, measure, look);
+    const notes = notesAt(table.notes, size, width, measure, look);
     const tableHeight = sum(heights) + CELL.gapY * Math.max(0, heights.length - 1);
     return {
       size,
@@ -315,7 +329,8 @@ function fit(
       titleHeight,
       widths,
       heights,
-      height: titleHeight + look.titleGap + tableHeight,
+      ...notes,
+      height: titleHeight + look.titleGap + tableHeight + notes.notesGap + notes.notesHeight,
       unmeasured: false,
     };
   };
@@ -343,12 +358,28 @@ function fit(
   );
 }
 
+/**
+ * One cell as the width search reads it: the row it sets the height of, and the width of
+ * every unbreakable piece of each of its lines, at {@link REFERENCE_SIZE}.
+ */
+export interface CellPieces {
+  /** 0 for the header, then each body row by its index + 1. */
+  readonly row: number;
+  readonly role: 'cell' | 'header';
+  /** One list per line the author wrote, `\` breaks splitting them. */
+  readonly lines: readonly (readonly number[])[];
+}
+
 /** How much room each column asks for, measured once at {@link REFERENCE_SIZE}. */
-interface Demand {
+export interface Demand {
   /** The widest unbreakable piece, text only. */
   readonly min: readonly number[];
-  /** The widest cell on one line, text only. */
+  /** The widest line of any cell, text only. */
   readonly natural: readonly number[];
+  /** Every cell of each column, for the search that shares the leftover. */
+  readonly cells: readonly (readonly CellPieces[])[];
+  /** The width of the space between two pieces, by role. */
+  readonly space: { readonly cell: number; readonly header: number };
 }
 
 function columnDemand(
@@ -359,29 +390,48 @@ function columnDemand(
 ): Demand | undefined {
   const min: number[] = table.header.map(() => 0);
   const natural: number[] = table.header.map(() => 0);
+  const cells: CellPieces[][] = table.header.map(() => []);
 
-  const take = (words: string, role: Role, column: number): boolean => {
-    const whole = widthAt(words, role, measure, look);
-    if (whole === undefined) return false;
-    natural[column] = Math.max(natural[column]!, whole);
-    for (const piece of pieces(words)) {
-      const one = widthAt(piece, role, measure, look);
-      if (one === undefined) return false;
-      min[column] = Math.max(min[column]!, one);
+  const take = (words: string, role: 'cell' | 'header', column: number, row: number): boolean => {
+    const cellLines: number[][] = [];
+    for (const line of words.split('\n')) {
+      const whole = widthAt(line, role, measure, look);
+      if (whole === undefined) return false;
+      natural[column] = Math.max(natural[column]!, whole);
+      const widths: number[] = [];
+      for (const piece of pieces(line)) {
+        const one = widthAt(piece, role, measure, look);
+        if (one === undefined) return false;
+        min[column] = Math.max(min[column]!, one);
+        widths.push(one);
+      }
+      if (widths.length > 0) cellLines.push(widths);
     }
+    cells[column]!.push({ row, role, lines: cellLines });
     return true;
   };
 
   for (const [column, words] of glued.header.entries()) {
-    if (!take(words, 'header', column)) return undefined;
+    if (!take(words, 'header', column, 0)) return undefined;
   }
   for (const [index, row] of table.rows.entries()) {
     if (row.kind !== 'cells') continue;
     for (const [column, words] of glued.rows[index]!.entries()) {
-      if (!take(words, 'cell', column)) return undefined;
+      if (!take(words, 'cell', column, index + 1)) return undefined;
     }
   }
-  return { min, natural };
+
+  const spaceOf = (role: Role): number | undefined => {
+    // A space measured between two letters: alone, a layout may trim it to nothing.
+    const pair = widthAt('n n', role, measure, look);
+    const one = widthAt('n', role, measure, look);
+    return pair === undefined || one === undefined ? undefined : Math.max(0, pair - 2 * one);
+  };
+  const cellSpace = spaceOf('cell');
+  const headerSpace = spaceOf('header');
+  if (cellSpace === undefined || headerSpace === undefined) return undefined;
+
+  return { min, natural, cells, space: { cell: cellSpace, header: headerSpace } };
 }
 
 /** One line's width at the reference size, or nothing when nothing can measure. */
@@ -394,16 +444,30 @@ function widthAt(words: string, role: Role, measure: Measure, look: TableLook): 
 /**
  * Each column's width at `size`, padding included, or nothing when even the minimums do not
  * fit across `room`.
+ *
+ * When the natural widths do not fit, every column starts at its minimum and the leftover is
+ * spent in steps, each one the widening that **shortens the table most per pixel it costs**.
+ * The candidates are the widths at which some cell of a column loses a line; for each one,
+ * the table's height is worked out from every cell of every row, the way the layout breaks a
+ * line (greedily, at a space). So a column with one long cell does not win room for it when
+ * that cell's row is held tall by another column anyway — the column whose cells set the
+ * heights does. Ties between two cells holding one row are broken by a small credit for every
+ * line saved anywhere, so the search does not stall where two columns must both widen.
+ *
+ * When no widening shortens anything, what is left goes to each column in proportion to how
+ * much it still wants (`natural − width`), as it always did.
+ *
+ * This only shares the width out; the heights the plan keeps are measured afterwards by the
+ * layout itself, so a guess off by a rounding error costs a little room, never a cut line.
  */
 export function columnWidths(demand: Demand, size: number, room: number): number[] | undefined {
   const scale = size / REFERENCE_SIZE;
   const padding = 2 * BODY.padding.inline * size;
   // A pixel of slack, so a box made exactly as wide as its piece never wraps it over a
   // rounding error between the scaled width and the one measured at this size.
-  const min = demand.min.map((value) => Math.ceil(value * scale + padding) + 1);
-  const natural = demand.natural.map((value, column) =>
-    Math.max(min[column]!, Math.ceil(value * scale + padding) + 1),
-  );
+  const toPx = (value: number) => Math.ceil(value * scale + padding) + 1;
+  const min = demand.min.map(toPx);
+  const natural = demand.natural.map((value, column) => Math.max(min[column]!, toPx(value)));
 
   if (sum(natural) <= room) {
     const share = (room - sum(natural)) / natural.length;
@@ -411,10 +475,119 @@ export function columnWidths(demand: Demand, size: number, room: number): number
   }
   if (sum(min) > room) return undefined;
 
-  const leftover = room - sum(min);
-  const wants = natural.map((value, column) => value - min[column]!);
+  const widths = shortestTable(demand, min, room - sum(min), size, toPx);
+  const leftover = room - sum(widths);
+  const wants = natural.map((value, column) => Math.max(0, value - widths[column]!));
   const wanted = sum(wants);
-  return min.map((value, column) => value + (leftover * wants[column]!) / wanted);
+  return widths.map((value, column) =>
+    wanted === 0 ? value + leftover / widths.length : value + (leftover * wants[column]!) / wanted,
+  );
+}
+
+/** How much a line saved anywhere counts against a row made shorter: a tie-breaker only. */
+const LINE_CREDIT = 0.01;
+
+/** The search's step limit: far more steps than any table has candidate widths. */
+const MAX_STEPS = 400;
+
+/** The widths, from `start`, that the leftover spent greedily makes the shortest table. */
+function shortestTable(
+  demand: Demand,
+  start: readonly number[],
+  leftover: number,
+  size: number,
+  toPx: (value: number) => number,
+): number[] {
+  const widths = [...start];
+  const scale = size / REFERENCE_SIZE;
+  const inline = BODY.padding.inline * size;
+  const rows = 1 + Math.max(0, ...demand.cells.flat().map((cell) => cell.row));
+
+  // The lines a cell takes at a column width, as the layout breaks: at a space, greedily.
+  const linesOf = (cell: CellPieces, width: number): number => {
+    const inner = (width - 2 * inline) / scale;
+    const space = demand.space[cell.role];
+    let count = 0;
+    for (const line of cell.lines) {
+      count += 1;
+      let used = -1;
+      for (const piece of line) {
+        if (used < 0) used = piece;
+        else if (used + space + piece <= inner) used += space + piece;
+        else {
+          count += 1;
+          used = piece;
+        }
+      }
+    }
+    return count;
+  };
+  const lineHeight = (cell: CellPieces) =>
+    (cell.role === 'header' ? HEADER.lineHeight : BODY.lineHeight) * size;
+
+  // Each column's height per row, and its line count, at the column's width.
+  const columnAt = (column: number, width: number) => {
+    const heights = new Array<number>(rows).fill(0);
+    let lineCount = 0;
+    for (const cell of demand.cells[column]!) {
+      const count = linesOf(cell, width);
+      lineCount += count;
+      heights[cell.row] = Math.max(heights[cell.row]!, count * lineHeight(cell));
+    }
+    return { heights, lines: lineCount };
+  };
+  const cost = (columns: readonly { heights: number[]; lines: number }[]): number => {
+    let total = 0;
+    for (let row = 0; row < rows; row += 1) {
+      total += Math.max(0, ...columns.map((column) => column.heights[row]!));
+    }
+    return total + LINE_CREDIT * sum(columns.map((column) => column.lines)) * size;
+  };
+
+  // Every width at which a cell of the column can lose a line: the width of each run of
+  // consecutive pieces of one of its lines.
+  const candidates = demand.cells.map((cells) => {
+    const found = new Set<number>();
+    for (const cell of cells) {
+      const space = demand.space[cell.role];
+      for (const line of cell.lines) {
+        for (let from = 0; from < line.length; from += 1) {
+          let span = 0;
+          for (let to = from; to < line.length; to += 1) {
+            span += (to > from ? space : 0) + line[to]!;
+            found.add(toPx(span) + 1);
+          }
+        }
+      }
+    }
+    return [...found].sort((a, b) => a - b);
+  });
+
+  const state = widths.map((width, column) => columnAt(column, width));
+  let current = cost(state);
+  let left = leftover;
+  for (let step = 0; step < MAX_STEPS && left > 0; step += 1) {
+    let best: { column: number; width: number; ratio: number; next: number } | undefined;
+    for (const [column, list] of candidates.entries()) {
+      for (const width of list) {
+        const extra = width - widths[column]!;
+        if (extra <= 0) continue;
+        if (extra > left) break;
+        const trial = [...state];
+        trial[column] = columnAt(column, width);
+        const next = cost(trial);
+        const ratio = (current - next) / extra;
+        if (ratio <= 1e-9) continue;
+        if (best === undefined || ratio > best.ratio) best = { column, width, ratio, next };
+      }
+    }
+    if (best === undefined) break;
+    left -= best.width - widths[best.column]!;
+    widths[best.column] = best.width;
+    state[best.column] = columnAt(best.column, best.width);
+    current = best.next;
+  }
+  return widths;
 }
 
 /** The header's height, then each body row's, at `size` with these widths. */
@@ -508,14 +681,29 @@ function unmeasuredPlan(
     ...table.rows.map((row) => line(row.kind === 'cells' ? 'cell' : 'band')),
   ];
   const titleHeight = title.length === 0 ? 0 : title.length * TITLE.lineHeight * UNMEASURED.title;
+  const noteSize = noteSizeFor(size);
+  const notes =
+    table.notes.length === 0
+      ? { noteSize, notesHeight: 0, notesGap: 0 }
+      : {
+          noteSize,
+          notesHeight: table.notes.length * NOTE.lineHeight * noteSize,
+          notesGap: NOTE.gap * size,
+        };
   return {
     size,
     title: UNMEASURED.title,
     titleHeight,
     widths: table.header.map(() => column),
     heights,
+    ...notes,
     height:
-      titleHeight + look.titleGap + sum(heights) + CELL.gapY * Math.max(0, heights.length - 1),
+      titleHeight +
+      look.titleGap +
+      sum(heights) +
+      CELL.gapY * Math.max(0, heights.length - 1) +
+      notes.notesGap +
+      notes.notesHeight,
     unmeasured: true,
   };
 }
@@ -538,16 +726,77 @@ function floorPlan(
   );
   const heights = rowHeights(table, glued, widths, size, measure, look);
   const titleHeight = titleHeightAt(title, look.titleFloor, width, measure, look);
+  const notes = notesAt(table.notes, size, width, measure, look);
   return {
     size,
     title: look.titleFloor,
     titleHeight,
     widths,
     heights,
+    ...notes,
     height:
-      titleHeight + look.titleGap + sum(heights) + CELL.gapY * Math.max(0, heights.length - 1),
+      titleHeight +
+      look.titleGap +
+      sum(heights) +
+      CELL.gapY * Math.max(0, heights.length - 1) +
+      notes.notesGap +
+      notes.notesHeight,
     unmeasured: false,
   };
+}
+
+/* -------------------------------------------------------------------------- notes -- */
+
+function noteSizeFor(size: number): number {
+  return Math.max(NOTE.floor, Math.round(NOTE.perBody * size * 2) / 2);
+}
+
+/** The notes as a text node's options: one line per note as written, set left, in ink. */
+function notesText(notes: readonly string[], size: number, look: TableLook) {
+  const style = { font: FACE, size, weight: BOOK, color: look.ink };
+  const [first = '', ...rest] = notes;
+  return {
+    name: 'notes',
+    runs: [
+      run(first, style),
+      ...rest.flatMap((line) => [lineBreak(), run(line, style)]),
+    ] as NonEmpty<TextRun>,
+    align: 'left' as const,
+    lineHeight: NOTE.lineHeight,
+  };
+}
+
+/** The notes' size, height and gap at a body size: all nothing when there are no notes. */
+function notesAt(
+  notes: readonly string[],
+  size: number,
+  width: number,
+  measure: Measure,
+  look: TableLook,
+): { noteSize: number; notesHeight: number; notesGap: number } {
+  const noteSize = noteSizeFor(size);
+  if (notes.length === 0) return { noteSize, notesHeight: 0, notesGap: 0 };
+  const measured = measure(text({ ...notesText(notes, noteSize, look), box: { w: width } }));
+  return {
+    noteSize,
+    notesHeight: measured?.height ?? notes.length * NOTE.lineHeight * noteSize,
+    notesGap: NOTE.gap * size,
+  };
+}
+
+function drawNotes(
+  notes: readonly string[],
+  plan: TablePlan,
+  width: number,
+  look: TableLook,
+): Block | undefined {
+  if (notes.length === 0) return undefined;
+  const node = text({
+    ...notesText(notes, plan.noteSize, look),
+    box: { w: width, h: plan.notesHeight },
+    ...(plan.unmeasured ? { overflow: 'shrink' as const } : {}),
+  });
+  return block(width, plan.notesHeight, group({ name: 'notes', children: [node] }));
 }
 
 /* ------------------------------------------------------------------------ drawing -- */

@@ -3,6 +3,7 @@ import { ExternalTokenizer } from '@lezer/lr';
 import {
   Formula,
   Frontmatter,
+  LiteralStar,
   blankRun,
   bodyBreak,
   commentBreak,
@@ -28,6 +29,7 @@ const DIGIT_ZERO = 48;
 const DIGIT_NINE = 57;
 const COLON = 58;
 const BACKSLASH = 92;
+const STAR = 42;
 
 type Input = { peek: (offset: number) => number };
 
@@ -312,4 +314,46 @@ export const formulas = new ExternalTokenizer((input) => {
     }
     offset += 1;
   }
+});
+
+/** A `*` standing alone: neither side of it is another `*`, which would make it bold's. */
+function isLoneStar(input: Input, offset: number): boolean {
+  return (
+    input.peek(offset) === STAR &&
+    input.peek(offset - 1) !== STAR &&
+    input.peek(offset + 1) !== STAR
+  );
+}
+
+/**
+ * A lone `*` that nothing on its line closes, as a literal asterisk (ADR 0213).
+ *
+ * An italic run never crosses a line, so whether a `*` opens one is settled by its line alone.
+ * The lone stars before it on the line are counted: an odd count means one of them is open and
+ * this one closes it, and the grammar's `italicMark` takes it. An even count means this one
+ * would open a run, and it does only when another lone star comes later on the line to close
+ * it; otherwise it is `LiteralStar`, read as the character. So `R$ 4.143,06*` and a footnote
+ * line `*Valores de referência` are text, and `*itálico*` is what it always was.
+ *
+ * A star beside another star is left alone: `**` is bold's, and `***` keeps the limit the
+ * grammar documents. Stars inside a formula earlier on the line are counted too; a formula
+ * holding a lone `*` beside a literal one on the same line is a case this does not untangle.
+ */
+export const literalStars = new ExternalTokenizer((input) => {
+  if (!isLoneStar(input, 0)) return;
+
+  let before = 0;
+  for (let offset = -1; ; offset -= 1) {
+    const code = input.peek(offset);
+    if (code < 0 || isLineEnd(code)) break;
+    if (isLoneStar(input, offset)) before += 1;
+  }
+  if (before % 2 === 1) return;
+
+  for (let offset = 1; ; offset += 1) {
+    const code = input.peek(offset);
+    if (code < 0 || isLineEnd(code)) break;
+    if (isLoneStar(input, offset)) return;
+  }
+  input.acceptToken(LiteralStar, 1);
 });

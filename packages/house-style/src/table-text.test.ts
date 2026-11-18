@@ -44,6 +44,29 @@ describe('reading the table a brief wrote', () => {
 
     expect(table.rows[0]).toEqual({ kind: 'band', text: 'Nível superior' });
   });
+
+  it('reads a line with no separator that starts with * as a note, not a band', () => {
+    const table = readTable(rich('A | B\nx | y*\n*Valores do último edital.\nNível superior'));
+
+    expect(table.notes).toEqual(['*Valores do último edital.']);
+    expect(table.rows).toEqual([
+      { kind: 'cells', cells: ['x', 'y*'] },
+      { kind: 'band', text: 'Nível superior' },
+    ]);
+  });
+
+  it('keeps a typed break inside its cell and the row going after it', () => {
+    const text: RichText = [
+      ...rich('A | B | C\nBanca contratada'),
+      { kind: 'break', typed: true, range: { start: cursor, end: ++cursor } },
+      ...rich('Quadrix | 7.862 | R$ 1,00'),
+    ];
+    const table = readTable(text);
+
+    expect(table.rows).toEqual([
+      { kind: 'cells', cells: ['Banca contratada\nQuadrix', '7.862', 'R$ 1,00'] },
+    ]);
+  });
 });
 
 describe('where a cell may break', () => {
@@ -72,6 +95,21 @@ describe('where a cell may break', () => {
   it('does not glue a connector that is a word, not a range', () => {
     // "e" between two words is prose; only a value before and after makes a range.
     expect(shown('Analista e Técnico')).toBe('Analista e Técnico');
+  });
+
+  it('leaves a long parenthesised phrase free to break, and glues a short one', () => {
+    expect(shown('10.604 (2.650 imediatas + 7.954 CR)')).toBe(
+      '10.604 (2.650 imediatas~+~7.954~CR)',
+    );
+    expect(shown('1.000 (nível superior)')).toBe('1.000~(nível~superior)');
+  });
+
+  it('keeps a dash with the word before it', () => {
+    expect(shown('Banca contratada — Quadrix')).toBe('Banca contratada~— Quadrix');
+  });
+
+  it('glues each line of a cell the author broke on its own', () => {
+    expect(shown('R$ 1,00\nR$ 2,00')).toBe('R$~1,00\nR$~2,00');
   });
 
   it('breaks a range into its two values and nowhere else', () => {

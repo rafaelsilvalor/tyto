@@ -90,8 +90,11 @@ had to answer them.
   cannot do (ADR 0015).
 - **Two closers cannot touch.** `**bold *italic***` does not parse: longest match reads the
   trailing `***` as `**` then `*`, leaving both runs open. Write `**bold *italic* **` or
-  reorder so text separates the closers. The error lands at the end of the line, repeated
-  once per open run — the editor collapses it before showing a squiggle.
+  reorder so text separates the closers. The error lands at the end of the line.
+- **A lone `*` nothing on its line closes is a literal asterisk** (ADR 0213): `R$ 4.143,06*`
+  and a footnote line `*Valores de referência` are text. Lone stars are paired along their line,
+  so `*a* b*` is italic `a`, then ` b*`. A `\` the author typed reaches the AST as a `Break`
+  with `typed: true`; a block line's end is a `Break` without it.
 - **The first `{…}` after a directive name is an adjustment list.** A mark opens the same
   way, so `::titulo {cor:azul}oi{/}` reads `{cor:azul}` as an adjustment. Put text before
   the mark, or put it in an indented body, where a mark may lead the line.

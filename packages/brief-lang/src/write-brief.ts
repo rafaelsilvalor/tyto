@@ -21,7 +21,7 @@ import { parseBrief } from './parse-brief.js';
  * default rather than being set to nothing.
  *
  * The written text is parsed back before it is returned, so a value the grammar cannot hold
- * (an unpaired `*`) is a problem naming its slot, and a brief that would not parse is never
+ * (an unclosed `**`) is a problem naming its slot, and a brief that would not parse is never
  * handed to anybody to write.
  *
  * Pure: no Node, no DOM (ADR 0010).
