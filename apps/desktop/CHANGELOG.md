@@ -1,5 +1,14 @@
 # @tyto/desktop
 
+## 0.24.5
+
+### Patch Changes
+
+- c6cd6aa: A `\` typed inside a `|` line no longer restarts the column colours: the words after it stay
+  in their column, as a table row keeps the break inside its cell.
+- Updated dependencies [c6cd6aa]
+  - @tyto/editor@0.21.4
+
 ## 0.24.4
 
 ### Patch Changes
