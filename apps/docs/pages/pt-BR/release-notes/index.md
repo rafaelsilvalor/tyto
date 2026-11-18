@@ -3,6 +3,7 @@
 O que mudou em cada versão do aplicativo, da mais nova para a mais antiga. Cada página é o texto
 publicado com aquela versão.
 
+- [Tyto 0.24.5](./desktop-v0.24.5) — a ficha de entrega vem ao lado da linha, e as cores das colunas seguem depois de um `\`
 - [Tyto 0.24.3](./desktop-v0.24.3) — um asterisco sozinho é só um asterisco, e a ficha de entrega guarda os campos que você declara
 - [Tyto 0.24.1](./desktop-v0.24.1) — as pastas recentes atravessam a atualização, e uma receita mantém uma pasta de entrega por linha
 - [Tyto 0.23.2](./desktop-v0.23.2) — o brief escreve fração, dispensa o recuo e aninha tags pelo template
