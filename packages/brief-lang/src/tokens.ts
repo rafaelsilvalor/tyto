@@ -326,7 +326,7 @@ function isLoneStar(input: Input, offset: number): boolean {
 }
 
 /**
- * A lone `*` that nothing on its line closes, as a literal asterisk (ADR 0213).
+ * A lone `*` that nothing on its line closes, as a literal asterisk (ADR 0214).
  *
  * An italic run never crosses a line, so whether a `*` opens one is settled by its line alone.
  * The lone stars before it on the line are counted: an odd count means one of them is open and

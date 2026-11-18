@@ -91,7 +91,7 @@ had to answer them.
 - **Two closers cannot touch.** `**bold *italic***` does not parse: longest match reads the
   trailing `***` as `**` then `*`, leaving both runs open. Write `**bold *italic* **` or
   reorder so text separates the closers. The error lands at the end of the line.
-- **A lone `*` nothing on its line closes is a literal asterisk** (ADR 0213): `R$ 4.143,06*`
+- **A lone `*` nothing on its line closes is a literal asterisk** (ADR 0214): `R$ 4.143,06*`
   and a footnote line `*Valores de referência` are text. Lone stars are paired along their line,
   so `*a* b*` is italic `a`, then ` b*`. A `\` the author typed reaches the AST as a `Break`
   with `typed: true`; a block line's end is a `Break` without it.

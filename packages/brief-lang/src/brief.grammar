@@ -79,7 +79,7 @@ bodyInline { headInline | Mark }
 // because longest match reads the trailing `***` as `**` then `*` and no lookahead could
 // prefer the other split. Write `**bold *italic* **` or reorder the runs (ADR 0015).
 //
-// A lone `*` that nothing on its line closes is a literal asterisk, `LiteralStar` (ADR 0213):
+// A lone `*` that nothing on its line closes is a literal asterisk, `LiteralStar` (ADR 0214):
 // `R$ 4.143,06*` and a footnote line `*Valores de referência` are text, not an italic run left
 // open. Whether a later `*` closes it needs the rest of the line, so `tokens.ts` decides.
 headInline { Text | Space | Bold | Italic | Break | Formula | LiteralStar | escape }

@@ -5,7 +5,7 @@ import { type Inline } from './index.js';
 import { parseBrief } from './parse-brief.js';
 
 /**
- * A lone `*` that nothing on its line closes is a literal asterisk (TYTO-775, ADR 0213).
+ * A lone `*` that nothing on its line closes is a literal asterisk (TYTO-775, ADR 0214).
  *
  * Before: `R$ 4.143,06*` in a table cell and a footnote line `*Valores de referência` were each
  * `E_SYNTAX`, "an italic run is missing its closing *", and the brief rendered nothing.

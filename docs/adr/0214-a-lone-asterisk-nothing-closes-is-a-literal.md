@@ -1,4 +1,4 @@
-# 0213 — A lone asterisk nothing closes is a literal
+# 0214 — A lone asterisk nothing closes is a literal
 
 Status: accepted · 2026-11-18 · TYTO-775 · amends ADR 0015
 

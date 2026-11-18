@@ -145,7 +145,7 @@ describe('where the error lands', () => {
   it('piles the adjacent-emphasis error at the end of the line', () => {
     // `**Constitucional *aplicado***`: longest match reads the trailing `***` as `**`
     // then `*`, so both runs are left open and recovery inserts the closers at EOF. It was
-    // four identical empty nodes until a lone `*` nothing closes became a literal (ADR 0213):
+    // four identical empty nodes until a lone `*` nothing closes became a literal (ADR 0214):
     // recovery now settles in one, still where the closing stars should be.
     expect(errorRanges(brokenAdjacentEmphasis)).toEqual([{ from: 46, to: 46, text: '' }]);
   });

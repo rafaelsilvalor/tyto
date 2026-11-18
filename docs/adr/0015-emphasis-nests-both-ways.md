@@ -28,4 +28,4 @@ The Scene IR needed nothing. A `TextRun` already carries `weight` and `style` in
 
 ## Note of 2026-11-18
 
-ADR 0213 makes a lone `*` that nothing on its line closes a literal asterisk. A `*` with a partner on its line still opens and closes italic exactly as decided here; the `***` limit stands, and recovery on it now leaves one error node at the end of the line instead of four.
+ADR 0214 makes a lone `*` that nothing on its line closes a literal asterisk. A `*` with a partner on its line still opens and closes italic exactly as decided here; the `***` limit stands, and recovery on it now leaves one error node at the end of the line instead of four.

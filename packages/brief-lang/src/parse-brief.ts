@@ -127,7 +127,7 @@ function literalOf(text: string, node: SyntaxNode): string | undefined {
     // (ADR 0204).
     case 'EscapedComment':
       return '//';
-    // A `*` nothing on its line closes is the character itself (ADR 0213).
+    // A `*` nothing on its line closes is the character itself (ADR 0214).
     case 'LiteralStar':
       return '*';
     default:
