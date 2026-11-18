@@ -1,9 +1,12 @@
 import {
+  DELIVERY_CHECK_COLUMNS,
   DELIVERY_WRITABLE_FIELDS,
   type DeliveryRecord,
   type Diagnostic,
   type Result,
+  type Size,
   type SourceRange,
+  checkDelivery,
   deliveryFormatsText,
   declaredFieldProblem,
   deliveryNameOf,
@@ -27,7 +30,7 @@ import {
   cellText,
   findColumn,
 } from './table.js';
-import type { ToDeliveryPorts } from './to-delivery.js';
+import type { DeliveryListing, ToDeliveryPorts } from './to-delivery.js';
 
 /**
  * `deliveries` (ADR 0211): a source that reads every delivery record under the project's
@@ -52,12 +55,19 @@ import type { ToDeliveryPorts } from './to-delivery.js';
  * whose `fields` is not a map of text, written by hand before ADR 0213, still reads, without
  * declared fields, and a warning names its folder.
  *
+ * Every row also says how its exports stand against the record (ADR 0215): the images at the
+ * root of `delivery.exports`, by pixel size, against the formats it owes at `delivery.sizes`
+ * (the host's format catalogue for a name it leaves out). `check` is `ready`, `incomplete` or
+ * `in-progress`, `check_problems` names each problem, `; `-separated, and `found_formats` the
+ * shapes found (`4:5:1,9:16:1`), in the words a remote folder's shapes are counted in, so a
+ * recipe maps both through one vocabulary table.
+ *
  * `with-deliveries by=<column>` (TYTO-779, ADR 0213's note of 2026-11-18) reads the same records
  * beside rows that came from elsewhere. It is a transform, not a source, so it is its own verb:
  * a verb has one kind whatever its arguments.
  */
 
-/** The columns, in order: where the delivery is, then the record's fields. */
+/** The columns, in order: where the delivery is, the record's fields, then the check. */
 export const DELIVERY_COLUMNS: readonly Column[] = [
   { name: 'folder', type: 'text', origin: 'deliveries' },
   { name: 'path', type: 'text', origin: 'deliveries' },
@@ -66,6 +76,7 @@ export const DELIVERY_COLUMNS: readonly Column[] = [
     type: field === 'link' ? 'link' : 'text',
     origin: 'deliveries',
   })),
+  ...DELIVERY_CHECK_COLUMNS.map((name): Column => ({ name, type: 'text', origin: 'deliveries' })),
 ];
 
 /** What `with-deliveries` puts before each column it brings, so none shadows a row's own. */
@@ -187,7 +198,8 @@ async function readRecords(
   if (!layout.ok) {
     return refuse(context, `cannot read the delivery layout: ${messages(layout.error)}`, at);
   }
-  const listed = await ports.list(layout.value.parent);
+  const listed = await ports.list(layout.value.parent, layout.value.exports ?? '.');
+  const sizes = layout.value.sizes ?? {};
   if (!listed.ok) {
     return refuse(context, `cannot list the deliveries: ${messages(listed.error)}`, at);
   }
@@ -232,7 +244,10 @@ async function readRecords(
     found.push({
       name: entry.name,
       path: entry.path,
-      values: valuesOf(entry.name, entry.path, record.value),
+      values: {
+        ...valuesOf(entry.name, entry.path, record.value),
+        ...checkValuesOf(entry, record.value, sizes),
+      },
       fields,
     });
   }
@@ -427,6 +442,25 @@ function valuesOf(
     }
   }
   return values;
+}
+
+/** The check's cells (ADR 0215): its state, its problems, and the shapes found. */
+function checkValuesOf(
+  entry: DeliveryListing,
+  record: DeliveryRecord,
+  sizes: Readonly<Record<string, Size>>,
+): Readonly<Record<string, CellValue>> {
+  const check = checkDelivery({
+    formats: record.formats,
+    sizes,
+    images: entry.images ?? [],
+    editables: entry.editables ?? 0,
+  });
+  return {
+    check: check.state,
+    check_problems: check.problems.length === 0 ? null : check.problems.join('; '),
+    found_formats: check.found === '' ? null : check.found,
+  };
 }
 
 function messages(found: readonly Diagnostic[]): string {

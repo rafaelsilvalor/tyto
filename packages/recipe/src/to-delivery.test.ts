@@ -22,17 +22,29 @@ class FakeWorkspace implements ToDeliveryPorts {
   readonly writes: string[] = [];
   where: DeliveryPlace | undefined = { restricted: false };
   parent = 'entregas';
+  /** `delivery.exports` and `delivery.sizes` (ADR 0215), when a test sets them. */
+  exports: string | undefined;
+  sizes: DeliveryLayout['sizes'];
+  /** Each delivery's images and editables, by folder path, and the `exports` list was asked. */
+  readonly landed = new Map<string, Pick<DeliveryListing, 'images' | 'editables'>>();
+  readonly listedExports: (string | undefined)[] = [];
 
   folder(): DeliveryPlace | undefined {
     return this.where;
   }
   layout() {
-    const layout: DeliveryLayout = { parent: this.parent, folders: ['assets', 'editaveis'] };
+    const layout: DeliveryLayout = {
+      parent: this.parent,
+      folders: ['assets', 'editaveis'],
+      ...(this.exports === undefined ? {} : { exports: this.exports }),
+      ...(this.sizes === undefined ? {} : { sizes: this.sizes }),
+    };
     return Promise.resolve(ok(layout));
   }
   /** Folders the host may not read, by path, with the reason. */
   readonly unreadable = new Map<string, string>();
-  list(parent: string) {
+  list(parent: string, exports?: string) {
+    this.listedExports.push(exports);
     const prefix = parent === '' ? '' : `${parent}/`;
     const names = new Set<string>();
     for (const path of [...this.folders, ...this.files.keys()]) {
@@ -45,7 +57,9 @@ class FakeWorkspace implements ToDeliveryPorts {
       const problem = this.unreadable.get(path);
       if (problem !== undefined) return { name, path, problem };
       const record = this.files.get(`${path}/editaveis/delivery.json`);
-      return record === undefined ? { name, path } : { name, path, record };
+      return record === undefined
+        ? { name, path }
+        : { name, path, record, ...this.landed.get(path) };
     });
     return Promise.resolve(ok(listed));
   }
@@ -362,6 +376,9 @@ describe('deliveries (ADR 0211)', () => {
       'due',
       'ship',
       'state',
+      'check',
+      'check_problems',
+      'found_formats',
     ]);
     expect(cell?.table?.rows[0]?.values).toMatchObject({
       folder: 'mca-1_aula',
@@ -619,8 +636,8 @@ describe('to-delivery declared fields (ADR 0213)', () => {
     const { cells } = await runLines(['deliveries'], workspace);
     const table = cells[0]?.table;
     expect(table?.columns.map((column) => column.name).slice(-3)).toEqual([
-      'ship',
-      'state',
+      'check_problems',
+      'found_formats',
       'description',
     ]);
     expect(table?.rows.map((row) => row.values['description'])).toEqual([
@@ -641,7 +658,7 @@ describe('to-delivery declared fields (ADR 0213)', () => {
     await apply(first.verbs, first.plan);
     const { cells } = await runLines(['deliveries'], workspace);
     expect(cells[0]?.table?.columns.map((column) => column.name).slice(-3)).toEqual([
-      'state',
+      'found_formats',
       'assignee',
       'variant',
     ]);
@@ -860,6 +877,9 @@ describe('with-deliveries (TYTO-779)', () => {
       ['record_due', 'text'],
       ['record_ship', 'text'],
       ['record_state', 'text'],
+      ['record_check', 'text'],
+      ['record_check_problems', 'text'],
+      ['record_found_formats', 'text'],
       ['record_description', 'text'],
     ]);
     const cells = (name: string) => table?.rows.map((row) => row.values[name]);
@@ -948,11 +968,19 @@ describe('with-deliveries (TYTO-779)', () => {
       const empty = new FakeWorkspace();
       const source = await bring('deliveries fields=variante,description', empty, null);
       expect(source.problems).toEqual([]);
-      expect(names(source.table)).toEqual([...FIXED, 'state', 'description', 'variante']);
+      expect(names(source.table)).toEqual([
+        ...FIXED,
+        'state',
+        'check',
+        'check_problems',
+        'found_formats',
+        'description',
+        'variante',
+      ]);
       expect(source.table?.rows).toEqual([]);
       const brought = await bring('with-deliveries by=pasta fields=variante', empty);
       expect(brought.problems).toEqual([]);
-      expect(names(brought.table)?.slice(-2)).toEqual(['record_state', 'record_variante']);
+      expect(names(brought.table)?.slice(-2)).toEqual(['record_found_formats', 'record_variante']);
       expect(brought.table?.rows.map((row) => row.values['record_variante'])).toEqual([
         null,
         null,
@@ -976,7 +1004,7 @@ describe('with-deliveries (TYTO-779)', () => {
         'record_variante',
       ]);
       const listedAndHeld = await bring('deliveries fields=description', workspace, null);
-      expect(names(listedAndHeld.table)?.slice(-2)).toEqual(['state', 'description']);
+      expect(names(listedAndHeld.table)?.slice(-2)).toEqual(['found_formats', 'description']);
     });
 
     it('refuses a column a listed field would add that the table already has', async () => {
@@ -1037,5 +1065,75 @@ describe('with-deliveries (TYTO-779)', () => {
         "'deliveries' takes no bare word: the project's delivery.parent says where deliveries are.",
       ]);
     });
+  });
+});
+
+describe('deliveries check (ADR 0215)', () => {
+  const owing = (key: string) =>
+    JSON.stringify({
+      version: 1,
+      key,
+      formats: [
+        { format: 'feed', count: 1 },
+        { format: 'story', count: 1 },
+      ],
+    });
+
+  async function checked(workspace: FakeWorkspace) {
+    const { cells } = await runLines(['deliveries'], workspace);
+    return cells[0]?.table?.rows.map((row) => [
+      row.key,
+      row.values['check'],
+      row.values['check_problems'],
+      row.values['found_formats'],
+    ]);
+  }
+
+  it('checks each record against the images its exports folder holds', async () => {
+    const workspace = new FakeWorkspace();
+    workspace.exports = 'final';
+    workspace.sizes = { feed: { w: 1080, h: 1350 }, story: { w: 1080, h: 1920 } };
+    workspace.files.set('entregas/a/editaveis/delivery.json', owing('T-1'));
+    workspace.files.set('entregas/b/editaveis/delivery.json', owing('T-2'));
+    workspace.files.set('entregas/c/editaveis/delivery.json', owing('T-3'));
+    workspace.landed.set('entregas/a', {
+      images: [
+        { name: 'feed.png', size: { w: 1080, h: 1350 } },
+        { name: 'story.png', size: { w: 1080, h: 1920 } },
+      ],
+      editables: 1,
+    });
+    workspace.landed.set('entregas/b', {
+      images: [
+        { name: 'feed.png', size: { w: 1080, h: 1080 } },
+        { name: 'story.png', size: { w: 1080, h: 1920 } },
+      ],
+      editables: 1,
+    });
+    expect(await checked(workspace)).toEqual([
+      ['T-1', 'ready', null, '4:5:1,9:16:1'],
+      [
+        'T-2',
+        'incomplete',
+        "'feed' has 0 of 1 at 1080×1350; 'feed.png' is 1080×1080, and the record owes feed 1080×1350, story 1080×1920",
+        '1:1:1,9:16:1',
+      ],
+      ['T-3', 'in-progress', null, null],
+    ]);
+    expect(workspace.listedExports).toEqual(['final']);
+  });
+
+  it("asks for the delivery's root when the layout names no exports folder, and names a format with no size", async () => {
+    const workspace = new FakeWorkspace();
+    workspace.files.set('entregas/a/editaveis/delivery.json', owing('T-1'));
+    expect(await checked(workspace)).toEqual([
+      [
+        'T-1',
+        'in-progress',
+        "no size is known for 'feed'; add it to delivery.sizes; no size is known for 'story'; add it to delivery.sizes",
+        null,
+      ],
+    ]);
+    expect(workspace.listedExports).toEqual(['.']);
   });
 });

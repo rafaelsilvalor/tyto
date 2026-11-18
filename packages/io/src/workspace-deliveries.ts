@@ -1,12 +1,14 @@
 import type { Dirent } from 'node:fs';
-import { mkdir, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
 import {
   DELIVERY_RECORD_FILE,
   DELIVERY_RECORD_FOLDER,
+  type DeliveryImage,
   type Diagnostic,
   type Result,
+  type Size,
   type Trust,
   type TrustStore,
   diagnostic,
@@ -21,6 +23,7 @@ import type {
 } from '@tyto/plugin-api';
 
 import { fsTrustStore } from './fs-trust-store.js';
+import { imageSize } from './image-size.js';
 import { isMissing } from './real-paths.js';
 import { writeEntry } from './source-cache.js';
 import { briefDigest } from './workspace-briefs.js';
@@ -44,6 +47,11 @@ import { loadWorkspace } from './workspace.js';
  * `list` is what `deliveries` reads the records back through (ADR 0211): the folders directly
  * under `delivery.parent`, hidden ones and `.tyto` left out, each record read through its own
  * confinement, in a trusted folder only, as every other call.
+ *
+ * Given the layout's `exports`, `list` also reads, for each folder with a record, the PNG and
+ * JPEG files at the root of that exports folder, each one's pixel size from its header only
+ * (`imageSize`, no decode and no new dependency), and counts the other files beside the record:
+ * what `deliveries` checks the record against (ADR 0215).
  */
 
 export interface WorkspaceDeliveryOptions {
@@ -57,7 +65,22 @@ export interface WorkspaceDeliveryOptions {
   readonly trustStore?: TrustStore;
   /** The host's clock as ISO 8601, which stamps an applied write. */
   readonly now?: () => string;
+  /**
+   * The pixel size of each format in the host's format catalogue (`formats.yaml`), which a
+   * name `delivery.sizes` leaves out falls back to (ADR 0215). None when absent.
+   */
+  readonly formatSizes?: () => Promise<Readonly<Record<string, Size>>>;
 }
+
+/** The images a delivery's check reads: what a designer exports, as a remote count reads them. */
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg']);
+
+/**
+ * How much of an image is read for its size. A PNG states it in its first 24 bytes; a JPEG after
+ * its metadata, which a camera or Photoshop can make long, so the head is generous and a file
+ * whose size is not in it is read whole once.
+ */
+const IMAGE_HEAD_BYTES = 256 * 1024;
 
 type Refusal = Result<never, readonly Diagnostic[]>;
 
@@ -78,13 +101,19 @@ export function workspaceDeliveryPorts(options: WorkspaceDeliveryOptions): ToDel
     if (workspaceFolder === undefined) return refuse('writes only inside a workspace');
     const loaded = await loadWorkspace(workspaceFolder, { trustStore, home });
     if (loaded === undefined) return refuse('writes no delivery in the Tyto home folder');
-    const { parent, folders } = loaded.project.delivery;
+    const { parent, folders, exports, sizes } = loaded.project.delivery;
     // `core` kept `parent` inside the workspace already (ADR 0157 §3); asked again, cheaply.
     const between = relative(loaded.folder, parent);
     if (between === '..' || between.startsWith(`..${sep}`) || isAbsolute(between)) {
       return refuse(`finds delivery.parent '${parent}' outside the workspace`);
     }
-    return ok({ parent: between.split(sep).filter(Boolean).join('/'), folders });
+    const catalogue = (await options.formatSizes?.()) ?? {};
+    return ok({
+      parent: between.split(sep).filter(Boolean).join('/'),
+      folders,
+      exports,
+      sizes: { ...catalogue, ...sizes },
+    });
   }
 
   /** The real path of a workspace path, or the refusal that stops the call. */
@@ -154,11 +183,76 @@ export function workspaceDeliveryPorts(options: WorkspaceDeliveryOptions): ToDel
     }
   }
 
+  /**
+   * The images at the root of a delivery's exports folder and the editables beside its record,
+   * for the check (ADR 0215). A folder that is not there holds nothing; one that leads out of
+   * the workspace is not read, and holds nothing either: its record already read, or did not.
+   */
+  async function landedIn(
+    path: string,
+    exports: string,
+  ): Promise<{ readonly images: readonly DeliveryImage[]; readonly editables: number }> {
+    const images: DeliveryImage[] = [];
+    const exportsFolder = exports === '.' ? path : `${path}/${exports}`;
+    for (const name of await filesIn(exportsFolder)) {
+      const dot = name.lastIndexOf('.');
+      if (dot <= 0 || !IMAGE_EXTENSIONS.has(name.slice(dot).toLowerCase())) continue;
+      const size = await sizeOf(`${exportsFolder}/${name}`);
+      images.push(size === undefined ? { name } : { name, size });
+    }
+    const beside = await filesIn(`${path}/${DELIVERY_RECORD_FOLDER}`);
+    const editables = beside.filter((name) => name !== DELIVERY_RECORD_FILE).length;
+    return { images, editables };
+  }
+
+  /** The visible files directly in a workspace folder, by name; none when it cannot be read. */
+  async function filesIn(path: string): Promise<readonly string[]> {
+    const confined = await confineToWorkspace(
+      workspaceFolder ?? '',
+      join(workspaceFolder ?? '', path),
+      { follow: 'nearest' },
+    );
+    if ('refused' in confined) return [];
+    try {
+      const entries = await readdir(confined.real, { withFileTypes: true });
+      return entries
+        .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+        .map((entry) => entry.name)
+        .sort();
+    } catch {
+      return [];
+    }
+  }
+
+  /** An image's pixel size from its header, or `undefined` when it does not read. */
+  async function sizeOf(path: string): Promise<Size | undefined> {
+    const confined = await confineToWorkspace(
+      workspaceFolder ?? '',
+      join(workspaceFolder ?? '', path),
+      { follow: 'nearest' },
+    );
+    if ('refused' in confined) return undefined;
+    try {
+      const handle = await open(confined.real, 'r');
+      try {
+        const head = Buffer.alloc(IMAGE_HEAD_BYTES);
+        const { bytesRead } = await handle.read(head, 0, IMAGE_HEAD_BYTES, 0);
+        const size = imageSize(head.subarray(0, bytesRead));
+        if (size !== undefined || bytesRead < IMAGE_HEAD_BYTES) return size;
+      } finally {
+        await handle.close();
+      }
+      return imageSize(await readFile(confined.real));
+    } catch {
+      return undefined;
+    }
+  }
+
   return {
     folder,
     layout,
 
-    async list(parent) {
+    async list(parent, exports) {
       const real = await locate(parent);
       if (!real.ok) return real;
       let entries: Dirent[];
@@ -176,7 +270,10 @@ export function workspaceDeliveryPorts(options: WorkspaceDeliveryOptions): ToDel
       const listed: DeliveryListing[] = [];
       for (const name of names) {
         const path = parent === '' ? name : `${parent}/${name}`;
-        listed.push({ name, path, ...(await recordOf(path)) });
+        const record = await recordOf(path);
+        const landed =
+          exports === undefined || record.record === undefined ? {} : await landedIn(path, exports);
+        listed.push({ name, path, ...record, ...landed });
       }
       return ok(listed);
     },

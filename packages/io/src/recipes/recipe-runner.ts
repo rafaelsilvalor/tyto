@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 
 import {
   type Diagnostic,
+  type Size,
   type TemplateManifest,
   createLineIndex,
   diagnostic,
@@ -140,6 +141,11 @@ export interface RecipeRunnerOptions {
    * only its address and its Apply is refused as from a host that sends none.
    */
   readonly calls?: RecipeRunnerCalls;
+  /**
+   * TYTO-757, ADR 0215: the pixel size of each format in the host's catalogue, which a format
+   * name `delivery.sizes` leaves out is checked at. Absent, only `delivery.sizes` is known.
+   */
+  readonly formatSizes?: () => Promise<Readonly<Record<string, Size>>>;
   /** Overrides for a test; the app takes the defaults. */
   readonly registries?: (request: RecipeRegistryRequest) => RecipeRegistries;
   readonly state?: (options: RecipeStateOptions) => RecipeState;
@@ -364,7 +370,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
           place.trust === 'trusted' ? options.sectionFor(directory, plugin) : undefined,
         refresh: request.fresh === true,
         briefs: briefsFor(place, directory, options.templates),
-        deliveries: deliveriesFor(place, options.home),
+        deliveries: deliveriesFor(place, options),
         calls: callsFor(place, directory, options.calls),
       });
       const steps = recipe.steps;
@@ -570,7 +576,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       refresh: false,
       now,
       briefs: briefsFor(place, directory, options.templates, now),
-      deliveries: deliveriesFor(place, options.home, now),
+      deliveries: deliveriesFor(place, options, now),
       calls: callsFor(place, directory, options.calls, now),
     });
     const answer = await applyCell({
@@ -908,14 +914,20 @@ function briefsFor(
  * `to-brief`'s are. Lent whatever the host's templates: a delivery needs no template. A recipe in
  * no workspace still gets ports, whose folder is nowhere, so the verb says where it may write.
  */
-function deliveriesFor(place: RecipePlace, home: string, now?: () => string): ToDeliveryPorts {
+function deliveriesFor(
+  place: RecipePlace,
+  options: RecipeRunnerOptions,
+  now?: () => string,
+): ToDeliveryPorts {
   const inWorkspace = place.trust !== 'none' && place.folder !== undefined;
   const trust = place.trust === 'trusted' ? 'trusted' : 'restricted';
+  const { formatSizes } = options;
   return workspaceDeliveryPorts({
     workspaceFolder: inWorkspace ? place.folder : undefined,
     trust: () => trust,
-    home,
+    home: options.home,
     ...(now === undefined ? {} : { now }),
+    ...(formatSizes === undefined ? {} : { formatSizes }),
   });
 }
 
