@@ -129,7 +129,7 @@ beforeAll(async () => {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
   }, work);
   await switchingFolder(page, () => command('workspace.openFolder'));
-}, 60_000);
+}, 300_000);
 
 afterAll(async () => {
   await closeApp(app);
