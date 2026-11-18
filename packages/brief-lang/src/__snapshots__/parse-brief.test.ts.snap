@@ -476,50 +476,24 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
               {
                 "kind": "text",
                 "range": {
-                  "end": 34,
+                  "end": 43,
                   "start": 19,
                 },
-                "value": "Constitucional ",
-              },
-              {
-                "children": [
-                  {
-                    "kind": "text",
-                    "range": {
-                      "end": 43,
-                      "start": 35,
-                    },
-                    "value": "aplicado",
-                  },
-                  {
-                    "children": [
-                      {
-                        "children": [],
-                        "kind": "italic",
-                        "range": {
-                          "end": 46,
-                          "start": 45,
-                        },
-                      },
-                    ],
-                    "kind": "bold",
-                    "range": {
-                      "end": 46,
-                      "start": 43,
-                    },
-                  },
-                ],
-                "kind": "italic",
-                "range": {
-                  "end": 46,
-                  "start": 34,
-                },
+                "value": "Constitucional *aplicado",
               },
             ],
             "kind": "bold",
             "range": {
-              "end": 46,
+              "end": 45,
               "start": 17,
+            },
+          },
+          {
+            "children": [],
+            "kind": "italic",
+            "range": {
+              "end": 46,
+              "start": 45,
             },
           },
         ],
@@ -1512,6 +1486,7 @@ exports[`the corpus, one level up from the tree > matches the recorded AST of ev
               "end": 27,
               "start": 26,
             },
+            "typed": true,
           },
         ],
         "name": "subtitulo",

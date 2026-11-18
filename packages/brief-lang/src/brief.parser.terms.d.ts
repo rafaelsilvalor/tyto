@@ -12,3 +12,4 @@ export declare const commentBreak: number;
 export declare const Formula: number;
 export declare const bodyBreak: number;
 export declare const directiveIndent: number;
+export declare const LiteralStar: number;

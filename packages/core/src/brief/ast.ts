@@ -49,10 +49,15 @@ export interface Italic {
  * a paragraph. It is still one line break; how much room a paragraph takes is the template's
  * to say (`RunsOptions.paragraphSpacing`), and a template that says nothing draws it as any
  * other break. Absent, never `false`, so every break written before it reads the same.
+ *
+ * `typed` marks a `\` the author wrote, as against the boundary between two lines of a block.
+ * Most templates draw both the same; one that reads each block line as a record — a table row —
+ * needs to tell a break inside a record from the end of one. Absent, never `false`, as above.
  */
 export interface Break {
   readonly kind: 'break';
   readonly paragraph?: true;
+  readonly typed?: true;
   readonly range: SourceRange;
 }
 

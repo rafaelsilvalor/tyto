@@ -44,6 +44,10 @@ One asterisk on each side, `*like this*`, is italic. Italic inside bold, `**a *f
 
 A template whose typeface has no italic cannot export it. Tyto says so while you write, with `E_FONT_FACE_UNAVAILABLE` on the italic words in the Problems panel; the preview still draws, but no file is written for that artwork until the italic comes out or the template changes.
 
+### An asterisk on its own
+
+A `*` that no other `*` on the same line closes is just the character: `R$ 4.143,06*` and a note that starts `*Values from the last notice` come out with their asterisk, as you wrote them. Italic never runs from one line to the next, so an asterisk at the end of one line and one at the start of the next do not pair up. Two lone `*` on the same line still make the words between them italic.
+
 ## Formulas
 
 Write a formula between two `$`. Inside it, `\frac{top}{bottom}` stacks a fraction over a rule, `^` raises a superscript and `_` lowers a subscript. Each takes a group in braces, or a single character without them: `$x^2$` is the same as `$x^{2}$`. A group may hold another fraction or another script, as in `$\frac{1}{10^{3}}$`.

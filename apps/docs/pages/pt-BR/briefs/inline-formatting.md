@@ -44,6 +44,10 @@ Um asterisco de cada lado, `*assim*`, é itálico. Itálico dentro do negrito, `
 
 Um template cuja fonte não tem itálico não consegue exportá-lo. O Tyto avisa enquanto você escreve, com `E_FONT_FACE_UNAVAILABLE` nas palavras em itálico no painel de Problemas; a prévia continua desenhando, mas nenhum arquivo é gravado para aquela arte até o itálico sair ou o template mudar.
 
+### Um asterisco sozinho
+
+Um `*` que nenhum outro `*` fecha na mesma linha é só o caractere: `R$ 4.143,06*` e uma nota que começa com `*Valores do último edital` saem com o asterisco, como você escreveu. Um itálico nunca passa de uma linha para outra, então o asterisco no fim de uma linha e o do começo da linha seguinte não se juntam. Se houver dois `*` soltos na mesma linha, o texto entre eles vira itálico.
+
 ## Fórmulas
 
 Escreva uma fórmula entre dois `$`. Dentro dela, `\frac{cima}{baixo}` empilha uma fração sobre um traço, `^` sobe um expoente e `_` desce um índice. Cada um recebe um grupo entre chaves, ou um único caractere sem elas: `$x^2$` é o mesmo que `$x^{2}$`. Um grupo pode ter outra fração ou outro expoente, como em `$\frac{1}{10^{3}}$`.

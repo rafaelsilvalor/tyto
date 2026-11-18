@@ -85,6 +85,21 @@ export const HEADER = { tracking: 0.05, lineHeight: 1.2, block: 1.06 } as const;
 /** A band across the whole table: bold, uppercase, tracked, a little less tall. */
 export const BAND = { tracking: 0.04, block: 0.94, inline: 0.6 } as const;
 
+/**
+ * The notes under the table, the `*` lines: smaller than the body, in the body's ink, set
+ * left as a footnote is. Their size follows the body's, so a table set small does not carry
+ * notes as big as its cells.
+ */
+export const NOTE = {
+  /** The note's size as a multiple of the body's. */
+  perBody: 0.72,
+  /** The smallest a note is set, in px. */
+  floor: 13,
+  lineHeight: 1.3,
+  /** Table → notes, in em of the body. */
+  gap: 0.7,
+} as const;
+
 /** Cell geometry, in px. */
 export const CELL = { radius: 4, gapX: 6, gapY: 5 } as const;
 
