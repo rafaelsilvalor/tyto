@@ -2,6 +2,7 @@ import {
   type Diagnostic,
   type FileSystem,
   type FormatCatalogue,
+  type Size,
   type TemplateFailure,
   type TemplateManifest,
   type TemplateRegistry,
@@ -10,6 +11,7 @@ import {
   loadFormats,
   loadTemplateRegistry,
   NO_TEMPLATE_CONFIGURATIONS,
+  catalogueSizes,
   resolveTemplateConfigurations,
 } from '@tyto/core';
 import type { InstalledCodePack } from '@tyto/io';
@@ -311,4 +313,16 @@ export function templateManifestsOf(
     const { registry, configurations } = sources.current();
     return Promise.resolve(registry?.get(configurations.select(name)?.template ?? name));
   };
+}
+
+/**
+ * The pixel size of each format in the catalogue in force (TYTO-757, ADR 0215): what a format
+ * name `delivery.sizes` leaves out is checked at, by a recipe's `deliveries` and the Explorer's
+ * badge alike. Read at every call, so a folder whose `formats.yaml` changed answers the new one.
+ */
+export function formatSizesOf(
+  sources: Pick<ProjectSources, 'current'>,
+): Readonly<Record<string, Size>> {
+  const { formats } = sources.current();
+  return formats === undefined ? {} : catalogueSizes(formats);
 }

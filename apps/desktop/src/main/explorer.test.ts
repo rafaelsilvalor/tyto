@@ -556,6 +556,31 @@ describe('hearing a change', () => {
   });
 });
 
+describe("a delivery folder's badge (TYTO-757, ADR 0215)", () => {
+  it('gives a listed folder the badge main holds for its real path, and a file none', async () => {
+    const asked: string[] = [];
+    const explorer = createExplorerService({
+      onChange: () => undefined,
+      watch: handWatcher().watch,
+      deliveryOf: (real) => {
+        asked.push(real);
+        return real === join(work, 'slides')
+          ? { check: 'incomplete', problems: ["'feed' has 0 of 1 at 1080×1350"] }
+          : undefined;
+      },
+    });
+    await explorer.setRoot(work);
+    const entries = (await explorer.list(null)).entries;
+    expect(entries.find((entry) => entry.name === 'slides')?.delivery).toEqual({
+      check: 'incomplete',
+      problems: ["'feed' has 0 of 1 at 1080×1350"],
+    });
+    expect(entries.find((entry) => entry.name === 'assets')).not.toHaveProperty('delivery');
+    expect(entries.find((entry) => entry.name === 'logo.png')).not.toHaveProperty('delivery');
+    expect(asked).not.toContain(join(work, 'logo.png'));
+  });
+});
+
 describe('flagging what a name cannot tell (TYTO-282, ADR 0116)', () => {
   beforeEach(async () => {
     await mkdir(join(work, '.tyto'), { recursive: true });

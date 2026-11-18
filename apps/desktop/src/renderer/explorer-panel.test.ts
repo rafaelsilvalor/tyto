@@ -348,6 +348,73 @@ describe('file-type icons (TYTO-282, ADR 0116)', () => {
   });
 });
 
+describe("a delivery folder's badge (TYTO-757, ADR 0215)", () => {
+  const delivered = (): Disk => ({
+    root: {
+      entries: [
+        { id: 'a', name: 'mca-1', kind: 'folder', delivery: { check: 'ready', problems: [] } },
+        {
+          id: 'b',
+          name: 'mca-2',
+          kind: 'folder',
+          delivery: {
+            check: 'incomplete',
+            problems: [
+              "'feed' has 0 of 1 at 1080×1350",
+              "'feed.png' is 1080×1080, and the record owes feed 1080×1350",
+            ],
+          },
+        },
+        {
+          id: 'c',
+          name: 'mca-3',
+          kind: 'folder',
+          delivery: { check: 'in-progress', problems: [] },
+        },
+        { id: 'd', name: 'rascunho', kind: 'folder' },
+      ],
+      more: 0,
+      gone: false,
+    },
+  });
+
+  const badge = (element: ExplorerPanel, name: string) =>
+    row(element, name).querySelector<HTMLElement>('.explorer__delivery');
+
+  it('draws the state after the name, its words for a screen reader and each problem in the tooltip', async () => {
+    const { element } = await mount(delivered());
+
+    expect(
+      ['mca-1', 'mca-2', 'mca-3'].map((name) => [
+        badge(element, name)?.dataset['deliveryCheck'],
+        badge(element, name)?.getAttribute('aria-label'),
+      ]),
+    ).toEqual([
+      ['ready', 'Delivery ready to check'],
+      ['incomplete', 'Delivery incomplete'],
+      ['in-progress', 'Delivery in progress'],
+    ]);
+    expect(badge(element, 'mca-2')?.title).toBe(
+      [
+        'Delivery incomplete',
+        "'feed' has 0 of 1 at 1080×1350",
+        "'feed.png' is 1080×1080, and the record owes feed 1080×1350",
+      ].join('\n'),
+    );
+    expect(badge(element, 'mca-1')?.title).toBe('Delivery ready to check');
+    expect(badge(element, 'rascunho')).toBeNull();
+    // After the name, so the name keeps its place in the row.
+    expect(badge(element, 'mca-1')?.previousElementSibling?.className).toBe('explorer__name');
+  });
+
+  it('says the state in Portuguese in a Portuguese window', async () => {
+    const { element } = await mount(delivered());
+    element.locale = 'pt-BR';
+    await settle(element);
+    expect(badge(element, 'mca-2')?.getAttribute('aria-label')).toBe('Entrega incompleta');
+  });
+});
+
 /** TYTO-352, ADR 0121: new, rename and delete from the explorer. */
 describe('new, rename and delete', () => {
   const press = async (element: ExplorerPanel, key: string): Promise<void> => {
