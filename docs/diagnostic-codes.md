@@ -247,6 +247,8 @@ non-zero.
 | `W_RECIPE_ROLLUP_ORPHANS` | warning | no | A 'rollup' found rows whose parent is not a row of the table, and counted them nowhere. |
 | `W_RECIPE_WARN` | warning | no | A 'warn' step's when= kept a row, and the run reports its message; past 100 rows, one more says how many were not listed. |
 | `W_RECIPE_DELIVERY_RECORD` | warning | no | 'deliveries' left a delivery out of its table: its record is not one, its folder could not be read, or another folder has its key. |
+| `W_RECIPE_DELIVERY_FIELD_NEAR` | warning | no | 'to-delivery' declares a field whose name is two edits or fewer from a fixed field's, which may be a slip. |
+| `W_RECIPE_DELIVERY_FIELDS_UNREAD` | warning | no | 'deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields. |
 | `W_RECIPE_DECIDE_CLEAR_COLUMN` | warning | no | A 'decide' with clear=push found its local column missing or empty on every row, and pushed no clear that run. |
 | `W_RECIPE_DECIDE_CLEAR_LIMIT` | warning | no | A 'decide' with clear=push would have pushed more clears than clear-limit=, and pushed none of them. |
 | `W_RECIPE_NOT_REMEMBERED` | warning | no | A plan was applied but the recipe's state was not committed, so the next run plans those rows again. |
@@ -3660,6 +3662,34 @@ The other deliveries are still read; nothing is written.
 ```
 
 Parameters: `folder`, `problem`
+
+### `W_RECIPE_DELIVERY_FIELD_NEAR`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md`
+
+'to-delivery' declares a field whose name is two edits or fewer from a fixed field's, which may be a slip.
+
+The field is still declared and written; a name may be close to a fixed one.
+
+```
+'{field}' is declared as a new field; did you mean '{fixed}'?
+```
+
+Parameters: `field`, `fixed`
+
+### `W_RECIPE_DELIVERY_FIELDS_UNREAD`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0213-a-delivery-record-keeps-the-fields-a-recipe-declares.md`
+
+'deliveries' read a record whose 'fields' is not a map of text, and gave it no declared fields.
+
+The delivery is still read, with its fixed fields; nothing is written.
+
+```
+'deliveries' read {folder} without its declared fields: its 'fields' is not a map of text.
+```
+
+Parameters: `folder`
 
 ### `W_RECIPE_DECIDE_CLEAR_COLUMN`
 

@@ -278,15 +278,15 @@ describe('to-delivery', () => {
     expect(workspace.writes).toEqual([]);
   });
 
-  it("refuses 'state', a field it does not know, and a mapping without 'key'", async () => {
+  it("refuses 'state', a name no field may have, and a mapping without 'key'", async () => {
     const workspace = new FakeWorkspace();
     const state = await plan('to-delivery name=folder fields=key:key,state:due', workspace);
     expect(state.problems[0]?.message).toBe(
       "'to-delivery' never writes 'state', which is the person's.",
     );
-    const unknown = await plan('to-delivery name=folder fields=key:key,owner:due', workspace);
+    const unknown = await plan('to-delivery name=folder fields=key:key,Owner:due', workspace);
     expect(unknown.problems[0]?.message).toBe(
-      "'to-delivery' has no field 'owner'; a record has key, link, formats, stem, copy, due, ship.",
+      "'to-delivery' cannot declare a field: 'Owner' is not a field name; a declared field is lowercase letters, digits, _ and -; the fixed fields are key, link, formats, stem, copy, due, ship.",
     );
     const keyless = await plan('to-delivery name=folder fields=due:due', workspace);
     expect(keyless.problems[0]?.code).toBe('E_RECIPE_ARGUMENTS');
@@ -575,8 +575,8 @@ describe('to-delivery keep= (ADR 0211 note of 2026-11-17)', () => {
         "'to-delivery' cannot keep 'state', which is declared inbound; name it in keep= or inbound=, not both.",
       ],
       [
-        'to-delivery name=folder fields=key:key keep=colour',
-        "'to-delivery' has no field 'colour' to keep; a record has key, link, formats, stem, copy, due, ship, state.",
+        'to-delivery name=folder fields=key:key keep=Colour',
+        "'to-delivery' cannot keep a field: 'Colour' is not a field name; a declared field is lowercase letters, digits, _ and -.",
       ],
     ];
     for (const [line, message] of cases) {
@@ -590,5 +590,185 @@ describe('to-delivery keep= (ADR 0211 note of 2026-11-17)', () => {
     const unmapped = await plan('to-delivery name=folder fields=key:key keep=copy', workspace);
     expect(unmapped.problems[0]?.message).toContain("keeps 'copy' but does not map it");
     expect(workspace.writes).toEqual([]);
+  });
+});
+
+describe('to-delivery declared fields (ADR 0213)', () => {
+  const ROWS = tasks(
+    ['folder', 'due', 'task', 'owner'],
+    [
+      ['mca-1_aula', '2026-11-20', 'Cover, three slides', 'ana'],
+      ['mca-2_simulado', '2026-11-21', '', 'bruno'],
+    ],
+  );
+  const DECLARED = 'to-delivery name=folder fields=key:key,due:due,description:task';
+
+  it('writes a declared field in the fields map, and deliveries reads it back as a column', async () => {
+    const workspace = new FakeWorkspace();
+    const first = await plan(DECLARED, workspace, ROWS);
+    expect(first.problems).toEqual([]);
+    await apply(first.verbs, first.plan);
+    expect(JSON.parse(workspace.files.get(RECORD) ?? '{}')).toEqual({
+      version: 1,
+      key: 'T-0',
+      due: '2026-11-20',
+      fields: { description: 'Cover, three slides' },
+      written: { key: 'T-0', due: '2026-11-20', fields: { description: 'Cover, three slides' } },
+    });
+
+    const { cells } = await runLines(['deliveries'], workspace);
+    const table = cells[0]?.table;
+    expect(table?.columns.map((column) => column.name).slice(-3)).toEqual([
+      'ship',
+      'state',
+      'description',
+    ]);
+    expect(table?.rows.map((row) => row.values['description'])).toEqual([
+      'Cover, three slides',
+      null,
+    ]);
+    const again = await plan(DECLARED, workspace, ROWS);
+    expect(again.plan?.count).toBe(0);
+  });
+
+  it('orders declared columns alphabetically, after the fixed ones, across records', async () => {
+    const workspace = new FakeWorkspace();
+    const first = await plan(
+      'to-delivery name=folder fields=key:key,variant:task,assignee:owner',
+      workspace,
+      ROWS,
+    );
+    await apply(first.verbs, first.plan);
+    const { cells } = await runLines(['deliveries'], workspace);
+    expect(cells[0]?.table?.columns.map((column) => column.name).slice(-3)).toEqual([
+      'state',
+      'assignee',
+      'variant',
+    ]);
+    expect(cells[0]?.table?.rows[1]?.values).toMatchObject({ assignee: 'bruno', variant: null });
+  });
+
+  it('keeps a declared field a person edited, and lets keep= and inbound= name one', async () => {
+    const workspace = new FakeWorkspace();
+    const line =
+      'to-delivery name=folder fields=key:key,description:task,assignee:owner inbound=assignee:row keep=description';
+    const first = await plan(line, workspace, ROWS);
+    expect(first.problems).toEqual([]);
+    await apply(first.verbs, first.plan);
+    const record = JSON.parse(workspace.files.get(RECORD) ?? '{}') as Record<string, unknown>;
+    workspace.files.set(
+      RECORD,
+      JSON.stringify({ ...record, fields: { description: 'Cover', assignee: 'carla' } }),
+    );
+    const later = await plan(
+      line,
+      workspace,
+      tasks(
+        ['folder', 'task', 'owner'],
+        [
+          ['mca-1_aula', '', 'dora'],
+          ['mca-2_simulado', '', 'bruno'],
+        ],
+      ),
+    );
+    expect(descriptions(later.plan)).toEqual([
+      [
+        'T-0',
+        "entregas/mca-1_aula: updates assignee (both changed; row wins over 'carla'); kept: description (source empty)",
+      ],
+    ]);
+  });
+
+  it('refuses a name a delivery row already has, at the argument, for fields=, keep= and inbound=', async () => {
+    const workspace = new FakeWorkspace();
+    const cases = [
+      'to-delivery name=folder fields=key:key,folder:task',
+      'to-delivery name=folder fields=key:key,path:task',
+      'to-delivery name=folder fields=key:key,my.field:task',
+      'to-delivery name=folder fields=key:key,due:due keep=path',
+      'to-delivery name=folder fields=key:key,due:due inbound=folder:row',
+    ];
+    for (const line of cases) {
+      const refused = await plan(line, workspace, ROWS);
+      expect(refused.plan).toBeUndefined();
+      expect(refused.problems[0]?.code).toBe('E_RECIPE_DELIVERY');
+      const source = ['recipe deliveries', line].join('\n');
+      const range = refused.problems[0]?.range;
+      expect(source.slice(range?.start, range?.end)).toMatch(/^(fields|keep|inbound)=/u);
+    }
+    expect(workspace.writes).toEqual([]);
+  });
+
+  it('warns at fields= when a declared name is two edits from a fixed field', async () => {
+    const workspace = new FakeWorkspace();
+    const line = 'to-delivery name=folder fields=key:key,lnik:task,description:task';
+    const near = await plan(line, workspace, ROWS);
+    expect(near.plan?.count).toBe(2);
+    expect(near.problems.map((found) => [found.code, found.message])).toEqual([
+      ['W_RECIPE_DELIVERY_FIELD_NEAR', "'lnik' is declared as a new field; did you mean 'link'?"],
+    ]);
+    const source = ['recipe deliveries', line].join('\n');
+    const range = near.problems[0]?.range;
+    expect(source.slice(range?.start, range?.end)).toMatch(/^fields=/u);
+  });
+
+  it("reads a hand-made 'fields' that is not a map, warns, and refuses to write over it", async () => {
+    const workspace = new FakeWorkspace();
+    const first = await plan(DECLARED, workspace, ROWS);
+    await apply(first.verbs, first.plan);
+    workspace.files.set(
+      RECORD,
+      JSON.stringify({ version: 1, key: 'T-0', fields: ['by', 'hand'], written: { key: 'T-0' } }),
+    );
+    const { cells } = await runLines(['deliveries'], workspace);
+    expect(cells[0]?.table?.rows.map((row) => row.key)).toEqual(['T-0', 'T-1']);
+    expect(cells[0]?.diagnostics.map((found) => found.message)).toEqual([
+      "'deliveries' read entregas/mca-1_aula without its declared fields: its 'fields' is not a map of text.",
+    ]);
+    const write = await plan(DECLARED, workspace, ROWS);
+    expect(write.note).toContain(
+      "row 'T-0': entregas/mca-1_aula/editaveis/delivery.json holds a 'fields' that is not a map of text",
+    );
+    const fixedOnly = await plan('to-delivery name=folder fields=key:key,due:due', workspace, ROWS);
+    expect(fixedOnly.note).toBeUndefined();
+  });
+});
+
+describe('to-delivery create= (ADR 0213)', () => {
+  it('skips a row whose folder does not exist under create=no, and names it', async () => {
+    const workspace = await threeFolders();
+    const rows = tasks(
+      ['folder', 'due'],
+      [
+        ['mca-1_aula', '2026-12-01'],
+        ['mca-9_nova', '2026-12-02'],
+      ],
+    );
+    const line = 'to-delivery name=folder fields=key:key,due:due create=no';
+    const skipped = await plan(line, workspace, rows);
+    expect(descriptions(skipped.plan)).toEqual([['T-0', 'entregas/mca-1_aula: updates due']]);
+    expect(skipped.note).toBe("Skipped 1 row with no delivery folder: 'T-1'.");
+    await apply(skipped.verbs, skipped.plan);
+    expect([...workspace.folders].some((folder) => folder.includes('mca-9_nova'))).toBe(false);
+    expect(workspace.writes).not.toContain('entregas/mca-9_nova/editaveis/delivery.json');
+
+    const created = await plan(line.replace('create=no', 'create=yes'), workspace, rows);
+    expect(descriptions(created.plan)).toEqual([['T-1', 'entregas/mca-9_nova: new']]);
+    expect(created.note).toBeUndefined();
+  });
+
+  it('matches an existing folder whatever its case, and refuses a value that is not yes or no', async () => {
+    const workspace = await threeFolders();
+    const rows = tasks(['folder', 'due'], [['MCA-1_AULA', '2026-11-20']]);
+    const folded = await plan(
+      'to-delivery name=folder fields=key:key,due:due create=no',
+      workspace,
+      rows,
+    );
+    expect(folded.note).toBeUndefined();
+    const wrong = await plan('to-delivery name=folder fields=key:key create=maybe', workspace);
+    expect(wrong.problems[0]?.message).toBe(
+      "'to-delivery' reads create= as yes or no, and 'maybe' is neither.",
+    );
   });
 });

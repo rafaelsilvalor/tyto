@@ -147,3 +147,9 @@ as an empty value, and a field nobody edited takes it. `to-delivery` gains `keep
 
 Without `keep=`, nothing changes. No new ADR: the merge's base and its rules stay those of §3
 and ADR 0210.
+
+## Note, 2026-11-18: declared fields are columns (TYTO-776)
+
+> **Amended by ADR 0213.** `deliveries` gives, after the columns of §1, one text column per
+> field a recipe declared that any record read holds, in alphabetical order. `inbound=` and
+> `keep=` take declared fields as they take fixed ones.

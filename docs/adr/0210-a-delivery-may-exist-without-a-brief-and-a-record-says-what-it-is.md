@@ -129,3 +129,10 @@ nothing.
 - **`into=`.** A second place deciding where deliveries live, beside `delivery.parent`.
 - **Sanitising the name.** ADR 0157 rejected it for the same reason: one ticket would map to a
   folder whose name nobody typed.
+
+## Note, 2026-11-18: declared fields and `create=no` (TYTO-776)
+
+> **Amended by ADR 0213.** A name in `fields=` outside the fixed set is a declared text field,
+> kept in the record's `fields` map with its base in `written.fields`; §2's "generic fields
+> only" now reads: generic fixed fields, plus the ones a workspace's recipe declares.
+> `create=no` writes only into delivery folders that already exist.

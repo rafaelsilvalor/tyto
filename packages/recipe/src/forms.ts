@@ -457,7 +457,7 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           'fields',
           'list',
           true,
-          'field:column pairs (key, link, formats, stem, copy, due, ship), or a data reference.',
+          'field:column pairs (key, link, formats, stem, copy, due, ship, or a declared text field), or a data reference.',
         ),
         named(
           'inbound',
@@ -470,6 +470,16 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
           'list',
           false,
           "Mapped fields whose empty cell keeps the record's value instead of clearing it.",
+        ),
+        named(
+          'create',
+          'choice',
+          false,
+          'Whether a row whose delivery folder is missing makes it.',
+          {
+            values: ['yes', 'no'],
+            default: 'yes',
+          },
         ),
       ],
       'sink',

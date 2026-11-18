@@ -3,21 +3,24 @@ import {
   DELIVERY_RECORD_FILE,
   DELIVERY_RECORD_FOLDER,
   DELIVERY_WRITABLE_FIELDS,
+  type DeliveryFieldName,
   type DeliveryFieldValue,
   type DeliveryInboundWinner,
   type DeliveryInboundWinners,
   type DeliveryRecord,
   type DeliveryRecordMerge,
-  type DeliveryWritableField,
   type Diagnostic,
   type Result,
   type SourceRange,
+  declaredFieldProblem,
   deliveryFormatsText,
   deliveryNameOf,
   diagnostic,
   err,
+  isDeclaredFieldMap,
   isDeliveryDue,
   mergeDeliveryRecord,
+  nearFixedField,
   ok,
   parseDeliveryFormats,
   readDeliveryRecord,
@@ -64,6 +67,16 @@ import { type Column, type Row, cellText } from './table.js';
  * record's value, and its base, as they are, instead of clearing it: a source that goes blank,
  * an orphan link say. The step's note names every value so kept, on every run, and a plan line
  * written for another reason says `kept: copy (source empty)`. Never `key`, never an inbound field.
+ *
+ * A name in `fields=` that is not a fixed field is a **declared field** (ADR 0213): text, kept in
+ * the record's `fields` map with its own base, read back by `deliveries` as a column. It is
+ * lowercase letters, digits, `_` and `-`, and never a column `deliveries` already gives
+ * (`folder`, `path` and the fixed fields). A name two edits from a fixed field's is declared all
+ * the same, with a warning naming the field it may have meant. `keep=` and `inbound=` take
+ * declared fields as they take fixed ones.
+ *
+ * `create=no` (ADR 0213) writes only into delivery folders that already exist: a row whose
+ * folder is not there plans nothing, and the note names it. `create=yes`, the default, makes it.
  */
 export interface ToDeliveryPorts {
   /**
@@ -128,7 +141,7 @@ export const TO_DELIVERY_PLAN_LIMITS: PlanLimits = {
 /** How many refused rows the note names, so a broken column is not a thousand lines. */
 const REPORTED = 8;
 
-const NAMES = ['name', 'fields', 'inbound', 'keep'] as const;
+const NAMES = ['name', 'fields', 'inbound', 'keep', 'create'] as const;
 const FIELD_MAP = z.record(z.string(), z.string());
 const WINNERS: readonly DeliveryInboundWinner[] = ['record', 'row'];
 
@@ -186,7 +199,7 @@ async function planDeliveries(
     }
     argument[name] = written;
   }
-  const { name, fields, inbound, keep } = argument;
+  const { name, fields, inbound, keep, create } = argument;
   if (name === undefined || fields === undefined) {
     return argumentsProblem(context, 'needs name=<column> fields=<field>:<column>,…');
   }
@@ -199,16 +212,25 @@ async function planDeliveries(
     return refuse('writes nothing in a restricted folder; trust the folder first', at(name.range));
   }
 
+  if (create !== undefined && create.value !== 'yes' && create.value !== 'no') {
+    return argumentProblem(
+      context,
+      create,
+      `reads create= as yes or no, and '${create.value}' is neither`,
+    );
+  }
+  const creates = create?.value !== 'no';
   const winners = inbound === undefined ? ok(new Map()) : await readInbound(context, inbound);
   if (!winners.ok) return winners;
   const mapping = await readFields(context, fields, winners.value);
   if (!mapping.ok) return mapping;
   const kept =
     keep === undefined
-      ? ok(new Set<DeliveryWritableField>())
+      ? ok(new Set<DeliveryFieldName>())
       : readKeep(context, keep, mapping.value, winners.value);
   if (!kept.ok) return kept;
-  const columns: { readonly field: DeliveryWritableField; readonly column: Column }[] = [];
+  const declares = [...mapping.value.keys()].some((field) => !isWritableField(field));
+  const columns: { readonly field: DeliveryFieldName; readonly column: Column }[] = [];
   for (const [field, written] of mapping.value) {
     const column = resolveColumn(table.value, written, at(fields.range), context.aliases);
     if (!column.ok) return column;
@@ -222,8 +244,17 @@ async function planDeliveries(
   const parent = layout.value.parent;
   const inside = [...layout.value.folders];
   if (!inside.includes(DELIVERY_RECORD_FOLDER)) inside.push(DELIVERY_RECORD_FOLDER);
+  // Under create=no, the folders already there, read once: a row whose folder is missing plans
+  // nothing. Folded, as `taken` is, since the file systems a workspace lives on mostly ignore case.
+  let existing: ReadonlySet<string> | undefined;
+  if (!creates) {
+    const listed = await ports.list(parent);
+    if (!listed.ok) return err(listed.error.map((found) => ({ ...found, range: at(name.range) })));
+    existing = new Set(listed.value.map((entry) => entry.name.toLowerCase()));
+  }
 
   const refused: string[] = [];
+  const skipped: string[] = [];
   const held: string[] = [];
   let heldValues = 0;
   const operations: PlannedOperation[] = [];
@@ -233,6 +264,10 @@ async function planDeliveries(
     const folderName = deliveryNameOf(cellText(row.values[nameColumn.value.name]));
     if (!folderName.ok) {
       refused.push(`row '${row.key}': ${messages(folderName.error)}`);
+      continue;
+    }
+    if (existing !== undefined && !existing.has(folderName.value.toLowerCase())) {
+      skipped.push(`'${row.key}'`);
       continue;
     }
     const folder = parent === '' ? folderName.value : `${parent}/${folderName.value}`;
@@ -260,6 +295,13 @@ async function planDeliveries(
         const record = readDeliveryRecord(text.value);
         if (!record.ok) {
           refused.push(`row '${row.key}': ${path} ${record.error}; fix or remove it first`);
+          continue;
+        }
+        const fieldsOnDisk = record.value.fields;
+        if (declares && fieldsOnDisk !== undefined && !isDeclaredFieldMap(fieldsOnDisk)) {
+          refused.push(
+            `row '${row.key}': ${path} holds a 'fields' that is not a map of text, where declared fields go; fix or remove it first`,
+          );
           continue;
         }
         onDisk = record.value;
@@ -300,14 +342,52 @@ async function planDeliveries(
   if (!checked.ok) return checked;
   shownRecords.set(checked.value, stated);
   const notes = [
+    ...(skipped.length === 0 ? [] : [skippedNote(skipped)]),
     ...(held.length === 0 ? [] : [heldNote(held, heldValues)]),
     ...(refused.length === 0 ? [] : [refusedNote(refused)]),
   ];
-  return ok({
-    table: table.value,
-    plan: checked.value,
-    ...(notes.length === 0 ? {} : { note: notes.join(' ') }),
-  });
+  return ok(
+    {
+      table: table.value,
+      plan: checked.value,
+      ...(notes.length === 0 ? {} : { note: notes.join(' ') }),
+    },
+    nearWarnings(context, fields, mapping.value),
+  );
+}
+
+/**
+ * A warning for each declared field two edits or fewer from a fixed field's (`lnik`, `link`):
+ * declared all the same, since a near name may be meant, but never silently.
+ */
+function nearWarnings(
+  context: VerbContext,
+  argument: NamedArgument,
+  mapping: ReadonlyMap<DeliveryFieldName, string>,
+): Diagnostic[] {
+  const warnings: Diagnostic[] = [];
+  for (const field of mapping.keys()) {
+    if (isWritableField(field)) continue;
+    const fixed = nearFixedField(field);
+    if (fixed === undefined) continue;
+    warnings.push(
+      diagnostic(
+        'W_RECIPE_DELIVERY_FIELD_NEAR',
+        { field, fixed },
+        { range: locate(context)(argument.range) },
+      ),
+    );
+  }
+  return warnings;
+}
+
+/** The rows `create=no` left out because their delivery folder does not exist, named. */
+function skippedNote(skipped: readonly string[]): string {
+  const named = skipped.slice(0, REPORTED).join(', ');
+  const more = skipped.length - REPORTED;
+  return `Skipped ${String(skipped.length)} ${
+    skipped.length === 1 ? 'row' : 'rows'
+  } with no delivery folder: ${named}${more > 0 ? `, and ${String(more)} more` : ''}.`;
 }
 
 /**
@@ -334,9 +414,9 @@ function refusedNote(refused: readonly string[]): string {
 /** One row's mapped values, as the record holds them, or why the record cannot hold them. */
 function incomingOf(
   row: Row,
-  columns: readonly { readonly field: DeliveryWritableField; readonly column: Column }[],
-): Result<Map<DeliveryWritableField, DeliveryFieldValue | undefined>, string> {
-  const incoming = new Map<DeliveryWritableField, DeliveryFieldValue | undefined>();
+  columns: readonly { readonly field: DeliveryFieldName; readonly column: Column }[],
+): Result<Map<DeliveryFieldName, DeliveryFieldValue | undefined>, string> {
+  const incoming = new Map<DeliveryFieldName, DeliveryFieldValue | undefined>();
   for (const { field, column } of columns) {
     const text = cellText(row.values[column.name]).trim();
     if (text === '') {
@@ -407,17 +487,14 @@ async function readPairs(
 async function readInbound(
   context: VerbContext,
   argument: NamedArgument,
-): Promise<Result<Map<DeliveryWritableField, DeliveryInboundWinner>, readonly Diagnostic[]>> {
+): Promise<Result<Map<DeliveryFieldName, DeliveryInboundWinner>, readonly Diagnostic[]>> {
   const pairs = await readPairs(context, argument, 'inbound fields as <field>:<winner>');
   if (!pairs.ok) return pairs;
-  const winners = new Map<DeliveryWritableField, DeliveryInboundWinner>();
+  const winners = new Map<DeliveryFieldName, DeliveryInboundWinner>();
   for (const [field, winner] of pairs.value) {
-    if (!isWritableField(field)) {
-      return fieldRefused(
-        context,
-        argument,
-        `has no field '${field}' to take inbound; a record has ${DELIVERY_WRITABLE_FIELDS.join(', ')}`,
-      );
+    const problem = isWritableField(field) ? undefined : declaredFieldProblem(field);
+    if (problem !== undefined) {
+      return fieldRefused(context, argument, `cannot take a field inbound: ${problem}`);
     }
     if (field === 'key') {
       return fieldRefused(context, argument, "never takes 'key' inbound: it names the delivery");
@@ -449,10 +526,10 @@ async function readFields(
   context: VerbContext,
   argument: NamedArgument,
   winners: DeliveryInboundWinners,
-): Promise<Result<ReadonlyMap<DeliveryWritableField, string>, readonly Diagnostic[]>> {
+): Promise<Result<ReadonlyMap<DeliveryFieldName, string>, readonly Diagnostic[]>> {
   const pairs = await readPairs(context, argument, 'fields as <field>:<column>');
   if (!pairs.ok) return pairs;
-  const mapping = new Map<DeliveryWritableField, string>();
+  const mapping = new Map<DeliveryFieldName, string>();
   for (const [field, column] of pairs.value) {
     if (column === '') {
       return argumentProblem(
@@ -464,11 +541,12 @@ async function readFields(
     if (field === 'state' && !winners.has('state')) {
       return fieldRefused(context, argument, "never writes 'state', which is the person's");
     }
-    if (!isWritableField(field)) {
+    const problem = isWritableField(field) ? undefined : declaredFieldProblem(field);
+    if (problem !== undefined) {
       return fieldRefused(
         context,
         argument,
-        `has no field '${field}'; a record has ${DELIVERY_RECORD_FIELDS.join(', ')}`,
+        `cannot declare a field: ${problem}; the fixed fields are ${DELIVERY_RECORD_FIELDS.join(', ')}`,
       );
     }
     if (mapping.has(field)) {
@@ -498,21 +576,18 @@ async function readFields(
 function readKeep(
   context: VerbContext,
   argument: NamedArgument,
-  mapping: ReadonlyMap<DeliveryWritableField, string>,
+  mapping: ReadonlyMap<DeliveryFieldName, string>,
   winners: DeliveryInboundWinners,
-): Result<Set<DeliveryWritableField>, readonly Diagnostic[]> {
-  const kept = new Set<DeliveryWritableField>();
+): Result<Set<DeliveryFieldName>, readonly Diagnostic[]> {
+  const kept = new Set<DeliveryFieldName>();
   for (const entry of argument.value.split(',')) {
     const field = entry.trim();
     if (field === '') {
       return argumentProblem(context, argument, 'reads fields as <field>,…, and one is empty');
     }
-    if (!isWritableField(field)) {
-      return fieldRefused(
-        context,
-        argument,
-        `has no field '${field}' to keep; a record has ${DELIVERY_WRITABLE_FIELDS.join(', ')}`,
-      );
+    const problem = isWritableField(field) ? undefined : declaredFieldProblem(field);
+    if (problem !== undefined) {
+      return fieldRefused(context, argument, `cannot keep a field: ${problem}`);
     }
     if (field === 'key') {
       return fieldRefused(context, argument, "never keeps 'key': a row without one is refused");
@@ -539,7 +614,8 @@ function readKeep(
   return ok(kept);
 }
 
-function isWritableField(field: string): field is DeliveryWritableField {
+/** A fixed field; any other name a recipe maps is a declared one (ADR 0213). */
+function isWritableField(field: string): boolean {
   return (DELIVERY_WRITABLE_FIELDS as readonly string[]).includes(field);
 }
 
@@ -550,7 +626,7 @@ function isWritableField(field: string): field is DeliveryWritableField {
  */
 function describeMerge(merged: DeliveryRecordMerge): string {
   if (merged.created) return 'new';
-  const settled = (field: DeliveryWritableField) => {
+  const settled = (field: DeliveryFieldName) => {
     const conflict = merged.conflicts.find((found) => found.field === field);
     return conflict === undefined
       ? field
