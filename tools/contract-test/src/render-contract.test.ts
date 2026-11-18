@@ -48,6 +48,7 @@ beforeEach(async () => {
   // Created here rather than committed: Git does not version an empty directory, and the
   // only thing in it is the binary below.
   await mkdir(join(workspace, 'task', 'assets'), { recursive: true });
+  await mkdir(join(workspace, 'home'), { recursive: true });
   await writeFile(join(workspace, 'task', 'assets', 'logo.png'), LOGO_PNG);
 
   const ajv = new Ajv2020({ strict: false });
@@ -64,10 +65,20 @@ interface Run {
   readonly stderr: string;
 }
 
-/** Spawns the binary. A non-zero exit rejects, so the code is read off the error. */
+/**
+ * Spawns the binary. A non-zero exit rejects, so the code is read off the error.
+ *
+ * With a `TYTO_HOME` of its own, empty (TYTO-787): a consumer's machine is not the one running
+ * this test, and without it the binary loaded every plugin installed in the runner's real home —
+ * about 4 s a render on a machine with the house's plugins, against 0.7 s with an empty one,
+ * which put each test past the 5 s limit.
+ */
 async function tyto(...args: readonly string[]): Promise<Run> {
   try {
-    const { stdout, stderr } = await run(process.execPath, [CLI, ...args], { cwd: workspace });
+    const { stdout, stderr } = await run(process.execPath, [CLI, ...args], {
+      cwd: workspace,
+      env: { ...process.env, TYTO_HOME: join(workspace, 'home') },
+    });
     return { code: EXIT_OK, stdout, stderr };
   } catch (cause) {
     const failure = cause as { code?: number; stdout?: string; stderr?: string };
