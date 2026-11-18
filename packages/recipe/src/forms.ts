@@ -488,14 +488,29 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       'deliveries',
       "Reads every delivery record under the project's delivery folder as one row each.",
       'deliveries',
-      [],
+      [
+        named(
+          'fields',
+          'list',
+          false,
+          'Declared fields whose columns exist even when no record holds them, comma-separated.',
+        ),
+      ],
       'source',
     ),
     form(
       'with-deliveries',
       "Brings each row's delivery record beside its columns, as record_ columns.",
       'with-deliveries by=folder',
-      [named('by', 'column', true, "The column naming each row's delivery folder.")],
+      [
+        named('by', 'column', true, "The column naming each row's delivery folder."),
+        named(
+          'fields',
+          'list',
+          false,
+          'Declared fields whose record_ columns exist even when no record holds them, comma-separated.',
+        ),
+      ],
     ),
     form(
       'call',

@@ -125,3 +125,24 @@ record's columns after the row's own.
   folder's record text, so no folder is read again. It never writes.
 - `W_RECIPE_DELIVERY_RECORD` and `W_RECIPE_DELIVERY_FIELDS_UNREAD` now name the verb that
   reported them instead of always saying `deliveries`.
+
+## Note, 2026-11-18: `fields=` names the declared columns a recipe needs (TYTO-784)
+
+A declared field's column came only from the records read (§3), so on a recipe's first run no
+record held `description` or `variante`, `record_description` did not exist, and every later
+step that read it stopped with `E_RECIPE_UNKNOWN_COLUMN`. The column could not be made
+beforehand either: `with-deliveries` refuses a table that already has a column it would add.
+
+- **`deliveries fields=<name>,…` and `with-deliveries by=<column> fields=<name>,…`** list
+  declared fields whose columns always exist, empty when no record holds them. They are merged
+  with the declared fields the records hold, after the fixed columns, in alphabetical order, so
+  a listed column sits where it will sit once a record holds it. `with-deliveries` puts
+  `record_` before each, as before.
+- **A listed name follows `to-delivery`'s rules** (`declaredFieldProblem`): a fixed column or a
+  name that is not lowercase letters, digits, `_` and `-` is refused at `fields=`, under the
+  verb's own code (`E_RECIPE_DELIVERIES`, `E_RECIPE_WITH_DELIVERIES`); an empty or repeated
+  name is `E_RECIPE_ARGUMENTS`.
+- **`with-deliveries`'s clash check counts the listed names**: a table that already has
+  `record_<name>` for a listed name is refused as for any other column it would add.
+- Plain text, comma-separated, not a data reference: the list is short, and `keep=` reads its
+  names the same way.
