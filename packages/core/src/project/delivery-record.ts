@@ -47,17 +47,112 @@ export const DELIVERY_WRITABLE_FIELDS = [...DELIVERY_RECORD_FIELDS, 'state'] as 
 export type DeliveryWritableField = (typeof DELIVERY_WRITABLE_FIELDS)[number];
 
 /**
+ * The column names `deliveries` gives every row (ADR 0211): where the delivery is, then the
+ * record's fixed fields. None of them may name a declared field (ADR 0213), or a declared
+ * column would shadow one of these.
+ */
+export const DELIVERY_ROW_COLUMNS = ['folder', 'path', ...DELIVERY_WRITABLE_FIELDS] as const;
+
+/**
+ * A field a merge is given: a fixed one, or any other name, which is a field the recipe declared
+ * (ADR 0213). A declared field holds text, in the record's `fields` map, and its base is in
+ * `written.fields`.
+ */
+export type DeliveryFieldName = DeliveryWritableField | (string & {});
+
+const DECLARED_NAME = /^[a-z0-9][a-z0-9_-]*$/u;
+
+/**
+ * Why `name` may not be a declared field, or `undefined` when it may: lowercase letters, digits,
+ * `_` and `-`, and none of the columns `deliveries` already gives a row (ADR 0213).
+ */
+export function declaredFieldProblem(name: string): string | undefined {
+  if ((DELIVERY_ROW_COLUMNS as readonly string[]).includes(name)) {
+    return `'${name}' is a column every delivery already has, so it cannot be declared`;
+  }
+  if (!DECLARED_NAME.test(name)) {
+    return `'${name}' is not a field name; a declared field is lowercase letters, digits, _ and -`;
+  }
+  return undefined;
+}
+
+/**
+ * The fixed field a declared name is likely a slip for, within two edits (`lnik` for `link`),
+ * or `undefined`. A warning's business, never a refusal: `stage` is a fair name near `state`.
+ */
+export function nearFixedField(name: string): DeliveryWritableField | undefined {
+  let nearest: DeliveryWritableField | undefined;
+  let best = 3;
+  for (const field of DELIVERY_WRITABLE_FIELDS) {
+    const distance = editDistance(name, field);
+    if (distance > 0 && distance < best) {
+      best = distance;
+      nearest = field;
+    }
+  }
+  return nearest;
+}
+
+/** Edit distance, a swap of two neighbouring letters counted as one edit (`lnik`, `link`). */
+function editDistance(left: string, right: string): number {
+  const table: number[][] = [];
+  for (let row = 0; row <= left.length; row += 1) {
+    const line: number[] = [];
+    for (let column = 0; column <= right.length; column += 1) {
+      if (row === 0 || column === 0) {
+        line.push(row + column);
+        continue;
+      }
+      const above = table[row - 1] ?? [];
+      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
+      let distance = Math.min(
+        (above[column] ?? 0) + 1,
+        (line[column - 1] ?? 0) + 1,
+        (above[column - 1] ?? 0) + cost,
+      );
+      const swapped =
+        row > 1 &&
+        column > 1 &&
+        left[row - 1] === right[column - 2] &&
+        left[row - 2] === right[column - 1];
+      if (swapped) distance = Math.min(distance, (table[row - 2]?.[column - 2] ?? 0) + 1);
+      line.push(distance);
+    }
+    table.push(line);
+  }
+  return table[left.length]?.[right.length] ?? 0;
+}
+
+function isFixedField(field: string): field is DeliveryWritableField {
+  return (DELIVERY_WRITABLE_FIELDS as readonly string[]).includes(field);
+}
+
+/**
+ * Whether a record's `fields` is a map of text, the only shape declared fields are read from.
+ * A record written by hand before ADR 0213 may hold something else there: it still reads, as a
+ * key the schema does not know, and a recipe that declares fields refuses to write over it.
+ */
+export function isDeclaredFieldMap(value: unknown): value is Readonly<Record<string, string>> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((item) => typeof item === 'string')
+  );
+}
+
+/**
  * Who wins a declared inbound field when both the record and the outside value changed since
  * the last run (ADR 0211): the record in the folder, or the row the recipe brings.
  */
 export type DeliveryInboundWinner = 'record' | 'row';
 
 /** The fields a recipe declared inbound, each with the side that wins when both changed. */
-export type DeliveryInboundWinners = ReadonlyMap<DeliveryWritableField, DeliveryInboundWinner>;
+export type DeliveryInboundWinners = ReadonlyMap<DeliveryFieldName, DeliveryInboundWinner>;
 
 /** A declared inbound field both sides changed: who won, and the value that lost. */
 export interface DeliveryConflict {
-  readonly field: DeliveryWritableField;
+  readonly field: DeliveryFieldName;
   readonly winner: DeliveryInboundWinner;
   /** The value that did not enter: the record's when the row wins, the row's otherwise. */
   readonly lost: DeliveryFieldValue | null;
@@ -91,6 +186,12 @@ export const deliveryRecordSchema = z.looseObject({
   due: isoDue.optional(),
   ship: z.string().optional(),
   state: z.string().optional(),
+  /**
+   * The fields a recipe declared (ADR 0213), text by name. Not checked here: a record written
+   * by hand before ADR 0213 may hold another shape under the name, and still reads
+   * (`isDeclaredFieldMap`).
+   */
+  fields: z.unknown().optional(),
   written: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -157,10 +258,7 @@ export function writeDeliveryRecord(record: DeliveryRecord): string {
  * What a recipe brings for one delivery: the fields it maps, each with the row's value, or
  * `undefined` for an empty cell, which leaves the field out of a new record.
  */
-export type IncomingDeliveryFields = ReadonlyMap<
-  DeliveryWritableField,
-  DeliveryFieldValue | undefined
->;
+export type IncomingDeliveryFields = ReadonlyMap<DeliveryFieldName, DeliveryFieldValue | undefined>;
 
 export interface DeliveryRecordMerge {
   /** The record to write; the one on disk, unchanged, when nothing changes. */
@@ -168,21 +266,21 @@ export interface DeliveryRecordMerge {
   /** True when no record was on disk. */
   readonly created: boolean;
   /** The fields the recipe changes, in the order it maps them. */
-  readonly updated: readonly DeliveryWritableField[];
+  readonly updated: readonly DeliveryFieldName[];
   /** The fields a person edited since the recipe last wrote them, which keep the person's value. */
-  readonly kept: readonly DeliveryWritableField[];
+  readonly kept: readonly DeliveryFieldName[];
   /**
    * Fields the recipe asked to keep (`keep=`) whose incoming value is empty while the record
    * holds one: value and base stay as they are (ADR 0211, note of 2026-11-17).
    */
-  readonly held: readonly DeliveryWritableField[];
+  readonly held: readonly DeliveryFieldName[];
   /** Declared inbound fields both sides changed, each settled by its winner (ADR 0211). */
   readonly conflicts: readonly DeliveryConflict[];
   /**
    * Declared inbound fields whose value stays and whose base alone moves to the outside value:
    * the record already agrees with it, or the record won a conflict.
    */
-  readonly based: readonly DeliveryWritableField[];
+  readonly based: readonly DeliveryFieldName[];
   /** Whether the file must be written at all. */
   readonly changed: boolean;
 }
@@ -213,12 +311,16 @@ export interface DeliveryRecordMerge {
  * alone, value and base, and named in `held`: a source that goes blank, an orphan link say, must
  * not clear what the record already knows. Checked before the edit rule, so a value a person
  * edited is reported as held too. Never combined with `winners` for the same field.
+ *
+ * **A declared field (ADR 0213)**, any name not a fixed field, follows the same rules, edit,
+ * inbound and kept alike; only where it lives differs: its value in `fields`, its base in
+ * `written.fields`. `fields` leaves the record when it holds nothing.
  */
 export function mergeDeliveryRecord(
   onDisk: DeliveryRecord | undefined,
   incoming: IncomingDeliveryFields,
   winners: DeliveryInboundWinners = new Map(),
-  keep: ReadonlySet<DeliveryWritableField> = new Set(),
+  keep: ReadonlySet<DeliveryFieldName> = new Set(),
 ): DeliveryRecordMerge {
   if (onDisk === undefined) {
     const record: Record<string, unknown> = { version: DELIVERY_RECORD_VERSION };
@@ -229,6 +331,15 @@ export function mergeDeliveryRecord(
       if (value !== undefined) record[field] = value;
       written[field] = value ?? null;
     }
+    const declared: Record<string, unknown> = {};
+    const declaredBase: Record<string, unknown> = {};
+    for (const [field, value] of incoming) {
+      if (isFixedField(field)) continue;
+      if (value !== undefined) declared[field] = value;
+      declaredBase[field] = value ?? null;
+    }
+    if (Object.keys(declared).length > 0) record['fields'] = declared;
+    if (Object.keys(declaredBase).length > 0) written['fields'] = declaredBase;
     record['written'] = written;
     return {
       record: record as DeliveryRecord,
@@ -244,23 +355,35 @@ export function mergeDeliveryRecord(
 
   const disk = onDisk as Readonly<Record<string, unknown>>;
   const base: Record<string, unknown> = { ...(onDisk.written ?? {}) };
+  // A declared field's value is in `fields`, and its base in `written.fields` (ADR 0213).
+  const diskDeclared: Readonly<Record<string, unknown>> = isDeclaredFieldMap(onDisk.fields)
+    ? onDisk.fields
+    : {};
+  const writtenDeclared = base['fields'];
+  const declaredBase: Record<string, unknown> =
+    typeof writtenDeclared === 'object' && writtenDeclared !== null
+      ? { ...(writtenDeclared as Record<string, unknown>) }
+      : {};
   const values = new Map<string, unknown>();
-  const updated: DeliveryWritableField[] = [];
-  const kept: DeliveryWritableField[] = [];
-  const held: DeliveryWritableField[] = [];
+  const declaredValues = new Map<string, unknown>();
+  const updated: DeliveryFieldName[] = [];
+  const kept: DeliveryFieldName[] = [];
+  const held: DeliveryFieldName[] = [];
   const conflicts: DeliveryConflict[] = [];
-  const based: DeliveryWritableField[] = [];
+  const based: DeliveryFieldName[] = [];
   for (const [field, value] of incoming) {
+    const fixed = isFixedField(field);
+    const bases = fixed ? base : declaredBase;
     const next = value ?? null;
-    const current = disk[field] ?? null;
-    const last = base[field] ?? null;
+    const current = (fixed ? disk[field] : diskDeclared[field]) ?? null;
+    const last = bases[field] ?? null;
     const enter = () => {
-      values.set(field, next);
-      base[field] = next;
+      (fixed ? values : declaredValues).set(field, next);
+      bases[field] = next;
       updated.push(field);
     };
     const moveBase = () => {
-      base[field] = next;
+      bases[field] = next;
       based.push(field);
     };
     if (next === null && current !== null && keep.has(field)) {
@@ -302,9 +425,18 @@ export function mergeDeliveryRecord(
   }
 
   // The disk's own order, a new field before `written`, which stays last.
+  const declared: Record<string, unknown> = { ...diskDeclared };
+  for (const [key, value] of declaredValues) {
+    if (value === null) delete declared[key];
+    else declared[key] = value;
+  }
   const record: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(disk)) {
     if (key === 'written') continue;
+    if (key === 'fields' && declaredValues.size > 0) {
+      if (Object.keys(declared).length > 0) record[key] = declared;
+      continue;
+    }
     if (!values.has(key)) {
       record[key] = value;
       continue;
@@ -315,6 +447,8 @@ export function mergeDeliveryRecord(
   for (const [key, value] of values) {
     if (!(key in disk) && value !== null) record[key] = value;
   }
+  if (!('fields' in disk) && Object.keys(declared).length > 0) record['fields'] = declared;
+  if (Object.keys(declaredBase).length > 0) base['fields'] = declaredBase;
   record['written'] = base;
   return {
     record: record as DeliveryRecord,
