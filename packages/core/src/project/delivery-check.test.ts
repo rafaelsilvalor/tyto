@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { aspectOf, aspectsText, checkDelivery } from './delivery-check.js';
+import { formatCatalogue } from '../config/formats.js';
+import { aspectOf, aspectsText, catalogueSizes, checkDelivery } from './delivery-check.js';
 
 /**
  * `aspectOf` pins the edge cases of the shapes a plugin counts on a remote folder (TYTO-761's
@@ -36,6 +37,19 @@ describe('aspectOf', () => {
     [undefined, 1350, '?'],
   ])('reads %s×%s as %s', (width, height, expected) => {
     expect(aspectOf(width, height)).toBe(expected);
+  });
+});
+
+describe('catalogueSizes', () => {
+  it('gives each format of a catalogue by id at its size', () => {
+    const catalogue = formatCatalogue({
+      story: { w: 1080, h: 1920 },
+      'grid-1x1': { w: 1080, h: 1080, label: 'Square' },
+    });
+    expect(catalogueSizes(catalogue)).toEqual({
+      story: { w: 1080, h: 1920 },
+      'grid-1x1': { w: 1080, h: 1080 },
+    });
   });
 });
 

@@ -1,3 +1,4 @@
+import type { FormatCatalogue } from '../config/formats.js';
 import type { Size } from '../scene/primitives.js';
 import type { DeliveryFormatCount } from './delivery-record.js';
 
@@ -61,6 +62,16 @@ export function aspectsText(aspects: ReadonlyMap<string, number>): string {
 
 function greatestCommonDivisor(a: number, b: number): number {
   return b === 0 ? a : greatestCommonDivisor(b, a % b);
+}
+
+/**
+ * Each format of a catalogue by its id and pixel size: what a format name `delivery.sizes` leaves
+ * out falls back to (ADR 0215), so a host hands the catalogue it renders with.
+ */
+export function catalogueSizes(catalogue: FormatCatalogue): Readonly<Record<string, Size>> {
+  const sizes: Record<string, Size> = {};
+  for (const { id, w, h } of catalogue.list()) sizes[id] = { w, h };
+  return sizes;
 }
 
 /** One image at the root of a delivery's exports folder; no size when its header did not read. */

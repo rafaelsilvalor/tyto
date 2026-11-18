@@ -221,6 +221,7 @@ export {
   type DeliveryImage,
   aspectOf,
   aspectsText,
+  catalogueSizes,
   checkDelivery,
 } from './project/delivery-check.js';
 
