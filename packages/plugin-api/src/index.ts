@@ -19,6 +19,7 @@ export type {
   EditorVimEx,
   EditorVimMapping,
   ExportFrameOptions,
+  ExportedFrame,
   Exporter,
   ExporterRegistry,
   PanelCallAnswer,

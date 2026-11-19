@@ -69,11 +69,13 @@ import {
  * workspace file in parts, and stat and list the folder, three requests a host on 26 would
  * refuse as unknown capabilities (ADR 0212, TYTO-768); 28 since an `apply` answer may say an
  * operation should `continue`, with its `progress`, a status and a field the strict answer
- * schema of a host on 27 would refuse (ADR 0216, TYTO-791). The number is the host's and its
- * own guest bootstrap's: a plugin's code carries none, so a plugin built before 28 runs on 28
- * unchanged.
+ * schema of a host on 27 would refuse (ADR 0216, TYTO-791); 29 since an exporter may answer a
+ * file's bytes and a frame's guide layer may carry its raster, an answer the strict result
+ * schema of a host on 28 would refuse and a field the strict frame schema of a guest on 28
+ * would refuse (ADR 0221, TYTO-740). The number is the host's and its own guest bootstrap's: a
+ * plugin's code carries none, so a plugin built before 29 runs on 29 unchanged.
  */
-export const RPC_PROTOCOL_VERSION = 28;
+export const RPC_PROTOCOL_VERSION = 29;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

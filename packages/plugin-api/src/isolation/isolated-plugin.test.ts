@@ -32,6 +32,7 @@ import { z } from 'zod';
 import type {
   BrandKitContribution,
   DirectiveContribution,
+  ExportedFrame,
   Exporter,
   IsolatedPackBuild,
   TemplatePack,
@@ -240,6 +241,11 @@ async function isolate(
   return { pair, connected };
 }
 
+/** An exporter's answer as text: every exporter these tests read as text writes a string. */
+function answerText(value: ExportedFrame): string {
+  return typeof value === 'string' ? value : String.fromCharCode(...value);
+}
+
 function exporterIn(plugin: Plugin): Exporter {
   const host = createPluginHost();
   const activated = host.tryActivate(plugin);
@@ -270,6 +276,53 @@ describe('an isolated exporter', () => {
       ...inProcess,
       exportFrame: undefined,
     });
+  });
+
+  it('carries a binary file as its bytes, which the host takes as bytes (ADR 0221)', async () => {
+    const file = new Uint8Array([0x38, 0x42, 0x50, 0x53, 0, 1, 255]);
+    const { connected } = await isolate((host) =>
+      host.registerExporter({ ...textExporter, exportFrame: () => ok(file) }),
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
+    expect(answer.ok && answer.value instanceof Uint8Array ? [...answer.value] : answer).toEqual([
+      ...file,
+    ]);
+  });
+
+  it("hands the plugin a guide frame with its layers' rasters (ADR 0221)", async () => {
+    const raster = {
+      id: 'guide-layer:capa:feed:texto',
+      source: 'inline',
+      hash: 'fnv1a-0',
+    } as const;
+    const layer = {
+      name: 'texto',
+      label: 'texto',
+      nodes: [],
+      locked: true,
+      visible: true,
+      opacity: 1,
+      raster,
+    } as const;
+    const withRaster: typeof FRAME = { ...FRAME, guide: { layers: [{ ...layer, nodes: [] }] } };
+    const { connected } = await isolate((host) =>
+      host.registerExporter({
+        ...textExporter,
+        exportFrame: (_scene, _artwork, frame) =>
+          ok(frame.guide?.layers[0]?.raster?.id ?? 'no raster'),
+      }),
+    );
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+
+    const scene: Scene = { ...SCENE, artworks: [{ ...ARTWORK, frames: [withRaster] }] };
+    const answer = await exporterIn(connected.value.plugin).exportFrame(
+      scene,
+      scene.artworks[0]!,
+      withRaster,
+    );
+    expect(answer.ok ? answer.value : answer.error).toBe(raster.id);
   });
 
   it('is activated into every host it is given, from one process', async () => {
@@ -392,7 +445,7 @@ describe('a crashed plugin', () => {
     pair.crash('exit code 7');
     release?.();
 
-    const codes = (answer: Result<string, Diagnostics>): readonly string[] =>
+    const codes = (answer: Result<ExportedFrame, Diagnostics>): readonly string[] =>
       answer.ok ? [] : answer.error.map((item) => item.message);
     expect(codes(await waiting)).toEqual(["Plugin 'texto' stopped running: exit code 7."]);
     expect(codes(await exporter.exportFrame(SCENE, ARTWORK, FRAME))).toEqual([
@@ -907,7 +960,7 @@ describe('host.signin across the boundary (ADR 0174)', () => {
       [nobody, cli].map(async ({ connected }) => {
         if (!connected.ok) throw new Error(connected.error[0]?.message);
         const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
-        return answer.ok ? answer.value : '';
+        return answer.ok ? answerText(answer.value) : '';
       }),
     );
     expect(answers).toEqual(['E_SIGNIN_REQUIRED', 'E_SIGNIN_UNAVAILABLE']);
@@ -946,7 +999,7 @@ describe('host.window across the boundary (ADR 0183)', () => {
   const answerOf = async (connected: Result<IsolatedPlugin, Diagnostics>): Promise<string> => {
     if (!connected.ok) throw new Error(connected.error[0]?.message);
     const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
-    return answer.ok ? answer.value : '';
+    return answer.ok ? answerText(answer.value) : '';
   };
 
   it('hands a plugin that names a program the server, as the host checked it', async () => {
@@ -1031,7 +1084,7 @@ describe('host.window.tools and callTool across the boundary (ADR 0190)', () => 
   const answerOf = async (connected: Result<IsolatedPlugin, Diagnostics>): Promise<string> => {
     if (!connected.ok) throw new Error(connected.error[0]?.message);
     const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
-    return answer.ok ? answer.value : '';
+    return answer.ok ? answerText(answer.value) : '';
   };
 
   it('lists and calls the window’s tools for a plugin that declares window:tools', async () => {
@@ -1139,7 +1192,7 @@ describe('credentialHeaders and host.storage across the boundary (ADR 0191)', ()
     });
     if (!connected.ok) throw new Error(connected.error[0]?.message);
     const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
-    expect(answer.ok ? JSON.parse(answer.value) : answer).toEqual({
+    expect(answer.ok ? JSON.parse(answerText(answer.value)) : answer).toEqual({
       status: 200,
       ledger: { spentMicros: 4200 },
       empty: null,
@@ -1188,7 +1241,7 @@ describe('host.terminal across the boundary (ADR 0184)', () => {
     const answers: string[] = [];
     for (let time = 0; time < times; time += 1) {
       const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
-      answers.push(answer.ok ? answer.value : '');
+      answers.push(answer.ok ? answerText(answer.value) : '');
     }
     return answers;
   };
@@ -3384,7 +3437,7 @@ describe('host.process across the boundary (ADR 0182)', () => {
   async function answerOf(connected: Result<IsolatedPlugin, Diagnostics>): Promise<string> {
     if (!connected.ok) throw new Error(connected.error[0]?.message);
     const answer = await exporterIn(connected.value.plugin).exportFrame(SCENE, ARTWORK, FRAME);
-    return answer.ok ? answer.value : answer.error.map((item) => item.code).join(',');
+    return answer.ok ? answerText(answer.value) : answer.error.map((item) => item.code).join(',');
   }
 
   it('talks to a long-lived program both ways, in bytes, until its stdin closes', async () => {

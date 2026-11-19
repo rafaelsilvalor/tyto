@@ -34,6 +34,15 @@ export {
   runJob,
 } from './job.js';
 
+export {
+  type GuideRasterPorts,
+  type RasterizedGuide,
+  type StoredAsset,
+  hasGuide,
+  layerFrame,
+  rasterizeGuideLayers,
+} from './guide-raster.js';
+
 export { type Limiter, limiter } from './limit.js';
 
 export {

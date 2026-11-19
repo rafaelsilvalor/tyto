@@ -49,6 +49,16 @@ export interface Contribution {
 
 /* ------------------------------------------------------------------------- exporter -- */
 
+/**
+ * What one frame exports to: a document, or the file's own bytes (ADR 0221).
+ *
+ * A string is what every exporter produced until a layered file needed bytes: the HTML a
+ * rasterizer turns into a picture, or an SVG that is already the file. A `Uint8Array` is a
+ * binary file nothing rasters, such as a PSD. Only a non-`rasterized` exporter may answer
+ * bytes; a job refuses bytes from one whose document still has to be rastered.
+ */
+export type ExportedFrame = string | Uint8Array;
+
 export interface ExportFrameOptions {
   /**
    * Draw text as outlines rather than as text runs. `svg` only; an exporter that does not
@@ -103,7 +113,7 @@ export interface Exporter extends Contribution {
     artwork: Artwork,
     frame: Frame,
     options?: ExportFrameOptions,
-  ): Result<string, Diagnostics> | Promise<Result<string, Diagnostics>>;
+  ): Result<ExportedFrame, Diagnostics> | Promise<Result<ExportedFrame, Diagnostics>>;
 }
 
 /**

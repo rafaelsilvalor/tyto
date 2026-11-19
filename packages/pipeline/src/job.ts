@@ -29,7 +29,7 @@ import {
   sceneResources,
 } from '@tyto/core';
 import { parseBrief } from '@tyto/brief-lang';
-import type { Exporter, ExporterRegistry } from '@tyto/plugin-api';
+import type { ExportedFrame, Exporter, ExporterRegistry } from '@tyto/plugin-api';
 import type { Rasterizer } from '@tyto/raster';
 
 import {
@@ -43,6 +43,7 @@ import {
   isRasterFormat,
 } from './artifact.js';
 import { type FrameTarget, type JobListener, notify } from './events.js';
+import { type StoredAsset, hasGuide, rasterizeGuideLayers } from './guide-raster.js';
 import { limiter } from './limit.js';
 import { type TemplateSource, renderedSlotsOf } from './template-source.js';
 
@@ -161,6 +162,11 @@ export interface JobRequest {
   readonly formats?: readonly string[];
   /** At least one. An empty list is a caller that has not decided what it wants. */
   readonly outputs: readonly OutputRequest[];
+  /**
+   * Compile the guide for art painted outside Tyto (ADR 0220): `compile`'s own `guide`. A
+   * Scene with a guide has its layers rasterised before the first export (ADR 0221).
+   */
+  readonly guide?: boolean;
   readonly signal?: AbortSignal;
 }
 
@@ -242,6 +248,13 @@ export interface JobPorts {
   readonly loadResources?: (
     needed: SceneResources,
   ) => void | Diagnostics | LoadedResources | Promise<void | Diagnostics | LoadedResources>;
+  /**
+   * Where bytes the job made itself are kept: a guide's layer rasters (ADR 0221). The
+   * composition root puts them in the store the exporters' resolvers read, under each ref's
+   * id, so an exporter asks for a raster as it asks for a loaded picture. Absent, nothing
+   * keeps them, and an exporter that needs one reports it unresolved.
+   */
+  readonly storeAssets?: (assets: readonly StoredAsset[]) => void | Promise<void>;
   /** Frames rastered at once. Defaults to 2 — see `limit.ts` for why not more. */
   readonly concurrency?: number;
   readonly onEvent?: JobListener;
@@ -505,6 +518,7 @@ export async function runJob(
       formats: ports.formats,
       ...(faces === undefined ? {} : { faces }),
       ...(ports.brandKits === undefined ? {} : { brandKits: ports.brandKits }),
+      ...(request.guide === true ? { guide: true } : {}),
     };
     // Only an installed code template answers later (ADR 0048); every other one is compiled
     // by the same synchronous `compile` as before.
@@ -552,14 +566,48 @@ export async function runJob(
     return ok(empty(true), problems);
   }
 
+  /* ------------------------------------------------------------------------ guide -- */
+
+  // After the resources, because a layer is drawn through the HTML exporter, which needs
+  // the bytes they loaded; before the render, because the exporter that writes the layered
+  // file reads the rasters from the Scene (ADR 0221). A Scene with no guide skips it whole.
+  let scene = compiled.value;
+  if (hasGuide(scene)) {
+    const drawer = ports.exporters.forKind('png');
+    if (drawer === undefined || !drawer.rasterized || ports.rasterizer === undefined) {
+      problems.push(
+        diagnostic('E_RENDER_FAILED', {
+          frame: 'guide',
+          kind: 'layers',
+          problem:
+            "a guide's layers are drawn through a rasterized exporter of png and a " +
+            'rasterizer, and this job was given ' +
+            (ports.rasterizer === undefined ? 'no rasterizer' : 'no such exporter'),
+        }),
+      );
+    } else {
+      const guide = await rasterizeGuideLayers(scene, {
+        exporter: drawer,
+        rasterizer: ports.rasterizer,
+      });
+      problems.push(...guide.diagnostics);
+      if (guide.rasters.length > 0) await ports.storeAssets?.(guide.rasters);
+      scene = guide.scene;
+    }
+  }
+
+  if (aborted()) {
+    notify(onEvent, { kind: 'cancelled', done: 0, total: 0 });
+    return ok(empty(true), problems);
+  }
+
   /* ----------------------------------------------------------------------- render -- */
 
-  const tasks = plan(compiled.value, request.outputs);
+  const tasks = plan(scene, request.outputs);
   const total = tasks.length;
   notify(onEvent, { kind: 'planned', total });
   notify(onEvent, { kind: 'stage-started', stage: 'render' });
 
-  const scene = compiled.value;
   const gate = limiter(ports.concurrency ?? DEFAULT_CONCURRENCY);
   const artifacts: (Artifact | undefined)[] = Array.from({ length: total });
   const failures: Diagnostic[][] = Array.from({ length: total }, () => []);
@@ -593,7 +641,7 @@ export async function runJob(
     return encoding;
   }
 
-  async function bytesOf(task: Task): Promise<Result<string, Diagnostics>> {
+  async function bytesOf(task: Task): Promise<Result<ExportedFrame, Diagnostics>> {
     // An exporter that does not understand `textAsPaths` ignores it, which is why this is
     // the same call for every kind. The resources were bound when it was registered.
     // Awaited, because an isolated plugin's exporter answers from another thread (ADR 0041).
@@ -607,10 +655,24 @@ export async function runJob(
       : err(explainUnloadedAssets(exported.error));
   }
 
-  async function encode(task: Task, document: string): Promise<Result<Uint8Array, Diagnostics>> {
+  async function encode(
+    task: Task,
+    document: ExportedFrame,
+  ): Promise<Result<Uint8Array, Diagnostics>> {
     // The exporter says whether its document is already the artifact. The job used to ask
-    // `kind === 'svg'`, which is the same question with the answer hardcoded.
-    if (!exporterOf(task).rasterized) return ok(new TextEncoder().encode(document));
+    // `kind === 'svg'`, which is the same question with the answer hardcoded. A binary
+    // file's bytes are the artifact as they come (ADR 0221).
+    if (!exporterOf(task).rasterized) {
+      return ok(typeof document === 'string' ? new TextEncoder().encode(document) : document);
+    }
+    if (typeof document !== 'string') {
+      return err([
+        renderFailure(
+          task.target,
+          `the exporter '${exporterOf(task).id}' is rasterized and answered bytes, not a document`,
+        ),
+      ]);
+    }
 
     // The `Rasterizer` port takes positive integers and refuses to guess at a rounding
     // (`resolveRasterOptions`), so the job — the caller — decides here. A frame that

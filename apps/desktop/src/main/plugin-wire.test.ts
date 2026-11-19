@@ -20,6 +20,24 @@ describe('the plugin wire', () => {
     expect(Buffer.compare(Buffer.from(crossed.value as Uint8Array), Buffer.from(part))).toBe(0);
   });
 
+  it("carries an exporter's binary answer as bytes (ADR 0221)", () => {
+    const file = new Uint8Array([0x38, 0x42, 0x50, 0x53, 0, 255]);
+    // A result as the plugin's process sends it back for `exportFrame`.
+    const message = {
+      protocol: RPC_PROTOCOL_VERSION,
+      type: 'result',
+      id: 3,
+      value: { ok: true, value: file, diagnostics: [] },
+    };
+
+    const crossed = decodeFromWire(JSON.parse(JSON.stringify(encodeForWire(message)))) as {
+      value: { value: unknown };
+    };
+
+    expect(crossed.value.value).toBeInstanceOf(Uint8Array);
+    expect(Array.from(crossed.value.value as Uint8Array)).toEqual(Array.from(file));
+  });
+
   it('carries a subarray as its own bytes, not the buffer behind it', () => {
     const whole = new Uint8Array([1, 2, 3, 4, 5]);
     const crossed = decodeFromWire(
