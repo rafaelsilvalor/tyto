@@ -3,6 +3,7 @@
 '@tyto/recipe': minor
 '@tyto/io': minor
 '@tyto/desktop': minor
+'@tyto/plugin-api': patch
 ---
 
 `rename-exports stem=<column> [digits=2] [path=<column>]` renames the images exported into
