@@ -12,6 +12,10 @@ A [galeria de templates](./gallery.md) mostra todos os templates que vêm com o 
 
 Na janela, **Novo brief a partir de template…** lista todos os templates que você pode usar, com a pasta de onde cada um veio, e abre um brief novo com os slots daquele template já escritos. Na linha de comando, a linha `template:` do brief ou `--template` escolhe o template.
 
+## Arte pintada em outro programa
+
+Alguns templates deixam uma imagem para ser pintada fora, num editor de imagens: um fundo que cobre a peça, ou uma ilustração abaixo do título. O template diz o tamanho dessa arte em cada formato. Enquanto o arquivo não existe, o brief continua renderizando: o lugar da arte é uma **caixa contornada em magenta**, no tamanho e na posição que a arte vai ocupar, e o painel de problemas mostra `W_EXTERNAL_ART_MISSING` para cada uma. Quando o arquivo estiver pronto, escreva o caminho dele no brief, como qualquer imagem, e a caixa dá lugar à arte. O `arte-teste` na [galeria](./gallery.md) mostra isso.
+
 ## Quando nenhum template serve
 
 Templates são pastas de arquivos simples: um `manifest.yaml` que lista os slots e os tamanhos, e um `template.html` que os desenha. **Novo template…** escreve um que já funciona para você alterar, e a [sua pasta de templates](./templates-folder.md) é onde ficam os seus. Escrever um template do zero está no [guia de autoria de templates](../extend/), em inglês.

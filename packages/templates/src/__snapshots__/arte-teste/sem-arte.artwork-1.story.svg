@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+  <defs>
+    <clipPath id="stroke0">
+      <path d="M0 0 H1080 V1920 H0 V0 Z"/>
+    </clipPath>
+    <clipPath id="stroke1">
+      <path d="M0 0 H920 V1080 H0 V0 Z"/>
+    </clipPath>
+    <style>@font-face{font-family:"Source Sans 3";font-weight:400;font-style:normal;src:url("tyto-test-font:Source Sans 3-400-normal")}@font-face{font-family:"Source Sans 3";font-weight:700;font-style:normal;src:url("tyto-test-font:Source Sans 3-700-normal")}
+    </style>
+  </defs>
+  <rect width="1080" height="1920" fill="#f7f5f0"/>
+  <g id="artwork-1.story.fundo">
+    <path d="M0 0 H1080 V1920 H0 V0 Z" fill="none"/>
+    <path d="M0 0 H1080 V1920 H0 V0 Z" fill="none" stroke="#ff00aa" stroke-width="18" clip-path="url(#stroke0)"/>
+  </g>
+  <g id="artwork-1.story.titulo" transform="matrix(1 0 0 1 80 160)">
+    <text x="0" y="61.2" xml:space="preserve"><tspan font-family="&quot;Source Sans 3&quot;" font-size="72" font-weight="400" fill="#1f2933">Uma peça com arte </tspan><tspan font-family="&quot;Source Sans 3&quot;" font-size="72" font-weight="700" fill="#1f2933">pintada fora</tspan></text>
+  </g>
+  <g id="artwork-1.story.imagem" transform="matrix(1 0 0 1 80 520)">
+    <path d="M0 0 H920 V1080 H0 V0 Z" fill="none"/>
+    <path d="M0 0 H920 V1080 H0 V0 Z" fill="none" stroke="#ff00aa" stroke-width="16" clip-path="url(#stroke1)"/>
+  </g>
+</svg>

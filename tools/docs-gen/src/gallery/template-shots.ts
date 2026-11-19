@@ -31,6 +31,12 @@ import { BUILT_IN_FORMATS_FILE, BUILT_IN_PACK, GALLERY_IMAGES, readPack } from '
  * contributes a `brand-kit` stops the run: the isolation is checked, not assumed.
  */
 
+/**
+ * The one warning a right picture carries: external art with no file yet is drawn as an
+ * outlined box where it goes (ADR 0220), and that box is what the gallery shows of it.
+ */
+const SHOWN_AS_DRAWN = new Set(['W_EXTERNAL_ART_MISSING']);
+
 const CLI = fileURLToPath(new URL('../../../../apps/cli/dist/index.js', import.meta.url));
 const run = promisify(execFile);
 
@@ -96,10 +102,11 @@ for (const { manifest, example, pictureFormat } of pack.templates) {
 
     const result = JSON.parse(await readFile(join(out, 'result.json'), 'utf8')) as Result;
     const first = result.artifacts.find((artifact) => artifact.format === pictureFormat);
-    if (result.status !== 'ok' || result.diagnostics.length > 0 || first === undefined) {
+    const blocking = result.diagnostics.filter((item) => !SHOWN_AS_DRAWN.has(item.code));
+    if (result.status !== 'ok' || blocking.length > 0 || first === undefined) {
       problems.push(
         `${manifest.name} (${example}, ${pictureFormat}): ${result.status}` +
-          result.diagnostics.map((item) => `\n  ${item.code} ${item.message}`).join(''),
+          blocking.map((item) => `\n  ${item.code} ${item.message}`).join(''),
       );
       continue;
     }

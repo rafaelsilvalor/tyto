@@ -2,7 +2,7 @@
 
 # Template gallery
 
-The templates that come with Tyto: 3, in 6 formats. They are there to try Tyto and to test it with. The templates a team publishes with live in their own repositories, and a plugin file names them so Tyto fetches them: [Fetch templates from their own repositories](../command-line/plugins.md#fetch-templates-from-their-own-repositories) shows how. Each picture is the template drawing the example brief kept beside it, in the first format it lists, drawn without a brand kit: a plain shape stands where a brand's logo goes and `@assinatura` where its signature goes. A brief names one of these in its `template:` line and fills the slots listed under it. The descriptions are written in the templates themselves, in English.
+The templates that come with Tyto: 4, in 6 formats. They are there to try Tyto and to test it with. The templates a team publishes with live in their own repositories, and a plugin file names them so Tyto fetches them: [Fetch templates from their own repositories](../command-line/plugins.md#fetch-templates-from-their-own-repositories) shows how. Each picture is the template drawing the example brief kept beside it, in the first format it lists, drawn without a brand kit: a plain shape stands where a brand's logo goes and `@assinatura` where its signature goes. A brief names one of these in its `template:` line and fills the slots listed under it. The descriptions are written in the templates themselves, in English.
 
 ## Formats
 
@@ -16,6 +16,22 @@ The sizes a brief can ask for in its `formats:` line. A template draws only the 
 | `banner` | 1200 × 628 | `banner` | Banner |
 | `banner-1x1` | 600 × 600 | `banner` | Banner 1:1 |
 | `banner-345x146` | 345 × 146 | `banner` | Banner 345×146 |
+
+## arte-teste
+
+![arte-teste, drawing examples/sem-arte.brief in the grid-1x1 format](/template-gallery/arte-teste.png)
+
+A test piece whose background and picture are painted outside Tyto.
+
+**Brand** `tyto-demo` · **Makes** grid, story · **Formats** `grid-1x1` (1080 × 1080), `story` (1080 × 1920)
+
+**Slots**
+
+| Slot | Type |  | Accepts |
+| --- | --- | --- | --- |
+| `titulo` | `rich-text` | required | text; at most 80 characters |
+| `fundo` | `image` | optional | a path to an image |
+| `imagem` | `image` | optional | a path to an image |
 
 ## banner-teste
 

@@ -1,0 +1,8 @@
+---
+template: arte-teste
+formats: [grid-1x1, story]
+---
+// No art painted yet: the background and the picture are outlined boxes where they go.
+
+::titulo
+  Uma peça com arte **pintada fora**

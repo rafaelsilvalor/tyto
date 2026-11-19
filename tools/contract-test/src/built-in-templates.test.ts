@@ -94,6 +94,13 @@ const EXAMPLES: readonly Example[] = [
     body: 'markup',
     formats: ['grid-1x1', 'story'],
   },
+  // External art with no file yet (ADR 0220): its two pictures are outlined boxes.
+  {
+    template: 'arte-teste',
+    brief: 'examples/sem-arte.brief',
+    body: 'code',
+    formats: ['grid-1x1', 'story'],
+  },
   // The product banner (TYTO-210): one text over a background from the template's own folder,
   // in three sizes, its breaks chosen by measuring.
   {
@@ -659,6 +666,7 @@ describe('the pack as a whole', () => {
     expect(
       Object.fromEntries(registry.value.list().map((manifest) => [manifest.name, manifest.brand])),
     ).toEqual({
+      'arte-teste': 'tyto-demo',
       'banner-teste': 'tyto-demo',
       'carrossel-lista': 'tyto-demo',
       'promo-curso': 'tyto-demo',
@@ -680,6 +688,7 @@ describe('the pack as a whole', () => {
         ]),
     );
     expect(kinds).toEqual({
+      'arte-teste': ['grid', 'story'],
       // One piece per format: three sizes of one banner read as three banners.
       'banner-teste': ['banner', 'banner', 'banner'],
       'carrossel-lista': ['carrossel', 'stories'],
@@ -696,7 +705,7 @@ describe('the pack as a whole', () => {
         .list()
         .map((entry) => entry.name)
         .sort(),
-    ).toEqual(['banner-teste', 'carrossel-lista', 'promo-curso']);
+    ).toEqual(['arte-teste', 'banner-teste', 'carrossel-lista', 'promo-curso']);
     // A manifest that does not parse becomes a failure rather than an exception, so an
     // empty list and a broken pack look alike unless this is checked.
     expect(registry.value.failures).toEqual([]);

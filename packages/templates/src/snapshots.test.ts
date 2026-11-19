@@ -14,6 +14,9 @@ import { exportSvg } from '@tyto/export-svg';
 import { compileTemplate, placeholderFont } from '@tyto/template-kit/testing';
 import { describe, expect, it } from 'vitest';
 
+import arteSemArteBrief from '../templates/arte-teste/examples/sem-arte.brief?raw';
+import arteManifest from '../templates/arte-teste/manifest.yaml?raw';
+import { build as arteTeste } from '../templates/arte-teste/template.js';
 import agenciaBrief from '../templates/banner-teste/examples/agencia.brief?raw';
 import prefeituraBrief from '../templates/banner-teste/examples/prefeitura.brief?raw';
 import bannerManifest from '../templates/banner-teste/manifest.yaml?raw';
@@ -116,4 +119,9 @@ describe('banner-teste', () => {
     { name: 'agencia', brief: agenciaBrief },
     { name: 'prefeitura', brief: prefeituraBrief },
   ]);
+});
+
+// External art with no file yet (ADR 0220): both pictures are outlined boxes where they go.
+describe('arte-teste', () => {
+  snapshotsOf(templateOf(arteManifest, arteTeste), [{ name: 'sem-arte', brief: arteSemArteBrief }]);
 });

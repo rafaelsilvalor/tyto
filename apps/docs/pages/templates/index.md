@@ -12,6 +12,10 @@ The [template gallery](./gallery.md) shows every template that comes with Tyto: 
 
 In the window, **New brief from template…** lists every template you can use, with the folder each one came from, and opens a new brief with that template's slots already written out. From the command line, a brief's `template:` line or `--template` chooses it.
 
+## Art painted in another program
+
+Some templates leave a picture to be painted elsewhere, in an image editor: a background that covers the piece, or an illustration under the title. The template says how big that art is in each format. Until the file exists, the brief still renders: the art's place is an **outlined magenta box**, at the size and in the position the art will take, and the Problems panel says `W_EXTERNAL_ART_MISSING` for each one. Write the file's path in the brief when it is ready, as you would any picture, and the box gives way to it. `arte-teste` in the [gallery](./gallery.md) shows it.
+
 ## When no template fits
 
 Templates are folders of plain files: a `manifest.yaml` that lists the slots and sizes, and a `template.html` that draws them. **New template…** writes a working one for you to change, and [Your templates folder](./templates-folder.md) is where your own live. Writing a template from scratch is covered in the [template author's guide](../extend/template-authoring.md).

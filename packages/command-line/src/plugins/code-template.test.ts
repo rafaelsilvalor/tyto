@@ -8,6 +8,7 @@ import {
   type Scene,
   compileDeferred,
   createFaceCache,
+  externalArtPlaceholder,
   describeFace,
   formatCatalogue,
   isDeferredTemplate,
@@ -74,6 +75,8 @@ interface Case {
   readonly faces?: string;
   readonly formats?: readonly string[];
   readonly fonts?: InstalledTemplateFonts;
+  /** The manifest's `slots:` value, inline YAML; none by default. */
+  readonly slots?: string;
 }
 
 const bundledFonts = createFontLibrary({ describe: describeFace, directories: [] });
@@ -90,7 +93,7 @@ async function templateOf(options: Case) {
   const formats = options.formats ?? ['feed'];
   await writeFile(
     join(template, 'manifest.yaml'),
-    `name: cartaz\nversion: 1.0.0\nformats: [${formats.join(', ')}]\nslots: {}\n${options.faces ?? ''}`,
+    `name: cartaz\nversion: 1.0.0\nformats: [${formats.join(', ')}]\nslots: ${options.slots ?? '{}'}\n${options.faces ?? ''}`,
   );
   const entry = join(plugin, 'index.js');
   await writeFile(
@@ -335,5 +338,48 @@ describe("an installed code template's reports (ADR 0058)", () => {
     });
 
     expect(problemsOf(scene).map((problem) => problem.code)).toEqual(['E_PLUGIN_TEMPLATE']);
+  }, 60_000);
+});
+
+describe('missing external art across the isolation protocol (ADR 0220)', () => {
+  // Starts a plugin's process, which a full `pnpm check` can hold past Vitest's 5 s.
+  it("reaches the plugin's template sized for the format, and comes back as an outlined box", async () => {
+    const { template } = await templateOf({
+      formats: ['story'],
+      slots:
+        '{ arte: { type: image, external: { kind: inline, sizes: { story: { width: 80, suggestedHeight: 30 } } } } }',
+      // The template places the ref it was handed, at the size the ref carries.
+      body: `const asset = context.slots.arte.value.asset;
+return { format: context.format, size: context.size, children: [{
+  id: context.idPrefix + '.arte', kind: 'image', asset, size: asset.size, fit: 'cover',
+  position: { x: 0.5, y: 0.5 },
+  transform: { x: 10, y: 20, rotation: 0, scaleX: 1, scaleY: 1, anchor: { x: 0, y: 0 } },
+  opacity: 1, blend: 'normal', visible: true, clip: false, effects: [],
+}] };`,
+    });
+    const brief: ResolvedBrief = {
+      ...briefFor('cartaz', ['story']),
+      slots: {
+        arte: {
+          name: 'arte',
+          value: { kind: 'image', asset: externalArtPlaceholder('arte') },
+          adjustments: [],
+        },
+      },
+    };
+
+    const scene = await compileDeferred(brief, template, { formats: FORMATS });
+
+    expect(problemsOf(scene)).toEqual([]);
+    const built = sceneOf(scene);
+    expect(built.artworks[0]?.frames[0]?.children).toEqual([
+      expect.objectContaining({
+        kind: 'rect',
+        name: 'external-art:arte',
+        size: { w: 80, h: 30 },
+        transform: expect.objectContaining({ x: 10, y: 20 }),
+      }),
+    ]);
+    expect(built.assets).toEqual([]);
   }, 60_000);
 });

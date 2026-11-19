@@ -140,7 +140,7 @@ describe('New brief from template…', () => {
     const lista = rows.find((row) => row.startsWith('carrossel-lista / '));
 
     // The test templates the pack keeps since the production ones left it (TYTO-436).
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     // The built-in pack's name, in the window's language, before the description.
     expect(lista).toMatch(/^carrossel-lista \/ (built-in|embutido) · A list carousel/u);
     await shoot('picker-light');
