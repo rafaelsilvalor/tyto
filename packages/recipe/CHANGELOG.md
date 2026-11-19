@@ -1,5 +1,24 @@
 # @tyto/recipe
 
+## 0.13.0
+
+### Minor Changes
+
+- 48cca9b: A delivery's exports are checked against its record (TYTO-757, ADR 0215). `deliveries` gives
+  every row `check` (`ready`, `incomplete` or `in-progress`), `check_problems`, each problem
+  named, and `found_formats`, the shapes of the PNG and JPEG images at the root of the
+  delivery's `exports` folder, read from their headers. The project file's `delivery.sizes`
+  gives each format name its pixel size; a name it leaves out falls back to the format
+  catalogue, which `tyto recipe run` and `tyto mcp` lend. `core` owns the one shape snapping,
+  `aspectOf` and `aspectsText`, which `@tyto/plugin-api` re-exports for plugins. A declared
+  field can no longer be named `check`, `check_problems` or `found_formats`.
+
+### Patch Changes
+
+- Updated dependencies [48cca9b]
+  - @tyto/core@0.52.0
+  - @tyto/brief-lang@0.12.3
+
 ## 0.12.0
 
 ### Minor Changes
