@@ -232,6 +232,7 @@ export {
   DELIVERY_RECORD_FOLDER,
   DELIVERY_RECORD_VERSION,
   DELIVERY_ROW_COLUMNS,
+  DELIVERY_COPY_FILE,
   DELIVERY_WRITABLE_FIELDS,
   type DeliveryConflict,
   type DeliveryFieldName,
@@ -244,6 +245,8 @@ export {
   type DeliveryRecordMerge,
   type DeliveryWritableField,
   type IncomingDeliveryFields,
+  deliveryCopyText,
+  deliveryFileBase,
   deliveryFormatsText,
   deliveryRecordSchema,
   declaredFieldProblem,
@@ -253,6 +256,7 @@ export {
   nearFixedField,
   parseDeliveryFormats,
   readDeliveryRecord,
+  withDeliveryFileBase,
   writeDeliveryRecord,
 } from './project/delivery-record.js';
 

@@ -221,3 +221,59 @@ function header(width: number, height: number): Buffer {
   bytes.writeUInt32BE(height, 20);
   return bytes;
 }
+
+describe("to-delivery's copy file through the recipe runner (TYTO-756, ADR 0217)", () => {
+  it('writes copy.md over a real folder, plans none on the next run, and keeps an edited copy', async () => {
+    const runner = createRecipeRunner({
+      contributions: contributions(),
+      placeOf: () => Promise.resolve({ trust: 'trusted', folder: workspace }),
+      sectionFor: () => undefined,
+      home: join(scratch, 'home'),
+      clock: () => clock,
+    });
+    const text = [
+      'recipe copies',
+      'demo.tasks',
+      'to-delivery name=folder fields=key:key copy-text=formats',
+      '',
+    ].join('\n');
+    const run = () => runner.run({ documentId: 'tab-1', text, path: recipePath, explicit: true });
+
+    const first = await run();
+    const cell = first.cells[1];
+    expect(cell?.diagnostics).toEqual([]);
+    expect(cell?.plan?.operations[0]?.description).toBe('entregas/mca-1_aula: new; copy.md new');
+    const applied = await runner.apply({
+      documentId: 'tab-1',
+      index: 1,
+      planId: cell?.planId ?? -1,
+      path: recipePath,
+    });
+    expect(applied?.applied?.operations.map((operation) => operation.status)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+    const copy = join(workspace, 'entregas', 'mca-1_aula', 'editaveis', 'copy.md');
+    expect(await readFile(copy, 'utf8')).toBe('feed:2,story:1\n');
+
+    const again = await run();
+    expect(again.cells[1]?.diagnostics).toEqual([]);
+    expect(again.cells[1]?.plan?.count).toBe(0);
+
+    // A file edited on disk changes no cell's signature, so the step is run again from itself,
+    // as Run from here does; the next run of the whole recipe reuses the planned cell.
+    await writeFile(copy, 'feed:2,story:1, and a line of my own\n', 'utf8');
+    const edited = await runner.run({
+      documentId: 'tab-1',
+      text,
+      path: recipePath,
+      explicit: true,
+      from: 1,
+    });
+    expect(edited.cells[1]?.plan?.count).toBe(0);
+    expect(edited.cells[1]?.note).toBe(
+      "Kept 1 copy.md file edited since the last run, never overwritten: 'entregas/mca-1_aula'.",
+    );
+  });
+});

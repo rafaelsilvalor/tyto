@@ -290,6 +290,12 @@ export function workspaceDeliveryPorts(options: WorkspaceDeliveryOptions): ToDel
       return ok(bytes.value === undefined ? undefined : briefDigest(bytes.value));
     },
 
+    // What `stat` answers for the same bytes, so a copy file's base compares with the file on
+    // disk (ADR 0217).
+    digest(text) {
+      return briefDigest(new TextEncoder().encode(text));
+    },
+
     async make(path) {
       const real = await locate(path);
       if (!real.ok) return real;

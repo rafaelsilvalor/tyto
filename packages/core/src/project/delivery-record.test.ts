@@ -8,12 +8,15 @@ import {
   type DeliveryRecordField,
   type DeliveryWritableField,
   declaredFieldProblem,
+  deliveryCopyText,
+  deliveryFileBase,
   deliveryFormatsText,
   isDeclaredFieldMap,
   mergeDeliveryRecord,
   nearFixedField,
   parseDeliveryFormats,
   readDeliveryRecord,
+  withDeliveryFileBase,
   writeDeliveryRecord,
 } from './delivery-record.js';
 
@@ -430,5 +433,38 @@ describe('declared fields (ADR 0213)', () => {
     expect(nearFixedField('description')).toBeUndefined();
     expect(nearFixedField('variante')).toBeUndefined();
     expect(nearFixedField('assignee')).toBeUndefined();
+  });
+});
+
+describe('a delivery copy file (ADR 0217)', () => {
+  it('puts the source on the first line, then the copy as it is, ending in one newline', () => {
+    expect(deliveryCopyText('https://docs.example/d/1', '# Aula\n\n- um\n\n\n')).toBe(
+      'Source: https://docs.example/d/1\n\n# Aula\n\n- um\n',
+    );
+    expect(deliveryCopyText(undefined, 'plain')).toBe('plain\n');
+    expect(deliveryCopyText('  ', 'plain')).toBe('plain\n');
+  });
+
+  it('remembers a digest per file in written.files, and a merge keeps it', () => {
+    const record: DeliveryRecord = { version: 1, key: 'T-1', written: { key: 'T-1' } };
+    const based = withDeliveryFileBase(
+      withDeliveryFileBase(record, 'editaveis/copy.md', 'a'),
+      'editaveis/other.md',
+      'b',
+    );
+    expect(based.written).toEqual({
+      key: 'T-1',
+      files: { 'editaveis/copy.md': 'a', 'editaveis/other.md': 'b' },
+    });
+    expect(record.written).toEqual({ key: 'T-1' });
+    expect(deliveryFileBase(based, 'editaveis/copy.md')).toBe('a');
+    expect(deliveryFileBase(record, 'editaveis/copy.md')).toBeUndefined();
+    expect(deliveryFileBase({ ...record, written: { files: ['a'] } }, 'editaveis/copy.md')).toBe(
+      undefined,
+    );
+
+    const merged = mergeDeliveryRecord(based, new Map([['due', '2026-11-20']]));
+    expect(merged.changed).toBe(true);
+    expect(deliveryFileBase(merged.record, 'editaveis/copy.md')).toBe('a');
   });
 });

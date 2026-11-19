@@ -481,6 +481,12 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
             default: 'yes',
           },
         ),
+        named(
+          'copy-text',
+          'column',
+          false,
+          'The column whose text becomes editaveis/copy.md; a copy edited by hand is kept.',
+        ),
       ],
       'sink',
     ),

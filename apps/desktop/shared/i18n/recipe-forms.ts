@@ -207,6 +207,8 @@ const PT_BR: Readonly<Record<string, string>> = {
     'Campos mapeados cuja célula vazia mantém o valor da ficha em vez de apagá-lo.',
   'recipe.verb.to-delivery.field.create.help':
     'Se uma linha cuja pasta de entrega não existe a cria.',
+  'recipe.verb.to-delivery.field.copy-text.help':
+    'A coluna cujo texto vira editaveis/copy.md; uma copy editada à mão é mantida.',
 
   'recipe.verb.deliveries.summary':
     'Lê cada ficha de entrega na pasta de entregas do projeto como uma linha.',

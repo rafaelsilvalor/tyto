@@ -136,3 +136,9 @@ nothing.
 > kept in the record's `fields` map with its base in `written.fields`; §2's "generic fields
 > only" now reads: generic fixed fields, plus the ones a workspace's recipe declares.
 > `create=no` writes only into delivery folders that already exist.
+
+## Note, 2026-11-19 — the digest of the files a recipe wrote (TYTO-756)
+
+ADR 0217 amends this record: `written` also keeps `files`, the digest of each file a recipe
+wrote into the delivery by its path relative to it, starting with `editaveis/copy.md`, so a
+copy a person edited is kept as an edited field is.

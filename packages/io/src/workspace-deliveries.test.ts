@@ -177,6 +177,17 @@ describe('workspaceDeliveryPorts', () => {
     expect(digest.ok && digest.value).toMatch(/^[0-9a-f]{64}$/u);
   });
 
+  it('digests a text as stat digests the file holding it, accents included (ADR 0217)', async () => {
+    const lent = ports();
+    const path = 'entregas/mca-1/editaveis/copy.md';
+    const text = 'Source: https://docs.example/d/1\n\nLançamento: três peças\n';
+    expect((await lent.make('entregas/mca-1/editaveis')).ok).toBe(true);
+    expect((await lent.write(path, text)).ok).toBe(true);
+    const onDisk = await lent.stat(path);
+    expect(onDisk.ok && onDisk.value).toBe(lent.digest?.(text));
+    expect(lent.digest?.(`${text} `)).not.toBe(lent.digest?.(text));
+  });
+
   it('refuses a path into .tyto, out of the workspace, or through a link that leads out', async () => {
     const lent = ports();
     const tyto = await lent.write('.tyto/delivery.json', '{}');

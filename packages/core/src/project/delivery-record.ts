@@ -476,3 +476,53 @@ export function mergeDeliveryRecord(
 function same(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
+
+/** A delivery's copy file (ADR 0217), beside its record, as a path relative to the delivery. */
+export const DELIVERY_COPY_FILE = `${DELIVERY_RECORD_FOLDER}/copy.md`;
+
+/**
+ * The text a recipe writes as a delivery's copy file (ADR 0217): the source on the first line,
+ * when the record names one, a blank line, then the copy as the row holds it, Markdown or plain
+ * alike, ending in one newline.
+ */
+export function deliveryCopyText(source: string | undefined, copy: string): string {
+  const body = `${copy.replace(/\s+$/u, '')}\n`;
+  return source === undefined || source.trim() === ''
+    ? body
+    : `Source: ${source.trim()}\n\n${body}`;
+}
+
+/**
+ * The digest a recipe last wrote a file of the delivery at (ADR 0217), from `written.files`, by
+ * its path relative to the delivery; `undefined` when it wrote none there, or the record holds
+ * another shape under the name.
+ */
+export function deliveryFileBase(
+  record: DeliveryRecord | undefined,
+  path: string,
+): string | undefined {
+  const files = record?.written?.['files'];
+  if (typeof files !== 'object' || files === null || Array.isArray(files)) return undefined;
+  const digest = (files as Readonly<Record<string, unknown>>)[path];
+  return typeof digest === 'string' ? digest : undefined;
+}
+
+/**
+ * The record with `written.files[path]` set to `digest` (ADR 0217): what the recipe wrote at that
+ * file, so the next run tells a file a person edited from one nobody touched. Every other key,
+ * and every other file's digest, stays as it was.
+ */
+export function withDeliveryFileBase(
+  record: DeliveryRecord,
+  path: string,
+  digest: string,
+): DeliveryRecord {
+  const written: Record<string, unknown> = { ...(record.written ?? {}) };
+  const files = written['files'];
+  const kept =
+    typeof files === 'object' && files !== null && !Array.isArray(files)
+      ? (files as Readonly<Record<string, unknown>>)
+      : {};
+  written['files'] = { ...kept, [path]: digest };
+  return { ...record, written };
+}
