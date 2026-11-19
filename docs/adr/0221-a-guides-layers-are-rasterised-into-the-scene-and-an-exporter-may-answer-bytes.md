@@ -91,3 +91,32 @@ first.
   for an `inline` one), in sequence, before the render; a render without a guide costs nothing.
 - The CLI and the desktop wire `storeAssets` and `guide` when the PSD lands (the fifth pull
   request of TYTO-740); until then nothing asks for a guide.
+
+## Note of 2026-11-19: the PSD exporter (TYTO-740, fourth pull request)
+
+What `@tyto/export-psd` settled beyond decision 3:
+
+- **The port is `PsdResources.pixels(ref)`**, synchronous like the HTML exporter's
+  resolvers, answering straight RGBA (`RgbaPixels`: width, height, `width × height × 4`
+  bytes) or `undefined`. The exporter is registered as `psd`, `image/vnd.adobe.photoshop`,
+  `rasterized: false`, and answers a `Uint8Array`.
+- **Measured: `ag-psd` 34.2.2 writes in Node with no canvas.** The tests install a canvas
+  factory that throws and every write passes. Reading back is another matter: `readPsd`
+  allocates through `createImageData` even with `useImageData`, so a test hands it a plain
+  one. The exporter installs nothing.
+- **The composite is computed in TypeScript.** `ag-psd` writes the composite it is given
+  and cannot compute one without a canvas; with none it writes zeros, which every viewer
+  that shows the flattened image draws black. `compositeOver` draws the visible layers
+  "over" one another with each layer's opacity, so `decoracao`, hidden, is not in it.
+- **A locked layer sets every `protected` flag** (transparency, composite, position and
+  `all`, the padlock button's bit), and `noBackground` is on: an opaque `decoracao`, which
+  carries the frame's background, would otherwise become Photoshop's "Background", which
+  cannot be hidden.
+- **Nothing is written when anything is missing.** A frame without `guide`, a painted layer
+  without `raster`, or pixels of another size than the frame (rounded) is `E_RENDER_FAILED`
+  (frame `<artwork>:<format>`, kind `psd`); a raster the port has no pixels for is
+  `E_EXPORT_ASSET_UNRESOLVED` naming the layer. A Scene carries no source range, so each
+  names its frame as the other exporters' diagnostics do. A guide missing a layer the
+  designer counts on would look complete, which is why there is no partial file.
+- **`arte` is a layer with no pixels**, so it reads back as 0×0 at the document's origin;
+  an `inline` canvas's PSD is that one layer, named by its label (`arte 920px`).

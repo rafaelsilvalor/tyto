@@ -19,6 +19,8 @@ const PURE_PACKAGES = [
   'packages/template-lang',
   'packages/export-html',
   'packages/export-svg',
+  // Writes a guide frame as a layered PSD from the Scene and decoded pixels (TYTO-740, ADR 0221).
+  'packages/export-psd',
   'packages/templates',
   // Everything a template imports runs wherever the compiler runs (TYTO-185).
   'packages/template-kit',

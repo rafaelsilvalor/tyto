@@ -26,6 +26,9 @@
 'pkg:export-svg':
   - changed-files:
       - any-glob-to-any-file: 'packages/export-svg/**'
+'pkg:export-psd':
+  - changed-files:
+      - any-glob-to-any-file: 'packages/export-psd/**'
 'pkg:templates':
   - changed-files:
       - any-glob-to-any-file: 'packages/templates/**'
