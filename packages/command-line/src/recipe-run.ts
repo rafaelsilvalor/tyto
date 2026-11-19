@@ -44,8 +44,13 @@ import { workspaceOfFolder } from './workspace.js';
  * order. It is the only way the CLI lends `call` a `send` (ADR 0193 decision 5), with the
  * credentials read from the environment (`recipe-credentials.ts`).
  *
- * Exit codes are ADR 0011's: 1 when a cell failed, an operation failed or any diagnostic is an
- * error, and for a bad command line; 2 for an internal failure.
+ * A write that takes more than one call (ADR 0216) is asked again within the same Apply, and
+ * its plugin's progress goes to stderr, one line a call. The first Ctrl+C while applying stops
+ * between two calls: what was in progress is reported unfinished, no later plan is applied, and
+ * the command exits 1.
+ *
+ * Exit codes are ADR 0011's: 1 when a cell failed, an operation failed, an Apply was cancelled
+ * or any diagnostic is an error, and for a bad command line; 2 for an internal failure.
  */
 
 export interface RecipeRunCommandOptions {
@@ -230,17 +235,37 @@ export async function recipeRunCommand(
     });
 
     const cells: RunnerCell[] = [...answer.cells];
+    const cancel = new AbortController();
     if (apply) {
-      for (const [at, cell] of cells.entries()) {
-        if (cell.applicable !== true || cell.planId === undefined) continue;
-        const after = await runner.apply({
-          documentId: path,
-          index: cell.index,
-          planId: cell.planId,
-          path,
-        });
-        if (after !== undefined) cells[at] = after;
+      const release = environment.interrupt?.(() => {
+        cancel.abort();
+      });
+      try {
+        for (const [at, cell] of cells.entries()) {
+          if (cell.applicable !== true || cell.planId === undefined) continue;
+          if (cancel.signal.aborted) break;
+          const after = await runner.apply({
+            documentId: path,
+            index: cell.index,
+            planId: cell.planId,
+            path,
+            options: {
+              cancel: cancel.signal,
+              onProgress: ({ done, total, note }) => {
+                if (note === undefined) return;
+                console.err(
+                  `applying cell ${String(cell.index + 1)}: ${String(done)} of ` +
+                    `${plural(total, 'operation', 'operations')} done; ${note}\n`,
+                );
+              },
+            },
+          });
+          if (after !== undefined) cells[at] = after;
+        }
+      } finally {
+        release?.();
       }
+      if (cancel.signal.aborted) console.err('cancelled: the Apply stopped between two calls\n');
     }
 
     const primary = { primary: { path: shownRecipe, source: text } };
@@ -250,6 +275,7 @@ export async function recipeRunCommand(
       ...answer.diagnostics,
     ];
     const failed =
+      cancel.signal.aborted ||
       hasErrors(whole) ||
       cells.some(
         (cell) =>

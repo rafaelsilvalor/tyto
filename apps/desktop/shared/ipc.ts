@@ -3048,6 +3048,16 @@ export const IPC_CHANNELS = {
   ),
 
   /**
+   * Stops the Apply of a plan cell between two calls (TYTO-791, ADR 0216): a long write still in
+   * progress is reported unfinished, and nothing is asked again. The cell's `recipe:apply` answer
+   * says how it ended; `cancelled` is false when no Apply of that cell was under way.
+   */
+  'recipe:apply-cancel': channel(
+    z.object({ documentId, index: z.number().int().nonnegative() }),
+    z.object({ cancelled: z.boolean() }),
+  ),
+
+  /**
    * One page of a kept cell's table, as a view shows it (TYTO-379, ADR 0171): sorted with the
    * `sort` verb's comparator and filtered by the quick filter, in main, over the whole table.
    * `total` is every row the table has and `matched` those the filter keeps; `totals` are the
@@ -3774,6 +3784,19 @@ export const IPC_EVENTS = {
    * was clicked, which the window opens with `schedule:open`.
    */
   'schedule:changed': z.object({ open: scheduleId.optional() }),
+
+  /**
+   * How far a plan cell's Apply has got (TYTO-791, ADR 0216), after each call that left a write
+   * in progress: operations finished of the plan's, and the plugin's words for the one still
+   * going ("sent 48 of 100 MB"). The `recipe:apply` answer ends it.
+   */
+  'recipe:apply-progress': z.object({
+    documentId,
+    index: z.number().int().nonnegative(),
+    done: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+    note: z.string().max(80).optional(),
+  }),
 } as const;
 
 export type IpcEvents = typeof IPC_EVENTS;

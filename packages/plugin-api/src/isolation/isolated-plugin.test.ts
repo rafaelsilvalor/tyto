@@ -3133,9 +3133,11 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
 
   /**
    * `demo.mark` over 250 rows, each operation carrying its row in a payload; `apply` answers
-   * from the payload, and `stall` names the call that waits past the 200 ms deadline.
+   * from the payload, and `stall` names the call that waits past the 200 ms deadline. With
+   * `continues`, the first call answers its first operation `continue` with a progress line
+   * (ADR 0216), and every later call applies.
    */
-  async function appliedAcross(stall?: number) {
+  async function appliedAcross(stall?: number, continues = false) {
     const calls: number[] = [];
     const { connected } = await isolate(
       (host) => {
@@ -3171,10 +3173,12 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
             calls.push(operations.length);
             if (calls.length === stall) await later(400, undefined);
             return ok({
-              operations: operations.map((operation) =>
-                (operation.payload as { id?: unknown } | undefined)?.id === operation.rowKey
-                  ? { status: 'applied' as const }
-                  : { status: 'failed' as const, reason: 'the payload did not cross' },
+              operations: operations.map((operation, index) =>
+                continues && calls.length === 1 && index === 0
+                  ? { status: 'continue' as const, progress: 'sent 1 of 2 parts' }
+                  : (operation.payload as { id?: unknown } | undefined)?.id === operation.rowKey
+                    ? { status: 'applied' as const }
+                    : { status: 'failed' as const, reason: 'the payload did not cross' },
               ),
             });
           },
@@ -3207,6 +3211,12 @@ describe('isolated recipe verbs and derivations (TYTO-376, ADR 0135)', () => {
     const { plan, calls, statuses } = await appliedAcross();
     expect(plan.operations[0]?.payload).toEqual({ id: 'N-1', expected: [null, { since: 1 }] });
     expect(calls).toEqual([100, 100, 50]);
+    expect(new Set(statuses)).toEqual(new Set(['applied']));
+  });
+
+  it('crosses a continue answer with its progress, and asks again for that operation (ADR 0216)', async () => {
+    const { calls, statuses } = await appliedAcross(undefined, true);
+    expect(calls).toEqual([100, 1, 100, 50]);
     expect(new Set(statuses)).toEqual(new Set(['applied']));
   });
 

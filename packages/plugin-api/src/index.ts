@@ -169,8 +169,13 @@ export {
   type TransformRequest,
   type VerbRequest,
   APPLY_BATCH,
+  APPLY_CANCELLED,
+  APPLY_CONTINUE_CALLS,
+  APPLY_NOT_STARTED,
   APPLY_NO_ANSWER,
+  APPLY_PROGRESS_MAX_LENGTH,
   APPLY_REASON_MAX_LENGTH,
+  APPLY_UNFINISHED,
   RECIPE_VERB_KINDS,
   recipeRegistriesOf,
 } from './recipes.js';

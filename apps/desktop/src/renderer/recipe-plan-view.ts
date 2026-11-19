@@ -19,6 +19,9 @@ import type { CellStatus } from './recipe-notebook.js';
  * - **A refusal** (a stale plan, a verb that cannot apply) is said once, on the cell, from the
  *   `recipe:apply` answer: main keeps no refusal, so the next run's answer drops it.
  * - **`apply auto` held** (a Run outside a trusted folder) is one discreet line.
+ * - **A long write** (TYTO-791, ADR 0216) shows how far its Apply has got, with the plugin's own
+ *   words, and Cancel beside it, which stops between two calls; once pressed it says so and
+ *   asks nothing more.
  *
  * Pure apart from `document`: what a click does is the host's.
  */
@@ -39,6 +42,18 @@ export interface PlanViewState {
   readonly applying: boolean;
   /** Why this cell's last Apply was refused, as main said it; shown until the next answer. */
   readonly refusal: string | undefined;
+  /** TYTO-791: how far this cell's Apply has got, while a write is in progress. */
+  readonly progress?: ApplyProgressShown | undefined;
+  /** TYTO-791: Cancel for this cell's Apply; absent, no Cancel is drawn. */
+  readonly cancel?: (() => void) | undefined;
+}
+
+/** A long Apply's progress as main pushed it, and whether Cancel was pressed. */
+export interface ApplyProgressShown {
+  readonly done: number;
+  readonly total: number;
+  readonly note?: string | undefined;
+  readonly cancelling: boolean;
 }
 
 /** Apply is offered: the plan may be applied, main stamped it, and it was not applied. */
@@ -97,12 +112,47 @@ export function planBody(
       text(element('div', 'recipe-plan__summary'), summaryOf(cell.applied, state.locale)),
     );
   }
+  if (state.applying && state.progress !== undefined) {
+    body.append(progressLine(state.progress, state.locale, state.cancel));
+  }
   if (state.refusal !== undefined) {
     const refusal = text(element('div', 'recipe-plan__refusal'), state.refusal);
     refusal.setAttribute('role', 'alert');
     body.append(refusal);
   }
   return body;
+}
+
+/** "Applying: 3 of 10 done · sent 48 of 100 MB", and Cancel, which says it is stopping once pressed. */
+function progressLine(
+  progress: ApplyProgressShown,
+  locale: Locale,
+  cancel: (() => void) | undefined,
+): HTMLElement {
+  const line = element('div', 'recipe-plan__progress');
+  line.setAttribute('role', 'status');
+  const counted = translate(locale, 'recipe.plan.progress')
+    .replace('{done}', String(progress.done))
+    .replace('{total}', String(progress.total));
+  const words = progress.note === undefined ? counted : `${counted} · ${progress.note}`;
+  line.append(text(element('span', 'recipe-plan__progress-text'), words));
+  if (cancel !== undefined) {
+    const stop = element('button', 'recipe-cell__action');
+    stop.type = 'button';
+    stop.dataset['action'] = 'cancel-apply';
+    stop.textContent = translate(
+      locale,
+      progress.cancelling ? 'recipe.plan.cancelling' : 'recipe.plan.cancel',
+    );
+    if (progress.cancelling) stop.setAttribute('aria-disabled', 'true');
+    stop.addEventListener('click', () => {
+      if (stop.getAttribute('aria-disabled') === 'true') return;
+      stop.setAttribute('aria-disabled', 'true');
+      cancel();
+    });
+    line.append(stop);
+  }
+  return line;
 }
 
 function operationList(plan: WirePlan, applied: WireCell['applied'], locale: Locale): HTMLElement {

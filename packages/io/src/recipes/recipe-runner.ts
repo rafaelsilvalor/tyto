@@ -21,6 +21,7 @@ import {
   recipeRegistriesOf,
 } from '@tyto/plugin-api';
 import {
+  type ApplyOptions,
   type Cell,
   type CellView,
   type IncludedRecipe,
@@ -240,6 +241,11 @@ export interface RecipeApplyInput {
   readonly planId: number;
   /** The document's file, which main holds. */
   readonly path: string | undefined;
+  /**
+   * ADR 0216: stops the Apply between two calls of a long write, and follows it. Read only once
+   * the Apply's turn in the file's queue comes, so a cancel before then applies nothing.
+   */
+  readonly options?: ApplyOptions;
 }
 
 export interface RecipeRunner {
@@ -503,7 +509,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
 
     async apply(request) {
       return queued(await applyLaneOf(request.documentId, request.path), () =>
-        applyKept(request.documentId, request.index, request.planId, request.path),
+        applyKept(request.documentId, request.index, request.planId, request.path, request.options),
       );
     },
 
@@ -561,6 +567,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
     index: number,
     planId: number,
     path: string | undefined,
+    applyOptions?: ApplyOptions,
   ): Promise<RunnerCell | undefined> {
     const cells = kept.get(documentId)?.cells;
     const cell = cells?.[index];
@@ -586,6 +593,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
       registries,
       state: writableStateFor(place, path, options.home, stateOf),
       now,
+      ...(applyOptions === undefined ? {} : { options: applyOptions }),
     });
     const applied = answer.applied;
     // TYTO-643: only an Apply that wrote something makes the plan out of date. One refused, or

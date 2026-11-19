@@ -2,6 +2,7 @@ import { type Diagnostic, diagnostic } from '@tyto/core';
 import type { RecipeRegistries, RecipeState } from '@tyto/plugin-api';
 import {
   type AppliedOperation,
+  type ApplyOptions,
   type ApplyOutcome,
   type Plan,
   type StateWrite,
@@ -55,6 +56,8 @@ export interface ApplyRequest {
   readonly state: RecipeState | undefined;
   /** The host clock, as ISO 8601 in UTC. */
   readonly now: () => string;
+  /** ADR 0216: the host's cancel and progress line, handed to the verb as they are. */
+  readonly options?: ApplyOptions;
 }
 
 export interface ApplyAnswer {
@@ -87,7 +90,7 @@ export async function applyCell(request: ApplyRequest): Promise<ApplyAnswer> {
   if (verb?.apply === undefined) return refuse('the verb only plans; nothing applies it');
 
   // The kept object itself: the registries know it by identity, and refuse a copy.
-  const answered = await verb.apply(cell.plan);
+  const answered = await verb.apply(cell.plan, request.options);
   if (!answered.ok) return { diagnostics: answered.error };
   const applied: AppliedRecord = { at: request.now(), operations: answered.value.operations };
   const remembered = await commitState(request, applied, verbName);

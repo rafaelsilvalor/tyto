@@ -66,6 +66,8 @@ export { PATTERN_DIALECT, PATTERN_LIMITS, boundedInput, compilePattern } from '.
 export type { JsonValue, Plan, PlanContext, PlanLimits, PlannedOperation } from './plan.js';
 export { PLAN_LIMITS, checkPlan } from './plan.js';
 export type {
+  ApplyOptions,
+  ApplyProgress,
   Derivation,
   DerivationRegistry,
   IncludedRecipe,

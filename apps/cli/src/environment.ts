@@ -152,5 +152,14 @@ export function defaultEnvironment(): CliEnvironment {
     rasterizer: defaultRasterizer,
     launch: launchPluginProcess,
     stdio: () => claimStdio(),
+    interrupt: (stop) => {
+      // Once: removing the listener on the first Ctrl+C gives the second one Node's default.
+      const once = (): void => {
+        process.off('SIGINT', once);
+        stop();
+      };
+      process.on('SIGINT', once);
+      return () => process.off('SIGINT', once);
+    },
   };
 }

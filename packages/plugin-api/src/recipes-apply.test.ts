@@ -1,10 +1,22 @@
 import { err, ok } from '@tyto/core';
-import { type Plan, type Table, type Verb, parseRecipe, runRecipe } from '@tyto/recipe';
+import {
+  type ApplyOptions,
+  type ApplyProgress,
+  type Plan,
+  type Table,
+  type Verb,
+  parseRecipe,
+  runRecipe,
+} from '@tyto/recipe';
 import { describe, expect, it } from 'vitest';
 
 import { type Plugin, type PluginHost, createPluginHost } from './host.js';
 import {
+  APPLY_CANCELLED,
+  APPLY_CONTINUE_CALLS,
+  APPLY_NOT_STARTED,
   APPLY_NO_ANSWER,
+  APPLY_UNFINISHED,
   type AppliedBatch,
   type ApplyRequest,
   type RecipeRegistries,
@@ -123,8 +135,8 @@ async function planned(rows: number, apply: Applier | undefined): Promise<Planne
   return { host, registries, plan, verb, calls };
 }
 
-async function applied(setup: Planned, plan: Plan = setup.plan) {
-  const outcome = await setup.verb.apply?.(plan);
+async function applied(setup: Planned, plan: Plan = setup.plan, options?: ApplyOptions) {
+  const outcome = await setup.verb.apply?.(plan, options);
   if (outcome === undefined) throw new Error('the verb must apply');
   return outcome;
 }
@@ -284,6 +296,168 @@ describe('apply, in batches (ADR 0170 decision 2)', () => {
     }
   });
 });
+
+/**
+ * An upload that takes `needs` calls per operation, as a long write does: the plugin keeps how
+ * far each one got (here a map, in a plugin its cache, ADR 0138) and answers `continue` with a
+ * progress line until the last call (ADR 0216).
+ */
+function uploads(needs: (rowKey: string) => number): Applier {
+  const sent = new Map<string, number>();
+  return (request) =>
+    ok({
+      operations: request.operations.map((operation) => {
+        const key = operation.rowKey ?? '';
+        const parts = needs(key);
+        const done = (sent.get(key) ?? 0) + 1;
+        sent.set(key, done);
+        return done < parts
+          ? {
+              status: 'continue' as const,
+              progress: `sent ${String(done)} of ${String(parts)} parts`,
+            }
+          : { status: 'applied' as const };
+      }),
+    });
+}
+
+describe('apply, an operation in progress (ADR 0216)', () => {
+  it('asks again for an operation that needs three calls, and finishes it in one Apply', async () => {
+    const setup = await planned(
+      2,
+      uploads((key) => (key === 'N-1' ? 3 : 1)),
+    );
+    const progress: ApplyProgress[] = [];
+    const outcome = await applied(setup, setup.plan, { onProgress: (each) => progress.push(each) });
+    if (!outcome.ok) throw new Error(outcome.error[0]?.message);
+
+    // The first call carries both; each later one only the operation still in progress.
+    expect(setup.calls.map((call) => call.operations.map((each) => each.rowKey))).toEqual([
+      ['N-1', 'N-2'],
+      ['N-1'],
+      ['N-1'],
+    ]);
+    // The operation handed back is the planned one, payload included.
+    expect(setup.calls[2]?.operations[0]).toEqual(setup.plan.operations[0]);
+    expect(outcome.value.operations).toEqual([
+      { rowKey: 'N-1', status: 'applied', appliedAt: NOW },
+      { rowKey: 'N-2', status: 'applied', appliedAt: NOW },
+    ]);
+    expect(progress).toEqual([
+      { done: 1, total: 2, note: 'sent 1 of 3 parts' },
+      { done: 1, total: 2, note: 'sent 2 of 3 parts' },
+      { done: 2, total: 2 },
+    ]);
+  });
+
+  it('asks nothing after a cancel, and reports the operation in progress unfinished', async () => {
+    const setup = await planned(
+      2,
+      uploads((key) => (key === 'N-1' ? 3 : 1)),
+    );
+    // No DOM or Node type here: a cancel is anything with `aborted`.
+    const cancel = { aborted: false };
+    const outcome = await applied(setup, setup.plan, {
+      cancel,
+      // The person cancels while the first call's progress is shown.
+      onProgress: () => {
+        cancel.aborted = true;
+      },
+    });
+    if (!outcome.ok) throw new Error(outcome.error[0]?.message);
+    expect(setup.calls).toHaveLength(1);
+    expect(outcome.value.operations).toEqual([
+      { rowKey: 'N-1', status: 'failed', reason: APPLY_CANCELLED },
+      { rowKey: 'N-2', status: 'applied', appliedAt: NOW },
+    ]);
+  });
+
+  it('skips with no call the batches a cancel came before', async () => {
+    const setup = await planned(150, appliesAll);
+    // No DOM or Node type here: a cancel is anything with `aborted`.
+    const cancel = { aborted: false };
+    const outcome = await applied(setup, setup.plan, {
+      cancel,
+      onProgress: () => {
+        cancel.aborted = true;
+      },
+    });
+    if (!outcome.ok) throw new Error(outcome.error[0]?.message);
+    expect(setup.calls).toHaveLength(1);
+    expect(outcome.value.operations[99]?.status).toBe('applied');
+    expect(outcome.value.operations[100]).toEqual({
+      rowKey: 'N-101',
+      status: 'skipped',
+      reason: APPLY_NOT_STARTED,
+    });
+  });
+
+  it('stops asking at the ceiling, and reports the operation unfinished', async () => {
+    const setup = await planned(
+      1,
+      uploads(() => Number.POSITIVE_INFINITY),
+    );
+    const outcome = await applied(setup);
+    if (!outcome.ok) throw new Error(outcome.error[0]?.message);
+    expect(setup.calls).toHaveLength(1 + APPLY_CONTINUE_CALLS);
+    expect(outcome.value.operations).toEqual([
+      { rowKey: 'N-1', status: 'failed', reason: APPLY_UNFINISHED },
+    ]);
+  });
+
+  it('fails as no answer a later call that throws, and skips every later batch', async () => {
+    const continuing = uploads((key) => (key === 'N-1' ? 3 : 1));
+    const result = await statusesOf(250, (request, call) => {
+      if (call === 2) throw new Error('the upload session expired');
+      return continuing(request, call);
+    });
+    expect(result.calls).toBe(2);
+    expect(result.first).toEqual({ rowKey: 'N-1', status: 'failed', reason: APPLY_NO_ANSWER });
+    expect(result.second).toEqual({ rowKey: 'N-2', status: 'applied', appliedAt: NOW });
+    expect(result.later).toEqual(['skipped: an earlier batch had no answer']);
+  });
+
+  it('fails as no answer a progress line on another status, or one over 80 characters', async () => {
+    const answers = [
+      { status: 'applied' as const, progress: 'done' },
+      { status: 'continue' as const, progress: 'x'.repeat(81) },
+      { status: 'continue' as const, progress: '' },
+    ];
+    for (const answer of answers) {
+      const result = await statusesOf(2, (request) =>
+        ok({ operations: request.operations.map(() => answer) }),
+      );
+      expect(result.calls).toBe(1);
+      expect(result.first?.reason).toBe(APPLY_NO_ANSWER);
+    }
+  });
+
+  // Version skew: a plugin that answers `continue` to a host on protocol 27 or earlier gets the
+  // outcome that host gives any status it does not know: the batch fails as no answer.
+  it('fails as no answer a status this host does not know, as continue was to a host on 27', async () => {
+    const result = await statusesOf(2, (request) =>
+      ok({
+        operations: request.operations.map(() => ({ status: 'later' })),
+      } as unknown as AppliedBatch),
+    );
+    expect(result.calls).toBe(1);
+    expect(result.first).toEqual({ rowKey: 'N-1', status: 'failed', reason: APPLY_NO_ANSWER });
+  });
+});
+
+/** An Apply of `rows` operations: its calls, its first two outcomes, and every later status. */
+async function statusesOf(rows: number, apply: Applier) {
+  const setup = await planned(rows, apply);
+  const outcome = await applied(setup);
+  if (!outcome.ok) throw new Error(outcome.error[0]?.message);
+  const [first, second, ...rest] = outcome.value.operations;
+  return {
+    calls: setup.calls.length,
+    first,
+    second,
+    later: [...new Set(rest.slice(98).map((each) => `${each.status}: ${each.reason ?? ''}`))],
+  };
+}
 
 describe('apply at registration', () => {
   it("lets an action without 'apply' register, and refuses a source with one", () => {

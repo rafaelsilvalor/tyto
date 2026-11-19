@@ -4,6 +4,7 @@ import {
   type ArgumentSpec,
   type AppliedOperation,
   type ArgumentValues,
+  type ApplyOptions,
   type Derivation,
   type DerivationRegistry,
   PAGE_LIMITS,
@@ -107,11 +108,21 @@ export interface ApplyRequest extends VerbRequest {
   readonly target: string;
 }
 
-/** How one operation of a batch went, in the plugin's words. */
+/**
+ * How one operation of a batch went, in the plugin's words. `continue` (ADR 0216) says the
+ * operation is in progress and not finished: the host asks again with that operation, within
+ * the same Apply, and the plugin resumes from what it keeps in its own cache (ADR 0138). It
+ * carries no new payload; the operation handed back is the planned one.
+ */
 export interface AppliedBatchOperation {
-  readonly status: 'applied' | 'failed' | 'skipped';
+  readonly status: 'applied' | 'failed' | 'skipped' | 'continue';
   /** Why it failed or was skipped; a `failed` operation must say. At most 500 characters. */
   readonly reason?: string;
+  /**
+   * A `continue` operation's progress in a person's words, such as "sent 48 of 100 MB", which
+   * the host shows while the Apply runs. Only on `continue`; at most 80 characters.
+   */
+  readonly progress?: string;
 }
 
 /**
@@ -137,6 +148,26 @@ export const APPLY_REASON_MAX_LENGTH = 500;
  * the host cannot say which, and says so.
  */
 export const APPLY_NO_ANSWER = 'no answer; some may have been written';
+
+/**
+ * Further calls the host makes for one batch's `continue` operations (ADR 0216), after its first.
+ * At the 30 s deadline of a call that is an hour: a long upload fits, and a plugin that answers
+ * `continue` for ever does not hold an Apply open past it.
+ */
+export const APPLY_CONTINUE_CALLS = 120;
+
+/** Of a `continue` operation's `progress`, in characters: one line under a plan. */
+export const APPLY_PROGRESS_MAX_LENGTH = 80;
+
+/** The reason of an operation still in progress when the person cancelled the Apply. */
+export const APPLY_CANCELLED = 'unfinished: the Apply was cancelled; some may have been written';
+
+/** The reason of an operation still in progress after {@link APPLY_CONTINUE_CALLS} more calls. */
+export const APPLY_UNFINISHED =
+  'unfinished: still in progress after 120 more calls; some may have been written';
+
+/** The reason of an operation the Apply never handed over because it was cancelled first. */
+export const APPLY_NOT_STARTED = 'the Apply was cancelled before it was handed over';
 
 type Answer<T> = Result<T, Diagnostics> | Promise<Result<T, Diagnostics>>;
 
@@ -474,7 +505,10 @@ function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Ver
   return {
     kind: contribution.kind,
     ...(contribution.kind === 'action' || contribution.kind === 'sink'
-      ? { apply: (plan: Plan) => applyPlan(contribution.id, plan, binding) }
+      ? {
+          apply: (plan: Plan, options?: ApplyOptions) =>
+            applyPlan(contribution.id, plan, binding, options),
+        }
       : {}),
     async run(context) {
       const values = readArguments(context, contribution.arguments);
@@ -558,11 +592,17 @@ function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Ver
  * plan's `rowKey`, never anything the plugin said. A batch with no usable answer is `failed`
  * with {@link APPLY_NO_ANSWER}, and every later batch is `skipped` without a call: the plugin
  * may be stuck or gone, and nobody can say what it wrote.
+ *
+ * ADR 0216: the operations a batch answers `continue` are handed back, alone and in order, until
+ * each finishes, up to {@link APPLY_CONTINUE_CALLS} more calls. A cancel is read between calls,
+ * never during one: an operation still in progress is `failed` as unfinished, and a batch not
+ * yet handed over is `skipped`. Nothing is asked again after a cancel.
  */
 async function applyPlan(
   id: string,
   plan: Plan,
   binding: VerbBinding,
+  options: ApplyOptions = {},
 ): Promise<Result<{ readonly operations: readonly AppliedOperation[] }, readonly Diagnostic[]>> {
   const refuse = (problem: string) => err([diagnostic('E_RECIPE_APPLY', { verb: id, problem })]);
   const shown = shownPlans.get(plan);
@@ -586,41 +626,73 @@ async function applyPlan(
     return refuse(`the plan as shown no longer passes the verb's check (${problem})`);
   }
 
+  const cancelled = () => options.cancel?.aborted === true;
   const operations: AppliedOperation[] = [];
+  const total = plan.operations.length;
   let answering = true;
-  for (let start = 0; start < plan.operations.length; start += APPLY_BATCH) {
+  for (let start = 0; start < total; start += APPLY_BATCH) {
     const batch = plan.operations.slice(start, start + APPLY_BATCH);
-    if (!answering) {
+    if (!answering || cancelled()) {
+      const reason = answering ? APPLY_NOT_STARTED : 'an earlier batch had no answer';
       operations.push(
-        ...batch.map((operation) =>
-          outcomeOf(operation, { status: 'skipped', reason: 'an earlier batch had no answer' }),
-        ),
+        ...batch.map((operation) => outcomeOf(operation, { status: 'skipped', reason })),
       );
       continue;
     }
-    const answered = await askBatch(verb, apply, {
-      arguments: shown.arguments,
-      operations: batch,
-      target: plan.target,
-      ...withSection(live.section()),
-    });
-    if (answered === undefined) {
-      answering = false;
-      operations.push(
-        ...batch.map((operation) =>
-          outcomeOf(operation, { status: 'failed', reason: APPLY_NO_ANSWER }),
-        ),
-      );
-      continue;
+    const finished: (AppliedOperation | undefined)[] = batch.map(() => undefined);
+    const unfinished = (pending: readonly number[], reason: string): void => {
+      for (const at of pending) {
+        finished[at] = outcomeOf(batch[at] as PlannedOperation, { status: 'failed', reason });
+      }
+    };
+    let pending = batch.map((_operation, at) => at);
+    for (let call = 0; pending.length > 0; call += 1) {
+      if (call > 0 && cancelled()) {
+        unfinished(pending, APPLY_CANCELLED);
+        break;
+      }
+      if (call > APPLY_CONTINUE_CALLS) {
+        unfinished(pending, APPLY_UNFINISHED);
+        break;
+      }
+      const answered = await askBatch(verb, apply, {
+        arguments: shown.arguments,
+        operations: pending.map((at) => batch[at] as PlannedOperation),
+        target: plan.target,
+        ...withSection(live.section()),
+      });
+      if (answered === undefined) {
+        answering = false;
+        unfinished(pending, APPLY_NO_ANSWER);
+        break;
+      }
+      const appliedAt = binding.now();
+      const next: number[] = [];
+      let note: string | undefined;
+      answered.forEach((answer, index) => {
+        // `askBatch` answered as many entries as it was handed.
+        const at = pending[index] as number;
+        const { status, reason, progress } = answer;
+        if (status === 'continue') {
+          next.push(at);
+          note ??= progress;
+          return;
+        }
+        finished[at] = outcomeOf(
+          batch[at] as PlannedOperation,
+          { status, ...(reason === undefined ? {} : { reason }) },
+          status === 'applied' ? appliedAt : undefined,
+        );
+      });
+      pending = next;
+      if (pending.length > 0) {
+        const done = operations.length + finished.filter((each) => each !== undefined).length;
+        options.onProgress?.({ done, total, ...(note === undefined ? {} : { note }) });
+      }
     }
-    const appliedAt = binding.now();
-    operations.push(
-      ...batch.map((operation, index) => {
-        // `askBatch` answered as many entries as the batch holds.
-        const answer = answered[index] as AppliedBatchOperation;
-        return outcomeOf(operation, answer, answer.status === 'applied' ? appliedAt : undefined);
-      }),
-    );
+    // Every index of the batch is finished, unfinished or answered by now.
+    operations.push(...(finished as AppliedOperation[]));
+    options.onProgress?.({ done: operations.length, total });
   }
   return ok({ operations });
 }
@@ -628,7 +700,7 @@ async function applyPlan(
 /** One applied operation: the row is the shown plan's, the status and reason the answer's. */
 function outcomeOf(
   operation: PlannedOperation,
-  answer: AppliedBatchOperation,
+  answer: { readonly status: AppliedOperation['status']; readonly reason?: string },
   appliedAt?: string,
 ): AppliedOperation {
   return {
@@ -639,7 +711,12 @@ function outcomeOf(
   };
 }
 
-const APPLIED_STATUSES: ReadonlySet<unknown> = new Set(['applied', 'failed', 'skipped']);
+const APPLIED_STATUSES: ReadonlySet<unknown> = new Set([
+  'applied',
+  'failed',
+  'skipped',
+  'continue',
+]);
 
 /**
  * One `apply` call, and its answer if it is one the host can read: as many entries as the batch,
@@ -663,8 +740,22 @@ async function askBatch(
   if (!Array.isArray(entries) || entries.length !== request.operations.length) return undefined;
   const readable = entries.every((entry: unknown) => {
     if (typeof entry !== 'object' || entry === null) return false;
-    const { status, reason } = entry as { status?: unknown; reason?: unknown };
+    const { status, reason, progress } = entry as {
+      status?: unknown;
+      reason?: unknown;
+      progress?: unknown;
+    };
     if (!APPLIED_STATUSES.has(status)) return false;
+    // ADR 0216: progress is a `continue` operation's, and one line long.
+    if (
+      progress !== undefined &&
+      (status !== 'continue' ||
+        typeof progress !== 'string' ||
+        progress === '' ||
+        progress.length > APPLY_PROGRESS_MAX_LENGTH)
+    ) {
+      return false;
+    }
     if (reason === undefined) return status !== 'failed';
     return typeof reason === 'string' && reason !== '' && reason.length <= APPLY_REASON_MAX_LENGTH;
   });

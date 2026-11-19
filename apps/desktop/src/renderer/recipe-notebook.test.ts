@@ -51,6 +51,7 @@ function harness() {
   const shown: { documentId: string; text: string; requestId: number; until?: number }[] = [];
   const applies: RecipeApplyRequest[] = [];
   const applied: ((reply: RecipeApplyAnswer) => void)[] = [];
+  const cancels: { documentId: string; index: number }[] = [];
   const lastShown: { answer?: RecipeRunAnswer } = {};
   const timers: (() => void)[] = [];
   const texts = new Map([['tab-1', TEXT]]);
@@ -62,6 +63,10 @@ function harness() {
     apply: (request) => {
       applies.push(request);
       return new Promise((resolve) => applied.push(resolve));
+    },
+    cancelApply: (request) => {
+      cancels.push(request);
+      return Promise.resolve({ cancelled: true });
     },
     refusedWithoutReason: () => 'Not applied: run the recipe again',
     textOf: (documentId) => texts.get(documentId),
@@ -85,7 +90,7 @@ function harness() {
       },
     },
   });
-  return { notebook, asked, replies, shown, timers, texts, applies, applied, lastShown };
+  return { notebook, asked, replies, shown, timers, texts, applies, applied, lastShown, cancels };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -624,6 +629,45 @@ describe('Apply (TYTO-378)', () => {
     replies[asked.length - 1]?.(answer(asked.length, [planCell()]));
     await settle();
     expect(notebook.refusalsOf('tab-1').size).toBe(0);
+  });
+
+  // TYTO-791, ADR 0216: a long write's progress, and Cancel, while its Apply is on its way.
+  it('keeps the progress main pushes while the Apply is on its way, and drops it after', async () => {
+    const { notebook, applied, shown } = await shownPlan();
+    notebook.progressed({ documentId: 'tab-1', index: 0, done: 0, total: 1, note: 'early' });
+    expect(notebook.progressOf('tab-1').size).toBe(0);
+
+    void notebook.apply('tab-1', 0, 7);
+    const before = shown.length;
+    notebook.progressed({ documentId: 'tab-1', index: 0, done: 0, total: 1, note: 'sent 1 of 3' });
+    expect(notebook.progressOf('tab-1').get(0)).toEqual({
+      done: 0,
+      total: 1,
+      note: 'sent 1 of 3',
+      cancelling: false,
+    });
+    expect(shown.length).toBe(before + 1);
+
+    applied[0]?.({ cell: planCell() });
+    await settle();
+    expect(notebook.progressOf('tab-1').size).toBe(0);
+    notebook.progressed({ documentId: 'tab-1', index: 0, done: 1, total: 1, note: 'late' });
+    expect(notebook.progressOf('tab-1').size).toBe(0);
+  });
+
+  it('asks main to cancel once, and keeps saying it is stopping as progress arrives', async () => {
+    const { notebook, cancels } = await shownPlan();
+    notebook.cancelApply('tab-1', 0);
+    expect(cancels).toEqual([]);
+
+    void notebook.apply('tab-1', 0, 7);
+    notebook.progressed({ documentId: 'tab-1', index: 0, done: 0, total: 1, note: 'sent 1 of 3' });
+    notebook.cancelApply('tab-1', 0);
+    notebook.progressed({ documentId: 'tab-1', index: 0, done: 0, total: 1, note: 'sent 2 of 3' });
+    notebook.cancelApply('tab-1', 0);
+
+    expect(cancels).toEqual([{ documentId: 'tab-1', index: 0 }]);
+    expect(notebook.progressOf('tab-1').get(0)?.cancelling).toBe(true);
   });
 
   it('says a refusal with no reason, or no cell, in its own words', async () => {

@@ -10,8 +10,10 @@ import {
   IPC_CHANNELS,
   IPC_CHANNEL_NAMES,
   IpcContractError,
+  type IpcEventPayload,
   type UpdateStatus,
   parseIpc,
+  parseIpcEvent,
 } from '../../shared/ipc.js';
 import { type Credentials } from './credentials.js';
 import { recipeCredentialStore } from './recipe-credentials.js';
@@ -24,7 +26,14 @@ import {
   registerIpcHandlers,
 } from './ipc.js';
 import { OfferedRecipes } from './cli-offers.js';
-import type { RecipeApplyInput, RecipeRunInput, RecipeRunner } from '@tyto/io';
+import {
+  type RecipeApplyInput,
+  type RecipeRunInput,
+  type RecipeRunner,
+  createRecipeRunner,
+} from '@tyto/io';
+import { ok } from '@tyto/core';
+import type { RecipeContributions, RecipeVerbContribution } from '@tyto/plugin-api';
 import { type Table, vocabularySkeleton } from '@tyto/recipe';
 
 import { zoneClock } from './recipe-clock.js';
@@ -1451,9 +1460,11 @@ describe('the tab a message is about (E9.11)', () => {
       operations: [{ status: 'applied' }],
     });
     expect(none).toEqual({});
+    // TYTO-791: each Apply carries its own cancel and progress line, which the window never sends.
+    const options = { cancel: expect.any(AbortSignal), onProgress: expect.any(Function) };
     expect(injected.recipes.applies).toEqual([
-      { documentId: 'document-1', index: 1, planId: 7, path: '/recipes/weekly.recipe' },
-      { documentId: 'document-2', index: 0, planId: 1, path: undefined },
+      { documentId: 'document-1', index: 1, planId: 7, path: '/recipes/weekly.recipe', options },
+      { documentId: 'document-2', index: 0, planId: 1, path: undefined, options },
     ]);
   });
 
@@ -3666,5 +3677,143 @@ describe('commands:templates', () => {
       templates: [],
       note: 'aviso.yaml: it has not been fetched yet',
     });
+  });
+});
+
+/**
+ * TYTO-791, ADR 0216: the desktop runner. `recipe:apply` and `recipe:apply-cancel` over the real
+ * runner main composes, with a plugin whose mark on EX-2 takes three calls, as a long upload
+ * does. Outside any workspace, so no state is written; what is asserted is the Apply.
+ */
+describe('a long write through the desktop runner (TYTO-791, ADR 0216)', () => {
+  const ITEMS: Table = {
+    columns: [{ name: 'key', type: 'text', origin: 'acme' }],
+    rows: ['EX-1', 'EX-2'].map((key) => ({
+      key,
+      values: { key },
+      provenance: { source: 'acme', id: key, fetchedAt: '2026-11-19T09:00:00.000Z' },
+    })),
+  };
+
+  function longWrite(onCall: (call: number) => Promise<void> = () => Promise.resolve()) {
+    const sent = new Map<string, number>();
+    let calls = 0;
+    const pull: RecipeVerbContribution = {
+      id: 'acme.pull',
+      kind: 'source',
+      arguments: [],
+      page: () => Promise.resolve(ok({ table: ITEMS })),
+    };
+    const upload: RecipeVerbContribution = {
+      id: 'acme.upload',
+      kind: 'action',
+      arguments: [],
+      writes: ['upload'],
+      plan: ({ table }) => {
+        const operations = table.rows.map((row) => ({
+          write: 'upload',
+          rowKey: row.key,
+          description: `Upload ${row.key}`,
+        }));
+        return Promise.resolve(ok({ target: 'drive', operations, count: operations.length }));
+      },
+      apply: async ({ operations }) => {
+        calls += 1;
+        const answers = operations.map((operation) => {
+          const key = operation.rowKey ?? '';
+          const parts = key === 'EX-2' ? 3 : 1;
+          const done = (sent.get(key) ?? 0) + 1;
+          sent.set(key, done);
+          return done < parts
+            ? { status: 'continue' as const, progress: `sent ${String(done * 33)} of 100 MB` }
+            : { status: 'applied' as const };
+        });
+        await onCall(calls);
+        return ok({ operations: answers });
+      },
+    };
+    const contributions: RecipeContributions = {
+      recipeVerbs: () => [pull, upload],
+      ownedRecipeVerbs: () => [
+        { plugin: 'acme', verb: pull },
+        { plugin: 'acme', verb: upload },
+      ],
+      recipeDerivations: () => [],
+    };
+    const home = mkdtempSync(join(tmpdir(), 'tyto-ipc-long-write-'));
+    const recipes = createRecipeRunner({
+      contributions,
+      placeOf: () => Promise.resolve({ trust: 'none' }),
+      sectionFor: () => undefined,
+      home,
+      clock: () => zoneClock('UTC'),
+    });
+    const pushed: IpcEventPayload<'recipe:apply-progress'>[] = [];
+    const handlers = createHandlers({
+      ...dependencies(),
+      recipes,
+      applyProgress: (progress) => pushed.push(progress),
+    });
+    const planned = async () => {
+      const answer = await handlers['recipe:run']({
+        requestId: 1,
+        documentId: 'document-2',
+        text: 'recipe upload\nacme.pull\nacme.upload\n',
+        explicit: true,
+      });
+      return answer.cells[1]?.plan?.planId ?? -1;
+    };
+    return { handlers, pushed, sent, planned, home };
+  }
+
+  it('finishes a write that takes three calls in one Apply, and pushes its progress', async () => {
+    const { handlers, pushed, sent, planned, home } = longWrite();
+    try {
+      const planId = await planned();
+      const answer = await handlers['recipe:apply']({ documentId: 'document-2', index: 1, planId });
+
+      expect(sent.get('EX-2')).toBe(3);
+      expect(answer.cell?.applied?.operations.map((each) => each.status)).toEqual([
+        'applied',
+        'applied',
+      ]);
+      expect(pushed).toEqual([
+        { documentId: 'document-2', index: 1, done: 1, total: 2, note: 'sent 33 of 100 MB' },
+        { documentId: 'document-2', index: 1, done: 1, total: 2, note: 'sent 66 of 100 MB' },
+      ]);
+      for (const each of pushed) {
+        expect(() => parseIpcEvent('recipe:apply-progress', each)).not.toThrow();
+      }
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('stops after a cancel during the first call, and answers the write unfinished', async () => {
+    let cancel: () => Promise<unknown> = () => Promise.resolve();
+    const cancelled: boolean[] = [];
+    const { handlers, sent, planned, home } = longWrite(async (call) => {
+      // The person presses Cancel while the first call runs.
+      if (call === 1) cancelled.push((await cancel()) as boolean);
+    });
+    try {
+      const planId = await planned();
+      cancel = async () =>
+        (await handlers['recipe:apply-cancel']({ documentId: 'document-2', index: 1 })).cancelled;
+      const answer = await handlers['recipe:apply']({ documentId: 'document-2', index: 1, planId });
+
+      expect(cancelled).toEqual([true]);
+      expect(sent.get('EX-2')).toBe(1);
+      expect(answer.cell?.applied?.operations[1]).toEqual({
+        status: 'failed',
+        reason: 'unfinished: the Apply was cancelled; some may have been written',
+      });
+      // Nothing is under way any more, so a later Cancel stops nothing.
+      expect(await handlers['recipe:apply-cancel']({ documentId: 'document-2', index: 1 })).toEqual(
+        { cancelled: false },
+      );
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

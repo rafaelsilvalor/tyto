@@ -116,8 +116,30 @@ export interface Verb {
    * the order given. The answer's `rowKey` and `appliedAt` are not trusted: the host takes the
    * row from the shown plan and the time from its own clock. An operation whose target moved
    * since the plan answers `failed` with a reason, and the others still run.
+   *
+   * `options` lets the host follow and stop a long Apply (ADR 0216): a verb whose operations
+   * take more than one call reports between calls, and stops asking once `cancel` is aborted.
    */
-  apply?(plan: Plan): Promise<Result<ApplyOutcome, readonly Diagnostic[]>>;
+  apply?(plan: Plan, options?: ApplyOptions): Promise<Result<ApplyOutcome, readonly Diagnostic[]>>;
+}
+
+/**
+ * How far an Apply has got (ADR 0216): operations finished out of the plan's, and the plugin's
+ * own words for the one still in progress ("sent 48 of 100 MB"), when it gave any.
+ */
+export interface ApplyProgress {
+  readonly done: number;
+  readonly total: number;
+  readonly note?: string;
+}
+
+/**
+ * What a host hands an Apply besides the plan (ADR 0216). `cancel` is anything with an `aborted`
+ * flag, an `AbortSignal` included; this package names no DOM or Node type.
+ */
+export interface ApplyOptions {
+  readonly cancel?: { readonly aborted: boolean };
+  readonly onProgress?: (progress: ApplyProgress) => void;
 }
 
 /** The verbs Tyto owns. A contributed verb is namespaced, so it can never take one of these. */

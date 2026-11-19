@@ -1783,6 +1783,16 @@ tyto-preview-pane[hidden] {
   padding-top: var(--tyto-space-1);
 }
 
+/* TYTO-791: a long write's progress, its plugin's words, and Cancel at the end of the line. */
+.recipe-plan__progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--tyto-space-3);
+  padding-top: var(--tyto-space-1);
+  color: var(--tyto-text);
+}
+
 /* The bar is a header row (TYTO-288): the formats take what the toggle, zoom and lock leave. */
 .preview__tabs {
   display: flex;

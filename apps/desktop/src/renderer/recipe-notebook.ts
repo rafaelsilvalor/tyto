@@ -10,6 +10,7 @@ import {
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import type { IpcRequest, IpcResponse } from '../../shared/ipc.js';
+import type { ApplyProgressShown } from './recipe-plan-view.js';
 
 /**
  * A `.recipe` tab's side of the notebook (TYTO-377, ADR 0148): when to ask main to run it, which
@@ -45,6 +46,15 @@ export type RecipeRunRequest = IpcRequest<'recipe:run'>;
 export type RecipeRunAnswer = IpcResponse<'recipe:run'>;
 export type RecipeApplyRequest = IpcRequest<'recipe:apply'>;
 export type RecipeApplyAnswer = IpcResponse<'recipe:apply'>;
+export type RecipeApplyCancelRequest = IpcRequest<'recipe:apply-cancel'>;
+/** TYTO-791, ADR 0216: how far a long Apply has got, as main pushes it. */
+export interface RecipeApplyProgress {
+  readonly documentId: string;
+  readonly index: number;
+  readonly done: number;
+  readonly total: number;
+  readonly note?: string | undefined;
+}
 type WireCell = RecipeRunAnswer['cells'][number];
 
 /**
@@ -106,6 +116,8 @@ export interface RecipeNotebookOptions {
   readonly run: (request: RecipeRunRequest) => Promise<RecipeRunAnswer>;
   /** `recipe:apply` over the bridge. */
   readonly apply: (request: RecipeApplyRequest) => Promise<RecipeApplyAnswer>;
+  /** TYTO-791, ADR 0216: `recipe:apply-cancel` over the bridge. */
+  readonly cancelApply?: (request: RecipeApplyCancelRequest) => Promise<unknown>;
   /** Why an Apply was refused when main gave no reason, in the window's language. */
   readonly refusedWithoutReason: () => string;
   /** The document's text now, or `undefined` once its tab is gone. */
@@ -156,6 +168,12 @@ export interface RecipeNotebook {
   applyingOf(documentId: string): ReadonlySet<number>;
   /** Why a cell's last Apply was refused, by index, until the next run's answer. */
   refusalsOf(documentId: string): ReadonlyMap<number, string>;
+  /** TYTO-791: main said how far a cell's Apply has got; dropped for an Apply not on its way. */
+  progressed(progress: RecipeApplyProgress): void;
+  /** TYTO-791: Cancel on a cell's Apply, which main stops between two calls. */
+  cancelApply(documentId: string, index: number): void;
+  /** TYTO-791: how far each cell's Apply has got, by index, while it is on its way. */
+  progressOf(documentId: string): ReadonlyMap<number, ApplyProgressShown>;
   /** Shows every open recipe's last answer again: the window's language changed. */
   reshow(): void;
   /** The last answer shown for a document, with the text its request carried. */
@@ -231,6 +249,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const expanded = new Map<string, Set<number>>();
   const applying = new Map<string, Set<number>>();
   const refusals = new Map<string, Map<number, string>>();
+  const progress = new Map<string, Map<number, ApplyProgressShown>>();
   const views = new Map<string, Map<number, RecipeViewState>>();
   /** Each step's last number, by the start of its line (TYTO-676), and the last number given. */
   const counts = new Map<string, Map<number, number>>();
@@ -348,6 +367,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       answer = undefined;
     }
     cells.delete(index);
+    progress.get(documentId)?.delete(index);
     const shown = last.get(documentId);
     if (shown === undefined) return;
     const before = shown.answer.cells.find((cell) => cell.index === index);
@@ -390,6 +410,24 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     apply,
     applyingOf: (documentId) => applying.get(documentId) ?? new Set(),
     refusalsOf: (documentId) => refusals.get(documentId) ?? new Map(),
+    progressed({ documentId, index, done, total, note }) {
+      // A push that lands after the answer would show an Apply that is over.
+      if (applying.get(documentId)?.has(index) !== true) return;
+      const cells = progress.get(documentId) ?? new Map<number, ApplyProgressShown>();
+      const cancelling = cells.get(index)?.cancelling ?? false;
+      cells.set(index, { done, total, ...(note === undefined ? {} : { note }), cancelling });
+      progress.set(documentId, cells);
+      reshowOne(documentId);
+    },
+    cancelApply(documentId, index) {
+      const shown = progress.get(documentId)?.get(index);
+      const going = applying.get(documentId)?.has(index) === true;
+      if (!going || shown === undefined || shown.cancelling) return;
+      progress.get(documentId)?.set(index, { ...shown, cancelling: true });
+      reshowOne(documentId);
+      void options.cancelApply?.({ documentId, index }).catch(() => undefined);
+    },
+    progressOf: (documentId) => progress.get(documentId) ?? new Map(),
     reshow() {
       for (const [documentId, shown] of last) {
         options.show(documentId, shown.text, shown.answer, shown.until);
@@ -490,6 +528,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
       expanded.delete(documentId);
       applying.delete(documentId);
       refusals.delete(documentId);
+      progress.delete(documentId);
       views.delete(documentId);
       counts.delete(documentId);
       counters.delete(documentId);

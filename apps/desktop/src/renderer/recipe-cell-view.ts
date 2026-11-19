@@ -2,7 +2,12 @@ import { type CellOutput, cellOutputLineStart, remeasureCellOutput } from '@tyto
 
 import { type CatalogueKey, type Locale, translate } from '../../shared/i18n/index.js';
 import { type CellStatus, type RecipeViewState, statusText } from './recipe-notebook.js';
-import { type PlanViewState, applyButton, planBody } from './recipe-plan-view.js';
+import {
+  type ApplyProgressShown,
+  type PlanViewState,
+  applyButton,
+  planBody,
+} from './recipe-plan-view.js';
 import type { FacetsAnswer, FacetsRequest } from './recipe-board-view.js';
 import type { RowAnswer, RowRequest } from './recipe-cards-view.js';
 import type { CopyAnswer, CopyRequest, RowsAnswer, RowsRequest } from './recipe-table-view.js';
@@ -60,6 +65,8 @@ export interface CellViewActions {
   readonly expandedIncluded: (at: number, expanded: boolean) => void;
   /** Apply: the plan main stamped `planId` on this cell (TYTO-378). */
   readonly apply: (index: number, planId: number) => void;
+  /** TYTO-791, ADR 0216: stops this cell's Apply between two calls of a long write. */
+  readonly cancelApply?: (index: number) => void;
   /** A page of a kept cell's table, for its view: `recipe:rows` for this tab (TYTO-379). */
   readonly rows: (request: RowsRequest) => Promise<RowsAnswer>;
   /** Copy rows of a kept cell's table: `recipe:copy` for this tab (TYTO-379). */
@@ -82,6 +89,8 @@ export interface CellViewContext {
   readonly applying: ReadonlySet<number>;
   /** Why a cell's last Apply was refused, by index, until the next answer. */
   readonly refusals: ReadonlyMap<number, string>;
+  /** TYTO-791: how far each cell's long Apply has got, by index, while it runs. */
+  readonly progress?: ReadonlyMap<number, ApplyProgressShown>;
   /** Milliseconds since the epoch; injected so a test fixes the clock. */
   readonly now: () => number;
   readonly actions: CellViewActions;
@@ -131,6 +140,7 @@ export function cellOutputOf(status: CellStatus, context: CellViewContext): Cell
       cell.applied?.at ?? '',
       context.applying.has(status.index) ? 'applying' : '',
       context.refusals.get(status.index) ?? '',
+      JSON.stringify(context.progress?.get(status.index) ?? null),
       cell.view?.name ?? '',
       // TYTO-381: `show board by=status` and `by=owner` draw different boards.
       JSON.stringify(cell.view?.options ?? {}),
@@ -154,6 +164,13 @@ function renderCell(
     locale,
     applying: context.applying.has(status.index),
     refusal: context.refusals.get(status.index),
+    progress: context.progress?.get(status.index),
+    cancel:
+      actions.cancelApply === undefined
+        ? undefined
+        : () => {
+            actions.cancelApply?.(status.index);
+          },
   };
   const root = element('div', 'recipe-cell');
   root.classList.toggle('recipe-cell--collapsed', collapsed);
