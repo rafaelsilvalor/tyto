@@ -138,9 +138,15 @@ interface Exporter {
   extension: string;
   kinds: readonly string[]; // 'svg'; or 'png','jpeg','webp' for html
   rasterized: boolean; // the document still has to go through a Rasterizer
-  exportFrame(scene, artwork, frame, options?): Result<string, Diagnostics>;
+  exportFrame(scene, artwork, frame, options?): Result<string | Uint8Array, Diagnostics>;
 }
 ```
+
+**A document or a file's bytes** (ADR 0221). A string is a document: HTML a rasterizer turns
+into a picture, or an SVG that is the file. A `Uint8Array` is a binary file nothing rasters,
+such as the PSD of a guide, and the job hands it to the sink as it came; a `rasterized`
+exporter that answers bytes fails the frame with `E_RENDER_FAILED`. Bytes cross an isolated
+plugin's boundary as any `Uint8Array` does (the desktop's `$tytoBytes` marker, ADR 0050).
 
 **Per frame, not per scene, and not a `SceneVisitor`.** This row used to say
 `SceneVisitor<string>`, which is not a thing a job can call: a visitor is per node, and a

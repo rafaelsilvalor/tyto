@@ -446,9 +446,10 @@ describe('a plugin under the permission model', () => {
         ),
       );
       const answer = await exporter.exportFrame(SCENE, ARTWORK, FRAME);
-      const seen = answer.ok
-        ? answer.value.split(',').filter((key) => key !== '')
-        : ['(no answer)'];
+      const seen =
+        answer.ok && typeof answer.value === 'string'
+          ? answer.value.split(',').filter((key) => key !== '')
+          : ['(no answer)'];
       // Nothing of the CLI's: on POSIX nothing at all, and on Windows only what libuv copies back
       // from the parent's own, which is fewer of them when the parent lacks some (under Turbo).
       const allowed = process.platform === 'win32' ? WINDOWS_REQUIRED_VARIABLES : [];

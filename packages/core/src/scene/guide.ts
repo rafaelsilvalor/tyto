@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { assetRefSchema } from './primitives.js';
+
 /**
  * What a frame says about itself when it is a guide for art painted outside Tyto (ADR 0220).
  *
@@ -9,8 +11,9 @@ import { z } from 'zod';
  * is metadata over nodes the frame already holds, so every other exporter draws a guide
  * frame as it draws any frame, and a frame compiled without `guide` has no such field.
  *
- * A later pull request (ADR 0221) rasterises each layer into the Scene; the field it adds to
- * a layer is that pull request's, not this one's.
+ * A pipeline stage (ADR 0221) rasterises each layer but `arte` into the Scene, as the layer's
+ * `raster`, so the exporter that writes the layered file reads pixels from the IR and stays
+ * pure.
  */
 
 /** Top to bottom, the order a layered file stacks them in (ADR 0220). */
@@ -49,6 +52,13 @@ export const guideLayerSchema = z.strictObject({
   locked: z.boolean(),
   visible: z.boolean(),
   opacity: z.number().min(0).max(1),
+  /**
+   * The layer's pixels, a transparent PNG of the whole frame (ADR 0221). Set only by the
+   * pipeline's `rasterizeGuideLayers`, after `compile`; its bytes sit in the store the
+   * exporters' resolvers read, under this ref's id, as a loaded asset's do. `arte` never
+   * has one: it is where the designer paints.
+   */
+  raster: assetRefSchema.optional(),
 });
 export type GuideLayer = z.infer<typeof guideLayerSchema>;
 

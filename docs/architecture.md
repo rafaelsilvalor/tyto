@@ -15,7 +15,8 @@ Every arrow is a pure function `(input) → Result<output, Diagnostic[]>`. Stage
 | parse   | `brief-lang`                | text → `BriefAst` (frontmatter + directives + rich text)                                                                                |
 | resolve | `core`                      | `BriefAst` + `TemplateRegistry` → `ResolvedBrief` (typed slots, adjustments validated against the manifest)                             |
 | compile | `core`                      | `ResolvedBrief` × template → `Scene` (one `Artwork` per slide, one `Frame` per format; text measured and wrapped when `faces` is given) |
-| export  | `export-html`, `export-svg` | `Scene` → string per `Frame`                                                                                                            |
+| guide   | `pipeline`                  | `Scene` with `frame.guide` → the same `Scene`, each layer but `arte` carrying its `raster` (HTML export + raster port, ADR 0221)        |
+| export  | `export-html`, `export-svg` | `Scene` → string per `Frame` (an installed exporter may answer a binary file's bytes, ADR 0221)                                         |
 | raster  | `raster` (port)             | HTML → image bytes                                                                                                                      |
 | deliver | `io` (port)                 | artifacts → fs / …                                                                                                                      |
 

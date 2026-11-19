@@ -731,6 +731,108 @@ describe('an exporter that answers later (TYTO-48)', () => {
   });
 });
 
+describe('an exporter that writes a binary file (ADR 0221)', () => {
+  const FILE = new Uint8Array([0x38, 0x42, 0x50, 0x53, 0, 255]);
+
+  function binaryExporters(rasterized: boolean): ExporterRegistry {
+    const host = createPluginHost();
+    host.hostFor('psd').registerExporter({
+      id: 'psd',
+      mime: 'image/vnd.adobe.photoshop',
+      extension: 'psd',
+      kinds: rasterized ? ['png'] : ['psd'],
+      rasterized,
+      exportFrame: () => ok(FILE),
+    });
+    return host.registry.exporters;
+  }
+
+  it('hands the sink its bytes as they came', async () => {
+    const sink = recordingSink();
+    const { rasterizer: _ignored, ...withoutRasterizer } = await portsOf({
+      exporters: binaryExporters(false),
+      sink,
+    });
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'psd' }] },
+      withoutRasterizer,
+    );
+
+    expect(result.ok && result.value.rendered).toBe(6);
+    expect(sink.written[0]?.name).toBe('feed-01.psd');
+    expect([...(sink.written[0]?.bytes ?? [])]).toEqual([...FILE]);
+  });
+
+  it('refuses bytes from an exporter whose document still has to be rastered', async () => {
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'png' }] },
+      await portsOf({ exporters: binaryExporters(true) }),
+    );
+
+    expect(result.ok && result.value.failed).toBe(6);
+    expect((result.ok ? result.diagnostics : result.error).map((item) => item.code)).toContain(
+      'E_RENDER_FAILED',
+    );
+  });
+});
+
+describe('a guide (ADR 0221)', () => {
+  it("rasterises every layer but 'arte' before the render, and stores the bytes", async () => {
+    const rasterizer = fakeRasterizer();
+    const stored: string[] = [];
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'png' }], guide: true },
+      await portsOf({
+        rasterizer,
+        storeAssets: (rasters) => {
+          stored.push(...rasters.map((raster) => raster.ref.id));
+        },
+      }),
+    );
+
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    // Six frames, three layers each that paint, then the six frames themselves.
+    expect(stored).toHaveLength(18);
+    expect(stored.slice(0, 3)).toEqual([
+      'guide-layer:slide-1:feed:texto',
+      'guide-layer:slide-1:feed:areas',
+      'guide-layer:slide-1:feed:decoracao',
+    ]);
+    expect(rasterizer.calls).toHaveLength(24);
+    expect(result.value.rendered).toBe(6);
+  });
+
+  it('touches nothing when the job compiles no guide', async () => {
+    const rasterizer = fakeRasterizer();
+    let stores = 0;
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'png' }] },
+      await portsOf({ rasterizer, storeAssets: () => void (stores += 1) }),
+    );
+
+    expect(result.ok && result.value.rendered).toBe(6);
+    expect(stores).toBe(0);
+    expect(rasterizer.calls).toHaveLength(6);
+  });
+
+  it('says why when it has no rasterizer to draw the layers with', async () => {
+    const { rasterizer: _ignored, ...withoutRasterizer } = await portsOf();
+    const result = await runJob(
+      { brief: briefSource, outputs: [{ kind: 'svg' }], guide: true },
+      withoutRasterizer,
+    );
+
+    expect(
+      (result.ok ? result.diagnostics : result.error)
+        .filter((item) => item.code === 'E_RENDER_FAILED')
+        .map((item) => item.message),
+    ).toEqual([
+      "Frame 'guide' could not be rendered as layers: a guide's layers are drawn through a " +
+        'rasterized exporter of png and a rasterizer, and this job was given no rasterizer.',
+    ]);
+  });
+});
+
 describe('the resources stage', () => {
   /**
    * A folder of many files, of which the brief draws one.

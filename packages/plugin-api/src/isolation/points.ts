@@ -378,7 +378,9 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
         // guest's check does not have to know which trailing argument a caller may drop.
         args: z.tuple([sceneSchema, artworkSchema, frameSchema, exportFrameOptionsSchema]),
         send: ([scene, artwork, frame, options]) => [scene, artwork, frame, options ?? {}],
-        result: resultSchema(z.string()),
+        // A document or a binary file's bytes (ADR 0221); bytes cross the desktop's JSON
+        // channel as plugin-wire's `$tytoBytes` marker and arrive here as a `Uint8Array`.
+        result: resultSchema(z.union([z.string(), z.instanceof(Uint8Array)])),
         failed: (problems) => err(problems),
       },
     },
