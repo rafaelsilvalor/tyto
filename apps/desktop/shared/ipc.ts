@@ -1,4 +1,4 @@
-import { slotSchema, templateManifestSchema } from '@tyto/core';
+import { DELIVERY_CHECK_STATES, slotSchema, templateManifestSchema } from '@tyto/core';
 import { CALL_CREDENTIAL_NAME } from '@tyto/recipe';
 import {
   ASSET_SOURCE_MAX_BYTES,
@@ -685,6 +685,17 @@ const explorerEntry = z.object({
   kind: z.enum(['folder', 'brief', 'file']),
   // What the name cannot say, from the resolved project (TYTO-282, ADR 0116).
   place: z.enum(EXPLORER_PLACES).optional(),
+  /**
+   * A delivery folder's exports checked against its record (TYTO-757, ADR 0215): the state, and
+   * each problem in a sentence for the badge's tooltip. Only on a folder holding a record, in a
+   * trusted workspace. TYTO-755 adds the record's own state beside it.
+   */
+  delivery: z
+    .object({
+      check: z.enum(DELIVERY_CHECK_STATES),
+      problems: z.array(z.string().max(2000)).max(20),
+    })
+    .optional(),
 });
 
 /**

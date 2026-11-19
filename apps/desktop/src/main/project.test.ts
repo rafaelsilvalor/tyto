@@ -2,11 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { diagnostic } from '@tyto/core';
+import { diagnostic, formatCatalogue } from '@tyto/core';
 import { NO_INSTALLED_PACKS, NO_PLUGIN_FILES, nodeFileSystem } from '@tyto/io';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { type ProjectSnapshot, createProjectSources } from './project.js';
+import { type ProjectSnapshot, createProjectSources, formatSizesOf } from './project.js';
 
 /**
  * Which folders are searched, and in which order (TYTO-122).
@@ -506,5 +506,20 @@ describe("a configuration's brand with no kit (TYTO-471, ADR 0155)", () => {
 
     expect(missing(await sources.setFetched(synced()))).toHaveLength(1);
     expect(missing(await sources.setKitBrands(new Set(['casa', 'nonexistent'])))).toEqual([]);
+  });
+});
+
+describe('the format sizes a delivery check falls back to (TYTO-757, ADR 0215)', () => {
+  const sourcesWith = (formats: ProjectSnapshot['formats']) => ({
+    current: () => ({ formats }) as ProjectSnapshot,
+  });
+
+  it('gives each format of the catalogue in force at its size, and none without one', () => {
+    const catalogue = formatCatalogue({ story: { w: 1080, h: 1920 }, feed: { w: 1080, h: 1350 } });
+    expect(formatSizesOf(sourcesWith(catalogue))).toEqual({
+      story: { w: 1080, h: 1920 },
+      feed: { w: 1080, h: 1350 },
+    });
+    expect(formatSizesOf(sourcesWith(undefined))).toEqual({});
   });
 });

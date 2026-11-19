@@ -382,6 +382,33 @@ describe('a response that does not match', () => {
   });
 });
 
+describe("a delivery folder's badge on a listed entry (TYTO-757, ADR 0215)", () => {
+  const listing = (delivery: unknown) => ({
+    entries: [{ id: 'a', name: 'mca-1', kind: 'folder', delivery }],
+    more: 0,
+    gone: false,
+  });
+
+  it('carries the check and its problems', () => {
+    const parsed = parseIpc(
+      'explorer:list',
+      'response',
+      listing({ check: 'incomplete', problems: ["'feed' has 0 of 1 at 1080×1350"] }),
+    );
+    expect(parsed.entries[0]?.delivery?.check).toBe('incomplete');
+  });
+
+  it('refuses a state the check does not give, and more problems than a badge carries', () => {
+    expect(() =>
+      parseIpc('explorer:list', 'response', listing({ check: 'done', problems: [] })),
+    ).toThrow(IpcContractError);
+    const many = Array.from({ length: 21 }, (_, index) => String(index));
+    expect(() =>
+      parseIpc('explorer:list', 'response', listing({ check: 'ready', problems: many })),
+    ).toThrow(IpcContractError);
+  });
+});
+
 describe('the theme the window applies (TYTO-208)', () => {
   const theme = (colors: Record<string, string>) => ({
     mode: 'system',

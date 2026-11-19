@@ -154,11 +154,12 @@ import {
   type ScheduleNotice,
   createRecipeSchedule,
 } from './recipe-schedule.js';
-import { createProjectSources, templateManifestsOf } from './project.js';
+import { createProjectSources, formatSizesOf, templateManifestsOf } from './project.js';
 import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
 import { createDeliveryService } from './delivery.js';
 import { createExplorerService } from './explorer.js';
+import { createDeliveryChecks } from './delivery-checks.js';
 import { createExitGuard, mayUnload } from './quit.js';
 import { windowEvents } from './window-events.js';
 import {
@@ -776,12 +777,35 @@ async function start(): Promise<void> {
   // The recipe scheduler (TYTO-385, ADR 0175), bound once the recipe runner exists below; it
   // schedules the folder the workspace opens, and walks again when the explorer hears a recipe.
   let recipeSchedule: RecipeSchedule | undefined = undefined;
+  // TYTO-757, ADR 0215: each delivery's exports checked against its record, read again after
+  // every burst and on opening a folder; the Explorer lists again when a badge changed. The
+  // workspace is bound below, so the place is asked through it lazily.
+  let deliveryPlace: () => Promise<
+    { folder: string; trust: 'trusted' | 'restricted' } | undefined
+  > = () => Promise.resolve(undefined);
+  const deliveryChecks = createDeliveryChecks({
+    place: () => deliveryPlace(),
+    home: pluginsHome,
+    formatSizes: () => Promise.resolve(formatSizesOf(sources)),
+  });
+  const checkDeliveriesSoon = (): void => {
+    deliveryChecks
+      .refresh()
+      .then((changed) => {
+        if (changed) toWindow('explorer:changed', {});
+      })
+      .catch((cause: unknown) => {
+        log.error('explorer: the deliveries could not be checked', cause);
+      });
+  };
   const explorer = createExplorerService({
     onChange: (names) => {
       toWindow('explorer:changed', {});
+      checkDeliveriesSoon();
       // TYTO-385: a `.recipe` changed, so the scheduler walks the folder again.
       recipeSchedule?.filesChanged(names);
     },
+    deliveryOf: (real) => deliveryChecks.badgeOf(real),
     onError: (message, cause) => {
       log.error(message, cause);
     },
@@ -963,6 +987,7 @@ async function start(): Promise<void> {
         log.error('The agent endpoint record could not be written.', cause);
       });
       await explorer.setRoot(folder, places);
+      checkDeliveriesSoon();
       // Not awaited: the walk reads every recipe in the folder, which opens meanwhile.
       void recipeSchedule?.setFolder(folder);
       if (folder !== undefined) await recentFolders.remember(folder);
@@ -971,6 +996,15 @@ async function start(): Promise<void> {
       pluginFilesSoon(false);
     },
   });
+
+  // The badges read the open folder's trust as a recipe there would (ADR 0215).
+  deliveryPlace = async () => {
+    const folder = explorer.folder();
+    if (folder === undefined) return undefined;
+    const answer = await workspace.sourceTrustFor(folder);
+    if (answer === undefined || answer.trust === 'none') return undefined;
+    return { folder: answer.folder ?? folder, trust: answer.trust };
+  };
 
   aboutFacts = () => ({
     version: app.getVersion(),
@@ -1280,6 +1314,8 @@ async function start(): Promise<void> {
     clock: () => recipeClock(recipeTimeZone),
     // `to-brief`'s templates (TYTO-380, ADR 0172), as the preview finds a brief's.
     templates: templateManifestsOf(sources),
+    // TYTO-757, ADR 0215: the sizes a format name `delivery.sizes` leaves out is checked at.
+    formatSizes: () => Promise.resolve(formatSizesOf(sources)),
     // `call` (TYTO-671, ADR 0193): the open folder's `recipes.call.hosts`, the keychain's
     // `recipe:<name>` credentials and the platform's `fetch`; the window sends.
     calls: desktopRecipeCalls({

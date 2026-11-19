@@ -46,6 +46,12 @@ export type ExplorerListing = IpcResponse<'explorer:list'>;
 export type ExplorerRead = IpcResponse<'explorer:read'>;
 export type ExplorerEntry = ExplorerListing['entries'][number];
 
+/** A delivery folder's badge as main holds it (TYTO-757, ADR 0215). */
+export type ExplorerDelivery = Readonly<{
+  check: NonNullable<ExplorerEntry['delivery']>['check'];
+  problems: readonly string[];
+}>;
+
 /** The most entries one folder's listing carries; the rest are counted, not sent. */
 export const EXPLORER_ENTRY_CAP = 2000;
 
@@ -211,6 +217,11 @@ export interface ExplorerServiceOptions {
    * Injected so a test can change the source between the walk and the copy (TYTO-537).
    */
   readonly copyTree?: (from: string, to: string) => Promise<void>;
+  /**
+   * The badge of a listed folder at a real path, when it is a delivery (TYTO-757, ADR 0215).
+   * Read at every listing, so a check main made since the last one shows on the next.
+   */
+  readonly deliveryOf?: (realFolder: string) => ExplorerDelivery | undefined;
 }
 
 /** `copy`'s default: never overwrite, never follow a link (ADR 0201). */
@@ -449,11 +460,15 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
         : dirent.isDirectory();
       const kind = kindOf(isFolder, dirent.name);
       const place = placeOf(real, isFolder, rootReal, places);
+      const badge = isFolder ? options.deliveryOf?.(real) : undefined;
+      const delivery =
+        badge === undefined ? undefined : { check: badge.check, problems: [...badge.problems] };
       return {
         id: idFor(path, kind),
         name: dirent.name,
         kind,
         ...(place === undefined ? {} : { place }),
+        ...(delivery === undefined ? {} : { delivery }),
       };
     } catch {
       // A broken link, or a file gone between the listing and this look at it.

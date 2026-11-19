@@ -737,6 +737,25 @@ export class ExplorerPanel extends DockedPanel {
       }`;
   }
 
+  /**
+   * A delivery folder's badge (TYTO-757, ADR 0215): its exports checked against its record, a
+   * glyph at the row's end, the state's words and each problem in its tooltip. TYTO-755 adds
+   * the record's own state to this same element.
+   */
+  private deliveryBadge(entry: ExplorerEntry): unknown {
+    const delivery = entry.delivery;
+    if (delivery === undefined) return nothing;
+    const label = this.say(DELIVERY_CHECK_LABELS[delivery.check]);
+    const title = [label, ...delivery.problems].join('\n');
+    return html`<span
+      class="explorer__delivery"
+      data-delivery-check=${delivery.check}
+      title=${title}
+      aria-label=${label}
+      >${DELIVERY_CHECK_GLYPHS[delivery.check]}</span
+    >`;
+  }
+
   private row(row: ExplorerRow, focusable: string): unknown {
     const indent = `padding-inline-start: ${String(row.depth * INDENT + 4)}px`;
     if (row.type === 'more') {
@@ -784,7 +803,7 @@ export class ExplorerPanel extends DockedPanel {
         row.renaming === true
           ? this.field('explorer.menu.rename')
           : html`<span class="explorer__name">${entry.name}</span>`
-      }${
+      }${this.deliveryBadge(entry)}${
         notice === undefined
           ? nothing
           : html`<span class="explorer__error" role="alert">${notice}</span>`
@@ -792,6 +811,20 @@ export class ExplorerPanel extends DockedPanel {
     </li>`;
   }
 }
+
+/** The words of each check state (TYTO-757, ADR 0215), for the badge's name and tooltip. */
+const DELIVERY_CHECK_LABELS = {
+  ready: 'explorer.delivery.ready',
+  incomplete: 'explorer.delivery.incomplete',
+  'in-progress': 'explorer.delivery.inProgress',
+} as const satisfies Record<NonNullable<ExplorerEntry['delivery']>['check'], CatalogueKey>;
+
+/** The glyph a badge shows: the state at a glance, its words in the tooltip. */
+const DELIVERY_CHECK_GLYPHS = {
+  ready: '✓',
+  incomplete: '!',
+  'in-progress': '…',
+} as const satisfies Record<NonNullable<ExplorerEntry['delivery']>['check'], string>;
 
 customElements.define(EXPLORER_PANEL_TAG, ExplorerPanel);
 
