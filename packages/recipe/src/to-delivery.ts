@@ -1,4 +1,5 @@
 import {
+  DELIVERY_COPY_FILE,
   DELIVERY_RECORD_FIELDS,
   DELIVERY_RECORD_FILE,
   DELIVERY_RECORD_FOLDER,
@@ -15,6 +16,8 @@ import {
   type Size,
   type SourceRange,
   declaredFieldProblem,
+  deliveryCopyText,
+  deliveryFileBase,
   deliveryFormatsText,
   deliveryNameOf,
   diagnostic,
@@ -26,6 +29,7 @@ import {
   ok,
   parseDeliveryFormats,
   readDeliveryRecord,
+  withDeliveryFileBase,
   writeDeliveryRecord,
 } from '@tyto/core';
 import { z } from 'zod';
@@ -79,6 +83,12 @@ import { type Column, type Row, cellText } from './table.js';
  *
  * `create=no` (ADR 0213) writes only into delivery folders that already exist: a row whose
  * folder is not there plans nothing, and the note names it. `create=yes`, the default, makes it.
+ *
+ * `copy-text=<column>` (ADR 0217) also keeps each delivery's copy in `editaveis/copy.md`: the
+ * record's `copy` as a `Source:` line on top, then the cell's text as it is, Markdown or plain.
+ * The record keeps the digest of the copy it wrote in `written.files`, so a copy a person edited
+ * since is **kept, never overwritten**, and the plan's note names it on every run. A copy file
+ * that is missing is written again; an empty cell leaves the file alone.
  */
 export interface ToDeliveryPorts {
   /**
@@ -112,6 +122,11 @@ export interface ToDeliveryPorts {
   write(path: string, text: string): Promise<Result<void, readonly Diagnostic[]>>;
   /** The host's clock as ISO 8601 in UTC, which stamps an applied write; the system's if absent. */
   now?(): string;
+  /**
+   * The digest `stat` would answer for a file holding exactly this text, as UTF-8 (ADR 0217).
+   * A host without it keeps no copy file: `copy-text=` stops the step.
+   */
+  digest?(text: string): string;
 }
 
 export interface DeliveryPlace {
@@ -161,7 +176,10 @@ export const TO_DELIVERY_PLAN_LIMITS: PlanLimits = {
 /** How many refused rows the note names, so a broken column is not a thousand lines. */
 const REPORTED = 8;
 
-const NAMES = ['name', 'fields', 'inbound', 'keep', 'create'] as const;
+const NAMES = ['name', 'fields', 'inbound', 'keep', 'create', 'copy-text'] as const;
+
+/** What the plan and its note call the copy file. */
+const COPY_NAME = 'copy.md';
 const FIELD_MAP = z.record(z.string(), z.string());
 const WINNERS: readonly DeliveryInboundWinner[] = ['record', 'row'];
 
@@ -173,6 +191,16 @@ interface RecordWrite {
   readonly path: string;
   readonly text: string;
   /** The digest the record had when the plan was made; `null` when there was none. */
+  readonly before: string | null;
+  /** The copy file to write before the record (ADR 0217), when the row's copy changed. */
+  readonly copy?: CopyWrite;
+}
+
+/** One copy file of a shown plan, written before the record that remembers its digest. */
+interface CopyWrite {
+  readonly path: string;
+  readonly text: string;
+  /** The digest the copy file had when the plan was made; `null` when there was none. */
   readonly before: string | null;
 }
 
@@ -220,6 +248,7 @@ async function planDeliveries(
     argument[name] = written;
   }
   const { name, fields, inbound, keep, create } = argument;
+  const copyText = argument['copy-text'];
   if (name === undefined || fields === undefined) {
     return argumentsProblem(context, 'needs name=<column> fields=<field>:<column>,…');
   }
@@ -258,6 +287,15 @@ async function planDeliveries(
   }
   const nameColumn = resolveColumn(table.value, name.value, at(name.range), context.aliases);
   if (!nameColumn.ok) return nameColumn;
+  let copyColumn: Column | undefined;
+  if (copyText !== undefined) {
+    if (ports.digest === undefined) {
+      return refuse('cannot keep a copy file: this host gives no digest', at(copyText.range));
+    }
+    const column = resolveColumn(table.value, copyText.value, at(copyText.range), context.aliases);
+    if (!column.ok) return column;
+    copyColumn = column.value;
+  }
 
   const layout = await ports.layout();
   if (!layout.ok) return err(layout.error.map((found) => ({ ...found, range: at(name.range) })));
@@ -276,6 +314,7 @@ async function planDeliveries(
   const refused: string[] = [];
   const skipped: string[] = [];
   const held: string[] = [];
+  const edited: string[] = [];
   let heldValues = 0;
   const operations: PlannedOperation[] = [];
   const stated: RecordWrite[] = [];
@@ -332,20 +371,44 @@ async function planDeliveries(
       held.push(`row '${row.key}' ${merged.held.join(', ')}`);
       heldValues += merged.held.length;
     }
-    if (!merged.changed) continue;
+    let record = merged.record;
+    const parts = merged.changed ? [describeMerge(merged)] : [];
+    let copy: CopyWrite | undefined;
+    const text = copyColumn === undefined ? '' : cellText(row.values[copyColumn.name]).trim();
+    if (text !== '' && ports.digest !== undefined) {
+      const planned = await planCopy(ports.digest, ports, folder, onDisk, record, text);
+      if (!planned.ok) {
+        return err(planned.error.map((found) => ({ ...found, range: at(name.range) })));
+      }
+      if (planned.value.state === 'edited') {
+        edited.push(`'${folder}'`);
+        parts.push(`kept: ${COPY_NAME} (edited since the last run)`);
+      } else if (planned.value.state !== 'same') {
+        record = planned.value.record;
+        copy = planned.value.write;
+        parts.push(planned.value.says);
+      }
+    }
+    if (!merged.changed && record === merged.record) continue;
     const write: RecordWrite = {
       rowKey: row.key,
       folders: [folder, ...inside.map((item) => `${folder}/${item}`)],
       path,
-      text: writeDeliveryRecord(merged.record),
+      text: writeDeliveryRecord(record),
       before: before.value ?? null,
+      ...(copy === undefined ? {} : { copy }),
     };
     stated.push(write);
     operations.push({
       write: TO_DELIVERY_WRITE,
       rowKey: row.key,
-      description: `${folder}: ${describeMerge(merged)}`,
-      payload: { path, text: write.text, before: write.before },
+      description: `${folder}: ${parts.join('; ')}`,
+      payload: {
+        path,
+        text: write.text,
+        before: write.before,
+        ...(copy === undefined ? {} : { copy: { path: copy.path, before: copy.before } }),
+      },
     });
   }
 
@@ -364,6 +427,7 @@ async function planDeliveries(
   const notes = [
     ...(skipped.length === 0 ? [] : [skippedNote(skipped)]),
     ...(held.length === 0 ? [] : [heldNote(held, heldValues)]),
+    ...(edited.length === 0 ? [] : [editedNote(edited)]),
     ...(refused.length === 0 ? [] : [refusedNote(refused)]),
   ];
   return ok(
@@ -420,6 +484,78 @@ function heldNote(held: readonly string[], values: number): string {
   return `Kept ${String(values)} ${values === 1 ? 'value' : 'values'} whose cell came back empty: ${named}${
     more > 0 ? `; and ${String(more)} more rows` : ''
   }.`;
+}
+
+/**
+ * The copy files a person edited since the recipe last wrote them, by folder, on every run: kept,
+ * never overwritten, so the row's new copy waits until the file is removed or put back.
+ */
+function editedNote(edited: readonly string[]): string {
+  const named = edited.slice(0, REPORTED).join(', ');
+  const more = edited.length - REPORTED;
+  return `Kept ${String(edited.length)} ${COPY_NAME} ${
+    edited.length === 1 ? 'file' : 'files'
+  } edited since the last run, never overwritten: ${named}${
+    more > 0 ? `, and ${String(more)} more` : ''
+  }.`;
+}
+
+/** What a row's copy file needs (ADR 0217), and the record that remembers it. */
+type PlannedCopy =
+  /** The file and its base already hold the row's copy: nothing to do. */
+  | { readonly state: 'same' }
+  /** A person edited the file since the recipe last wrote it: kept. */
+  | { readonly state: 'edited' }
+  /** The file already holds the row's copy, and only the base catches up. */
+  | {
+      readonly state: 'based';
+      readonly record: DeliveryRecord;
+      readonly says: string;
+      readonly write?: undefined;
+    }
+  /** The file is missing, or still what the recipe wrote: it takes the row's copy. */
+  | {
+      readonly state: 'write';
+      readonly record: DeliveryRecord;
+      readonly says: string;
+      readonly write: CopyWrite;
+    };
+
+/**
+ * The three-way rule of a copy file, the base being the digest the recipe last wrote there
+ * (`written.files`). A file the recipe never wrote counts as edited, since it is somebody's.
+ */
+async function planCopy(
+  digest: (text: string) => string,
+  ports: ToDeliveryPorts,
+  folder: string,
+  onDisk: DeliveryRecord | undefined,
+  record: DeliveryRecord,
+  copy: string,
+): Promise<Result<PlannedCopy, readonly Diagnostic[]>> {
+  const path = `${folder}/${DELIVERY_COPY_FILE}`;
+  const text = deliveryCopyText(record.copy, copy);
+  const next = digest(text);
+  const current = await ports.stat(path);
+  if (!current.ok) return current;
+  const base = deliveryFileBase(onDisk, DELIVERY_COPY_FILE);
+  if (current.value === next) {
+    if (base === next) return ok({ state: 'same' });
+    return ok({
+      state: 'based',
+      record: withDeliveryFileBase(record, DELIVERY_COPY_FILE, next),
+      says: `${COPY_NAME} already holds the copy`,
+    });
+  }
+  if (current.value === undefined || current.value === base) {
+    return ok({
+      state: 'write',
+      record: withDeliveryFileBase(record, DELIVERY_COPY_FILE, next),
+      says: `${COPY_NAME} ${current.value === undefined ? 'new' : 'replaced'}`,
+      write: { path, text, before: current.value ?? null },
+    });
+  }
+  return ok({ state: 'edited' });
 }
 
 /** The refused rows, named, so the person sees which rows the plan leaves out and why. */
@@ -711,10 +847,30 @@ async function applyDeliveries(
       operations.push(failed(`${write.path} changed since the plan`));
       continue;
     }
+    if (write.copy !== undefined) {
+      const copyNow = await ports.stat(write.copy.path);
+      if (!copyNow.ok) {
+        operations.push(failed(`could not read ${write.copy.path}: ${messages(copyNow.error)}`));
+        continue;
+      }
+      if ((copyNow.value ?? null) !== write.copy.before) {
+        operations.push(failed(`${write.copy.path} changed since the plan`));
+        continue;
+      }
+    }
     const made = await makeAll(ports, write.folders);
     if (made !== undefined) {
       operations.push(failed(made));
       continue;
+    }
+    // The copy before the record that remembers its digest: a copy that fails leaves the record
+    // as it was, and the next run plans the same write again.
+    if (write.copy !== undefined) {
+      const copied = await ports.write(write.copy.path, write.copy.text);
+      if (!copied.ok) {
+        operations.push(failed(`could not write ${write.copy.path}: ${messages(copied.error)}`));
+        continue;
+      }
     }
     const written = await ports.write(write.path, write.text);
     operations.push(

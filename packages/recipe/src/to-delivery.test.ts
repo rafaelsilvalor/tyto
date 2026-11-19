@@ -82,6 +82,9 @@ class FakeWorkspace implements ToDeliveryPorts {
   now(): string {
     return '2026-11-17T12:00:00.000Z';
   }
+  digest(text: string): string {
+    return `digest:${text}`;
+  }
 }
 
 const TASKS = tasks(
@@ -1135,5 +1138,148 @@ describe('deliveries check (ADR 0215)', () => {
       ],
     ]);
     expect(workspace.listedExports).toEqual(['.']);
+  });
+});
+
+describe('to-delivery copy-text= (ADR 0217)', () => {
+  const COPY = 'entregas/mca-1_aula/editaveis/copy.md';
+  const COPY_LINE = 'to-delivery name=folder fields=key:key,copy:source copy-text=text';
+  const DOC = 'https://docs.example/d/1';
+
+  function copyRows(text: string, source = DOC) {
+    return tasks(['folder', 'source', 'text'], [['mca-1_aula', source, text]]);
+  }
+
+  async function applied(workspace: FakeWorkspace, input: Table) {
+    const shown = await plan(COPY_LINE, workspace, input);
+    const answer = await apply(shown.verbs, shown.plan);
+    return answer.ok ? answer.value.operations.map((operation) => operation.status) : answer;
+  }
+
+  it('plans copy.md with the record, writes it first with its source on top, and a second run plans none', async () => {
+    const workspace = new FakeWorkspace();
+    const first = await plan(COPY_LINE, workspace, copyRows('# Aula\n\nTrês peças.\n\n'));
+    expect(first.problems).toEqual([]);
+    expect(workspace.writes).toEqual([]);
+    expect(descriptions(first.plan)).toEqual([['T-0', 'entregas/mca-1_aula: new; copy.md new']]);
+    expect(first.plan?.operations[0]?.payload).toMatchObject({
+      copy: { path: COPY, before: null },
+    });
+
+    const answer = await apply(first.verbs, first.plan);
+    expect(answer.ok && answer.value.operations.map((operation) => operation.status)).toEqual([
+      'applied',
+    ]);
+    expect(workspace.writes).toEqual([COPY, RECORD]);
+    const text = `Source: ${DOC}\n\n# Aula\n\nTrês peças.\n`;
+    expect(workspace.files.get(COPY)).toBe(text);
+    const record = JSON.parse(workspace.files.get(RECORD) ?? '') as Record<string, unknown>;
+    expect(record['written']).toEqual({
+      key: 'T-0',
+      copy: DOC,
+      files: { 'editaveis/copy.md': `digest:${text}` },
+    });
+
+    const second = await plan(COPY_LINE, workspace, copyRows('# Aula\n\nTrês peças.\n\n'));
+    expect(second.problems).toEqual([]);
+    expect(second.plan?.count).toBe(0);
+    expect(second.note).toBeUndefined();
+  });
+
+  it('replaces a copy nobody touched when the row brings a new one', async () => {
+    const workspace = new FakeWorkspace();
+    await applied(workspace, copyRows('first'));
+    const later = await plan(COPY_LINE, workspace, copyRows('second'));
+    expect(descriptions(later.plan)).toEqual([['T-0', 'entregas/mca-1_aula: copy.md replaced']]);
+    await apply(later.verbs, later.plan);
+    expect(workspace.files.get(COPY)).toBe(`Source: ${DOC}\n\nsecond\n`);
+    expect((await plan(COPY_LINE, workspace, copyRows('second'))).plan?.count).toBe(0);
+  });
+
+  it('keeps a copy a person edited, never overwrites it, and says so on every run', async () => {
+    const workspace = new FakeWorkspace();
+    await applied(workspace, copyRows('first'));
+    workspace.files.set(COPY, `Source: ${DOC}\n\nfirst, fixed by hand\n`);
+
+    const later = await plan(COPY_LINE, workspace, copyRows('second'));
+    expect(later.plan?.count).toBe(0);
+    expect(later.note).toBe(
+      "Kept 1 copy.md file edited since the last run, never overwritten: 'entregas/mca-1_aula'.",
+    );
+    const moved = await plan(COPY_LINE, workspace, copyRows('second', 'https://docs.example/d/2'));
+    expect(descriptions(moved.plan)).toEqual([
+      ['T-0', 'entregas/mca-1_aula: updates copy; kept: copy.md (edited since the last run)'],
+    ]);
+    expect(moved.plan?.operations[0]?.payload).not.toHaveProperty('copy');
+    await apply(moved.verbs, moved.plan);
+    expect(workspace.files.get(COPY)).toBe(`Source: ${DOC}\n\nfirst, fixed by hand\n`);
+    expect((await plan(COPY_LINE, workspace, copyRows('second'))).note).toContain('Kept 1 copy.md');
+  });
+
+  it('writes a missing copy again, and counts a file the recipe never wrote as edited', async () => {
+    const workspace = new FakeWorkspace();
+    await applied(workspace, copyRows('first'));
+    workspace.files.delete(COPY);
+    const again = await plan(COPY_LINE, workspace, copyRows('first'));
+    expect(descriptions(again.plan)).toEqual([['T-0', 'entregas/mca-1_aula: copy.md new']]);
+
+    const someone = new FakeWorkspace();
+    someone.files.set(COPY, 'notes of my own\n');
+    const fresh = await plan(COPY_LINE, someone, copyRows('first'));
+    expect(descriptions(fresh.plan)).toEqual([
+      ['T-0', 'entregas/mca-1_aula: new; kept: copy.md (edited since the last run)'],
+    ]);
+    await apply(fresh.verbs, fresh.plan);
+    expect(someone.files.get(COPY)).toBe('notes of my own\n');
+  });
+
+  it('lets the base catch up with a copy that already holds the row, writing only the record', async () => {
+    const workspace = new FakeWorkspace();
+    await applied(workspace, copyRows('first'));
+    workspace.files.set(COPY, `Source: ${DOC}\n\nsecond\n`);
+    const later = await plan(COPY_LINE, workspace, copyRows('second'));
+    expect(descriptions(later.plan)).toEqual([
+      ['T-0', 'entregas/mca-1_aula: copy.md already holds the copy'],
+    ]);
+    workspace.writes.length = 0;
+    await apply(later.verbs, later.plan);
+    expect(workspace.writes).toEqual([RECORD]);
+    expect((await plan(COPY_LINE, workspace, copyRows('second'))).plan?.count).toBe(0);
+  });
+
+  it('fails a row whose copy changed since the plan, and leaves its record as it was', async () => {
+    const workspace = new FakeWorkspace();
+    await applied(workspace, copyRows('first'));
+    const before = workspace.files.get(RECORD);
+    const later = await plan(COPY_LINE, workspace, copyRows('second'));
+    workspace.files.set(COPY, 'edited while the plan was open\n');
+    workspace.writes.length = 0;
+    const answer = await apply(later.verbs, later.plan);
+    expect(answer.ok && answer.value.operations).toEqual([
+      { rowKey: 'T-0', status: 'failed', reason: `${COPY} changed since the plan` },
+    ]);
+    expect(workspace.writes).toEqual([]);
+    expect(workspace.files.get(RECORD)).toBe(before);
+  });
+
+  it('leaves the copy alone for an empty cell, and stops on a host that gives no digest', async () => {
+    const workspace = new FakeWorkspace();
+    const empty = await plan(COPY_LINE, workspace, copyRows('  '));
+    expect(descriptions(empty.plan)).toEqual([['T-0', 'entregas/mca-1_aula: new']]);
+
+    const bare: ToDeliveryPorts = {
+      folder: () => workspace.folder(),
+      layout: () => workspace.layout(),
+      list: (parent, exports) => workspace.list(parent, exports),
+      read: (path) => workspace.read(path),
+      stat: (path) => workspace.stat(path),
+      make: (path) => workspace.make(path),
+      write: (path, text) => workspace.write(path, text),
+    };
+    const refused = await plan(COPY_LINE, bare, copyRows('first'));
+    expect(refused.plan).toBeUndefined();
+    expect(refused.problems[0]?.message).toBe(
+      "'to-delivery' cannot keep a copy file: this host gives no digest.",
+    );
   });
 });

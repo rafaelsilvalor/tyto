@@ -146,3 +146,9 @@ beforehand either: `with-deliveries` refuses a table that already has a column i
   `record_<name>` for a listed name is refused as for any other column it would add.
 - Plain text, comma-separated, not a data reference: the list is short, and `keep=` reads its
   names the same way.
+
+## Note, 2026-11-19 — the digest of the files a recipe wrote (TYTO-756)
+
+ADR 0217 amends this record: `written` also keeps `files`, the digest of each file a recipe
+wrote into the delivery by its path relative to it, starting with `editaveis/copy.md`, so a
+copy a person edited is kept as an edited field is.
