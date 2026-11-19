@@ -150,6 +150,7 @@ export const SECTIONS: readonly Section[] = [
     // file rather than copying it (TYTO-318). `test/release-notes.test.ts` holds this list to the
     // folder, so a release whose notes were written and not listed fails the suite.
     pages: [
+      { slug: 'desktop-v0.26.0', title: { en: 'Tyto 0.26.0', 'pt-BR': 'Tyto 0.26.0' } },
       { slug: 'desktop-v0.24.3', title: { en: 'Tyto 0.24.3', 'pt-BR': 'Tyto 0.24.3' } },
       { slug: 'desktop-v0.24.1', title: { en: 'Tyto 0.24.1', 'pt-BR': 'Tyto 0.24.1' } },
       { slug: 'desktop-v0.23.2', title: { en: 'Tyto 0.23.2', 'pt-BR': 'Tyto 0.23.2' } },
