@@ -70,6 +70,18 @@ describe('fileIconFor', () => {
   it("takes main's place over the name", () => {
     expect(fileIconFor({ name: 'saida', kind: 'folder', place: 'output' })).toBe('folderOutput');
     expect(fileIconFor({ name: 'assets', kind: 'folder', place: 'output' })).toBe('folderOutput');
+  });
+
+  it('marks a folder holding a delivery record, below a place the project names (TYTO-755)', () => {
+    expect(fileIconFor({ name: 'mca-1', kind: 'folder', delivery: true })).toBe('folderDelivery');
+    expect(fileIconFor({ name: 'mca-1', kind: 'folder', delivery: true, expanded: true })).toBe(
+      'folderDelivery',
+    );
+    expect(fileIconFor({ name: 'mca-1', kind: 'folder', delivery: false })).toBe('folder');
+    expect(fileIconFor({ name: 'saida', kind: 'folder', delivery: true, place: 'output' })).toBe(
+      'folderOutput',
+    );
+    expect(fileIconFor({ name: 'mca-1.png', kind: 'file', delivery: true })).toBe('image');
     expect(fileIconFor({ name: 'modelos', kind: 'folder', place: 'templates' })).toBe(
       'templateFolder',
     );

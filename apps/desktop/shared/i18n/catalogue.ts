@@ -1054,6 +1054,12 @@ export interface Catalogue {
   readonly 'explorer.delivery.incomplete': string;
   readonly 'explorer.delivery.inProgress': string;
   /**
+   * TYTO-755, ADR 0210. The record the badge reads: `{key}` is the record's key and `{state}`
+   * the person's state as written, untranslated. Both open the tooltip and the spoken name.
+   */
+  readonly 'explorer.delivery.record': string;
+  readonly 'explorer.delivery.state': string;
+  /**
    * TYTO-352, ADR 0121. The explorer's context menu, the delete question and the line under the
    * name field. `{bin}` is the system's trash, by the platform's name in English and *Lixeira*
    * in Portuguese on all three; `{name}`, `{count}` and `{reason}` are filled by the panel.
@@ -1919,6 +1925,8 @@ export const CATALOGUE_KEYS = [
   'explorer.delivery.ready',
   'explorer.delivery.incomplete',
   'explorer.delivery.inProgress',
+  'explorer.delivery.record',
+  'explorer.delivery.state',
   'explorer.menu.newFile',
   'explorer.menu.newFolder',
   'explorer.menu.rename',

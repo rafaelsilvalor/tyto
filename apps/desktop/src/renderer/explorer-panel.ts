@@ -739,20 +739,32 @@ export class ExplorerPanel extends DockedPanel {
 
   /**
    * A delivery folder's badge (TYTO-757, ADR 0215): its exports checked against its record, a
-   * glyph at the row's end, the state's words and each problem in its tooltip. TYTO-755 adds
-   * the record's own state to this same element.
+   * glyph at the row's end, the state's words and each problem in its tooltip. TYTO-755 (ADR
+   * 0210) puts the record's own `state` before the glyph, as the person wrote it, and opens the
+   * tooltip and the spoken name with the record's key and that state.
    */
   private deliveryBadge(entry: ExplorerEntry): unknown {
     const delivery = entry.delivery;
     if (delivery === undefined) return nothing;
     const label = this.say(DELIVERY_CHECK_LABELS[delivery.check]);
-    const title = [label, ...delivery.problems].join('\n');
+    const record = [
+      this.say('explorer.delivery.record').replaceAll('{key}', delivery.key),
+      ...(delivery.state === undefined
+        ? []
+        : [this.say('explorer.delivery.state').replaceAll('{state}', delivery.state)]),
+    ].join(' · ');
+    const title = [record, label, ...delivery.problems].join('\n');
     return html`<span
       class="explorer__delivery"
       data-delivery-check=${delivery.check}
+      data-delivery-state=${delivery.state ?? nothing}
       title=${title}
-      aria-label=${label}
-      >${DELIVERY_CHECK_GLYPHS[delivery.check]}</span
+      aria-label=${`${record}. ${label}`}
+      >${
+        delivery.state === undefined
+          ? nothing
+          : html`<span class="explorer__delivery-state">${delivery.state}</span>`
+      }<span class="explorer__delivery-glyph">${DELIVERY_CHECK_GLYPHS[delivery.check]}</span></span
     >`;
   }
 
@@ -776,7 +788,11 @@ export class ExplorerPanel extends DockedPanel {
     const { entry } = row;
     const folder = entry.kind === 'folder';
     const selected = this.tree.selected === entry.id;
-    const fileIcon = fileIconFor({ ...entry, expanded: row.expanded });
+    const fileIcon = fileIconFor({
+      ...entry,
+      expanded: row.expanded,
+      delivery: entry.delivery !== undefined,
+    });
     const notice = this.notice?.id === entry.id ? this.notice.text : undefined;
     return html`<li
       class="explorer__row ${row.renaming === true ? 'explorer__row--editing' : ''}"

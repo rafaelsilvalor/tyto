@@ -688,10 +688,13 @@ const explorerEntry = z.object({
   /**
    * A delivery folder's exports checked against its record (TYTO-757, ADR 0215): the state, and
    * each problem in a sentence for the badge's tooltip. Only on a folder holding a record, in a
-   * trusted workspace. TYTO-755 adds the record's own state beside it.
+   * trusted workspace. TYTO-755 (ADR 0210) adds the record's key and the person's `state`, as
+   * written, so the row names the delivery and says where it stands.
    */
   delivery: z
     .object({
+      key: z.string().min(1).max(200),
+      state: z.string().min(1).max(200).optional(),
       check: z.enum(DELIVERY_CHECK_STATES),
       problems: z.array(z.string().max(2000)).max(20),
     })

@@ -38,6 +38,7 @@ export type FileIconName =
   | 'folderOpen'
   | 'folderAssets'
   | 'folderOutput'
+  | 'folderDelivery'
   | 'file';
 
 export interface FileIconSubject {
@@ -46,6 +47,11 @@ export interface FileIconSubject {
   readonly place?: ExplorerPlace | undefined;
   /** A folder's state on screen. Only a plain folder draws it; the chevron says it elsewhere. */
   readonly expanded?: boolean;
+  /**
+   * A folder holding a delivery's record (TYTO-755, ADR 0210), which main read for the Explorer.
+   * A place the project names still wins: it says what the folder is for in this project.
+   */
+  readonly delivery?: boolean;
 }
 
 /** Files known by their whole name, compared case-insensitively. */
@@ -97,6 +103,7 @@ export function fileIconFor(subject: FileIconSubject): FileIconName {
   if (subject.place !== undefined) return BY_PLACE[subject.place];
   const name = subject.name.toLowerCase();
   if (subject.kind === 'folder') {
+    if (subject.delivery === true) return 'folderDelivery';
     // `assets/` is a place by convention too: a brief's assets resolve in the `assets` beside
     // it whether or not the project names it (ADR 0056).
     if (name === 'assets') return 'folderAssets';

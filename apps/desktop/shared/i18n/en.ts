@@ -658,6 +658,8 @@ export const en: Catalogue = {
   'explorer.delivery.ready': 'Delivery ready to check',
   'explorer.delivery.incomplete': 'Delivery incomplete',
   'explorer.delivery.inProgress': 'Delivery in progress',
+  'explorer.delivery.record': 'Delivery {key}',
+  'explorer.delivery.state': 'state: {state}',
   'explorer.menu.newFile': 'New File…',
   'explorer.menu.newFolder': 'New Folder…',
   'explorer.menu.newRecipe': 'New Recipe…',

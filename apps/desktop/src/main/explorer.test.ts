@@ -565,13 +565,20 @@ describe("a delivery folder's badge (TYTO-757, ADR 0215)", () => {
       deliveryOf: (real) => {
         asked.push(real);
         return real === join(work, 'slides')
-          ? { check: 'incomplete', problems: ["'feed' has 0 of 1 at 1080×1350"] }
+          ? {
+              key: 'MCA-1',
+              state: 'doing',
+              check: 'incomplete',
+              problems: ["'feed' has 0 of 1 at 1080×1350"],
+            }
           : undefined;
       },
     });
     await explorer.setRoot(work);
     const entries = (await explorer.list(null)).entries;
     expect(entries.find((entry) => entry.name === 'slides')?.delivery).toEqual({
+      key: 'MCA-1',
+      state: 'doing',
       check: 'incomplete',
       problems: ["'feed' has 0 of 1 at 1080×1350"],
     });

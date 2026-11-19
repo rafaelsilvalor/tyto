@@ -17,6 +17,10 @@ import { switchingFolder } from './folder-switch.js';
  * its root turn it ready within the watcher's settle, and a wrong-size one turns it incomplete,
  * the file and the size it should be in the badge's tooltip.
  *
+ * TYTO-755 (ADR 0210): the folder wears the delivery icon, the record's `state` sits before the
+ * glyph as the person wrote it, the tooltip opens with the record's key and that state, and a
+ * state edited in the record reaches the row on its own.
+ *
  * The PNGs are headers only: the check reads the size from the header and nothing else. Its own
  * `--user-data-dir` and `TYTO_HOME`, the folder trusted through `tyto trust add` before launch;
  * one launch, inside the 60 s budget (ADR 0105). With `TYTO_DELIVERY_CHECK_SHOTS` set to a folder
@@ -65,8 +69,30 @@ const badgeOf = (name: string) =>
     const badge = document.querySelector<HTMLElement>(
       `.explorer__row[data-name="${folder}"] .explorer__delivery`,
     );
-    return badge === null ? null : { check: badge.dataset['deliveryCheck'], title: badge.title };
+    return badge === null
+      ? null
+      : {
+          check: badge.dataset['deliveryCheck'],
+          state: badge.querySelector('.explorer__delivery-state')?.textContent ?? null,
+          title: badge.title,
+        };
   }, name);
+
+/** The icon a row draws (`data-icon`). */
+const iconOf = (name: string) =>
+  page.getAttribute(`.explorer__row[data-name="${name}"]`, 'data-icon');
+
+/** The record `mca-1` holds, with the person's `state`. */
+const record = (state: string) =>
+  JSON.stringify({
+    version: 1,
+    key: 'MCA-1',
+    state,
+    formats: [
+      { format: 'feed', count: 1 },
+      { format: 'story', count: 1 },
+    ],
+  });
 
 /** Waits until the badge on `name` says `check`. */
 const waitForCheck = (name: string, check: string) =>
@@ -92,17 +118,7 @@ beforeAll(async () => {
   );
   const delivery = join(work, 'entregas', 'mca-1');
   mkdirSync(join(delivery, 'editaveis'), { recursive: true });
-  writeFileSync(
-    join(delivery, 'editaveis', 'delivery.json'),
-    JSON.stringify({
-      version: 1,
-      key: 'MCA-1',
-      formats: [
-        { format: 'feed', count: 1 },
-        { format: 'story', count: 1 },
-      ],
-    }),
-  );
+  writeFileSync(join(delivery, 'editaveis', 'delivery.json'), record('em revisão'));
   writeFileSync(join(delivery, 'editaveis', 'arte.psd'), 'psd');
   mkdirSync(join(work, 'entregas', 'rascunho'), { recursive: true });
   mkdirSync(home, { recursive: true });
@@ -136,15 +152,18 @@ afterAll(async () => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-describe("a delivery folder's badge (TYTO-757)", () => {
+describe("a delivery folder's badge (TYTO-757, TYTO-755)", () => {
   it('shows a delivery with nothing exported in progress, and a folder with no record bare', async () => {
     await page.locator('.explorer__row[data-name="entregas"]').click({ timeout: 15_000 });
     await waitForCheck('mca-1', 'in-progress');
     expect(await badgeOf('mca-1')).toEqual({
       check: 'in-progress',
-      title: 'Delivery in progress',
+      state: 'em revisão',
+      title: 'Delivery MCA-1 · state: em revisão\nDelivery in progress',
     });
+    expect(await iconOf('mca-1')).toBe('folderDelivery');
     expect(await badgeOf('rascunho')).toBeNull();
+    expect(await iconOf('rascunho')).toBe('folder');
   }, 20_000);
 
   it('turns ready when the two exports land at their sizes', async () => {
@@ -152,7 +171,11 @@ describe("a delivery folder's badge (TYTO-757)", () => {
     writeFileSync(join(delivery, 'feed.png'), png(1080, 1350));
     writeFileSync(join(delivery, 'story.png'), png(1080, 1920));
     await waitForCheck('mca-1', 'ready');
-    expect(await badgeOf('mca-1')).toEqual({ check: 'ready', title: 'Delivery ready to check' });
+    expect(await badgeOf('mca-1')).toEqual({
+      check: 'ready',
+      state: 'em revisão',
+      title: 'Delivery MCA-1 · state: em revisão\nDelivery ready to check',
+    });
 
     if (shots !== undefined) {
       mkdirSync(shots, { recursive: true });
@@ -172,6 +195,7 @@ describe("a delivery folder's badge (TYTO-757)", () => {
     await waitForCheck('mca-1', 'incomplete');
     const badge = await badgeOf('mca-1');
     expect(badge?.title.split('\n')).toEqual([
+      'Delivery MCA-1 · state: em revisão',
       'Delivery incomplete',
       "'feed' has 0 of 1 at 1080×1350",
       "'feed.png' is 1080×1080, and the record owes feed 1080×1350, story 1080×1920",
@@ -182,5 +206,20 @@ describe("a delivery folder's badge (TYTO-757)", () => {
         .locator('.explorer__row[data-name="mca-1"]')
         .screenshot({ path: join(shots, 'delivery-incomplete-row.png') });
     }
+  }, 20_000);
+
+  it('shows a state edited in the record on the row, with no other change to the folder', async () => {
+    writeFileSync(
+      join(work, 'entregas', 'mca-1', 'editaveis', 'delivery.json'),
+      record('aprovado'),
+    );
+    await page.waitForFunction(
+      () =>
+        document.querySelector<HTMLElement>('.explorer__row[data-name="mca-1"] .explorer__delivery')
+          ?.dataset['deliveryState'] === 'aprovado',
+      undefined,
+      { timeout: 15_000 },
+    );
+    expect((await badgeOf('mca-1'))?.state).toBe('aprovado');
   }, 20_000);
 });

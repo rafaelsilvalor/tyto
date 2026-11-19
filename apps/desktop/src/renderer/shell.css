@@ -3896,13 +3896,32 @@ tyto-gallery-dialog[open] {
 /*
  * TYTO-757, ADR 0215: a delivery folder's badge, its exports checked against its record. At the
  * row's end, past the name, which gives way first; the colour carries the state and the
- * tooltip the words. TYTO-755 adds the record's state to the same element.
+ * tooltip the words. TYTO-755: the record's `state`, as the person wrote it, goes quiet before
+ * the glyph and gives way with an ellipsis, so a long state never pushes the glyph off the row.
  */
 .explorer__delivery {
-  flex: none;
+  display: flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: var(--tyto-space-2);
+  min-width: 0;
+  max-width: 50%;
   margin-inline-start: auto;
   padding-inline-start: var(--tyto-space-3);
   color: var(--tyto-text-muted);
+}
+
+.explorer__delivery-state {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--tyto-text-xs);
+  color: var(--tyto-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer__delivery-glyph {
+  flex: none;
 }
 
 .explorer__delivery[data-delivery-check='ready'] {
