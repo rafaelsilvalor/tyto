@@ -31,6 +31,7 @@ tyto render [options] <brief>
 | `--delivery` | export into the brief's delivery: artwork into its exports folder, result.json and template.txt beside the brief |  |
 | `--assets <dir>` | what relative asset paths resolve against (default: assets/ beside the brief, else the brief's folder) |  |
 | `--trust` | trust the brief's workspace folder and its work profile for this run only; never written to trust.json |  |
+| `--guide` | write the layered PSD guide of the template's external art: &lt;artwork>-&lt;format>.psd, and &lt;slot>-&lt;format>.psd per inline picture |  |
 | `--section <plugin.key=value>` | set a key of a plugin's project section for this run, over .tyto/project.json; repeatable, value read as JSON or else as text |  |
 | `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
 | `--formats-file <path>` | the project's formats.yaml; the built-in sizes when the default is not there | `"formats.yaml"` |

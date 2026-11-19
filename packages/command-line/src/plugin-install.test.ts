@@ -407,7 +407,7 @@ describe('an installed exporter at render', () => {
 
     expect(code).toBe(EXIT_DIAGNOSTICS);
     expect(stderr()).toContain(
-      "'txt' is not an output type any installed exporter produces. Available: png, jpeg, webp, svg.",
+      "'txt' is not an output type any installed exporter produces. Available: png, jpeg, webp, svg, psd.",
     );
   });
 

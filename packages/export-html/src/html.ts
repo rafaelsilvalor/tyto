@@ -485,7 +485,9 @@ function textDeclarations(node: TextNode, emit: Emit, context: VisitContext): st
     // `max-content` says; a declared one is a box the text wraps inside.
     `width: ${node.box.w === undefined ? 'max-content' : cssLength(node.box.w)}`,
     ...(node.box.h === undefined ? [] : [`height: ${cssLength(node.box.h)}`]),
-    'display: flex',
+    // Only when shown: a later `display` wins, and this one used to undo the `display: none`
+    // a hidden node gets above, so a hidden text was drawn (found by TYTO-740's guide layers).
+    ...(node.visible ? ['display: flex'] : []),
     'flex-direction: column',
     `justify-content: ${VERTICAL_ALIGN[node.valign]}`,
     `text-align: ${node.align}`,

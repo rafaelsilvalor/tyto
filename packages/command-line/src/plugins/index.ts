@@ -1,4 +1,5 @@
 import { htmlExporterManifest, htmlExporterPlugin } from '@tyto/export-html';
+import { type PsdResources, psdExporterManifest, psdExporterPlugin } from '@tyto/export-psd';
 import { svgExporterManifest, svgExporterPlugin } from '@tyto/export-svg';
 import type { Diagnostics } from '@tyto/core';
 import {
@@ -62,6 +63,7 @@ import { rasterizerPlugin } from './rasterizer.js';
 export const BUILT_IN_MANIFESTS: readonly unknown[] = [
   htmlExporterManifest,
   svgExporterManifest,
+  psdExporterManifest,
   builtInTemplatesManifest,
   chromiumManifest,
   fsInboxManifest,
@@ -72,6 +74,12 @@ export const BUILT_IN_MANIFESTS: readonly unknown[] = [
 export interface BuiltInOptions {
   /** Bound into the exporters. Each gets the half it understands. */
   readonly resources?: ExportResources;
+  /**
+   * The PSD exporter's pixels (ADR 0221): each guide layer's PNG, decoded. Absent, it is
+   * registered all the same, so `psd` is a kind every run knows, and a frame it is asked for
+   * says which layer had no pixels.
+   */
+  readonly psd?: PsdResources;
   /** Registered when the run has something to raster. Absent for an svg-only render. */
   readonly rasterizer?: Rasterizer;
   /**
@@ -98,6 +106,7 @@ export function activateBuiltIns(options: BuiltInOptions = {}): InProcessHost {
     svgExporterPlugin({
       ...(options.resources?.svg === undefined ? {} : { resources: options.resources.svg }),
     }),
+    psdExporterPlugin(options.psd === undefined ? {} : { resources: options.psd }),
     ...(options.rasterizer === undefined ? [] : [rasterizerPlugin(options.rasterizer)]),
     ...(options.googleFonts === undefined ? [] : [googleFontsPlugin(options.googleFonts)]),
   ];

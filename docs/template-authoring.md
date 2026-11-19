@@ -164,7 +164,8 @@ These are the rules it enforces beyond the shape:
   Until the file exists, the slot is `W_EXTERNAL_ART_MISSING` and never missing: the template
   is handed a placeholder ref whose `size` is the declared one for the format it draws, places
   it as it places any picture, and `compile` draws it as an outlined magenta box in that place.
-  `arte-teste` in the built-in pack is the example.
+  `arte-teste` in the built-in pack is the example. `tyto render --guide` writes the layered PSD
+  a designer paints in, per format (ADR 0221).
 
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's
   identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by

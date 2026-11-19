@@ -120,3 +120,31 @@ What `@tyto/export-psd` settled beyond decision 3:
   designer counts on would look complete, which is why there is no partial file.
 - **`arte` is a layer with no pixels**, so it reads back as 0×0 at the document's origin;
   an `inline` canvas's PSD is that one layer, named by its label (`arte 920px`).
+
+## Note of 2026-11-19: the CLI writes the guide (TYTO-740, fifth pull request)
+
+What `tyto render --guide` settled beyond decision 2 and the note above:
+
+- **A flag, not a type.** `--guide` compiles the guide, asks for `psd` and nothing else, and
+  conflicts with `--types`: a guide is another Scene, with the art empty and an artwork per
+  `inline` canvas, so it cannot share a run with the artwork's own files. `--types psd`
+  without it is refused on the command line, since every frame would fail for want of a
+  guide. The PSD exporter is registered with the built-ins either way.
+- **The pixels port decodes in the composition root.** `JobPorts.storeAssets` keeps each
+  layer's PNG in memory under its ref's id; the PSD exporter's `pixels` decodes it with
+  `pngjs` to straight RGBA. Both live in `@tyto/command-line`, where the adapters meet.
+- **Files are named for the person painting**: `<artwork>-<format>.psd` for the piece and
+  `<slot>-<format>.psd` for an `inline` canvas (artwork `external-art-<slot>`), in the sink
+  and in `result.json` alike, rather than the render's `<format>-<NN>`.
+- **A template with no external art is `E_GUIDE_NO_EXTERNAL_ART`**, fatal, raised when the
+  template is loaded, before anything compiles: no PSD is written (`result.json` still is,
+  per ADR 0011).
+- **A hidden text node was drawn.** `export-html` wrote `display: none` for a hidden node and
+  then `display: flex` for every text, which won; so every guide layer carried the title and
+  the area labels. Found by the measurement below and fixed in the same pull request: the
+  flex box is written only for a visible text. Rects and images were never affected.
+- **Measured**, in `packages/command-line/src/guide.visual.test.ts` against a real browser:
+  for `arte-teste`, `decoracao` with `texto` over it, read back from the PSD, equals the PNG
+  render of the same brief wherever `areas` paints nothing, within 1 per channel (tolerance
+  2), with every magenta box pixel of the render under `areas`, no title ink in `areas` and
+  no label magenta in `texto`.
