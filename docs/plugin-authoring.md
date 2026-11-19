@@ -290,6 +290,7 @@ already installed replaces it, and that is how an update lands.
 $ tyto plugin list --active
 html                0.4.2  built-in  enabled  exporter
 svg                 1.0.2  built-in  enabled  exporter
+psd                 0.1.0  built-in  enabled  exporter
 built-in-templates  0.1.0  built-in  enabled  template-pack
 chromium            0.1.0  built-in  enabled  rasterizer
 fs-inbox            1.0.3  built-in  enabled  source

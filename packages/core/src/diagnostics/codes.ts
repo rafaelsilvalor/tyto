@@ -1029,6 +1029,17 @@ export const diagnosticCodes = {
     fatality:
       'The declaration is the size somebody paints to, and art painted to the wrong proportion is cropped or stretched on every render; `compile` refuses before it builds anything, as it does for a format with no size.',
   },
+  E_GUIDE_NO_EXTERNAL_ART: {
+    severity: 'error',
+    summary:
+      'A guide was asked for a brief whose template declares no art painted outside Tyto (ADR 0221).',
+    template:
+      "Template '{template}' declares no slot with external art, so there is no guide to write: a guide is for a slot whose manifest declares 'external'.",
+    spec: 'docs/adr/0221-a-guides-layers-are-rasterised-into-the-scene-and-an-exporter-may-answer-bytes.md',
+    fatal: true,
+    fatality:
+      'A guide with no art is the artwork cut into layers with nowhere to paint, which looks like a guide and guides nothing; the run writes no file.',
+  },
   E_MANIFEST_SYNTAX: {
     severity: 'error',
     summary: 'A template manifest is not valid YAML.',

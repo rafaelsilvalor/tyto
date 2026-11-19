@@ -122,6 +122,7 @@ non-zero.
 | `E_FORMATS_SHAPE` | error | yes | A formats file parses as YAML but does not match the formats schema. |
 | `E_FORMAT_NOT_DEFINED` | error | yes | A template renders a format the project does not define a size for. |
 | `E_EXTERNAL_ART_ASPECT` | error | yes | A slot's full external art does not keep the proportion of a format it covers (ADR 0220). |
+| `E_GUIDE_NO_EXTERNAL_ART` | error | yes | A guide was asked for a brief whose template declares no art painted outside Tyto (ADR 0221). |
 | `E_MANIFEST_SYNTAX` | error | yes | A template manifest is not valid YAML. |
 | `E_MANIFEST_SHAPE` | error | yes | A template manifest parses as YAML but does not match the manifest schema. |
 | `E_TEMPLATE_DUPLICATE` | error | yes | Two template folders declare the same manifest name. |
@@ -372,6 +373,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_FORMATS_SHAPE` | yes | No formats file means no frame has a size. |
 | `E_FORMAT_NOT_DEFINED` | yes | A frame with no size cannot be drawn, and `compile` refuses before it builds anything — so the formats that are defined do not render either, which is what would have to change first. |
 | `E_EXTERNAL_ART_ASPECT` | yes | The declaration is the size somebody paints to, and art painted to the wrong proportion is cropped or stretched on every render; `compile` refuses before it builds anything, as it does for a format with no size. |
+| `E_GUIDE_NO_EXTERNAL_ART` | yes | A guide with no art is the artwork cut into layers with nowhere to paint, which looks like a guide and guides nothing; the run writes no file. |
 | `E_MANIFEST_SYNTAX` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_MANIFEST_SHAPE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_TEMPLATE_DUPLICATE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
@@ -1783,6 +1785,20 @@ Slot '{slot}' of template '{template}' declares full art of {width}×{height} fo
 ```
 
 Parameters: `slot`, `template`, `width`, `height`, `format`, `formatWidth`, `formatHeight`, `expected`
+
+### `E_GUIDE_NO_EXTERNAL_ART`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0221-a-guides-layers-are-rasterised-into-the-scene-and-an-exporter-may-answer-bytes.md`
+
+A guide was asked for a brief whose template declares no art painted outside Tyto (ADR 0221).
+
+A guide with no art is the artwork cut into layers with nowhere to paint, which looks like a guide and guides nothing; the run writes no file.
+
+```
+Template '{template}' declares no slot with external art, so there is no guide to write: a guide is for a slot whose manifest declares 'external'.
+```
+
+Parameters: `template`
 
 ### `E_MANIFEST_SYNTAX`
 

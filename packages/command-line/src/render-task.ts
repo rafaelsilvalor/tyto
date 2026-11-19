@@ -6,6 +6,7 @@ import {
   type TemplateManifest,
   createFaceCache,
   describeFace,
+  err,
   hasErrors,
 } from '@tyto/core';
 import { type FontLibrary, createFontLibrary, systemFontDirectories } from '@tyto/fonts';
@@ -47,6 +48,7 @@ import {
   activateBuiltIns,
   activateInstalled,
 } from './plugins/index.js';
+import { declaresExternalArt, guideArtifactName, guideStore, noExternalArt } from './guide.js';
 import { realPathConfined } from './real-path-assets.js';
 import { type RenderContext, templateWiring } from './render-context.js';
 import { registerOrigin } from './report.js';
@@ -162,6 +164,12 @@ export interface RenderTaskOptions {
   readonly googleFonts?: GoogleFontsOptions;
   /** `host.fetch` for a built-in that reaches the network — Google Fonts. */
   readonly capabilities?: HostCapabilities;
+  /**
+   * `tyto render --guide` (ADR 0221): compile the guide, keep its layer rasters for the PSD
+   * exporter, refuse a template with no external art, and name each file
+   * `<artwork>-<format>.psd` or `<slot>-<format>.psd`. {@link outputs} is then `psd` alone.
+   */
+  readonly guide?: boolean;
 }
 
 export interface TaskSources {
@@ -337,7 +345,7 @@ export async function renderTask(
     return blockedReport(forDelivery.error, inherited, options);
   }
   const delivery = forDelivery?.value;
-  const output =
+  const opening =
     task.output ??
     opened?.value ??
     delivery ??
@@ -345,6 +353,17 @@ export async function renderTask(
       label: task.id,
       removeLeftovers: task.removeLeftovers ?? false,
     }));
+  // A guide names its files by artwork and slot, not `<format>-<NN>` (`guide.ts`): renamed on
+  // the way into the sink, and again in the list `result.json` is built from, below.
+  const guide = options.guide === true ? guideStore() : undefined;
+  const output: ReusableTaskOutput =
+    guide === undefined
+      ? opening
+      : {
+          write: (artifact) => opening.write({ ...artifact, name: guideArtifactName(artifact) }),
+          removeLeftovers: (run) => opening.removeLeftovers(run),
+          finish: (result) => opening.finish(result),
+        };
 
   // Handed out empty and filled by `loadResources` below, once the scene says which files
   // it draws. The folder is no longer read to find out (TYTO-62).
@@ -359,6 +378,7 @@ export async function renderTask(
     ...(options.rasterizer === undefined ? {} : { rasterizer: options.rasterizer }),
     ...(options.googleFonts === undefined ? {} : { googleFonts: options.googleFonts }),
     ...(options.capabilities === undefined ? {} : { capabilities: options.capabilities }),
+    ...(guide === undefined ? {} : { psd: guide.resources }),
   });
   // After the built-ins, so a built-in keeps every id it has. A plugin refused here is a
   // warning in this task's `result.json`, and the task renders without it (ADR 0040).
@@ -412,7 +432,13 @@ export async function renderTask(
   const templates: TemplateSource = {
     load: async (name) => {
       const answer = await wiring.source.load(name);
-      if (answer.ok) loaded = answer.value.manifest;
+      if (!answer.ok) return answer;
+      loaded = answer.value.manifest;
+      // Before anything compiles, so nothing is written: a guide of a template with no
+      // external art would be the artwork cut into layers with nowhere to paint.
+      if (guide !== undefined && !declaresExternalArt(loaded)) {
+        return err([...answer.diagnostics, noExternalArt(loaded)]);
+      }
       return answer;
     },
   };
@@ -441,6 +467,7 @@ export async function renderTask(
       ...(options.template === undefined ? {} : { template: options.template }),
       ...(options.formats === undefined ? {} : { formats: options.formats }),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
+      ...(guide === undefined ? {} : { guide: true }),
     },
     {
       registry: context.registry,
@@ -481,6 +508,7 @@ export async function renderTask(
       },
       ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
       sink: output,
+      ...(guide === undefined ? {} : { storeAssets: guide.keep }),
     },
   );
 
@@ -489,7 +517,11 @@ export async function renderTask(
   // `templateWiring` already did for the template's own diagnostics.
   registerOrigin(produced, { path: task.briefPath, source: task.brief });
 
-  const artifacts = job.ok ? job.value.artifacts : [];
+  const made = job.ok ? job.value.artifacts : [];
+  const artifacts =
+    guide === undefined
+      ? made
+      : made.map((artifact) => ({ ...artifact, name: guideArtifactName(artifact) }));
   // A watched task and a delivery's export remove what their last run left; `--out` was opened without the rule and
   // answers nothing, because its reader reconciles against `result.json` itself (ADR 0054,
   // ADR 0060), and `--folder` keeps no report to tell Tyto's files apart (ADR 0157).

@@ -149,6 +149,30 @@ $ tyto render briefs/cartaz.brief --types svg
 
 O `--trust` vale para a pasta e para o perfil que ela cita, só naquela execução.
 
+## Gerar o gabarito da arte pintada fora
+
+Alguns templates deixam uma imagem para ser pintada em outro programa, como um fundo ou uma ilustração, e dizem isso no manifesto. Enquanto esse arquivo não existe, a renderização desenha uma caixa magenta contornada no lugar dela. O `--guide` grava, em vez das imagens, um **PSD** em camadas para quem vai pintar: um por tamanho da peça e um por tamanho de cada imagem que fica no meio do texto. Conferido em 19/11/2026 com o brief de exemplo do template embutido `arte-teste`, num build de desenvolvimento do CLI:
+
+```
+$ tyto render sem-arte.brief --guide --out guide
+sem-arte.brief:1:1: warning W_EXTERNAL_ART_MISSING Slot 'fundo' of template 'arte-teste' has no art yet (the brief names no file); an outlined box is drawn where it goes.
+sem-arte.brief:1:1: warning W_EXTERNAL_ART_MISSING Slot 'imagem' of template 'arte-teste' has no art yet (the brief names no file); an outlined box is drawn where it goes.
+artwork-1-grid-1x1.psd
+artwork-1-story.psd
+imagem-grid-1x1.psd
+imagem-story.psd
+```
+
+- **A peça**, `<arte>-<tamanho>.psd`, tem o tamanho do formato e quatro camadas, de cima para baixo: `texto` (tudo o que fica acima da arte, travada), `areas` (a caixa de cada slot, contornada e com o nome, travada, com metade da opacidade), `arte` (vazia: pinte aqui) e `decoracao` (o fundo e o que fica sob a arte, oculta e travada).
+- **Uma imagem no meio do texto**, `<slot>-<tamanho>.psd`, tem a largura que o template declara para aquele tamanho e a altura que ele sugere, com uma camada vazia cujo nome traz a largura, como `arte 920px`. Mude a altura se a imagem pedir; mantenha a largura.
+
+O `--guide` decide o tipo de arquivo, então não se combina com `--types`, e `--types psd` sozinho é recusado. Um brief cujo template não declara imagem assim não grava gabarito:
+
+```
+$ tyto render promo.brief --guide --out guide
+promo.brief: error E_GUIDE_NO_EXTERNAL_ART Template 'promo-curso' declares no slot with external art, so there is no guide to write: a guide is for a slot whose manifest declares 'external'.
+```
+
 ## Quando o brief tem erros
 
 Cada problema sai com o arquivo, a linha e a coluna, o código e o que está errado, e o comando termina com código de saída `1`:

@@ -149,6 +149,30 @@ $ tyto render briefs/cartaz.brief --types svg
 
 `--trust` covers the folder and the profile it names, for that run only.
 
+## Write the guide for art painted elsewhere
+
+Some templates leave a picture to be painted in another program, such as a background or an illustration, and say so in their manifest. Until that file exists, a render draws an outlined magenta box where it goes. `--guide` writes, instead of the images, a layered **PSD** for whoever paints it: one per size of the piece, and one per size of each picture that sits among the text. Checked on 2026-11-19 with the built-in `arte-teste` template's example brief, on a development build of the CLI:
+
+```
+$ tyto render sem-arte.brief --guide --out guide
+sem-arte.brief:1:1: warning W_EXTERNAL_ART_MISSING Slot 'fundo' of template 'arte-teste' has no art yet (the brief names no file); an outlined box is drawn where it goes.
+sem-arte.brief:1:1: warning W_EXTERNAL_ART_MISSING Slot 'imagem' of template 'arte-teste' has no art yet (the brief names no file); an outlined box is drawn where it goes.
+artwork-1-grid-1x1.psd
+artwork-1-story.psd
+imagem-grid-1x1.psd
+imagem-story.psd
+```
+
+- **The piece**, `<artwork>-<size>.psd`, is the size of the format and has four layers, top first: `texto` (everything drawn above the art, locked), `areas` (each slot's box, outlined and named, locked, at half opacity), `arte` (empty: paint here) and `decoracao` (the background and what lies under the art, hidden and locked).
+- **A picture among the text**, `<slot>-<size>.psd`, is as wide as the template declares for that size and as tall as it suggests, with one empty layer whose name carries the width, such as `arte 920px`. Change the height if the picture needs it; keep the width.
+
+`--guide` decides the file type, so it cannot be combined with `--types`, and `--types psd` alone is refused. A brief whose template declares no such picture writes no guide:
+
+```
+$ tyto render promo.brief --guide --out guide
+promo.brief: error E_GUIDE_NO_EXTERNAL_ART Template 'promo-curso' declares no slot with external art, so there is no guide to write: a guide is for a slot whose manifest declares 'external'.
+```
+
 ## When the brief has errors
 
 Each problem is printed with the file, the line and the column, the code and what is wrong, and the command ends with exit code `1`:

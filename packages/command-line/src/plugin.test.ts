@@ -1,5 +1,6 @@
 import { htmlExporterManifest, htmlExporterPlugin } from '@tyto/export-html';
 import { svgExporterManifest, svgExporterPlugin } from '@tyto/export-svg';
+import { psdExporterManifest } from '@tyto/export-psd';
 import { googleFontsPlugin } from '@tyto/google-fonts';
 import { validatePluginManifest } from '@tyto/plugin-api';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -54,6 +55,7 @@ describe('tyto plugin list', () => {
     expect(out.join('')).toMatchInlineSnapshot(`
       "html                0.4.2  built-in  enabled  exporter
       svg                 1.0.2  built-in  enabled  exporter
+      psd                 0.1.0  built-in  enabled  exporter
       built-in-templates  0.1.0  built-in  enabled  template-pack
       chromium            0.1.0  built-in  enabled  rasterizer
       fs-inbox            1.0.3  built-in  enabled  source
@@ -75,6 +77,7 @@ describe('tyto plugin list', () => {
     expect(document.plugins.map((plugin) => [plugin.name, plugin.contributes.join()])).toEqual([
       ['html', 'exporter'],
       ['svg', 'exporter'],
+      ['psd', 'exporter'],
       ['built-in-templates', 'template-pack'],
       ['chromium', 'rasterizer'],
       ['fs-inbox', 'source'],
@@ -100,6 +103,7 @@ describe('the catalog the listing reads', () => {
     const shipped = [
       htmlExporterManifest,
       svgExporterManifest,
+      psdExporterManifest,
       templatePackPlugin().manifest,
       rasterizerPlugin({ raster: () => Promise.resolve(new Uint8Array()) }).manifest,
       sourcePlugin({ pull: () => Promise.resolve([]), ack: () => Promise.resolve() }).manifest,

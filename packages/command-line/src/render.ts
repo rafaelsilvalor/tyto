@@ -13,6 +13,7 @@ import {
   unavailableTypes,
 } from './options.js';
 import { reachableExporters, withoutRefused } from './plugins/index.js';
+import { GUIDE_KIND } from './guide.js';
 import { readFailure } from './render-context.js';
 import { renderTask } from './render-task.js';
 import { googleFontsOption } from './google-fonts.js';
@@ -51,6 +52,11 @@ export interface RenderCommandOptions {
    * with `--out` and `--folder`, which commander refuses before this runs.
    */
   readonly delivery?: boolean;
+  /**
+   * `--guide` (TYTO-740, ADR 0221): write the layered PSD guide of the template's external art
+   * instead of the artwork, `psd` and nothing else. Commander refuses it beside `--types`.
+   */
+  readonly guide?: boolean;
   /** True when `--types` was typed: then it wins over the delivery's `types`. */
   readonly typesNamed?: boolean;
   readonly template?: string;
@@ -158,7 +164,7 @@ export async function renderCommand(
     });
     return reportFailure([...projectDiagnostics, refused], options, environment);
   }
-  const run: RenderCommandOptions =
+  const asked: RenderCommandOptions =
     layout === undefined
       ? options
       : {
@@ -168,6 +174,16 @@ export async function renderCommand(
             ? { formats: layout.formats }
             : {}),
         };
+  const run: RenderCommandOptions =
+    options.guide === true ? { ...asked, types: [GUIDE_KIND] } : asked;
+  // A PSD is only ever a guide's: asked for as a type, every frame would fail for want of one.
+  if (options.guide !== true && run.types.includes(GUIDE_KIND)) {
+    environment.console.err(
+      `error: '${GUIDE_KIND}' is the layered guide of a template's external art: ask for it with --guide, not --types.
+`,
+    );
+    return EXIT_DIAGNOSTICS;
+  }
 
   const out =
     delivery?.exports ?? (options.out === undefined ? project?.output : resolve(cwd, options.out));
@@ -221,7 +237,11 @@ export async function renderCommand(
     return EXIT_DIAGNOSTICS;
   }
 
-  const rasterizer = needsRasterizer(run.types, exporters) ? environment.rasterizer() : undefined;
+  // A guide draws its layers through the browser (ADR 0221), though the PSD itself rasters nothing.
+  const rasterizer =
+    options.guide === true || needsRasterizer(run.types, exporters)
+      ? environment.rasterizer()
+      : undefined;
 
   try {
     const report = await renderTask(
@@ -251,6 +271,7 @@ export async function renderCommand(
         ...(project === undefined ? {} : { fontDirectories: project.fonts }),
         ...optionalSources(renderSources(environment.home, workspace?.loaded, options.section)),
         ...googleFontsOption(options.googleFonts, environment.variables),
+        ...(options.guide === true ? { guide: true } : {}),
       },
       [...projectDiagnostics, ...pluginFiles.diagnostics, ...context.diagnostics],
     );

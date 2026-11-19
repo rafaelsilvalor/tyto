@@ -24,12 +24,14 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:visual": "vitest run --config vitest.visual.config.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
     "@tyto/core": "workspace:*",
     "@tyto/export-html": "workspace:*",
+    "@tyto/export-psd": "workspace:*",
     "@tyto/export-svg": "workspace:*",
     "@tyto/fonts": "workspace:*",
     "@tyto/google-fonts": "workspace:*",
@@ -41,11 +43,15 @@
     "@tyto/template-lang": "workspace:*",
     "@tyto/templates": "workspace:*",
     "commander": "^15.0.0",
+    "pngjs": "^7.0.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/pngjs": "^6.0.5",
     "@tyto/recipe": "workspace:*",
+    "ag-psd": "^34.2.2",
     "esbuild": "0.27.7",
+    "playwright": "^1.63.0",
     "vitest": "^5.0.1"
   }
 }

@@ -420,6 +420,16 @@ describe('the mask is a document of its own', () => {
     expect(feed).toContain('#fade { transform: matrix(1, 0, 0, 1, 20, 130); display: none;');
     expect(feed).toContain('mask-image:');
   });
+
+  it('hides a hidden text, whose flex box used to show it again', () => {
+    // A guide layer hides every node outside it (ADR 0221); a text's `display: flex` came
+    // after the `display: none` and won, so a hidden title was drawn in every layer.
+    const [frame = ''] = htmlOf(sceneOf(textMaskFixture()));
+    const rule = /#letters \{([^}]*)\}/u.exec(frame)?.[1] ?? '';
+
+    expect(rule).toContain('display: none');
+    expect(rule).not.toContain('display: flex');
+  });
 });
 
 describe('the SVG renderer inside this exporter', () => {

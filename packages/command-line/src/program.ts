@@ -206,6 +206,16 @@ export function createProgram(
       "trust the brief's workspace folder and its work profile for this run only; never written to trust.json",
       false,
     )
+    // A flag rather than a type (TYTO-740, ADR 0221): a guide is another Scene, compiled with
+    // the art empty and cut into layers, so it cannot share a run with the artwork's types.
+    .addOption(
+      new Option(
+        '--guide',
+        "write the layered PSD guide of the template's external art: <artwork>-<format>.psd, and <slot>-<format>.psd per inline picture",
+      )
+        .default(false)
+        .conflicts(['types']),
+    )
     // Repeatable, one key each, rather than a JSON blob: a shell quotes `jira.site=acme.example`
     // the same everywhere, and a script adds a key without rebuilding an object (ADR 0147).
     .option(
