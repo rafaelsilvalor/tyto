@@ -100,6 +100,7 @@ export type {
 } from './to-delivery.js';
 export { DELIVERY_COLUMNS } from './deliveries.js';
 export { TO_DELIVERY_PLAN_LIMITS, TO_DELIVERY_WRITE } from './to-delivery.js';
+export { RENAME_EXPORTS_WRITE } from './rename-exports.js';
 export { GENERIC_VERBS, createDerivationRegistry, createVerbRegistry } from './registry.js';
 export type { Cell, RecipeRun, RunOptions } from './run.js';
 export { runRecipe } from './run.js';

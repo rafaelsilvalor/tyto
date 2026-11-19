@@ -1,6 +1,7 @@
 import type { FormatCatalogue } from '../config/formats.js';
 import type { Size } from '../scene/primitives.js';
 import type { DeliveryFormatCount } from './delivery-record.js';
+import { problemWithFolderName } from './profile.js';
 
 /**
  * A delivery's exports checked against its record (TYTO-757, ADR 0215): what landed in the
@@ -128,18 +129,8 @@ export function checkDelivery(input: DeliveryCheckInput): DeliveryCheck {
     .map(({ format }) => `no size is known for '${format}'; add it to delivery.sizes`);
   if (images.length === 0) return { state: 'in-progress', problems: setup, found };
 
-  // Each image goes to the first format of its size that still owes one, in the record's order,
-  // so two formats of one size share the images before either counts an extra.
-  const counted = new Map<string, number>();
-  const strays: DeliveryImage[] = [];
-  for (const image of images) {
-    const owed = formats.find(
-      ({ format, count }) =>
-        sameSize(sizeOf(format), image.size) && (counted.get(format) ?? 0) < count,
-    );
-    if (owed === undefined) strays.push(image);
-    else counted.set(owed.format, (counted.get(owed.format) ?? 0) + 1);
-  }
+  const { matched, strays } = assignImages(formats, sizeOf, images);
+  const counted = new Map([...matched].map(([format, taken]) => [format, taken.length]));
 
   const problems = [...setup];
   for (const { format, count } of formats) {
@@ -165,6 +156,97 @@ export function checkDelivery(input: DeliveryCheckInput): DeliveryCheck {
   }
   if (input.editables === 0) problems.push('no editable is kept beside the record');
   return { state: problems.length === 0 ? 'ready' : 'incomplete', problems, found };
+}
+
+/**
+ * Each image goes to the first format of its size that still owes one, in the record's order,
+ * so two formats of one size share the images before either counts an extra. `images` arrive
+ * sorted by name, and each format's keep that order.
+ */
+function assignImages(
+  formats: readonly DeliveryFormatCount[],
+  sizeOf: (format: string) => Size | undefined,
+  images: readonly DeliveryImage[],
+): { readonly matched: ReadonlyMap<string, DeliveryImage[]>; readonly strays: DeliveryImage[] } {
+  const matched = new Map<string, DeliveryImage[]>();
+  const strays: DeliveryImage[] = [];
+  for (const image of images) {
+    const owed = formats.find(
+      ({ format, count }) =>
+        sameSize(sizeOf(format), image.size) && (matched.get(format)?.length ?? 0) < count,
+    );
+    if (owed === undefined) {
+      strays.push(image);
+    } else {
+      const found = matched.get(owed.format) ?? [];
+      found.push(image);
+      matched.set(owed.format, found);
+    }
+  }
+  return { matched, strays };
+}
+
+/** What {@link deliveryExportNames} names a delivery's exports from. */
+export interface DeliveryExportNamesInput {
+  /** What the record owes, in its order; absent when it names none. */
+  readonly formats?: readonly DeliveryFormatCount[] | undefined;
+  /** The pixel size of each format name, as the check reads it. */
+  readonly sizes: Readonly<Record<string, Size>>;
+  /** The images at the root of the exports folder. */
+  readonly images: readonly DeliveryImage[];
+  /** The file-name stem, the record's `stem` say: `mca-1_aula`. */
+  readonly stem: string;
+  /** How many digits each number is written with, zero-padded; 2 gives `-01`. */
+  readonly digits: number;
+}
+
+/** One export's name now and the name it ships under; the same when it already has it. */
+export interface DeliveryExportName {
+  readonly from: string;
+  readonly to: string;
+}
+
+/** The longest stem a name is made from, well inside what every file system takes. */
+const MAXIMUM_STEM_LENGTH = 200;
+
+/**
+ * The name each export ships under (TYTO-758, ADR 0218): `<stem>-<n>.<extension>`, numbered from
+ * 1 in one run across the delivery, the extension in lower case. The order is the record's: the
+ * images each format owes, by the check's matching (ADR 0215), in the record's order of formats
+ * and by name within one; then every image no format took, by name, so an incomplete delivery
+ * still ships each file under a name of the stem. A stem a file name cannot hold, or more images
+ * than the digits number, is the problem returned instead.
+ */
+export function deliveryExportNames(
+  input: DeliveryExportNamesInput,
+): { readonly names: readonly DeliveryExportName[] } | { readonly problem: string } {
+  const stem = input.stem.normalize('NFC');
+  if (stem === '') return { problem: 'its stem is empty' };
+  const problem = problemWithFolderName(stem, {
+    noun: 'a file-name stem',
+    maximum: MAXIMUM_STEM_LENGTH,
+  });
+  if (problem !== undefined) return { problem: `its stem '${stem}' ${problem}` };
+  const images = [...input.images].sort((a, b) => compare(a.name, b.name));
+  const capacity = 10 ** input.digits - 1;
+  if (images.length > capacity) {
+    return {
+      problem: `has ${String(images.length)} exports, more than digits=${String(input.digits)} numbers`,
+    };
+  }
+  const sizeOf = (format: string): Size | undefined =>
+    Object.hasOwn(input.sizes, format) ? input.sizes[format] : undefined;
+  const formats = input.formats ?? [];
+  const { matched, strays } = assignImages(formats, sizeOf, images);
+  const ordered = [...formats.flatMap(({ format }) => matched.get(format) ?? []), ...strays];
+  return {
+    names: ordered.map((image, index) => {
+      const dot = image.name.lastIndexOf('.');
+      const extension = dot <= 0 ? '' : image.name.slice(dot).toLowerCase();
+      const number = String(index + 1).padStart(input.digits, '0');
+      return { from: image.name, to: `${stem}-${number}${extension}` };
+    }),
+  };
 }
 
 function sameSize(expected: Size | undefined, actual: Size | undefined): boolean {

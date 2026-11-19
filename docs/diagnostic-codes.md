@@ -216,6 +216,7 @@ non-zero.
 | `E_RECIPE_APPLY` | error | no | An Apply was refused before any write: the shown plan holds a write its verb no longer declares, or the verb cannot apply. |
 | `E_RECIPE_BRIEF` | error | no | 'to-brief' cannot plan its briefs: an unknown template or slot, a value brief text cannot hold, two rows with one file name, or a folder it may not write. |
 | `E_RECIPE_DELIVERY` | error | no | 'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write. |
+| `E_RECIPE_RENAME_EXPORTS` | error | no | 'rename-exports' cannot plan the names of the deliveries' exports: a missing argument, a host that renames no files, or a folder it may not write. |
 | `E_RECIPE_DELIVERIES` | error | no | 'deliveries' cannot read the delivery records: the host reads none, the recipe is in no trusted workspace, or fields= lists a name a declared field cannot have. |
 | `E_RECIPE_WITH_DELIVERIES` | error | no | 'with-deliveries' cannot bring the delivery records: the host reads none, the recipe is in no trusted workspace, fields= lists a name a declared field cannot have, or the table already has a column it would add. |
 | `E_RECIPE_CALL` | error | no | 'call' cannot plan its requests: an address that is not https, a host the workspace's project does not allow, a credential not stored on this machine, or a body too large. |
@@ -400,6 +401,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_APPLY` | no | Nothing of that plan is written, and no recipe state is committed. |
 | `E_RECIPE_BRIEF` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_DELIVERY` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
+| `E_RECIPE_RENAME_EXPORTS` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is renamed. |
 | `E_RECIPE_DELIVERIES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_WITH_DELIVERIES` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_CALL` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is sent. |
@@ -2245,6 +2247,20 @@ That cell has no plan and the cells after it do not run; earlier cells keep thei
 
 ```
 'to-delivery' {problem}.
+```
+
+Parameters: `problem`
+
+### `E_RECIPE_RENAME_EXPORTS`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0218-a-deliverys-exports-are-renamed-by-its-stem-as-a-plan.md`
+
+'rename-exports' cannot plan the names of the deliveries' exports: a missing argument, a host that renames no files, or a folder it may not write.
+
+That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is renamed.
+
+```
+'rename-exports' {problem}.
 ```
 
 Parameters: `problem`

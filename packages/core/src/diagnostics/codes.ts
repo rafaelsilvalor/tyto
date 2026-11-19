@@ -2015,6 +2015,18 @@ export const diagnosticCodes = {
     fatality:
       'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written.',
   },
+  // `rename-exports` checks its arguments and the workspace before it plans; a delivery it cannot
+  // rename is refused in the cell's note instead, and the others still plan (ADR 0218).
+  E_RECIPE_RENAME_EXPORTS: {
+    severity: 'error',
+    summary:
+      "'rename-exports' cannot plan the names of the deliveries' exports: a missing argument, a host that renames no files, or a folder it may not write.",
+    template: "'rename-exports' {problem}.",
+    spec: 'docs/adr/0218-a-deliverys-exports-are-renamed-by-its-stem-as-a-plan.md',
+    fatal: false,
+    fatality:
+      'That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is renamed.',
+  },
   // `deliveries` reads the records back as rows only inside a trusted workspace; a record it
   // cannot read is a warning, and the other folders still read (ADR 0211).
   E_RECIPE_DELIVERIES: {

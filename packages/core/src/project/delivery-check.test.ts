@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatCatalogue } from '../config/formats.js';
-import { aspectOf, aspectsText, catalogueSizes, checkDelivery } from './delivery-check.js';
+import {
+  aspectOf,
+  aspectsText,
+  catalogueSizes,
+  checkDelivery,
+  deliveryExportNames,
+} from './delivery-check.js';
 
 /**
  * `aspectOf` pins the edge cases of the shapes a plugin counts on a remote folder (TYTO-761's
@@ -205,5 +211,59 @@ describe('checkDelivery', () => {
     expect(check.problems).toEqual([
       "no size is known for 'constructor'; add it to delivery.sizes",
     ]);
+  });
+});
+
+describe('deliveryExportNames', () => {
+  const owedSizes = { feed: { w: 1080, h: 1350 }, story: { w: 1080, h: 1920 } };
+
+  it('numbers the owed images in the record order of formats, then the rest by name', () => {
+    const named = deliveryExportNames({
+      formats: [
+        { format: 'story', count: 1 },
+        { format: 'feed', count: 2 },
+      ],
+      sizes: owedSizes,
+      images: [
+        { name: 'zz-extra.JPEG', size: { w: 500, h: 500 } },
+        { name: 'b.png', size: owedSizes.feed },
+        { name: 'a.png', size: owedSizes.feed },
+        { name: 'cover.png', size: owedSizes.story },
+        { name: 'broken.png' },
+      ],
+      stem: 'mca-1_aula',
+      digits: 2,
+    });
+
+    expect(named).toEqual({
+      names: [
+        { from: 'cover.png', to: 'mca-1_aula-01.png' },
+        { from: 'a.png', to: 'mca-1_aula-02.png' },
+        { from: 'b.png', to: 'mca-1_aula-03.png' },
+        { from: 'broken.png', to: 'mca-1_aula-04.png' },
+        { from: 'zz-extra.JPEG', to: 'mca-1_aula-05.jpeg' },
+      ],
+    });
+  });
+
+  it('refuses an empty stem, one a file name cannot hold, and more images than the digits number', () => {
+    const images = [{ name: 'a.png' }, { name: 'b.png' }];
+    expect(deliveryExportNames({ sizes: owedSizes, images, stem: ' ', digits: 2 })).toEqual({
+      problem: "its stem ' ' ends in a space or a dot, which Windows drops from a name",
+    });
+    expect(deliveryExportNames({ sizes: owedSizes, images, stem: '', digits: 2 })).toEqual({
+      problem: 'its stem is empty',
+    });
+    expect(deliveryExportNames({ sizes: owedSizes, images, stem: 'a/b', digits: 2 })).toEqual({
+      problem: "its stem 'a/b' holds a path separator, which a file-name stem may not",
+    });
+    expect(
+      deliveryExportNames({
+        sizes: owedSizes,
+        images: Array.from({ length: 10 }, (_, index) => ({ name: `${String(index)}.png` })),
+        stem: 'x',
+        digits: 1,
+      }),
+    ).toEqual({ problem: 'has 10 exports, more than digits=1 numbers' });
   });
 });

@@ -1,4 +1,14 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -257,5 +267,65 @@ describe('workspaceDeliveryPorts', () => {
     await writeFile(join(workspace, 'entregas'), 'a file', 'utf8');
     const made = await ports().make('entregas');
     expect(made.ok ? '' : made.error[0]?.message).toContain('a file is there');
+  });
+
+  it('renames a file inside the workspace, never over another one (ADR 0218)', async () => {
+    const folder = join(workspace, 'entregas', 'mca-1', 'final');
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, 'feed.png'), 'feed', 'utf8');
+    await writeFile(join(folder, 'story.png'), 'story', 'utf8');
+    const lent = ports();
+
+    const renamed = await lent.rename?.(
+      'entregas/mca-1/final/feed.png',
+      'entregas/mca-1/final/mca-1-01.png',
+    );
+    expect(renamed?.ok).toBe(true);
+    expect(await readFile(join(folder, 'mca-1-01.png'), 'utf8')).toBe('feed');
+    await expect(stat(join(folder, 'feed.png'))).rejects.toThrow();
+
+    const over = await lent.rename?.(
+      'entregas/mca-1/final/story.png',
+      'entregas/mca-1/final/mca-1-01.png',
+    );
+    expect(over?.ok ? '' : over?.error[0]?.message).toContain('which is there');
+    expect(await readFile(join(folder, 'mca-1-01.png'), 'utf8')).toBe('feed');
+
+    const missing = await lent.rename?.(
+      'entregas/mca-1/final/gone.png',
+      'entregas/mca-1/final/x.png',
+    );
+    expect(missing?.ok ? '' : missing?.error[0]?.message).toContain('it is not there');
+  });
+
+  it('renames a file to its own name in another case', async () => {
+    const folder = join(workspace, 'entregas', 'mca-1', 'final');
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, 'Feed.PNG'), 'feed', 'utf8');
+
+    const renamed = await ports().rename?.(
+      'entregas/mca-1/final/Feed.PNG',
+      'entregas/mca-1/final/feed.png',
+    );
+
+    expect(renamed?.ok).toBe(true);
+    expect(await readdir(folder)).toEqual(['feed.png']);
+  });
+
+  it('renames nothing out of the workspace, into .tyto, or once restricted', async () => {
+    const folder = join(workspace, 'entregas', 'mca-1');
+    await mkdir(folder, { recursive: true });
+    await writeFile(join(folder, 'a.png'), 'a', 'utf8');
+
+    const out = await ports().rename?.('entregas/mca-1/a.png', '../elsewhere/a.png');
+    expect(out?.ok ? '' : out?.error[0]?.message).toContain('outside the workspace');
+    const tyto = await ports().rename?.('entregas/mca-1/a.png', '.tyto/a.png');
+    expect(tyto?.ok ? '' : tyto?.error[0]?.message).toContain('inside .tyto/');
+    const restricted = await ports(() => 'restricted').rename?.(
+      'entregas/mca-1/a.png',
+      'entregas/mca-1/b.png',
+    );
+    expect(restricted?.ok ? '' : restricted?.error[0]?.message).toContain('restricted folder');
+    expect(await readFile(join(folder, 'a.png'), 'utf8')).toBe('a');
   });
 });

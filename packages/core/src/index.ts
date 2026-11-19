@@ -218,11 +218,14 @@ export {
   type DeliveryCheck,
   type DeliveryCheckInput,
   type DeliveryCheckState,
+  type DeliveryExportName,
+  type DeliveryExportNamesInput,
   type DeliveryImage,
   aspectOf,
   aspectsText,
   catalogueSizes,
   checkDelivery,
+  deliveryExportNames,
 } from './project/delivery-check.js';
 
 export {
