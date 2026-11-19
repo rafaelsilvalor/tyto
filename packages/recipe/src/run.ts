@@ -5,6 +5,7 @@ import { type RunClock, systemClock } from './clock.js';
 import type { DataResolver } from './data.js';
 import { fillPlaceholders } from './parse.js';
 import type { Plan } from './plan.js';
+import { type PlannedRename, plannedRenamesOf } from './rename-exports.js';
 import type {
   DerivationRegistry,
   IncludedRecipe,
@@ -53,6 +54,12 @@ export interface RunOptions {
    * its view and arguments against them. Absent, `show` takes any one name, as a CLI run does.
    */
   readonly views?: ViewSpecs | undefined;
+  /**
+   * Under `apply together` (ADR 0219): the renames the `rename-exports` cells above the first
+   * step given planned and did not apply, which a host that runs a slice of the recipe hands on
+   * from the cells it reused, as it hands `values`.
+   */
+  readonly plannedRenames?: readonly PlannedRename[] | undefined;
 }
 
 /**
@@ -133,6 +140,10 @@ export async function runRecipe(
   let failed = false;
   const recipes = [...(options.within ?? []), recipe.name];
   const clock = options.clock ?? systemClock;
+  // ADR 0219: only `apply together` applies the plans in order, so only then may a step plan
+  // against the files a rename above it leaves.
+  const plannedRenames: PlannedRename[] | undefined =
+    recipe.apply === 'together' ? [...(options.plannedRenames ?? [])] : undefined;
 
   for (const written of recipe.steps) {
     if (failed) {
@@ -160,6 +171,9 @@ export async function runRecipe(
       verbs: options.verbs,
       recipes,
       views: options.views,
+      ...(plannedRenames === undefined || plannedRenames.length === 0
+        ? {}
+        : { plannedRenames: [...plannedRenames] }),
     });
     if (!outcome.ok) {
       cells.push({ step: written, status: 'failed', diagnostics: outcome.error });
@@ -176,6 +190,7 @@ export async function runRecipe(
     const cellRemembers = outcome.value.remembers ?? [];
     remembers.push(...cellRemembers);
     const { plan, included, note } = outcome.value;
+    plannedRenames?.push(...plannedRenamesOf(written.verb, plan));
     const computed = Object.entries(outcome.value.values ?? {});
     for (const [name, value] of computed) values.set(name, value);
     const [named] = computed;

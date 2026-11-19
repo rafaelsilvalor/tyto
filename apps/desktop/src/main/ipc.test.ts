@@ -915,6 +915,8 @@ const recipeRunner = () => {
           : undefined,
       );
     },
+    // ADR 0219: the window does not offer it yet (TYTO-758's desktop pull request).
+    applyTogether: () => Promise.resolve({ cells: [], diagnostics: [] }),
     run: (input) => {
       asked.push(input);
       return Promise.resolve({

@@ -1991,6 +1991,18 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'Nothing of that plan is written, and no recipe state is committed.',
   },
+  // ADR 0219: one Apply of every plan of an `apply together` recipe, refused before any write or
+  // stopped at the first cell that does not go through.
+  E_RECIPE_APPLY_TOGETHER: {
+    severity: 'error',
+    summary:
+      "'apply together' did not apply every plan: it was refused before any write, or it stopped at a cell whose Apply did not go through.",
+    template: "'apply together' {problem}.",
+    spec: 'docs/adr/0219-apply-together-applies-a-runs-plans-in-order-against-the-renames-above.md',
+    fatal: false,
+    fatality:
+      'The plans below the cell it names are not applied and wait for the next run; what the cells above it applied stays applied.',
+  },
   // `to-brief` checks its rows against the template and the workspace before it plans, so a
   // brief that could not compile, or a file outside the workspace, is never shown (ADR 0172).
   E_RECIPE_BRIEF: {

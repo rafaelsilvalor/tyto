@@ -10,7 +10,7 @@ import type { Table } from './table.js';
 import { type CallPorts, callVerb } from './call.js';
 import { deliveriesVerb, withDeliveriesVerb } from './deliveries.js';
 import { type ToBriefPorts, toBriefVerb } from './to-brief.js';
-import { renameExportsVerb } from './rename-exports.js';
+import { type PlannedRename, renameExportsVerb } from './rename-exports.js';
 import { type ToDeliveryPorts, toDeliveryVerb } from './to-delivery.js';
 import { genericVerbs } from './verbs.js';
 import type { ViewOptionValue, ViewSpecs } from './views.js';
@@ -62,6 +62,12 @@ export interface VerbContext {
    * `run` hands on. Absent where the host draws none: `show` then takes any one name.
    */
   readonly views?: ViewSpecs | undefined;
+  /**
+   * Under `apply together` (ADR 0219), the renames the `rename-exports` plans above this step
+   * hold, not yet applied: a plugin's verb reads the workspace as they leave it while it plans.
+   * Absent otherwise.
+   */
+  readonly plannedRenames?: readonly PlannedRename[] | undefined;
 }
 
 export interface VerbOutput {

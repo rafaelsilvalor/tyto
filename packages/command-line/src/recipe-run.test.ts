@@ -353,6 +353,26 @@ describe('tyto recipe run', () => {
     expect(Object.keys(await stored('sync.recipe'))).toHaveLength(ROWS);
   });
 
+  it('applies an apply together recipe through one Apply of every plan under --apply (ADR 0219)', async () => {
+    await trust();
+    await writeFile(
+      join(workspace, 'recipes', 'sync.recipe'),
+      SYNC.replace('recipe sync\n', 'recipe sync\napply together\n').replace(
+        'example.mark {label}',
+        'example.mark {label}\nexample.mark again',
+      ),
+    );
+    const sink = newSink();
+
+    const code = await recipeRunCommand('recipes/sync.recipe', { apply: true }, environment(), {
+      contributions: verbs(sink),
+    });
+
+    expect(code).toBe(EXIT_OK);
+    expect(sink.applied).toHaveLength(2 * ROWS);
+    expect(Object.keys(await stored('sync.recipe'))).toHaveLength(ROWS);
+  });
+
   it('plans an apply auto recipe without --apply in a trusted folder, and applies nothing', async () => {
     // TYTO-684: the window's command panel refuses only `--apply`, because a plan-only run of
     // an `apply auto` recipe is a save's, not a Run's, and so applies nothing (ADR 0170).

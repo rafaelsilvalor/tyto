@@ -7,6 +7,7 @@ import {
   storageRefusal,
 } from './storage.js';
 import { RECIPE_CREDENTIAL_KEY_PREFIX, SIGNIN_CLIENT_KEY_PREFIX } from './manifest.js';
+import { projectedList, projectedPath } from './planned-view.js';
 import type { StartProcess } from './process.js';
 import type { OpenTerminal } from './terminal.js';
 import type { AgentServer, WindowTool, WindowToolResult } from './window.js';
@@ -834,7 +835,13 @@ export function checkedCapabilities(
       if (capabilities?.workspaceRead === undefined) {
         return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
       }
-      const bytes = await capabilities.workspaceRead(plugin, relative);
+      // ADR 0219: while a plan under `apply together` runs, the renames above it are read as done.
+      const projected = projectedPath(plugin, relative);
+      if (projected.kind === 'gone') return refuse(workspaceRefusal(plugin, path, PLANNED_AWAY));
+      const bytes = await capabilities.workspaceRead(
+        plugin,
+        projected.kind === 'renamed' ? projected.from : relative,
+      );
       if (bytes.length > PLUGIN_FILE_LIMIT_BYTES) {
         return refuse(workspaceRefusal(plugin, path, overCeiling('file', bytes.length)));
       }
@@ -872,7 +879,14 @@ export function checkedCapabilities(
       if (capabilities?.workspaceReadPart === undefined) {
         return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
       }
-      const bytes = await capabilities.workspaceReadPart(plugin, relative, offset, length);
+      const projected = projectedPath(plugin, relative);
+      if (projected.kind === 'gone') return refuse(workspaceRefusal(plugin, path, PLANNED_AWAY));
+      const bytes = await capabilities.workspaceReadPart(
+        plugin,
+        projected.kind === 'renamed' ? projected.from : relative,
+        offset,
+        length,
+      );
       // The line a misbehaving adapter cannot cross: never more than the part asked for.
       if (bytes.length > length) {
         const answered = `the host answered ${String(bytes.length)} bytes for a part of ${String(length)}`;
@@ -890,6 +904,12 @@ export function checkedCapabilities(
       if (capabilities?.workspaceStat === undefined) {
         return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
       }
+      const projected = projectedPath(plugin, relative);
+      if (projected.kind === 'gone') return refuse(workspaceRefusal(plugin, path, PLANNED_AWAY));
+      if (projected.kind === 'renamed') {
+        const entry = await capabilities.workspaceStat(plugin, projected.from);
+        return { ...entry, name: projected.name };
+      }
       return capabilities.workspaceStat(plugin, relative);
     },
 
@@ -902,7 +922,12 @@ export function checkedCapabilities(
       if (capabilities?.workspaceList === undefined) {
         return refuse(workspaceRefusal(plugin, path, noWorkspace(capabilities)));
       }
-      const entries = await capabilities.workspaceList(plugin, relative);
+      const stat = capabilities.workspaceStat?.bind(capabilities);
+      const listed = await capabilities.workspaceList(plugin, relative);
+      const entries =
+        stat === undefined
+          ? listed
+          : await projectedList(plugin, relative, listed, (found) => stat(plugin, found));
       if (entries.length > PLUGIN_FOLDER_LIST_LIMIT) {
         return refuse(workspaceRefusal(plugin, path, tooManyEntries(entries.length)));
       }
@@ -1047,6 +1072,9 @@ function overCeiling(what: 'entry' | 'file', bytes: number): string {
 function noCache(capabilities: HostCapabilities | undefined): string {
   return `${capabilities?.hostName ?? 'this host'} keeps no cache for plugins`;
 }
+
+/** A file a rename planned above the step takes away, read while that step plans (ADR 0219). */
+const PLANNED_AWAY = 'no such file: a rename planned above this step takes it away';
 
 function noWorkspace(capabilities: HostCapabilities | undefined): string {
   return `${capabilities?.hostName ?? 'this host'} gives plugins no workspace files`;

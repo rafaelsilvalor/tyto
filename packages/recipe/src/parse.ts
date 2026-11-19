@@ -40,7 +40,8 @@ export const MINIMUM_INTERVAL_MINUTES = 5;
  * ```
  *
  * A header names the recipe and `|` lines describe it; `apply auto` in the header lets an
- * explicit Run in a trusted folder apply its plans without a click (ADR 0170); `every 30m`
+ * explicit Run in a trusted folder apply its plans without a click (ADR 0170), and `apply
+ * together` makes one Apply carry out every plan of the run in order (ADR 0219); `every 30m`
  * or `every 2h` in the header asks the host to run it on that interval while the app is open
  * (ADR 0175); `param` lines declare what varies and `const` lines what does not (ADR 0199);
  * every other line is one verb and its arguments, and so one cell, or several steps chained
@@ -58,7 +59,7 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
   const steps: Step[] = [];
   const description: string[] = [];
   let name: string | undefined;
-  let apply: 'auto' | undefined;
+  let apply: 'auto' | 'together' | undefined;
   let every: RecipeInterval | undefined;
 
   for (const line of linesOf(text)) {
@@ -112,14 +113,17 @@ export function parseRecipe(text: string): Result<RecipeAst, readonly Diagnostic
       continue;
     }
     if (verb === 'apply') {
-      if (!/^apply\s+auto$/u.test(content)) {
-        syntax("the header line 'apply' takes one word, auto, as in 'apply auto'");
+      // ADR 0219: `apply together` is the other word. One `apply` line, so the two do not mix.
+      const word = /^apply\s+(auto|together)$/u.exec(content)?.[1] as
+        'auto' | 'together' | undefined;
+      if (word === undefined) {
+        syntax("the header line 'apply' takes one word, auto or together, as in 'apply auto'");
       } else if (steps.length > 0) {
-        syntax("'apply auto' belongs in the header, before the first step");
+        syntax(`'apply ${word}' belongs in the header, before the first step`);
       } else if (apply !== undefined) {
-        syntax("'apply auto' is written once");
+        syntax("a recipe has one 'apply' line, auto or together");
       } else {
-        apply = 'auto';
+        apply = word;
       }
       continue;
     }

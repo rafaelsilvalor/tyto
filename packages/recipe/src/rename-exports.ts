@@ -44,6 +44,35 @@ import {
  * file's old one (two files swap their numbers), the files go through a hidden name first.
  */
 
+/**
+ * A rename a `rename-exports` plan holds, both paths relative to the workspace: what a step
+ * below it plans against under `apply together` (ADR 0219).
+ */
+export interface PlannedRename {
+  readonly from: string;
+  readonly to: string;
+}
+
+/**
+ * The renames a cell's plan holds, when its verb is `rename-exports`; none for any other verb.
+ * Read from the operations' payloads, which only this verb writes in that shape.
+ */
+export function plannedRenamesOf(
+  verb: string | undefined,
+  plan: Plan | undefined,
+): PlannedRename[] {
+  if (verb !== 'rename-exports' || plan === undefined) return [];
+  const renames: PlannedRename[] = [];
+  for (const operation of plan.operations) {
+    const payload = operation.payload as { from?: unknown; to?: unknown } | undefined;
+    if (operation.write !== RENAME_EXPORTS_WRITE || payload === undefined) continue;
+    if (typeof payload.from === 'string' && typeof payload.to === 'string') {
+      renames.push({ from: payload.from, to: payload.to });
+    }
+  }
+  return renames;
+}
+
 /** The kind of write `rename-exports` declares, and the only one its plans hold. */
 export const RENAME_EXPORTS_WRITE = 'rename';
 

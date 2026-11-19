@@ -235,13 +235,34 @@ export async function recipeRunCommand(
     });
 
     const cells: RunnerCell[] = [...answer.cells];
+    const togetherDiagnostics: Diagnostics[number][] = [];
     const cancel = new AbortController();
     if (apply) {
       const release = environment.interrupt?.(() => {
         cancel.abort();
       });
       try {
-        for (const [at, cell] of cells.entries()) {
+        // ADR 0219: `apply together` is one Apply of every plan, in order, stopping at the first
+        // that does not go through; its reasons join the run's.
+        if (answer.together === true) {
+          const together = await runner.applyTogether({
+            documentId: path,
+            path,
+            options: {
+              cancel: cancel.signal,
+              onProgress: ({ done, total, note }) => {
+                if (note === undefined) return;
+                console.err(
+                  `applying: ${String(done)} of ${plural(total, 'operation', 'operations')} ` +
+                    `done; ${note}\n`,
+                );
+              },
+            },
+          });
+          cells.splice(0, cells.length, ...together.cells);
+          togetherDiagnostics.push(...together.diagnostics);
+        }
+        for (const [at, cell] of answer.together === true ? [] : cells.entries()) {
           if (cell.applicable !== true || cell.planId === undefined) continue;
           if (cancel.signal.aborted) break;
           const after = await runner.apply({
@@ -273,6 +294,7 @@ export async function recipeRunCommand(
       ...workspaceDiagnostics,
       ...pluginFiles.diagnostics,
       ...answer.diagnostics,
+      ...togetherDiagnostics,
     ];
     const failed =
       cancel.signal.aborted ||
