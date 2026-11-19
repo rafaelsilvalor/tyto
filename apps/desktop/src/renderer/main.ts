@@ -137,6 +137,7 @@ import {
   hasFoldableResult,
   tickAges,
 } from './recipe-cell-view.js';
+import { togetherOutputOf } from './recipe-together-view.js';
 import {
   type BlockHost,
   dropBlock,
@@ -1004,6 +1005,12 @@ const recipeNotebook = createRecipeNotebook({
     if (bridge === undefined) return {};
     return bridge['recipe:apply-cancel'](request);
   },
+  // TYTO-758, ADR 0219: Apply all under an `apply together` header.
+  applyTogether: async (request) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return { cells: [], diagnostics: [] };
+    return bridge['recipe:apply-together'](request);
+  },
   refusedWithoutReason: () => translate(state.locale, 'recipe.plan.refused'),
   // TYTO-676: the blocks a run reaches show `[*]` until its answer.
   running: (documentId) => {
@@ -1209,6 +1216,7 @@ function showRecipeAnswer(
     applying: recipeNotebook.applyingOf(documentId),
     refusals: recipeNotebook.refusalsOf(documentId),
     progress: recipeNotebook.progressOf(documentId),
+    together: answer.together === true,
     now: Date.now,
     // TYTO-639: a view's filter, span and opened card, kept by line as folds are.
     views: {
@@ -1246,8 +1254,19 @@ function showRecipeAnswer(
   // TYTO-676, ADR 0196: a block shows its last step's result only.
   const statuses = blockResults(text, cellStatuses(text, answer, state.locale, until));
   // TYTO-676: the block toolbars read the new answer too (which results fold).
+  // TYTO-758, ADR 0219: Apply all, under the `apply together` header line.
+  const together = togetherOutputOf(text, answer, {
+    locale: state.locale,
+    state: recipeNotebook.togetherOf(documentId),
+    progress: recipeNotebook.progressOf(documentId),
+    apply: () => void recipeNotebook.applyTogether(documentId),
+    cancel: () => {
+      recipeNotebook.cancelTogether(documentId);
+    },
+  });
+  const outputs = statuses.map((status) => cellOutputOf(status, context));
   const effects = [
-    setCellOutputs.of(statuses.map((status) => cellOutputOf(status, context))),
+    setCellOutputs.of(together === undefined ? outputs : [together, ...outputs]),
     refreshNotebookFrames.of(null),
   ];
   const showing = [...shownIn]

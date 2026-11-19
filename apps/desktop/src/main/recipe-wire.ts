@@ -23,6 +23,7 @@ export function recipeAnswerToWire(answer: RunnerAnswer): WireAnswer {
     diagnostics: diagnosticsToWire(answer.diagnostics),
     ...(answer.held === undefined ? {} : { held: answer.held }),
     ranAt: answer.ranAt,
+    ...(answer.together === true ? { together: true as const } : {}),
   };
 }
 
@@ -161,7 +162,7 @@ export function cut(text: string, limit: number = RECIPE_WIRE_LIMITS.text): stri
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
 }
 
-function diagnosticsToWire(diagnostics: readonly Diagnostic[]): WireDiagnostic[] {
+export function diagnosticsToWire(diagnostics: readonly Diagnostic[]): WireDiagnostic[] {
   return diagnostics.slice(0, RECIPE_WIRE_LIMITS.diagnostics).map((item) => ({
     severity: item.severity,
     code: item.code,

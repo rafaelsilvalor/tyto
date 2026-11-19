@@ -3027,6 +3027,11 @@ export const IPC_CHANNELS = {
        */
       held: z.enum(['restricted', 'source', 'apply']).optional(),
       ranAt: z.string(),
+      /**
+       * TYTO-758, ADR 0219: the header says `apply together`, so the window offers one Apply for
+       * every plan of the run (`recipe:apply-together`) and none per plan.
+       */
+      together: z.literal(true).optional(),
     }),
   ),
 
@@ -3048,6 +3053,21 @@ export const IPC_CHANNELS = {
       planId: z.number().int().nonnegative(),
     }),
     z.object({ cell: recipeCell.optional() }),
+  ),
+
+  /**
+   * Applies every plan the document's last run kept, in cell order, as one confirmation
+   * (TYTO-758, ADR 0219): main stops at the first cell whose Apply is refused or fails an
+   * operation, and the plans below wait for the next run. The answer is every cell as main keeps
+   * it afterwards, and why it was refused or where it stopped. A long write's progress comes as
+   * `recipe:apply-progress` on the cell being applied, whose `recipe:apply-cancel` stops it.
+   */
+  'recipe:apply-together': channel(
+    z.object({ documentId }),
+    z.object({
+      cells: z.array(recipeCell).max(RECIPE_WIRE_LIMITS.cells),
+      diagnostics: z.array(diagnostic).max(RECIPE_WIRE_LIMITS.diagnostics),
+    }),
   ),
 
   /**

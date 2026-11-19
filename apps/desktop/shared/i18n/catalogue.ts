@@ -682,6 +682,9 @@ export interface Catalogue {
   readonly 'recipe.plan.progress': string;
   readonly 'recipe.plan.cancel': string;
   readonly 'recipe.plan.cancelling': string;
+  /** TYTO-758, ADR 0219: Apply all under an `apply together` header, and what it does. */
+  readonly 'recipe.together.apply': string;
+  readonly 'recipe.together.hint': string;
   /**
    * TYTO-379, the Table and Summary views (`recipe-table-view.ts`): the quick filter, the column
    * picker, Copy, the row count with and without a filter, what a copy wrote, the Summary's
@@ -1689,6 +1692,8 @@ export const CATALOGUE_KEYS = [
   'recipe.plan.progress',
   'recipe.plan.cancel',
   'recipe.plan.cancelling',
+  'recipe.together.apply',
+  'recipe.together.hint',
   'recipe.table.filter',
   'recipe.table.columns',
   'recipe.table.copy',

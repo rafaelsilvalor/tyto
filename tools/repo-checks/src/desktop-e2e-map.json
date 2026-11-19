@@ -784,8 +784,16 @@
       "why": "reviewed: which links leave the app for the system browser (TYTO-379), read by window.ts and the Table view's anchors; the rule is in external-url.test.ts, and no suite opens the system browser"
     },
     {
+      "paths": [
+        "apps/desktop/src/renderer/recipe-together-view.ts",
+        "apps/desktop/e2e/recipe-together.desktop.test.ts"
+      ],
+      "e2e": ["recipe-together.desktop.test.ts"],
+      "why": "reviewed: Apply all under an apply together header (TYTO-758, ADR 0219); the logic is in recipe-together-view.test.ts, and the together suite runs a recipe from the command bar and clicks Apply all in the real window"
+    },
+    {
       "paths": ["apps/desktop/src/renderer/recipe-plan-view.ts"],
-      "e2e": ["recipe-notebook.desktop.test.ts"],
+      "e2e": ["recipe-notebook.desktop.test.ts", "recipe-together.desktop.test.ts"],
       "why": "reviewed: a plan cell's lines, Apply and its marks (TYTO-378); the logic is in recipe-plan-view.test.ts, and the notebook suite clicks Apply on the example plugin's plan in the real window"
     },
     {

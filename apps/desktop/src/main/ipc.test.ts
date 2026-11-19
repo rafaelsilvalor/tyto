@@ -3756,11 +3756,11 @@ describe('a long write through the desktop runner (TYTO-791, ADR 0216)', () => {
       recipes,
       applyProgress: (progress) => pushed.push(progress),
     });
-    const planned = async () => {
+    const planned = async (header = '') => {
       const answer = await handlers['recipe:run']({
         requestId: 1,
         documentId: 'document-2',
-        text: 'recipe upload\nacme.pull\nacme.upload\n',
+        text: `recipe upload\n${header}acme.pull\nacme.upload\n`,
         explicit: true,
       });
       return answer.cells[1]?.plan?.planId ?? -1;
@@ -3786,6 +3786,40 @@ describe('a long write through the desktop runner (TYTO-791, ADR 0216)', () => {
       for (const each of pushed) {
         expect(() => parseIpcEvent('recipe:apply-progress', each)).not.toThrow();
       }
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('applies an apply together recipe in one call, its progress and Cancel on the cell applied (TYTO-758)', async () => {
+    let cancel: () => Promise<unknown> = () => Promise.resolve();
+    const cancelled: boolean[] = [];
+    const { handlers, pushed, sent, planned, home } = longWrite(async (call) => {
+      if (call === 2) cancelled.push((await cancel()) as boolean);
+    });
+    try {
+      await planned('apply together\n');
+      cancel = async () =>
+        (await handlers['recipe:apply-cancel']({ documentId: 'document-2', index: 1 })).cancelled;
+      const answer = await handlers['recipe:apply-together']({ documentId: 'document-2' });
+
+      expect(() => parseIpc('recipe:apply-together', 'response', answer)).not.toThrow();
+      expect(pushed[0]).toEqual({
+        documentId: 'document-2',
+        index: 1,
+        done: 1,
+        total: 2,
+        note: 'sent 33 of 100 MB',
+      });
+      expect(cancelled).toEqual([true]);
+      expect(sent.get('EX-2')).toBe(2);
+      expect(answer.cells[1]?.applied?.operations.map((each) => each.status)).toEqual([
+        'applied',
+        'failed',
+      ]);
+      expect(await handlers['recipe:apply-cancel']({ documentId: 'document-2', index: 1 })).toEqual(
+        { cancelled: false },
+      );
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
