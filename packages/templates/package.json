@@ -30,6 +30,8 @@
     "@tyto/template-kit": "workspace:*"
   },
   "devDependencies": {
-    "@tyto/export-svg": "workspace:*"
+    "@tyto/export-psd": "workspace:*",
+    "@tyto/export-svg": "workspace:*",
+    "ag-psd": "^34.2.2"
   }
 }

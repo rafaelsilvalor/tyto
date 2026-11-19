@@ -5,20 +5,21 @@
 ```
 brief.brief ──parse──▶ AST ──compile──▶ Scene ──export-html──▶ HTML ──raster──▶ PNG/JPG/WebP
                           │(manifest)      │
-                       validate            └──export-svg──▶ SVG
+                       validate            ├──export-svg──▶ SVG
+                                           └──export-psd──▶ PSD (a guide frame, ADR 0221)
 ```
 
 Every arrow is a pure function `(input) → Result<output, Diagnostic[]>`. Stages do not know each other; `pipeline` composes them.
 
-| Stage   | Package                     | Input → Output                                                                                                                          |
-| ------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| parse   | `brief-lang`                | text → `BriefAst` (frontmatter + directives + rich text)                                                                                |
-| resolve | `core`                      | `BriefAst` + `TemplateRegistry` → `ResolvedBrief` (typed slots, adjustments validated against the manifest)                             |
-| compile | `core`                      | `ResolvedBrief` × template → `Scene` (one `Artwork` per slide, one `Frame` per format; text measured and wrapped when `faces` is given) |
-| guide   | `pipeline`                  | `Scene` with `frame.guide` → the same `Scene`, each layer but `arte` carrying its `raster` (HTML export + raster port, ADR 0221)        |
-| export  | `export-html`, `export-svg` | `Scene` → string per `Frame` (an installed exporter may answer a binary file's bytes, ADR 0221)                                         |
-| raster  | `raster` (port)             | HTML → image bytes                                                                                                                      |
-| deliver | `io` (port)                 | artifacts → fs / …                                                                                                                      |
+| Stage   | Package                                   | Input → Output                                                                                                                          |
+| ------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| parse   | `brief-lang`                              | text → `BriefAst` (frontmatter + directives + rich text)                                                                                |
+| resolve | `core`                                    | `BriefAst` + `TemplateRegistry` → `ResolvedBrief` (typed slots, adjustments validated against the manifest)                             |
+| compile | `core`                                    | `ResolvedBrief` × template → `Scene` (one `Artwork` per slide, one `Frame` per format; text measured and wrapped when `faces` is given) |
+| guide   | `pipeline`                                | `Scene` with `frame.guide` → the same `Scene`, each layer but `arte` carrying its `raster` (HTML export + raster port, ADR 0221)        |
+| export  | `export-html`, `export-svg`, `export-psd` | `Scene` → string per `Frame`; `export-psd` answers a guide frame's PSD bytes (ADR 0221)                                                 |
+| raster  | `raster` (port)                           | HTML → image bytes                                                                                                                      |
+| deliver | `io` (port)                               | artifacts → fs / …                                                                                                                      |
 
 ## Packages
 
@@ -29,6 +30,7 @@ packages/
   template-lang  grammar + parser for the HTML-like template markup → template function
   export-html    Scene → HTML/CSS (SceneVisitor)
   export-svg     Scene → SVG (SceneVisitor)
+  export-psd     a guide frame of the Scene → a layered PSD's bytes, with ag-psd and pixels the host decodes (ADR 0221)
   raster         Rasterizer port + chromium adapter (Electron offscreen or Playwright)
   templates      the built-in test templates (template-pack plugin); production templates live in their own repositories (TYTO-436)
   template-kit   what a TypeScript template composes with: arrangement and configurable components (pillTable)

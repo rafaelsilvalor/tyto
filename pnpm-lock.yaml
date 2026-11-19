@@ -378,6 +378,18 @@ importers:
         specifier: workspace:*
         version: link:../plugin-api
 
+  packages/export-psd:
+    dependencies:
+      '@tyto/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tyto/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+      ag-psd:
+        specifier: ^34.2.2
+        version: 34.2.2
+
   packages/export-svg:
     dependencies:
       '@tyto/core':
@@ -599,9 +611,15 @@ importers:
         specifier: workspace:*
         version: link:../template-kit
     devDependencies:
+      '@tyto/export-psd':
+        specifier: workspace:*
+        version: link:../export-psd
       '@tyto/export-svg':
         specifier: workspace:*
         version: link:../export-svg
+      ag-psd:
+        specifier: ^34.2.2
+        version: 34.2.2
 
   packages/theme-pack:
     dependencies:
@@ -697,6 +715,9 @@ importers:
       '@tyto/export-html':
         specifier: workspace:*
         version: link:../../packages/export-html
+      '@tyto/export-psd':
+        specifier: workspace:*
+        version: link:../../packages/export-psd
       '@tyto/export-svg':
         specifier: workspace:*
         version: link:../../packages/export-svg
@@ -2705,6 +2726,9 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  ag-psd@34.2.2:
+    resolution: {integrity: sha512-iT36+prHtStdlAEPrO/+BfwcZttQsVq8uU3zREgxGFv9bLPHBwEYCV0dEYsgDZOQueR3iCz29u+Z4VZBkDgbYg==}
+
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
@@ -3996,6 +4020,9 @@ packages:
 
   pako@0.2.9:
     resolution: {integrity: sha512-NUcwaKxUxWrZLpDG+z/xZaCgQITkA/Dv4V/T6bw7VON6l1Xz/VnrBqrYjZQ12TamKHzITTfOEIYUj48y2KXImA==}
+
+  pako@2.1.0:
+    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -6607,6 +6634,11 @@ snapshots:
 
   acorn@8.18.0: {}
 
+  ag-psd@34.2.2:
+    dependencies:
+      base64-js: 1.5.1
+      pako: 2.1.0
+
   agent-base@7.1.4: {}
 
   ajv@6.15.0:
@@ -8086,6 +8118,8 @@ snapshots:
   package-manager-detector@1.8.0: {}
 
   pako@0.2.9: {}
+
+  pako@2.1.0: {}
 
   parent-module@1.0.1:
     dependencies:

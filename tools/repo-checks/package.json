@@ -16,6 +16,7 @@
     "@tyto/core": "workspace:*",
     "@tyto/editor": "workspace:*",
     "@tyto/export-html": "workspace:*",
+    "@tyto/export-psd": "workspace:*",
     "@tyto/export-svg": "workspace:*",
     "@tyto/fonts": "workspace:*",
     "@tyto/google-fonts": "workspace:*",
