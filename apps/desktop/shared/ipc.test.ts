@@ -386,7 +386,7 @@ describe('a response that does not match', () => {
   });
 });
 
-describe("a delivery folder's badge on a listed entry (TYTO-757, ADR 0215)", () => {
+describe("a delivery folder's badge on a listed entry (TYTO-757, ADR 0215; TYTO-755)", () => {
   const listing = (delivery: unknown) => ({
     entries: [{ id: 'a', name: 'mca-1', kind: 'folder', delivery }],
     more: 0,
@@ -397,18 +397,45 @@ describe("a delivery folder's badge on a listed entry (TYTO-757, ADR 0215)", () 
     const parsed = parseIpc(
       'explorer:list',
       'response',
-      listing({ check: 'incomplete', problems: ["'feed' has 0 of 1 at 1080×1350"] }),
+      listing({
+        key: 'MCA-1',
+        state: 'doing',
+        check: 'incomplete',
+        problems: ["'feed' has 0 of 1 at 1080×1350"],
+      }),
     );
-    expect(parsed.entries[0]?.delivery?.check).toBe('incomplete');
+    expect(parsed.entries[0]?.delivery).toMatchObject({
+      key: 'MCA-1',
+      state: 'doing',
+      check: 'incomplete',
+    });
+  });
+
+  it("refuses a badge with no record key, and a key or state longer than a row's", () => {
+    const badge = { key: 'MCA-1', check: 'ready', problems: [] };
+    expect(() => parseIpc('explorer:list', 'response', listing(badge))).not.toThrow();
+    for (const wrong of [
+      { check: 'ready', problems: [] },
+      { ...badge, key: '' },
+      { ...badge, key: 'k'.repeat(201) },
+      { ...badge, state: '' },
+      { ...badge, state: 's'.repeat(201) },
+    ]) {
+      expect(() => parseIpc('explorer:list', 'response', listing(wrong))).toThrow(IpcContractError);
+    }
   });
 
   it('refuses a state the check does not give, and more problems than a badge carries', () => {
     expect(() =>
-      parseIpc('explorer:list', 'response', listing({ check: 'done', problems: [] })),
+      parseIpc('explorer:list', 'response', listing({ key: 'MCA-1', check: 'done', problems: [] })),
     ).toThrow(IpcContractError);
     const many = Array.from({ length: 21 }, (_, index) => String(index));
     expect(() =>
-      parseIpc('explorer:list', 'response', listing({ check: 'ready', problems: many })),
+      parseIpc(
+        'explorer:list',
+        'response',
+        listing({ key: 'MCA-1', check: 'ready', problems: many }),
+      ),
     ).toThrow(IpcContractError);
   });
 });

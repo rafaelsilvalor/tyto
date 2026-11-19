@@ -46,8 +46,10 @@ export type ExplorerListing = IpcResponse<'explorer:list'>;
 export type ExplorerRead = IpcResponse<'explorer:read'>;
 export type ExplorerEntry = ExplorerListing['entries'][number];
 
-/** A delivery folder's badge as main holds it (TYTO-757, ADR 0215). */
+/** A delivery folder's badge as main holds it (TYTO-757, ADR 0215; TYTO-755, ADR 0210). */
 export type ExplorerDelivery = Readonly<{
+  key: string;
+  state?: string;
   check: NonNullable<ExplorerEntry['delivery']>['check'];
   problems: readonly string[];
 }>;
@@ -462,7 +464,14 @@ export function createExplorerService(options: ExplorerServiceOptions): Explorer
       const place = placeOf(real, isFolder, rootReal, places);
       const badge = isFolder ? options.deliveryOf?.(real) : undefined;
       const delivery =
-        badge === undefined ? undefined : { check: badge.check, problems: [...badge.problems] };
+        badge === undefined
+          ? undefined
+          : {
+              key: badge.key,
+              ...(badge.state === undefined ? {} : { state: badge.state }),
+              check: badge.check,
+              problems: [...badge.problems],
+            };
       return {
         id: idFor(path, kind),
         name: dirent.name,

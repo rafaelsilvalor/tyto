@@ -64,7 +64,7 @@ describe('createDeliveryChecks', () => {
     const lent = checks();
     expect(await lent.refresh()).toBe(true);
     const folder = join(work, 'entregas', 'mca-1');
-    expect(lent.badgeOf(folder)).toEqual({ check: 'in-progress', problems: [] });
+    expect(lent.badgeOf(folder)).toEqual({ key: 'MCA-1', check: 'in-progress', problems: [] });
     expect(lent.badgeOf(join(work, 'entregas', 'rascunho'))).toBeUndefined();
     expect(await lent.refresh()).toBe(false);
 
@@ -72,6 +72,7 @@ describe('createDeliveryChecks', () => {
     await writeFile(join(folder, 'story.png'), png(1080, 1920));
     expect(await lent.refresh()).toBe(true);
     expect(lent.badgeOf(folder)).toEqual({
+      key: 'MCA-1',
       check: 'incomplete',
       problems: [
         "'feed' has 0 of 1 at 1080×1350",
@@ -81,7 +82,7 @@ describe('createDeliveryChecks', () => {
 
     await writeFile(join(folder, 'feed.png'), png(1080, 1350));
     expect(await lent.refresh()).toBe(true);
-    expect(lent.badgeOf(folder)).toEqual({ check: 'ready', problems: [] });
+    expect(lent.badgeOf(folder)).toEqual({ key: 'MCA-1', check: 'ready', problems: [] });
   });
 
   it('badges nothing in a restricted folder, or with no folder open', async () => {
@@ -94,6 +95,46 @@ describe('createDeliveryChecks', () => {
       formatSizes: () => Promise.resolve({}),
     });
     expect(await none.refresh()).toBe(false);
+  });
+
+  it("carries the record's state as the person wrote it, and says when it changed (TYTO-755)", async () => {
+    const folder = join(work, 'entregas', 'mca-1');
+    const file = join(folder, 'editaveis', 'delivery.json');
+    const write = (state: string | undefined) =>
+      writeFile(
+        file,
+        JSON.stringify({
+          version: 1,
+          key: 'MCA-1',
+          formats: [{ format: 'story', count: 1 }],
+          ...(state === undefined ? {} : { state }),
+        }),
+      );
+    await write('em revisão');
+    const lent = checks();
+    expect(await lent.refresh()).toBe(true);
+    expect(lent.badgeOf(folder)).toMatchObject({ key: 'MCA-1', state: 'em revisão' });
+
+    await write('aprovado');
+    expect(await lent.refresh()).toBe(true);
+    expect(lent.badgeOf(folder)?.state).toBe('aprovado');
+
+    await write(undefined);
+    expect(await lent.refresh()).toBe(true);
+    expect(lent.badgeOf(folder)).not.toHaveProperty('state');
+    expect(await lent.refresh()).toBe(false);
+  });
+
+  it("cuts a record's key and state to what a row can carry", async () => {
+    const folder = join(work, 'entregas', 'mca-1');
+    await writeFile(
+      join(folder, 'editaveis', 'delivery.json'),
+      JSON.stringify({ version: 1, key: 'K'.repeat(500), state: 's'.repeat(500) }),
+    );
+    const lent = checks();
+    await lent.refresh();
+    expect(lent.badgeOf(folder)?.key).toHaveLength(200);
+    expect(lent.badgeOf(folder)?.state).toHaveLength(200);
   });
 
   it('caps the problems a badge carries at twenty', async () => {

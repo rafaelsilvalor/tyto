@@ -661,6 +661,8 @@ export const ptBR: Catalogue = {
   'explorer.delivery.ready': 'Entrega pronta para conferir',
   'explorer.delivery.incomplete': 'Entrega incompleta',
   'explorer.delivery.inProgress': 'Entrega em andamento',
+  'explorer.delivery.record': 'Entrega {key}',
+  'explorer.delivery.state': 'estado: {state}',
   'explorer.menu.newFile': 'Novo arquivo…',
   'explorer.menu.newFolder': 'Nova pasta…',
   'explorer.menu.newRecipe': 'Nova receita…',

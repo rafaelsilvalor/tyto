@@ -106,8 +106,11 @@ nothing.
 - `E_RECIPE_DELIVERY` reports what stops the whole step; refused rows are a note, not a code.
 - `@tyto/io` gains `workspaceDeliveryPorts`, and the shared recipe runner lends them to every
   host, the desktop and `tyto mcp` included, whatever templates the host has.
-- **The explorer's badge for a folder with a record is a later pull request** (TYTO-755 PR B);
-  this one changes nothing in the window but the step form's Portuguese.
+- ~~**The explorer's badge for a folder with a record is a later pull request** (TYTO-755 PR B);
+  this one changes nothing in the window but the step form's Portuguese.~~ TYTO-755 PR B: a
+  folder whose record reads wears a delivery icon, and the record's `state`, as written, sits
+  before the check's mark of ADR 0215; the mark's tooltip opens with the record's key. A record
+  that does not read still leaves its folder unmarked.
 - A row whose only difference is a field a person edited plans no operation, so the plan names
   `kept` only beside a field it does update.
 - A delivery folder whose `assets/` was deleted after its record was written is not given a new

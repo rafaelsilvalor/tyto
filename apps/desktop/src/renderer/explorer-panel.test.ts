@@ -348,16 +348,23 @@ describe('file-type icons (TYTO-282, ADR 0116)', () => {
   });
 });
 
-describe("a delivery folder's badge (TYTO-757, ADR 0215)", () => {
+describe("a delivery folder's badge (TYTO-757, ADR 0215; TYTO-755, ADR 0210)", () => {
   const delivered = (): Disk => ({
     root: {
       entries: [
-        { id: 'a', name: 'mca-1', kind: 'folder', delivery: { check: 'ready', problems: [] } },
+        {
+          id: 'a',
+          name: 'mca-1',
+          kind: 'folder',
+          delivery: { key: 'MCA-1', check: 'ready', problems: [] },
+        },
         {
           id: 'b',
           name: 'mca-2',
           kind: 'folder',
           delivery: {
+            key: 'MCA-2',
+            state: 'em revisão',
             check: 'incomplete',
             problems: [
               "'feed' has 0 of 1 at 1080×1350",
@@ -369,7 +376,7 @@ describe("a delivery folder's badge (TYTO-757, ADR 0215)", () => {
           id: 'c',
           name: 'mca-3',
           kind: 'folder',
-          delivery: { check: 'in-progress', problems: [] },
+          delivery: { key: 'MCA-3', state: 'doing', check: 'in-progress', problems: [] },
         },
         { id: 'd', name: 'rascunho', kind: 'folder' },
       ],
@@ -380,6 +387,8 @@ describe("a delivery folder's badge (TYTO-757, ADR 0215)", () => {
 
   const badge = (element: ExplorerPanel, name: string) =>
     row(element, name).querySelector<HTMLElement>('.explorer__delivery');
+  const stateOf = (element: ExplorerPanel, name: string) =>
+    badge(element, name)?.querySelector<HTMLElement>('.explorer__delivery-state') ?? null;
 
   it('draws the state after the name, its words for a screen reader and each problem in the tooltip', async () => {
     const { element } = await mount(delivered());
@@ -390,28 +399,67 @@ describe("a delivery folder's badge (TYTO-757, ADR 0215)", () => {
         badge(element, name)?.getAttribute('aria-label'),
       ]),
     ).toEqual([
-      ['ready', 'Delivery ready to check'],
-      ['incomplete', 'Delivery incomplete'],
-      ['in-progress', 'Delivery in progress'],
+      ['ready', 'Delivery MCA-1. Delivery ready to check'],
+      ['incomplete', 'Delivery MCA-2 · state: em revisão. Delivery incomplete'],
+      ['in-progress', 'Delivery MCA-3 · state: doing. Delivery in progress'],
     ]);
     expect(badge(element, 'mca-2')?.title).toBe(
       [
+        'Delivery MCA-2 · state: em revisão',
         'Delivery incomplete',
         "'feed' has 0 of 1 at 1080×1350",
         "'feed.png' is 1080×1080, and the record owes feed 1080×1350",
       ].join('\n'),
     );
-    expect(badge(element, 'mca-1')?.title).toBe('Delivery ready to check');
+    expect(badge(element, 'mca-1')?.title).toBe('Delivery MCA-1\nDelivery ready to check');
     expect(badge(element, 'rascunho')).toBeNull();
     // After the name, so the name keeps its place in the row.
     expect(badge(element, 'mca-1')?.previousElementSibling?.className).toBe('explorer__name');
   });
 
-  it('says the state in Portuguese in a Portuguese window', async () => {
+  it("puts the record's state, as written, before the glyph, and nothing on a record without one", async () => {
+    const { element } = await mount(delivered());
+
+    expect(
+      ['mca-1', 'mca-2', 'mca-3'].map((name) => [
+        badge(element, name)?.dataset['deliveryState'],
+        stateOf(element, name)?.textContent,
+        badge(element, name)?.lastElementChild?.textContent,
+      ]),
+    ).toEqual([
+      [undefined, undefined, '✓'],
+      ['em revisão', 'em revisão', '!'],
+      ['doing', 'doing', '…'],
+    ]);
+    expect(stateOf(element, 'mca-2')?.nextElementSibling?.className).toBe(
+      'explorer__delivery-glyph',
+    );
+  });
+
+  it('marks a folder with a record by its icon, and leaves a plain folder plain', async () => {
+    const { element } = await mount(delivered());
+    const icons = Object.fromEntries(
+      [...element.querySelectorAll<HTMLElement>('.explorer__row')].map((each) => [
+        each.dataset.name ?? '',
+        each.dataset.icon,
+      ]),
+    );
+    expect(icons).toEqual({
+      'mca-1': 'folderDelivery',
+      'mca-2': 'folderDelivery',
+      'mca-3': 'folderDelivery',
+      rascunho: 'folder',
+    });
+  });
+
+  it('says the record and the state in Portuguese in a Portuguese window, the state untranslated', async () => {
     const { element } = await mount(delivered());
     element.locale = 'pt-BR';
     await settle(element);
-    expect(badge(element, 'mca-2')?.getAttribute('aria-label')).toBe('Entrega incompleta');
+    expect(badge(element, 'mca-2')?.getAttribute('aria-label')).toBe(
+      'Entrega MCA-2 · estado: em revisão. Entrega incompleta',
+    );
+    expect(stateOf(element, 'mca-3')?.textContent).toBe('doing');
   });
 });
 

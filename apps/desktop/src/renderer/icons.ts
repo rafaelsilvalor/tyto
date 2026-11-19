@@ -164,6 +164,9 @@ const GEOMETRY: Readonly<Record<IconName, (lit: boolean) => SVGTemplateResult>> 
   folderAssets: () => svg`${FOLDER}<path d="M4.5 11.25 6.75 9l1.75 1.5 1.25-1 1.75 1.75" />`,
   // The folder with the export icon's arrow.
   folderOutput: () => svg`${FOLDER}<path d="M8 11.5V7.75M6.5 9.25 8 7.75l1.5 1.5" />`,
+  // The folder with a tag hung on it: a delivery, named by its record (TYTO-755).
+  folderDelivery: () =>
+    svg`${FOLDER}<path d="M6.25 7.75h3.25l1.25 1.5-1.25 1.5H6.25Z" /><circle cx="7.4" cy="9.25" r=".35" />`,
   // The page alone: anything the table does not know.
   file: () => PAGE,
 };

@@ -22,8 +22,14 @@ import { workspaceDeliveryPorts } from '@tyto/io';
  * badges. Nothing is written.
  */
 
-/** What the Explorer shows on a delivery folder's row. */
+/**
+ * What the Explorer shows on a delivery folder's row: the record's key and the person's `state`
+ * (TYTO-755, ADR 0210), and the check of its exports (TYTO-757, ADR 0215).
+ */
 export interface DeliveryBadge {
+  readonly key: string;
+  /** The record's `state` as the person wrote it; absent when the record holds none. */
+  readonly state?: string;
   readonly check: DeliveryCheckState;
   readonly problems: readonly string[];
 }
@@ -33,6 +39,9 @@ export const DELIVERY_BADGE_PROBLEMS = 20;
 
 /** How long one problem may be: a file name is a person's, and may be very long. */
 export const DELIVERY_BADGE_PROBLEM_LENGTH = 2000;
+
+/** How long the record's key and state may be on a row: a person writes both, and a row is short. */
+export const DELIVERY_BADGE_TEXT_LENGTH = 200;
 
 export interface DeliveryChecksOptions {
   /** The open folder and its trust, asked on every read; `undefined` when none is open. */
@@ -85,7 +94,10 @@ export function createDeliveryChecks(options: DeliveryChecksOptions): DeliveryCh
       } catch {
         continue;
       }
+      const state = record.value.state?.slice(0, DELIVERY_BADGE_TEXT_LENGTH);
       found.set(real, {
+        key: record.value.key.slice(0, DELIVERY_BADGE_TEXT_LENGTH),
+        ...(state === undefined || state === '' ? {} : { state }),
         check: check.state,
         problems: check.problems
           .slice(0, DELIVERY_BADGE_PROBLEMS)
@@ -117,7 +129,9 @@ function sameBadges(
   for (const [path, badge] of a) {
     const other = b.get(path);
     if (
-      other?.check !== badge.check ||
+      other?.key !== badge.key ||
+      other.state !== badge.state ||
+      other.check !== badge.check ||
       other.problems.length !== badge.problems.length ||
       other.problems.some((problem, index) => problem !== badge.problems[index])
     ) {
