@@ -901,6 +901,25 @@ export const diagnosticCodes = {
     fatal: true,
     fatality: 'The IR is malformed, so the exporter has nothing it can draw.',
   },
+  E_SCENE_GUIDE_NODE_NOT_FOUND: {
+    severity: 'error',
+    summary: "A guide's layer names a node that is not one of its frame's top-level children.",
+    template:
+      "Layer '{layer}' of the guide for '{frame}' names node '{id}', which is not one of the frame's top-level children.",
+    spec: 'docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md',
+    fatal: true,
+    fatality: 'The IR is malformed, so the exporter has nothing it can draw.',
+  },
+  E_SCENE_GUIDE_LAYERING: {
+    severity: 'error',
+    summary: "A frame's node is not in exactly one of its guide's layers.",
+    template:
+      "Node '{id}' of the guide for '{frame}' is in {count} layers; every top-level node is in exactly one.",
+    spec: 'docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md',
+    fatal: true,
+    fatality:
+      'A node in no layer would vanish from the layered file and one in two would be painted twice, so the IR is malformed.',
+  },
   E_SCENE_MASK_DESCENDANT: {
     severity: 'error',
     summary: 'A mask references a descendant of the node it masks.',

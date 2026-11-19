@@ -97,3 +97,32 @@ ADR 0035 removed: it looks finished.
   file still missing says which file and where it was looked for.
 - A template that draws the art as a frame background loses that background to a box while
   the file is missing; one that draws it as an image node keeps its stacking exactly.
+
+## Note of 2026-11-19: the guide's Scene (TYTO-740, second pull request)
+
+What the second pull request settled beyond the sketch above:
+
+- **One layout path.** `compile(..., { guide: true })` runs the render's own path and adds a
+  `guide` to each frame: `art` (`slot`, `kind`, `box` in frame coordinates) and `layers`, top
+  to bottom, each with `name`, `label`, `nodes`, `locked`, `visible` and `opacity`. Without
+  `guide` no frame has the key, so every other Scene is byte for byte what it was; a `guide` a
+  template sends with its frame is dropped.
+- **Layers name the frame's top-level children**, in paint order. `parseScene` refuses a guide
+  that names a node the frame does not hold (`E_SCENE_GUIDE_NODE_NOT_FOUND`) or leaves a
+  top-level node in no layer or in two (`E_SCENE_GUIDE_LAYERING`). A group that holds the art
+  holds its place.
+- **The frame's art** is the first `full` slot in manifest order with a box in the frame, else
+  the first `inline` one. Every external slot's box is in `areas`; a frame with no external
+  art has no `art`, and everything it paints is `texto`.
+- **In a guide the art is empty**, even when the brief names a file that exists: it is what
+  the designer is about to paint, so its place is the box of decision 5.
+- **Areas** are one outline and one label per text or picture node a slot produced, named by
+  the slot, at the node's layout box (`bounds.ts`; a text left to its content is measured, or
+  estimated without faces). The label draws in the frame's first text face; a frame with no
+  text gets the outline alone.
+- **The frame's background is not a node**, so no layer names it. It is painted under the art,
+  and the raster stage of ADR 0221 paints it into `decoracao`.
+- **An `inline` canvas** is an artwork `external-art-<slot>`, one empty frame per format at
+  width × suggested height, whose one layer is `arte` labelled `arte <width>px`.
+- **Naming the art per format** stays open: it changes the brief's syntax, which this pull
+  request does not touch.

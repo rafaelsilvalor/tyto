@@ -177,6 +177,40 @@ function refusedMarkup(records: readonly NodeRecord[]): Diagnostic[] {
 }
 
 /**
+ * A guide's layers cut the frame exactly (ADR 0220): every node a layer names is one of the
+ * frame's top-level children, and every top-level child is in exactly one layer. A node in
+ * no layer would vanish from the layered file, and one in two would be painted twice.
+ */
+function guideProblems(scene: Scene): Diagnostic[] {
+  return scene.artworks.flatMap((artwork) =>
+    artwork.frames.flatMap((frame) => {
+      if (frame.guide === undefined) return [];
+      const where = `${artwork.id}:${frame.format}`;
+      const painted = new Set(frame.children.map((child) => child.id));
+      const counts = new Map<string, number>();
+      const problems: Diagnostic[] = [];
+      for (const layer of frame.guide.layers) {
+        for (const id of layer.nodes) {
+          counts.set(id, (counts.get(id) ?? 0) + 1);
+          if (!painted.has(id)) {
+            problems.push(
+              diagnostic('E_SCENE_GUIDE_NODE_NOT_FOUND', { id, layer: layer.name, frame: where }),
+            );
+          }
+        }
+      }
+      for (const id of painted) {
+        const count = counts.get(id) ?? 0;
+        if (count !== 1) {
+          problems.push(diagnostic('E_SCENE_GUIDE_LAYERING', { id, count, frame: where }));
+        }
+      }
+      return problems;
+    }),
+  );
+}
+
+/**
  * Runs every rule and returns everything wrong, rather than stopping at the first —
  * a scene is usually fixed in one editing pass, not one problem per compile.
  */
@@ -189,5 +223,6 @@ export function sceneInvariants(scene: Scene): readonly Diagnostic[] {
     ...undeclaredAssets(scene, records),
     ...emptyText(records),
     ...refusedMarkup(records),
+    ...guideProblems(scene),
   ];
 }

@@ -102,6 +102,8 @@ export interface CompileTemplateOptions {
    * configuration will supply them; absent, every value draws with its default.
    */
   readonly values?: SuppliedValues;
+  /** Compile the guide for art painted outside Tyto instead (ADR 0220); absent, a render. */
+  readonly guide?: boolean;
 }
 
 /** One frame of one artwork, as the document the HTML exporter wrote. */
@@ -170,6 +172,7 @@ export async function compileTemplate(
     ...(options.faces === undefined ? {} : { faces: options.faces }),
     ...(options.brandKits === undefined ? {} : { brandKits: options.brandKits }),
     ...(options.values === undefined ? {} : { values: options.values }),
+    ...(options.guide === undefined ? {} : { guide: options.guide }),
   });
   if (!scene.ok) return err([...ast.diagnostics, ...resolved.diagnostics, ...scene.error]);
 

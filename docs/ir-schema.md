@@ -5,7 +5,7 @@ Defined with Zod in `packages/core/src/scene/`. Types are inferred from the sche
 ```ts
 Scene    { version: 1; artworks: Artwork[]; fonts: FontRef[]; assets: AssetRef[] }
 Artwork  { id: string; label?: string; frames: Frame[] }          // one Artwork per carousel slide
-Frame    { format: string; size: {w,h}; background?: Paint; children: Node[] }  // no background ⇒ alpha
+Frame    { format: string; size: {w,h}; background?: Paint; children: Node[]; guide?: FrameGuide }  // no background ⇒ alpha; guide: ADR 0220
 
 Node = Group | Rect | Text | Image | Vector       // tagged by `kind`
 Base     { id; name?; kind; transform: Transform; opacity: 0..1; blend: BlendMode; visible: boolean;
@@ -231,3 +231,4 @@ Checked in `scene/invariants.ts`, after the shape holds. Each one names the id a
 - `mask.nodeId` points to an existing node that is not a descendant of the masked node. A node masked by its own child would have to be rendered to produce the mask that decides how it is rendered.
 - Referenced fonts exist in `Scene.fonts`; assets in `Scene.assets`. An `ImagePaint` counts as an asset reference wherever it appears, including a frame background — which is blamed on `<artwork id>:<format>`, having no node id of its own.
 - No Text without at least one `kind: 'text'` run. Empty `runs`, or runs that are all line breaks, draw the same amount: nothing.
+- A frame's `guide` (ADR 0220) cuts it exactly: every node a layer names is a top-level child of the frame, and every top-level child is in exactly one layer.

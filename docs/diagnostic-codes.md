@@ -108,6 +108,8 @@ non-zero.
 | `E_SCENE_SHAPE` | error | yes | A scene does not match the IR schema. |
 | `E_SCENE_DUPLICATE_ID` | error | yes | The same id is used more than once in one scene. |
 | `E_SCENE_MASK_NOT_FOUND` | error | yes | A mask references a node the scene does not contain. |
+| `E_SCENE_GUIDE_NODE_NOT_FOUND` | error | yes | A guide's layer names a node that is not one of its frame's top-level children. |
+| `E_SCENE_GUIDE_LAYERING` | error | yes | A frame's node is not in exactly one of its guide's layers. |
 | `E_SCENE_MASK_DESCENDANT` | error | yes | A mask references a descendant of the node it masks. |
 | `E_SCENE_FONT_NOT_DECLARED` | error | yes | Text uses a font family the scene does not declare. |
 | `E_SCENE_ASSET_NOT_DECLARED` | error | yes | A node or paint uses an asset the scene does not declare. |
@@ -356,6 +358,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_SCENE_SHAPE` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_DUPLICATE_ID` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_MASK_NOT_FOUND` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_GUIDE_NODE_NOT_FOUND` | yes | The IR is malformed, so the exporter has nothing it can draw. |
+| `E_SCENE_GUIDE_LAYERING` | yes | A node in no layer would vanish from the layered file and one in two would be painted twice, so the IR is malformed. |
 | `E_SCENE_MASK_DESCENDANT` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_FONT_NOT_DECLARED` | yes | The IR is malformed, so the exporter has nothing it can draw. |
 | `E_SCENE_ASSET_NOT_DECLARED` | yes | The IR is malformed, so the exporter has nothing it can draw. |
@@ -1583,6 +1587,34 @@ Node '{id}' is masked by '{maskId}', which no node in the scene defines.
 ```
 
 Parameters: `id`, `maskId`
+
+### `E_SCENE_GUIDE_NODE_NOT_FOUND`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md`
+
+A guide's layer names a node that is not one of its frame's top-level children.
+
+The IR is malformed, so the exporter has nothing it can draw.
+
+```
+Layer '{layer}' of the guide for '{frame}' names node '{id}', which is not one of the frame's top-level children.
+```
+
+Parameters: `layer`, `frame`, `id`
+
+### `E_SCENE_GUIDE_LAYERING`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md`
+
+A frame's node is not in exactly one of its guide's layers.
+
+A node in no layer would vanish from the layered file and one in two would be painted twice, so the IR is malformed.
+
+```
+Node '{id}' of the guide for '{frame}' is in {count} layers; every top-level node is in exactly one.
+```
+
+Parameters: `id`, `frame`, `count`
 
 ### `E_SCENE_MASK_DESCENDANT`
 

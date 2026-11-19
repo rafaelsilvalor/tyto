@@ -10,6 +10,8 @@ pnpm-lock.yaml
 # Exporter output, compared byte for byte. Reflowing it would fail the snapshot it is.
 **/__snapshots__/**/*.html
 **/__snapshots__/**/*.svg
+# A guide Scene, one value per line where it fits, compared byte for byte (TYTO-740).
+**/__snapshots__/**/*.guide.json
 # What `resolve` gave at a past commit, compared as JSON.stringify's bytes (TYTO-746).
 **/__fixtures__/**/*.resolved.json
 docs/patterns-explained.pt-BR.html

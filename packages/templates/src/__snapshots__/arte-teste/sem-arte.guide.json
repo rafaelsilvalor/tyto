@@ -1,0 +1,374 @@
+{
+  "version": 1,
+  "artworks": [
+    {
+      "id": "artwork-1",
+      "frames": [
+        {
+          "format": "grid-1x1",
+          "size": {"w":1080,"h":1080},
+          "background": {"kind":"solid","color":{"r":247,"g":245,"b":240,"a":1}},
+          "children": [
+            {
+              "id": "artwork-1.grid-1x1.fundo",
+              "name": "external-art:fundo",
+              "transform": {"x":0,"y":0,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {"w":1080,"h":1080},
+              "radius": [0,0,0,0],
+              "stroke": {
+                "paint": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}},
+                "width": 9,
+                "align": "inside"
+              }
+            },
+            {
+              "id": "artwork-1.grid-1x1.titulo",
+              "transform": {"x":80,"y":80,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "text",
+              "box": {"w":920,"h":180},
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Uma peça com arte ",
+                  "font": {"family":"Source Sans 3","source":"bundled"},
+                  "size": 72,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {"kind":"solid","color":{"r":31,"g":41,"b":51,"a":1}}
+                },
+                {
+                  "kind": "text",
+                  "text": "pintada fora",
+                  "font": {"family":"Source Sans 3","source":"bundled"},
+                  "size": 72,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {"kind":"solid","color":{"r":31,"g":41,"b":51,"a":1}}
+                }
+              ],
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.1,
+              "letterSpacing": 0,
+              "overflow": "clip"
+            },
+            {
+              "id": "artwork-1.grid-1x1.imagem",
+              "name": "external-art:imagem",
+              "transform": {"x":80,"y":300,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {"w":920,"h":560},
+              "radius": [0,0,0,0],
+              "stroke": {
+                "paint": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}},
+                "width": 5,
+                "align": "inside"
+              }
+            },
+            {
+              "id": "artwork-1.grid-1x1.titulo.area",
+              "name": "titulo",
+              "transform": {"x":80,"y":80,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {"w":920,"h":180},
+              "radius": [0,0,0,0],
+              "stroke": {
+                "paint": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}},
+                "width": 2,
+                "align": "inside"
+              }
+            },
+            {
+              "id": "artwork-1.grid-1x1.titulo.area-label",
+              "name": "titulo",
+              "transform": {"x":84,"y":84,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "text",
+              "box": {"w":912},
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "titulo",
+                  "font": {"family":"Source Sans 3","source":"bundled"},
+                  "size": 20,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}}
+                }
+              ],
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "grow"
+            }
+          ],
+          "guide": {
+            "art": {"slot":"fundo","kind":"full","box":{"x":0,"y":0,"w":1080,"h":1080}},
+            "layers": [
+              {
+                "name": "texto",
+                "label": "texto",
+                "nodes": ["artwork-1.grid-1x1.titulo"],
+                "locked": true,
+                "visible": true,
+                "opacity": 1
+              },
+              {
+                "name": "areas",
+                "label": "areas",
+                "nodes": [
+                  "artwork-1.grid-1x1.fundo",
+                  "artwork-1.grid-1x1.imagem",
+                  "artwork-1.grid-1x1.titulo.area",
+                  "artwork-1.grid-1x1.titulo.area-label"
+                ],
+                "locked": true,
+                "visible": true,
+                "opacity": 0.5
+              },
+              {"name":"arte","label":"arte","nodes":[],"locked":false,"visible":true,"opacity":1},
+              {
+                "name": "decoracao",
+                "label": "decoracao",
+                "nodes": [],
+                "locked": true,
+                "visible": false,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "format": "story",
+          "size": {"w":1080,"h":1920},
+          "background": {"kind":"solid","color":{"r":247,"g":245,"b":240,"a":1}},
+          "children": [
+            {
+              "id": "artwork-1.story.fundo",
+              "name": "external-art:fundo",
+              "transform": {"x":0,"y":0,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {"w":1080,"h":1920},
+              "radius": [0,0,0,0],
+              "stroke": {
+                "paint": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}},
+                "width": 9,
+                "align": "inside"
+              }
+            },
+            {
+              "id": "artwork-1.story.titulo",
+              "transform": {"x":80,"y":160,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "text",
+              "box": {"w":920,"h":180},
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Uma peça com arte ",
+                  "font": {"family":"Source Sans 3","source":"bundled"},
+                  "size": 72,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {"kind":"solid","color":{"r":31,"g":41,"b":51,"a":1}}
+                },
+                {
+                  "kind": "text",
+                  "text": "pintada fora",
+                  "font": {"family":"Source Sans 3","source":"bundled"},
+                  "size": 72,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {"kind":"solid","color":{"r":31,"g":41,"b":51,"a":1}}
+                }
+              ],
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.1,
+              "letterSpacing": 0,
+              "overflow": "clip"
+            },
+            {
+              "id": "artwork-1.story.imagem",
+              "name": "external-art:imagem",
+              "transform": {"x":80,"y":520,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {"w":920,"h":1080},
+              "radius": [0,0,0,0],
+              "stroke": {
+                "paint": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}},
+                "width": 8,
+                "align": "inside"
+              }
+            },
+            {
+              "id": "artwork-1.story.titulo.area",
+              "name": "titulo",
+              "transform": {"x":80,"y":160,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {"w":920,"h":180},
+              "radius": [0,0,0,0],
+              "stroke": {
+                "paint": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}},
+                "width": 2,
+                "align": "inside"
+              }
+            },
+            {
+              "id": "artwork-1.story.titulo.area-label",
+              "name": "titulo",
+              "transform": {"x":84,"y":164,"rotation":0,"scaleX":1,"scaleY":1,"anchor":{"x":0,"y":0}},
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "text",
+              "box": {"w":912},
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "titulo",
+                  "font": {"family":"Source Sans 3","source":"bundled"},
+                  "size": 20,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {"kind":"solid","color":{"r":255,"g":0,"b":170,"a":1}}
+                }
+              ],
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "grow"
+            }
+          ],
+          "guide": {
+            "art": {"slot":"fundo","kind":"full","box":{"x":0,"y":0,"w":1080,"h":1920}},
+            "layers": [
+              {
+                "name": "texto",
+                "label": "texto",
+                "nodes": ["artwork-1.story.titulo"],
+                "locked": true,
+                "visible": true,
+                "opacity": 1
+              },
+              {
+                "name": "areas",
+                "label": "areas",
+                "nodes": [
+                  "artwork-1.story.fundo",
+                  "artwork-1.story.imagem",
+                  "artwork-1.story.titulo.area",
+                  "artwork-1.story.titulo.area-label"
+                ],
+                "locked": true,
+                "visible": true,
+                "opacity": 0.5
+              },
+              {"name":"arte","label":"arte","nodes":[],"locked":false,"visible":true,"opacity":1},
+              {
+                "name": "decoracao",
+                "label": "decoracao",
+                "nodes": [],
+                "locked": true,
+                "visible": false,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "external-art-imagem",
+      "label": "imagem",
+      "frames": [
+        {
+          "format": "grid-1x1",
+          "size": {"w":920,"h":560},
+          "children": [],
+          "guide": {
+            "art": {"slot":"imagem","kind":"inline","box":{"x":0,"y":0,"w":920,"h":560}},
+            "layers": [
+              {
+                "name": "arte",
+                "label": "arte 920px",
+                "nodes": [],
+                "locked": false,
+                "visible": true,
+                "opacity": 1
+              }
+            ]
+          }
+        },
+        {
+          "format": "story",
+          "size": {"w":920,"h":1080},
+          "children": [],
+          "guide": {
+            "art": {"slot":"imagem","kind":"inline","box":{"x":0,"y":0,"w":920,"h":1080}},
+            "layers": [
+              {
+                "name": "arte",
+                "label": "arte 920px",
+                "nodes": [],
+                "locked": false,
+                "visible": true,
+                "opacity": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "fonts": [{"family":"Source Sans 3","source":"bundled"}],
+  "assets": []
+}
