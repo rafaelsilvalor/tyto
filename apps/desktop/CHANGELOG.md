@@ -1,5 +1,34 @@
 # @tyto/desktop
 
+## 0.25.0
+
+### Minor Changes
+
+- 93bc3c4: The Explorer marks each delivery folder of a trusted folder with its exports checked against
+  its record (TYTO-757, ADR 0215): ✓ ready to check, ! incomplete, … in progress, each problem
+  in the mark's tooltip. Main checks again a moment after files land, through the same check a
+  recipe's `deliveries` reads, and lends the format catalogue to the recipe runner as the fallback
+  for `delivery.sizes`.
+
+### Patch Changes
+
+- Updated dependencies [48cca9b]
+  - @tyto/core@0.52.0
+  - @tyto/recipe@0.13.0
+  - @tyto/io@5.12.0
+  - @tyto/plugin-api@0.25.0
+  - @tyto/command-line@0.9.9
+  - @tyto/brief-lang@0.12.3
+  - @tyto/editor@0.21.6
+  - @tyto/export-html@0.8.8
+  - @tyto/export-svg@2.1.8
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.30
+  - @tyto/pipeline@0.12.27
+  - @tyto/template-lang@0.8.28
+  - @tyto/templates@1.2.25
+  - @tyto/theme-pack@0.1.30
+
 ## 0.24.6
 
 ### Patch Changes
