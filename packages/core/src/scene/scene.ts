@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { frameGuideSchema } from './guide.js';
 import { sceneNodeSchema } from './nodes.js';
 import { assetRefSchema, fontRefSchema, paintSchema, sizeSchema } from './primitives.js';
 import { sceneInvariants } from './invariants.js';
@@ -21,6 +22,11 @@ export const frameSchema = z.strictObject({
   /** No background means transparent: the rasterizer omits it rather than painting white. */
   background: paintSchema.optional(),
   children: z.array(sceneNodeSchema),
+  /**
+   * How a layered guide cuts this frame (ADR 0220). Only `compile(..., { guide: true })`
+   * sets it, so a frame of any other render has no such key.
+   */
+  guide: frameGuideSchema.optional(),
 });
 export type Frame = z.infer<typeof frameSchema>;
 

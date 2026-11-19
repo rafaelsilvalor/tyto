@@ -125,3 +125,49 @@ describe('banner-teste', () => {
 describe('arte-teste', () => {
   snapshotsOf(templateOf(arteManifest, arteTeste), [{ name: 'sem-arte', brief: arteSemArteBrief }]);
 });
+
+const NEWLINE = '\n';
+
+/** JSON with every value that fits on a line written on one, so a diff reads node by node. */
+function compactJson(value: unknown, indent = ''): string {
+  const flat = JSON.stringify(value);
+  if (flat.length + indent.length <= 100 || value === null || typeof value !== 'object') {
+    return flat;
+  }
+  const inner = `${indent}  `;
+  const lines = Array.isArray(value)
+    ? value.map((item) => inner + compactJson(item, inner))
+    : Object.entries(value).map(
+        ([key, item]) => `${inner}${JSON.stringify(key)}: ${compactJson(item, inner)}`,
+      );
+  const [open, close] = Array.isArray(value) ? ['[', ']'] : ['{', '}'];
+  return [open, lines.join(`,${NEWLINE}`), `${indent}${close}`].join(NEWLINE);
+}
+
+/**
+ * The guide for the same brief (ADR 0220), as the Scene `compile(..., { guide: true })` hands
+ * the layered-file exporter: the frame of each format cut into layers, the title's area, and
+ * the `inline` picture's own canvas per format. JSON, because what is pinned is the layering,
+ * which no HTML or SVG shows.
+ */
+describe('arte-teste guide', () => {
+  it('writes the guide Scene it wrote for sem-arte.brief', async () => {
+    const compiled = valueOf(
+      await compileTemplate({
+        brief: arteSemArteBrief,
+        template: templateOf(arteManifest, arteTeste),
+        formats: FORMATS,
+        assets: ASSETS,
+        asset: placeholderAsset,
+        guide: true,
+      }),
+    );
+    expect(compiled.scene.artworks.map((artwork) => artwork.id)).toEqual([
+      'artwork-1',
+      'external-art-imagem',
+    ]);
+    await expect(compactJson(compiled.scene) + NEWLINE).toMatchFileSnapshot(
+      './__snapshots__/arte-teste/sem-arte.guide.json',
+    );
+  });
+});

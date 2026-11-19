@@ -8,6 +8,14 @@ import { measureText } from '../text/layout.js';
 import { originOf } from '../text/origin.js';
 import type { SourceRange } from '../source/range.js';
 import type { AssetRef, FontRef, Paint } from '../scene/primitives.js';
+import {
+  externalNodesOf,
+  guideOf,
+  inlineArtCanvases,
+  slotNodesOf,
+  withExternalArtEmptied,
+  withGuideAreas,
+} from './guide.js';
 import { externalArtSlotOf, withExternalArtBoxes } from '../scene/external-art.js';
 import { gapStampNode } from '../scene/gap.js';
 import { type Artwork, type Frame, type Scene, parseScene } from '../scene/scene.js';
@@ -123,6 +131,19 @@ function slotAt(
   for (const slot of Object.values(slots)) {
     if (slot.range === undefined) continue;
     if (slot.range.start <= range.start && range.end <= slot.range.end) return slot;
+  }
+  return undefined;
+}
+
+/** The slot a text node's content came from, when a run of it came from one. */
+function textSlotOf(
+  node: TextNode,
+  slots: Readonly<Record<string, ResolvedSlot>>,
+): string | undefined {
+  for (const run of node.runs) {
+    const range = originOf(run);
+    const slot = range === undefined ? undefined : slotAt(range, slots);
+    if (slot !== undefined) return slot.name;
   }
   return undefined;
 }
@@ -348,7 +369,19 @@ interface Plan {
  * slide. A manifest without one gives a single artwork, because a brief still produces
  * an artwork even when nothing repeats.
  */
-function planArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): readonly Plan[] {
+function planArtworks(
+  resolved: ResolvedBrief,
+  manifest: TemplateManifest,
+  guide = false,
+): readonly Plan[] {
+  const plans = plannedArtworks(resolved, manifest);
+  // In a guide the art is what the designer is about to paint, so even a file the brief
+  // names is left out and its place is the box (ADR 0220).
+  if (!guide) return plans;
+  return plans.map((plan) => ({ ...plan, slots: withExternalArtEmptied(plan.slots, manifest) }));
+}
+
+function plannedArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): readonly Plan[] {
   const repeatable = Object.entries(manifest.slots).find(([, slot]) => slot.repeat)?.[0];
 
   if (repeatable === undefined || resolved.artworks.length === 0) {
@@ -417,6 +450,13 @@ export interface CompileOptions {
    * and what is supplied here is laid over it.
    */
   readonly values?: SuppliedValues;
+  /**
+   * Compile the guide for art painted outside Tyto (ADR 0220): every external slot left
+   * empty, an outlined area per node a slot produced, each frame's `guide` saying how it cuts
+   * into layers, and one canvas per `inline` slot. The same layout path as any render; absent
+   * or false, the Scene is byte for byte what it was.
+   */
+  readonly guide?: boolean;
 }
 
 export function compile(
@@ -455,7 +495,7 @@ export async function compileDeferred(
   ];
   if (missing.length > 0) return err(missing);
 
-  const plans = planArtworks(resolved, manifest);
+  const plans = planArtworks(resolved, manifest, options.guide);
   const measure = measureOf(options.faces);
   const brand = brandKitOf(resolved, manifest, options);
   // What the host read from the template's folder in the installed plugin (TYTO-478), so a
@@ -620,7 +660,8 @@ function compileWith(
   const brand = brandKitOf(resolved, manifest, options);
   const values = resolveValues(manifest, suppliedOf(resolved, options), files);
 
-  const plans = planArtworks(resolved, manifest);
+  const guide = options.guide === true;
+  const plans = planArtworks(resolved, manifest, guide);
   const problems: Diagnostic[] = [...values.diagnostics];
   const artworks: Artwork[] = [];
   const fonts = new Map<string, FontRef>();
@@ -648,7 +689,9 @@ function compileWith(
       const built = build(context);
       problems.push(...reports, ...built.problems);
       if (built.frame === undefined) continue;
-      let frame: Frame = built.frame;
+      // `guide` is compile's to set: one a template sent is not carried into the Scene.
+      const { guide: _sent, ...own } = built.frame;
+      let frame: Frame = own;
 
       // A template that returns the wrong frame has mixed up its own branches, and the
       // scene would render the story layout under the feed's name.
@@ -662,6 +705,11 @@ function compileWith(
         continue;
       }
 
+      // Before layout, which replaces the runs that remember which slot they came from.
+      const slotNodes = guide
+        ? slotNodesOf(frame.children, plan.slots, (node) => textSlotOf(node, plan.slots))
+        : undefined;
+
       if (faces !== undefined) {
         frame = {
           ...frame,
@@ -670,7 +718,12 @@ function compileWith(
       }
 
       // Before `collect`, so a placeholder never reaches `Scene.assets` as bytes to load.
+      const external = guide ? externalNodesOf(frame, context.idPrefix) : undefined;
       frame = withExternalArtBoxes(frame, context.idPrefix);
+      let areas: readonly string[] = [];
+      if (slotNodes !== undefined) {
+        ({ frame, areas } = withGuideAreas(frame, slotNodes, faces));
+      }
 
       // The stamp goes on last, so it sits over everything the template drew (ADR 0035).
       // `collect` runs before it because the stamp references neither a font nor an asset
@@ -683,11 +736,16 @@ function compileWith(
           children: [...frame.children, gapStampNode(`${context.idPrefix}.gap`, frame.size)],
         };
       }
+      // Last, so every node the frame paints, the stamp included, is in a layer.
+      if (external !== undefined) {
+        frame = { ...frame, guide: guideOf(frame, external, areas, manifest, faces) };
+      }
       frames.push(frame);
     }
 
     artworks.push({ id: plan.id, frames });
   }
+  if (guide) artworks.push(...inlineArtCanvases(manifest, resolved.formats));
 
   // Fatal diagnostics replace the scene; everything else rides along with it (ADR 0025,
   // extending ADR 0013). Until text was measured here nothing in this function produced a

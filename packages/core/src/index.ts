@@ -461,6 +461,19 @@ export {
   sceneSchema,
 } from './scene/scene.js';
 
+export {
+  type FrameGuide,
+  type GuideArt,
+  type GuideBox,
+  type GuideLayer,
+  type GuideLayerName,
+  GUIDE_LAYER_NAMES,
+  frameGuideSchema,
+  guideArtSchema,
+  guideBoxSchema,
+  guideLayerSchema,
+} from './scene/guide.js';
+
 export { sceneInvariants } from './scene/invariants.js';
 
 export { SVG_MARKUP_WAY_OUT, checkSvgMarkup } from './scene/svg-markup.js';
