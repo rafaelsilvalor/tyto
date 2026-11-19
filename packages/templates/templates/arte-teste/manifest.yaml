@@ -1,0 +1,25 @@
+name: arte-teste
+version: 1.0.0
+brand: tyto-demo
+description: A test piece whose background and picture are painted outside Tyto.
+# The pack's test template for external art (ADR 0220): a slot painted in another program at
+# the size declared per format. With no file yet, each one is an outlined box where it goes.
+formats: [grid-1x1, story]
+slots:
+  titulo: { type: rich-text, required: true, max: 80 }
+  # Covers the whole format and keeps its proportion.
+  fundo:
+    type: image
+    external:
+      kind: full
+      sizes:
+        grid-1x1: { width: 1080, height: 1080 }
+        story: { width: 1080, height: 1920 }
+  # A picture under the title, as wide as the text; whoever paints it decides its height.
+  imagem:
+    type: image
+    external:
+      kind: inline
+      sizes:
+        grid-1x1: { width: 920, suggestedHeight: 560 }
+        story: { width: 920, suggestedHeight: 1080 }

@@ -119,6 +119,7 @@ non-zero.
 | `E_FORMATS_SYNTAX` | error | yes | The project's formats.yaml is not valid YAML. |
 | `E_FORMATS_SHAPE` | error | yes | A formats file parses as YAML but does not match the formats schema. |
 | `E_FORMAT_NOT_DEFINED` | error | yes | A template renders a format the project does not define a size for. |
+| `E_EXTERNAL_ART_ASPECT` | error | yes | A slot's full external art does not keep the proportion of a format it covers (ADR 0220). |
 | `E_MANIFEST_SYNTAX` | error | yes | A template manifest is not valid YAML. |
 | `E_MANIFEST_SHAPE` | error | yes | A template manifest parses as YAML but does not match the manifest schema. |
 | `E_TEMPLATE_DUPLICATE` | error | yes | Two template folders declare the same manifest name. |
@@ -143,6 +144,7 @@ non-zero.
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_TEMPLATE_ORPHAN` | warning | no | A paragraph of an artwork ends on a line holding a single word in one format. |
 | `W_TEMPLATE_FILE_MISSING` | warning | no | A file an artwork's template draws with is not in the template's folder in one format. |
+| `W_EXTERNAL_ART_MISSING` | warning | no | A slot whose art is painted outside Tyto has no file yet, and an outlined box stands in for it (ADR 0220). |
 | `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
 | `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration sets a declared value to one of the wrong kind or outside its limits. |
 | `E_TEMPLATE_ALIAS_TAKEN` | error | no | A plugin file gives a configuration an alias that is a template's name. |
@@ -365,6 +367,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_FORMATS_SYNTAX` | yes | No formats file means no frame has a size. |
 | `E_FORMATS_SHAPE` | yes | No formats file means no frame has a size. |
 | `E_FORMAT_NOT_DEFINED` | yes | A frame with no size cannot be drawn, and `compile` refuses before it builds anything — so the formats that are defined do not render either, which is what would have to change first. |
+| `E_EXTERNAL_ART_ASPECT` | yes | The declaration is the size somebody paints to, and art painted to the wrong proportion is cropped or stretched on every render; `compile` refuses before it builds anything, as it does for a format with no size. |
 | `E_MANIFEST_SYNTAX` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_MANIFEST_SHAPE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
 | `E_TEMPLATE_DUPLICATE` | yes | The registry answers with no manifest at all, and a manifest is what every slot is checked against. |
@@ -1735,6 +1738,20 @@ Template '{template}' renders format '{format}', which the project does not defi
 
 Parameters: `template`, `format`, `defined`
 
+### `E_EXTERNAL_ART_ASPECT`
+
+**Severity:** error · **Fatal:** yes · **Spec:** `docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md`
+
+A slot's full external art does not keep the proportion of a format it covers (ADR 0220).
+
+The declaration is the size somebody paints to, and art painted to the wrong proportion is cropped or stretched on every render; `compile` refuses before it builds anything, as it does for a format with no size.
+
+```
+Slot '{slot}' of template '{template}' declares full art of {width}×{height} for format '{format}', which is {formatWidth}×{formatHeight}: full art keeps the format's proportion, so its height there is {expected}.
+```
+
+Parameters: `slot`, `template`, `width`, `height`, `format`, `formatWidth`, `formatHeight`, `expected`
+
 ### `E_MANIFEST_SYNTAX`
 
 **Severity:** error · **Fatal:** yes · **Spec:** `docs/template-authoring.md`
@@ -2912,6 +2929,20 @@ Artwork '{artwork}' is drawn without '{path}' in format '{format}': template '{t
 ```
 
 Parameters: `artwork`, `path`, `format`, `template`
+
+### `W_EXTERNAL_ART_MISSING`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md`
+
+A slot whose art is painted outside Tyto has no file yet, and an outlined box stands in for it (ADR 0220).
+
+The art arrives later by design, and the box keeps its place, size and stacking in every format; a warning never replaces a value (ADR 0013).
+
+```
+Slot '{slot}' of template '{template}' has no art yet ({reason}); an outlined box is drawn where it goes.
+```
+
+Parameters: `slot`, `template`, `reason`
 
 ### `W_TEMPLATE_VALUE_UNKNOWN`
 

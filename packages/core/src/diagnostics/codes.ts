@@ -999,6 +999,17 @@ export const diagnosticCodes = {
     fatality:
       'A frame with no size cannot be drawn, and `compile` refuses before it builds anything — so the formats that are defined do not render either, which is what would have to change first.',
   },
+  E_EXTERNAL_ART_ASPECT: {
+    severity: 'error',
+    summary:
+      "A slot's full external art does not keep the proportion of a format it covers (ADR 0220).",
+    template:
+      "Slot '{slot}' of template '{template}' declares full art of {width}×{height} for format '{format}', which is {formatWidth}×{formatHeight}: full art keeps the format's proportion, so its height there is {expected}.",
+    spec: 'docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md',
+    fatal: true,
+    fatality:
+      'The declaration is the size somebody paints to, and art painted to the wrong proportion is cropped or stretched on every render; `compile` refuses before it builds anything, as it does for a format with no size.',
+  },
   E_MANIFEST_SYNTAX: {
     severity: 'error',
     summary: 'A template manifest is not valid YAML.',
@@ -1283,6 +1294,17 @@ export const diagnosticCodes = {
     spec: 'docs/adr/0058-a-template-reports-warnings-beside-its-frame.md',
     fatal: false,
     fatality: 'A warning never replaces a value (ADR 0013).',
+  },
+  W_EXTERNAL_ART_MISSING: {
+    severity: 'warning',
+    summary:
+      'A slot whose art is painted outside Tyto has no file yet, and an outlined box stands in for it (ADR 0220).',
+    template:
+      "Slot '{slot}' of template '{template}' has no art yet ({reason}); an outlined box is drawn where it goes.",
+    spec: 'docs/adr/0220-a-slot-may-declare-art-painted-outside-tyto.md',
+    fatal: false,
+    fatality:
+      'The art arrives later by design, and the box keeps its place, size and stacking in every format; a warning never replaces a value (ADR 0013).',
   },
   // Warnings and not errors: a configuration is tolerant per value, as a plugin file is per
   // entry (ADR 0151 decision 2). The template draws with its default instead, and says so.

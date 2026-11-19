@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { parseYamlConfig } from '../config/yaml-source.js';
 import { diagnostic } from '../diagnostics/diagnostic.js';
 import { type Diagnostics, type Result, err, ok } from '../result/result.js';
+import type { Size } from '../scene/primitives.js';
 
 /**
  * `manifest.yaml` — what a template declares about itself (`docs/template-authoring.md`).
@@ -51,6 +52,30 @@ export type SlotType = z.infer<typeof slotTypeSchema>;
 export const adjustmentTypeSchema = z.enum(['flag', 'enum']);
 export type AdjustmentType = z.infer<typeof adjustmentTypeSchema>;
 
+const pixels = z.number().int().positive();
+
+/**
+ * One format's size of a slot's external art (ADR 0220): the art's own width, and its height
+ * for a `full` slot or the height a person starts from for an `inline` one.
+ */
+export const externalArtSizeSchema = z.strictObject({
+  width: pixels,
+  height: pixels.optional(),
+  suggestedHeight: pixels.optional(),
+});
+export type ExternalArtSize = z.infer<typeof externalArtSizeSchema>;
+
+/**
+ * Art painted outside Tyto, in another program, for an image slot (ADR 0220). `full` covers
+ * the whole format and keeps its proportion; `inline` is a picture among the text, as wide as
+ * the declaration says and as tall as the person painting it decides.
+ */
+export const externalArtSchema = z.strictObject({
+  kind: z.enum(['full', 'inline']),
+  sizes: z.record(z.string().min(1), externalArtSizeSchema),
+});
+export type ExternalArt = z.infer<typeof externalArtSchema>;
+
 /**
  * `min` and `max` count occurrences on a repeatable slot and characters on every other
  * one. That is the overload `docs/template-authoring.md` writes — `titulo` is capped at 60
@@ -93,8 +118,14 @@ export const slotSchema = z
     /** The accepted values of an `enum` slot, and nothing else's. */
     values: z.array(z.string().min(1)).min(1).optional(),
     default: z.string().optional(),
+    /**
+     * Art somebody paints in another program, at the sizes declared per format (ADR 0220).
+     * Optional, so a manifest that never says it parses to the object it did before.
+     */
+    external: externalArtSchema.optional(),
   })
   .superRefine((slot, context) => {
+    if (slot.external !== undefined) externalArtProblems(slot, context);
     if (slot.type === 'enum') {
       if (slot.values === undefined) {
         context.addIssue({
@@ -163,6 +194,70 @@ export const slotSchema = z
     }
   });
 export type Slot = z.infer<typeof slotSchema>;
+
+interface ExternalSlotShape {
+  readonly type: SlotType;
+  readonly repeat: boolean;
+  readonly per?: string | undefined;
+  readonly multiple?: boolean | undefined;
+  readonly external?: ExternalArt | undefined;
+}
+
+/**
+ * What a slot's `external` declaration may not say (ADR 0220). Only an image is art; a `full`
+ * slot states its height, an `inline` one the height a person starts from, and neither states
+ * the other's. A slide's own slot is refused for now: the guide draws one canvas per slot and
+ * format, and a carousel would need one per slide too, which nothing has decided.
+ */
+function externalArtProblems(slot: ExternalSlotShape, context: z.RefinementCtx): void {
+  const external = slot.external;
+  if (external === undefined) return;
+  if (slot.type !== 'image') {
+    context.addIssue({
+      code: 'custom',
+      path: ['external'],
+      message: `external is only meaningful on an 'image' slot, not on '${slot.type}'`,
+    });
+  }
+  if (slot.repeat || slot.per !== undefined || slot.multiple === true) {
+    context.addIssue({
+      code: 'custom',
+      path: ['external'],
+      message:
+        'external art is one picture per format: not on a slot that repeats, belongs to each slide or takes several values',
+    });
+  }
+  const wanted = external.kind === 'full' ? 'height' : 'suggestedHeight';
+  const refused = external.kind === 'full' ? 'suggestedHeight' : 'height';
+  for (const [format, size] of Object.entries(external.sizes)) {
+    if (size[wanted] === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['external', 'sizes', format],
+        message: `${wanted} is required for each format of a '${external.kind}' slot`,
+      });
+    }
+    if (size[refused] !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['external', 'sizes', format, refused],
+        message: `${refused} is not meaningful on a '${external.kind}' slot; it takes ${wanted}`,
+      });
+    }
+  }
+}
+
+/**
+ * The size a slot's external art has in `format` (ADR 0220): `full`'s width × height, or
+ * `inline`'s width × suggestedHeight. `undefined` when the slot declares no external art or
+ * no size for that format.
+ */
+export function externalArtSize(slot: Pick<Slot, 'external'>, format: string): Size | undefined {
+  const size = slot.external?.sizes[format];
+  if (size === undefined) return undefined;
+  const height = slot.external?.kind === 'full' ? size.height : size.suggestedHeight;
+  return height === undefined ? undefined : { w: size.width, h: height };
+}
 
 export const adjustmentSchema = z
   .strictObject({
@@ -352,6 +447,28 @@ export const templateManifestSchema = z
           code: 'custom',
           path: ['slots', name, 'repeat'],
           message: `only one slot may repeat, and '${repeatable[0]?.[0]}' already does`,
+        });
+      }
+    }
+
+    // External art is sized per format the template renders, so its sizes name exactly the
+    // manifest's formats: one it does not render is a typo, and one left out has no canvas.
+    for (const [name, slot] of Object.entries(manifest.slots)) {
+      if (slot.external === undefined) continue;
+      for (const format of Object.keys(slot.external.sizes)) {
+        if (manifest.formats.includes(format)) continue;
+        context.addIssue({
+          code: 'custom',
+          path: ['slots', name, 'external', 'sizes', format],
+          message: `names format '${format}', which the manifest does not render (${manifest.formats.join(', ')})`,
+        });
+      }
+      for (const format of manifest.formats) {
+        if (format in slot.external.sizes) continue;
+        context.addIssue({
+          code: 'custom',
+          path: ['slots', name, 'external', 'sizes'],
+          message: `states no size for format '${format}', which the manifest renders`,
         });
       }
     }

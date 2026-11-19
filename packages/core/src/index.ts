@@ -295,6 +295,8 @@ export {
   type AdjustmentType,
   type DeclaredValue,
   type DeclaredValueType,
+  type ExternalArt,
+  type ExternalArtSize,
   type ManifestFace,
   type Slot,
   type SlotType,
@@ -303,6 +305,9 @@ export {
   adjustmentTypeSchema,
   declaredValueSchema,
   declaredValueTypeSchema,
+  externalArtSchema,
+  externalArtSize,
+  externalArtSizeSchema,
   listsOccurrences,
   manifestFaceSchema,
   parseManifest,
@@ -504,3 +509,10 @@ export {
   gapStampNode,
   gapStampWidth,
 } from './scene/gap.js';
+
+export {
+  externalArtPlaceholder,
+  externalArtSlotOf,
+  isExternalArtPlaceholder,
+  withExternalArtBoxes,
+} from './scene/external-art.js';

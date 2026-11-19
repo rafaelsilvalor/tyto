@@ -144,6 +144,28 @@ These are the rules it enforces beyond the shape:
   Declare it only when the template really reads the value that way, and only on a
   `rich-text` slot (anything else is refused). A slot that does not declare it warns as
   before (`docs/brief-language.md`).
+- **`external` says an image is painted outside Tyto** (ADR 0220, TYTO-740), at a size per
+  format: `kind: full` covers the format and states `width` and `height`, which keep the
+  format's proportion (`E_EXTERNAL_ART_ASPECT` at render otherwise); `kind: inline` states
+  `width` and `suggestedHeight`, the height whoever paints it starts from. `sizes` names every
+  format the manifest renders and no other. Only on an `image` slot that does not repeat,
+  belong to each slide or take several values.
+
+  ```yaml
+  fundo:
+    type: image
+    external:
+      kind: full
+      sizes:
+        grid-1x1: { width: 1080, height: 1080 }
+        story: { width: 1080, height: 1920 }
+  ```
+
+  Until the file exists, the slot is `W_EXTERNAL_ART_MISSING` and never missing: the template
+  is handed a placeholder ref whose `size` is the declared one for the format it draws, places
+  it as it places any picture, and `compile` draws it as an outlined magenta box in that place.
+  `arte-teste` in the built-in pack is the example.
+
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's
   identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by
   any brief.

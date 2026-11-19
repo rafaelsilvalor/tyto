@@ -8,6 +8,7 @@ import { measureText } from '../text/layout.js';
 import { originOf } from '../text/origin.js';
 import type { SourceRange } from '../source/range.js';
 import type { AssetRef, FontRef, Paint } from '../scene/primitives.js';
+import { externalArtSlotOf, withExternalArtBoxes } from '../scene/external-art.js';
 import { gapStampNode } from '../scene/gap.js';
 import { type Artwork, type Frame, type Scene, parseScene } from '../scene/scene.js';
 import { TemplateError } from '../template/errors.js';
@@ -21,7 +22,7 @@ import {
   measureNothing,
   noFiles,
 } from '../template/define.js';
-import type { TemplateManifest } from '../template/manifest.js';
+import { type TemplateManifest, externalArtSize } from '../template/manifest.js';
 import { type SuppliedValues, resolveValues } from '../template/declared-values.js';
 import type { TemplateValues } from '../template/value-readers.js';
 import { type BrandKit, noBrandKit } from '../template/brand.js';
@@ -255,6 +256,70 @@ function layoutText(
   });
 }
 
+/**
+ * `slots` with each placeholder of missing external art sized for `format`, from the
+ * manifest's declaration (ADR 0220), so a template sizes it as it sizes a picture (ADR 0158).
+ */
+function withExternalArtSizes(
+  slots: Readonly<Record<string, ResolvedSlot>>,
+  manifest: TemplateManifest,
+  format: string,
+): Readonly<Record<string, ResolvedSlot>> {
+  let sized: Record<string, ResolvedSlot> | undefined;
+  for (const [name, slot] of Object.entries(slots)) {
+    if (slot.value.kind !== 'image') continue;
+    const placeholderOf = externalArtSlotOf(slot.value.asset);
+    const declared = manifest.slots[placeholderOf ?? ''];
+    if (placeholderOf === undefined || declared === undefined) continue;
+    const size = externalArtSize(declared, format);
+    if (size === undefined) continue;
+    sized ??= { ...slots };
+    sized[name] = { ...slot, value: { kind: 'image', asset: { ...slot.value.asset, size } } };
+  }
+  return sized ?? slots;
+}
+
+/**
+ * `E_EXTERNAL_ART_ASPECT` for every format a `full` slot's declared size does not keep the
+ * proportion of (ADR 0220). Checked here because the format's size is the project's
+ * `formats.yaml`, which the manifest's own parse never sees; within a pixel, for rounding.
+ */
+function externalArtAspectProblems(
+  resolved: ResolvedBrief,
+  manifest: TemplateManifest,
+  catalogue: FormatCatalogue,
+): Diagnostic[] {
+  const problems: Diagnostic[] = [];
+  for (const [slot, declared] of Object.entries(manifest.slots)) {
+    if (declared.external?.kind !== 'full') continue;
+    for (const format of resolved.formats) {
+      const art = externalArtSize(declared, format);
+      const canvas = catalogue.sizeOf(format);
+      if (art === undefined || canvas === undefined) continue;
+      const expected = (art.w * canvas.h) / canvas.w;
+      if (Math.abs(art.h - expected) < 1) continue;
+      const range = resolved.slots[slot]?.range;
+      problems.push(
+        diagnostic(
+          'E_EXTERNAL_ART_ASPECT',
+          {
+            slot,
+            template: manifest.name,
+            width: art.w,
+            height: art.h,
+            format,
+            formatWidth: canvas.w,
+            formatHeight: canvas.h,
+            expected: Math.round(expected),
+          },
+          range === undefined ? {} : { range },
+        ),
+      );
+    }
+  }
+  return problems;
+}
+
 /** The adjustments of one slot, flattened the way a template wants to read them. */
 function flatten(slot: ResolvedSlot | undefined): Readonly<Record<string, string | true>> {
   const flat: Record<string, string | true> = {};
@@ -384,7 +449,10 @@ export async function compileDeferred(
 ): Promise<Result<Scene, Diagnostics>> {
   const { manifest } = template;
   // Before the first call, for `compile`'s reason, and because a call here costs a message.
-  const missing = undefinedFormats(options.formats, resolved.formats, manifest.name);
+  const missing = [
+    ...undefinedFormats(options.formats, resolved.formats, manifest.name),
+    ...externalArtAspectProblems(resolved, manifest, options.formats),
+  ];
   if (missing.length > 0) return err(missing);
 
   const plans = planArtworks(resolved, manifest);
@@ -403,7 +471,7 @@ export async function compileDeferred(
       const context = contextOf(
         plan,
         format,
-        manifest.name,
+        manifest,
         summariesOf(plans),
         options,
         measure,
@@ -475,7 +543,7 @@ function summariesOf(plans: readonly Plan[]): readonly ArtworkSummary[] {
 function contextOf(
   plan: Plan,
   format: string,
-  template: string,
+  manifest: TemplateManifest,
   artworks: readonly ArtworkSummary[],
   options: CompileOptions,
   measure: TemplateContext['measure'],
@@ -490,7 +558,7 @@ function contextOf(
     size: options.formats.sizeOf(format) ?? { w: 0, h: 0 },
     idPrefix: idPrefixOf(plan.id, format),
     artwork: { id: plan.id, index: plan.index, count: artworks.length },
-    slots: plan.slots,
+    slots: withExternalArtSizes(plan.slots, manifest, format),
     adjustments: plan.adjustments,
     artworks,
     measure,
@@ -498,7 +566,7 @@ function contextOf(
     brand,
     ...(values === undefined ? {} : { values }),
     report: (report) => {
-      reports.push(reportDiagnostic(report, plan, format, template));
+      reports.push(reportDiagnostic(report, plan, format, manifest.name));
     },
   };
 }
@@ -540,7 +608,10 @@ function compileWith(
 ): Result<Scene, Diagnostics> {
   // Before anything is built: a format with no size cannot produce a frame, and finding
   // that out per artwork would report the same thing once per slide.
-  const missing = undefinedFormats(options.formats, resolved.formats, manifest.name);
+  const missing = [
+    ...undefinedFormats(options.formats, resolved.formats, manifest.name),
+    ...externalArtAspectProblems(resolved, manifest, options.formats),
+  ];
   if (missing.length > 0) return err(missing);
 
   const faces = options.faces;
@@ -564,7 +635,7 @@ function compileWith(
       const context = contextOf(
         plan,
         format,
-        manifest.name,
+        manifest,
         summariesOf(plans),
         options,
         measure,
@@ -597,6 +668,9 @@ function compileWith(
           children: layoutText(frame.children, faces, plan.slots, format, faceReport, problems),
         };
       }
+
+      // Before `collect`, so a placeholder never reaches `Scene.assets` as bytes to load.
+      frame = withExternalArtBoxes(frame, context.idPrefix);
 
       // The stamp goes on last, so it sits over everything the template drew (ADR 0035).
       // `collect` runs before it because the stamp references neither a font nor an asset

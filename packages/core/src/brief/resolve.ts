@@ -4,6 +4,7 @@ import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import { didYouMean } from '../diagnostics/suggest.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
 import { type Diagnostics, type Result, err, fromPartial } from '../result/result.js';
+import { externalArtPlaceholder, isExternalArtPlaceholder } from '../scene/external-art.js';
 import type { AssetRef } from '../scene/primitives.js';
 import { type SourceRange, sourceRange } from '../source/range.js';
 import type { TemplateConfigurations, TemplateSelection } from '../template/configurations.js';
@@ -225,6 +226,10 @@ function unknownSlot(
       ...(suggestion === undefined ? {} : { hint: `Did you mean '${suggestion}'?` }),
     },
   );
+}
+
+function isPlaceholderValue(slot: ResolvedSlot): boolean {
+  return slot.value.kind === 'image' && isExternalArtPlaceholder(slot.value.asset);
 }
 
 /** A run of lines as a block, or nothing when the run is empty. */
@@ -756,6 +761,16 @@ class Resolver {
 
       case 'image': {
         const asset = await this.options.assets.resolve(plain);
+        if (asset === undefined && slot.external !== undefined) {
+          // Art painted elsewhere arrives later by design (ADR 0220): the slot takes a
+          // placeholder the template places as usual, and `compile` draws it as a box.
+          this.reportExternalArtMissing(
+            candidate.name,
+            `'${plain}' was not found in ${searchedIn(this.options.assets)}`,
+            candidate.range,
+          );
+          return { kind: 'image', asset: externalArtPlaceholder(candidate.name) };
+        }
         if (asset === undefined) {
           const explained = this.options.assets.explain?.(plain);
           this.report(
@@ -827,11 +842,36 @@ class Resolver {
     }
   }
 
+  private reportExternalArtMissing(
+    slot: string,
+    reason: string,
+    range: SourceRange | undefined,
+  ): void {
+    this.report(
+      diagnostic(
+        'W_EXTERNAL_ART_MISSING',
+        { slot, template: this.manifest.name, reason },
+        range === undefined ? {} : { range },
+      ),
+    );
+  }
+
   /** Manifest defaults, the required slots nobody set, and the repeat count. */
   finish(fallbackRange: SourceRange | undefined): void {
     for (const [name, slot] of Object.entries(this.manifest.slots)) {
       if (slot.per !== undefined) {
         this.finishPerOccurrence(name, slot);
+        continue;
+      }
+      // An external slot nobody set is art not painted yet, not a hole (ADR 0220): it is
+      // drawn as an outlined box, so it neither stamps the frame nor counts as missing.
+      if (slot.external !== undefined && !this.slots.has(name)) {
+        this.reportExternalArtMissing(name, 'the brief names no file', fallbackRange);
+        this.slots.set(name, {
+          name,
+          value: { kind: 'image', asset: externalArtPlaceholder(name) },
+          adjustments: [],
+        });
         continue;
       }
       if (slot.default !== undefined && !this.slots.has(name) && !slot.repeat) {
@@ -895,6 +935,8 @@ class Resolver {
       ];
       for (const [name, resolved] of [...this.slots, ...perOccurrence]) {
         if (rendered.includes(name)) continue;
+        // A placeholder nobody wrote is not a value the brief filled in for nothing.
+        if (resolved.range === undefined && isPlaceholderValue(resolved)) continue;
         this.report(
           diagnostic(
             'W_UNUSED_SLOT',

@@ -2,7 +2,7 @@
 
 # Galeria de templates
 
-Os templates que vêm com o Tyto: 3, em 6 formatos. Eles servem para experimentar o Tyto e para testá-lo. Os templates com que uma equipe publica ficam nos seus próprios repositórios, e um arquivo de plugin os nomeia para o Tyto buscá-los: [Buscar templates nos seus próprios repositórios](../command-line/plugins.md#buscar-templates-nos-seus-proprios-repositorios) mostra como. Cada imagem é o template desenhando o brief de exemplo guardado junto dele, no primeiro formato que ele lista, desenhado sem kit de marca: uma forma simples ocupa o lugar do logo da marca e `@assinatura` o da assinatura. Um brief escolhe um deles na linha `template:` e preenche os slots listados abaixo dele. As descrições vêm escritas nos próprios templates, em inglês.
+Os templates que vêm com o Tyto: 4, em 6 formatos. Eles servem para experimentar o Tyto e para testá-lo. Os templates com que uma equipe publica ficam nos seus próprios repositórios, e um arquivo de plugin os nomeia para o Tyto buscá-los: [Buscar templates nos seus próprios repositórios](../command-line/plugins.md#buscar-templates-nos-seus-proprios-repositorios) mostra como. Cada imagem é o template desenhando o brief de exemplo guardado junto dele, no primeiro formato que ele lista, desenhado sem kit de marca: uma forma simples ocupa o lugar do logo da marca e `@assinatura` o da assinatura. Um brief escolhe um deles na linha `template:` e preenche os slots listados abaixo dele. As descrições vêm escritas nos próprios templates, em inglês.
 
 ## Formatos
 
@@ -16,6 +16,22 @@ Os tamanhos que um brief pode pedir na linha `formats:`. Um template só desenha
 | `banner` | 1200 × 628 | `banner` | Banner |
 | `banner-1x1` | 600 × 600 | `banner` | Banner 1:1 |
 | `banner-345x146` | 345 × 146 | `banner` | Banner 345×146 |
+
+## arte-teste
+
+![arte-teste, desenhando examples/sem-arte.brief no formato grid-1x1](/template-gallery/arte-teste.png)
+
+A test piece whose background and picture are painted outside Tyto.
+
+**Marca** `tyto-demo` · **Faz** grid, story · **Formatos** `grid-1x1` (1080 × 1080), `story` (1080 × 1920)
+
+**Slots**
+
+| Slot | Tipo |  | Aceita |
+| --- | --- | --- | --- |
+| `titulo` | `rich-text` | obrigatório | texto; no máximo 80 caracteres |
+| `fundo` | `image` | opcional | o caminho de uma imagem |
+| `imagem` | `image` | opcional | o caminho de uma imagem |
 
 ## banner-teste
 
