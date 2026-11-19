@@ -1,5 +1,70 @@
 # @tyto/desktop
 
+## 0.26.0
+
+### Minor Changes
+
+- 1ac3ef7: A plugin action can finish a long write within one Apply (TYTO-791, ADR 0216). An `apply`
+  answer may say an operation should `continue`, with a `progress` line of at most 80
+  characters; the host asks again for those operations within the same Apply, up to 120 more
+  calls per batch, and a cancel read between calls leaves what was in progress `failed` as
+  unfinished. The plugin protocol moves from 27 to 28; a plugin built before it runs
+  unchanged. The desktop shows the progress under the plan with Cancel beside it, and
+  `tyto recipe run --apply` prints it on stderr and stops at the first Ctrl+C, exiting 1.
+- afeec68: The notebook draws **Apply all plans** under a recipe's `apply together` header line (TYTO-758,
+  ADR 0219), over the new `recipe:apply-together` channel, with a long write's progress and
+  Cancel under it and where it stopped once it ends. Under that header no plan has an Apply of
+  its own, so a lower plan is never applied before the ones above it. `applyTogether` tells its
+  caller each cell it starts (`onCell`), so the window shows progress on the cell being applied.
+- 5f0d18c: `to-delivery copy-text=<column>` keeps each delivery's copy in `editaveis/copy.md`
+  (TYTO-756, ADR 0217): a `Source:` line with the record's `copy`, then the cell's text as it
+  is, Markdown or plain. The record remembers the digest of the copy it wrote in
+  `written.files`, so a copy a person edited since is kept, never overwritten, and the plan's
+  note names it on every run; a missing copy is written again, and Apply fails a row whose
+  copy changed since the plan. The step form gains the field, with its help in Portuguese.
+- a44baf0: The Explorer marks a folder holding a delivery record as a delivery (TYTO-755, ADR 0210): the
+  folder wears a delivery icon, the record's `state` sits before the check's mark as the person
+  wrote it, and the mark's tooltip opens with the record's key and that state. The
+  `explorer:list` entry's `delivery` carries the record's `key` and `state`.
+- 912e97e: `rename-exports stem=<column> [digits=2] [path=<column>]` renames the images exported into
+  each delivery to the names it ships under, `<stem>-01.png` and on (TYTO-758, ADR 0218). The
+  numbers follow the record: the images each format owes, in the record's order of formats,
+  then any other image by name. Running it plans one line per file whose name changes; Apply
+  renames each delivery whole or not at all, failing it when a file changed since the plan or
+  a new name was taken, and never renames a file over another one. `core` gains
+  `deliveryExportNames`, the workspace ports a confined `rename`, and the step form its fields,
+  with their help in Portuguese.
+
+### Patch Changes
+
+- c3fc939: `apply together`, a recipe header line, applies every plan of a run in order with one
+  confirmation (TYTO-758, ADR 0219): `RecipeRunner.applyTogether` applies each cell's plan as
+  its own Apply would and stops at the first cell that is refused or fails an operation,
+  leaving the plans below for the next run (`E_RECIPE_APPLY_TOGETHER`). Under it, a plugin's
+  step plans against the renames a `rename-exports` above it planned: `host.workspace` reads,
+  stats and lists the new names while that plan call runs, and nothing else is read ahead.
+  `tyto recipe run --apply` applies such a recipe this way; the window's single Apply follows.
+- Updated dependencies [1ac3ef7]
+- Updated dependencies [afeec68]
+- Updated dependencies [c3fc939]
+- Updated dependencies [5f0d18c]
+- Updated dependencies [912e97e]
+  - @tyto/plugin-api@0.26.0
+  - @tyto/recipe@0.14.0
+  - @tyto/io@5.13.0
+  - @tyto/command-line@0.10.0
+  - @tyto/core@0.53.0
+  - @tyto/export-html@0.8.9
+  - @tyto/export-svg@2.1.9
+  - @tyto/google-fonts@0.1.31
+  - @tyto/pipeline@0.12.28
+  - @tyto/theme-pack@0.1.31
+  - @tyto/editor@0.21.7
+  - @tyto/brief-lang@0.12.4
+  - @tyto/fonts@0.5.0
+  - @tyto/template-lang@0.8.29
+  - @tyto/templates@1.2.26
+
 ## 0.25.0
 
 ### Minor Changes

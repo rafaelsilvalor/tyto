@@ -1,5 +1,44 @@
 # @tyto/command-line
 
+## 0.10.0
+
+### Minor Changes
+
+- 1ac3ef7: A plugin action can finish a long write within one Apply (TYTO-791, ADR 0216). An `apply`
+  answer may say an operation should `continue`, with a `progress` line of at most 80
+  characters; the host asks again for those operations within the same Apply, up to 120 more
+  calls per batch, and a cancel read between calls leaves what was in progress `failed` as
+  unfinished. The plugin protocol moves from 27 to 28; a plugin built before it runs
+  unchanged. The desktop shows the progress under the plan with Cancel beside it, and
+  `tyto recipe run --apply` prints it on stderr and stops at the first Ctrl+C, exiting 1.
+- c3fc939: `apply together`, a recipe header line, applies every plan of a run in order with one
+  confirmation (TYTO-758, ADR 0219): `RecipeRunner.applyTogether` applies each cell's plan as
+  its own Apply would and stops at the first cell that is refused or fails an operation,
+  leaving the plans below for the next run (`E_RECIPE_APPLY_TOGETHER`). Under it, a plugin's
+  step plans against the renames a `rename-exports` above it planned: `host.workspace` reads,
+  stats and lists the new names while that plan call runs, and nothing else is read ahead.
+  `tyto recipe run --apply` applies such a recipe this way; the window's single Apply follows.
+
+### Patch Changes
+
+- Updated dependencies [1ac3ef7]
+- Updated dependencies [afeec68]
+- Updated dependencies [c3fc939]
+- Updated dependencies [5f0d18c]
+- Updated dependencies [912e97e]
+  - @tyto/plugin-api@0.26.0
+  - @tyto/recipe@0.14.0
+  - @tyto/io@5.13.0
+  - @tyto/core@0.53.0
+  - @tyto/export-html@0.8.9
+  - @tyto/export-svg@2.1.9
+  - @tyto/google-fonts@0.1.31
+  - @tyto/pipeline@0.12.28
+  - @tyto/fonts@0.5.0
+  - @tyto/raster@0.2.5
+  - @tyto/template-lang@0.8.29
+  - @tyto/templates@1.2.26
+
 ## 0.9.9
 
 ### Patch Changes
