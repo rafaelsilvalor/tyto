@@ -210,6 +210,14 @@ const PT_BR: Readonly<Record<string, string>> = {
   'recipe.verb.to-delivery.field.copy-text.help':
     'A coluna cujo texto vira editaveis/copy.md; uma copy editada à mão é mantida.',
 
+  'recipe.verb.rename-exports.summary':
+    'Planeja os nomes com que as exportações de cada entrega são entregues, <stem>-01.png em diante, renomeadas ao Aplicar.',
+  'recipe.verb.rename-exports.field.stem.help':
+    'A coluna com o radical do nome dos arquivos de cada entrega.',
+  'recipe.verb.rename-exports.field.digits.help': 'Quantos dígitos cada número tem.',
+  'recipe.verb.rename-exports.field.path.help':
+    'A coluna com a pasta de cada entrega; path se não for dada.',
+
   'recipe.verb.deliveries.summary':
     'Lê cada ficha de entrega na pasta de entregas do projeto como uma linha.',
   'recipe.verb.deliveries.field.fields.help':

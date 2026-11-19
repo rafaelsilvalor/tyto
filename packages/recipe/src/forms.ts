@@ -491,6 +491,25 @@ export const GENERIC_VERB_FORMS: Readonly<Record<string, VerbForm>> = Object.fro
       'sink',
     ),
     form(
+      'rename-exports',
+      "Plans the names each delivery's exports ship under, <stem>-01.png and on, renamed on Apply.",
+      'rename-exports stem=stem',
+      [
+        named('stem', 'column', true, "The column holding each delivery's file-name stem."),
+        named('digits', 'choice', false, 'How many digits each number has.', {
+          values: ['1', '2', '3', '4'],
+          default: '2',
+        }),
+        named(
+          'path',
+          'column',
+          false,
+          "The column holding each delivery's folder; path unless given.",
+        ),
+      ],
+      'sink',
+    ),
+    form(
       'deliveries',
       "Reads every delivery record under the project's delivery folder as one row each.",
       'deliveries',

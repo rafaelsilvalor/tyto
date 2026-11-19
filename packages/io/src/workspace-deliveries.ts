@@ -1,6 +1,6 @@
 import type { Dirent } from 'node:fs';
-import { mkdir, open, readFile, readdir, stat } from 'node:fs/promises';
-import { isAbsolute, join, relative, sep } from 'node:path';
+import { lstat, mkdir, open, readFile, readdir, rename, stat } from 'node:fs/promises';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 
 import {
   DELIVERY_RECORD_FILE,
@@ -52,6 +52,9 @@ import { loadWorkspace } from './workspace.js';
  * JPEG files at the root of that exports folder, each one's pixel size from its header only
  * (`imageSize`, no decode and no new dependency), and counts the other files beside the record:
  * what `deliveries` checks the record against (ADR 0215).
+ *
+ * `rename` renames a delivery's export for `rename-exports` (ADR 0218), both paths confined as a
+ * write's are, never over another file.
  */
 
 export interface WorkspaceDeliveryOptions {
@@ -323,6 +326,32 @@ export function workspaceDeliveryPorts(options: WorkspaceDeliveryOptions): ToDel
         return ok(undefined);
       } catch (cause) {
         return refuse(`cannot write '${path}': ${describe(cause)}`);
+      }
+    },
+
+    // ADR 0218: both ends confined as a write is, and never over another file. A new name that
+    // differs only in case finds the same file on the file systems that fold case, which is
+    // told apart from another file by its identity, never by the name.
+    async rename(from, to) {
+      const source = await locate(from);
+      if (!source.ok) return source;
+      const target = await locate(to);
+      if (!target.ok) return target;
+      try {
+        const found = await lstat(source.value, { bigint: true }).catch(() => undefined);
+        if (found === undefined) return refuse(`cannot rename '${from}': it is not there`);
+        if (!found.isFile()) return refuse(`would rename '${from}', which is not a file`);
+        const there = await lstat(target.value, { bigint: true }).catch(() => undefined);
+        if (there !== undefined && (there.ino !== found.ino || there.dev !== found.dev)) {
+          return refuse(`would rename '${from}' over '${to}', which is there`);
+        }
+        // The confined path takes the case of a file already there (`realpath`); the name
+        // asked for is the one the file must take.
+        const named = join(dirname(target.value), to.slice(to.lastIndexOf('/') + 1));
+        await rename(source.value, named);
+        return ok(undefined);
+      } catch (cause) {
+        return refuse(`cannot rename '${from}': ${describe(cause)}`);
       }
     },
 

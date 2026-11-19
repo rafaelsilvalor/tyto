@@ -120,6 +120,13 @@ export interface ToDeliveryPorts {
   make(path: string): Promise<Result<void, readonly Diagnostic[]>>;
   /** Writes the file. The host confines the path to the workspace again. */
   write(path: string, text: string): Promise<Result<void, readonly Diagnostic[]>>;
+  /**
+   * Renames a file inside one workspace folder (ADR 0218), both paths relative to the workspace.
+   * The host confines both, and refuses when `to` is taken by another file: a name that differs
+   * from `from` only in case is the same file. A host without it renames nothing:
+   * `rename-exports` stops the step.
+   */
+  rename?(from: string, to: string): Promise<Result<void, readonly Diagnostic[]>>;
   /** The host's clock as ISO 8601 in UTC, which stamps an applied write; the system's if absent. */
   now?(): string;
   /**

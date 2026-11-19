@@ -277,3 +277,74 @@ describe("to-delivery's copy file through the recipe runner (TYTO-756, ADR 0217)
     );
   });
 });
+
+describe('rename-exports through the recipe runner (TYTO-758, ADR 0218)', () => {
+  it('renames the exports over a real folder on Apply, and plans none on the next run', async () => {
+    await writeFile(
+      join(workspace, '.tyto', 'project.json'),
+      JSON.stringify({
+        delivery: {
+          parent: 'entregas',
+          exports: 'final',
+          sizes: { feed: '1080x1350', story: '1080x1920' },
+        },
+      }),
+      'utf8',
+    );
+    const folder = join(workspace, 'entregas', 'mca-1_aula');
+    await mkdir(join(folder, 'editaveis'), { recursive: true });
+    await mkdir(join(folder, 'final'), { recursive: true });
+    await writeFile(
+      join(folder, 'editaveis', 'delivery.json'),
+      JSON.stringify({
+        version: 1,
+        key: 'MCA-1',
+        stem: 'mca-1_aula',
+        formats: [
+          { format: 'story', count: 1 },
+          { format: 'feed', count: 1 },
+        ],
+      }),
+    );
+    await writeFile(join(folder, 'final', 'Feed.PNG'), header(1080, 1350));
+    await writeFile(join(folder, 'final', 'story.png'), header(1080, 1920));
+    const runner = createRecipeRunner({
+      contributions: contributions(),
+      placeOf: () => Promise.resolve({ trust: 'trusted', folder: workspace }),
+      sectionFor: () => undefined,
+      home: join(scratch, 'home'),
+      clock: () => clock,
+    });
+    const text = ['recipe ship', 'deliveries', 'rename-exports stem=stem', ''].join('\n');
+    const path = join(workspace, 'recipes', 'ship.recipe');
+    const run = () => runner.run({ documentId: 'tab-4', text, path, explicit: true });
+
+    const first = await run();
+    const cell = first.cells[1];
+    expect(cell?.diagnostics).toEqual([]);
+    expect(cell?.plan?.operations.map((operation) => operation.description)).toEqual([
+      'entregas/mca-1_aula/final: story.png → mca-1_aula-01.png',
+      'entregas/mca-1_aula/final: Feed.PNG → mca-1_aula-02.png',
+    ]);
+    expect((await readdir(join(folder, 'final'))).sort()).toEqual(['Feed.PNG', 'story.png']);
+
+    const applied = await runner.apply({
+      documentId: 'tab-4',
+      index: 1,
+      planId: cell?.planId ?? -1,
+      path,
+    });
+    expect(applied?.applied?.operations.map((operation) => operation.status)).toEqual([
+      'applied',
+      'applied',
+    ]);
+    expect((await readdir(join(folder, 'final'))).sort()).toEqual([
+      'mca-1_aula-01.png',
+      'mca-1_aula-02.png',
+    ]);
+
+    const again = await run();
+    expect(again.cells[1]?.diagnostics).toEqual([]);
+    expect(again.cells[1]?.plan?.count).toBe(0);
+  });
+});
