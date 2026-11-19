@@ -156,7 +156,7 @@ describe('the "/" menu', () => {
     await page.keyboard.type('/');
     const rows = await waitForList();
 
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     expect(rows).toContainEqual(
       expect.stringMatching(/^carrossel-lista \/ (new brief|novo brief)/u),
     );
@@ -230,7 +230,7 @@ describe('the "/" menu', () => {
     await page.keyboard.press('Control+Alt+y');
     const rows = await waitForList();
 
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     expect(await editorText()).toBe('::titulo Olá');
 
     await page.keyboard.press('Escape');
