@@ -214,6 +214,7 @@ non-zero.
 | `E_RECIPE_SOURCE` | error | no | A source was cut short, repeated a cursor, or passed a ceiling on its pages or rows. |
 | `E_RECIPE_PLAN` | error | no | An action or a sink planned a write it did not declare, miscounted its plan, or passed a ceiling. |
 | `E_RECIPE_APPLY` | error | no | An Apply was refused before any write: the shown plan holds a write its verb no longer declares, or the verb cannot apply. |
+| `E_RECIPE_APPLY_TOGETHER` | error | no | 'apply together' did not apply every plan: it was refused before any write, or it stopped at a cell whose Apply did not go through. |
 | `E_RECIPE_BRIEF` | error | no | 'to-brief' cannot plan its briefs: an unknown template or slot, a value brief text cannot hold, two rows with one file name, or a folder it may not write. |
 | `E_RECIPE_DELIVERY` | error | no | 'to-delivery' cannot plan its delivery records: an unknown field, a field a recipe may not write, a host that writes none, or a folder it may not write. |
 | `E_RECIPE_RENAME_EXPORTS` | error | no | 'rename-exports' cannot plan the names of the deliveries' exports: a missing argument, a host that renames no files, or a folder it may not write. |
@@ -399,6 +400,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_RECIPE_SOURCE` | no | That cell has no table and the cells after it do not run; earlier cells keep theirs. |
 | `E_RECIPE_PLAN` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_APPLY` | no | Nothing of that plan is written, and no recipe state is committed. |
+| `E_RECIPE_APPLY_TOGETHER` | no | The plans below the cell it names are not applied and wait for the next run; what the cells above it applied stays applied. |
 | `E_RECIPE_BRIEF` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_DELIVERY` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is written. |
 | `E_RECIPE_RENAME_EXPORTS` | no | That cell has no plan and the cells after it do not run; earlier cells keep theirs. Nothing is renamed. |
@@ -2222,6 +2224,20 @@ Applying the plan of '{verb}' was refused: {problem}.
 ```
 
 Parameters: `verb`, `problem`
+
+### `E_RECIPE_APPLY_TOGETHER`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0219-apply-together-applies-a-runs-plans-in-order-against-the-renames-above.md`
+
+'apply together' did not apply every plan: it was refused before any write, or it stopped at a cell whose Apply did not go through.
+
+The plans below the cell it names are not applied and wait for the next run; what the cells above it applied stays applied.
+
+```
+'apply together' {problem}.
+```
+
+Parameters: `problem`
 
 ### `E_RECIPE_BRIEF`
 

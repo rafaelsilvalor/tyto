@@ -32,6 +32,7 @@ import {
   type Step,
   type Table,
   type ViewSpecs,
+  plannedRenamesOf,
   RECIPE_VIEWS,
   parseRecipe,
   runRecipe,
@@ -232,6 +233,27 @@ export interface RunnerAnswer {
   readonly diagnostics: readonly Diagnostic[];
   readonly held?: RunHeld;
   readonly ranAt: string;
+  /**
+   * ADR 0219: the header says `apply together`, so one `applyTogether` carries out every plan
+   * of the run in order, and no cell's plan is meant to be applied alone.
+   */
+  readonly together?: true;
+}
+
+/** ADR 0219: apply every plan a document's last run kept, in order, as one confirmation. */
+export interface RecipeApplyTogetherInput {
+  readonly documentId: string;
+  /** The document's file, which main holds. */
+  readonly path: string | undefined;
+  /** ADR 0216: stops between two calls; the plans not yet reached are not applied. */
+  readonly options?: ApplyOptions;
+}
+
+/** What one `applyTogether` did: every cell as kept afterwards, and why it stopped, if it did. */
+export interface RunnerTogetherAnswer {
+  readonly cells: readonly RunnerCell[];
+  /** A refusal before any write, or the cell it stopped at and why. */
+  readonly diagnostics: readonly Diagnostic[];
 }
 
 /** Apply a plan cell's kept plan (TYTO-378): the window names the cell and the plan's id. */
@@ -255,6 +277,13 @@ export interface RecipeRunner {
    * as kept afterwards, with why it was refused or not remembered. `undefined` for no such cell.
    */
   apply(input: RecipeApplyInput): Promise<RunnerCell | undefined>;
+  /**
+   * ADR 0219: for a recipe whose header says `apply together`, applies every plan its last run
+   * kept, cell by cell in order, and stops at the first cell whose Apply was refused or failed
+   * an operation; the plans below it are not applied. Refused whole, before any write, when the
+   * recipe does not say `apply together` or a cell did not run this time.
+   */
+  applyTogether(input: RecipeApplyTogetherInput): Promise<RunnerTogetherAnswer>;
   /**
    * TYTO-379, ADR 0171: the whole table the document's cell `index` keeps, for a view that reads
    * it in pages, with the instant it ran, which a page request must name. `undefined` for no
@@ -300,6 +329,8 @@ type KeptCell = Omit<RunnerCell, 'index' | 'applicable'> & {
 interface Kept {
   readonly header: string;
   readonly cells: readonly KeptCell[];
+  /** ADR 0219: the header says `apply together`. */
+  readonly together?: true;
   /** The last run's clock, whose zone a Calendar's days are read in (TYTO-383). */
   readonly clock: RunClock;
 }
@@ -412,11 +443,20 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         const input = next[start - 1]?.table;
         // ADR 0199: the steps run read `{name}` from the `set` cells reused above them.
         const values = setValuesOf(next);
+        // ADR 0219: and, under `apply together`, the renames those cells planned and did not
+        // apply, so a step below plans against the files they leave.
+        const plannedRenames =
+          recipe.apply === 'together'
+            ? next.flatMap((cell) =>
+                cell.applied === undefined ? plannedRenamesOf(cell.verb, cell.plan) : [],
+              )
+            : [];
         const result = await runRecipe(
           { ...recipe, steps: steps.slice(start, stop) },
           {
             ...(input === undefined ? {} : { input }),
             values,
+            ...(plannedRenames.length === 0 ? {} : { plannedRenames }),
             ...(request.params === undefined ? {} : { params: request.params }),
             verbs: registries.verbs,
             derivations: registries.derivations,
@@ -456,7 +496,12 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
 
       const current = latest.get(request.documentId) === run;
       if (current) {
-        kept.set(request.documentId, { header, cells: next, clock });
+        kept.set(request.documentId, {
+          header,
+          cells: next,
+          clock,
+          ...(recipe.apply === 'together' ? { together: true as const } : {}),
+        });
       }
 
       // TYTO-378, ADR 0170 decision 6: `apply auto` applies the plans this run made, in cell
@@ -504,12 +549,19 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         diagnostics,
         ...(reason === undefined ? {} : { held: reason }),
         ranAt,
+        ...(recipe.apply === 'together' ? { together: true as const } : {}),
       };
     },
 
     async apply(request) {
       return queued(await applyLaneOf(request.documentId, request.path), () =>
         applyKept(request.documentId, request.index, request.planId, request.path, request.options),
+      );
+    },
+
+    async applyTogether(request) {
+      return queued(await applyLaneOf(request.documentId, request.path), () =>
+        applyAllKept(request),
       );
     },
 
@@ -623,6 +675,66 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
     return applied === undefined
       ? { ...view, diagnostics: [...view.diagnostics, ...answer.diagnostics] }
       : view;
+  }
+
+  /**
+   * ADR 0219: every plan the document keeps, applied in cell order within one turn of the file's
+   * queue. Each cell's Apply is the one a click makes (`applyKept`), so its state commits as
+   * ADR 0170 decision 4 says, the plans not yet applied counting `skipped`. The first cell whose
+   * Apply was refused, or failed an operation, stops it: what was planned below it read the
+   * files as that cell would have left them, so it waits for the next run.
+   */
+  async function applyAllKept(request: RecipeApplyTogetherInput): Promise<RunnerTogetherAnswer> {
+    const { documentId, path } = request;
+    const holding = kept.get(documentId);
+    const refuse = (problem: string): RunnerTogetherAnswer => ({
+      cells: (holding?.cells ?? []).map((cell, index) => shown(cell, index)),
+      diagnostics: [diagnostic('E_RECIPE_APPLY_TOGETHER', { problem: `was refused: ${problem}` })],
+    });
+    if (holding === undefined) return refuse('the recipe has not run; run it first');
+    if (holding.together !== true) {
+      return refuse("the recipe's header does not say 'apply together'; apply each plan instead");
+    }
+    const notRun = holding.cells.findIndex((cell) => cell.status !== 'ok');
+    if (notRun !== -1) {
+      return refuse(
+        `cell ${String(notRun + 1)} did not run this time, so the plans below it may be out of date; run the recipe again`,
+      );
+    }
+    const order = holding.cells
+      .map((cell, index) => ({ cell, index }))
+      .filter(
+        ({ cell }) =>
+          cell.planId !== undefined && cell.applied === undefined && (cell.plan?.count ?? 0) > 0,
+      );
+    const diagnostics: Diagnostic[] = [];
+    for (const [at, { cell, index }] of order.entries()) {
+      if (request.options?.cancel?.aborted === true) {
+        diagnostics.push(stopped(index, 'the Apply was cancelled', order.length - at));
+        break;
+      }
+      const after = await applyKept(documentId, index, cell.planId ?? -1, path, request.options);
+      const failed =
+        after?.applied === undefined ||
+        after.applied.operations.some((operation) => operation.status === 'failed');
+      if (failed) {
+        if (after?.applied === undefined) diagnostics.push(...(after?.diagnostics ?? []));
+        const left = order.length - at - 1;
+        if (left > 0) diagnostics.push(stopped(index, 'its Apply did not go through', left));
+        break;
+      }
+    }
+    const cells = kept.get(documentId)?.cells ?? holding.cells;
+    return { cells: cells.map((cell, index) => shown(cell, index)), diagnostics };
+  }
+
+  /** Why `apply together` left the plans below cell `index` unapplied. */
+  function stopped(index: number, why: string, left: number): Diagnostic {
+    return diagnostic('E_RECIPE_APPLY_TOGETHER', {
+      problem: `stopped at cell ${String(index + 1)}: ${why}, and ${String(left)} ${
+        left === 1 ? 'plan below it was' : 'plans below it were'
+      } not applied; run the recipe again for what is left`,
+    });
   }
 
   /**

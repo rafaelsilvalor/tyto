@@ -71,9 +71,11 @@ export interface RecipeAst {
   readonly consts: readonly RecipeConst[];
   /**
    * `auto` when the header says `apply auto`: an explicit Run in a trusted folder applies the
-   * plans without a click (ADR 0129 decision 4, ADR 0170). Absent otherwise.
+   * plans without a click (ADR 0129 decision 4, ADR 0170). `together` when it says `apply
+   * together`: one Apply carries out every plan of the run, in order, and a step plans against
+   * the files the renames above it leave (ADR 0219). Absent otherwise.
    */
-  readonly apply?: 'auto';
+  readonly apply?: 'auto' | 'together';
   /**
    * The interval from an `every 30m` or `every 2h` header line: the host runs the recipe that
    * often while the app is open (ADR 0175). Absent when the recipe runs only when asked.

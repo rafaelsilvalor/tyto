@@ -66,7 +66,14 @@ describe('parseRecipe', () => {
     ['a description after a step', 'recipe x\nshow table\n| late', '| late', 'right under'],
     ['apply with another word', 'recipe x\napply always', 'apply always', "'apply auto'"],
     ['apply with no word', 'recipe x\napply', 'apply', 'takes one word, auto'],
-    ['apply auto twice', 'recipe x\napply auto\napply auto', 'apply auto', 'written once'],
+    ['apply auto twice', 'recipe x\napply auto\napply auto', 'apply auto', "one 'apply' line"],
+    ['apply auto and together', 'recipe x\napply auto\napply together', 'apply together', 'one'],
+    [
+      'apply together after a step',
+      'recipe x\nshow table\napply together',
+      'apply together',
+      'header',
+    ],
     ['apply auto after a step', 'recipe x\nshow table\napply auto', 'apply auto', 'header'],
     ['every below five minutes', 'recipe x\nevery 4m', 'every 4m', 'at most every 5 minutes'],
     ['every with no unit', 'recipe x\nevery 30', 'every 30', "as in 'every 30m'"],
@@ -141,6 +148,12 @@ where b matches "\p{Lu}\P{Nd}\u{FF}{a}"`;
     expect(parsed.value.steps.map((step) => step.verb)).toEqual(['show']);
     const plain = parseRecipe('recipe x\nshow table');
     expect(plain.ok && 'apply' in plain.value).toBe(false);
+  });
+
+  it("reads 'apply together' in the header as the recipe's apply (ADR 0219)", () => {
+    const parsed = parseRecipe('recipe ship\napply together\nshow table');
+    if (!parsed.ok) throw new Error(parsed.error.map(({ message }) => message).join('\n'));
+    expect(parsed.value.apply).toBe('together');
   });
 
   it.each([

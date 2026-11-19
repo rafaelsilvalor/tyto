@@ -33,6 +33,7 @@ import { z } from 'zod';
 
 import type { Contribution } from './contributions.js';
 import { unmatchedContribution } from './isolation/protocol.js';
+import { withPlannedRenames } from './planned-view.js';
 
 /**
  * `recipe-verb` and `recipe-derivation`: a plugin's share of the recipe vocabulary (ADR 0128,
@@ -425,6 +426,7 @@ export function recipeRegistriesOf(
         return contributed === undefined
           ? undefined
           : verbOf(contributed.verb, {
+              plugin: contributed.plugin,
               sectionOfOwner: () => sectionOf(contributed.plugin),
               // Apply reads the verb again, at the time of the click: the plugin may have been
               // withdrawn or updated since the plan was shown.
@@ -468,6 +470,8 @@ function withSection(section: unknown): VerbRequest {
 }
 
 interface VerbBinding {
+  /** The plugin that contributes the verb, whose workspace reads a planned view covers. */
+  readonly plugin: string;
   readonly sectionOfOwner: () => unknown;
   readonly live: () => LiveVerb | undefined;
   readonly refresh: boolean;
@@ -557,7 +561,13 @@ function verbOf(contribution: RecipeVerbContribution, binding: VerbBinding): Ver
         return placed(context, checkedAnswer(answer, contribution.id, limits));
       }
       if (plan !== undefined && (contribution.kind === 'action' || contribution.kind === 'sink')) {
-        const answer = await plan.call(contribution, request);
+        // ADR 0219: under `apply together`, the plugin reads the workspace as the renames
+        // planned above this step leave it, for as long as this plan call runs.
+        const answer = await withPlannedRenames(
+          binding.plugin,
+          context.plannedRenames,
+          async () => await plan.call(contribution, request),
+        );
         const checked = checkedPlan(answer, contribution, context.table, planLimits);
         if (checked.ok && checked.value.plan !== undefined) {
           shownPlans.set(checked.value.plan, {
