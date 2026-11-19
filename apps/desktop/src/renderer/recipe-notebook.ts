@@ -29,6 +29,9 @@ import type { ApplyProgressShown } from './recipe-plan-view.js';
  * - **Apply** (TYTO-378, ADR 0170) names the cell and the plan's id over `recipe:apply`. The cell
  *   main answers replaces the shown one when it still holds that plan; an answer with no new
  *   outcome is a refusal, kept here, on that cell, until the next run's answer.
+ * - **Apply all** (TYTO-758, ADR 0219), for a recipe whose header says `apply together`, asks
+ *   `recipe:apply-together` once. Each cell main answers replaces the shown one that still holds
+ *   its plan; why main refused or where it stopped is kept for the document until the next run.
  *
  * It keeps, per document, the last answer shown with its text, so a change of language shows it
  * again ({@link RecipeNotebook.reshow}), and which tables the person folded, by their line and
@@ -47,6 +50,16 @@ export type RecipeRunAnswer = IpcResponse<'recipe:run'>;
 export type RecipeApplyRequest = IpcRequest<'recipe:apply'>;
 export type RecipeApplyAnswer = IpcResponse<'recipe:apply'>;
 export type RecipeApplyCancelRequest = IpcRequest<'recipe:apply-cancel'>;
+export type RecipeApplyTogetherRequest = IpcRequest<'recipe:apply-together'>;
+export type RecipeApplyTogetherAnswer = IpcResponse<'recipe:apply-together'>;
+
+/** TYTO-758, ADR 0219: a document's Apply all, while it runs and after. */
+export interface TogetherState {
+  /** Apply all is on its way. */
+  readonly applying: boolean;
+  /** Why main refused it or where it stopped, until the next run's answer. */
+  readonly said: string | undefined;
+}
 /** TYTO-791, ADR 0216: how far a long Apply has got, as main pushes it. */
 export interface RecipeApplyProgress {
   readonly documentId: string;
@@ -118,6 +131,10 @@ export interface RecipeNotebookOptions {
   readonly apply: (request: RecipeApplyRequest) => Promise<RecipeApplyAnswer>;
   /** TYTO-791, ADR 0216: `recipe:apply-cancel` over the bridge. */
   readonly cancelApply?: (request: RecipeApplyCancelRequest) => Promise<unknown>;
+  /** TYTO-758, ADR 0219: `recipe:apply-together` over the bridge. */
+  readonly applyTogether?: (
+    request: RecipeApplyTogetherRequest,
+  ) => Promise<RecipeApplyTogetherAnswer>;
   /** Why an Apply was refused when main gave no reason, in the window's language. */
   readonly refusedWithoutReason: () => string;
   /** The document's text now, or `undefined` once its tab is gone. */
@@ -166,6 +183,12 @@ export interface RecipeNotebook {
   apply(documentId: string, index: number, planId: number): Promise<void>;
   /** The cells whose Apply is on its way, by index. */
   applyingOf(documentId: string): ReadonlySet<number>;
+  /** TYTO-758, ADR 0219: Apply all, every plan of the run in order, shown again once main answers. */
+  applyTogether(documentId: string): Promise<void>;
+  /** TYTO-758: whether a document's Apply all is on its way, and what main said of the last one. */
+  togetherOf(documentId: string): TogetherState;
+  /** TYTO-758: Cancel on Apply all, which main stops between two calls of the cell being applied. */
+  cancelTogether(documentId: string): void;
   /** Why a cell's last Apply was refused, by index, until the next run's answer. */
   refusalsOf(documentId: string): ReadonlyMap<number, string>;
   /** TYTO-791: main said how far a cell's Apply has got; dropped for an Apply not on its way. */
@@ -250,6 +273,9 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
   const applying = new Map<string, Set<number>>();
   const refusals = new Map<string, Map<number, string>>();
   const progress = new Map<string, Map<number, ApplyProgressShown>>();
+  /** TYTO-758: the documents whose Apply all is on its way, and what main said of each last one. */
+  const together = new Set<string>();
+  const togetherSaid = new Map<string, string>();
   const views = new Map<string, Map<number, RecipeViewState>>();
   /** Each step's last number, by the start of its line (TYTO-676), and the last number given. */
   const counts = new Map<string, Map<number, number>>();
@@ -325,6 +351,7 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     numberRun(documentId, text, answer);
     // A refusal is said once: the run that follows it has the cell's own word.
     refusals.delete(documentId);
+    togetherSaid.delete(documentId);
     options.show(documentId, text, answer, scope.until);
   };
 
@@ -391,6 +418,39 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     reshowOne(documentId);
   };
 
+  const applyTogether = async (documentId: string): Promise<void> => {
+    if (together.has(documentId) || options.applyTogether === undefined) return;
+    together.add(documentId);
+    togetherSaid.delete(documentId);
+    reshowOne(documentId);
+    let answer: RecipeApplyTogetherAnswer | undefined;
+    try {
+      answer = await options.applyTogether({ documentId });
+    } catch {
+      answer = undefined;
+    }
+    together.delete(documentId);
+    progress.delete(documentId);
+    const shown = last.get(documentId);
+    if (answer !== undefined && shown !== undefined) {
+      const byIndex = new Map(answer.cells.map((cell) => [cell.index, cell]));
+      // Only onto a cell still showing the plan main applied: a run since may have planned again.
+      const cellsNow = shown.answer.cells.map((cell) => {
+        const after = byIndex.get(cell.index);
+        return after?.applied !== undefined && after.plan?.planId === cell.plan?.planId
+          ? after
+          : cell;
+      });
+      last.set(documentId, { ...shown, answer: { ...shown.answer, cells: cellsNow } });
+    }
+    const reasons = (answer?.diagnostics ?? [])
+      .filter((found) => found.severity === 'error')
+      .map((found) => found.message);
+    if (answer === undefined) togetherSaid.set(documentId, options.refusedWithoutReason());
+    else if (reasons.length > 0) togetherSaid.set(documentId, reasons.join(' '));
+    reshowOne(documentId);
+  };
+
   return {
     typed(documentId) {
       cancel(documentId);
@@ -409,11 +469,33 @@ export function createRecipeNotebook(options: RecipeNotebookOptions): RecipeNote
     fetchAgain: (documentId) => runNow(documentId, 'explicit', { fresh: true }),
     apply,
     applyingOf: (documentId) => applying.get(documentId) ?? new Set(),
+    applyTogether,
+    togetherOf: (documentId) => ({
+      applying: together.has(documentId),
+      said: togetherSaid.get(documentId),
+    }),
+    cancelTogether(documentId) {
+      const cells = progress.get(documentId);
+      if (!together.has(documentId) || cells === undefined) return;
+      // Main files the one cancel under the cell being applied, the one its progress names.
+      for (const [index, shown] of cells) {
+        if (shown.cancelling) continue;
+        cells.set(index, { ...shown, cancelling: true });
+        void options.cancelApply?.({ documentId, index }).catch(() => undefined);
+      }
+      reshowOne(documentId);
+    },
     refusalsOf: (documentId) => refusals.get(documentId) ?? new Map(),
     progressed({ documentId, index, done, total, note }) {
       // A push that lands after the answer would show an Apply that is over.
-      if (applying.get(documentId)?.has(index) !== true) return;
-      const cells = progress.get(documentId) ?? new Map<number, ApplyProgressShown>();
+      const going = applying.get(documentId)?.has(index) === true || together.has(documentId);
+      if (!going) return;
+      // Apply all shows one line, the cell being applied's: an earlier cell's is over.
+      const cells = together.has(documentId)
+        ? new Map<number, ApplyProgressShown>(
+            [...(progress.get(documentId) ?? [])].filter(([at]) => at === index),
+          )
+        : (progress.get(documentId) ?? new Map<number, ApplyProgressShown>());
       const cancelling = cells.get(index)?.cancelling ?? false;
       cells.set(index, { done, total, ...(note === undefined ? {} : { note }), cancelling });
       progress.set(documentId, cells);

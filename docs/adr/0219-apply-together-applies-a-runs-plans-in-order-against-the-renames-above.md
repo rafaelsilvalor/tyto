@@ -82,6 +82,23 @@ source, an Apply) is not held back and sees the view while one is up, for the pa
 name only. That needs two recipes over the same delivery's exports at the same moment, and it
 reads the files as they are about to be.
 
+## Note, 2026-11-19 — the window's Apply all (TYTO-758, desktop pull request)
+
+- **Apply all plans is drawn under the `apply together` header line**, once a run has planned,
+  with a line saying what it does, over `recipe:apply-together`. It is offered while a plan may
+  be applied, and is `aria-disabled` while its answer is on its way.
+- **No plan has an Apply of its own under that header: the button is hidden, not disabled.** A
+  lower plan was planned against the files the plans above it leave, so applying it first fails
+  it, and a lone Apply would skip decision 2's stop at the first plan that does not go through.
+  A disabled button would invite a click that can only be refused. Main still answers
+  `recipe:apply` for one cell, which `tyto mcp` uses.
+- **A long write's progress and Cancel** (ADR 0216) show under Apply all: main pushes
+  `recipe:apply-progress` on the cell being applied (`RecipeApplyTogetherInput.onCell`) and files
+  one cancel under that cell, so `recipe:apply-cancel` stops it between two calls.
+- Where it stopped, or why it was refused, is said under the button until the next run.
+- **Run recipe from the command bar** (`recipe.run`) is the run that reaches it: the button is
+  drawn from that answer, as from the toolbar's.
+
 ## Consequences
 
 - A ship recipe shows each plan under its line, the upload listing the files under the names they

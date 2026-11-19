@@ -175,8 +175,14 @@ describe('apply together (ADR 0219)', () => {
     await runner.run({ documentId: 'ship', text, path, explicit: true, from: 2 });
     expect(stand.seen[1]).toEqual(stand.seen[0]);
 
-    const together = await runner.applyTogether({ documentId: 'ship', path });
+    const started: number[] = [];
+    const together = await runner.applyTogether({
+      documentId: 'ship',
+      path,
+      onCell: (index) => started.push(index),
+    });
     expect(together.diagnostics).toEqual([]);
+    expect(started).toEqual([1, 3]);
     expect(
       together.cells.map((cell) => cell.applied?.operations.map(({ status }) => status)),
     ).toEqual([undefined, ['applied'], undefined, ['applied']]);

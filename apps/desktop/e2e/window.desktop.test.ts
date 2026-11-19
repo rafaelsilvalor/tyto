@@ -396,6 +396,8 @@ describe('the bridge', () => {
       // TYTO-791, ADR 0216: Cancel under a long write, which only a plugin answering
       // `continue` draws; `src/main/ipc.test.ts` stops a real runner's Apply through it.
       'recipe:apply-cancel',
+      // TYTO-758, ADR 0219: Apply all plans, exercised by `e2e/recipe-together.desktop.test.ts`.
+      'recipe:apply-together',
       // TYTO-379, ADR 0171: a view's pages and its copy, which the Table view calls.
       // `recipe-table.desktop.test.ts` scrolls, sorts and filters through `recipe:rows`; copy
       // writes the real clipboard, which no suite should, so `ipc.test.ts` holds it.
@@ -1161,6 +1163,11 @@ describe('switching the language', () => {
     'recipe.plan.progress',
     'recipe.plan.cancel',
     'recipe.plan.cancelling',
+    // TYTO-758, ADR 0219: drawn only under an `apply together` header line;
+    // `recipe-together-view.test.ts` paints both in both languages, and
+    // `recipe-together.desktop.test.ts` clicks Apply all in the real window.
+    'recipe.together.apply',
+    'recipe.together.hint',
     // TYTO-379: drawn only under a cell in a Table or Summary view; `recipe-table-view.test.ts`
     // paints them, and `recipe-table.desktop.test.ts` reads the bar in the real window.
     'recipe.table.filter',

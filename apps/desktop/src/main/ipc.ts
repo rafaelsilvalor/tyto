@@ -79,7 +79,13 @@ import {
 } from './recipe-facets.js';
 import { type RowsQuery, createRowViews, rowsAsTsv, visibleColumns } from './recipe-rows.js';
 import { type RecipeSchedule } from './recipe-schedule.js';
-import { cellToWire, cut, recipeAnswerToWire, valueToWire } from './recipe-wire.js';
+import {
+  cellToWire,
+  cut,
+  diagnosticsToWire,
+  recipeAnswerToWire,
+  valueToWire,
+} from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
 import { type TemplateCatalogue } from './templates.js';
 import { type AppliedThemes, type ThemeService, themeVariant } from './themes.js';
@@ -731,6 +737,45 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
         return cell === undefined ? {} : { cell: cellToWire(cell) };
       } finally {
         if (applyCancels.get(key) === cancel) applyCancels.delete(key);
+      }
+    },
+
+    // TYTO-758, ADR 0219: one Apply of every kept plan, in order. One cancel covers it, filed
+    // under the cell being applied, which is the cell the window's progress names.
+    'recipe:apply-together': async ({ documentId }) => {
+      const cancel = new AbortController();
+      const keys: string[] = [];
+      let current = 0;
+      try {
+        const answer = await recipes.applyTogether({
+          documentId,
+          path: documents.pathOf(documentId),
+          onCell: (index) => {
+            current = index;
+            const key = applyKey(documentId, index);
+            keys.push(key);
+            applyCancels.set(key, cancel);
+          },
+          options: {
+            cancel: cancel.signal,
+            onProgress: ({ done, total, note }) => {
+              if (note === undefined && done === total) return;
+              applyProgress?.({
+                documentId,
+                index: current,
+                done,
+                total,
+                ...(note === undefined ? {} : { note }),
+              });
+            },
+          },
+        });
+        return {
+          cells: answer.cells.slice(0, RECIPE_WIRE_LIMITS.cells).map(cellToWire),
+          diagnostics: diagnosticsToWire(answer.diagnostics),
+        };
+      } finally {
+        for (const key of keys) if (applyCancels.get(key) === cancel) applyCancels.delete(key);
       }
     },
 

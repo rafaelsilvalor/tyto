@@ -397,6 +397,8 @@ export const ptBR: Catalogue = {
   'recipe.plan.refused': 'Não aplicado: execute a receita de novo e veja o plano',
   'recipe.plan.progress': 'Aplicando: {done} de {total} feitas',
   'recipe.plan.cancel': 'Cancelar',
+  'recipe.together.apply': 'Aplicar todos os planos',
+  'recipe.together.hint': 'Aplica cada plano abaixo, em ordem, e para no primeiro que não passar.',
   'recipe.plan.cancelling': 'Parando depois desta chamada',
   'recipe.table.filter': 'Filtrar linhas',
   'recipe.table.columns': 'Colunas',

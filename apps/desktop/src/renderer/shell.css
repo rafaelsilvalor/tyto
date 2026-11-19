@@ -4791,3 +4791,21 @@ tyto-recent-folders[open] {
 .plugins__recipe-credential-failed {
   color: var(--tyto-error);
 }
+
+/* TYTO-758, ADR 0219: Apply all under an `apply together` header line, its hint beside it, then
+   a long write's progress and what main said of the last one, as a plan's own lines. */
+.recipe-together {
+  padding: var(--tyto-space-1) 0 var(--tyto-space-2) var(--tyto-space-2);
+  font-size: var(--tyto-text-sm);
+}
+
+.recipe-together__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tyto-space-1) var(--tyto-space-3);
+}
+
+.recipe-together__hint {
+  color: var(--tyto-text-muted);
+}

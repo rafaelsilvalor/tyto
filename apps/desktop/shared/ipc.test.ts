@@ -113,6 +113,8 @@ describe('the IPC contract', () => {
       'recipe:apply',
       // TYTO-791, ADR 0216: Cancel on a long Apply, between two calls.
       'recipe:apply-cancel',
+      // TYTO-758, ADR 0219: one Apply of every plan of an `apply together` recipe.
+      'recipe:apply-together',
       'recipe:copy',
       'recipe:facets',
       // TYTO-402, ADR 0176: Load recipe, a copy into the folder an explorer id names.

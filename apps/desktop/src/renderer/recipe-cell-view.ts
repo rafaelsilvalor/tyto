@@ -91,6 +91,11 @@ export interface CellViewContext {
   readonly refusals: ReadonlyMap<number, string>;
   /** TYTO-791: how far each cell's long Apply has got, by index, while it runs. */
   readonly progress?: ReadonlyMap<number, ApplyProgressShown>;
+  /**
+   * TYTO-758, ADR 0219: the header says `apply together`, so no plan has an Apply of its own:
+   * Apply all, under the header line, applies them in order (`recipe-together-view.ts`).
+   */
+  readonly together?: boolean;
   /** Milliseconds since the epoch; injected so a test fixes the clock. */
   readonly now: () => number;
   readonly actions: CellViewActions;
@@ -134,6 +139,7 @@ export function cellOutputOf(status: CellStatus, context: CellViewContext): Cell
       status.held ?? '',
       cell.source === true ? 'source' : '',
       context.locale,
+      context.together === true ? 'together' : '',
       collapsed ? 'folded' : 'open',
       cell.plan?.planId ?? '',
       cell.plan?.applicable === true ? 'applicable' : '',
@@ -213,9 +219,12 @@ function renderCell(
   if (age !== undefined) header.append(age);
 
   if (table !== undefined || cell.plan !== undefined) {
-    const apply = applyButton(cell, plan, (planId) => {
-      actions.apply(status.index, planId);
-    });
+    const apply =
+      context.together === true
+        ? undefined
+        : applyButton(cell, plan, (planId) => {
+            actions.apply(status.index, planId);
+          });
     if (apply !== undefined) header.append(apply);
     header.append(
       button(say('recipe.cell.runFrom'), 'run-from', () => {

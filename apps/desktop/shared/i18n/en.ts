@@ -394,6 +394,9 @@ export const en: Catalogue = {
   'recipe.plan.refused': 'Not applied: run the recipe again and look at the plan',
   'recipe.plan.progress': 'Applying: {done} of {total} done',
   'recipe.plan.cancel': 'Cancel',
+  'recipe.together.apply': 'Apply all plans',
+  'recipe.together.hint':
+    'Applies every plan below in order, and stops at the first one that does not go through.',
   'recipe.plan.cancelling': 'Stopping after this call',
   'recipe.table.filter': 'Filter rows',
   'recipe.table.columns': 'Columns',

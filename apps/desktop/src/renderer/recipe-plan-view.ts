@@ -124,7 +124,7 @@ export function planBody(
 }
 
 /** "Applying: 3 of 10 done · sent 48 of 100 MB", and Cancel, which says it is stopping once pressed. */
-function progressLine(
+export function progressLine(
   progress: ApplyProgressShown,
   locale: Locale,
   cancel: (() => void) | undefined,

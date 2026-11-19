@@ -247,6 +247,11 @@ export interface RecipeApplyTogetherInput {
   readonly path: string | undefined;
   /** ADR 0216: stops between two calls; the plans not yet reached are not applied. */
   readonly options?: ApplyOptions;
+  /**
+   * Told the cell each Apply is about to start, by index, so a host shows a long write's
+   * progress, and offers its Cancel, on the cell being applied (TYTO-758).
+   */
+  readonly onCell?: (index: number) => void;
 }
 
 /** What one `applyTogether` did: every cell as kept afterwards, and why it stopped, if it did. */
@@ -713,6 +718,7 @@ export function createRecipeRunner(options: RecipeRunnerOptions): RecipeRunner {
         diagnostics.push(stopped(index, 'the Apply was cancelled', order.length - at));
         break;
       }
+      request.onCell?.(index);
       const after = await applyKept(documentId, index, cell.planId ?? -1, path, request.options);
       const failed =
         after?.applied === undefined ||
