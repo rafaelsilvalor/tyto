@@ -1,5 +1,31 @@
 # @tyto/core
 
+## 0.53.0
+
+### Minor Changes
+
+- c3fc939: `apply together`, a recipe header line, applies every plan of a run in order with one
+  confirmation (TYTO-758, ADR 0219): `RecipeRunner.applyTogether` applies each cell's plan as
+  its own Apply would and stops at the first cell that is refused or fails an operation,
+  leaving the plans below for the next run (`E_RECIPE_APPLY_TOGETHER`). Under it, a plugin's
+  step plans against the renames a `rename-exports` above it planned: `host.workspace` reads,
+  stats and lists the new names while that plan call runs, and nothing else is read ahead.
+  `tyto recipe run --apply` applies such a recipe this way; the window's single Apply follows.
+- 5f0d18c: `to-delivery copy-text=<column>` keeps each delivery's copy in `editaveis/copy.md`
+  (TYTO-756, ADR 0217): a `Source:` line with the record's `copy`, then the cell's text as it
+  is, Markdown or plain. The record remembers the digest of the copy it wrote in
+  `written.files`, so a copy a person edited since is kept, never overwritten, and the plan's
+  note names it on every run; a missing copy is written again, and Apply fails a row whose
+  copy changed since the plan. The step form gains the field, with its help in Portuguese.
+- 912e97e: `rename-exports stem=<column> [digits=2] [path=<column>]` renames the images exported into
+  each delivery to the names it ships under, `<stem>-01.png` and on (TYTO-758, ADR 0218). The
+  numbers follow the record: the images each format owes, in the record's order of formats,
+  then any other image by name. Running it plans one line per file whose name changes; Apply
+  renames each delivery whole or not at all, failing it when a file changed since the plan or
+  a new name was taken, and never renames a file over another one. `core` gains
+  `deliveryExportNames`, the workspace ports a confined `rename`, and the step form its fields,
+  with their help in Portuguese.
+
 ## 0.52.0
 
 ### Minor Changes
