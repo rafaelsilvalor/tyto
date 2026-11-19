@@ -453,7 +453,13 @@ interface RecipeVerbContribution {
     operations: PlannedOperation[]; // at most 100, in the shown plan's order
     target: string;
     section?: unknown;
-  }): Result<{ operations: { status: 'applied' | 'failed' | 'skipped'; reason?: string }[] }>;
+  }): Result<{
+    operations: {
+      status: 'applied' | 'failed' | 'skipped' | 'continue'; // `continue`: ADR 0216
+      reason?: string;
+      progress?: string; // a `continue` entry's, at most 80 characters
+    }[];
+  }>;
 }
 interface Plan {
   target: string;
@@ -554,6 +560,22 @@ a copy, or another verb's — is refused the same way. **This is a contract chec
 sandbox**: it holds the plugin to the writes a person read before installing it and to the plan
 they confirmed, and it cannot see what the plugin's code then does; what a plugin can reach at
 all is the isolation's and the permissions' business (ADR 0049, ADR 0041).
+
+**A write too long for one call answers `continue`** (ADR 0216). An upload of 100 MB does not
+fit a 30 s call; answer that operation `continue`, with an optional `progress` line of at most
+80 characters such as `sent 48 of 100 MB`, and keep how far you got in your private cache
+(ADR 0138). The host calls `apply` again within the same Apply, with only the operations that
+answered `continue`, each the planned one, payload included, until each answers `applied`,
+`failed` or `skipped`; the person sees the progress line under the plan, or on stderr from
+`tyto recipe run --apply`. The host stops asking after 120 more calls for one batch
+(`APPLY_CONTINUE_CALLS`, an hour at the deadline) and when the person cancels, between two
+calls, never during one: an operation still in progress is then `failed` with a reason that
+starts `unfinished:` and says some may have been written, and a batch not yet handed over is
+`skipped`. A later call with no usable answer stops the Apply as a first call does. A `progress`
+on any other status, empty or over 80 characters makes the batch unreadable. **Answering
+`continue` needs protocol 28**, which `@tyto/plugin-api` 0.26 carries: write
+`"engine": ">=0.26"`, since an older host reads the status as an answer it cannot read and fails
+the batch as `no answer; some may have been written`.
 
 **A plugin that registers `apply` needs protocol 16**, which `@tyto/plugin-api` 0.15 carries:
 write `"engine": ">=0.15"` in its manifest, so an older Tyto refuses to install it rather than

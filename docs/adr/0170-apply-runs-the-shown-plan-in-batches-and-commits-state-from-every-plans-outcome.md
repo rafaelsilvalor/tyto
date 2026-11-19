@@ -142,3 +142,9 @@ operation's mark.
 - The mark is on the kept cell that holds the applied plan when the Apply ends, found by its
   plan id, as the outcome already is; a cell planned again meanwhile holds another id and is
   left alone.
+
+## Note, 2026-11-19 — an operation may answer continue (TYTO-791)
+
+Decision 2 called `apply` once per batch. ADR 0216 lets an operation answer `continue`, with a
+progress line, and the host asks again for it within the same Apply, up to 120 more calls per
+batch and until a cancel, which is read between calls; what it leaves unfinished is `failed`.

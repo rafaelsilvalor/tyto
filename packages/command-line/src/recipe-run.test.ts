@@ -27,6 +27,12 @@ interface Sink {
   readonly applied: string[];
   /** How many times the source was asked for a page. */
   pulls: number;
+  /** TYTO-791, ADR 0216: calls a row's mark takes, as a long upload takes several. */
+  readonly parts: Map<string, number>;
+  /** How many calls each row's mark has had: the plugin's cache. */
+  readonly sent: Map<string, number>;
+  /** Called after every `apply` call, as a person might press Ctrl+C during it. */
+  afterCall?: () => void;
 }
 
 const row = (key: string) => ({
@@ -69,10 +75,20 @@ function verbs(sink: Sink): RecipeContributions {
       return Promise.resolve(ok({ target: 'example items', operations, count: operations.length }));
     },
     apply: ({ operations }) => {
-      for (const operation of operations) sink.applied.push(operation.rowKey ?? '');
-      return Promise.resolve(
-        ok({ operations: operations.map(() => ({ status: 'applied' as const })) }),
-      );
+      const answers = operations.map((operation) => {
+        const key = operation.rowKey ?? '';
+        const parts = sink.parts.get(key) ?? 1;
+        const sent = (sink.sent.get(key) ?? 0) + 1;
+        sink.sent.set(key, sent);
+        if (sent < parts) {
+          const progress = `sent ${String(sent)} of ${String(parts)} parts`;
+          return { status: 'continue' as const, progress };
+        }
+        sink.applied.push(key);
+        return { status: 'applied' as const };
+      });
+      sink.afterCall?.();
+      return Promise.resolve(ok({ operations: answers }));
     },
   };
   return {
@@ -156,7 +172,7 @@ async function trust(): Promise<void> {
   err = '';
 }
 
-const newSink = (): Sink => ({ applied: [], pulls: 0 });
+const newSink = (): Sink => ({ applied: [], pulls: 0, parts: new Map(), sent: new Map() });
 
 /** What the recipe's store holds, by key. */
 async function stored(recipe: string, store = 'pushed'): Promise<Record<string, unknown>> {
@@ -263,6 +279,61 @@ describe('tyto recipe run', () => {
     const state = await stored('sync.recipe');
     expect(Object.keys(state)).toHaveLength(ROWS);
     expect(state['EX-120']).toMatchObject({ status: 'open', applied_at: expect.any(String) });
+  });
+
+  it('finishes a write that takes three calls in one --apply, its progress on stderr', async () => {
+    await trust();
+    const sink = newSink();
+    sink.parts.set('EX-2', 3);
+
+    const code = await recipeRunCommand('recipes/sync.recipe', { apply: true }, environment(), {
+      contributions: verbs(sink),
+    });
+
+    expect(code).toBe(EXIT_OK);
+    expect(sink.sent.get('EX-2')).toBe(3);
+    expect(sink.applied).toHaveLength(ROWS);
+    expect(err.split('\n').filter((line) => line.startsWith('applying'))).toEqual([
+      'applying cell 3: 99 of 120 operations done; sent 1 of 3 parts',
+      'applying cell 3: 99 of 120 operations done; sent 2 of 3 parts',
+    ]);
+    expect(out).toContain('applied, 0 failed, 0 skipped');
+    expect(Object.keys(await stored('sync.recipe'))).toHaveLength(ROWS);
+  });
+
+  it('stops at the first Ctrl+C between two calls, reports the write unfinished, and exits 1', async () => {
+    await trust();
+    const sink = newSink();
+    sink.parts.set('EX-2', 3);
+    let stop: (() => void) | undefined;
+    let released = false;
+    // The person presses Ctrl+C while the first call runs.
+    sink.afterCall = () => stop?.();
+    const interrupting: CliEnvironment = {
+      ...environment(),
+      interrupt: (handler) => {
+        stop = handler;
+        return () => {
+          released = true;
+        };
+      },
+    };
+
+    const code = await recipeRunCommand('recipes/sync.recipe', { apply: true }, interrupting, {
+      contributions: verbs(sink),
+    });
+
+    expect(code).toBe(EXIT_DIAGNOSTICS);
+    expect(sink.sent.get('EX-2')).toBe(1);
+    expect(released).toBe(true);
+    expect(out).toContain('applied at');
+    // The second batch of 20 was never handed over.
+    expect(out).toContain('99 applied, 1 failed, 20 skipped');
+    expect(out).toContain(
+      '    failed EX-2: unfinished: the Apply was cancelled; some may have been written',
+    );
+    expect(err).toContain('cancelled: the Apply stopped between two calls');
+    expect(Object.keys(await stored('sync.recipe'))).not.toContain('EX-2');
   });
 
   it('applies an apply auto recipe once under --apply', async () => {

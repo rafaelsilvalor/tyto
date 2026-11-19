@@ -678,6 +678,10 @@ export interface Catalogue {
   readonly 'recipe.plan.summary.none': string;
   readonly 'recipe.plan.held': string;
   readonly 'recipe.plan.refused': string;
+  /** TYTO-791, ADR 0216: a long write's progress under its plan, and Cancel beside it. */
+  readonly 'recipe.plan.progress': string;
+  readonly 'recipe.plan.cancel': string;
+  readonly 'recipe.plan.cancelling': string;
   /**
    * TYTO-379, the Table and Summary views (`recipe-table-view.ts`): the quick filter, the column
    * picker, Copy, the row count with and without a filter, what a copy wrote, the Summary's
@@ -1676,6 +1680,9 @@ export const CATALOGUE_KEYS = [
   'recipe.plan.summary.none',
   'recipe.plan.held',
   'recipe.plan.refused',
+  'recipe.plan.progress',
+  'recipe.plan.cancel',
+  'recipe.plan.cancelling',
   'recipe.table.filter',
   'recipe.table.columns',
   'recipe.table.copy',

@@ -2392,6 +2392,10 @@ async function start(): Promise<void> {
     },
     preview,
     recipes,
+    // TYTO-791, ADR 0216: how far a long Apply has got, under its plan cell.
+    applyProgress: (progress) => {
+      toWindow('recipe:apply-progress', progress);
+    },
     // TYTO-402, ADR 0176: a plugin verb's kind and declared arguments, for the step picker.
     contributedVerb: (name) =>
       contributed

@@ -111,6 +111,8 @@ describe('the IPC contract', () => {
       'recipe-credential:list',
       'recipe-credential:set',
       'recipe:apply',
+      // TYTO-791, ADR 0216: Cancel on a long Apply, between two calls.
+      'recipe:apply-cancel',
       'recipe:copy',
       'recipe:facets',
       // TYTO-402, ADR 0176: Load recipe, a copy into the folder an explorer id names.
@@ -257,6 +259,8 @@ describe('the event table', () => {
       'plugins:changed',
       // TYTO-45. The queue changed; the panel asks `queue:list` when it hears it.
       'queue:changed',
+      // TYTO-791. How far a long Apply has got, under its plan cell.
+      'recipe:apply-progress',
       // TYTO-385. The scheduled recipes changed, or a notification about one was clicked.
       'schedule:changed',
       // TYTO-206. settings.json changed, or a screen's change to it was refused.

@@ -342,8 +342,9 @@ const planSchema = z.strictObject({
 const appliedBatchSchema = z.strictObject({
   operations: z.array(
     z.strictObject({
-      status: z.enum(['applied', 'failed', 'skipped']),
+      status: z.enum(['applied', 'failed', 'skipped', 'continue']),
       reason: z.string().optional(),
+      progress: z.string().optional(),
     }),
   ),
 });

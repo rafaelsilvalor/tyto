@@ -132,6 +132,15 @@ export interface CliEnvironment {
    * internal failure (exit 2) and says why.
    */
   readonly stdio?: () => CliStdio;
+  /**
+   * Calls `stop` on the first Ctrl+C while it is installed, in place of ending the process, and
+   * answers the function that removes it; a second Ctrl+C ends the process as before. Only
+   * `tyto recipe run --apply` installs it, while it applies (ADR 0216): a long write stops
+   * between two calls and is reported unfinished, rather than cut off with nothing said.
+   *
+   * Absent in the window, whose command panel refuses `--apply` (TYTO-684).
+   */
+  readonly interrupt?: (stop: () => void) => () => void;
 }
 
 /**

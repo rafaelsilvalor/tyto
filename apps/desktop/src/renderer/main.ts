@@ -998,6 +998,12 @@ const recipeNotebook = createRecipeNotebook({
     if (bridge === undefined) return {};
     return bridge['recipe:apply'](request);
   },
+  // TYTO-791, ADR 0216: Cancel under a long write; the Apply's own answer says how it ended.
+  cancelApply: async (request) => {
+    const bridge = window.tyto;
+    if (bridge === undefined) return {};
+    return bridge['recipe:apply-cancel'](request);
+  },
   refusedWithoutReason: () => translate(state.locale, 'recipe.plan.refused'),
   // TYTO-676: the blocks a run reaches show `[*]` until its answer.
   running: (documentId) => {
@@ -1202,6 +1208,7 @@ function showRecipeAnswer(
     expanded: recipeNotebook.expandedOf(documentId),
     applying: recipeNotebook.applyingOf(documentId),
     refusals: recipeNotebook.refusalsOf(documentId),
+    progress: recipeNotebook.progressOf(documentId),
     now: Date.now,
     // TYTO-639: a view's filter, span and opened card, kept by line as folds are.
     views: {
@@ -1214,6 +1221,9 @@ function showRecipeAnswer(
       runFrom: (index) => void recipeNotebook.runFrom(documentId, index),
       fetchAgain: () => void recipeNotebook.fetchAgain(documentId),
       apply: (index, planId) => void recipeNotebook.apply(documentId, index, planId),
+      cancelApply: (index) => {
+        recipeNotebook.cancelApply(documentId, index);
+      },
       toggled: (at, collapsed) => {
         recipeNotebook.setCollapsed(documentId, at, collapsed);
         // TYTO-676: the block's toolbar says folded or open as the result's own toggle does.
@@ -7154,6 +7164,11 @@ async function load(): Promise<void> {
 
     bridge.on('queue:changed', () => {
       if (elements.queuePanel !== null) void refreshQueue();
+    });
+
+    // TYTO-791, ADR 0216: how far a long Apply has got, drawn under its plan cell.
+    bridge.on('recipe:apply-progress', (pushed) => {
+      recipeNotebook.progressed(pushed);
     });
 
     // TYTO-385, ADR 0175: a schedule was found or gone, or a run started or ended. `open` is a

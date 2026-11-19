@@ -393,6 +393,9 @@ describe('the bridge', () => {
       // `recipe:apply` has no window caller until the notebook's Apply button; its logic is in
       // `recipe-apply.test.ts`.
       'recipe:apply',
+      // TYTO-791, ADR 0216: Cancel under a long write, which only a plugin answering
+      // `continue` draws; `src/main/ipc.test.ts` stops a real runner's Apply through it.
+      'recipe:apply-cancel',
       // TYTO-379, ADR 0171: a view's pages and its copy, which the Table view calls.
       // `recipe-table.desktop.test.ts` scrolls, sorts and filters through `recipe:rows`; copy
       // writes the real clipboard, which no suite should, so `ipc.test.ts` holds it.
@@ -1153,6 +1156,11 @@ describe('switching the language', () => {
     'recipe.plan.summary.none',
     'recipe.plan.held',
     'recipe.plan.refused',
+    // TYTO-791: drawn only while a long write is in progress; `recipe-plan-view.test.ts`
+    // paints them in both languages.
+    'recipe.plan.progress',
+    'recipe.plan.cancel',
+    'recipe.plan.cancelling',
     // TYTO-379: drawn only under a cell in a Table or Summary view; `recipe-table-view.test.ts`
     // paints them, and `recipe-table.desktop.test.ts` reads the bar in the real window.
     'recipe.table.filter',

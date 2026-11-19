@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { ok } from '@tyto/core';
 import type { RecipeContributions, RecipeVerbContribution } from '@tyto/plugin-api';
-import type { JsonValue, RunClock, Table } from '@tyto/recipe';
+import type { ApplyOptions, ApplyProgress, JsonValue, RunClock, Table } from '@tyto/recipe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { recipeStateStore } from '../recipe-state.js';
@@ -48,6 +48,12 @@ interface Plugin {
   gate?: Promise<void> | undefined;
   applying: number;
   mostApplying: number;
+  /**
+   * TYTO-791, ADR 0216: calls a mark takes, by `label/row`, as a long upload takes several; until
+   * the last one `apply` answers `continue`. `sent` is how far each got, the plugin's cache.
+   */
+  readonly parts: Map<string, number>;
+  readonly sent: Map<string, number>;
 }
 
 function plugin(state: Plugin): RecipeContributions {
@@ -92,6 +98,13 @@ function plugin(state: Plugin): RecipeContributions {
         const now = state.marks.get(id) ?? null;
         if (now !== payload.expected) {
           return { status: 'failed' as const, reason: `${id} is marked '${String(now)}' now` };
+        }
+        const parts = state.parts.get(id) ?? 1;
+        const sent = (state.sent.get(id) ?? 0) + 1;
+        state.sent.set(id, sent);
+        if (sent < parts) {
+          const progress = `sent ${String(sent)} of ${String(parts)} parts`;
+          return { status: 'continue' as const, progress };
         }
         state.marks.set(id, String(payload.mark));
         return { status: 'applied' as const };
@@ -165,6 +178,8 @@ function harness(trust: RecipePlace['trust'] = 'trusted') {
     plans: 0,
     applying: 0,
     mostApplying: 0,
+    parts: new Map(),
+    sent: new Map(),
   };
   /** TYTO-650: every state write, with how many applies were under way when it started. */
   const writes: { readonly store: string; readonly applying: number }[] = [];
@@ -187,8 +202,14 @@ function harness(trust: RecipePlace['trust'] = 'trusted') {
   });
   const run = (text: string, more: Partial<RecipeRunInput> = {}) =>
     runner.run({ documentId: 'tab-1', text, path: recipePath, ...more });
-  const apply = (index: number, planId: number) =>
-    runner.apply({ documentId: 'tab-1', index, planId, path: recipePath });
+  const apply = (index: number, planId: number, options?: ApplyOptions) =>
+    runner.apply({
+      documentId: 'tab-1',
+      index,
+      planId,
+      path: recipePath,
+      ...(options === undefined ? {} : { options }),
+    });
   /** What the recipe's store holds, by key: `pushed` unless named. */
   const stored = async (store = 'pushed') => {
     const entries = await recipeStateStore({ home, workspace, recipe: recipePath }).entries(store);
@@ -309,6 +330,52 @@ describe('Apply in the notebook', () => {
     expect(cell?.applied?.operations).toHaveLength(3);
     expect(codes(cell)).toEqual(['W_RECIPE_NOT_REMEMBERED']);
     expect(await stored()).toEqual({});
+  });
+});
+
+describe('an Apply with a write in progress (TYTO-791, ADR 0216)', () => {
+  it('finishes a mark that takes three calls in one Apply, following its progress', async () => {
+    const { state, run, apply, stored } = harness();
+    state.parts.set('done/EX-2', 3);
+    const answer = await run(SYNC, { explicit: true });
+    const progress: ApplyProgress[] = [];
+
+    const cell = await apply(2, answer.cells[2]?.planId ?? -1, {
+      onProgress: (each) => progress.push(each),
+    });
+
+    expect(state.sent.get('done/EX-2')).toBe(3);
+    expect(cell?.applied?.operations.map((operation) => operation.status)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+    expect(progress.map((each) => each.note)).toEqual([
+      'sent 1 of 3 parts',
+      'sent 2 of 3 parts',
+      undefined,
+    ]);
+    expect(Object.keys(await stored())).toEqual(['EX-1', 'EX-2', 'EX-3']);
+  });
+
+  it('stops after a cancel: the mark in progress is unfinished, and its row is not remembered', async () => {
+    const { state, run, apply, stored } = harness();
+    state.parts.set('done/EX-2', 3);
+    const answer = await run(SYNC, { explicit: true });
+    const controller = new AbortController();
+
+    const cell = await apply(2, answer.cells[2]?.planId ?? -1, {
+      cancel: controller.signal,
+      onProgress: () => controller.abort(),
+    });
+
+    expect(state.sent.get('done/EX-2')).toBe(1);
+    expect(cell?.applied?.operations[1]).toEqual({
+      rowKey: 'EX-2',
+      status: 'failed',
+      reason: 'unfinished: the Apply was cancelled; some may have been written',
+    });
+    expect(Object.keys(await stored())).toEqual(['EX-1', 'EX-3']);
   });
 });
 

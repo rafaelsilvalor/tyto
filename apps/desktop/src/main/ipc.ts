@@ -11,6 +11,7 @@ import { type RunClock, systemClock } from '@tyto/recipe';
 
 import {
   type IpcChannelName,
+  type IpcEventPayload,
   type IpcRequest,
   type IpcResponse,
   type MenuModel,
@@ -481,6 +482,11 @@ export interface IpcDependencies {
    */
   readonly recipes: RecipeRunner;
   /**
+   * TYTO-791, ADR 0216: how far an Apply has got, pushed to the window as `recipe:apply-progress`.
+   * Absent in a test that does not follow it.
+   */
+  readonly applyProgress?: (progress: IpcEventPayload<'recipe:apply-progress'>) => void;
+  /**
    * TYTO-402, ADR 0176: a plugin's recipe verb, its kind and its declared argument schema, which
    * the step picker's form is drawn from. Without it the picker offers the generic verbs only.
    */
@@ -599,7 +605,12 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     templates,
     updates,
     writeClipboard,
+    applyProgress,
   } = dependencies;
+  // TYTO-791, ADR 0216: the Apply under way per document and cell, which Cancel stops.
+  const applyCancels = new Map<string, AbortController>();
+  // The index is a number, so the last `#` splits the key whatever the document id holds.
+  const applyKey = (documentId: string, index: number): string => `${documentId}#${String(index)}`;
   // TYTO-379, ADR 0171: one sorted and filtered view per document, as a view pages through it.
   const rowViews = createRowViews();
 
@@ -693,13 +704,40 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
     // TYTO-378, ADR 0170: the window names the cell and the plan's id, never a plan or a path;
     // main applies the plan it kept for that cell, against the file it holds for the tab.
     'recipe:apply': async ({ documentId, index, planId }) => {
-      const cell = await recipes.apply({
-        documentId,
-        index,
-        planId,
-        path: documents.pathOf(documentId),
-      });
-      return cell === undefined ? {} : { cell: cellToWire(cell) };
+      const key = applyKey(documentId, index);
+      const cancel = new AbortController();
+      applyCancels.set(key, cancel);
+      try {
+        const cell = await recipes.apply({
+          documentId,
+          index,
+          planId,
+          path: documents.pathOf(documentId),
+          options: {
+            cancel: cancel.signal,
+            onProgress: ({ done, total, note }) => {
+              // Only a write in progress has something to say; a finished batch is the answer's.
+              if (note === undefined && done === total) return;
+              applyProgress?.({
+                documentId,
+                index,
+                done,
+                total,
+                ...(note === undefined ? {} : { note }),
+              });
+            },
+          },
+        });
+        return cell === undefined ? {} : { cell: cellToWire(cell) };
+      } finally {
+        if (applyCancels.get(key) === cancel) applyCancels.delete(key);
+      }
+    },
+
+    'recipe:apply-cancel': ({ documentId, index }) => {
+      const cancel = applyCancels.get(applyKey(documentId, index));
+      cancel?.abort();
+      return Promise.resolve({ cancelled: cancel !== undefined });
     },
 
     // TYTO-379, ADR 0171: a view's pages and copies read the table main kept for the cell, and

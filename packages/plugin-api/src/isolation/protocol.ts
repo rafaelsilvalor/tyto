@@ -67,9 +67,13 @@ import {
  * verb's argument may carry `description`, a field the strict `recipe-verb` schema of a host on
  * 25 would refuse (ADR 0135, note of 2026-11-12, TYTO-687); 27 since a plugin may read a
  * workspace file in parts, and stat and list the folder, three requests a host on 26 would
- * refuse as unknown capabilities (ADR 0212, TYTO-768).
+ * refuse as unknown capabilities (ADR 0212, TYTO-768); 28 since an `apply` answer may say an
+ * operation should `continue`, with its `progress`, a status and a field the strict answer
+ * schema of a host on 27 would refuse (ADR 0216, TYTO-791). The number is the host's and its
+ * own guest bootstrap's: a plugin's code carries none, so a plugin built before 28 runs on 28
+ * unchanged.
  */
-export const RPC_PROTOCOL_VERSION = 27;
+export const RPC_PROTOCOL_VERSION = 28;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

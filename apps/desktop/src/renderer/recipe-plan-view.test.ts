@@ -231,3 +231,69 @@ describe('what a plan cell says besides its lines', () => {
     expect(render(cellOf()).element.querySelector('.recipe-plan__held')).toBeNull();
   });
 });
+
+describe('a long write in progress (TYTO-791, ADR 0216)', () => {
+  const going = { done: 3, total: 10, note: 'sent 48 of 100 MB', cancelling: false };
+
+  it("says how far the Apply got in the plugin's words, with Cancel, which names the cell", () => {
+    const cancelApply = vi.fn<(index: number) => void>();
+    const { element, actions, key } = render(cellOf(), {
+      applying: new Set([1]),
+      progress: new Map([[1, going]]),
+    });
+    expect(texts(element, '.recipe-plan__progress-text')).toEqual([
+      'Applying: 3 of 10 done · sent 48 of 100 MB',
+    ]);
+    expect(element.querySelector('.recipe-plan__progress')?.getAttribute('role')).toBe('status');
+    // No Cancel without the action that stops it.
+    expect(element.querySelector('[data-action="cancel-apply"]')).toBeNull();
+    expect(key).not.toBe(render(cellOf(), { applying: new Set([1]) }).key);
+
+    const withCancel = render(cellOf(), {
+      applying: new Set([1]),
+      progress: new Map([[1, going]]),
+      actions: { ...actions, cancelApply },
+    }).element;
+    const stop = withCancel.querySelector<HTMLButtonElement>('[data-action="cancel-apply"]');
+    expect(stop?.textContent).toBe('Cancel');
+    stop?.click();
+    stop?.click();
+    expect(cancelApply.mock.calls).toEqual([[1]]);
+    expect(stop?.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('says it is stopping once Cancel was pressed, in both languages, and asks nothing more', () => {
+    const cancelApply = vi.fn<(index: number) => void>();
+    const progressing = (cancelling: boolean, locale: Locale) => {
+      const base = render(cellOf()).actions;
+      return render(
+        cellOf(),
+        {
+          applying: new Set([1]),
+          progress: new Map([[1, { ...going, cancelling }]]),
+          actions: { ...base, cancelApply },
+        },
+        { locale },
+      ).element;
+    };
+    const stopIn = (root: Element) =>
+      root.querySelector<HTMLButtonElement>('[data-action="cancel-apply"]');
+
+    const stopping = progressing(true, 'en');
+    stopIn(stopping)?.click();
+    expect(cancelApply).not.toHaveBeenCalled();
+    expect(stopIn(stopping)?.textContent).toBe('Stopping after this call');
+
+    const portuguese = progressing(true, 'pt-BR');
+    expect(texts(portuguese, '.recipe-plan__progress-text')).toEqual([
+      'Aplicando: 3 de 10 feitas · sent 48 of 100 MB',
+    ]);
+    expect(stopIn(portuguese)?.textContent).toBe('Parando depois desta chamada');
+    expect(stopIn(progressing(false, 'pt-BR'))?.textContent).toBe('Cancelar');
+  });
+
+  it('draws no progress once the Apply is over, whatever was kept', () => {
+    const { element } = render(cellOf(), { progress: new Map([[1, going]]) });
+    expect(element.querySelector('.recipe-plan__progress')).toBeNull();
+  });
+});
