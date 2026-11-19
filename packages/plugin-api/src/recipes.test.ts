@@ -230,7 +230,7 @@ describe('recipeRegistriesOf', () => {
     expect(problem).toBe(
       "No verb named 'demo.number' is available. Available: age, call, collect, compose, " +
         'count, decide, deliveries, demo.numbers, derive, extract, group, join, keep, last, map, nearest, path, recall, remember, ' +
-        'rewrite, rollup, rules, run, select, set, show, sort, stamp, to-brief, to-delivery, urls, warn, where, with-deliveries.',
+        'rename-exports, rewrite, rollup, rules, run, select, set, show, sort, stamp, to-brief, to-delivery, urls, warn, where, with-deliveries.',
     );
   });
 
