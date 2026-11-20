@@ -1,5 +1,35 @@
 # @tyto/command-line
 
+## 0.11.3
+
+### Patch Changes
+
+- 2df7157: A brief may cite a file a plugin decodes (TYTO-742, ADR 0223), once a host composes the new
+  cache. `@tyto/core` gains `E_ASSET_DECODER_MISSING` and `E_ASSET_DECODE_FAILED`, the asset
+  port's optional `layerOf(reference)` with the `AssetLayer` type, and an `externalArtVariant`
+  that puts the format before a layer's `#` and reads `.guide.psd` as one extension, so the copy
+  of `x.guide.psd` is `x.<format>.guide.psd`. `@tyto/io` gains `decodedAssets`, which locates a
+  file without reading it, hashes it as a stream remembered by real path, size and modified
+  time, and keeps the decoder's PNG in `TYTO_HOME/cache/decoded/<plugin>/`; a restricted folder
+  is served the cache only. The file resolver gains `locate`, and a delivery copies a decoded
+  layer as `<stem>-<layer>.png`. `tyto guide` no longer names a guide `x.guide.guide.psd` when the
+  cited file is a guide itself.
+- Updated dependencies [2df7157]
+  - @tyto/core@0.55.0
+  - @tyto/io@5.14.0
+  - @tyto/brief-lang@0.12.6
+  - @tyto/export-html@0.8.12
+  - @tyto/export-psd@0.1.2
+  - @tyto/export-svg@2.1.12
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.34
+  - @tyto/pipeline@0.13.2
+  - @tyto/plugin-api@0.28.1
+  - @tyto/raster@0.2.5
+  - @tyto/recipe@0.14.2
+  - @tyto/template-lang@0.8.31
+  - @tyto/templates@1.3.3
+
 ## 0.11.2
 
 ### Patch Changes
