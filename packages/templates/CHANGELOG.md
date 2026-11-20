@@ -1,5 +1,33 @@
 # @tyto/templates
 
+## 1.3.0
+
+### Minor Changes
+
+- 6465865: An image slot may declare `external` art, painted in another program at a size per format
+  (ADR 0220). Until its file exists the brief still renders: `W_EXTERNAL_ART_MISSING`, and an
+  outlined box where the art goes. `full` art that does not keep a format's proportion is
+  `E_EXTERNAL_ART_ASPECT`. The pack ships `arte-teste`, a test template with one of each kind.
+
+### Patch Changes
+
+- 833e7ec: `compile(..., { guide: true })` builds the guide for art painted outside Tyto (ADR 0220): every
+  external slot left empty, an outlined area named by its slot for each node a text or picture
+  slot produced, each frame's new optional `guide` cutting its top-level nodes into the `texto`,
+  `areas`, `arte` and `decoracao` layers, and one empty canvas per `inline` slot. `parseScene`
+  refuses a guide that does not cut its frame exactly. Without `guide` a Scene is what it was.
+  `compileTemplate` takes the same `guide` option, and `arte-teste` pins its guide Scene.
+- Updated dependencies [833e7ec]
+- Updated dependencies [7e43e5c]
+- Updated dependencies [6465865]
+- Updated dependencies [cfd96ff]
+- Updated dependencies [6f50dd3]
+- Updated dependencies [0f19f1f]
+- Updated dependencies [b3aa927]
+  - @tyto/core@0.54.0
+  - @tyto/template-kit@0.13.0
+  - @tyto/house-style@0.6.5
+
 ## 1.2.26
 
 ### Patch Changes

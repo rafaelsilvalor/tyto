@@ -1,5 +1,24 @@
 # @tyto/export-html
 
+## 0.8.10
+
+### Patch Changes
+
+- cfd96ff: `tyto render --guide` writes the layered PSD guide of a template's external art (ADR 0221):
+  `<artwork>-<format>.psd` for the piece and `<slot>-<format>.psd` for each inline picture,
+  with the PSD exporter registered among the built-ins and each layer's PNG decoded for it. A
+  template that declares no external art is the new fatal `E_GUIDE_NO_EXTERNAL_ART`, and
+  `--types psd` without `--guide` is refused. `export-html` no longer draws a hidden text node,
+  whose flex box undid its `display: none`.
+- Updated dependencies [833e7ec]
+- Updated dependencies [7e43e5c]
+- Updated dependencies [6465865]
+- Updated dependencies [cfd96ff]
+- Updated dependencies [6f50dd3]
+- Updated dependencies [0f19f1f]
+  - @tyto/core@0.54.0
+  - @tyto/plugin-api@0.27.0
+
 ## 0.8.9
 
 ### Patch Changes

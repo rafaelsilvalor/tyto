@@ -1,5 +1,44 @@
 # @tyto/core
 
+## 0.54.0
+
+### Minor Changes
+
+- 833e7ec: `compile(..., { guide: true })` builds the guide for art painted outside Tyto (ADR 0220): every
+  external slot left empty, an outlined area named by its slot for each node a text or picture
+  slot produced, each frame's new optional `guide` cutting its top-level nodes into the `texto`,
+  `areas`, `arte` and `decoracao` layers, and one empty canvas per `inline` slot. `parseScene`
+  refuses a guide that does not cut its frame exactly. Without `guide` a Scene is what it was.
+  `compileTemplate` takes the same `guide` option, and `arte-teste` pins its guide Scene.
+- 7e43e5c: An external art slot may have a file per format beside the one the brief cites (ADR 0222):
+  for `grafico.png`, `grafico.story.png` is what the story draws, and a format with no such file
+  draws the cited one. Only external slots are looked for, one more read of the asset port per
+  rendered format. `W_EXTERNAL_ART_MISSING` names the formats still drawn as a box, and is silent
+  when every format has its file. `externalArtVariant` gives a copy's reference.
+- 6465865: An image slot may declare `external` art, painted in another program at a size per format
+  (ADR 0220). Until its file exists the brief still renders: `W_EXTERNAL_ART_MISSING`, and an
+  outlined box where the art goes. `full` art that does not keep a format's proportion is
+  `E_EXTERNAL_ART_ASPECT`. The pack ships `arte-teste`, a test template with one of each kind.
+- cfd96ff: `tyto render --guide` writes the layered PSD guide of a template's external art (ADR 0221):
+  `<artwork>-<format>.psd` for the piece and `<slot>-<format>.psd` for each inline picture,
+  with the PSD exporter registered among the built-ins and each layer's PNG decoded for it. A
+  template that declares no external art is the new fatal `E_GUIDE_NO_EXTERNAL_ART`, and
+  `--types psd` without `--guide` is refused. `export-html` no longer draws a hidden text node,
+  whose flex box undid its `display: none`.
+- 6f50dd3: An exporter may answer a file's bytes (ADR 0221): `exportFrame` returns
+  `Result<string | Uint8Array>`, and an isolated exporter's byte answer crosses the boundary,
+  so `RPC_PROTOCOL_VERSION` is 29. A guide layer may carry its `raster`, and the pipeline's
+  new `rasterizeGuideLayers` stage draws every layer but `arte` through the HTML exporter and
+  the rasterizer before the render, when `JobRequest.guide` asks `compile` for a guide; the
+  bytes reach the exporters' store through the new `JobPorts.storeAssets`. A render without a
+  guide is unchanged.
+- 0f19f1f: `tyto guide <brief>` writes the PSD guide of each external-art file the brief cites beside
+  that file, named after it (ADR 0222): `grafico.guide.psd` for one format,
+  `grafico.<format>.guide.psd` per format for several. Missing guides by default, `--all`,
+  `--only`, `--list` (writes nothing), `--force` and `--open`. A guide newer than the brief is
+  the new fatal `E_GUIDE_NEWER_THAN_BRIEF` without `--force`. `guideCandidates`, `guidePaths`,
+  `guideOverwrite` and `writeGuides` are exported for the window.
+
 ## 0.53.0
 
 ### Minor Changes

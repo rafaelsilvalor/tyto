@@ -1,5 +1,33 @@
 # @tyto/template-kit
 
+## 0.13.0
+
+### Minor Changes
+
+- 833e7ec: `compile(..., { guide: true })` builds the guide for art painted outside Tyto (ADR 0220): every
+  external slot left empty, an outlined area named by its slot for each node a text or picture
+  slot produced, each frame's new optional `guide` cutting its top-level nodes into the `texto`,
+  `areas`, `arte` and `decoracao` layers, and one empty canvas per `inline` slot. `parseScene`
+  refuses a guide that does not cut its frame exactly. Without `guide` a Scene is what it was.
+  `compileTemplate` takes the same `guide` option, and `arte-teste` pins its guide Scene.
+- b3aa927: `levelsOf` reads a block's lines as `docs/slot-vocabulary.md` ranks them: `|` between parts,
+  `#` to `###` for a part's level, the main part by position when a line has no mark, and a line
+  of `---` as the divider. `levelStack` draws them one part per row, each row as tall as its
+  measured words, with the level's look and the divider the template supplies.
+
+### Patch Changes
+
+- Updated dependencies [833e7ec]
+- Updated dependencies [7e43e5c]
+- Updated dependencies [6465865]
+- Updated dependencies [cfd96ff]
+- Updated dependencies [6f50dd3]
+- Updated dependencies [0f19f1f]
+  - @tyto/core@0.54.0
+  - @tyto/export-html@0.8.10
+  - @tyto/brief-lang@0.12.5
+  - @tyto/template-lang@0.8.30
+
 ## 0.12.9
 
 ### Patch Changes
