@@ -133,6 +133,53 @@ describe('the reference of a format’s own copy', () => {
   it('is nothing for a reference a plugin’s source answers', () => {
     expect(externalArtVariant('drive:abc123', 'story')).toBeUndefined();
   });
+
+  it.each([
+    ['x.guide.psd', 'story', 'x.story.guide.psd'],
+    ['assets/capa.Guide.PSD', 'feed', 'assets/capa.feed.Guide.PSD'],
+    ['x.guide.png', 'story', 'x.guide.story.png'],
+  ])(
+    'reads a guide as one extension: %s in %s is %s (ADR 0223, decision 7)',
+    (reference, format, expected) => {
+      expect(externalArtVariant(reference, format)).toBe(expected);
+    },
+  );
+
+  it('puts the format before the fragment the port split off (ADR 0223)', () => {
+    const layer = { file: 'capa.psd', layer: 'grupo/arte.v2' };
+    expect(externalArtVariant('capa.psd#grupo/arte.v2', 'story', layer)).toBe(
+      'capa.story.psd#grupo/arte.v2',
+    );
+    const guide = { file: 'x.guide.psd', layer: 'arte' };
+    expect(externalArtVariant('x.guide.psd#arte', 'feed', guide)).toBe('x.feed.guide.psd#arte');
+  });
+
+  it('keeps a `#` the port did not split off as part of the file’s name', () => {
+    expect(externalArtVariant('post#1.png', 'story')).toBe('post#1.story.png');
+  });
+});
+
+describe('a layer of external art (ADR 0223)', () => {
+  it('asks for each format’s copy with the format before the fragment', async () => {
+    const asked: string[] = [];
+    const assets: AssetResolver = {
+      base: 'briefs/',
+      resolve: (reference) => {
+        asked.push(reference);
+        return Promise.resolve(
+          reference === 'capa.story.psd#arte'
+            ? { id: reference, source: 'url', path: 'cache/x.png', hash: 'sha256-x' }
+            : undefined,
+        );
+      },
+      layerOf: (reference) =>
+        reference === 'capa.psd#arte' ? { file: 'capa.psd', layer: 'arte' } : undefined,
+    };
+    const result = await resolve(brief({ fundo: 'capa.psd#arte' }), { registry, assets });
+    if (!result.ok) throw new Error('resolve failed');
+    expect(asked).toEqual(['capa.psd#arte', 'capa.feed.psd#arte', 'capa.story.psd#arte']);
+    expect(result.value.externalArt?.fundo?.story?.id).toBe('capa.story.psd#arte');
+  });
 });
 
 describe('a format’s own copy of external art', () => {

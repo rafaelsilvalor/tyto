@@ -31,6 +31,8 @@ non-zero.
 | `E_BAD_ADJUSTMENT` | error | no | An adjustment is not declared for the slot it is applied to. |
 | `E_ASSET_NOT_FOUND` | error | no | An asset path in the brief does not resolve to a file. |
 | `E_ASSET_SOURCE_FAILED` | error | no | A plugin that serves an asset scheme could not supply the asset the brief named. |
+| `E_ASSET_DECODER_MISSING` | error | no | The brief names a file of a kind no picture is drawn from, and no installed plugin decodes it. |
+| `E_ASSET_DECODE_FAILED` | error | no | The plugin that decodes a file kind could not turn the file the brief named into a picture. |
 | `E_UNSUPPORTED_CSS` | error | yes | A template uses a CSS property outside the accepted set. |
 | `E_UNSUPPORTED_TAG` | error | yes | A template uses a tag the template language does not define. |
 | `E_UNSUPPORTED_ATTRIBUTE` | error | yes | A template uses an attribute the tag it sits on does not accept. |
@@ -292,6 +294,8 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_BAD_ADJUSTMENT` | no | One adjustment on one slot; the slot keeps the adjustments that are declared. |
 | `E_ASSET_NOT_FOUND` | no | One image the brief named. The slot stays unset, so the scene never references bytes nobody can supply. |
 | `E_ASSET_SOURCE_FAILED` | no | One image the brief named, exactly as a missing file is: the slot stays unset and the rest of the brief renders. |
+| `E_ASSET_DECODER_MISSING` | no | One image the brief named, exactly as a missing file is: the slot stays unset and the rest of the brief renders. |
+| `E_ASSET_DECODE_FAILED` | no | One image the brief named, never drawn blank: the slot stays unset as for a missing file and the rest of the brief renders. |
 | `E_UNSUPPORTED_CSS` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_UNSUPPORTED_TAG` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
 | `E_UNSUPPORTED_ATTRIBUTE` | yes | The template is what every artwork is drawn through, so a broken one breaks all of them rather than one slot. |
@@ -636,6 +640,34 @@ One image the brief named, exactly as a missing file is: the slot stays unset an
 
 ```
 Asset '{path}' could not be fetched from plugin '{plugin}': {problem}.
+```
+
+Parameters: `path`, `plugin`, `problem`
+
+### `E_ASSET_DECODER_MISSING`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0223-a-plugin-decodes-a-file-kind-into-an-image-through-a-one-call-token.md`
+
+The brief names a file of a kind no picture is drawn from, and no installed plugin decodes it.
+
+One image the brief named, exactly as a missing file is: the slot stays unset and the rest of the brief renders.
+
+```
+Asset '{path}' is a '{extension}' file, which Tyto cannot draw by itself; install a plugin that decodes '{extension}' files.
+```
+
+Parameters: `path`, `extension`
+
+### `E_ASSET_DECODE_FAILED`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0223-a-plugin-decodes-a-file-kind-into-an-image-through-a-one-call-token.md`
+
+The plugin that decodes a file kind could not turn the file the brief named into a picture.
+
+One image the brief named, never drawn blank: the slot stays unset as for a missing file and the rest of the brief renders.
+
+```
+Asset '{path}' could not be decoded by plugin '{plugin}': {problem}.
 ```
 
 Parameters: `path`, `plugin`, `problem`

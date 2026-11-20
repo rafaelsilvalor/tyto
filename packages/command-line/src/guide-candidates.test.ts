@@ -156,6 +156,30 @@ describe('guidePaths', () => {
   });
 });
 
+describe('guidePaths for a cited guide (ADR 0223, decision 7)', () => {
+  const cited = { ...FUNDO, cited: 'capa.guide.psd' };
+  const assets = join(BRIEF_DIRECTORY, 'assets');
+
+  it('is the cited file itself for one format, never x.guide.guide.psd', () => {
+    expect(guidePaths(cited, ['story'], at(BRIEF_DIRECTORY, []))[0]).toMatchObject({
+      guide: join(assets, 'capa.guide.psd'),
+      art: join(assets, 'capa.guide.psd'),
+    });
+  });
+
+  it('is the format’s copy for several, where the brief reads it back', () => {
+    expect(
+      guidePaths(cited, ['feed', 'story'], at(BRIEF_DIRECTORY, [])).map(({ guide, art }) => ({
+        guide,
+        art,
+      })),
+    ).toEqual([
+      { guide: join(assets, 'capa.feed.guide.psd'), art: join(assets, 'capa.feed.guide.psd') },
+      { guide: join(assets, 'capa.story.guide.psd'), art: join(assets, 'capa.story.guide.psd') },
+    ]);
+  });
+});
+
 describe('guideOverwrite', () => {
   const brief = 1_000;
   it.each([

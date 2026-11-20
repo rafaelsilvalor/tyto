@@ -188,8 +188,15 @@ function fileName(reference: string): string {
   return reference.slice(Math.max(reference.lastIndexOf('/'), reference.lastIndexOf('\\')) + 1);
 }
 
-/** `grafico.png` → `grafico`; a hidden file's leading dot is its name, not an extension. */
+/**
+ * `grafico.png` → `grafico`; a hidden file's leading dot is its name, not an extension. A
+ * guide is one extension (ADR 0223, decision 7), so a cited `x.guide.psd` is `x`, and its
+ * guide is itself rather than `x.guide.guide.psd`.
+ */
 function stemOf(name: string): string {
+  if (name.toLowerCase().endsWith(GUIDE_SUFFIX) && name.length > GUIDE_SUFFIX.length) {
+    return name.slice(0, -GUIDE_SUFFIX.length);
+  }
   const dot = name.lastIndexOf('.');
   return dot <= 0 ? name : name.slice(0, dot);
 }

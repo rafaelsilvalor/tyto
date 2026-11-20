@@ -29,11 +29,22 @@ export {
   sourceCache,
 } from './source-cache.js';
 
+export {
+  type DecodeCall,
+  type DecodePort,
+  type DecodedAssets,
+  type DecodedAssetsOptions,
+  type DecodedSourceFiles,
+  decodedAssets,
+  nodeDecodedSourceFiles,
+} from './decoded-assets.js';
+
 export type { ExportResources } from './export-resources.js';
 
 export {
   type DeliveredAsset,
   type FileAssetResolverOptions,
+  type LocatingAssetResolver,
   briefAssetResolver,
   fileAssetResolver,
   recordingAssetResolver,

@@ -47,4 +47,24 @@ export interface AssetResolver {
    * reference's range on whatever comes back.
    */
   explain?(reference: string): Diagnostic | undefined;
+
+  /**
+   * The file and the layer `reference` names, when this resolver read its last `#` as the
+   * start of a layer's name (ADR 0223): `capa.psd#arte` is the layer `arte` of `capa.psd`.
+   *
+   * Asked after `resolve(reference)`. Whether a `#` starts a layer depends on what the disk
+   * holds (a real `post#1.png` is a file's name) and on which plugins decode which files, and
+   * `core` knows neither; so the resolver that did the split says so, and `resolve` puts a
+   * format's copy before the fragment (ADR 0222). Absent, or answering `undefined`, the
+   * reference is one file's name.
+   */
+  layerOf?(reference: string): AssetLayer | undefined;
+}
+
+/** A reference read as a layer of a file: `capa.psd#grupo/arte`. */
+export interface AssetLayer {
+  /** The file's reference, the part before the last `#`. */
+  readonly file: string;
+  /** The layer's exact name, a layer inside a group as `group/layer`. */
+  readonly layer: string;
 }

@@ -1,7 +1,15 @@
 import { copyFile, lstat, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
-import { type Diagnostic, type Diagnostics, type Result, diagnostic, err, ok } from '@tyto/core';
+import {
+  type AssetLayer,
+  type Diagnostic,
+  type Diagnostics,
+  type Result,
+  diagnostic,
+  err,
+  ok,
+} from '@tyto/core';
 import type { Artifact } from '@tyto/pipeline';
 
 import { isInside } from './contain.js';
@@ -367,11 +375,15 @@ const LONGEST_FETCHED_STEM = 64;
  * The reference is text from a brief, and this is the only place it becomes part of a path:
  * nothing it holds can name a folder, because every separator is cut before it is used.
  */
-function fetchedStem(reference: string): string {
-  const scheme = reference.slice(0, reference.indexOf(':'));
-  const last = reference.split(/[/\\:]/u).pop() ?? '';
-  const safe = last.replace(/[^A-Za-z0-9._-]/gu, '-');
-  const stem = basename(safe, extname(safe))
+function fetchedStem(reference: string, layer?: AssetLayer): string {
+  const file = layer?.file ?? reference;
+  const scheme = file.slice(0, file.indexOf(':'));
+  const last = file.split(/[/\\:]/u).pop() ?? '';
+  const safe = (text: string): string => text.replace(/[^A-Za-z0-9._-]/gu, '-');
+  // A decoded layer (ADR 0223) is folded in after the file's stem: `capa.psd#grupo/arte` is
+  // `capa-grupo-arte`, every separator in the layer's name cut as the reference's are.
+  const fileStem = basename(safe(last), extname(safe(last)));
+  const stem = (layer === undefined ? fileStem : `${fileStem}-${safe(layer.layer)}`)
     .replace(/^\.+|\.+$/gu, '')
     .slice(0, LONGEST_FETCHED_STEM);
   const name = stem === '' ? scheme : stem;
@@ -390,10 +402,10 @@ function deliveredNames(
 ): Map<string, { readonly name: string; readonly source: string }> {
   const names = new Map<string, { readonly name: string; readonly source: string }>();
   const taken = new Set<string>();
-  for (const { path, reference, fetched } of assets) {
+  for (const { path, reference, fetched, layer } of assets) {
     if (names.has(path)) continue;
     const extension = extname(path);
-    const stem = fetched === true ? fetchedStem(reference) : basename(path, extension);
+    const stem = fetched === true ? fetchedStem(reference, layer) : basename(path, extension);
     let name = `${stem}${extension}`;
     for (let count = 2; taken.has(name.toLowerCase()); count += 1) {
       name = `${stem}-${String(count)}${extension}`;

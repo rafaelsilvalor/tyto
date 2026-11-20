@@ -869,8 +869,10 @@ class Resolver {
     // The cited file first, so `assets` keeps the order the brief referenced them in.
     if (cited !== undefined) this.assets.set(cited.id, cited);
     const copies: Record<string, AssetRef> = {};
+    // Asked after the cited file resolved: the port that split a `#` off says where (ADR 0223).
+    const layer = this.options.assets.layerOf?.(reference);
     for (const format of this.formats) {
-      const variant = externalArtVariant(reference, format);
+      const variant = externalArtVariant(reference, format, layer);
       if (variant === undefined) continue;
       const copy = await this.options.assets.resolve(variant);
       if (copy !== undefined) copies[format] = copy;

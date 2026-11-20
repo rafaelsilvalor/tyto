@@ -168,6 +168,29 @@ export const diagnosticCodes = {
       'One image the brief named, exactly as a missing file is: the slot stays unset and the ' +
       'rest of the brief renders.',
   },
+  E_ASSET_DECODER_MISSING: {
+    severity: 'error',
+    summary:
+      'The brief names a file of a kind no picture is drawn from, and no installed plugin decodes it.',
+    template:
+      "Asset '{path}' is a '{extension}' file, which Tyto cannot draw by itself; install a plugin that decodes '{extension}' files.",
+    spec: 'docs/adr/0223-a-plugin-decodes-a-file-kind-into-an-image-through-a-one-call-token.md',
+    fatal: false,
+    fatality:
+      'One image the brief named, exactly as a missing file is: the slot stays unset and the ' +
+      'rest of the brief renders.',
+  },
+  E_ASSET_DECODE_FAILED: {
+    severity: 'error',
+    summary:
+      'The plugin that decodes a file kind could not turn the file the brief named into a picture.',
+    template: "Asset '{path}' could not be decoded by plugin '{plugin}': {problem}.",
+    spec: 'docs/adr/0223-a-plugin-decodes-a-file-kind-into-an-image-through-a-one-call-token.md',
+    fatal: false,
+    fatality:
+      'One image the brief named, never drawn blank: the slot stays unset as for a missing ' +
+      'file and the rest of the brief renders.',
+  },
   E_UNSUPPORTED_CSS: {
     severity: 'error',
     summary: 'A template uses a CSS property outside the accepted set.',

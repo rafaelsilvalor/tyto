@@ -296,6 +296,9 @@ export function sourceCache(options: SourceCacheOptions): SourceCache {
         explain(reference: string): Diagnostic | undefined {
           return failures.get(reference) ?? inner.explain?.(reference);
         },
+
+        // A decoded layer's split (ADR 0223) is the inner resolver's; a scheme has none.
+        ...(inner.layerOf === undefined ? {} : { layerOf: inner.layerOf.bind(inner) }),
       };
     },
 
