@@ -88,7 +88,10 @@ The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `pillTable` for a table read out of one
 slot; `titleBlock` for a centred column of optional pieces — a picture, lines of words, a
-rule; `mark` and `textBlock` for a path icon and a brief's words at a stated size.
+rule; `card` and `cardRow` for an outlined box cut into a title, a filled band and a foot,
+shaped by the parts of an `::apelo` through `cardSegments` (cards side by side share one
+height, their bands lined up); `mark` and `textBlock` for a path icon and a brief's words at a
+stated size.
 
 ```ts
 const sessions = pillTable(sessionTable, { text: lamina, width, measure: context.measure });
