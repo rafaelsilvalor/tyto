@@ -1,5 +1,12 @@
 # @tyto/export-psd
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [422cf7c]
+  - @tyto/plugin-api@0.28.0
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,15 @@
 # @tyto/io
 
+## 5.13.2
+
+### Patch Changes
+
+- Updated dependencies [422cf7c]
+  - @tyto/plugin-api@0.28.0
+  - @tyto/export-html@0.8.11
+  - @tyto/export-svg@2.1.11
+  - @tyto/pipeline@0.13.1
+
 ## 5.13.1
 
 ### Patch Changes
