@@ -99,6 +99,18 @@ export {
 } from './rhythm.js';
 
 export {
+  DEEPEST_LEVEL,
+  DIVIDER,
+  type Level,
+  type LevelItem,
+  type LevelLook,
+  type LevelPart,
+  type LevelPosition,
+  type LevelStackStyle,
+  levelStack,
+  levelsOf,
+} from './levels.js';
+export {
   type TitleBlockContent,
   type TitleBlockStyle,
   type TitleImagePart,
