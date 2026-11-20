@@ -3,6 +3,7 @@
 O que mudou em cada versão do aplicativo, da mais nova para a mais antiga. Cada página é o texto
 publicado com aquela versão.
 
+- [Tyto 0.27.0](./desktop-v0.27.0) — a arte pintada fora do Tyto ganha um gabarito em PSD, e a prévia acompanha os arquivos dela
 - [Tyto 0.26.0](./desktop-v0.26.0) — uma receita leva a entrega do começo ao fim, e o Explorador confere cada pasta de entrega
 - [Tyto 0.24.3](./desktop-v0.24.3) — um asterisco sozinho é só um asterisco, e a ficha de entrega guarda os campos que você declara
 - [Tyto 0.24.1](./desktop-v0.24.1) — as pastas recentes atravessam a atualização, e uma receita mantém uma pasta de entrega por linha
