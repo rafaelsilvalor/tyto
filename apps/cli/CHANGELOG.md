@@ -1,5 +1,20 @@
 # @tyto/cli
 
+## 0.13.1
+
+### Patch Changes
+
+- 0f19f1f: `tyto guide <brief>` writes the PSD guide of each external-art file the brief cites beside
+  that file, named after it (ADR 0222): `grafico.guide.psd` for one format,
+  `grafico.<format>.guide.psd` per format for several. Missing guides by default, `--all`,
+  `--only`, `--list` (writes nothing), `--force` and `--open`. A guide newer than the brief is
+  the new fatal `E_GUIDE_NEWER_THAN_BRIEF` without `--force`. `guideCandidates`, `guidePaths`,
+  `guideOverwrite` and `writeGuides` are exported for the window.
+- Updated dependencies [cfd96ff]
+- Updated dependencies [0f19f1f]
+  - @tyto/command-line@0.11.0
+  - @tyto/raster@0.2.5
+
 ## 0.13.0
 
 ### Minor Changes

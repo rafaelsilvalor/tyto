@@ -1,5 +1,31 @@
 # @tyto/pipeline
 
+## 0.13.0
+
+### Minor Changes
+
+- 6f50dd3: An exporter may answer a file's bytes (ADR 0221): `exportFrame` returns
+  `Result<string | Uint8Array>`, and an isolated exporter's byte answer crosses the boundary,
+  so `RPC_PROTOCOL_VERSION` is 29. A guide layer may carry its `raster`, and the pipeline's
+  new `rasterizeGuideLayers` stage draws every layer but `arte` through the HTML exporter and
+  the rasterizer before the render, when `JobRequest.guide` asks `compile` for a guide; the
+  bytes reach the exporters' store through the new `JobPorts.storeAssets`. A render without a
+  guide is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [833e7ec]
+- Updated dependencies [7e43e5c]
+- Updated dependencies [6465865]
+- Updated dependencies [cfd96ff]
+- Updated dependencies [6f50dd3]
+- Updated dependencies [0f19f1f]
+  - @tyto/core@0.54.0
+  - @tyto/plugin-api@0.27.0
+  - @tyto/brief-lang@0.12.5
+  - @tyto/raster@0.2.5
+  - @tyto/template-lang@0.8.30
+
 ## 0.12.28
 
 ### Patch Changes

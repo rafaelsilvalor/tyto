@@ -1,5 +1,46 @@
 # @tyto/command-line
 
+## 0.11.0
+
+### Minor Changes
+
+- cfd96ff: `tyto render --guide` writes the layered PSD guide of a template's external art (ADR 0221):
+  `<artwork>-<format>.psd` for the piece and `<slot>-<format>.psd` for each inline picture,
+  with the PSD exporter registered among the built-ins and each layer's PNG decoded for it. A
+  template that declares no external art is the new fatal `E_GUIDE_NO_EXTERNAL_ART`, and
+  `--types psd` without `--guide` is refused. `export-html` no longer draws a hidden text node,
+  whose flex box undid its `display: none`.
+- 0f19f1f: `tyto guide <brief>` writes the PSD guide of each external-art file the brief cites beside
+  that file, named after it (ADR 0222): `grafico.guide.psd` for one format,
+  `grafico.<format>.guide.psd` per format for several. Missing guides by default, `--all`,
+  `--only`, `--list` (writes nothing), `--force` and `--open`. A guide newer than the brief is
+  the new fatal `E_GUIDE_NEWER_THAN_BRIEF` without `--force`. `guideCandidates`, `guidePaths`,
+  `guideOverwrite` and `writeGuides` are exported for the window.
+
+### Patch Changes
+
+- Updated dependencies [833e7ec]
+- Updated dependencies [7e43e5c]
+- Updated dependencies [279b6c1]
+- Updated dependencies [6465865]
+- Updated dependencies [cfd96ff]
+- Updated dependencies [6f50dd3]
+- Updated dependencies [0f19f1f]
+  - @tyto/core@0.54.0
+  - @tyto/templates@1.3.0
+  - @tyto/export-psd@0.1.0
+  - @tyto/export-html@0.8.10
+  - @tyto/plugin-api@0.27.0
+  - @tyto/pipeline@0.13.0
+  - @tyto/brief-lang@0.12.5
+  - @tyto/export-svg@2.1.10
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.32
+  - @tyto/io@5.13.1
+  - @tyto/raster@0.2.5
+  - @tyto/recipe@0.14.1
+  - @tyto/template-lang@0.8.30
+
 ## 0.10.0
 
 ### Minor Changes
