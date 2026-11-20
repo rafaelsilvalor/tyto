@@ -4,6 +4,7 @@ import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import { didYouMean } from '../diagnostics/suggest.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
 import { type Diagnostics, type Result, err, fromPartial } from '../result/result.js';
+import { externalArtVariant } from './external-art-files.js';
 import { externalArtPlaceholder, isExternalArtPlaceholder } from '../scene/external-art.js';
 import type { AssetRef } from '../scene/primitives.js';
 import { type SourceRange, sourceRange } from '../source/range.js';
@@ -138,6 +139,13 @@ export interface ResolvedBrief {
    * case and means the artwork is whole.
    */
   readonly missingRequiredSlots: readonly string[];
+  /**
+   * Each external slot's own file per format, by slot and then format (ADR 0222): the
+   * `grafico.story.png` beside a cited `grafico.png`, which `compile` draws in that format in
+   * place of the cited file. Present only when one was found, so a brief without one resolves
+   * to the object it did.
+   */
+  readonly externalArt?: Readonly<Record<string, Readonly<Record<string, AssetRef>>>>;
   /**
    * The configuration a plugin file gave the name the brief wrote (ADR 0151): an alias's, or
    * the entry's `default` for the template's own name. Absent when no file configures it.
@@ -385,6 +393,13 @@ class Resolver {
    * the parent holds under the slot's name (ADR 0207, note of 2026-11-16).
    */
   private readonly siblings = new Map<ResolvedSlot, ResolvedSlot[]>();
+  /** Each external slot's own file per format (ADR 0222), for `ResolvedBrief.externalArt`. */
+  private readonly externalArt = new Map<string, Readonly<Record<string, AssetRef>>>();
+  /**
+   * The formats this run renders, which an external slot's copies are looked for in. Set once
+   * they are known, before the first slot is taken.
+   */
+  formats: readonly string[] = [];
 
   constructor(
     private readonly manifest: TemplateManifest,
@@ -761,15 +776,8 @@ class Resolver {
 
       case 'image': {
         const asset = await this.options.assets.resolve(plain);
-        if (asset === undefined && slot.external !== undefined) {
-          // Art painted elsewhere arrives later by design (ADR 0220): the slot takes a
-          // placeholder the template places as usual, and `compile` draws it as a box.
-          this.reportExternalArtMissing(
-            candidate.name,
-            `'${plain}' was not found in ${searchedIn(this.options.assets)}`,
-            candidate.range,
-          );
-          return { kind: 'image', asset: externalArtPlaceholder(candidate.name) };
+        if (slot.external !== undefined) {
+          return this.externalArtValue(candidate.name, plain, asset, candidate.range);
         }
         if (asset === undefined) {
           const explained = this.options.assets.explain?.(plain);
@@ -840,6 +848,49 @@ class Resolver {
       if (value.kind === 'image') this.assets.set(value.asset.id, value.asset);
       this.slots.set(name, { name, value, adjustments: [] });
     }
+  }
+
+  /**
+   * An external slot's value: the cited file, with each format's own copy looked for beside
+   * it (ADR 0222). Only external slots are probed, one more question to the asset port per
+   * rendered format, so a brief's other pictures cost what they did.
+   *
+   * Art painted elsewhere arrives later by design (ADR 0220): when the cited file is not
+   * there the slot takes a placeholder the template places as usual, and `compile` draws it
+   * as a box in every format that has no copy of its own. A warning says so only when such a
+   * format remains; one copy per format is a whole set of art.
+   */
+  private async externalArtValue(
+    name: string,
+    reference: string,
+    cited: AssetRef | undefined,
+    range: SourceRange | undefined,
+  ): Promise<SlotValue> {
+    // The cited file first, so `assets` keeps the order the brief referenced them in.
+    if (cited !== undefined) this.assets.set(cited.id, cited);
+    const copies: Record<string, AssetRef> = {};
+    for (const format of this.formats) {
+      const variant = externalArtVariant(reference, format);
+      if (variant === undefined) continue;
+      const copy = await this.options.assets.resolve(variant);
+      if (copy !== undefined) copies[format] = copy;
+    }
+    const found = Object.values(copies);
+    if (found.length > 0) this.externalArt.set(name, copies);
+    else this.externalArt.delete(name);
+    for (const copy of found) this.assets.set(copy.id, copy);
+
+    if (cited !== undefined) return { kind: 'image', asset: cited };
+    const bare = this.formats.filter((format) => copies[format] === undefined);
+    if (bare.length > 0) {
+      const where = `'${reference}' was not found in ${searchedIn(this.options.assets)}`;
+      this.reportExternalArtMissing(
+        name,
+        bare.length === this.formats.length ? where : `${where} for ${listed(bare)}`,
+        range,
+      );
+    }
+    return { kind: 'image', asset: externalArtPlaceholder(name) };
   }
 
   private reportExternalArtMissing(
@@ -1040,6 +1091,7 @@ class Resolver {
       }),
       assets: [...this.assets.values()],
       missingRequiredSlots: this.missingRequired,
+      ...(this.externalArt.size === 0 ? {} : { externalArt: Object.fromEntries(this.externalArt) }),
     };
   }
 }
@@ -1234,6 +1286,7 @@ export async function resolve(
       resolver.report(problem);
     },
   );
+  resolver.formats = formats;
 
   for (const [key, value] of Object.entries(ast.frontmatter.data)) {
     if (RESERVED.has(key)) continue;
@@ -1270,6 +1323,13 @@ export async function resolve(
         },
     resolver.diagnostics,
   );
+}
+
+/** Formats as a warning names them: `format 'a'`, `formats 'a' and 'b'`. */
+function listed(formats: readonly string[]): string {
+  const quoted = formats.map((format) => `'${format}'`);
+  if (quoted.length === 1) return `format ${quoted.join('')}`;
+  return `formats ${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
 }
 
 /**
