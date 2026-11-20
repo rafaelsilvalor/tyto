@@ -160,7 +160,10 @@ information, the template draws it.** Inside one line:
   second level, `###` the third. A part with no mark is the base level. The template decides
   what each level looks like — size, weight, case, letter spacing — so the same marks give a
   different, consistent look in each template.
-- **A line with no `#` at all is read by position**, so most lines need no mark:
+- **The block's first line, with no `#` at all, is read by position**, so most titles need no
+  mark. **Any later line with no `#` is a supporting line**: all of it is the base level, after
+  the block's main part — the cargos under the exam's name need no `###`, and a later line that
+  should stand out says so with `##`.
 
   | Parts | Read as         | Example                                      |
   | ----- | --------------- | -------------------------------------------- |

@@ -45,7 +45,7 @@ describe('levelsOf', () => {
       ).toEqual([
         ['1:main:Concurso TRT 4 (RS)', '2:after:Edital publicado'],
         ['---'],
-        ['1:main:Ganhe até R$ 16 mil por mês!'],
+        ['0:after:Ganhe até R$ 16 mil por mês!'],
       ]);
     });
 
@@ -71,6 +71,24 @@ describe('levelsOf', () => {
     ])('%s', (source, parts) => {
       expect(read(source)).toEqual([parts]);
     });
+  });
+
+  it('reads only the block’s first line by position; a later unmarked line is base level', () => {
+    const written = [
+      '## Edital publicado | # Concurso TRT 4 (RS)',
+      'Vagas para Analista | Técnico',
+      '## Ganhe até R$ 16 mil',
+    ].join('\n');
+    expect(read(written)).toEqual([
+      ['2:before:Edital publicado', '1:main:Concurso TRT 4 (RS)'],
+      ['0:after:Vagas para Analista', '0:after:Técnico'],
+      ['2:main:Ganhe até R$ 16 mil'],
+    ]);
+    expect(read(['---', 'TRT 4', 'Cargos'].join('\n'))).toEqual([
+      ['---'],
+      ['1:main:TRT 4'],
+      ['0:after:Cargos'],
+    ]);
   });
 
   it('takes the highest level written as the main part when there is no #', () => {
@@ -141,7 +159,7 @@ describe('levelStack', () => {
       { name: 'titulo-before-0', y: 0 },
       { name: 'titulo-main-1', y: 15 },
       { name: 'divisor', y: 65 },
-      { name: 'titulo-main-0', y: 89 },
+      { name: 'titulo-after-0', y: 89 },
     ]);
   });
 
