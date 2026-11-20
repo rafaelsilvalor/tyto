@@ -220,6 +220,20 @@ export interface HostCapabilities {
   workspaceList?(plugin: string, path: string): Promise<readonly WorkspaceEntry[]>;
 
   /**
+   * A part of the file a decode call's token names (ADR 0223), the offset and length already
+   * checked as a workspace part's are. **The adapter answers only a token it minted for this
+   * plugin and has not spent**, and refuses any other with {@link unknownToken}; `DecodeGrants`
+   * in `decoders.ts` is that adapter, and a host passes its `readPart`. Absent on a host that
+   * decodes nothing, which refuses every token the same way.
+   */
+  decodeReadPart?(
+    plugin: string,
+    token: string,
+    offset: number,
+    length: number,
+  ): Promise<Uint8Array>;
+
+  /**
    * A current access token for the plugin's sign-in `id`, already allowed (ADR 0174), or
    * `undefined` when nobody has signed in to it. **The adapter never opens a browser here**:
    * only a person starts a sign-in, from the host's own screen or command. It refreshes an
@@ -396,6 +410,7 @@ export interface PluginCapabilities {
   workspaceReadPart(path: string, offset: number, length: number): Promise<Uint8Array>;
   workspaceStat(path: string): Promise<WorkspaceEntry>;
   workspaceList(path: string): Promise<readonly WorkspaceEntry[]>;
+  decodeReadPart(token: string, offset: number, length: number): Promise<Uint8Array>;
   signinAccessToken(id: string): Promise<string>;
   storageGet(key: string): Promise<unknown>;
   storageSet(key: string, value: unknown): Promise<void>;
@@ -458,6 +473,43 @@ export interface HostWorkspace {
   list(path?: string): Promise<readonly WorkspaceEntry[]>;
   /** Writes bytes, or a string as UTF-8; resolves to `null`. Never into `.tyto/`. */
   write(path: string, value: Uint8Array | string): Promise<null>;
+}
+
+/**
+ * `host.decoding`: the file an `image-decoder` is asked about, read through the token its
+ * `decode` call was handed (ADR 0223). No permission: the token is the grant, good for one file,
+ * for the plugin it was minted for, until that call answers.
+ */
+export interface HostDecoding {
+  /**
+   * At most `part.length` bytes from `part.offset` of the call's file, shorter at its end and
+   * empty past it, `part.length` at most {@link PLUGIN_FILE_LIMIT_BYTES}. Read in parts of
+   * {@link PLUGIN_FILE_PART_BYTES}. A token that is spent, another plugin's or never minted is
+   * `E_PERMISSION`.
+   */
+  read(token: string, part: WorkspaceFilePart): Promise<Uint8Array>;
+}
+
+/** The `host.decoding` both sides of the isolation boundary hand a plugin. */
+export function hostDecoding(checked: Pick<PluginCapabilities, 'decodeReadPart'>): HostDecoding {
+  return { read: (token, part) => checked.decodeReadPart(token, part.offset, part.length) };
+}
+
+/**
+ * The refusal of a decode token no call holds open: never minted, minted for another plugin,
+ * or spent because its call answered (ADR 0223). One message for the three, so a plugin learns
+ * nothing about another plugin's calls.
+ */
+export function unknownToken(plugin: string): Diagnostic {
+  return diagnostic('E_PERMISSION', {
+    plugin,
+    capability: 'host.decoding.read with a token no decode call of its own holds open',
+  });
+}
+
+/** A part `host.decoding.read` cannot answer, said under the one code a decode read has. */
+function decodingRefusal(plugin: string, problem: string): Diagnostic {
+  return diagnostic('E_PERMISSION', { plugin, capability: `host.decoding.read (${problem})` });
 }
 
 /**
@@ -891,6 +943,21 @@ export function checkedCapabilities(
       if (bytes.length > length) {
         const answered = `the host answered ${String(bytes.length)} bytes for a part of ${String(length)}`;
         return refuse(workspaceRefusal(plugin, path, answered));
+      }
+      return bytes;
+    },
+
+    async decodeReadPart(token, offset, length) {
+      const refused = partProblem(offset, length);
+      if (refused !== undefined) {
+        return refuse(decodingRefusal(plugin, refused));
+      }
+      if (capabilities?.decodeReadPart === undefined) return refuse(unknownToken(plugin));
+      const bytes = await capabilities.decodeReadPart(plugin, token, offset, length);
+      // As for a workspace part: never more than the part asked for, whatever the adapter does.
+      if (bytes.length > length) {
+        const answered = `the host answered ${String(bytes.length)} bytes for a part of ${String(length)}`;
+        return refuse(decodingRefusal(plugin, answered));
       }
       return bytes;
     },

@@ -29,11 +29,13 @@ import {
   type HostFetchInit,
   type HostFetchResponse,
   type HostSignin,
+  type HostDecoding,
   type HostWorkspace,
   checkedCapabilities,
   hostCache,
   hostCredentials,
   hostSignin,
+  hostDecoding,
   hostWorkspace,
   responseOf,
 } from './capabilities.js';
@@ -61,6 +63,11 @@ import {
   type OwnedSource,
   SOURCE_SCHEME,
 } from './sources.js';
+import {
+  DECODER_EXTENSION,
+  type ImageDecoderContribution,
+  type OwnedImageDecoder,
+} from './decoders.js';
 import type { OwnedPanel } from './panels.js';
 import { type HostStorage, hostStorage } from './storage.js';
 import { type ThemeContribution, checkThemeContribution } from './theme.js';
@@ -151,6 +158,11 @@ export interface PluginHost {
   /** Faces of the families it names, for a face no local folder has (ADR 0117). */
   registerFontSource(source: FontSourceContribution): Disposable;
   /**
+   * Pictures out of files of the kinds it names by extension (ADR 0223): the host hands it a
+   * token for one file and reads that file to it in parts through `host.decoding`.
+   */
+  registerImageDecoder(decoder: ImageDecoderContribution): Disposable;
+  /**
    * A recipe verb, named `<namespace>.<verb>` in the namespace the manifest declares
    * (ADR 0135). An action or a sink declares `writes`, a subset of the manifest's.
    */
@@ -209,6 +221,12 @@ export interface PluginHost {
    * `E_WORKSPACE_FILE_RESTRICTED`.
    */
   readonly workspace: HostWorkspace;
+  /**
+   * The file an `image-decoder`'s `decode` call is about (ADR 0223): `read(token, part)` reads a
+   * part of it through the token the call was handed. No permission; a token that is spent,
+   * another plugin's or never minted is `E_PERMISSION`.
+   */
+  readonly decoding: HostDecoding;
   /**
    * A browser sign-in the host ran for this plugin (ADR 0174), behind `signin:<id>` and the
    * manifest's `signin.<id>` entry. `accessToken(id)` answers a current token, never opens a
@@ -292,6 +310,8 @@ export interface PluginRegistry extends RecipeContributions {
   assetSources(): readonly OwnedSource<AssetSourceContribution>[];
   /** Every font source with its plugin, in registration order: earlier wins a family. */
   fontSources(): readonly OwnedSource<FontSourceContribution>[];
+  /** Every image decoder with its plugin, in registration order: earlier wins an extension. */
+  imageDecoders(): readonly OwnedImageDecoder[];
 }
 
 /** The kits of every plugin merged into one per brand, and the warnings the merge made. */
@@ -495,6 +515,23 @@ function checkAssetSource(pluginId: string, source: AssetSourceContribution): vo
   }
 }
 
+/**
+ * An extension a file name could never end in is a wiring mistake, said at registration, as a
+ * scheme is (ADR 0223).
+ */
+function checkImageDecoder(pluginId: string, decoder: ImageDecoderContribution): void {
+  const bad = decoder.extensions.filter((extension) => !DECODER_EXTENSION.test(extension));
+  if (decoder.extensions.length === 0 || bad.length > 0) {
+    throw new TypeError(
+      `Plugin '${pluginId}' registered image decoder '${decoder.id}' with ` +
+        (bad.length > 0
+          ? `the extension${bad.length > 1 ? 's' : ''} ${bad.map((extension) => `'${extension}'`).join(', ')}`
+          : 'no extension') +
+        `. An extension is a dot followed by lowercase letters or digits, such as '.psd'.`,
+    );
+  }
+}
+
 function checkFontSource(pluginId: string, source: FontSourceContribution): void {
   if (source.families.length === 0 || source.families.some((family) => family.trim() === '')) {
     throw new TypeError(
@@ -563,6 +600,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
   const themes = new Point<ThemeContribution>('theme', emitter, contributed);
   const assetSources = new Point<AssetSourceContribution>('asset-source', emitter, contributed);
   const fontSources = new Point<FontSourceContribution>('font-source', emitter, contributed);
+  const imageDecoders = new Point<ImageDecoderContribution>('image-decoder', emitter, contributed);
   const recipeVerbs = new Point<RecipeVerbContribution>('recipe-verb', emitter, contributed);
   const recipeDerivations = new Point<RecipeDerivationContribution>(
     'recipe-derivation',
@@ -587,6 +625,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
     themes,
     assetSources,
     fontSources,
+    imageDecoders,
     recipeVerbs,
     recipeDerivations,
   ];
@@ -616,6 +655,8 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       assetSources.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
     fontSources: () =>
       fontSources.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
+    imageDecoders: () =>
+      imageDecoders.owned().map((entry) => ({ plugin: entry.plugin, source: entry.value })),
     recipeVerbs: () => recipeVerbs.list(),
     // With the plugin, as the sources are, so a verb is handed its own plugin's section.
     ownedRecipeVerbs: () =>
@@ -672,6 +713,10 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
         checkFontSource(pluginId, source);
         return fontSources.add(pluginId, source, onConflict);
       },
+      registerImageDecoder: (decoder) => {
+        checkImageDecoder(pluginId, decoder);
+        return imageDecoders.add(pluginId, decoder, onConflict);
+      },
       registerRecipeVerb: (verb) => {
         checkRecipeVerb(pluginId, recipe, verb);
         return recipeVerbs.add(pluginId, verb, onConflict);
@@ -703,6 +748,7 @@ export function createPluginHost(options: PluginHostOptions = {}): InProcessHost
       cache: hostCache(checked),
       storage: hostStorage(checked),
       workspace: hostWorkspace(checked),
+      decoding: hostDecoding(checked),
       signin: hostSignin(checked),
       process: hostProcess(async (name, args) => {
         // Kept from the first start only, so a host asked for often holds nothing it never used.

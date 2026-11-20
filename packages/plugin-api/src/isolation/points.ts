@@ -32,6 +32,7 @@ import type { ContributionPoint } from '../manifest.js';
 import { panelCallRequestSchema, panelCallResultSchema } from '../panels.js';
 import { RECIPE_VERB_KINDS, argumentDescriptionSchema } from '../recipes.js';
 import { settingFormSchema } from '../setting-form.js';
+import { DECODER_EXTENSION, IMAGE_DECODER_MAX_BYTES } from '../decoders.js';
 import { ASSET_SOURCE_MAX_BYTES, FONT_SOURCE_MAX_BYTES, SOURCE_SCHEME } from '../sources.js';
 import { THEME_KINDS, isThemePath } from '../theme.js';
 import type { GuestFaces, ShippedFace } from './faces.js';
@@ -104,6 +105,7 @@ export type RegisterMethod =
   | 'registerTheme'
   | 'registerAssetSource'
   | 'registerFontSource'
+  | 'registerImageDecoder'
   | 'registerRecipeVerb'
   | 'registerRecipeDerivation';
 
@@ -595,6 +597,30 @@ export const ISOLATED_POINTS: Readonly<Partial<Record<ContributionPoint, PointSp
         args: z.tuple([fontFaceSchema, sourceRequestSchema]),
         send: ([face, request]) => [face, request ?? {}],
         result: resultSchema(boundedBytes(FONT_SOURCE_MAX_BYTES)),
+        failed: (problems) => err(problems),
+      },
+    },
+  },
+  // Data plus `decode`, which stays in the plugin's process and reads the file through the
+  // token it is handed; the PNG crosses back, bounded here and again by the cache (ADR 0223).
+  'image-decoder': {
+    method: 'registerImageDecoder',
+    data: z.strictObject({
+      id: z.string().min(1),
+      extensions: z.array(z.string().regex(DECODER_EXTENSION)).min(1),
+    }),
+    callables: {
+      decode: {
+        args: z.tuple([
+          z.strictObject({
+            token: z.string().min(1).max(200),
+            name: z.string().min(1).max(FILE_PATH_LIMIT),
+            size: z.number().int().nonnegative(),
+          }),
+          z.strictObject({ layer: z.string().min(1).max(FILE_PATH_LIMIT).optional() }),
+        ]),
+        send: ([file, request]) => [file, request ?? {}],
+        result: resultSchema(z.strictObject({ bytes: boundedBytes(IMAGE_DECODER_MAX_BYTES) })),
         failed: (problems) => err(problems),
       },
     },

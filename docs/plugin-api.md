@@ -79,6 +79,7 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `theme`             | a colour theme, a JSON file in the plugin: `{ id, label, kind, path }` (0077)             | desktop (Tyto Light, Tyto Dark)                       |
 | `asset-source`      | images behind URI schemes: `{ id, schemes, fetch }`, cached (ADR 0117)                    | —                                                     |
 | `font-source`       | faces of named families: `{ id, families, fetch }`, cached (ADR 0117)                     | google-fonts (ADR 0120)                               |
+| `image-decoder`     | pictures out of files by extension: `{ id, extensions, decode }` (ADR 0223)               | —                                                     |
 | `recipe-verb`       | `<namespace>.<verb>`: a paged source, a transform, an action or a sink (0135)             | — (the generic verbs are `@tyto/recipe`'s)            |
 | `recipe-derivation` | `<namespace>.<name>` for `derive`: `{ id, requires, produces, derive }` (0133)            | —                                                     |
 
@@ -425,6 +426,42 @@ document cannot embed is `E_ASSET_SOURCE_FAILED` for an image and `W_FONT_SOURCE
 (beside `W_FONT_SUBSTITUTED`) for a face. Reach the network with `host.fetch` under
 `net:<host>`.
 
+### `image-decoder`, in full
+
+```ts
+registerImageDecoder({
+  id: 'layers',
+  extensions: ['.psd'], // a dot and lowercase letters or digits
+  decode: async (file, { layer }) => {
+    // file: { token, name, size }; layer: 'arte' or 'group/layer' from `capa.psd#arte`
+    const head = await host.decoding.read(file.token, {
+      offset: 0,
+      length: PLUGIN_FILE_PART_BYTES,
+    });
+    return ok({ bytes: png }); // a PNG, at most 32 MiB
+  },
+});
+```
+
+**A brief may cite a file no browser draws, and a plugin turns it into a PNG** (ADR 0223,
+TYTO-742). The host asks a decoder only about a file whose extension is not one it embeds itself
+(`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.avif`, `.svg`), and the first decoder registered for an extension wins
+it. **The plugin is handed a token, never a path**: `file.token` names that one file for the
+length of the `decode` call, and `host.decoding.read(token, { offset, length })` reads a part of
+it, short at its end and empty past it, `length` at most 32 MiB and 8 MiB advised
+(`PLUGIN_FILE_PART_BYTES`), as a workspace part (ADR 0212). No permission is needed, and the file
+may be outside any workspace. A token is good only for the plugin it was handed to and only until
+its call answers; any other is `E_PERMISSION`. An answer over 32 MiB
+(`IMAGE_DECODER_MAX_BYTES`) is refused on the wire. A file the decoder cannot draw is an error
+answer, never a blank picture.
+
+The host composes one `decodeGrants()` table: its `decode(decoder, subject, request)` mints the
+token and spends it when the call settles, and its `readPart` is the `decodeReadPart` port of
+`HostCapabilities`. `decoderFor(registry.imageDecoders(), name)` picks the decoder. In a plugin's
+own tests, `testPlugin(...).decode(name, bytes, { layer })` runs the same path (ADR 0150). Where
+the host caches the answer, how `file.psd#layer` is split, and what an untrusted folder serves are
+ADR 0223's; the host side lands with TYTO-742's later pull requests.
+
 ### `recipe-verb` and `recipe-derivation`, in full
 
 ```ts
@@ -732,6 +769,7 @@ interface PluginHost {
   fetch(url, init?): Promise<HostFetchResponse>; // net:<host> only; redirects not followed
   cache: HostCache;                             // private, no permission; get/put/delete/list (ADR 0138)
   workspace: HostWorkspace;                     // workspace:read / workspace:write; read/write (ADR 0138), parts/stat/list (ADR 0212)
+  decoding: HostDecoding;                       // no permission; read(token, part) during an image-decoder's decode (ADR 0223)
   signin: HostSignin;                           // signin:<id>; accessToken(id), never a browser (ADR 0174)
   log: Logger; events: TypedEmitter<HostEvents>;
 }
@@ -947,7 +985,7 @@ host (CLI process)                               guest (plugin's process)
                         ◀── result {value} ──      answer checked by the host
 ```
 
-**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), and `page`, `transform`, `plan`, `apply` and `derive` on the recipe points (ADR 0135, ADR 0170), and a panel's `call` (ADR 0173), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel` (but for its `call`), `theme` and `configuration` — as a form, ADR 0145 — cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
+**Each side validates what it receives**, with the Zod schemas in `isolation/protocol.ts` and `isolation/points.ts`: the host every guest message and every answer, the guest every host message and a call's arguments, before the plugin's code sees them. **A contribution crosses as data, and its functions stay behind as handles**; a function is callable only if its point names it, with a schema for its arguments and one for its answer. Today that is `exporter.exportFrame`, `directive.transform` (TYTO-49), `fetch` on `asset-source` and `font-source` (ADR 0117), `decode` on `image-decoder` (ADR 0223), and `page`, `transform`, `plan`, `apply` and `derive` on the recipe points (ADR 0135, ADR 0170), and a panel's `call` (ADR 0173), which may therefore return a `Promise`; the job and `resolve` await them. `template-pack`, `brand-kit`, `editor.command`, `editor.keymap`, `editor.vim`, `panel` (but for its `call`), `theme` and `configuration` — as a form, ADR 0145 — cross as data. `source`, `sink` and `rasterizer` are refused by name — _not available to an isolated plugin yet_. A directive's answer schema is strict: a replacement that carries a `namespace` or a `range` is `E_PLUGIN_PROTOCOL`.
 
 **The proxy goes through `tryActivate`**, so an isolated plugin meets every check an in-process one does. `protocol` is its own number, compared at the `hello` handshake and nowhere else; it is not the engine (ADR 0040), because a plugin never sees these messages.
 

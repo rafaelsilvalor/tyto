@@ -72,10 +72,13 @@ import {
  * schema of a host on 27 would refuse (ADR 0216, TYTO-791); 29 since an exporter may answer a
  * file's bytes and a frame's guide layer may carry its raster, an answer the strict result
  * schema of a host on 28 would refuse and a field the strict frame schema of a guest on 28
- * would refuse (ADR 0221, TYTO-740). The number is the host's and its own guest bootstrap's: a
- * plugin's code carries none, so a plugin built before 29 runs on 29 unchanged.
+ * would refuse (ADR 0221, TYTO-740); 30 since a plugin may register an `image-decoder` and read
+ * the file a decode call names through its token, a point a host on 29 would refuse to
+ * register and a request it would refuse as an unknown capability (ADR 0223, TYTO-742). The
+ * number is the host's and its own guest bootstrap's: a plugin's code carries none, so a
+ * plugin built before 30 runs on 30 unchanged.
  */
-export const RPC_PROTOCOL_VERSION = 29;
+export const RPC_PROTOCOL_VERSION = 30;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
@@ -257,6 +260,7 @@ const requestedCapabilitySchema = z.enum([
   'workspaceReadPart',
   'workspaceStat',
   'workspaceList',
+  'decodeReadPart',
   'signinAccessToken',
   'processStart',
   'processWrite',
@@ -297,7 +301,7 @@ export const guestMessageSchema = z.discriminatedUnion('type', [
   }),
   /**
    * The plugin asking the host for one of its capabilities: `host.fetch`, `host.credentials`
-   * and its `.set` and `.delete`, `host.cache`, `host.workspace`, `host.signin`,
+   * and its `.set` and `.delete`, `host.cache`, `host.workspace`, `host.decoding`, `host.signin`,
    * `host.process` with what a started program's handle does, and `host.window`.
    */
   z.strictObject({
@@ -360,6 +364,8 @@ export const workspaceWriteArgsSchema = z.tuple([z.string(), bytesSchema]);
 /** Path, offset, length (ADR 0212); whole numbers and the ceiling are `checkedCapabilities`'. */
 export const workspaceReadPartArgsSchema = z.tuple([z.string(), z.number(), z.number()]);
 export const workspacePathArgsSchema = z.tuple([z.string()]);
+/** Token, offset, length (ADR 0223); the part's bounds are `checkedCapabilities`', as above. */
+export const decodeReadPartArgsSchema = z.tuple([z.string(), z.number(), z.number()]);
 
 /** `host.cache.get`'s answer; `null` is a miss, because a JSON channel drops `undefined`. */
 export const cacheEntrySchema = z.union([

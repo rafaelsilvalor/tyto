@@ -132,3 +132,10 @@ an existing guide is overwritten.
   starts checked and an existing one unchecked. The line for an uncited slot goes before the
   frontmatter's closing `---` (a brief with none gets one) when it is a key, and at the end of
   the brief when it is a `::` directive, as one CodeMirror transaction.
+- **2026-11-20 (TYTO-742): a per-format copy is fragment-aware, and `.guide.psd` is one
+  extension.** ADR 0223 lets a brief cite `capa.psd#arte`, a layer of a PSD a plugin decodes;
+  the copy for a format is then `capa.<format>.psd#arte`, the format before the fragment.
+  Decision 2 names a guide's copy `x.<format>.guide.psd`, but `externalArtVariant` splits at the
+  last dot and would look for `x.guide.<format>.psd`; it will read `.guide.psd` as one extension.
+  And `tyto guide` will not name a guide `x.guide.guide.psd` when the cited file is a guide
+  itself. ADR 0223 decision 7 holds both; the fix lands with TYTO-742's core and io pull request.

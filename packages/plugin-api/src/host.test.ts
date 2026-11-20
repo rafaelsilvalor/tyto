@@ -310,10 +310,10 @@ describe('activating a plugin', () => {
     expect(host.registry.exporters.list()).toEqual([]);
   });
 
-  it('knows the same seventeen points the manifest vocabulary names', () => {
+  it('knows the same eighteen points the manifest vocabulary names', () => {
     // Two declarations of one vocabulary: `CONTRIBUTION_POINTS` is what a JSON file may
     // say, and the host's points are what code may register into. This activates one
-    // plugin into all seventeen and compares what was recorded against the list.
+    // plugin into all eighteen and compares what was recorded against the list.
     const host = createPluginHost();
     host.activate(
       pluginOf({
@@ -339,6 +339,7 @@ describe('activating a plugin', () => {
           plugin.registerTheme({ id: 'k', label: 'Dusk', kind: 'dark', path: 'dusk.json' });
           plugin.registerAssetSource({ id: 'l', schemes: ['test'], fetch: () => ok(PIXEL) });
           plugin.registerFontSource({ id: 'm', families: ['Inter'], fetch: () => ok(BYTES) });
+          plugin.registerImageDecoder({ id: 'q', extensions: ['.psd'], decode: () => ok(PIXEL) });
           plugin.registerRecipeVerb({
             id: 'promo.n',
             kind: 'transform',
@@ -357,9 +358,9 @@ describe('activating a plugin', () => {
 
     // The real assertion is that this did not throw: a point the host knows and
     // `CONTRIBUTION_POINTS` does not would have been registered without being declared,
-    // which `activate` refuses. The counts below say the seventeen arrived rather than that
+    // which `activate` refuses. The counts below say the eighteen arrived rather than that
     // nothing was attempted.
-    expect(CONTRIBUTION_POINTS).toHaveLength(17);
+    expect(CONTRIBUTION_POINTS).toHaveLength(18);
     expect(
       [
         host.registry.sources(),
@@ -377,10 +378,11 @@ describe('activating a plugin', () => {
         host.registry.themes(),
         host.registry.assetSources(),
         host.registry.fontSources(),
+        host.registry.imageDecoders(),
         host.registry.recipeVerbs(),
         host.registry.recipeDerivations(),
       ].map((point) => point.length),
-    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    ).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
   });
 });
 

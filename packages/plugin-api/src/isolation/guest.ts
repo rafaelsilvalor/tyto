@@ -8,6 +8,7 @@ import {
   type WorkspaceEntry,
   hostCache,
   hostCredentials,
+  hostDecoding,
   hostSignin,
   hostWorkspace,
   responseOf,
@@ -263,6 +264,7 @@ export function runGuest(
     registerTheme: (value) => register('registerTheme', value),
     registerAssetSource: (value) => register('registerAssetSource', value),
     registerFontSource: (value) => register('registerFontSource', value),
+    registerImageDecoder: (value) => register('registerImageDecoder', value),
     registerRecipeVerb: (value) => register('registerRecipeVerb', value),
     registerRecipeDerivation: (value) => register('registerRecipeDerivation', value),
     config<T>(schema: ZodType<T>): T {
@@ -330,6 +332,14 @@ export function runGuest(
         (await request('workspaceStat', [path], workspaceEntrySchema)) as WorkspaceEntry,
       workspaceList: async (path) =>
         (await request('workspaceList', [path], workspaceListingSchema)) as WorkspaceEntry[],
+    }),
+    decoding: hostDecoding({
+      decodeReadPart: async (token, offset, length) =>
+        (await request(
+          'decodeReadPart',
+          [token, offset, length],
+          workspaceBytesSchema,
+        )) as Uint8Array,
     }),
     process: hostProcess(async (name, args) => {
       const { id, cwd } = (await request(
