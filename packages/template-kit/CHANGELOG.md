@@ -1,5 +1,18 @@
 # @tyto/template-kit
 
+## 0.14.0
+
+### Minor Changes
+
+- f7eda34: `levelStack` takes a space per pair of neighbours: `lineGap` accepts a function of the items
+  above and below the gap, and `gap` a function of the two parts of a line around it. A number
+  keeps today's spacing. `LevelStackStyle` is now a type alias; `lineGap` is required when `gap`
+  is a function. The new `LevelGap` type names either form (TYTO-810).
+
+### Patch Changes
+
+- @tyto/export-html@0.8.11
+
 ## 0.13.1
 
 ### Patch Changes

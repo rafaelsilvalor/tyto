@@ -1,5 +1,28 @@
 # @tyto/desktop
 
+## 0.28.0
+
+### Minor Changes
+
+- ebd3df0: Generate Guide for External Art (`guide.generate`, TYTO-741, ADR 0222): a dialog over the brief in
+  front lists each guide `tyto guide` would write, with a checkbox, the missing ones checked and
+  the existing ones not; offers the line that cites a file for an external slot the brief names
+  none for, inserted as one undoable change; asks to save a brief with unsaved edits first; and
+  says which guides it wrote and whether each opened in its program or was shown in its folder.
+
+### Patch Changes
+
+- Updated dependencies [422cf7c]
+  - @tyto/plugin-api@0.28.0
+  - @tyto/command-line@0.11.2
+  - @tyto/export-html@0.8.11
+  - @tyto/export-svg@2.1.11
+  - @tyto/google-fonts@0.1.33
+  - @tyto/io@5.13.2
+  - @tyto/pipeline@0.13.1
+  - @tyto/theme-pack@0.1.33
+  - @tyto/templates@1.3.2
+
 ## 0.27.0
 
 ### Minor Changes
