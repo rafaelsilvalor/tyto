@@ -107,3 +107,18 @@ an existing guide is overwritten.
   `full` slot (still open above); and an empty value. An absolute cited path puts the guide
   beside it. `E_GUIDE_NEWER_THAN_BRIEF` is fatal for the run: when one guide in the way is
   newer than the brief, none is written, so a folder is never half regenerated.
+- **2026-11-20 (TYTO-741, the desktop's main process): the window writes through `tyto guide`.**
+  `guide:candidates` lists the guides with `guideCandidates` and `guidePaths` over the registry
+  the preview compiles with; `guide:write` runs `tyto guide <brief> --only <names>` in-process,
+  as the command panel runs a command (ADR 0159), rather than calling `writeGuides`, whose
+  render context the command builds from the brief's workspace and plugins and the package keeps
+  to itself: one way of building it, not two. The window names a guide by its file name and
+  never sends a path. Decision 4's question is a native box main shows, keeping the guide the
+  default; a yes adds `--force`. Each written guide is opened with the system's opener; when it
+  answers that no program opens a PSD, or the brief's folder is restricted (ADR 0111: a folder
+  not trusted does not get to start a program by writing a file), the guide is shown in its folder instead and the answer says which.
+  **A preview follows the art painted beside it**: each preview answer names the files the
+  compile asked the asset folders for, the per-format copies of decision 1 included, and
+  `explorer:changed` names the files of the watcher's burst, so a brief that asked for a file
+  of a changed name compiles again with no keystroke. Matched by file name, which costs at most
+  a compile more than needed.

@@ -82,6 +82,7 @@ const preview = () => ({
       artworks: brief.trim() === '' ? [] : [{ id: 'a1', index: 0, range: { start: 4, end: 9 } }],
       diagnostics: [],
       completion: { directives: ['demo/shout'] },
+      references: brief.includes('foto.png') ? ['foto.png', 'foto.feed.png'] : [],
     });
   },
 });
@@ -954,6 +955,17 @@ const dependencies = () => {
     writeClipboard: (text: string) => {
       clipboard.push(text);
     },
+    // TYTO-741: `guides.test.ts` holds what the service does; here only that the channels reach it.
+    guides: {
+      candidates: () =>
+        Promise.resolve({ ok: false as const, reason: 'no-file' as const, diagnostics: [] }),
+      write: (request: { readonly unsaved: boolean }) =>
+        Promise.resolve(
+          request.unsaved
+            ? { outcome: 'refused' as const, reason: 'unsaved' as const }
+            : { outcome: 'declined' as const },
+        ),
+    },
     cli: {
       start: () => ({ runId: 'cli-1' }),
       cancel: () => {},
@@ -1333,6 +1345,34 @@ describe('the tab a message is about (E9.11)', () => {
     // The whole reason the id travels on this channel: two tabs, two folders, and the
     // answer must not depend on which one happens to be in front when the compile lands.
     expect(injected.preview.folders).toEqual(['/briefs', undefined]);
+  });
+
+  // TYTO-741: what the compile asked the asset folders for reaches the window, through the guard.
+  it('hands the window the references a preview asked for', async () => {
+    const handlers = createHandlers(dependencies());
+    const answer = await guard(
+      'brief:preview',
+      handlers['brief:preview'],
+    )({ requestId: 3, documentId: 'document-1', brief: 'imagem: foto.png' });
+    expect(answer.references).toEqual(['foto.png', 'foto.feed.png']);
+  });
+
+  it('reaches the guide service on both guide channels, an unsaved brief refused', async () => {
+    const handlers = createHandlers(dependencies());
+    expect(
+      await guard(
+        'guide:write',
+        handlers['guide:write'],
+      )({
+        documentId: 'document-1',
+        only: ['grafico.guide.psd'],
+        overwrite: false,
+        unsaved: true,
+      }),
+    ).toEqual({ outcome: 'refused', reason: 'unsaved' });
+    expect(
+      await guard('guide:candidates', handlers['guide:candidates'])({ documentId: 'document-1' }),
+    ).toEqual({ ok: false, reason: 'no-file', diagnostics: [] });
   });
 
   it('tells the service when a tab is gone', async () => {

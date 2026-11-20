@@ -159,6 +159,7 @@ import { createTemplateEditor } from './template-editor.js';
 import { createWorkspaceService } from './workspace.js';
 import { createDeliveryService } from './delivery.js';
 import { createExplorerService } from './explorer.js';
+import { createGuideService } from './guides.js';
 import { createDeliveryChecks } from './delivery-checks.js';
 import { createExitGuard, mayUnload } from './quit.js';
 import { windowEvents } from './window-events.js';
@@ -792,7 +793,8 @@ async function start(): Promise<void> {
     deliveryChecks
       .refresh()
       .then((changed) => {
-        if (changed) toWindow('explorer:changed', {});
+        // A badge changed, not a file: no name for a preview to compile again for.
+        if (changed) toWindow('explorer:changed', { names: [] });
       })
       .catch((cause: unknown) => {
         log.error('explorer: the deliveries could not be checked', cause);
@@ -800,7 +802,8 @@ async function start(): Promise<void> {
   };
   const explorer = createExplorerService({
     onChange: (names) => {
-      toWindow('explorer:changed', {});
+      // TYTO-741: the names too, so a brief whose preview asked for one compiles again.
+      toWindow('explorer:changed', { names: [...names] });
       checkDeliveriesSoon();
       // TYTO-385: a `.recipe` changed, so the scheduler walks the folder again.
       recipeSchedule?.filesChanged(names);
@@ -1578,7 +1581,9 @@ async function start(): Promise<void> {
     afterRun: async ([command, subcommand], code) => {
       if (code !== 0) return;
       if (command === 'plugin' && subcommand === 'sync') await syncPluginFiles(false);
-      if (command === 'delivery' && subcommand === 'new') toWindow('explorer:changed', {});
+      if (command === 'delivery' && subcommand === 'new') {
+        toWindow('explorer:changed', { names: [] });
+      }
       // A revoke applies the next time the folder opens (ADR 0111), so only a grant re-reads.
       const open = workspace.state().folder;
       if (command === 'trust' && subcommand === 'add' && open !== null) await workspace.open(open);
@@ -1957,6 +1962,44 @@ async function start(): Promise<void> {
   // person who chose to stay for an unsaved tab keeps the version they are typing in.
   app.on('quit', (_event, exitCode) => {
     updates.quitting(exitCode);
+  });
+
+  // TYTO-741, ADR 0222: the external-art guides, written by `tyto guide` run as the command
+  // panel runs it. Opening and showing a file are `shell`'s, looked up at every call so an
+  // end-to-end suite can stand in for both through `app.evaluate`, as for the trash.
+  const guides = createGuideService({
+    pathOf: (documentId) => documents.pathOf(documentId),
+    sources: () => sources.current(),
+    projectAssets: (briefDirectory) => workspace.placesFor(briefDirectory).assets,
+    restricted: async (briefDirectory) =>
+      (await workspace.sourceTrustFor(briefDirectory))?.trust === 'restricted',
+    capture: (argv, cwd) => cli.capture(argv, cwd),
+    opener: {
+      open: (path) => shell.openPath(path),
+      reveal: (path) => {
+        shell.showItemInFolder(path);
+      },
+    },
+    askOverwrite: async (names) => {
+      const options = {
+        type: 'warning' as const,
+        message: translate(uiLocale, 'guide.overwrite.message'),
+        detail: translate(uiLocale, 'guide.overwrite.detail').replace('{guides}', names.join('\n')),
+        buttons: [
+          translate(uiLocale, 'guide.overwrite.yes'),
+          translate(uiLocale, 'guide.overwrite.no'),
+        ],
+        // Keeping them is the default and what Escape answers: the paint is the person's.
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      };
+      const answer =
+        mainWindow === undefined
+          ? await dialog.showMessageBox(options)
+          : await dialog.showMessageBox(mainWindow, options);
+      return answer.response === 0;
+    },
   });
 
   registerIpcHandlers(ipcMain, {
@@ -2406,6 +2449,7 @@ async function start(): Promise<void> {
     schedule,
     // TYTO-379, ADR 0171: `recipe:copy` writes the text it built in main.
     writeClipboard: (text) => clipboard.writeText(text),
+    guides,
     templates,
     templateEditor,
     templateFolder,

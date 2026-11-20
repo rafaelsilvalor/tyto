@@ -334,6 +334,9 @@ describe('the bridge', () => {
       'gallery:install',
       'gallery:list',
       'gallery:update',
+      // TYTO-741: the external-art guides; the window's command is the next pull request's.
+      'guide:candidates',
+      'guide:write',
       // TYTO-318: Help > Documentation. Opens the system browser, which no suite should do;
       // `src/main/ipc.test.ts` and `src/main/documentation.test.ts` hold what it does.
       'help:open-documentation',
@@ -616,6 +619,11 @@ describe('switching the language', () => {
     // TYTO-495: the native box a `tyto` command run in the window asks through (ADR 0159).
     'cli.confirm.yes',
     'cli.confirm.no',
+    // TYTO-741: the box before a guide newer than the brief is written over.
+    'guide.overwrite.message',
+    'guide.overwrite.detail',
+    'guide.overwrite.yes',
+    'guide.overwrite.no',
     // TYTO-726: the refusal's offer is a native box, like the confirm above.
     'cli.offer.trust.message',
     'cli.offer.trust.detail',

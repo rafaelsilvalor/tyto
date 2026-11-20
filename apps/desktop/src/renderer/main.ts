@@ -164,6 +164,7 @@ import {
 } from './export-dialog.js';
 import { type PluginsDialog, PLUGINS_DIALOG_TAG, settingKeyOffset } from './plugins-dialog.js';
 import { type GalleryDialog, GALLERY_DIALOG_TAG } from './gallery-dialog.js';
+import { briefsToRecompile } from './asset-redraw.js';
 import { previewAnalysis } from './brief-analysis.js';
 import {
   type OfferedPanel,
@@ -1357,6 +1358,12 @@ function resolveElements() {
  * opposite of what it is for.
  */
 const gates = new Map<string, RequestGate>();
+
+/**
+ * The files each brief's last preview asked the asset folders for (TYTO-741): what a change on
+ * disk compiles it again for (`asset-redraw.ts`).
+ */
+const askedFiles = new Map<string, readonly string[]>();
 
 function gateFor(documentId: string): RequestGate {
   const existing = gates.get(documentId);
@@ -5171,6 +5178,7 @@ function closeTab(id: string): void {
   if (timer !== undefined) clearTimeout(timer);
   pending.delete(id);
   gates.delete(id);
+  askedFiles.delete(id);
   recipeNotebook.close(id);
   void withBridge(async (bridge) => {
     await bridge['file:close']({ documentId: id });
@@ -5978,6 +5986,7 @@ async function request(
     ...(fetch ? { fetch } : {}),
   });
   if (!gate.accept(answer.requestId)) return;
+  askedFiles.set(documentId, answer.references ?? []);
   // Every answer is kept for its document, shown or not (TYTO-351). A tab compiled behind
   // another one — by a folder change, say — is linted when a pane shows it again, and that lint
   // answers from what was kept; keeping only what was shown would hand it the answer before.
@@ -7199,12 +7208,20 @@ async function load(): Promise<void> {
 
     // The open folder changed on disk (TYTO-279, ADR 0115): the explorer lists its open
     // folders again. Ignored while it is closed, for the queue's reason.
-    bridge.on('explorer:changed', () => {
+    bridge.on('explorer:changed', ({ names }) => {
       elements.explorerPanel?.refresh();
       panelTemplates.forget();
       // TYTO-366: an image a preview shows is asked again with its version, so main answers
       // `unchanged` from a `stat` unless the file did change.
       refreshImages();
+      // TYTO-741: a brief that asked for a file of a changed name compiles again, so art
+      // painted beside it shows with no keystroke. From its buffer, as typing compiles it.
+      for (const documentId of briefsToRecompile(askedFiles, names)) {
+        const document_ = documentOf(workspace, documentId);
+        if (document_ !== undefined && isBrief(document_.kind)) {
+          void request(bridge, documentId, contentOf(document_));
+        }
+      }
     });
 
     // A sync of the plugin files fetched or dropped a pack (TYTO-433): the picker, the "/"

@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { GAP_COLOR_CSS, ok } from '@tyto/core';
@@ -289,5 +290,32 @@ describe("the preview of a plugin file's alias (TYTO-433, ADR 0151)", () => {
     expect(vertical.completion.formats).toEqual(['story']);
     expect(plain.completion.manifest?.name).toBe('promo-curso');
     expect(plain.completion).not.toHaveProperty('formats');
+  });
+});
+
+describe('the references a preview asked for (TYTO-741)', () => {
+  it("names the cited art and each format's copy resolve looked for beside it", async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'tyto-preview-references-'));
+    try {
+      const brief = '---\ntemplate: arte-teste\nfundo: grafico.png\n---\n::titulo\n  Capa\n';
+      const result = await preview.preview(brief, folder);
+
+      expect([...result.references].sort()).toEqual([
+        'grafico.grid-1x1.png',
+        'grafico.png',
+        'grafico.story.png',
+      ]);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it('names them for an incomplete brief too, and none for a brief that cites no file', async () => {
+    const incomplete = await preview.preview('---\ntemplate: arte-teste\nfundo: x.png\n---\n', '.');
+    expect(incomplete.diagnostics.map((item) => item.code)).toContain('E_MISSING_REQUIRED_SLOT');
+    expect(incomplete.references).toContain('x.png');
+
+    const none = await preview.preview(exampleBrief('arte-teste', 'sem-arte.brief'), '.');
+    expect(none.references).toEqual([]);
   });
 });
