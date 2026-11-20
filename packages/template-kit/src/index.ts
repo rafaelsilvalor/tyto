@@ -99,6 +99,20 @@ export {
 } from './rhythm.js';
 
 export {
+  type Card,
+  type CardRole,
+  type CardRowItem,
+  type CardSegment,
+  type CardSegmentKind,
+  type CardStyle,
+  type PlacedSegment,
+  bandBottom,
+  card,
+  cardRow,
+  cardSegments,
+  naturalCardHeight,
+} from './card.js';
+export {
   DEEPEST_LEVEL,
   DIVIDER,
   type Level,

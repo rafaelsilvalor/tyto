@@ -1,0 +1,18 @@
+---
+template: cartao-teste
+formats: [grid]
+---
+// One card per artwork; the last artwork's two lines are two cards side by side.
+
+::lamina
+  Pacotes com 40% OFF | Por tempo limitado
+
+::lamina
+  Lote Especial | # Pacotes com 40% OFF
+
+::lamina
+  Lote Especial | Pacotes com 40% OFF | Por tempo limitado
+
+::lamina
+  Pacote Completo | # 30% OFF | Por tempo limitado
+  Prova social em uma frase longa que quebra em mais de uma linha | # 7 de 10 | aprovados

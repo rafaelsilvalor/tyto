@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+  <defs>
+    <clipPath id="stroke0">
+      <path d="M16 0 H264 A16 16 0 0 1 280 16 V120 A16 16 0 0 1 264 136 H16 A16 16 0 0 1 0 120 V16 A16 16 0 0 1 16 0 Z"/>
+    </clipPath>
+    <style>@font-face{font-family:"Test";font-weight:400;font-style:normal;src:url("tyto-test-font:Test-400-normal")}@font-face{font-family:"Test";font-weight:900;font-style:normal;src:url("tyto-test-font:Test-900-normal")}
+    </style>
+  </defs>
+  <g id="lamina-3.grid.0" transform="matrix(1 0 0 1 160 40)">
+    <g id="lamina-3.grid.0.0">
+      <path d="M16 0 H264 A16 16 0 0 1 280 16 V120 A16 16 0 0 1 264 136 H16 A16 16 0 0 1 0 120 V16 A16 16 0 0 1 16 0 Z" fill="#ffffff"/>
+      <path d="M16 0 H264 A16 16 0 0 1 280 16 V120 A16 16 0 0 1 264 136 H16 A16 16 0 0 1 0 120 V16 A16 16 0 0 1 16 0 Z" fill="none" stroke="#1360d0" stroke-width="4" clip-path="url(#stroke0)"/>
+    </g>
+    <g id="lamina-3.grid.0.1" transform="matrix(1 0 0 1 0 40)">
+      <path d="M0 0 H280 V56 H0 V0 Z" fill="#1360d0"/>
+    </g>
+    <g id="lamina-3.grid.0.2" transform="matrix(1 0 0 1 20 0)">
+      <g id="lamina-3.grid.0.2.0" transform="matrix(1 0 0 1 0 10)">
+        <g id="lamina-3.grid.0.2.0.0">
+          <text x="120" y="14.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">Lote Especial</tspan></text>
+        </g>
+      </g>
+    </g>
+    <g id="lamina-3.grid.0.3" transform="matrix(1 0 0 1 20 43)">
+      <g id="lamina-3.grid.0.3.0" transform="matrix(1 0 0 1 0 10)">
+        <g id="lamina-3.grid.0.3.0.0">
+          <text x="120" y="22.2" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="24" font-weight="900" fill="#ffffff">Pacotes com 40% OFF</tspan></text>
+        </g>
+      </g>
+    </g>
+    <g id="lamina-3.grid.0.4" transform="matrix(1 0 0 1 20 96)">
+      <g id="lamina-3.grid.0.4.0" transform="matrix(1 0 0 1 0 10)">
+        <g id="lamina-3.grid.0.4.0.0">
+          <text x="120" y="14.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">Por tempo limitado</tspan></text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
