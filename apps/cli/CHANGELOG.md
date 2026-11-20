@@ -1,5 +1,11 @@
 # @tyto/cli
 
+## 0.13.2
+
+### Patch Changes
+
+- @tyto/command-line@0.11.1
+
 ## 0.13.1
 
 ### Patch Changes
