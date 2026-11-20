@@ -324,6 +324,13 @@ export const PROBLEMS_SHOW = 'problems.show';
  * brief in a delivery; no key by default, bindable in `keybindings.json`.
  */
 export const DELIVERY_EXPORT = 'delivery.export';
+/**
+ * The external-art guides of the brief in front (TYTO-741, ADR 0222): a dialog listing each guide
+ * with a checkbox, written by `tyto guide` in main and opened in the program that opens a PSD.
+ * Brief-only; a brief whose template declares no external art gets the dialog saying so. The id
+ * is stable so a preview's context menu (TYTO-549) can run the same command. No key by default.
+ */
+export const GUIDE_GENERATE = 'guide.generate';
 export const DOCUMENT_CLOSE = 'document.close';
 export const DOCUMENT_NEXT = 'document.next';
 export const DOCUMENT_PREVIOUS = 'document.previous';
@@ -405,6 +412,7 @@ export const COMMAND_LABELS: Readonly<Record<string, CatalogueKey>> = {
   [TERMINAL_SHOW]: 'command.terminal.show',
   [PROBLEMS_SHOW]: 'command.problems.show',
   [DELIVERY_EXPORT]: 'command.delivery.export',
+  [GUIDE_GENERATE]: 'command.guide.generate',
   [EDITOR_OPEN]: 'command.file.open',
   [EDITOR_SAVE]: 'command.file.save',
   [EDITOR_SAVE_AS]: 'command.file.saveAs',
@@ -524,6 +532,8 @@ export interface DesktopActions {
   newDelivery(): void;
   /** TYTO-490. Exports the brief in front into its delivery; main resolves the folders. */
   exportDelivery(): void;
+  /** TYTO-741. Opens the guide dialog over the brief in front; the list is a round trip to main. */
+  openGuides(): void;
   openDocument(): void;
   saveDocument(saveAs: boolean): void;
   /** E9.10. Puts every panel back where ADR 0024 says it goes. */
@@ -710,6 +720,9 @@ export function createDesktopRegistry(actions: DesktopActions): CommandRegistry 
   });
   add(DELIVERY_EXPORT, () => {
     actions.exportDelivery();
+  });
+  add(GUIDE_GENERATE, () => {
+    actions.openGuides();
   });
   add(EDITOR_OPEN, () => {
     actions.openDocument();
@@ -936,6 +949,7 @@ export const BRIEF_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   PREVIEW_SHOW_ALL_SLIDES,
   FILE_EXPORT,
   DELIVERY_EXPORT,
+  GUIDE_GENERATE,
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,
   EDITOR_FORMAT_BRIEF,

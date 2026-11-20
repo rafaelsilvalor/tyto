@@ -97,6 +97,10 @@ export const SECTIONS: readonly Section[] = [
         title: { en: 'The command bar and search', 'pt-BR': 'A barra de comandos e a busca' },
       },
       { slug: 'format-brief', title: { en: 'Format Brief', 'pt-BR': 'Arrumar brief' } },
+      {
+        slug: 'external-art-guide',
+        title: { en: 'Guides for external art', 'pt-BR': 'Gabaritos para arte externa' },
+      },
       { slug: 'vim-mode', title: { en: 'Vim mode', 'pt-BR': 'Modo vim' } },
       { slug: 'template-mode', title: { en: 'Template mode', 'pt-BR': 'Modo template' } },
     ],

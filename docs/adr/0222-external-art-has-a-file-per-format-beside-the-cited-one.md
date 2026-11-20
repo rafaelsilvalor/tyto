@@ -122,3 +122,13 @@ an existing guide is overwritten.
   `explorer:changed` names the files of the watcher's burst, so a brief that asked for a file
   of a changed name compiles again with no keystroke. Matched by file name, which costs at most
   a compile more than needed.
+- **2026-11-20 (TYTO-741, the window's command): Generate Guide for External Art.** The command
+  `guide.generate` is brief-only, as export is, rather than hidden for a template with no
+  external art: whether a template has any is main's answer, and a command the palette lists
+  one moment and not the next is a command a person cannot find; on such a brief the dialog
+  says so and names the template. The dialog lists from the buffer (`guide:candidates` with
+  `text`), so a line just inserted lists its guide at once, and writes from the file, so a brief
+  with unsaved edits is asked to be saved first in a native box (decision 5). A missing guide
+  starts checked and an existing one unchecked. The line for an uncited slot goes before the
+  frontmatter's closing `---` (a brief with none gets one) when it is a key, and at the end of
+  the brief when it is a `::` directive, as one CodeMirror transaction.

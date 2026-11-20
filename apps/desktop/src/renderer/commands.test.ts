@@ -34,6 +34,7 @@ import {
   EDITOR_INSERT_MENU,
   EDITOR_GO_TO_BLOCK,
   EDITOR_FORMAT_BRIEF,
+  GUIDE_GENERATE,
   EDITOR_OPEN,
   EDITOR_SAVE_AS,
   EDITOR_TOGGLE_VIM,
@@ -111,6 +112,7 @@ const actions = () =>
     newDocumentFromTemplate: vi.fn<() => void>(),
     newDelivery: vi.fn<() => void>(),
     exportDelivery: vi.fn<() => void>(),
+    openGuides: vi.fn<() => void>(),
     openDocument: vi.fn<() => void>(),
     saveDocument: vi.fn<(saveAs: boolean) => void>(),
     restoreLayout: vi.fn<() => void>(),
@@ -506,6 +508,22 @@ describe('the ids the window registers', () => {
       (binding) => binding.key === 'Mod-Shift-o' && binding.command !== EDITOR_GO_TO_BLOCK,
     );
     expect(others).toEqual([]);
+  });
+
+  it('offers the external-art guides on a brief only, with no key, under a stable id (TYTO-741)', () => {
+    const spies = actions();
+    let brief = true;
+    const registry = withCommandGate(
+      createDesktopRegistry(spies),
+      (id) => brief || !BRIEF_ONLY_COMMANDS.has(id),
+    );
+    expect(GUIDE_GENERATE).toBe('guide.generate');
+    expect(registry.run(GUIDE_GENERATE, NO_VIEW)).toBe(true);
+    brief = false;
+    expect(registry.run(GUIDE_GENERATE, NO_VIEW)).toBe(false);
+    expect(spies.openGuides).toHaveBeenCalledOnce();
+    expect(COMMAND_LABELS[GUIDE_GENERATE]).toBe('command.guide.generate');
+    expect(builtInKeybindings.filter((binding) => binding.command === GUIDE_GENERATE)).toEqual([]);
   });
 
   it('offers Format Brief on a brief only, with text in front, on Alt-Shift-f in both modes (TYTO-297)', () => {

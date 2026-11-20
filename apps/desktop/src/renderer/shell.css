@@ -3752,6 +3752,115 @@ tyto-gallery-dialog[open] {
   justify-content: flex-end;
 }
 
+/* The external-art guides (TYTO-741): the gallery's overlay and panel, holding the plugins
+   screen's kind of table, one row per guide with its checkbox first. */
+tyto-guide-dialog {
+  display: contents;
+}
+
+tyto-guide-dialog[open] {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tyto-scrim);
+}
+
+.guide__panel {
+  display: flex;
+  overflow: auto;
+  width: min(var(--tyto-dialog-width-lg), calc(100vw - 2 * var(--tyto-space-6)));
+  max-height: calc(100vh - 2 * var(--tyto-space-6));
+  flex-direction: column;
+  padding: var(--tyto-space-6);
+  border: var(--tyto-hairline-width) solid var(--tyto-border);
+  border-radius: var(--tyto-radius-md);
+  margin: var(--tyto-space-6);
+  background: var(--tyto-surface-raised);
+  box-shadow: var(--tyto-shadow-overlay);
+  font-size: var(--tyto-text-sm);
+  gap: var(--tyto-space-4);
+}
+
+.guide__panel p,
+.guide__panel h3,
+.guide__panel ul {
+  margin: 0;
+}
+
+.guide__panel ul {
+  display: flex;
+  flex-direction: column;
+  padding-left: var(--tyto-space-4);
+  gap: var(--tyto-space-2);
+}
+
+.guide__panel h3 {
+  font-size: var(--tyto-text-md);
+}
+
+.guide__title {
+  margin: 0;
+  font-size: var(--tyto-text-lg);
+}
+
+.guide__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.guide__table th,
+.guide__table td {
+  padding: var(--tyto-space-2) var(--tyto-space-4);
+  border-bottom: var(--tyto-hairline-width) solid var(--tyto-hairline);
+  text-align: left;
+  vertical-align: top;
+}
+
+.guide__table code {
+  word-break: break-all;
+}
+
+.guide__state,
+.guide__format,
+.guide__template {
+  color: var(--tyto-text-muted);
+}
+
+tr[data-state='newer'] .guide__state {
+  color: var(--tyto-warning);
+}
+
+.guide__uncited li {
+  display: flex;
+  align-items: center;
+  gap: var(--tyto-space-4);
+}
+
+.guide__uncited code {
+  white-space: pre;
+}
+
+.guide__result[data-failed='true'],
+.guide__refusal {
+  color: var(--tyto-error);
+}
+
+.guide__report {
+  overflow: auto;
+  max-height: 10em;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.guide__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tyto-space-2);
+}
+
 /*
  * The untrusted-folder strip (TYTO-278, ADR 0111): one line above the editor groups, with the
  * warning edge the plugins notice has, so it reads as the same kind of sentence.

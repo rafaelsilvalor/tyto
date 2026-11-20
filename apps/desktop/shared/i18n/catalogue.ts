@@ -1041,6 +1041,46 @@ export interface Catalogue {
   readonly 'delivery.export.notInDelivery': string;
   /** `{problem}` is the diagnostic's own sentence, which says why. */
   readonly 'delivery.export.refused': string;
+  /**
+   * TYTO-741, ADR 0222: the external-art guide dialog. `{template}` and `{formats}` are the
+   * brief's; `{line}` is the line of a citation that gets no guide. The `guide.save.*` four are
+   * the native box asking to save a brief with unsaved edits first (decision 5).
+   */
+  readonly 'command.guide.generate': string;
+  readonly 'guide.heading': string;
+  readonly 'guide.loading': string;
+  readonly 'guide.unavailable': string;
+  readonly 'guide.template': string;
+  readonly 'guide.noFile': string;
+  readonly 'guide.noExternalArt': string;
+  readonly 'guide.notResolved': string;
+  readonly 'guide.column.write': string;
+  readonly 'guide.column.slot': string;
+  readonly 'guide.column.guide': string;
+  readonly 'guide.column.art': string;
+  readonly 'guide.state.missing': string;
+  readonly 'guide.state.exists': string;
+  readonly 'guide.state.newer': string;
+  readonly 'guide.none': string;
+  readonly 'guide.uncited.heading': string;
+  readonly 'guide.uncited.insert': string;
+  readonly 'guide.unguided.heading': string;
+  readonly 'guide.unguided.line': string;
+  readonly 'guide.write': string;
+  readonly 'guide.writing': string;
+  readonly 'guide.close': string;
+  readonly 'guide.save.message': string;
+  readonly 'guide.save.detail': string;
+  readonly 'guide.save.yes': string;
+  readonly 'guide.save.no': string;
+  readonly 'guide.result.written': string;
+  readonly 'guide.result.opened': string;
+  readonly 'guide.result.noProgram': string;
+  readonly 'guide.result.restricted': string;
+  readonly 'guide.result.declined': string;
+  readonly 'guide.result.notSaved': string;
+  readonly 'guide.result.failed': string;
+  readonly 'guide.result.refused': string;
   readonly 'slash.section.templates': string;
   /** TYTO-277. The heading over the person's snippets in the same menu. */
   readonly 'slash.section.snippets': string;
@@ -1926,6 +1966,41 @@ export const CATALOGUE_KEYS = [
   'command.delivery.export',
   'delivery.export.notInDelivery',
   'delivery.export.refused',
+  'command.guide.generate',
+  'guide.heading',
+  'guide.loading',
+  'guide.unavailable',
+  'guide.template',
+  'guide.noFile',
+  'guide.noExternalArt',
+  'guide.notResolved',
+  'guide.column.write',
+  'guide.column.slot',
+  'guide.column.guide',
+  'guide.column.art',
+  'guide.state.missing',
+  'guide.state.exists',
+  'guide.state.newer',
+  'guide.none',
+  'guide.uncited.heading',
+  'guide.uncited.insert',
+  'guide.unguided.heading',
+  'guide.unguided.line',
+  'guide.write',
+  'guide.writing',
+  'guide.close',
+  'guide.save.message',
+  'guide.save.detail',
+  'guide.save.yes',
+  'guide.save.no',
+  'guide.result.written',
+  'guide.result.opened',
+  'guide.result.noProgram',
+  'guide.result.restricted',
+  'guide.result.declined',
+  'guide.result.notSaved',
+  'guide.result.failed',
+  'guide.result.refused',
   'slash.section.templates',
   'slash.section.snippets',
   'slash.template.new',

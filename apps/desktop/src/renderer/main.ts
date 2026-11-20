@@ -164,6 +164,8 @@ import {
 } from './export-dialog.js';
 import { type PluginsDialog, PLUGINS_DIALOG_TAG, settingKeyOffset } from './plugins-dialog.js';
 import { type GalleryDialog, GALLERY_DIALOG_TAG } from './gallery-dialog.js';
+import { type GuideDialog, GUIDE_DIALOG_TAG } from './guide-dialog.js';
+import { type GuideWriteResult, guideLineInsertion } from './guide-view.js';
 import { briefsToRecompile } from './asset-redraw.js';
 import { previewAnalysis } from './brief-analysis.js';
 import {
@@ -1320,6 +1322,8 @@ function resolveElements() {
     pluginsDialog: document.querySelector<PluginsDialog>(PLUGINS_DIALOG_TAG),
     // TYTO-504. By tag, for the same reason.
     galleryDialog: document.querySelector<GalleryDialog>(GALLERY_DIALOG_TAG),
+    // TYTO-741. By tag, for the same reason.
+    guideDialog: document.querySelector<GuideDialog>(GUIDE_DIALOG_TAG),
     // TYTO-45. A dock panel, so `null` whenever it is closed — which is how it starts.
     queuePanel: document.querySelector<QueuePanel>(QUEUE_PANEL_TAG),
     // TYTO-347. A dock panel too, `null` while closed; painted from the workspace answer.
@@ -2055,6 +2059,65 @@ function openGalleryDialog(): void {
   });
 }
 
+/**
+ * The external-art guides of the brief in front (TYTO-741, ADR 0222). Listed from the buffer, so
+ * a line inserted from the dialog lists its guide at once; written from the file, so a brief with
+ * unsaved edits is asked to be saved first (decision 5), in a native box like closing a tab's.
+ */
+function openGuideDialog(): void {
+  const dialog = elements.guideDialog;
+  const bridge = window.tyto;
+  if (dialog === null || dialog === undefined || bridge === undefined) return;
+  const documentId = active().id;
+  dialog.locale = state.locale;
+  const textOf = (): string => {
+    const document_ = documentOf(workspace, documentId);
+    return document_ === undefined ? '' : contentOf(document_);
+  };
+  void dialog.show({
+    list: () => bridge['guide:candidates']({ documentId, text: textOf() }),
+    insert: (line) => {
+      const pane = primaryPaneOf(documentId);
+      if (pane === undefined) return false;
+      // One transaction, so one Ctrl+Z takes the line back out.
+      const { from, insert } = guideLineInsertion(pane.view.state.doc.toString(), line);
+      pane.view.dispatch({ changes: { from, insert }, userEvent: 'input' });
+      return true;
+    },
+    write: (names) => writeGuides(bridge, documentId, names),
+  });
+}
+
+/** Saves the brief first when it has unsaved edits and a person agrees, then writes. */
+async function writeGuides(
+  bridge: TytoBridge,
+  documentId: string,
+  names: readonly string[],
+): Promise<GuideWriteResult> {
+  const say = (key: CatalogueKey): string => translate(state.locale, key);
+  const unsaved = (): boolean => {
+    const document_ = documentOf(workspace, documentId);
+    return document_ !== undefined && isUnsaved(document_);
+  };
+  if (unsaved()) {
+    const { confirmed } = await bridge['dialog:confirm']({
+      message: say('guide.save.message'),
+      detail: say('guide.save.detail'),
+      confirm: say('guide.save.yes'),
+      cancel: say('guide.save.no'),
+    });
+    if (!confirmed || (await saveOneDocument(bridge, documentId, false)) !== 'saved') {
+      return { outcome: 'not-saved' };
+    }
+  }
+  return bridge['guide:write']({
+    documentId,
+    only: [...names],
+    overwrite: false,
+    unsaved: unsaved(),
+  });
+}
+
 function openExportDialog(): void {
   const dialog = elements.exportDialog;
   if (dialog === null || dialog === undefined) return;
@@ -2537,6 +2600,10 @@ const registry: CommandRegistry = withCommandGate(
 
     exportDelivery: () => {
       exportDelivery();
+    },
+
+    openGuides: () => {
+      openGuideDialog();
     },
 
     openInsertMenu: () => {
@@ -5748,6 +5815,7 @@ function applyLocale(next: Locale): void {
   }
   if (elements.pluginsDialog) elements.pluginsDialog.locale = next;
   if (elements.galleryDialog) elements.galleryDialog.locale = next;
+  if (elements.guideDialog) elements.guideDialog.locale = next;
   if (elements.trustDialog) elements.trustDialog.locale = next;
   if (elements.recentFolders) elements.recentFolders.locale = next;
   // The docked panels were handed the locale only when the dock was arranged, so a panel open

@@ -13,5 +13,6 @@ Everything the window does is a command, run from the command bar with **Ctrl+K*
 - [Panels](./panels.md) — Problems, the local queue and the preview.
 - [The command bar and search](./command-bar-and-search.md) — run a command, find text, go to a block.
 - [Format Brief](./format-brief.md) — tidy a brief's spacing in one key.
+- [Guides for external art](./external-art-guide.md) — write the PSD a picture painted elsewhere is painted on, and see it in the preview.
 - [Vim mode](./vim-mode.md) — edit with vim's keys.
 - [Template mode](./template-mode.md) — edit a template beside the formats it draws.
