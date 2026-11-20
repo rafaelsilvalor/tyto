@@ -130,3 +130,21 @@ a stand-in decoder in an e2e; the version pull request; then the PSD plugin in i
   asks; nothing else of the disk is reachable through a token.
 - `E_PERMISSION`'s message says "at install time", which reads oddly for a spent token; the
   capability text names the token, and a clearer wording is a catalog change for a later card.
+
+## Notes
+
+- **2026-11-20 (TYTO-742, core and io): the split lives in io, and core asks where it fell.**
+  `decodedAssets` in `@tyto/io` wraps the file resolver, inside the source cache, and is the
+  one place decision 6 is read: it locates the literal name through the file resolver's new
+  `locate`, which finds a file in the same folders without reading it. Core cannot ask a disk,
+  so the asset port gains an optional `layerOf(reference)`, answered after `resolve`, and
+  `resolve` hands it to `externalArtVariant` to put the format before the fragment; a wrapper
+  that does not forward it reads the reference as one file's name. A reference whose literal
+  name is not a file while the part before its last `#` is a file no decoder claims is
+  `E_ASSET_DECODER_MISSING` too: "not found" would send the author looking for a file that
+  is there. A literal name whose last dot is followed by more than letters and digits
+  (`capa.psd#arte` as a real file) is the file resolver's, as before. A decoded picture is an
+  `AssetRef` of source `url`, which is how `recordingAssetResolver` marks a fetched one; the
+  delivery's name folds a layer in after the file's stem, its separators cut like a
+  reference's (`capa.psd#grupo/arte` → `capa-grupo-arte.png`). The command line and the
+  desktop compose the cache in the next pull requests.

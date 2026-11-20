@@ -399,6 +399,27 @@ describe('one test per diagnostic code', () => {
     expect(problem?.range).toEqual(at);
   });
 
+  it.each([
+    diagnostic('E_ASSET_DECODER_MISSING', { path: 'capa.psd', extension: '.psd' }),
+    diagnostic('E_ASSET_DECODE_FAILED', {
+      path: 'capa.psd#arte',
+      plugin: 'psd',
+      problem: "no layer is named 'arte'",
+    }),
+  ])('puts $code at the brief’s line, from the resolver (ADR 0223)', async (said) => {
+    const at = sourceRange(60, 80);
+    const reference = said.message.split("'")[1] ?? '';
+    const ast = valid({ directives: [directive('imagem', reference, {}, at)] });
+    const found = await problems(ast, {
+      assets: { ...assets, explain: (asked) => (asked === reference ? said : undefined) },
+    });
+
+    expect(found.map((item) => item.code)).not.toContain('E_ASSET_NOT_FOUND');
+    const [problem] = found.filter((item) => item.code === said.code);
+    expect(problem?.message).toBe(said.message);
+    expect(problem?.range).toEqual(at);
+  });
+
   it('keeps E_ASSET_NOT_FOUND when the resolver has nothing to add', async () => {
     const ast = valid({ directives: [directive('imagem', './sumiu.png')] });
     expect(await codes(ast, { assets: { ...assets, explain: () => undefined } })).toContain(

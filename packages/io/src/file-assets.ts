@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { basename, isAbsolute, join, resolve } from 'node:path';
 
-import type { AssetResolver, AssetRef } from '@tyto/core';
+import type { AssetLayer, AssetResolver, AssetRef } from '@tyto/core';
 
 import { isInside } from './contain.js';
 import { ASSETS_DIR } from './fs-inbox.js';
@@ -50,18 +50,35 @@ export interface FileAssetResolverOptions {
   readonly confine?: boolean;
 }
 
+/**
+ * `core`'s port, and where a reference's file is without reading it.
+ *
+ * A file a plugin decodes (ADR 0223) can weigh hundreds of megabytes, and `resolve` reads a
+ * whole file to hash it; `locate` finds it through the same folders, in the same order and
+ * with the same containment, and leaves the reading to whoever asked.
+ */
+export interface LocatingAssetResolver extends AssetResolver {
+  /** The absolute path of the file `reference` names, or `undefined` where `resolve` finds none. */
+  locate(reference: string): Promise<string | undefined>;
+}
+
+/** Where `reference` is under `base`, or `'escaped'` when it climbs out of a confined base. */
+function pathUnder(base: string, reference: string, confine: boolean): string | 'escaped' {
+  const full = isAbsolute(reference) ? resolve(reference) : resolve(base, reference);
+  // Reported as absence rather than as a throw, so a brief that climbs out gets the
+  // same `E_ASSET_NOT_FOUND` as a typo — which is what it is from the author's side,
+  // and which does not tell a hostile brief whether the file it guessed at exists.
+  return confine && !isInside(base, full) ? 'escaped' : full;
+}
+
 /** The file at `reference` under `base`, or `undefined` — outside, missing or unreadable. */
 async function readUnder(
   base: string,
   reference: string,
   confine: boolean,
 ): Promise<{ readonly path: string; readonly bytes: Buffer } | 'escaped' | undefined> {
-  const full = isAbsolute(reference) ? resolve(reference) : resolve(base, reference);
-
-  // Reported as absence rather than as a throw, so a brief that climbs out gets the
-  // same `E_ASSET_NOT_FOUND` as a typo — which is what it is from the author's side,
-  // and which does not tell a hostile brief whether the file it guessed at exists.
-  if (confine && !isInside(base, full)) return 'escaped';
+  const full = pathUnder(base, reference, confine);
+  if (full === 'escaped') return 'escaped';
 
   try {
     return { path: full, bytes: await readFile(full) };
@@ -75,7 +92,7 @@ async function readUnder(
   }
 }
 
-export function fileAssetResolver(options: FileAssetResolverOptions): AssetResolver {
+export function fileAssetResolver(options: FileAssetResolverOptions): LocatingAssetResolver {
   const base = resolve(options.base);
   const fallbacks = (options.fallbacks ?? []).map((folder) => resolve(folder));
   const confine = options.confine ?? true;
@@ -83,6 +100,20 @@ export function fileAssetResolver(options: FileAssetResolverOptions): AssetResol
   return {
     base,
     searched: [base, ...fallbacks],
+
+    async locate(reference: string): Promise<string | undefined> {
+      for (const folder of [base, ...fallbacks]) {
+        const full = pathUnder(folder, reference, confine);
+        // The literal folder refuses an escape outright, as `resolve` does below.
+        if (full === 'escaped') {
+          if (folder === base) return undefined;
+          continue;
+        }
+        const found = await stat(full).catch(() => undefined);
+        if (found?.isFile() === true) return full;
+      }
+      return undefined;
+    },
 
     async resolve(reference: string): Promise<AssetRef | undefined> {
       // The literal path first, so what the brief says is what it gets when it is there.
@@ -138,7 +169,7 @@ export function briefAssetResolver(options: {
   readonly confine?: boolean;
   /** The workspace's asset folders, absolute, in the order `project.json` lists them. */
   readonly projectAssets?: readonly string[];
-}): AssetResolver {
+}): LocatingAssetResolver {
   const delivery = basename(resolve(options.briefDirectory)) === EDITABLE_DIR;
   return fileAssetResolver({
     base: options.briefDirectory,
@@ -157,10 +188,13 @@ export interface DeliveredAsset {
   readonly path: string;
   /**
    * True when a plugin's `asset-source` supplied it, and `path` is a file in the source
-   * cache named by a hash (ADR 0117). A delivery then names the copy after the reference
-   * instead (ADR 0118).
+   * cache named by a hash (ADR 0117), or a plugin decoded it into the decoded cache (ADR
+   * 0223). A delivery then names the copy after the reference instead (ADR 0118), a layer
+   * folded in: `capa.psd#arte` is copied as `capa-arte.png`.
    */
   readonly fetched?: boolean;
+  /** The file and layer a decoded reference named (ADR 0223), folded into the copy's name. */
+  readonly layer?: AssetLayer;
 }
 
 /**
@@ -183,14 +217,22 @@ export function recordingAssetResolver(inner: AssetResolver): {
       async resolve(reference: string): Promise<AssetRef | undefined> {
         const asset = await inner.resolve(reference);
         if (asset?.path !== undefined) {
-          // `url` is what the source cache answers, and nothing else does.
+          // `url` is what the source cache and the decoded cache answer (ADR 0223): a file
+          // named by a hash, which a delivery names after the reference instead.
           const fetched = asset.source === 'url';
-          found.set(reference, { reference, path: asset.path, ...(fetched ? { fetched } : {}) });
+          const layer = fetched ? inner.layerOf?.(reference) : undefined;
+          found.set(reference, {
+            reference,
+            path: asset.path,
+            ...(fetched ? { fetched } : {}),
+            ...(layer === undefined ? {} : { layer }),
+          });
         }
         return asset;
       },
       // Forwarded, or a plugin source's reason for a miss would be lost behind the record.
       ...(inner.explain === undefined ? {} : { explain: inner.explain.bind(inner) }),
+      ...(inner.layerOf === undefined ? {} : { layerOf: inner.layerOf.bind(inner) }),
     },
     delivered: () => [...found.values()],
   };
