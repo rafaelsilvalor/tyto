@@ -200,6 +200,8 @@ arte.brief: error E_GUIDE_NEWER_THAN_BRIEF The guide 'assetsundo.story.guide.ps
 
 O `--open` abre cada gabarito gravado no programa que o seu computador usa para abrir PSD. O `--formats` e o `--template` funcionam como no `tyto render`.
 
+O brief também pode citar um arquivo que o Tyto não desenha sozinho, como o próprio PSD, depois que um plugin que decodifica esse tipo de arquivo estiver instalado: `fundo: fundo.psd` desenha o arquivo inteiro, e `fundo: fundo.psd#arte` a camada chamada `arte` (uma camada dentro de um grupo é `grupo/arte`). O gabarito de uma camada citada leva o nome do arquivo, `fundo.guide.psd`, nunca o da camada. A imagem que o plugin decodifica fica guardada na sua pasta do Tyto e só é decodificada de novo quando o arquivo ou o plugin muda. Sem esse plugin instalado, a linha do brief diz que tipo de arquivo precisa de um. Numa pasta em que você não confiou, nenhum plugin decodifica nada novo, e a linha diz para confiar na pasta; o `tyto watch` decodifica, porque decodificar só lê um arquivo que já está no seu computador.
+
 ## Quando o brief tem erros
 
 Cada problema sai com o arquivo, a linha e a coluna, o código e o que está errado, e o comando termina com código de saída `1`:

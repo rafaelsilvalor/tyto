@@ -21,6 +21,7 @@ import {
   type RenderResult,
   type ReusableTaskOutput,
   briefAssetResolver,
+  decodedAssets,
   fileAssetResolver,
   fileResources,
   fsArtworkOutput,
@@ -47,6 +48,7 @@ import {
   NO_PLUGINS,
   activateBuiltIns,
   activateInstalled,
+  processDecodeGrants,
 } from './plugins/index.js';
 import { declaresExternalArt, guideArtifactName, guideStore, noExternalArt } from './guide.js';
 import { realPathConfined } from './real-path-assets.js';
@@ -179,6 +181,12 @@ export interface TaskSources {
   readonly fetches: boolean;
   /** What a miss says when {@link fetches} is false. The restricted folder's reason by default. */
   readonly notFetchedBecause?: string;
+  /**
+   * Whether a plugin's `image-decoder` may decode a file the cache lacks (ADR 0223, decision
+   * 8); {@link fetches} when absent. A restricted folder decodes nothing new; `tyto watch`
+   * decodes, because a decode reads a file already on this machine and reaches no network.
+   */
+  readonly decodes?: boolean;
   /** Each plugin's section of the brief's resolved project (ADR 0112), handed on each fetch. */
   readonly sections?: Readonly<Record<string, unknown>>;
 }
@@ -289,6 +297,21 @@ function exportResources(
   // exporters: its last folders are the font sources' that host's plugins registered.
   const font: FontLibrary['font'] = (face) => fonts().font(face);
   return { html: { ...layered.html, font }, svg: { ...layered.svg, font } };
+}
+
+/**
+ * Each installed plugin's version, by id, from its manifest (ADR 0223, decision 5): the decoded
+ * cache keys an answer by it, so an update that draws differently is asked again.
+ */
+function pluginVersions(loaded: LoadedPlugins): (plugin: string) => string | undefined {
+  const versions = new Map<string, string>();
+  for (const plugin of loaded.plugins) {
+    const { manifest } = plugin;
+    if (typeof manifest !== 'object' || manifest === null) continue;
+    const { version } = manifest as { readonly version?: unknown };
+    if (typeof version === 'string') versions.set(plugin.id, version);
+  }
+  return (plugin) => versions.get(plugin);
 }
 
 /**
@@ -420,7 +443,21 @@ export async function renderTask(
   // path anybody typed.
   const files =
     task.assetRoots === undefined ? written : realPathConfined(written, task.assetRoots);
-  const resolved = cache === undefined ? files : cache.assets(files);
+  // A file a plugin decodes (ADR 0223), around the file resolver and inside the source cache:
+  // the cited file is located through the same folders (confined under `tyto mcp`), and the PNG
+  // decoded from it is kept in `TYTO_HOME/cache/decoded/`, where no confinement looks.
+  const decoded =
+    sources === undefined
+      ? files
+      : decodedAssets({
+          home: sources.home,
+          decoders: () => host.registry.imageDecoders(),
+          decode: (decoder, subject, request) =>
+            processDecodeGrants.decode(decoder, subject, request),
+          versionOf: pluginVersions(options.plugins ?? NO_PLUGINS),
+          decodes: sources.decodes ?? sources.fetches,
+        }).assets(files);
+  const resolved = cache === undefined ? decoded : cache.assets(decoded);
   // A delivery's export copies what the brief drew from into its `assets/` (ADR 0161), so it
   // records each image as the run resolves it, after the source cache, which marks a fetch.
   const recorder = delivery === undefined ? undefined : recordingAssetResolver(resolved);

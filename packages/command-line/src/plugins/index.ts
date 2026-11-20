@@ -148,7 +148,7 @@ export {
   readInstalledPlugins,
 } from './external.js';
 export { withoutRefused } from '@tyto/io';
-export { credentialVariable, pluginCapabilities } from './capabilities.js';
+export { credentialVariable, pluginCapabilities, processDecodeGrants } from './capabilities.js';
 export { type CloseableRasterizer, rasterizerPlugin } from './rasterizer.js';
 export {
   type TemplatePackOptions,

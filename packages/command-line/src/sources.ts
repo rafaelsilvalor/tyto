@@ -66,5 +66,7 @@ export function optionalSources(sources: TaskSources | undefined): {
 export function watchSources(home: string | undefined): TaskSources | undefined {
   return home === undefined
     ? undefined
-    : { home, fetches: false, notFetchedBecause: WATCH_NEVER_FETCHES };
+    : // Decoded though never fetched (ADR 0223, decision 8): a decode reads a file already on
+      // this machine and reaches no network.
+      { home, fetches: false, notFetchedBecause: WATCH_NEVER_FETCHES, decodes: true };
 }
