@@ -2,7 +2,7 @@
 
 `::` directives + free text with inline Markdown, optional YAML frontmatter. Lezer grammar in `packages/brief-lang/src/brief.grammar`.
 
-Slot names and enum values are defined by each template's manifest, so they may be in the author's language (Portuguese in the built-in templates). Keywords of the language itself (`template`, `formats`) are English.
+Slot names and enum values are defined by each template's manifest, so they may be in the author's language (Portuguese in the built-in templates). Keywords of the language itself (`template`, `formats`) are English. Templates share a convention on top of this, in `docs/slot-vocabulary.md`: the common slot names, and how the lines inside a block rank themselves (`|` between parts, `#` to `###` for their level, an indented `---` for the divider). Those marks are plain text to the grammar; the template reads them.
 
 ```brief
 ---
