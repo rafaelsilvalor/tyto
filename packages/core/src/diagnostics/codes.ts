@@ -1040,6 +1040,17 @@ export const diagnosticCodes = {
     fatality:
       'A guide with no art is the artwork cut into layers with nowhere to paint, which looks like a guide and guides nothing; the run writes no file.',
   },
+  E_GUIDE_NEWER_THAN_BRIEF: {
+    severity: 'error',
+    summary:
+      'A guide was not written over because it changed after the brief and may hold paint (ADR 0222).',
+    template:
+      "The guide '{guide}' was changed after the brief, and may hold the art painted in it: move it away, or pass --force to write it again.",
+    spec: 'docs/adr/0222-external-art-has-a-file-per-format-beside-the-cited-one.md',
+    fatal: true,
+    fatality:
+      'Writing over a guide somebody painted in loses their work with no way back, so the run writes no guide at all and says which file stopped it.',
+  },
   E_MANIFEST_SYNTAX: {
     severity: 'error',
     summary: 'A template manifest is not valid YAML.',

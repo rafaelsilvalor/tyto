@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
+    "@tyto/brief-lang": "workspace:*",
     "@tyto/core": "workspace:*",
     "@tyto/export-html": "workspace:*",
     "@tyto/export-psd": "workspace:*",

@@ -139,6 +139,8 @@ export function defaultEnvironment(): CliEnvironment {
     ...(process.stdin.isTTY ? { confirm: askOnTerminal, ask: askLineOnTerminal } : {}),
     // Browser sign-in (ADR 0194): the system keychain, loaded only when a sign-in is read.
     signin: { secrets: systemKeychain(), openBrowser: (url) => openSystemBrowser(url) },
+    // `tyto guide --open` (TYTO-741): the handler that opens a URL opens a file in its program.
+    openFile: (path) => openSystemBrowser(path),
     console: {
       out: (text) => {
         process.stdout.write(text);

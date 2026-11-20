@@ -32,6 +32,20 @@ export {
   installPlugin,
 } from './plugin-actions.js';
 export { permissionPrompt } from './plugin.js';
+export {
+  type GuideCandidate,
+  type GuideCandidates,
+  type GuideLocation,
+  type GuideOverwrite,
+  type GuideTarget,
+  type UncitedSlot,
+  type UnguidedCitation,
+  guideCandidates,
+  guideFolders,
+  guideOverwrite,
+  guidePaths,
+} from './guide-candidates.js';
+export { type WriteGuidesRequest, type WrittenGuides, writeGuides } from './guide-command.js';
 export { serveAgent } from './mcp/command.js';
 export type {
   BriefInFront,

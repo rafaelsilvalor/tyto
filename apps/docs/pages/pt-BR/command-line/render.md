@@ -173,6 +173,33 @@ $ tyto render promo.brief --guide --out guide
 promo.brief: error E_GUIDE_NO_EXTERNAL_ART Template 'promo-curso' declares no slot with external art, so there is no guide to write: a guide is for a slot whose manifest declares 'external'.
 ```
 
+## Gravar cada gabarito ao lado da arte: `tyto guide`
+
+O `tyto render --guide` grava numa pasta de saída. O `tyto guide <brief>` grava cada gabarito **ao lado do arquivo que o brief cita para aquela arte**, com o nome dele, para que a imagem pintada a partir dele caia onde o brief a lê de volta. Um brief que cita `fundo: fundo.png` e renderiza dois tamanhos ganha `fundo.grid-1x1.guide.psd` e `fundo.story.guide.psd`; salve cada pintura como `fundo.grid-1x1.png` e `fundo.story.png` na mesma pasta, e cada tamanho desenha a sua. Com um tamanho só, o gabarito é `fundo.guide.psd` e a pintura é o próprio `fundo.png`. A pasta é a `assets/` ao lado do brief (a `assets/` da entrega, para um brief numa entrega), ou a pasta onde o arquivo citado já está, quando ele está ao lado do brief. Conferido em 19/11/2026 com o template embutido `arte-teste`, num build de desenvolvimento do CLI:
+
+```
+$ tyto guide arte.brief --list
+fundo (full): fundo.png, line 4
+  grid-1x1: guide assetsundo.grid-1x1.guide.psd missing; art assetsundo.grid-1x1.png missing
+  story: guide assetsundo.story.guide.psd missing; art assetsundo.story.png missing
+imagem (inline): not cited; add "imagem: imagem.png" to the brief
+$ tyto guide arte.brief
+assetsundo.grid-1x1.guide.psd
+assetsundo.story.guide.psd
+```
+
+O `--list` não grava nada: mostra cada arquivo citado, os gabaritos dele e se cada um existe, e a arte para a qual o brief não cita arquivo, com a linha que citaria um. Essa arte não ganha gabarito até o brief dar o nome do arquivo.
+
+Por padrão, só os gabaritos que faltam são gravados; o `--all` grava todos, e o `--only <arquivo>` os gabaritos de um arquivo citado ou de um nome de gabarito. Um gabarito alterado depois do brief pode ter o que alguém pintou, então nunca é sobrescrito sem `--force`; quando um está no caminho, nenhum é gravado:
+
+```
+$ tyto guide arte.brief --all
+arte.brief: error E_GUIDE_NEWER_THAN_BRIEF The guide 'assetsundo.grid-1x1.guide.psd' was changed after the brief, and may hold the art painted in it: move it away, or pass --force to write it again.
+arte.brief: error E_GUIDE_NEWER_THAN_BRIEF The guide 'assetsundo.story.guide.psd' was changed after the brief, and may hold the art painted in it: move it away, or pass --force to write it again.
+```
+
+O `--open` abre cada gabarito gravado no programa que o seu computador usa para abrir PSD. O `--formats` e o `--template` funcionam como no `tyto render`.
+
 ## Quando o brief tem erros
 
 Cada problema sai com o arquivo, a linha e a coluna, o código e o que está errado, e o comando termina com código de saída `1`:
