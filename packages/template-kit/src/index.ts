@@ -102,6 +102,7 @@ export {
   DEEPEST_LEVEL,
   DIVIDER,
   type Level,
+  type LevelGap,
   type LevelItem,
   type LevelLook,
   type LevelPart,

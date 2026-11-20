@@ -2,7 +2,13 @@ import { rect, solid, systemFont } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
 import { block } from './blocks.js';
-import { type LevelItem, type LevelStackStyle, levelStack, levelsOf } from './levels.js';
+import {
+  type LevelItem,
+  type LevelPart,
+  type LevelStackStyle,
+  levelStack,
+  levelsOf,
+} from './levels.js';
 import { bold, rich, span } from './rich-text.fixture.js';
 import { plain } from './rows.js';
 
@@ -144,8 +150,8 @@ const STYLE: LevelStackStyle = {
 };
 
 /** The rows of a drawn stack: each child's name, top and height. */
-function rows(items: LevelItem[]): { name: string; y: number }[] {
-  const drawn = levelStack(items, STYLE, 200, measure);
+function rows(items: LevelItem[], style: LevelStackStyle = STYLE): { name: string; y: number }[] {
+  const drawn = levelStack(items, style, 200, measure);
   const children = (drawn.draft as GroupDraft).children ?? [];
   return children.map((child: NodeDraft) => {
     const inner = child.kind === 'group' ? (child.children[0] ?? child) : child;
@@ -169,6 +175,43 @@ describe('levelStack', () => {
       { name: 'titulo-main-0', y: 0 },
       { name: 'titulo-after-1', y: 95 },
     ]);
+  });
+
+  it('spaces each pair of lines by the function of the items around the gap', () => {
+    const lineGap = (above: LevelItem, below: LevelItem): number => {
+      if (below.kind === 'divider' || above.kind === 'divider') return 7;
+      return above.parts.some((part) => part.level === 1) ? 40 : 11;
+    };
+    // # TRT (30) | 40 | Edital (10) | 11 | Ganhe (10) | 7 | divider (4) | 7 | Fim (10)
+    const items = levelsOf(rich('# TRT\nEdital\nGanhe\n---\nFim'));
+    expect(rows(items, { ...STYLE, lineGap })).toEqual([
+      { name: 'titulo-main-0', y: 0 },
+      { name: 'titulo-after-0', y: 70 },
+      { name: 'titulo-after-0', y: 91 },
+      { name: 'divisor', y: 108 },
+      { name: 'titulo-after-0', y: 119 },
+    ]);
+  });
+
+  it('spaces each pair of parts in a line by the function of the parts around the gap', () => {
+    const gap = (above: LevelPart, below: LevelPart): number =>
+      above.position === 'before' && below.position === 'main' ? 2 : 9;
+    // Edital (10) | 2 | TRT 4 (30) | 9 | Sul (10)
+    expect(rows(levelsOf(rich('Edital | # TRT 4 | Sul')), { ...STYLE, gap, lineGap: 20 })).toEqual([
+      { name: 'titulo-before-0', y: 0 },
+      { name: 'titulo-main-1', y: 12 },
+      { name: 'titulo-after-2', y: 51 },
+    ]);
+  });
+
+  it('never asks the line gap about a divider it leaves out', () => {
+    const seen: string[] = [];
+    const lineGap = (above: LevelItem, below: LevelItem): number => {
+      seen.push(`${above.kind}>${below.kind}`);
+      return 3;
+    };
+    rows(levelsOf(rich('---\nTRT\nSul\n---')), { ...STYLE, lineGap });
+    expect(seen).toEqual(['line>line']);
   });
 
   it('draws no divider with nothing on one side of it', () => {

@@ -129,20 +129,39 @@ export interface LevelLook {
   readonly transform?: (words: RichText) => RichText;
 }
 
-export interface LevelStackStyle {
+/**
+ * A space between two neighbours: one number for every pair, or the space for this pair, from
+ * the neighbour above and the neighbour below (TYTO-810). A designer spaces lines by what they
+ * are — more room under the exam's name than over the salary — and a function says that from
+ * the items' levels without counting lines.
+ */
+export type LevelGap<Neighbour> = number | ((above: Neighbour, below: Neighbour) => number);
+
+interface LevelStackLook {
   /** The wrapping group's name. */
   readonly name: string;
   /** How a part looks, from its level and position: the template's whole say on the hierarchy. */
   readonly look: (part: LevelPart) => LevelLook;
-  /** Space between two parts of one line, each drawn on its own row. */
-  readonly gap: number;
-  /** Space between two lines, or a line and a divider. Defaults to `gap`. */
-  readonly lineGap?: number;
   /** The template's divider, as wide as it likes up to `width`. Without it `---` draws nothing. */
   readonly divider?: (width: number) => Block;
   /** Where each row sits across the block. Defaults to `center`. */
   readonly align?: Align;
 }
+
+/**
+ * How a stack is drawn. `gap` is the space between two parts of one line, each on its own row;
+ * `lineGap` the space between two lines, or a line and a divider, from the two items drawn
+ * around it (a divider left out is not a neighbour). `lineGap` defaults to `gap` only when `gap`
+ * is a number: a function of two parts cannot space two lines.
+ */
+export type LevelStackStyle = LevelStackLook &
+  (
+    | { readonly gap: number; readonly lineGap?: LevelGap<LevelItem> }
+    | {
+        readonly gap: (above: LevelPart, below: LevelPart) => number;
+        readonly lineGap: LevelGap<LevelItem>;
+      }
+  );
 
 /**
  * The items drawn top to bottom, one part per row, each row as tall as its words measure, so
@@ -156,16 +175,21 @@ export function levelStack(
   measure: Measure,
 ): Block {
   const align = style.align ?? 'center';
-  const lineGap = style.lineGap ?? style.gap;
+  const lineGap: LevelGap<LevelItem> = style.lineGap ?? (style.gap as number);
 
-  const drawn: ({ kind: 'line'; rows: Block[] } | { kind: 'divider'; item: Block })[] = [];
+  type Drawn =
+    | { kind: 'line'; item: LevelItem & { kind: 'line' }; rows: Block[] }
+    | { kind: 'divider'; item: LevelItem; drawing: Block };
+  const drawn: Drawn[] = [];
   for (const item of items) {
     if (item.kind === 'divider') {
-      if (style.divider !== undefined) drawn.push({ kind: 'divider', item: style.divider(width) });
+      if (style.divider !== undefined) {
+        drawn.push({ kind: 'divider', item, drawing: style.divider(width) });
+      }
       continue;
     }
     const rows = item.parts.map((part, index) => rowOf(part, index, style, width, measure, align));
-    drawn.push({ kind: 'line', rows });
+    drawn.push({ kind: 'line', item, rows });
   }
 
   const kept = drawn.filter(
@@ -178,10 +202,16 @@ export function levelStack(
   let y = 0;
   const children = [];
   for (const [index, each] of kept.entries()) {
-    if (index > 0) y += lineGap;
-    const pieces = each.kind === 'line' ? each.rows : [each.item];
-    for (const [row, piece] of pieces.entries()) {
-      if (row > 0) y += style.gap;
+    if (index > 0) y += spaceOf(lineGap, kept[index - 1]!.item, each.item);
+    if (each.kind === 'divider') {
+      children.push(at(offsetOf(align, width, each.drawing.width), y, each.drawing));
+      y += each.drawing.height;
+      continue;
+    }
+    for (const [row, piece] of each.rows.entries()) {
+      if (row > 0) {
+        y += spaceOf(style.gap, each.item.parts[row - 1]!, each.item.parts[row]!);
+      }
       children.push(at(offsetOf(align, width, piece.width), y, piece));
       y += piece.height;
     }
@@ -189,6 +219,10 @@ export function levelStack(
 
   if (children.length === 0) return stack({ name: style.name, items: [] });
   return block(width, y, group({ name: style.name, children }));
+}
+
+function spaceOf<Neighbour>(gap: LevelGap<Neighbour>, above: Neighbour, below: Neighbour): number {
+  return typeof gap === 'number' ? gap : gap(above, below);
 }
 
 function rowOf(
