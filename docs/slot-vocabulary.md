@@ -12,6 +12,11 @@ change to it: the manifest's schema, `resolve` and the brief grammar are untouch
 manifest that ignores this document still parses. `formats.yaml` is the precedent — one
 shared list of formats instead of one per template.
 
+It covers three things a brief writer meets in every template: the slot names, the marks
+that give the lines inside a block their hierarchy (`|`, `#` to `###`, `---`), and the labels
+of a `Label: value` line. A template stays free to name what this document does not; what it
+names here means the same in every template, whatever the template draws for it.
+
 ## Why this exists now
 
 **Four templates had already drifted three ways.** Measured on 2026-09-27 against `main` at
@@ -114,6 +119,138 @@ The test: _would the slot keep its name if what it held changed subject?_
 flags such as `destaque`, per-field colours, and every domain field. A template needs no
 permission to add them. If three templates later invent the same name for the same role, that
 is the signal to add it here.
+
+## A tag names a set of information, not a line
+
+**A slot is the set; the lines inside it say their own hierarchy.** A brief that needed a
+label on every line would be longer to write and slower to learn, so the shared vocabulary
+names blocks of information (`::titulo`, `::apelo`) and leaves the inside to a few marks every
+template reads the same way. The marks are part of this vocabulary: one joins only the way a
+name does (see "Adding a name or a mark").
+
+A table is the precedent. A template that mixes a table and running text names the table
+block, and inside it the rows are still `|`-separated, as `agenda-semana` and
+`simulados-semana` already write them.
+
+### `apelo`: the panel that calls for attention
+
+| Name    | Type        | Role, in one sentence                                                                       |
+| ------- | ----------- | ------------------------------------------------------------------------------------------- |
+| `apelo` | `rich-text` | The panel that pulls the eye to one message — an offer, a guarantee, a deadline, a warning. |
+
+The name says what the panel does, not what it holds or how it is drawn: one template draws a
+card with a band, another a round badge, and both are `apelo`. It was chosen over `oferta`,
+because what the panel says is not always an offer, and over `destaque`, which the user manual
+already uses as its example adjustment (`::lamina {destaque}`), the same clash that made
+`cor` give way to `tom`.
+
+### Levels inside a block: `|`, `#` and `---`
+
+**Each line of a block is drawn in the order written; the brief writer orders the
+information, the template draws it.** Inside one line:
+
+- **`|` separates the parts of one line**, and each part is one level of the line's
+  hierarchy. Spaces around it are not part of the words.
+- **`#`, `##` and `###` before a part mark its level**: `#` is the main part, `##` the
+  second level, `###` the third. A part with no mark is the base level. The template decides
+  what each level looks like — size, weight, case, letter spacing — so the same marks give a
+  different, consistent look in each template.
+- **A line with no `#` at all is read by position**, so most lines need no mark:
+
+  | Parts | Read as         | Example                                      |
+  | ----- | --------------- | -------------------------------------------- |
+  | 1     | `# a`           | `Concurso TRT 4 (RS)`                        |
+  | 2     | `# a \| b`      | `Concurso TRT 4 (RS) \| Edital publicado`    |
+  | 3     | `a \| # b \| c` | `Concurso \| TRT 4 (RS) \| Edital publicado` |
+  | 4+    | `a \| # b \| …` | the second part is the main one              |
+
+- **A line that is only `---` is the divider.** The template draws its own divider there — a
+  row of dots, a single rule, a double rule, a dashed one. The brief only says where it goes.
+
+The same words, three hierarchies:
+
+```brief
+::titulo
+  Concurso | # TRT 4 (RS) | ## Edital publicado
+
+::titulo
+  ## Concurso | # TRT 4 (RS) | Edital publicado
+
+::titulo
+  # Concurso TRT 4 (RS) | ## Edital publicado
+  ---
+  Ganhe até R$ 16 mil por mês!
+```
+
+And one `apelo` shaping itself to what it was given — the template finds the main part and
+draws the rest around it:
+
+```brief
+::apelo
+  Pacotes com 40% OFF | Por tempo limitado
+
+::apelo
+  Lote Especial | # Pacotes com 40% OFF
+
+::apelo
+  Lote Especial | Pacotes com 40% OFF | Por tempo limitado
+```
+
+The brief language is untouched: `|`, `#` and an indented `---` are plain text inside a block
+today (checked by parsing the examples above with `parseBrief`: no diagnostic, every line a
+text run). Reading them into levels is the template's, through one shared function in
+`@tyto/template-kit` once it exists, so no template parses them its own way. A `---` that
+starts at the left margin is still the frontmatter's fence; the divider is always indented,
+inside a block.
+
+**Never change the words.** The marks reorder and rank what the copy says; a brief writer, or
+the brief modeller, moves a part to another place in the line only when the meaning stays the
+same, and never rewrites it.
+
+### Labels inside a block
+
+A line written `Label: value` is a pair, and the label is part of this vocabulary too: the
+same label means the same fact in every template. `Banca:` and `Vagas:` are written by four
+templates each; `Salário:`, `Inscrições:` and `Prova:` by two each, under the synonyms in the
+table below in two more. A label is for a fact with a name; a
+hierarchy of words is written with `|` and `#`, not with labels.
+
+## Names in use that drift, not checked yet
+
+These were counted on 2026-11-19 over the 14 production templates in their own repositories
+(manifests and example briefs). They are the convention from now on; the check's closed
+synonym list below does not know them yet, and each rename is a card per template
+repository.
+
+| In use                             | Where                                                 | The convention                  |
+| ---------------------------------- | ----------------------------------------------------- | ------------------------------- |
+| `fechamento`                       | concursos-abertos, concursos-abertos-saude            | `fecho`: the closing words      |
+| `abertura`                         | concursos-abertos, concursos-abertos-saude            | `titulo`                        |
+| `{fecho}` as the closing slide     | questao-estrategica, questao-engenharia, voce-conhece | `{contracapa}`, beside `{capa}` |
+| `Remuneração:`, `Salário inicial:` | concursos-abertos, concursos-abertos-ec               | `Salário:`                      |
+| `Período de inscrições:`           | concursos-abertos-ec                                  | `Inscrições:`                   |
+| `Data da prova:`                   | concursos-abertos-ec                                  | `Prova:`                        |
+
+`{fecho}` gives way to `{contracapa}` for the reason `cor` gave way to `tom`: `fecho` is
+already the slot for the closing words, and a slot and an adjustment of the same name would
+mean two things.
+
+**Two roles are open, for the maintainer to decide:**
+
+- **`chamada`** is reserved above for the short label over the title ("Resultado final"), and
+  `aprovados` uses it so. `simulados-semana`, `concursos-abertos`, `concursos-abertos-saude`
+  and `informativo` use it for a call to action ("Comente SIMULADO…"). The shape is the same,
+  so the check cannot see it.
+- **`imagem`** is reserved above for the one picture the brief supplies; `questao-estrategica`,
+  `questao-engenharia` and `voce-conhece` use it for several figures inside a slide
+  (`per: lamina, multiple: true`).
+
+## Adding a name or a mark
+
+**A name or a mark joins this document only when nothing in it plays the role.** The pull
+request that adds one says which entries it considered and why none fits, and it lists the
+templates that need it. Three templates inventing the same name for the same role is the
+usual signal; one template's need is usually a domain name, which needs no entry.
 
 ## What a check can enforce
 

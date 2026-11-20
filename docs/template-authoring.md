@@ -70,9 +70,12 @@ adjustments:
 
 Slot names are chosen by the template author and may be in Portuguese — they are the vocabulary the brief writer sees. Keys of the manifest itself are English.
 
-**Before naming a slot, read `docs/slot-vocabulary.md`.** It reserves six names — `titulo`,
-`subtitulo`, `chamada`, `imagem`, `lamina`, `tom` — with the role and type each carries, and
-says when a domain name is the better choice. The example above follows it, and
+**Before naming a slot, read `docs/slot-vocabulary.md`.** It reserves the shared names —
+`titulo`, `subtitulo`, `chamada`, `imagem`, `selo`, `lamina`, `tom`, `apelo` — with the role and
+type each carries, and says when a domain name is the better choice. It also fixes how the
+lines inside a block rank themselves (`|` between parts, `#` to `###` for their level, `---`
+for the template's divider) and which `Label:` names are shared, so read a block's lines that
+way rather than inventing a syntax of its own. The example above follows it, and
 `packages/core/src/template/manifest.test.ts` parses it verbatim.
 
 `templateManifestSchema` in `packages/core/src/template/manifest.ts` is the schema, and
