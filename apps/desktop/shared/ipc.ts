@@ -250,6 +250,30 @@ const diagnostic = z.object({
   hint: z.string().optional(),
 });
 
+/** At most the watcher's burst cap and the `null` that stands for the rest (TYTO-741). */
+export const EXPLORER_CHANGED_NAMES = 257;
+
+/** How many asset references one preview answer names (TYTO-741); past it, the first ones. */
+export const PREVIEW_REFERENCES_MAX = 1000;
+
+/** How many guides, uncited slots or unguided citations one answer carries (TYTO-741). */
+const GUIDES_MAX = 500;
+const externalArtKind = z.enum(['full', 'inline']);
+/**
+ * A guide by its file name, `grafico.story.guide.psd`, as `tyto guide --only` takes it: never a
+ * path, and never a word the command would read as an option.
+ */
+const guideName = z
+  .string()
+  .min(1)
+  .max(1000)
+  .regex(/^[^-/\\][^/\\]*$/u);
+/** The formats a guide is drawn at, narrowing the brief's own as `--formats` does. */
+const guideFormats = z
+  .array(z.string().regex(/^[^-,\s][^,\s]*$/u))
+  .min(1)
+  .max(100);
+
 /**
  * The bounds of a recipe cell on the wire (TYTO-377, ADR 0148): the first rows of its table and
  * how many it has, each text cut to a length a cell can show. A table is up to 50,000 rows
@@ -1279,6 +1303,13 @@ export const IPC_CHANNELS = {
          */
         formats: z.array(z.string().min(1).max(200)).max(500).optional(),
       }),
+      /**
+       * Every file the compile asked the brief's asset folders for, found or not, the copies
+       * per format beside an external one included (TYTO-741, ADR 0222). The window compiles
+       * the brief again when `explorer:changed` names a file of one of these names, so art
+       * painted beside the brief shows without a keystroke. Absent is none.
+       */
+      references: z.array(z.string().max(4096)).max(PREVIEW_REFERENCES_MAX).optional(),
     }),
   ),
 
@@ -1729,6 +1760,98 @@ export const IPC_CHANNELS = {
   'explorer:tabs-under': channel(
     z.strictObject({ entryId: explorerEntryId }),
     z.object({ documentIds: z.array(documentId) }),
+  ),
+
+  /**
+   * The external-art guides of the brief in a tab (TYTO-741, ADR 0222): each guide file with
+   * whether it is there and newer than the brief, the external slots the brief cites no file
+   * for with the line that would, and the citations that get no guide and why. `text` is the
+   * buffer, when the window wants the list for what is typed; the file is read otherwise.
+   * Paths are relative to the brief's folder, to show; a guide is named back by `name`.
+   */
+  'guide:candidates': channel(
+    z.strictObject({
+      documentId,
+      text: z.string().optional(),
+      formats: guideFormats.optional(),
+    }),
+    z.discriminatedUnion('ok', [
+      z.object({
+        ok: z.literal(true),
+        template: z.string(),
+        formats: z.array(z.string()),
+        guides: z
+          .array(
+            z.object({
+              slot: z.string(),
+              kind: externalArtKind,
+              cited: z.string(),
+              format: z.string(),
+              name: guideName,
+              guide: z.string(),
+              art: z.string(),
+              exists: z.boolean(),
+              newer: z.boolean(),
+              artExists: z.boolean(),
+            }),
+          )
+          .max(GUIDES_MAX),
+        uncited: z
+          .array(z.object({ slot: z.string(), kind: externalArtKind, line: z.string() }))
+          .max(GUIDES_MAX),
+        unguided: z
+          .array(
+            z.object({
+              slot: z.string(),
+              cited: z.string(),
+              reason: z.string(),
+              line: z.number().int().positive(),
+            }),
+          )
+          .max(GUIDES_MAX),
+      }),
+      z.object({
+        ok: z.literal(false),
+        /** `no-external-art`: the template declares none; `not-resolved`: see `diagnostics`. */
+        reason: z.enum(['no-file', 'no-external-art', 'not-resolved']),
+        diagnostics: z.array(diagnostic).max(200),
+      }),
+    ]),
+  ),
+
+  /**
+   * Writes the guides named in `only` with `tyto guide`, and opens each (TYTO-741, ADR 0222).
+   *
+   * `unsaved` is the window saying the tab has edits the file lacks: refused, since the guide
+   * is rendered from the file (decision 5). A guide newer than the brief is asked about in a
+   * native box main shows (decision 4) unless `overwrite` already said yes; a no is
+   * `declined`. `open` says how the guides reached the person: `opened` in their program,
+   * `no-program` shown in their folder because nothing opens a PSD here, `restricted` shown in
+   * their folder because a restricted folder never starts a program (ADR 0111). `report` is
+   * what the command printed besides the paths: its diagnostics, as the command panel shows them.
+   */
+  'guide:write': channel(
+    z.strictObject({
+      documentId,
+      only: z.array(guideName).min(1).max(GUIDES_MAX),
+      formats: guideFormats.optional(),
+      overwrite: z.boolean(),
+      unsaved: z.boolean(),
+    }),
+    z.discriminatedUnion('outcome', [
+      z.object({
+        outcome: z.literal('refused'),
+        reason: z.enum(['unsaved', 'no-file', 'no-guide']),
+      }),
+      z.object({ outcome: z.literal('declined') }),
+      z.object({ outcome: z.literal('failed'), report: z.string() }),
+      z.object({
+        outcome: z.literal('written'),
+        written: z.array(z.string()).max(GUIDES_MAX),
+        report: z.string(),
+        open: z.enum(['opened', 'no-program', 'restricted']),
+      }),
+    ]),
   ),
 
   /**
@@ -3743,10 +3866,15 @@ export const IPC_EVENTS = {
 
   /**
    * Something in the open workspace folder changed on disk (TYTO-279, ADR 0115), after a burst
-   * of watcher events went quiet for 150 ms. Empty, for `queue:changed`'s reason: the explorer
-   * lists again each folder it has expanded.
+   * of watcher events went quiet for 150 ms. The explorer lists again each folder it has
+   * expanded, for `queue:changed`'s reason. `names` are the burst's paths relative to the folder
+   * (TYTO-741), `null` for an event that named nothing or for the rest past the watcher's cap,
+   * and empty for a change main made to a badge rather than a file: a brief whose preview asked
+   * for a file of that name compiles again, so art painted beside it appears.
    */
-  'explorer:changed': z.object({}),
+  'explorer:changed': z.object({
+    names: z.array(z.string().max(4096).nullable()).max(EXPLORER_CHANGED_NAMES),
+  }),
 
   /**
    * The update status changed (TYTO-131). Empty, for `queue:changed`'s reason: the window asks

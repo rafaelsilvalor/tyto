@@ -123,6 +123,14 @@ export interface Catalogue {
    * TYTO-726, ADR 0159 note of 2026-11-15: the native box a refused command offers the window's
    * own way in. `{folder}`, `{plugin}`, `{id}` and `{recipe}` are filled by `cli-offers.ts`.
    */
+  /**
+   * TYTO-741, ADR 0222 decision 4: the native box before a guide newer than the brief is written
+   * over. `{guides}` is their file names, one per line.
+   */
+  readonly 'guide.overwrite.message': string;
+  readonly 'guide.overwrite.detail': string;
+  readonly 'guide.overwrite.yes': string;
+  readonly 'guide.overwrite.no': string;
   readonly 'cli.offer.trust.message': string;
   readonly 'cli.offer.trust.detail': string;
   readonly 'cli.offer.trust.yes': string;
@@ -1379,6 +1387,10 @@ export const CATALOGUE_KEYS = [
   'pluginFiles.approve.skip',
   'cli.confirm.yes',
   'cli.confirm.no',
+  'guide.overwrite.message',
+  'guide.overwrite.detail',
+  'guide.overwrite.yes',
+  'guide.overwrite.no',
   'cli.offer.trust.message',
   'cli.offer.trust.detail',
   'cli.offer.trust.yes',

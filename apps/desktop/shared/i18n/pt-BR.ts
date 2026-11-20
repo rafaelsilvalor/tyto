@@ -58,6 +58,11 @@ export const ptBR: Catalogue = {
   'pluginFiles.approve.skip': 'Agora não',
   'cli.confirm.yes': 'Sim',
   'cli.confirm.no': 'Não',
+  'guide.overwrite.message': 'Substituir gabaritos alterados depois do brief?',
+  'guide.overwrite.detail':
+    '{guides}\n\nEstes gabaritos foram salvos depois do brief, então podem ter pintura. Gerá-los de novo troca cada um por um gabarito vazio.',
+  'guide.overwrite.yes': 'Substituir',
+  'guide.overwrite.no': 'Manter',
   'cli.offer.trust.message': 'Confiar na pasta {folder} e rodar o comando?',
   'cli.offer.trust.detail':
     '--trust confia numa pasta só por uma execução, e a janela não tem essa confiança. Confiar aqui grava a pasta no trust.json, como Pasta de trabalho: gerenciar confiança faz: ela continua confiável em toda execução e janela até você retirar a confiança em Pasta de trabalho: gerenciar confiança ou com tyto trust remove. O comando então roda sem --trust.',

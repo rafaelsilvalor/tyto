@@ -77,6 +77,9 @@ describe('the IPC contract', () => {
       'gallery:install',
       'gallery:list',
       'gallery:update',
+      // TYTO-741, ADR 0222: the external-art guides of a tab's brief, and writing them.
+      'guide:candidates',
+      'guide:write',
       'help:open-documentation',
       'keybindings:open',
       'keybindings:read',
@@ -724,5 +727,38 @@ describe('what may be written to the log', () => {
         detail: 'Error: the preview blew up ⏎ at paint (preview.ts:1:1)',
       }),
     ).toMatchObject({ level: 'error' });
+  });
+});
+
+// TYTO-741, ADR 0222: a guide is named by its file name, never a path or a word the command would
+// read as an option, since main puts it on `tyto guide`'s command line.
+describe('the guide channels', () => {
+  const write = (only: string[]) => ({
+    documentId: 'document-1',
+    only,
+    overwrite: false,
+    unsaved: false,
+  });
+
+  it('takes guide names', () => {
+    expect(parseIpc('guide:write', 'request', write(['grafico.story.guide.psd']))).toMatchObject({
+      only: ['grafico.story.guide.psd'],
+    });
+  });
+
+  it('refuses a path, an option and an empty list', () => {
+    for (const only of [['../segredo.psd'], ['assets\\grafico.guide.psd'], ['--all'], []]) {
+      expect(() => parseIpc('guide:write', 'request', write(only))).toThrow(IpcContractError);
+    }
+    expect(() =>
+      parseIpc('guide:write', 'request', { ...write(['a.guide.psd']), formats: ['--open'] }),
+    ).toThrow(IpcContractError);
+  });
+
+  it('carries the burst names on explorer:changed, and refuses the old empty push', () => {
+    expect(parseIpcEvent('explorer:changed', { names: ['assets/grafico.png', null] })).toEqual({
+      names: ['assets/grafico.png', null],
+    });
+    expect(() => parseIpcEvent('explorer:changed', {})).toThrow(IpcContractError);
   });
 });

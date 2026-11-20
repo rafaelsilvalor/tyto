@@ -17,6 +17,7 @@ import {
   type MenuModel,
   type MenuMove,
   IPC_CHANNEL_NAMES,
+  PREVIEW_REFERENCES_MAX,
   RECIPE_WIRE_LIMITS,
   parseIpc,
 } from '../../shared/ipc.js';
@@ -87,6 +88,7 @@ import {
   valueToWire,
 } from './recipe-wire.js';
 import { type TemplateDiagnostic, type TemplateEditorService } from './template-editor.js';
+import { type GuideService } from './guides.js';
 import { type TemplateCatalogue } from './templates.js';
 import { type AppliedThemes, type ThemeService, themeVariant } from './themes.js';
 import { type UpdateService } from './updates.js';
@@ -507,6 +509,8 @@ export interface IpcDependencies {
    * `recipe:copy` builds the text in main, so a copy of thousands of rows never crosses.
    */
   readonly writeClipboard: (text: string) => void;
+  /** TYTO-741, ADR 0222: the external-art guides of a tab's brief. */
+  readonly guides: GuideService;
 }
 
 /** A setting's outline as the contract writes it: the same fields, in arrays of its own. */
@@ -649,12 +653,18 @@ export function createHandlers(dependencies: IpcDependencies): Handlers {
             ? {}
             : { formats: [...result.completion.formats] }),
         },
+        // TYTO-741: what the window compiles this brief again for when the folder changes.
+        references: result.references.slice(0, PREVIEW_REFERENCES_MAX),
       };
     },
 
     // No `Promise.resolve` any more: `list()` is async since TYTO-122, because a folder change
     // means new `preview.png` files to read.
     'templates:list': () => templates.list(),
+
+    'guide:candidates': (request) => dependencies.guides.candidates(request),
+
+    'guide:write': (request) => dependencies.guides.write(request),
 
     'templates:folder': () => Promise.resolve(project.folder()),
 

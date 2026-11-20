@@ -91,6 +91,26 @@ export interface PreviewResult {
    * disagree about which template is active or which plugin answers a directive.
    */
   readonly completion: PreviewCompletion;
+  /**
+   * Every reference this compile asked the brief's asset folders for, found or not, in the
+   * order asked (TYTO-741): the cited files and the per-format copies `resolve` looks for
+   * beside an external one (ADR 0222). The window compiles the brief again when a file of one
+   * of these names appears or changes in the open folder, so art painted beside it shows.
+   */
+  readonly references: readonly string[];
+}
+
+/**
+ * The resolver with every reference it is asked for recorded. Built over the original with
+ * `Object.create`, so whatever else it carries (`searched`, a reason for a miss) is still its.
+ */
+function recording(resolver: AssetResolver, asked: Set<string>): AssetResolver {
+  const recorder = Object.create(resolver) as AssetResolver & { resolve: AssetResolver['resolve'] };
+  recorder.resolve = (reference) => {
+    asked.add(reference);
+    return resolver.resolve(reference);
+  };
+  return recorder;
 }
 
 export interface PreviewCompletion {
@@ -209,11 +229,13 @@ export async function createPreviewService(
       } = sources.current();
 
       let completion: PreviewCompletion = { directives: options.directives?.names() ?? [] };
+      const asked = new Set<string>();
       const failed = (diagnostics: Diagnostics): PreviewResult => ({
         frames: [],
         artworks: [],
         diagnostics: [...startup, ...diagnostics],
         completion,
+        references: [...asked],
       });
 
       if (templates === undefined || catalogue === undefined) return failed([]);
@@ -251,7 +273,10 @@ export async function createPreviewService(
         baseDirectory === undefined
           ? noAssets
           : briefAssetResolver({ briefDirectory: baseDirectory, projectAssets: places.assets });
-      const assets = pluginSources === undefined ? files : pluginSources.cache.assets(files, call);
+      const assets = recording(
+        pluginSources === undefined ? files : pluginSources.cache.assets(files, call),
+        asked,
+      );
 
       const resolved = await resolve(ast.value, {
         registry: templates,
@@ -367,7 +392,13 @@ export async function createPreviewService(
       });
 
       if (!exported.ok) {
-        return { frames: [], artworks, diagnostics: [...before, ...exported.error], completion };
+        return {
+          frames: [],
+          artworks,
+          diagnostics: [...before, ...exported.error],
+          completion,
+          references: [...asked],
+        };
       }
 
       return {
@@ -381,6 +412,7 @@ export async function createPreviewService(
         artworks,
         diagnostics: [...before, ...exported.diagnostics],
         completion,
+        references: [...asked],
       };
     },
   };

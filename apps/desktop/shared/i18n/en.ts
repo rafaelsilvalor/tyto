@@ -58,6 +58,11 @@ export const en: Catalogue = {
   'pluginFiles.approve.skip': 'Not now',
   'cli.confirm.yes': 'Yes',
   'cli.confirm.no': 'No',
+  'guide.overwrite.message': 'Write over guides changed after the brief?',
+  'guide.overwrite.detail':
+    '{guides}\n\nThese guides were saved after the brief, so they may hold paint. Writing them again replaces them with an empty guide.',
+  'guide.overwrite.yes': 'Write over',
+  'guide.overwrite.no': 'Keep them',
   'cli.offer.trust.message': 'Trust the folder {folder} and run the command?',
   'cli.offer.trust.detail':
     '--trust trusts a folder for one run only, and the window has no such trust. Trusting it here saves it in trust.json, as Workspace: Manage Trust does: it stays trusted for every run and window until you take it back in Workspace: Manage Trust or with tyto trust remove. The command then runs without --trust.',

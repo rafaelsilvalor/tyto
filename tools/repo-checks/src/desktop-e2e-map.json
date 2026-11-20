@@ -2130,6 +2130,15 @@
       "paths": ["apps/desktop/e2e/window-record.ts", "apps/desktop/e2e/window-record.test.ts"],
       "e2e": ["packaged.package.test.ts"],
       "why": "TYTO-656: the packaged suite's pick of the app's own agent-endpoint record"
+    },
+    {
+      "paths": [
+        "apps/desktop/src/main/guides.ts",
+        "apps/desktop/src/renderer/asset-redraw.ts",
+        "apps/desktop/e2e/art-guide.desktop.test.ts"
+      ],
+      "e2e": ["art-guide.desktop.test.ts"],
+      "why": "TYTO-741, ADR 0222: the external-art guide written by tyto guide in main, opened or shown in its folder, and a brief's preview compiled again when art it cites appears"
     }
   ]
 }
