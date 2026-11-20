@@ -167,6 +167,11 @@ These are the rules it enforces beyond the shape:
   `arte-teste` in the built-in pack is the example. `tyto render --guide` writes the layered PSD
   a designer paints in, per format (ADR 0221).
 
+  Each format may have its own file beside the one the brief cites (ADR 0222): for
+  `fundo: grafico.png`, `grafico.story.png` is what the story draws, and a format with no such
+  file draws `grafico.png`. Only external slots are looked for this way, one more read of the
+  asset port per rendered format; the brief's syntax does not change.
+
 - **A slot or adjustment name has to be a name a brief can write** — the grammar's
   identifier, `[a-zA-Z_][a-zA-Z0-9_-]*`. A slot spelled any other way could never be set by
   any brief.

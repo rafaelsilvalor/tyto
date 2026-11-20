@@ -16,6 +16,8 @@ In the window, **New brief from template…** lists every template you can use, 
 
 Some templates leave a picture to be painted elsewhere, in an image editor: a background that covers the piece, or an illustration under the title. The template says how big that art is in each format. Until the file exists, the brief still renders: the art's place is an **outlined magenta box**, at the size and in the position the art will take, and the Problems panel says `W_EXTERNAL_ART_MISSING` for each one. Write the file's path in the brief when it is ready, as you would any picture, and the box gives way to it. `arte-teste` in the [gallery](./gallery.md) shows it.
 
+A story and a square post are usually painted separately, so each format can have its own file without changing the brief: next to the `grafico.png` the brief names, put `grafico.story.png` for the story and `grafico.grid-1x1.png` for the square post, the format's name before the extension. Each format draws its own file when it finds one, and `grafico.png` otherwise. When every format has its own file, `grafico.png` itself does not need to exist.
+
 ## When no template fits
 
 Templates are folders of plain files: a `manifest.yaml` that lists the slots and sizes, and a `template.html` that draws them. **New template…** writes a working one for you to change, and [Your templates folder](./templates-folder.md) is where your own live. Writing a template from scratch is covered in the [template author's guide](../extend/template-authoring.md).

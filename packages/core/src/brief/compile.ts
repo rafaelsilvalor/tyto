@@ -278,26 +278,36 @@ function layoutText(
 }
 
 /**
- * `slots` with each placeholder of missing external art sized for `format`, from the
- * manifest's declaration (ADR 0220), so a template sizes it as it sizes a picture (ADR 0158).
+ * `slots` as `format` draws them: each external slot's own file for `format` in place of the
+ * cited one when `resolve` found it (ADR 0222), and each placeholder of missing external art
+ * sized for `format` from the manifest's declaration (ADR 0220), so a template sizes it as it
+ * sizes a picture (ADR 0158). Only external slots are touched.
  */
 function withExternalArtSizes(
   slots: Readonly<Record<string, ResolvedSlot>>,
   manifest: TemplateManifest,
   format: string,
+  copies: ResolvedBrief['externalArt'],
 ): Readonly<Record<string, ResolvedSlot>> {
-  let sized: Record<string, ResolvedSlot> | undefined;
+  let drawn: Record<string, ResolvedSlot> | undefined;
   for (const [name, slot] of Object.entries(slots)) {
     if (slot.value.kind !== 'image') continue;
+    const copy =
+      manifest.slots[name]?.external === undefined ? undefined : copies?.[name]?.[format];
+    if (copy !== undefined) {
+      drawn ??= { ...slots };
+      drawn[name] = { ...slot, value: { kind: 'image', asset: copy } };
+      continue;
+    }
     const placeholderOf = externalArtSlotOf(slot.value.asset);
     const declared = manifest.slots[placeholderOf ?? ''];
     if (placeholderOf === undefined || declared === undefined) continue;
     const size = externalArtSize(declared, format);
     if (size === undefined) continue;
-    sized ??= { ...slots };
-    sized[name] = { ...slot, value: { kind: 'image', asset: { ...slot.value.asset, size } } };
+    drawn ??= { ...slots };
+    drawn[name] = { ...slot, value: { kind: 'image', asset: { ...slot.value.asset, size } } };
   }
-  return sized ?? slots;
+  return drawn ?? slots;
 }
 
 /**
@@ -521,6 +531,7 @@ export async function compileDeferred(
         // by compileWith below, which resolves the same values again.
         values,
         reports,
+        options.guide === true ? undefined : resolved.externalArt,
       );
       answers.set(context.idPrefix, await template.buildLater(context));
       reported.set(context.idPrefix, reports);
@@ -591,6 +602,7 @@ function contextOf(
   brand: BrandKit,
   values: TemplateValues | undefined,
   reports: Diagnostic[],
+  copies: ResolvedBrief['externalArt'],
 ): TemplateContext {
   return {
     format,
@@ -598,7 +610,7 @@ function contextOf(
     size: options.formats.sizeOf(format) ?? { w: 0, h: 0 },
     idPrefix: idPrefixOf(plan.id, format),
     artwork: { id: plan.id, index: plan.index, count: artworks.length },
-    slots: withExternalArtSizes(plan.slots, manifest, format),
+    slots: withExternalArtSizes(plan.slots, manifest, format, copies),
     adjustments: plan.adjustments,
     artworks,
     measure,
@@ -684,6 +696,8 @@ function compileWith(
         brand,
         values.values,
         reports,
+        // In a guide the art is empty, its own copies too (ADR 0220).
+        guide ? undefined : resolved.externalArt,
       );
 
       const built = build(context);

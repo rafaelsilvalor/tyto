@@ -168,6 +168,8 @@ export {
   resolve,
 } from './brief/resolve.js';
 
+export { externalArtVariant } from './brief/external-art-files.js';
+
 export type { AssetResolver } from './ports/asset-resolver.js';
 
 export type { FontFace, FontSource } from './ports/font-source.js';

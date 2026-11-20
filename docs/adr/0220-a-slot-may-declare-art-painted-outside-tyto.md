@@ -126,3 +126,9 @@ What the second pull request settled beyond the sketch above:
   width × suggested height, whose one layer is `arte` labelled `arte <width>px`.
 - **Naming the art per format** stays open: it changes the brief's syntax, which this pull
   request does not touch.
+
+## Note of 2026-11-19: naming the art per format (TYTO-741)
+
+Settled by ADR 0222 without touching the brief's syntax: for a cited `grafico.png`,
+`grafico.<format>.png` beside it is that format's art, and a format with no copy draws the
+cited file. The guide is named after the file it becomes and written beside it.
