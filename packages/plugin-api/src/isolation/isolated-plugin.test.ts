@@ -10,6 +10,7 @@ import {
   type TemplateRegistry,
   type TemplateReport,
   diagnostic,
+  err,
   ok,
   isTonedMark,
   parseManifest,
@@ -57,6 +58,12 @@ import {
   PluginCapabilityError,
 } from '../capabilities.js';
 import { ASSET_SOURCE_MAX_BYTES } from '../sources.js';
+import {
+  type DecodeFile,
+  type DecodeSubject,
+  IMAGE_DECODER_MAX_BYTES,
+  decodeGrants,
+} from '../decoders.js';
 import type { GuestChannel, PluginChannel } from './channel.js';
 import { runGuest } from './guest.js';
 import { NO_SHIPPED_FILES, type ShippedFiles } from './files.js';
@@ -2760,6 +2767,146 @@ describe('isolated asset and font sources (TYTO-280, ADR 0117)', () => {
     );
     expect(connection.ok ? '' : connection.error[0]?.message).toContain(
       "its 'asset-source' contribution does not match",
+    );
+  });
+});
+
+describe('an isolated image decoder (TYTO-742, ADR 0223)', () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const FILE = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  const NO_NETWORK = {
+    fetch: () => Promise.reject(new Error('no network here')),
+    credential: () => Promise.resolve(undefined),
+    describeCredential: () => 'nowhere',
+  } satisfies HostCapabilities;
+
+  const subject = (name: string, bytes: Uint8Array): DecodeSubject => ({
+    name,
+    size: bytes.length,
+    readPart: (offset, length) => Promise.resolve(bytes.slice(offset, offset + length)),
+  });
+
+  type Decoded = Result<{ bytes: Uint8Array }, Diagnostics>;
+
+  /** One plugin with a decoder, connected over a host whose reads go through `grants`. */
+  async function decoding(
+    decode: (host: PluginHost, file: DecodeFile, layer: string | undefined) => Promise<Decoded>,
+    options: { readonly capabilities?: HostCapabilities } = {},
+  ) {
+    const grants = decodeGrants();
+    const capabilities = options.capabilities ?? {
+      ...NO_NETWORK,
+      decodeReadPart: (plugin: string, token: string, offset: number, length: number) =>
+        grants.readPart(plugin, token, offset, length),
+    };
+    const { connected: connection } = await isolate(
+      (host) =>
+        host.registerImageDecoder({
+          id: 'layers',
+          extensions: ['.psd'],
+          decode: (file, request) => decode(host, file, request.layer),
+        }),
+      { contributes: ['image-decoder'], capabilities },
+    );
+    if (!connection.ok) throw new Error(connection.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connection.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const decoder = host.registry.imageDecoders()[0]!;
+    return {
+      grants,
+      decoder,
+      decode: (layer?: string) =>
+        grants.decode(decoder, subject('capa.psd', FILE), layer === undefined ? {} : { layer }),
+    };
+  }
+
+  const codeOf = (read: Promise<unknown>): Promise<string> =>
+    read.then(
+      () => 'read',
+      (cause: { code: string }) => cause.code,
+    );
+
+  it('reads the file in parts through its token, and the PNG crosses back', async () => {
+    const seen: unknown[] = [];
+    const { grants, decoder, decode } = await decoding(async (host, file, layer) => {
+      seen.push([file.name, file.size, layer]);
+      const head = await host.decoding.read(file.token, { offset: 0, length: 4 });
+      const rest = await host.decoding.read(file.token, { offset: 4, length: 100 });
+      const past = await host.decoding.read(file.token, { offset: 100, length: 4 });
+      return ok({ bytes: new Uint8Array([...PNG, ...head, ...rest, past.length]) });
+    });
+
+    expect(decoder.plugin).toBe('texto');
+    expect(decoder.source.extensions).toEqual(['.psd']);
+    const answer = await decode('arte/fundo');
+    expect(answer).toEqual(ok({ bytes: new Uint8Array([...PNG, ...FILE, 0]) }));
+    expect(seen).toEqual([['capa.psd', 10, 'arte/fundo']]);
+    expect(grants.live()).toBe(0);
+  });
+
+  it('refuses a spent token and one never minted, and reads its own', async () => {
+    const codes: string[] = [];
+    let previous: string | undefined;
+    const { decode } = await decoding(async (host, file) => {
+      if (previous !== undefined) {
+        codes.push(await codeOf(host.decoding.read(previous, { offset: 0, length: 1 })));
+      }
+      codes.push(await codeOf(host.decoding.read('never-minted', { offset: 0, length: 1 })));
+      codes.push(await codeOf(host.decoding.read(file.token, { offset: 0, length: 1 })));
+      previous = file.token;
+      return ok({ bytes: PNG });
+    });
+    await decode();
+    await decode();
+    // The first call: one never minted, its own. The second: the first's, now spent, then the same.
+    expect(codes).toEqual(['E_PERMISSION', 'read', 'E_PERMISSION', 'E_PERMISSION', 'read']);
+  });
+
+  it('refuses every token on a host that decodes nothing', async () => {
+    const codes: string[] = [];
+    const { decode } = await decoding(
+      async (host, file) => {
+        codes.push(await codeOf(host.decoding.read(file.token, { offset: 0, length: 1 })));
+        return ok({ bytes: PNG });
+      },
+      { capabilities: NO_NETWORK },
+    );
+    await decode();
+    expect(codes).toEqual(['E_PERMISSION']);
+  });
+
+  it('refuses a picture over the ceiling before anything can cache it', async () => {
+    const { decode } = await decoding(() =>
+      Promise.resolve(ok({ bytes: new Uint8Array(IMAGE_DECODER_MAX_BYTES + 1) })),
+    );
+    const answer = await decode();
+    expect(answer.ok ? [] : answer.error.map((problem) => problem.code)).toEqual([
+      'E_PLUGIN_PROTOCOL',
+    ]);
+  });
+
+  it("passes the plugin's own error through, and a throw as a failed call", async () => {
+    const { decode } = await decoding((_host, _file, layer) => {
+      if (layer === 'throw') throw new Error('the composite is transparent');
+      return Promise.resolve(
+        err([diagnostic('E_PERMISSION', { plugin: 'texto', capability: 'a stand-in' })]),
+      );
+    });
+    const refused = await decode();
+    expect(refused.ok ? '' : refused.error[0]?.code).toBe('E_PERMISSION');
+    const thrown = await decode('throw');
+    expect(thrown.ok ? '' : thrown.error[0]?.message).toContain('the composite is transparent');
+  });
+
+  it('is refused with an extension a file name could never end in', async () => {
+    const { connected: connection } = await isolate(
+      (host) =>
+        host.registerImageDecoder({ id: 'd', extensions: ['psd'], decode: () => ok({} as never) }),
+      { contributes: ['image-decoder'] },
+    );
+    expect(connection.ok ? '' : connection.error[0]?.message).toContain(
+      "its 'image-decoder' contribution does not match",
     );
   });
 });

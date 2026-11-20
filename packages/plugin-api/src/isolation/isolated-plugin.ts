@@ -34,6 +34,7 @@ import {
   workspacePathArgsSchema,
   workspaceReadArgsSchema,
   workspaceReadPartArgsSchema,
+  decodeReadPartArgsSchema,
   workspaceWriteArgsSchema,
   helloMessageSchema,
   processIdArgsSchema,
@@ -475,6 +476,7 @@ export function connectIsolatedPlugin(
         workspaceReadPart: 'host.workspace.read',
         workspaceStat: 'host.workspace.stat',
         workspaceList: 'host.workspace.list',
+        decodeReadPart: 'host.decoding.read',
       }[capability];
       const parse = <T>(schema: z.ZodType<T>): T => {
         const args = schema.safeParse(raw);
@@ -519,6 +521,10 @@ export function connectIsolatedPlugin(
         case 'workspaceReadPart': {
           const [path, offset, length] = parse(workspaceReadPartArgsSchema);
           return capabilities.workspaceReadPart(path, offset, length);
+        }
+        case 'decodeReadPart': {
+          const [token, offset, length] = parse(decodeReadPartArgsSchema);
+          return capabilities.decodeReadPart(token, offset, length);
         }
         case 'workspaceStat':
           return entryOf(await capabilities.workspaceStat(parse(workspacePathArgsSchema)[0]));

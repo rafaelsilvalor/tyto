@@ -11,6 +11,13 @@ import {
 
 import type { FetchedResponse, HostCapabilities, HostFetchInit } from './capabilities.js';
 import { type ResolvedSettings, resolveSettings } from './configuration.js';
+import {
+  type DecodeGrants,
+  type DecodeRequest,
+  type DecodedImage,
+  decodeGrants,
+  decoderFor,
+} from './decoders.js';
 import { PLUGIN_API_VERSION } from './engine.js';
 import { type InProcessHost, createPluginHost } from './host.js';
 import { runGuest } from './isolation/guest.js';
@@ -118,6 +125,17 @@ export interface PluginHarness {
   secret(key: string): string | undefined;
   /** Forgets a sign-in, as the person signing out would; `true` when there was one. */
   signOut(id: string): boolean;
+  /**
+   * Asks the plugin's `image-decoder` for a file of these bytes, as the host does (ADR 0223):
+   * a token for this one call, the file read through `host.decoding` in the parts the plugin
+   * asks for, the answer checked against the wire's schema. A name no decoder of the plugin
+   * claims by its extension throws, because that is the test's mistake.
+   */
+  decode(
+    name: string,
+    bytes: Uint8Array,
+    request?: DecodeRequest,
+  ): Promise<Result<DecodedImage, Diagnostics>>;
   /** The reason, if the plugin's side of the channel ended without being asked to. */
   crashed(): string | undefined;
   close(): Promise<void>;
@@ -128,6 +146,7 @@ function capabilitiesOf(
   options: TestPluginOptions,
   secrets: Map<string, string>,
   signins: Map<string, string>,
+  grants: DecodeGrants,
 ): HostCapabilities {
   const records = new Map<string, string>();
   const fetch =
@@ -154,6 +173,8 @@ function capabilitiesOf(
       return Promise.resolve();
     },
     storageDelete: (_plugin, key) => Promise.resolve(records.delete(key)),
+    // The tokens `decode` below mints, as a host's resolver mints them (ADR 0223).
+    decodeReadPart: (owner, token, offset, length) => grants.readPart(owner, token, offset, length),
     ...options.capabilities,
   };
 }
@@ -173,13 +194,14 @@ export async function testPlugin(
   const log: string[] = [];
   const secrets = new Map(Object.entries(options.secrets ?? {}));
   const signins = new Map(Object.entries(options.signins ?? {}));
+  const grants = decodeGrants();
   const channel = inProcessChannel((guest) => runGuest(guest, options.load, IN_PROCESS));
   const connected = await connectIsolatedPlugin({
     name: manifest.name,
     manifest: manifest as unknown,
     channel,
     requireSandbox: false,
-    capabilities: capabilitiesOf(manifest.name, options, secrets, signins),
+    capabilities: capabilitiesOf(manifest.name, options, secrets, signins, grants),
     ...(options.deadlineMs === undefined ? {} : { deadlineMs: options.deadlineMs }),
     log: {
       debug: (line) => log.push(`debug: ${line}`),
@@ -239,6 +261,19 @@ export async function testPlugin(
         },
         ...withoutHarnessOptions(recipeOptions),
       });
+    },
+    async decode(name, bytes, request = {}) {
+      const decoder = decoderFor(host.registry.imageDecoders(), name);
+      if (decoder === undefined) {
+        throw new TypeError(`no image decoder of '${manifest.name}' claims the file '${name}'.`);
+      }
+      const subject = {
+        name,
+        size: bytes.length,
+        readPart: (offset: number, length: number) =>
+          Promise.resolve(bytes.slice(offset, offset + length)),
+      };
+      return grants.decode(decoder, subject, request);
     },
     secret: (key) => secrets.get(key),
     signOut: (id) => signins.delete(id),

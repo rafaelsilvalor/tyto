@@ -257,6 +257,33 @@ describe('testPlugin', () => {
     expect(messages.join('\n')).toContain('no fetch for https://example.com/issues');
     await harness.value.close();
   });
+
+  it('decodes a file through the token the call was handed, as the host does (ADR 0223)', async () => {
+    const harness = await testPlugin({
+      manifest: manifestText({ contributes: ['image-decoder'], permissions: [] }),
+      load: moduleOf((host) => {
+        host.registerImageDecoder({
+          id: 'layers',
+          extensions: ['.psd'],
+          decode: async (file, request) => {
+            const bytes = await host.decoding.read(file.token, { offset: 0, length: file.size });
+            return ok({
+              bytes: new Uint8Array([...bytes].reverse().concat(request.layer ? 1 : 0)),
+            });
+          },
+        });
+      }),
+    });
+    if (!harness.ok) throw new Error(harness.error[0]?.message);
+    const answer = await harness.value.decode('capa.PSD', new Uint8Array([1, 2, 3]), {
+      layer: 'arte',
+    });
+    expect(answer).toEqual(ok({ bytes: new Uint8Array([3, 2, 1, 1]) }));
+    await expect(harness.value.decode('capa.png', new Uint8Array([1]))).rejects.toThrow(
+      "no image decoder of 'demo' claims the file 'capa.png'",
+    );
+    await harness.value.close();
+  });
 });
 
 /** The CLI's and the desktop's shared path, over one stored folder. */

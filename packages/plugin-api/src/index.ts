@@ -45,6 +45,21 @@ export {
   schemeOf,
 } from './sources.js';
 
+export {
+  type DecodeFile,
+  type DecodeGrants,
+  type DecodeRequest,
+  type DecodeSubject,
+  type DecodedImage,
+  type ImageDecoderContribution,
+  type OwnedImageDecoder,
+  DECODER_EXTENSION,
+  IMAGE_DECODER_MAX_BYTES,
+  decodeGrants,
+  decoderFor,
+  extensionOf,
+} from './decoders.js';
+
 export { directiveNamesOf, directiveResolverOf } from './directives.js';
 
 export {
@@ -253,6 +268,7 @@ export {
   type HostCredentials,
   type HostFetchInit,
   type HostFetchResponse,
+  type HostDecoding,
   type HostSignin,
   type HostWorkspace,
   PLUGIN_CACHE_KEY_LIMIT_BYTES,
@@ -276,9 +292,11 @@ export {
   credentialByteLength,
   hostCache,
   hostCredentials,
+  hostDecoding,
   hostSignin,
   hostWorkspace,
   namesHost,
+  unknownToken,
   tooManyEntries,
   workspaceFolderPath,
   workspacePath,
