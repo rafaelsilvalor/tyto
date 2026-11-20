@@ -209,7 +209,10 @@ today (checked by parsing the examples above with `parseBrief`: no diagnostic, e
 text run). Reading them into levels is the template's, through `@tyto/template-kit`, so no
 template parses them its own way: `levelsOf` reads a block into lines of parts with their
 level and position, and `levelStack` draws them one part per row, each level looking as the
-template's `look` says, with the template's own divider (TYTO-807). A `---` that
+template's `look` says, with the template's own divider (TYTO-807). The space between two
+lines, and between two parts of a line, is the template's too: one number for every pair, or a
+function of the neighbours around the gap, so a template gives the room under a `#` line its
+own size without counting lines (TYTO-810). A `---` that
 starts at the left margin is still the frontmatter's fence; the divider is always indented,
 inside a block.
 
