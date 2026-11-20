@@ -203,8 +203,10 @@ draws the rest around it:
 
 The brief language is untouched: `|`, `#` and an indented `---` are plain text inside a block
 today (checked by parsing the examples above with `parseBrief`: no diagnostic, every line a
-text run). Reading them into levels is the template's, through one shared function in
-`@tyto/template-kit` once it exists, so no template parses them its own way. A `---` that
+text run). Reading them into levels is the template's, through `@tyto/template-kit`, so no
+template parses them its own way: `levelsOf` reads a block into lines of parts with their
+level and position, and `levelStack` draws them one part per row, each level looking as the
+template's `look` says, with the template's own divider (TYTO-807). A `---` that
 starts at the left margin is still the frontmatter's fence; the divider is always indented,
 inside a block.
 
