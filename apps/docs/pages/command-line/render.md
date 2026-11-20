@@ -173,6 +173,33 @@ $ tyto render promo.brief --guide --out guide
 promo.brief: error E_GUIDE_NO_EXTERNAL_ART Template 'promo-curso' declares no slot with external art, so there is no guide to write: a guide is for a slot whose manifest declares 'external'.
 ```
 
+## Write each guide beside its art: `tyto guide`
+
+`tyto render --guide` writes into an output folder. `tyto guide <brief>` writes each guide **beside the file the brief cites for that art**, named after it, so the picture painted from it lands where the brief reads it back. A brief that cites `fundo: fundo.png` and renders two sizes gets `fundo.grid-1x1.guide.psd` and `fundo.story.guide.psd`; save each painting as `fundo.grid-1x1.png` and `fundo.story.png` in the same folder, and each size draws its own. With one size the guide is `fundo.guide.psd` and the painting is `fundo.png` itself. The folder is `assets/` beside the brief (a delivery's `assets/`, for a brief in a delivery), or the folder the cited file is already in when it is beside the brief. Checked on 2026-11-19 with the built-in `arte-teste` template, on a development build of the CLI:
+
+```
+$ tyto guide arte.brief --list
+fundo (full): fundo.png, line 4
+  grid-1x1: guide assetsundo.grid-1x1.guide.psd missing; art assetsundo.grid-1x1.png missing
+  story: guide assetsundo.story.guide.psd missing; art assetsundo.story.png missing
+imagem (inline): not cited; add "imagem: imagem.png" to the brief
+$ tyto guide arte.brief
+assetsundo.grid-1x1.guide.psd
+assetsundo.story.guide.psd
+```
+
+`--list` writes nothing: it shows each cited file, its guides and whether each is there, and the art the brief cites no file for, with the line that would cite one. Such art gets no guide until the brief names its file.
+
+By default only the missing guides are written; `--all` writes every one, and `--only <file>` the guides of one cited file or one guide name. A guide changed after the brief may hold what somebody painted, so it is never written over unless you add `--force`; when one is in the way, none is written:
+
+```
+$ tyto guide arte.brief --all
+arte.brief: error E_GUIDE_NEWER_THAN_BRIEF The guide 'assetsundo.grid-1x1.guide.psd' was changed after the brief, and may hold the art painted in it: move it away, or pass --force to write it again.
+arte.brief: error E_GUIDE_NEWER_THAN_BRIEF The guide 'assetsundo.story.guide.psd' was changed after the brief, and may hold the art painted in it: move it away, or pass --force to write it again.
+```
+
+`--open` opens each guide written in the program your computer opens a PSD with. `--formats` and `--template` work as they do for `tyto render`.
+
 ## When the brief has errors
 
 Each problem is printed with the file, the line and the column, the code and what is wrong, and the command ends with exit code `1`:

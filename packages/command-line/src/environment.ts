@@ -141,6 +141,12 @@ export interface CliEnvironment {
    * Absent in the window, whose command panel refuses `--apply` (TYTO-684).
    */
   readonly interrupt?: (stop: () => void) => () => void;
+  /**
+   * Opens a file in the program this machine opens it with: `tyto guide --open` hands it each
+   * guide it wrote (TYTO-741). Absent, `--open` is refused and nothing is started, which is
+   * what a test passes unless it hands in a fake that records the path.
+   */
+  readonly openFile?: (path: string) => Promise<void>;
 }
 
 /**

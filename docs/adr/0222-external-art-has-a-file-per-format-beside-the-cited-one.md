@@ -77,8 +77,8 @@ an existing guide is overwritten.
 - **A second `full` slot gets no PSD of its own** (ADR 0220's note: the frame's art is the
   first `full` slot). Its box is in `areas`; painting it needs a canvas nothing writes yet.
 
-- **A brief that names no file for an external slot** has no stem to name a guide after nor
-  a file to put it beside. The command line's pull request settles it, here as a note.
+- ~~**A brief that names no file for an external slot**~~ — settled in the note of
+  2026-11-19 below.
 
 ## Rejected
 
@@ -94,3 +94,16 @@ an existing guide is overwritten.
   `grafico.png` sees each in its format with no edit to the brief, and the warning goes away.
 - An external slot costs one more read of the asset port per rendered format on every resolve,
   the editor's included.
+
+## Notes
+
+- **2026-11-19 (TYTO-741, `tyto guide`): a slot the brief names no file for gets no guide.**
+  With no file named there is nothing to name the guide after and nowhere to put it, so it is
+  not a candidate. `tyto guide --list` prints it as not cited, with the line that would cite
+  one (`<slot>: <slot>.png`, or the `::<slot>` directive for a slot written under another),
+  and the command writes nothing for it; the window's pull request offers to insert that line.
+  Three more cases the command decides the same way, by giving no guide and saying why in
+  `--list`: a citation of a plugin source's item (ADR 0117), which is not a file; a second
+  `full` slot (still open above); and an empty value. An absolute cited path puts the guide
+  beside it. `E_GUIDE_NEWER_THAN_BRIEF` is fatal for the run: when one guide in the way is
+  newer than the brief, none is written, so a folder is never half regenerated.

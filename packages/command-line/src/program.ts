@@ -4,6 +4,7 @@ import { DEFAULT_GALLERY_INDEX } from '@tyto/plugin-api';
 import { CLEARABLE_OPTIONS, type CliEnvironment, type CommandInvocation } from './environment.js';
 import { deliveryNewCommand } from './delivery.js';
 import { EXIT_DIAGNOSTICS, EXIT_INTERNAL, EXIT_OK, type ExitCode } from './exit.js';
+import { guideCommand } from './guide-command.js';
 import { galleryInstallCommand, galleryListCommand, galleryUpdateCommand } from './gallery.js';
 import { mcpCommand } from './mcp/command.js';
 import {
@@ -234,6 +235,58 @@ export function createProgram(
         templatesNamed: namedOnTheCommandLine(render, 'templates'),
         formatsNamed: namedOnTheCommandLine(render, 'formatsFile'),
         typesNamed: namedOnTheCommandLine(render, 'types'),
+      },
+      environment,
+      signal,
+    );
+  });
+
+  /* ---------------------------------------------------------------------------- guide -- */
+
+  // A command of its own rather than another `render` flag (TYTO-741, ADR 0222): it writes
+  // beside the art the brief cites, not into an output folder, and decides per file what to
+  // write, which no render option means.
+  const guide = program
+    .command('guide')
+    .description(
+      'write the PSD guide each external-art file the brief cites is painted in, beside that file',
+    )
+    .argument('<brief>', 'path to the .brief file')
+    .addOption(
+      new Option('--all', 'write every guide, the ones already there included').default(false),
+    )
+    .addOption(
+      new Option(
+        '--only <files...>',
+        'write only the guides of these files, as the brief cites them, or these guide names',
+      ).conflicts(['all']),
+    )
+    .addOption(
+      new Option('--list', 'print each cited file, its guides and their state; write nothing')
+        .default(false)
+        .conflicts(['all', 'only', 'force', 'open']),
+    )
+    .option('--force', 'write over a guide changed after the brief', false)
+    .option('--open', 'open each guide written in the program this machine opens a PSD with', false)
+    .option(
+      '--trust',
+      "trust the brief's workspace folder and its work profile for this run only; never written to trust.json",
+      false,
+    )
+    .option(
+      '--no-google-fonts',
+      'never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style)',
+    );
+
+  valuesOf(guide, { '<brief>': { kind: 'brief' } });
+
+  withProjectOptions(guide).action(async (brief: string) => {
+    captured.code = await guideCommand(
+      brief,
+      {
+        ...guide.opts(),
+        templatesNamed: namedOnTheCommandLine(guide, 'templates'),
+        formatsNamed: namedOnTheCommandLine(guide, 'formatsFile'),
       },
       environment,
       signal,

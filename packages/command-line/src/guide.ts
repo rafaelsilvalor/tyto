@@ -18,7 +18,7 @@ import { PNG } from 'pngjs';
 export const GUIDE_KIND = 'psd';
 
 /** The artwork `compile` makes for an `inline` slot's canvas (ADR 0220's note). */
-const INLINE_CANVAS_PREFIX = 'external-art-';
+export const INLINE_CANVAS_PREFIX = 'external-art-';
 
 export interface GuideStore {
   /** `JobPorts.storeAssets`: keeps each raster's PNG under its ref's id. */

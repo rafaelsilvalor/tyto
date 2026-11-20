@@ -2,7 +2,7 @@
 
 # Command line
 
-Every command `tyto` takes: 24. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
+Every command `tyto` takes: 25. `tyto --help` and `tyto <command> --help` print the same text in the terminal.
 
 ## tyto render
 
@@ -39,6 +39,36 @@ tyto render [options] <brief>
 | `--concurrency <n>` | frames rastered at once (default 2) |  |
 | `--json` | print a machine-readable document instead of prose |  |
 | `--no-google-fonts` | never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style) |  |
+
+## tyto guide
+
+write the PSD guide each external-art file the brief cites is painted in, beside that file
+
+```sh
+tyto guide [options] <brief>
+```
+
+**Arguments**
+
+| Argument | What it does |
+| --- | --- |
+| `<brief>` | path to the .brief file |
+
+**Options**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `--all` | write every guide, the ones already there included |  |
+| `--only <files...>` | write only the guides of these files, as the brief cites them, or these guide names |  |
+| `--list` | print each cited file, its guides and their state; write nothing |  |
+| `--force` | write over a guide changed after the brief |  |
+| `--open` | open each guide written in the program this machine opens a PSD with |  |
+| `--trust` | trust the brief's workspace folder and its work profile for this run only; never written to trust.json |  |
+| `--no-google-fonts` | never ask Google Fonts for a face this machine lacks (each fetch sends Google the family, weight and style) |  |
+| `--templates <dir>` | folder holding one subfolder per template | `"templates"` |
+| `--formats-file <path>` | the project's formats.yaml; the built-in sizes when the default is not there | `"formats.yaml"` |
+| `-t, --template <name>` | template to use when the brief's frontmatter names none |  |
+| `-f, --formats <ids>` | comma-separated format ids; narrows the brief's own list when it has one |  |
 
 ## tyto watch
 
