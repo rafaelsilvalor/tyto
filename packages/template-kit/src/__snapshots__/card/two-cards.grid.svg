@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+  <defs>
+    <clipPath id="stroke0">
+      <path d="M16 0 H264 A16 16 0 0 1 280 16 V160 A16 16 0 0 1 264 176 H16 A16 16 0 0 1 0 160 V16 A16 16 0 0 1 16 0 Z"/>
+    </clipPath>
+    <clipPath id="stroke1">
+      <path d="M16 0 H264 A16 16 0 0 1 280 16 V160 A16 16 0 0 1 264 176 H16 A16 16 0 0 1 0 160 V16 A16 16 0 0 1 16 0 Z"/>
+    </clipPath>
+    <style>@font-face{font-family:"Test";font-weight:400;font-style:normal;src:url("tyto-test-font:Test-400-normal")}@font-face{font-family:"Test";font-weight:900;font-style:normal;src:url("tyto-test-font:Test-900-normal")}
+    </style>
+  </defs>
+  <g id="lamina-4.grid.0" transform="matrix(1 0 0 1 10 40)">
+    <g id="lamina-4.grid.0.0">
+      <g id="lamina-4.grid.0.0.0">
+        <path d="M16 0 H264 A16 16 0 0 1 280 16 V160 A16 16 0 0 1 264 176 H16 A16 16 0 0 1 0 160 V16 A16 16 0 0 1 16 0 Z" fill="#ffffff"/>
+        <path d="M16 0 H264 A16 16 0 0 1 280 16 V160 A16 16 0 0 1 264 176 H16 A16 16 0 0 1 0 160 V16 A16 16 0 0 1 16 0 Z" fill="none" stroke="#1360d0" stroke-width="4" clip-path="url(#stroke0)"/>
+      </g>
+      <g id="lamina-4.grid.0.0.1" transform="matrix(1 0 0 1 0 80)">
+        <path d="M0 0 H280 V56 H0 V0 Z" fill="#1360d0"/>
+      </g>
+      <g id="lamina-4.grid.0.0.2" transform="matrix(1 0 0 1 20 20)">
+        <g id="lamina-4.grid.0.0.2.0" transform="matrix(1 0 0 1 0 10)">
+          <g id="lamina-4.grid.0.0.2.0.0">
+            <text x="120" y="14.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">Pacote Completo</tspan></text>
+          </g>
+        </g>
+      </g>
+      <g id="lamina-4.grid.0.0.3" transform="matrix(1 0 0 1 20 83)">
+        <g id="lamina-4.grid.0.0.3.0" transform="matrix(1 0 0 1 0 10)">
+          <g id="lamina-4.grid.0.0.3.0.0">
+            <text x="120" y="22.2" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="24" font-weight="900" fill="#ffffff">30% OFF</tspan></text>
+          </g>
+        </g>
+      </g>
+      <g id="lamina-4.grid.0.0.4" transform="matrix(1 0 0 1 20 136)">
+        <g id="lamina-4.grid.0.0.4.0" transform="matrix(1 0 0 1 0 10)">
+          <g id="lamina-4.grid.0.0.4.0.0">
+            <text x="120" y="14.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">Por tempo limitado</tspan></text>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="lamina-4.grid.0.1" transform="matrix(1 0 0 1 300 0)">
+      <g id="lamina-4.grid.0.1.0">
+        <path d="M16 0 H264 A16 16 0 0 1 280 16 V160 A16 16 0 0 1 264 176 H16 A16 16 0 0 1 0 160 V16 A16 16 0 0 1 16 0 Z" fill="#ffffff"/>
+        <path d="M16 0 H264 A16 16 0 0 1 280 16 V160 A16 16 0 0 1 264 176 H16 A16 16 0 0 1 0 160 V16 A16 16 0 0 1 16 0 Z" fill="none" stroke="#1360d0" stroke-width="4" clip-path="url(#stroke1)"/>
+      </g>
+      <g id="lamina-4.grid.0.1.1" transform="matrix(1 0 0 1 0 80)">
+        <path d="M0 0 H280 V56 H0 V0 Z" fill="#1360d0"/>
+      </g>
+      <g id="lamina-4.grid.0.1.2" transform="matrix(1 0 0 1 20 0)">
+        <g id="lamina-4.grid.0.1.2.0" transform="matrix(1 0 0 1 0 10)">
+          <g id="lamina-4.grid.0.1.2.0.0">
+            <text x="120" y="14.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">Prova social em uma frase</tspan></text>
+            <text x="120" y="34.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">longa que quebra em mais de</tspan></text>
+            <text x="120" y="54.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">uma linha</tspan></text>
+          </g>
+        </g>
+      </g>
+      <g id="lamina-4.grid.0.1.3" transform="matrix(1 0 0 1 20 83)">
+        <g id="lamina-4.grid.0.1.3.0" transform="matrix(1 0 0 1 0 10)">
+          <g id="lamina-4.grid.0.1.3.0.0">
+            <text x="120" y="22.2" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="24" font-weight="900" fill="#ffffff">7 de 10</tspan></text>
+          </g>
+        </g>
+      </g>
+      <g id="lamina-4.grid.0.1.4" transform="matrix(1 0 0 1 20 136)">
+        <g id="lamina-4.grid.0.1.4.0" transform="matrix(1 0 0 1 0 10)">
+          <g id="lamina-4.grid.0.1.4.0.0">
+            <text x="120" y="14.8" text-anchor="middle" xml:space="preserve"><tspan font-family="Test" font-size="16" font-weight="400" fill="#202020">aprovados</tspan></text>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

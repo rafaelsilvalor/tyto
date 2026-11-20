@@ -204,6 +204,9 @@ draws the rest around it:
   Lote Especial | Pacotes com 40% OFF | Por tempo limitado
 ```
 
+The kit draws that card: `cardSegments` turns the parts into a title, a band and a foot, and
+`card` gives the band the corners of the edge it reaches (TYTO-800).
+
 The brief language is untouched: `|`, `#` and an indented `---` are plain text inside a block
 today (checked by parsing the examples above with `parseBrief`: no diagnostic, every line a
 text run). Reading them into levels is the template's, through `@tyto/template-kit`, so no
