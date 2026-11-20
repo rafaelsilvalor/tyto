@@ -41,15 +41,15 @@ A standard name is **reserved**: if a template has a slot playing that role, it 
 name, and if it uses that name, the slot plays that role with that type. Both directions
 matter — a `titulo` that is an image is worse than a template with no `titulo` at all.
 
-| Name        | Type                                          | Role, in one sentence                                                                                           |
-| ----------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `titulo`    | `rich-text`, `required: true`                 | The words the artwork is about, drawn largest; the one slot a brief can never leave out.                        |
-| `subtitulo` | `rich-text`                                   | The line that qualifies `titulo` — what, when or for whom — drawn smaller and next to it.                       |
-| `chamada`   | `rich-text`                                   | The short label that sets up the title block and says what kind of artwork this is: "Resultado final".          |
-| `imagem`    | `image`                                       | The one picture the brief supplies, wherever the template places it: behind the words, above them, beside them. |
-| `selo`      | `image`                                       | The seal art glued to the foot of the last grid slide, full width; the page above it shrinks by its height.     |
-| `lamina`    | any type, `repeat: true`                      | The block that becomes one artwork: one `::lamina` is one slide of the carousel.                                |
-| `tom`       | `enum`, and an adjustment when a slot repeats | The closed list that picks how the artwork looks; the adjustment of the same name overrides it on one lamina.   |
+| Name        | Type                                          | Role, in one sentence                                                                                                                                                                                                |
+| ----------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `titulo`    | `rich-text`, `required: true`                 | The words the artwork is about, drawn largest; the one slot a brief can never leave out.                                                                                                                             |
+| `subtitulo` | `rich-text`                                   | The line that qualifies `titulo` — what, when or for whom — drawn smaller and next to it.                                                                                                                            |
+| `chamada`   | `rich-text`                                   | The short label that sets up the title block and says what kind of artwork this is: "Resultado final".                                                                                                               |
+| `imagem`    | `image`                                       | A picture the brief supplies with the content: one wherever the template places it (behind the words, above them, beside them), or several inside a slide (`per: lamina, multiple: true`), each where it is written. |
+| `selo`      | `image`                                       | The seal art glued to the foot of the last grid slide, full width; the page above it shrinks by its height.                                                                                                          |
+| `lamina`    | any type, `repeat: true`                      | The block that becomes one artwork: one `::lamina` is one slide of the carousel.                                                                                                                                     |
+| `tom`       | `enum`, and an adjustment when a slot repeats | The closed list that picks how the artwork looks; the adjustment of the same name overrides it on one lamina.                                                                                                        |
 
 `lamina` is spelled without the circumflex because a slot name has to be the grammar's
 identifier, `[a-zA-Z_][a-zA-Z0-9_-]*` (`docs/template-authoring.md`, "manifest.yaml").
@@ -132,11 +132,16 @@ A table is the precedent. A template that mixes a table and running text names t
 block, and inside it the rows are still `|`-separated, as `agenda-semana` and
 `simulados-semana` already write them.
 
-### `apelo`: the panel that calls for attention
+### `apelo` and `convite`: two blocks every ad and carousel has
 
-| Name    | Type        | Role, in one sentence                                                                       |
-| ------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `apelo` | `rich-text` | The panel that pulls the eye to one message — an offer, a guarantee, a deadline, a warning. |
+| Name      | Type        | Role, in one sentence                                                                       |
+| --------- | ----------- | ------------------------------------------------------------------------------------------- |
+| `apelo`   | `rich-text` | The panel that pulls the eye to one message — an offer, a guarantee, a deadline, a warning. |
+| `convite` | `rich-text` | The call to act — comment, click, follow, save — wherever the template draws it.            |
+
+`convite` takes the call to action away from `chamada`, which four templates had used for it
+(see below); `chamada` keeps its reserved role, the short label over the title. The check
+does not know either name yet: they join its list when the check is next changed.
 
 The name says what the panel does, not what it holds or how it is drawn: one template draws a
 card with a band, another a round badge, and both are `apelo`. It was chosen over `oferta`,
@@ -222,28 +227,28 @@ These were counted on 2026-11-19 over the 14 production templates in their own r
 synonym list below does not know them yet, and each rename is a card per template
 repository.
 
-| In use                             | Where                                                 | The convention                  |
-| ---------------------------------- | ----------------------------------------------------- | ------------------------------- |
-| `fechamento`                       | concursos-abertos, concursos-abertos-saude            | `fecho`: the closing words      |
-| `abertura`                         | concursos-abertos, concursos-abertos-saude            | `titulo`                        |
-| `{fecho}` as the closing slide     | questao-estrategica, questao-engenharia, voce-conhece | `{contracapa}`, beside `{capa}` |
-| `Remuneração:`, `Salário inicial:` | concursos-abertos, concursos-abertos-ec               | `Salário:`                      |
-| `Período de inscrições:`           | concursos-abertos-ec                                  | `Inscrições:`                   |
-| `Data da prova:`                   | concursos-abertos-ec                                  | `Prova:`                        |
+| In use                             | Where                                                                     | The convention                  |
+| ---------------------------------- | ------------------------------------------------------------------------- | ------------------------------- |
+| `fechamento`                       | concursos-abertos, concursos-abertos-saude                                | `fecho`: the closing words      |
+| `abertura`                         | concursos-abertos, concursos-abertos-saude                                | `titulo`                        |
+| `{fecho}` as the closing slide     | questao-estrategica, questao-engenharia, voce-conhece                     | `{contracapa}`, beside `{capa}` |
+| `Remuneração:`, `Salário inicial:` | concursos-abertos, concursos-abertos-ec                                   | `Salário:`                      |
+| `Período de inscrições:`           | concursos-abertos-ec                                                      | `Inscrições:`                   |
+| `Data da prova:`                   | concursos-abertos-ec                                                      | `Prova:`                        |
+| `chamada` as a call to action      | simulados-semana, concursos-abertos, concursos-abertos-saude, informativo | `convite`                       |
 
 `{fecho}` gives way to `{contracapa}` for the reason `cor` gave way to `tom`: `fecho` is
 already the slot for the closing words, and a slot and an adjustment of the same name would
 mean two things.
 
-**Two roles are open, for the maintainer to decide:**
+Two roles were settled by the maintainer on 2026-11-20:
 
-- **`chamada`** is reserved above for the short label over the title ("Resultado final"), and
-  `aprovados` uses it so. `simulados-semana`, `concursos-abertos`, `concursos-abertos-saude`
-  and `informativo` use it for a call to action ("Comente SIMULADO…"). The shape is the same,
-  so the check cannot see it.
-- **`imagem`** is reserved above for the one picture the brief supplies; `questao-estrategica`,
-  `questao-engenharia` and `voce-conhece` use it for several figures inside a slide
-  (`per: lamina, multiple: true`).
+- **`chamada` keeps the short label over the title** ("Resultado final"), as `aprovados` uses
+  it. The four templates that drew a call to action under that name rename it `convite`. The
+  shape of the two is the same, so the check could never have told them apart.
+- **`imagem` covers both uses already in production**: the one picture on a cover
+  (`agenda-semana`, `aprovados`) and the figures inside a slide (`questao-estrategica`,
+  `questao-engenharia`, `voce-conhece`). No template renames it.
 
 ## Adding a name or a mark
 
