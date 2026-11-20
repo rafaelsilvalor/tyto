@@ -66,6 +66,8 @@ describe('the catalogue', () => {
       'shell.about.templates',
       // TYTO-44's slide picker: "Slide", which Portuguese borrowed whole (above).
       'templateMode.slide',
+      // TYTO-741's guide dialog column: "Slot" is the manifest's word in both, as in every card.
+      'guide.column.slot',
       // TYTO-276's heading over the templates in the "/" menu, for `template.label`'s reason.
       'slash.section.templates',
       // TYTO-537's `ls` kind for a `.brief`, for `panel.editor`'s reason.

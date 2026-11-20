@@ -21,6 +21,10 @@ import { SHOWN_PREVIEW, openPreviewBeside, previewSrcdoc } from './preview-pane.
  * folder, never opened (ADR 0111). Opening and showing a file are stand-ins swapped in through
  * `app.evaluate` for `shell.openPath` and `shell.showItemInFolder`, so no program starts.
  *
+ * The window's flow is driven as a person drives it (TYTO-741's fourth pull request): the command,
+ * the dialog's checkboxes, the line inserted for a slot the brief names no file for and undone in
+ * one step, and the "save first" box, answered through a stand-in for `dialog.showMessageBox`.
+ *
  * Then the card's done-when: a PNG saved where the brief reads it back shows in the preview
  * with no keystroke, because `explorer:changed` names the file and the brief's last preview
  * asked for one of that name. Before it is saved, the preview draws the art's box: the control.
@@ -63,6 +67,9 @@ const BRIEF = [
   '::titulo',
   '  Capa pintada',
 ].join('\n');
+
+/** The guide dialog while it is open. */
+const GUIDE_DIALOG = 'tyto-guide-dialog[open]';
 
 let app: ElectronApplication;
 let window: Page;
@@ -154,29 +161,78 @@ describe('the external-art guide from the window (TYTO-741)', () => {
     ]);
   });
 
-  it('refuses an unsaved brief, then writes the guide and shows it in a folder not trusted', async () => {
-    const write = { documentId, only: ['grafico.guide.psd'], overwrite: false };
-    expect(await call('guide:write', { ...write, unsaved: true })).toEqual({
-      outcome: 'refused',
-      reason: 'unsaved',
-    });
+  it('refuses an unsaved brief on the bridge', async () => {
+    expect(
+      await call('guide:write', {
+        documentId,
+        only: ['grafico.guide.psd'],
+        overwrite: false,
+        unsaved: true,
+      }),
+    ).toEqual({ outcome: 'refused', reason: 'unsaved' });
+  });
 
-    const answer = await call<{ outcome: string; written: string[]; open: string }>('guide:write', {
-      ...write,
-      unsaved: false,
+  it('writes the checked guide from the command, saving first, and shows it in its folder', async () => {
+    // The native boxes: "save first?" answered yes, and every question kept for the assertions.
+    await app.evaluate(({ dialog }) => {
+      const store = globalThis as { asked?: string[] };
+      store.asked = [];
+      dialog.showMessageBox = ((...args: unknown[]) => {
+        const box = args.find((arg) => typeof arg === 'object' && arg !== null && 'message' in arg);
+        store.asked?.push((box as { message: string }).message);
+        return Promise.resolve({ response: 1, checkboxChecked: false });
+      }) as typeof dialog.showMessageBox;
     });
+    const row = (name: string): string => `${GUIDE_DIALOG} tr[data-guide="${name}"]`;
+    const checked = (name: string): Promise<boolean> =>
+      window.$eval(`${row(name)} .guide__check`, (box) => (box as HTMLInputElement).checked);
+    const buffer = (): Promise<string> =>
+      window.$eval('#editor .cm-content', (content) => content.textContent ?? '');
+
+    await run('guide.generate');
+    await window.waitForSelector(row('grafico.guide.psd'));
+    // Missing, so checked; `imagem` is cited by no line yet, so it is offered one.
+    expect(await checked('grafico.guide.psd')).toBe(true);
+    const offer = `${GUIDE_DIALOG} .guide__uncited li[data-slot="imagem"]`;
+    expect(await window.textContent(`${offer} code`)).toBe('imagem: imagem.png');
+
+    // The line goes into the buffer as one change: one undo takes it out, and the command lists
+    // the slot as uncited again.
+    await window.click(`${offer} .guide__insert`);
+    await window.waitForSelector(row('imagem.guide.psd'));
+    expect(await buffer()).toContain('imagem: imagem.png');
+    await run('editor.undo');
+    await expect.poll(buffer).not.toContain('imagem: imagem.png');
+    await run('guide.generate');
+    await window.waitForSelector(`${offer} .guide__insert`);
+    await window.click(`${offer} .guide__insert`);
+    await window.waitForSelector(row('imagem.guide.psd'));
+    expect(await checked('imagem.guide.psd')).toBe(true);
+
+    // Only the checked guide is written: `imagem`'s is unchecked by hand.
+    await window.click(`${row('imagem.guide.psd')} .guide__check`);
+    await window.click(`${GUIDE_DIALOG} .guide__write`);
+    await window.waitForSelector(`${GUIDE_DIALOG} .guide__result`, { timeout: 30_000 });
+
     const guide = join(work, 'assets', 'grafico.guide.psd');
-    expect(answer).toMatchObject({
-      outcome: 'written',
-      written: [join('assets', 'grafico.guide.psd')],
-      open: 'restricted',
-    });
+    expect(await window.textContent(`${GUIDE_DIALOG} .guide__written`)).toContain(
+      join('assets', 'grafico.guide.psd'),
+    );
+    // The fresh folder is not trusted: shown in its folder, never opened (ADR 0111).
+    expect(await window.getAttribute(`${GUIDE_DIALOG} .guide__opened`, 'data-open')).toBe(
+      'restricted',
+    );
     expect(readFileSync(guide).subarray(0, 4).toString('latin1')).toBe('8BPS');
+    expect(existsSync(join(work, 'assets', 'imagem.guide.psd'))).toBe(false);
+    // The brief was saved first, with the inserted line, and the box asked before it.
+    expect(readFileSync(join(work, 'capa.brief'), 'utf8')).toContain('imagem: imagem.png');
     const seen = await app.evaluate(() => {
-      const store = globalThis as { opened?: string[]; revealed?: string[] };
-      return { opened: store.opened ?? [], revealed: store.revealed ?? [] };
+      const store = globalThis as { opened?: string[]; revealed?: string[]; asked?: string[] };
+      return { opened: store.opened ?? [], revealed: store.revealed ?? [], asked: store.asked };
     });
-    expect(seen).toEqual({ opened: [], revealed: [guide] });
+    expect(seen).toEqual({ opened: [], revealed: [guide], asked: ['Save the brief first?'] });
+
+    await window.click(`${GUIDE_DIALOG} .guide__close`);
   }, 60_000);
 
   it('draws the PNG painted from the guide as soon as it is saved, with no keystroke', async () => {

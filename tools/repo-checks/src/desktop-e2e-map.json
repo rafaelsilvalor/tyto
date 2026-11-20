@@ -2135,10 +2135,12 @@
       "paths": [
         "apps/desktop/src/main/guides.ts",
         "apps/desktop/src/renderer/asset-redraw.ts",
+        "apps/desktop/src/renderer/guide-dialog.ts",
+        "apps/desktop/src/renderer/guide-view.ts",
         "apps/desktop/e2e/art-guide.desktop.test.ts"
       ],
       "e2e": ["art-guide.desktop.test.ts"],
-      "why": "TYTO-741, ADR 0222: the external-art guide written by tyto guide in main, opened or shown in its folder, and a brief's preview compiled again when art it cites appears"
+      "why": "TYTO-741, ADR 0222: the external-art guide written by tyto guide in main, opened or shown in its folder, its dialog in the window, and a brief's preview compiled again when art it cites appears"
     }
   ]
 }

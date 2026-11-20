@@ -13,5 +13,6 @@ Tudo o que a janela faz é um comando, executado pela barra de comandos com **Ct
 - [Painéis](./panels.md) — Problemas, a fila local e a prévia.
 - [A barra de comandos e a busca](./command-bar-and-search.md) — executar um comando, procurar texto, ir para um bloco.
 - [Arrumar brief](./format-brief.md) — acertar os espaços de um brief com uma tecla.
+- [Gabaritos para arte externa](./external-art-guide.md) — gravar o PSD em que se pinta uma imagem feita fora e vê-la na prévia.
 - [Modo vim](./vim-mode.md) — editar com as teclas do vim.
 - [Modo template](./template-mode.md) — editar um template ao lado dos formatos que ele desenha.
