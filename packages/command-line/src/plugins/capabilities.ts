@@ -1,10 +1,12 @@
 import type { Trust } from '@tyto/core';
 import { pluginCache, pluginStorage, workspaceFiles } from '@tyto/io';
-import type {
-  FetchedResponse,
-  HostCapabilities,
-  HostFetchInit,
-  TokenFetch,
+import {
+  type DecodeGrants,
+  type FetchedResponse,
+  type HostCapabilities,
+  type HostFetchInit,
+  type TokenFetch,
+  decodeGrants,
 } from '@tyto/plugin-api';
 
 /**
@@ -63,6 +65,14 @@ async function fetchWithoutRedirects(url: string, init: HostFetchInit): Promise<
 export const tokenFetch: TokenFetch = (url, init) =>
   fetch(url, { ...init, headers: { ...init.headers } });
 
+/**
+ * The decode tokens this process has handed out (ADR 0223): one table, because the installed
+ * plugins are started once per process and every task's host asks the same processes. A render
+ * task mints a token through its `decode` for one call; a plugin reads through it with
+ * `host.decoding.read`, which reaches {@link pluginCapabilities}'s `decodeReadPart` below.
+ */
+export const processDecodeGrants: DecodeGrants = decodeGrants();
+
 /** What a command adds to the network and the secrets (ADR 0138). */
 export interface CommandCapabilities {
   /** The name a refusal gives the command: `tyto render`, `tyto watch`. */
@@ -91,6 +101,9 @@ export function pluginCapabilities(
       ? {}
       : workspaceFiles({ folder: () => workspace.folder, trust: () => workspace.trust })),
     ...command.signin,
+    // Every command: a token is the grant (ADR 0223), and only a render task mints one.
+    decodeReadPart: (plugin, token, offset, length) =>
+      processDecodeGrants.readPart(plugin, token, offset, length),
     fetch: fetchWithoutRedirects,
     credential: (plugin, key) => {
       const value = variables[credentialVariable(plugin, key)];

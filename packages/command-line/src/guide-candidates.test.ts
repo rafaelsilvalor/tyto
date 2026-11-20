@@ -180,6 +180,42 @@ describe('guidePaths for a cited guide (ADR 0223, decision 7)', () => {
   });
 });
 
+describe('guidePaths for a cited layer (ADR 0223, decision 6)', () => {
+  const assets = join(BRIEF_DIRECTORY, 'assets');
+
+  it('names the guide after the file, never the layer, and expects the file back', () => {
+    const cited = { ...FUNDO, cited: 'capa.psd#arte' };
+    expect(guidePaths(cited, ['story'], at(BRIEF_DIRECTORY, []))[0]).toMatchObject({
+      cited: 'capa.psd#arte',
+      guide: join(assets, 'capa.guide.psd'),
+      art: join(assets, 'capa.psd'),
+    });
+    expect(
+      guidePaths(cited, ['feed', 'story'], at(BRIEF_DIRECTORY, [])).map(({ guide, art }) => ({
+        guide,
+        art,
+      })),
+    ).toEqual([
+      { guide: join(assets, 'capa.feed.guide.psd'), art: join(assets, 'capa.feed.psd') },
+      { guide: join(assets, 'capa.story.guide.psd'), art: join(assets, 'capa.story.psd') },
+    ]);
+  });
+
+  it('is the cited guide itself when the layer is one of a guide', () => {
+    const cited = { ...FUNDO, cited: 'capa.guide.psd#grupo/arte' };
+    expect(guidePaths(cited, ['story'], at(BRIEF_DIRECTORY, []))[0]).toMatchObject({
+      guide: join(assets, 'capa.guide.psd'),
+      art: join(assets, 'capa.guide.psd'),
+    });
+  });
+
+  it('keeps a literal file whose name holds a #, as the render reads it', () => {
+    const literal = join(BRIEF_DIRECTORY, 'capa.psd#arte');
+    const cited = { ...FUNDO, cited: 'capa.psd#arte' };
+    expect(guidePaths(cited, ['story'], at(BRIEF_DIRECTORY, [literal]))[0]?.art).toBe(literal);
+  });
+});
+
 describe('guideOverwrite', () => {
   const brief = 1_000;
   it.each([

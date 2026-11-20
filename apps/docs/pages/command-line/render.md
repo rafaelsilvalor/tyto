@@ -200,6 +200,8 @@ arte.brief: error E_GUIDE_NEWER_THAN_BRIEF The guide 'assetsundo.story.guide.ps
 
 `--open` opens each guide written in the program your computer opens a PSD with. `--formats` and `--template` work as they do for `tyto render`.
 
+A brief can also cite a file Tyto does not draw by itself, such as the PSD, once a plugin that decodes that kind of file is installed: `fundo: fundo.psd` draws the whole file, and `fundo: fundo.psd#arte` the layer named `arte` (a layer in a group is `grupo/arte`). The guide of a cited layer is named after the file, `fundo.guide.psd`, never after the layer. The picture the plugin decodes is kept in your Tyto home folder and decoded again only when the file or the plugin changes. With no such plugin installed, the brief's line says which kind of file needs one. In a folder you have not trusted, no plugin decodes anything new, and the line says to trust the folder; `tyto watch` decodes, since a decode reads only a file already on your computer.
+
 ## When the brief has errors
 
 Each problem is printed with the file, the line and the column, the code and what is wrong, and the command ends with exit code `1`:

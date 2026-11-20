@@ -202,17 +202,37 @@ function stemOf(name: string): string {
 }
 
 /**
+ * The file a citation names, its layer cut off (ADR 0223, decision 6): `capa.psd#arte` is the
+ * layer `arte` of `capa.psd`, and a layer is no part of any file's name. Cut at the last `#`
+ * when the part before it ends in an extension and no file has the literal name; which plugin
+ * decodes it is the render's question, and a guide is named the same whichever answers.
+ */
+function citedFile(cited: string, location: GuideLocation): string {
+  const mark = cited.lastIndexOf('#');
+  if (mark <= 0 || mark === cited.length - 1) return cited;
+  const file = cited.slice(0, mark);
+  const name = fileName(file);
+  if (name.lastIndexOf('.') <= 0) return cited;
+  const literal = isAbsolute(cited)
+    ? location.exists(cited)
+    : guideFolders(location).some((folder) => location.exists(join(folder, cited)));
+  return literal ? cited : file;
+}
+
+/**
  * The guides of one candidate (ADR 0222, decision 2): `grafico.guide.psd` beside a cited
  * `grafico.png` for one format, `grafico.<format>.guide.psd` per format for several, whose
- * PNG is expected back at `grafico.<format>.png`.
+ * PNG is expected back at `grafico.<format>.png`. A cited layer (`capa.psd#arte`) names the
+ * file's guide, `capa.guide.psd`, and `art` is the file, `capa.psd`: the layer is painted in it.
  */
 export function guidePaths(
   candidate: Pick<GuideCandidate, 'slot' | 'kind' | 'cited'>,
   formats: readonly string[],
   location: GuideLocation,
 ): GuideTarget[] {
-  const folder = folderOf(candidate.cited, location);
-  const name = fileName(candidate.cited);
+  const file = citedFile(candidate.cited, location);
+  const folder = folderOf(file, location);
+  const name = fileName(file);
   const stem = stemOf(name);
   return formats.map((format) => {
     const single = formats.length === 1;

@@ -148,3 +148,19 @@ a stand-in decoder in an e2e; the version pull request; then the PSD plugin in i
   delivery's name folds a layer in after the file's stem, its separators cut like a
   reference's (`capa.psd#grupo/arte` → `capa-grupo-arte.png`). The command line and the
   desktop compose the cache in the next pull requests.
+- **2026-11-20 (TYTO-742, the command line): one token table per process, and trust as a
+  source's.** The CLI starts the installed plugins once per process, so it keeps one
+  `decodeGrants()` beside them (`processDecodeGrants`): every command's capabilities serve
+  `decodeReadPart` from it, and a render task's `decodedAssets` mints through its `decode`. The
+  plugin's version for the cache key is read from its manifest. `TaskSources.decodes` follows
+  `fetches` unless a command says otherwise: `tyto render` decodes outside any workspace and in a
+  trusted one; `tyto watch` decodes though it never fetches (decision 8); `tyto mcp` decodes in
+  a trusted workspace only, for a check as for a preview, because a decode reaches no network.
+  Under `tyto mcp` the decoded cache wraps the real-path confinement rather than the reverse:
+  `realPathConfined` confines `locate` too, so the cited file must be inside the folder's roots,
+  and the PNG in `TYTO_HOME/cache/decoded/` is answered outside that check, never through it.
+  `tyto guide` names a cited layer's guide after its file: `capa.psd#arte` gets `capa.guide.psd`
+  and expects `capa.psd` back, cut at the last `#` when the part before it has an extension and
+  no file has the literal name; which plugin decodes it is the render's question, not the
+  guide's. With no `TYTO_HOME` the cache is not composed, so a cited `.psd` stays
+  `E_ASSET_NOT_FOUND` there; a CLI always has a home in practice.

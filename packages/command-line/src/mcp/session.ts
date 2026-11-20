@@ -433,6 +433,9 @@ export async function openSession(
             ...given,
             fetches: false,
             notFetchedBecause: previewing ? PREVIEW_NOT_FETCHED : CHECK_NOT_FETCHED,
+            // A decode reaches no network, so a check decodes too; only in a trusted workspace,
+            // as installed code runs for nothing else here (ADR 0223, decision 8).
+            decodes: trust === 'trusted',
           };
     const report = await renderTask(
       value,
