@@ -46,9 +46,10 @@ export type LevelItem =
  * A block's rich text as its items, in the order written.
  *
  * Empty lines and empty parts are dropped, so `a | | b` is two parts. In a line with marks,
- * the main part is the first one at the highest level written (`#` before `##`); in a line
- * with none, it is the only part, the first of two, or the second of three or more — and it is
- * given level 1, the others staying at the base level.
+ * the main part is the first one at the highest level written (`#` before `##`). The block's
+ * first line with none gets its main part by position — the only part, the first of two, or the
+ * second of three or more — at level 1, the others at the base level; any later line with none
+ * is all base level, after the block's main part.
  */
 export function levelsOf(text: RichText): LevelItem[] {
   const items: LevelItem[] = [];
@@ -63,7 +64,8 @@ export function levelsOf(text: RichText): LevelItem[] {
       .filter((part) => plain(part).trim() !== '')
       .map(markOf);
     if (parts.length === 0) continue;
-    items.push({ kind: 'line', parts: ranked(parts) });
+    const first = !items.some((item) => item.kind === 'line');
+    items.push({ kind: 'line', parts: ranked(parts, first) });
   }
   return items;
 }
@@ -86,11 +88,20 @@ function markOf(part: RichText): Marked {
   return { words: [...head, ...part.slice(1)], level: match[1]!.length as Level };
 }
 
-/** Each part placed against the line's main one, by its marks or, with none, by position. */
-function ranked(parts: readonly Marked[]): LevelPart[] {
+/**
+ * Each part placed against the line's main one, by its marks or, with none, by position.
+ *
+ * Position reads only the block's first line. A later line with no mark is a supporting line —
+ * cargos under the exam's name, say — so all of it is the base level, standing after the main
+ * part the first line gave the block (the maintainer's rule, 2026-11-20).
+ */
+function ranked(parts: readonly Marked[], first: boolean): LevelPart[] {
   const marked = parts.filter((part) => part.level > 0);
   let main: number;
   let levels: Level[];
+  if (marked.length === 0 && !first) {
+    return parts.map((part) => ({ words: part.words, level: 0, position: 'after' }));
+  }
   if (marked.length === 0) {
     main = parts.length >= 3 ? 1 : 0;
     levels = parts.map((_, index) => (index === main ? 1 : 0));
