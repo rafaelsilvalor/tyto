@@ -152,6 +152,7 @@ import {
   type Diagnostic,
   type SourceRange,
   type Template,
+  followEdits,
   rangeOfArtwork,
   revealRange,
 } from './panel.js';
@@ -2409,7 +2410,7 @@ const registry: CommandRegistry = withCommandGate(
       // The editor follows, the same as choosing from the picker does. A command that moved
       // the picture and left the text behind would be a different feature wearing the same
       // name.
-      const at = rangeOfArtwork(current.artworks, artwork);
+      const at = slideRangeNow(current, artwork);
       if (at !== undefined) reveal(at);
     },
 
@@ -6384,6 +6385,23 @@ function documentOfPane(pane_: PreviewPane): string | undefined {
   return tab === undefined || tab.documentId === '' ? undefined : tab.documentId;
 }
 
+/**
+ * Where the slide `artwork` is written in the text the document holds now (TYTO-819).
+ *
+ * Its range indexes the text the artwork was rendered from, which a click right after an edit
+ * outruns: the compile waits for a pause. So the range is carried through the edits since.
+ */
+function slideRangeNow(
+  document_: DocumentState | undefined,
+  artwork: string | undefined,
+): SourceRange | undefined {
+  if (document_ === undefined) return undefined;
+  const range = rangeOfArtwork(document_.artworks, artwork);
+  return range === undefined
+    ? undefined
+    : followEdits(range, document_.renderedBrief, contentOf(document_));
+}
+
 /** One stage observer for every preview: `fit` follows a split or a window resize (TYTO-287). */
 let stageObserver: ResizeObserver | undefined;
 
@@ -6423,7 +6441,7 @@ function wirePreviewPane(pane_: PreviewPane, nodes: PreviewElements): void {
     // `resolve` knew — a `Scene` carries no source position at all.
     const documentId = documentOfPane(pane_);
     const target = documentId === undefined ? undefined : primaryPaneOf(documentId);
-    const at = rangeOfArtwork(documentOf(workspace, documentId ?? '')?.artworks ?? [], artwork);
+    const at = slideRangeNow(documentOf(workspace, documentId ?? ''), artwork);
     // `revealRange` focuses the editor; a key in the strip takes the focus back once the strip
     // has drawn the new selection, so the arrows go on moving it.
     if (at !== undefined && target !== undefined) revealRange(target.view, at);
