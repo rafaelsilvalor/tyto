@@ -2,7 +2,7 @@
 import { createEditor } from '@tyto/editor';
 import { describe, expect, it } from 'vitest';
 
-import { type Artwork, lineColumnAt, rangeOfArtwork, revealRange } from './panel.js';
+import { type Artwork, followEdits, lineColumnAt, rangeOfArtwork, revealRange } from './panel.js';
 
 /**
  * The pickers and the cursor, in the only two ways they can be checked without a screen.
@@ -115,5 +115,71 @@ describe('the artwork list', () => {
     // A brief whose template has no repeating slot produces one artwork standing for the
     // whole document; there is no single line for the editor to scroll to.
     expect(rangeOfArtwork([{ id: 'artwork-1', index: 0 }], 'artwork-1')).toBeUndefined();
+  });
+});
+
+describe('a slide clicked right after an edit (TYTO-819)', () => {
+  /** Slides each with a word no other has, as the preview grid's e2e types them. */
+  const slides = (count: number, change: (line: string) => string = (line) => line): string =>
+    [
+      '---',
+      'template: promo',
+      '---',
+      '::titulo Grade',
+      ...Array.from({ length: count }, (_, at) => change(`::lamina item${String(at + 1)}fim`)),
+    ].join('\n');
+  const rangeOf = (text: string, line: string): { start: number; end: number } => {
+    const start = text.indexOf(line);
+    return { start, end: start + line.length };
+  };
+  const landed = (text: string, range: { start: number; end: number }): string =>
+    text.slice(range.start, range.end);
+
+  it('finds the slide after an edit that shortened the text above it', () => {
+    // The e2e's sequence: compiled with `item3mudou`, retyped two characters shorter, and the
+    // seventh thumbnail clicked before the next compile. Unmapped, the range ends two
+    // characters into the eighth slide's line, and the cursor with it.
+    const compiled = slides(10, (line) => line.replace('item3fim', 'item3mudou'));
+    const current = slides(10);
+    const range = rangeOf(compiled, '::lamina item7fim');
+
+    expect(landed(current, range)).toBe('lamina item7fim\n:');
+    expect(landed(current, followEdits(range, compiled, current))).toBe('::lamina item7fim');
+  });
+
+  it('keeps the slide when a slide is inserted right above it', () => {
+    // A character diff would match the new `::lamina ` against the old one's and leave the
+    // cursor on the newcomer; whole lines do not.
+    const compiled = slides(3);
+    const current = compiled.replace('::lamina item2fim', '::lamina novo\n::lamina item2fim');
+    const range = rangeOf(compiled, '::lamina item2fim');
+
+    expect(landed(current, followEdits(range, compiled, current))).toBe('::lamina item2fim');
+  });
+
+  it('stays on the edited line when the slide clicked is the one edited', () => {
+    const compiled = slides(4);
+    const current = compiled.replace('item2fim', 'item2');
+    const range = rangeOf(compiled, '::lamina item2fim');
+
+    expect(landed(current, followEdits(range, compiled, current))).toBe('::lamina item2');
+  });
+
+  it('leaves a slide above the edit where it was, and the range alone with no edit', () => {
+    const compiled = slides(4);
+    const current = compiled.replace('item4fim', 'item4 e mais');
+    const range = rangeOf(compiled, '::lamina item1fim');
+
+    expect(followEdits(range, compiled, current)).toEqual(range);
+    expect(followEdits(range, compiled, compiled)).toBe(range);
+  });
+
+  it('counts a Windows line ending as one, as the parser does', () => {
+    const windows = (text: string): string => text.split('\n').join('\r\n');
+    const compiled = windows(slides(4, (line) => line.replace('item1fim', 'item1longo')));
+    const current = windows(slides(4));
+    const range = rangeOf(compiled, '::lamina item3fim');
+
+    expect(landed(current, followEdits(range, compiled, current))).toBe('::lamina item3fim');
   });
 });
