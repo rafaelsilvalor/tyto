@@ -483,6 +483,7 @@ export async function runJob(
     ...(renderedSlots === undefined ? {} : { renderedSlots }),
     ...(ports.directives === undefined ? {} : { directives: ports.directives }),
     ...(ports.configurations === undefined ? {} : { configurations: ports.configurations }),
+    ...(request.guide === true ? { guide: true } : {}),
   });
   if (!resolved.ok) return err([...problems, ...resolved.error]);
   problems.push(...resolved.diagnostics);
