@@ -174,6 +174,10 @@ information, the template draws it.** Inside one line:
 
 - **A line that is only `---` is the divider.** The template draws its own divider there — a
   row of dots, a single rule, a double rule, a dashed one. The brief only says where it goes.
+- **A `\` breaks the line inside its part, wherever it is written.** `Concurso | # ABIN \ 2027`
+  is one main part drawn on two lines, both at the main level; it never starts a new line of
+  the block. Spaces against the `\` are not words, and a `\` at either end of a part breaks
+  nothing (TYTO-822).
 
 The same words, three hierarchies:
 

@@ -1,4 +1,5 @@
-import { rect, solid, systemFont } from '@tyto/core/template';
+import { defineTemplate, formatCatalogue, parseManifest } from '@tyto/core';
+import { frame, rect, solid, systemFont } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
 import { block } from './blocks.js';
@@ -11,8 +12,9 @@ import {
 } from './levels.js';
 import { bold, rich, span } from './rich-text.fixture.js';
 import { plain } from './rows.js';
+import { compileTemplate } from './testing.js';
 
-import type { RichText } from '@tyto/core';
+import type { Inline, RichText } from '@tyto/core';
 import type { GroupDraft, NodeDraft } from '@tyto/core/template';
 import type { Measure, TextStyle } from './text.js';
 
@@ -158,6 +160,106 @@ function rows(items: LevelItem[], style: LevelStackStyle = STYLE): { name: strin
     return { name: inner.name ?? '', y: child.transform?.y ?? 0 };
   });
 }
+
+const probeManifest = parseManifest(
+  'name: niveis\nversion: 1.0.0\nformats: [grid]\nslots:\n  titulo: { type: rich-text }\n',
+  'manifest.yaml',
+);
+if (!probeManifest.ok) throw new Error(probeManifest.error.map((item) => item.message).join('; '));
+const PROBE_MANIFEST = probeManifest.value;
+
+/** A `\` the author typed, as the parser hands it on (`typed: true`). */
+function typed(): Inline {
+  return { kind: 'break', typed: true, range: { start: 0, end: 1 } };
+}
+
+/** The boundary between two block lines: a break the author did not type. */
+function boundary(): Inline {
+  return { kind: 'break', range: { start: 0, end: 0 } };
+}
+
+/** A part's words with each break shown as `/`, so a test sees where it stands. */
+function shown(words: RichText): string {
+  return words.map((inline) => (inline.kind === 'break' ? '/' : plain([inline]))).join('');
+}
+
+describe('a typed break (TYTO-822)', () => {
+  const parts = (text: RichText): string[][] =>
+    levelsOf(text).map((item) =>
+      item.kind === 'divider'
+        ? ['---']
+        : item.parts.map((part) => `${part.level}:${part.position}:${shown(part.words)}`),
+    );
+
+  it('stays inside the main part, its spaces taken off, and the block line still ends', () => {
+    const text = [span('Concurso | # ABIN '), typed(), span(' 2027'), boundary(), span('Agora')];
+    expect(parts(text)).toEqual([['0:before:Concurso', '1:main:ABIN/2027'], ['0:after:Agora']]);
+  });
+
+  it('stays inside a part before the main one', () => {
+    expect(parts([span('Edital '), typed(), span(' publicado | # TRT 4')])).toEqual([
+      ['0:before:Edital/publicado', '1:main:TRT 4'],
+    ]);
+  });
+
+  it('breaks nothing at either end of a part', () => {
+    expect(parts([span('# TRT 4 '), typed(), span(' | '), typed(), span(' Sul')])).toEqual([
+      ['1:main:TRT 4', '0:after:Sul'],
+    ]);
+  });
+
+  it('reaches levelsOf from a real brief, through parse, resolve and compile', async () => {
+    let titulo: RichText = [];
+    const template = defineTemplate(PROBE_MANIFEST, (context) => {
+      const value = context.slots['titulo']?.value;
+      titulo = value?.kind === 'rich-text' ? value.text : [];
+      return frame({
+        format: context.format,
+        size: context.size,
+        idPrefix: context.idPrefix,
+        background: solid('#ffffff'),
+        children: [],
+      });
+    });
+    const brief = [
+      '---',
+      'template: niveis',
+      'formats: [grid]',
+      '---',
+      '::titulo',
+      '  Concurso | # ABIN \\ 2027',
+      '  O melhor momento',
+    ].join('\n');
+    const compiled = await compileTemplate({
+      brief,
+      template,
+      formats: formatCatalogue({ grid: { w: 100, h: 100 } }),
+    });
+    expect(compiled.ok).toBe(true);
+    expect(parts(titulo)).toEqual([
+      ['0:before:Concurso', '1:main:ABIN/2027'],
+      ['0:after:O melhor momento'],
+    ]);
+  });
+
+  it('is drawn as a break inside that part’s row', () => {
+    const drawn = levelStack(
+      levelsOf([span('# ABIN'), typed(), span('2027')]),
+      STYLE,
+      200,
+      measure,
+    );
+    const children = (drawn.draft as GroupDraft).children ?? [];
+    expect(children).toHaveLength(1);
+    const node = children[0]!;
+    const runs = node.kind === 'text' ? node.runs : [];
+    expect(runs.map((run) => (run.kind === 'text' ? run.text : '/'))).toEqual([
+      'ABIN',
+      '/',
+      '2027',
+    ]);
+  });
+});
 
 describe('levelStack', () => {
   it('stacks a line’s parts one per row, with the line gap between lines', () => {
