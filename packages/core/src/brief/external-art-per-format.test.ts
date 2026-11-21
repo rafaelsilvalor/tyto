@@ -5,7 +5,7 @@ import { compile } from './compile.js';
 import { externalArtVariant } from './external-art-files.js';
 import { type ResolvedBrief, resolve } from './resolve.js';
 import { formatCatalogue } from '../config/formats.js';
-import type { Diagnostic } from '../diagnostics/diagnostic.js';
+import { type Diagnostic, diagnostic } from '../diagnostics/diagnostic.js';
 import type { AssetResolver } from '../ports/asset-resolver.js';
 import type { SceneNode } from '../scene/nodes.js';
 import type { Scene } from '../scene/scene.js';
@@ -259,6 +259,138 @@ describe('a format’s own copy of external art', () => {
   it('is left out of a guide, where the art is empty', async () => {
     const { value } = await resolved({ fundo: 'fundo.png' }, ['fundo.png', 'fundo.story.png']);
 
+    expect(artOf(sceneOf(value, true))).toEqual([
+      ['feed', 'box'],
+      ['story', 'box'],
+    ]);
+  });
+});
+
+/**
+ * Why an external slot's file did not resolve, when the asset port knows (ADR 0223, TYTO-742):
+ * a `.psd` that is there and no plugin decodes, or one whose decode failed, says so as a plain
+ * slot does, and the box still stands in for the art.
+ */
+describe('external art the asset port can explain', () => {
+  const NO_DECODER = diagnostic('E_ASSET_DECODER_MISSING', {
+    path: 'fundo.guide.psd#arte',
+    extension: '.psd',
+  });
+  const NO_LAYER = diagnostic('E_ASSET_DECODE_FAILED', {
+    path: 'fundo.guide.psd#arte',
+    plugin: 'psd-decoder',
+    problem: "fundo.guide.psd: no layer is named 'nada'",
+  });
+
+  /** A folder holding `files`, whose port explains the references in `reasons`. */
+  async function explained(
+    data: Readonly<Record<string, string>>,
+    files: readonly string[],
+    reasons: Readonly<Record<string, Diagnostic>>,
+    guide = false,
+  ): Promise<{ value: ResolvedBrief; problems: Diagnostic[] }> {
+    const { assets } = folder(files);
+    const result = await resolve(brief(data), {
+      registry,
+      assets: { ...assets, explain: (reference) => reasons[reference] },
+      ...(guide ? { guide: true } : {}),
+    });
+    if (!result.ok) throw new Error(result.error.map((item) => item.message).join('; '));
+    return { value: result.value, problems: [...result.diagnostics] };
+  }
+
+  it('says which plugin is missing at the slot, and draws the box', async () => {
+    const { value, problems } = await explained({ fundo: 'fundo.guide.psd#arte' }, [], {
+      'fundo.guide.psd#arte': NO_DECODER,
+    });
+
+    expect(problems.map(({ code, message, range }) => ({ code, message, range }))).toEqual([
+      {
+        code: 'E_ASSET_DECODER_MISSING',
+        message:
+          "Asset 'fundo.guide.psd#arte' is a '.psd' file, which Tyto cannot draw by itself; install a plugin that decodes '.psd' files.",
+        range: FRONT,
+      },
+    ]);
+    expect(artOf(sceneOf(value))).toEqual([
+      ['feed', 'box'],
+      ['story', 'box'],
+    ]);
+  });
+
+  it("carries the decoder's own message when the decode failed", async () => {
+    const { value, problems } = await explained({ fundo: 'fundo.guide.psd#arte' }, [], {
+      'fundo.guide.psd#arte': NO_LAYER,
+    });
+
+    expect(problems.map(({ code, message, range }) => ({ code, message, range }))).toEqual([
+      {
+        code: 'E_ASSET_DECODE_FAILED',
+        message:
+          "Asset 'fundo.guide.psd#arte' could not be decoded by plugin 'psd-decoder': fundo.guide.psd: no layer is named 'nada'.",
+        range: FRONT,
+      },
+    ]);
+    expect(artOf(sceneOf(value))).toEqual([
+      ['feed', 'box'],
+      ['story', 'box'],
+    ]);
+  });
+
+  it('explains a format’s own copy that is there and could not be decoded', async () => {
+    const copy = diagnostic('E_ASSET_DECODE_FAILED', {
+      path: 'capa.story.psd',
+      plugin: 'psd-decoder',
+      problem: 'capa.story.psd: the composite is transparent',
+    });
+    const { value, problems } = await explained({ fundo: 'capa.psd' }, ['capa.psd'], {
+      'capa.story.psd': copy,
+    });
+
+    expect(problems.map(({ code, message, range }) => ({ code, message, range }))).toEqual([
+      {
+        code: 'E_ASSET_DECODE_FAILED',
+        message:
+          "Asset 'capa.story.psd' could not be decoded by plugin 'psd-decoder': capa.story.psd: the composite is transparent.",
+        range: FRONT,
+      },
+    ]);
+    // The story falls back to the cited file, as for a copy that is not there.
+    expect(artOf(sceneOf(value))).toEqual([
+      ['feed', 'capa.psd'],
+      ['story', 'capa.psd'],
+    ]);
+  });
+
+  it('warns as before when the port has nothing to say: the file is not there', async () => {
+    const { value, problems } = await explained({ fundo: 'fundo.png' }, [], {});
+
+    expect(problems.map((item) => item.code)).toEqual(['W_EXTERNAL_ART_MISSING']);
+    expect(artOf(sceneOf(value))).toEqual([
+      ['feed', 'box'],
+      ['story', 'box'],
+    ]);
+  });
+
+  it('says nothing of the cited file when every format has its own copy', async () => {
+    const { problems } = await explained(
+      { fundo: 'fundo.guide.psd#arte' },
+      ['fundo.guide.feed.psd#arte', 'fundo.guide.story.psd#arte'],
+      { 'fundo.guide.psd#arte': NO_DECODER },
+    );
+
+    expect(problems).toEqual([]);
+  });
+
+  it('asks nothing in a guide, which is written for a file no plugin decodes yet', async () => {
+    const { value, problems } = await explained(
+      { fundo: 'fundo.guide.psd#arte' },
+      [],
+      { 'fundo.guide.psd#arte': NO_DECODER },
+      true,
+    );
+
+    expect(problems.map((item) => item.code)).toEqual(['W_EXTERNAL_ART_MISSING']);
     expect(artOf(sceneOf(value, true))).toEqual([
       ['feed', 'box'],
       ['story', 'box'],

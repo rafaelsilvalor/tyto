@@ -199,6 +199,13 @@ export interface ResolveOptions {
    * Absent, every name is a template's own.
    */
   readonly configurations?: TemplateConfigurations;
+  /**
+   * The run compiles a guide (ADR 0220): an external slot's art is what the designer is about
+   * to paint, so why its cited file did not resolve is not asked. A guide is written for a
+   * `.psd` no installed plugin decodes yet, the guide itself included (ADR 0223, note of
+   * 2026-11-21); the slot still says `W_EXTERNAL_ART_MISSING`, which `tyto guide` hides.
+   */
+  readonly guide?: boolean;
 }
 
 /** Reserved frontmatter keys: metadata about the brief, not slots of the template. */
@@ -876,6 +883,7 @@ class Resolver {
       if (variant === undefined) continue;
       const copy = await this.options.assets.resolve(variant);
       if (copy !== undefined) copies[format] = copy;
+      else this.reportExplained(variant, range);
     }
     const found = Object.values(copies);
     if (found.length > 0) this.externalArt.set(name, copies);
@@ -884,7 +892,10 @@ class Resolver {
 
     if (cited !== undefined) return { kind: 'image', asset: cited };
     const bare = this.formats.filter((format) => copies[format] === undefined);
-    if (bare.length > 0) {
+    // A file that is there and cannot be drawn (no decoder, a decode that failed, a folder not
+    // trusted) says so as a plain slot does (ADR 0223), and the box still stands in for it.
+    // Only while a format would draw it: one copy per format is a whole set of art.
+    if (bare.length > 0 && !this.reportExplained(reference, range)) {
       const where = `'${reference}' was not found in ${searchedIn(this.options.assets)}`;
       this.reportExternalArtMissing(
         name,
@@ -893,6 +904,18 @@ class Resolver {
       );
     }
     return { kind: 'image', asset: externalArtPlaceholder(name) };
+  }
+
+  /**
+   * Reports why an external slot's `reference` resolved to nothing, when the asset port knows
+   * better than "not there"; `false` when it does not, or in a guide, where the art is empty.
+   */
+  private reportExplained(reference: string, range: SourceRange | undefined): boolean {
+    if (this.options.guide === true) return false;
+    const explained = this.options.assets.explain?.(reference);
+    if (explained === undefined) return false;
+    this.report(range === undefined ? explained : { ...explained, range });
+    return true;
   }
 
   private reportExternalArtMissing(

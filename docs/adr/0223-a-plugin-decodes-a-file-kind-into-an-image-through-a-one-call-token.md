@@ -187,3 +187,19 @@ a stand-in decoder in an e2e; the version pull request; then the PSD plugin in i
   Tyto ships a built-in exporter named `psd` and a second plugin of that name is
   `E_PLUGIN_DUPLICATE`; its decoder's id stays `psd`. The repository is tagged `v0.1.0` and
   the gallery lists it under the id `psd-decoder`.
+- **2026-11-21 (TYTO-742, external art): a file that cannot be drawn says why on an external
+  slot too.** An external slot (ADR 0220) answered every miss with `W_EXTERNAL_ART_MISSING`,
+  "not found", so a `fundo.guide.psd#arte` that was there with no decoder installed, or whose
+  layer the plugin did not find, sent the author looking for a file on the disk. `resolve` now
+  asks the asset port's `explain` for the cited file and for each format's copy (ADR 0222) that
+  did not resolve, and reports what it answers at the slot's range, with the plain slot's code
+  and message. **The severity is the plain slot's**: `E_ASSET_DECODER_MISSING` and
+  `E_ASSET_DECODE_FAILED` stay errors and stay non-fatal, so the render goes on and ADR 0220's
+  outlined box still stands in for the art. The cited file's reason takes the place of
+  `W_EXTERNAL_ART_MISSING`, which is kept for a file that is not there, and is reported only
+  while a format would draw it: one copy per format is a whole set of art. A copy's reason is
+  reported beside it, and its format falls back as for a copy that is not there. **A guide
+  asks nothing**: `ResolveOptions.guide`, set by the job when it compiles one, skips `explain`
+  for external slots, because in a guide the art is empty and `tyto guide` must write the guide
+  for a `.psd` no plugin decodes yet, the cited guide itself included; the slot then says
+  `W_EXTERNAL_ART_MISSING`, which `tyto guide` hides.

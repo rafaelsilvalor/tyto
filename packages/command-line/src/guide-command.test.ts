@@ -198,6 +198,37 @@ describe('tyto guide', { timeout: 30_000 }, () => {
     expect(errors.join('')).toContain('--open is not available here');
   });
 
+  it('writes the guide a brief cites by its layer with no decoder, which a render then names', async () => {
+    // A home, so the decoded cache is composed and a cited `.psd` meets "no plugin decodes it".
+    const home = await mkdtemp(join(tmpdir(), 'tyto-guide-home-'));
+    try {
+      const withHome = (): CliEnvironment => ({ ...environment(), home });
+      await writeFile(
+        join(workspace, 'arte.brief'),
+        BRIEF.replace('fundo: fundo.png', 'fundo: fundo.guide.psd#arte'),
+      );
+      const words = ['arte.brief', '--no-google-fonts', '--formats', 'story'];
+      expect(await run(['guide', ...words], withHome())).toBe(EXIT_OK);
+      expect(await readdir(join(workspace, 'assets'))).toEqual(['fundo.guide.psd']);
+
+      // The guide is there now and no plugin decodes it: writing it again still needs none.
+      expect(await run(['guide', ...words, '--all', '--force'], withHome())).toBe(EXIT_OK);
+      expect(errors.join('')).toBe('');
+
+      const rendered = join(workspace, 'out');
+      expect(await run(['render', ...words, '--out', rendered], withHome())).toBe(EXIT_DIAGNOSTICS);
+      expect(errors.join('')).toContain(
+        "arte.brief:4:1: error E_ASSET_DECODER_MISSING Asset 'fundo.guide.psd#arte' is a '.psd' file, which Tyto cannot draw by itself; install a plugin that decodes '.psd' files.",
+      );
+      // `imagem`, which the brief leaves uncited, is still art to paint; `fundo` is not.
+      expect(errors.join('')).not.toContain("Slot 'fundo'");
+      // The story's own copy is simply not there: the port has nothing to explain about it.
+      expect(errors.join('')).not.toContain('fundo.guide.story.psd');
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it('refuses --only a file the brief does not cite', async () => {
     expect(await guide('--only', 'outro.png')).toBe(EXIT_DIAGNOSTICS);
     expect(errors.join('')).toContain("the brief cites no external art named 'outro.png'");
