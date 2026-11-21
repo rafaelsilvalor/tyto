@@ -171,8 +171,9 @@ a stand-in decoder in an e2e; the version pull request; then the PSD plugin in i
   The preview asks the window plugins' decoders and an export asks its run's host, as each
   asks its sources. Unlike a fetch (ADR 0119), a compile while typing decodes, and so does the
   queue, as `tyto watch` does: a decode reaches no network, and a PSD saved again must redraw
-  the preview with no save of the brief. A restricted folder decodes nothing new, its miss
-  naming Workspace: Manage Trust; an unsaved brief has no folder and decodes nothing. The
+  the preview with no save of the brief. A restricted folder decodes nothing new, the queue's
+  included, its miss naming Workspace: Manage Trust; an unsaved brief has no folder and decodes
+  nothing. The
   preview's `references` (TYTO-741) name the file a layer is drawn from, `capa.psd` for
   `capa.psd#arte`, so saving the PSD is what recompiles the brief, and the hash memo then sees
   a new modified time and the cache key a new hash.

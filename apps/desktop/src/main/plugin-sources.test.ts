@@ -271,7 +271,11 @@ describe('when a compile may ask a plugin to decode (ADR 0223)', () => {
     ['save', { trust: 'restricted', open: true }, false, NOT_DECODED.restricted],
     ['typing', { trust: 'restricted' }, false, NOT_DECODED.restrictedElsewhere],
     ['export', { trust: 'trusted' }, true, undefined],
-    ['queue', { trust: 'restricted', open: true }, true, undefined],
+    ['queue', { trust: 'trusted' }, true, undefined],
+    ['queue', { trust: 'none' }, true, undefined],
+    // No exception for the queue: an untrusted folder is served the cache only.
+    ['queue', { trust: 'restricted', open: true }, false, NOT_DECODED.restricted],
+    ['queue', { trust: 'restricted' }, false, NOT_DECODED.restrictedElsewhere],
     ['save', undefined, false, NOT_DECODED.unsaved],
   ] as const)('%s with %o decodes: %s', async (intent, answer, decodes, because) => {
     trust = answer;

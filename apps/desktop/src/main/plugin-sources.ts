@@ -161,21 +161,29 @@ export function desktopSources(options: DesktopSourcesOptions): DesktopSources {
         notFetchedBecause: because,
         decoding: decodes,
       });
-      // Before the folder is asked anything: the queue's answer does not depend on it. It
-      // decodes, as `tyto watch` does (ADR 0223, decision 8).
-      if (intent === 'queue') return refused(NOT_FETCHED.queue, decoding(true));
       const trust = await options.trustFor(briefDirectory);
+      // An untrusted folder decodes nothing new, the queue's included (ADR 0223, decision 8):
+      // it is served what is cached, and the miss says to trust the folder.
+      const restricted =
+        trust?.trust === 'restricted'
+          ? decoding(
+              false,
+              trust.open === true ? NOT_DECODED.restricted : NOT_DECODED.restrictedElsewhere,
+            )
+          : undefined;
+      // The queue never fetches, whatever the folder (ADR 0118); it decodes as `tyto watch`
+      // does, unless its folder is not trusted.
+      if (intent === 'queue') return refused(NOT_FETCHED.queue, restricted ?? decoding(true));
       if (trust === undefined) {
         return refused(NOT_FETCHED.unsaved, decoding(false, NOT_DECODED.unsaved));
       }
       const sections = trust.sections;
       const sectionOf =
         sections === undefined ? {} : { sectionOf: (plugin: string) => sections[plugin] };
-      if (trust.trust === 'restricted') {
-        const elsewhere = trust.open !== true;
-        const because = elsewhere ? NOT_FETCHED.restrictedElsewhere : NOT_FETCHED.restricted;
-        const notDecoded = elsewhere ? NOT_DECODED.restrictedElsewhere : NOT_DECODED.restricted;
-        return { ...refused(because, decoding(false, notDecoded)), ...sectionOf };
+      if (restricted !== undefined) {
+        const because =
+          trust.open === true ? NOT_FETCHED.restricted : NOT_FETCHED.restrictedElsewhere;
+        return { ...refused(because, restricted), ...sectionOf };
       }
       // Typing decodes: a decode reaches no network, and a repainted PSD redraws the preview
       // with no save (ADR 0223, decision 8).
