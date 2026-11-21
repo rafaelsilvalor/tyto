@@ -1,7 +1,7 @@
 import { group } from '@tyto/core/template';
 
 import { type Align, type Block, at, block, stack } from './blocks.js';
-import { fields, lines, plain } from './rows.js';
+import { fields, plain } from './rows.js';
 import { type Measure, type TextStyle, grownTextBlock } from './text.js';
 
 import type { Inline, RichText } from '@tyto/core';
@@ -45,6 +45,11 @@ export type LevelItem =
 /**
  * A block's rich text as its items, in the order written.
  *
+ * A line ends where the block's line ends, never at a `\` the author typed: that break stays
+ * inside its part and is drawn there, so `# Concurso ABIN \ 2027` is one main part on two
+ * lines (TYTO-822). The spaces against a typed break are not words, and a break at either end
+ * of a part breaks nothing, so both are taken off.
+ *
  * Empty lines and empty parts are dropped, so `a | | b` is two parts. In a line with marks,
  * the main part is the first one at the highest level written (`#` before `##`). The block's
  * first line with none gets its main part by position — the only part, the first of two, or the
@@ -53,7 +58,7 @@ export type LevelItem =
  */
 export function levelsOf(text: RichText): LevelItem[] {
   const items: LevelItem[] = [];
-  for (const line of lines(text)) {
+  for (const line of blockLines(text)) {
     const written = plain(line).trim();
     if (written === '') continue;
     if (written === DIVIDER) {
@@ -61,6 +66,7 @@ export function levelsOf(text: RichText): LevelItem[] {
       continue;
     }
     const parts = fields(line)
+      .map(tidied)
       .filter((part) => plain(part).trim() !== '')
       .map(markOf);
     if (parts.length === 0) continue;
@@ -68,6 +74,47 @@ export function levelsOf(text: RichText): LevelItem[] {
     items.push({ kind: 'line', parts: ranked(parts, first) });
   }
   return items;
+}
+
+/**
+ * The block's lines, cut only at the boundary between two of them. `lines()` cuts at every break,
+ * which is right for a table reading each line as a record but would make a typed `\` start a
+ * new level line.
+ */
+function blockLines(text: RichText): RichText[] {
+  const result: Inline[][] = [[]];
+  for (const inline of text) {
+    if (inline.kind === 'break' && inline.typed !== true) result.push([]);
+    else result[result.length - 1]!.push(inline);
+  }
+  return result;
+}
+
+/** A part with the spaces against each typed break, and any break at its ends, taken off. */
+function tidied(part: RichText): RichText {
+  const inlines = [...part];
+  inlines.forEach((inline, index) => {
+    if (inline.kind !== 'break') return;
+    const before = inlines[index - 1];
+    if (before?.kind === 'text') inlines[index - 1] = trimmed(before, 'end');
+    const after = inlines[index + 1];
+    if (after?.kind === 'text') inlines[index + 1] = trimmed(after, 'start');
+  });
+  while (inlines[0]?.kind === 'break') inlines.shift();
+  while (inlines[inlines.length - 1]?.kind === 'break') inlines.pop();
+  return inlines.filter((inline) => inline.kind !== 'text' || inline.value !== '');
+}
+
+type TextInline = Extract<Inline, { kind: 'text' }>;
+
+function trimmed(inline: TextInline, side: 'start' | 'end'): TextInline {
+  const value = side === 'start' ? inline.value.trimStart() : inline.value.trimEnd();
+  const cut = inline.value.length - value.length;
+  const range =
+    side === 'start'
+      ? { start: Math.min(inline.range.start + cut, inline.range.end), end: inline.range.end }
+      : { start: inline.range.start, end: Math.max(inline.range.end - cut, inline.range.start) };
+  return { ...inline, value, range };
 }
 
 interface Marked {

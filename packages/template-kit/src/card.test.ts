@@ -292,6 +292,26 @@ describe('cardSegments', () => {
     ]);
   });
 
+  it('keeps a typed break inside the band’s words (TYTO-822)', () => {
+    let band: RichText = [];
+    cardSegments(
+      levelsOf([
+        { kind: 'text', value: 'Lote | # 40% ', range: { start: 0, end: 13 } },
+        { kind: 'break', typed: true, range: { start: 13, end: 14 } },
+        { kind: 'text', value: ' OFF', range: { start: 14, end: 18 } },
+      ]),
+      (role, parts) => {
+        if (role === 'band') band = parts[0]!.words;
+        return sized(rect({ name: role, size: { w: 10, h: 10 } }));
+      },
+    );
+    expect(band.map((inline) => (inline.kind === 'text' ? inline.value : '/'))).toEqual([
+      '40%',
+      '/',
+      'OFF',
+    ]);
+  });
+
   it('leaves out a role with no part, so the band reaches that edge', () => {
     expect(roles('# 40% OFF | Prazo')).toEqual(['band:band:1', 'plain:foot:1']);
     expect(roles('Lote | # 40% OFF')).toEqual(['plain:title:1', 'band:band:1']);
