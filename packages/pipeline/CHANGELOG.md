@@ -1,5 +1,21 @@
 # @tyto/pipeline
 
+## 0.13.3
+
+### Patch Changes
+
+- 8fe6719: An external-art slot whose cited file is there and cannot be drawn says why, as a plain
+  picture slot does: `E_ASSET_DECODER_MISSING` when no installed plugin decodes it, and
+  `E_ASSET_DECODE_FAILED` with the plugin's message when its decode failed, at the brief's line.
+  The outlined box still stands in for the art. A guide asks no decoder: `tyto guide` writes the
+  guide for a cited `.psd` with no plugin installed, the guide itself included.
+- Updated dependencies [8fe6719]
+  - @tyto/core@0.55.1
+  - @tyto/brief-lang@0.12.7
+  - @tyto/plugin-api@0.28.2
+  - @tyto/raster@0.2.5
+  - @tyto/template-lang@0.8.32
+
 ## 0.13.2
 
 ### Patch Changes

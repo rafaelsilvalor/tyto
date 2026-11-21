@@ -1,5 +1,13 @@
 # @tyto/plugin-api
 
+## 0.28.2
+
+### Patch Changes
+
+- Updated dependencies [8fe6719]
+  - @tyto/core@0.55.1
+  - @tyto/recipe@0.14.3
+
 ## 0.28.1
 
 ### Patch Changes

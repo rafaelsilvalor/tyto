@@ -1,5 +1,40 @@
 # @tyto/command-line
 
+## 0.12.0
+
+### Minor Changes
+
+- 5824b78: `tyto render`, `tyto watch`, `tyto guide` and `tyto mcp` draw a file an installed plugin
+  decodes (TYTO-742, ADR 0223): `capa.psd` as a whole, `capa.psd#arte` as one layer, decoded
+  once into `TYTO_HOME/cache/decoded/` and read from there until the file or the plugin changes.
+  A restricted folder decodes nothing new and says to trust it; `tyto watch` decodes. With no
+  decoder installed for the kind, the brief's line says a plugin is needed. `tyto guide` names a
+  cited layer's guide after its file, never the layer, and `tyto mcp` confines the cited file to
+  its folder while drawing the decoded picture from the cache.
+
+### Patch Changes
+
+- 8fe6719: An external-art slot whose cited file is there and cannot be drawn says why, as a plain
+  picture slot does: `E_ASSET_DECODER_MISSING` when no installed plugin decodes it, and
+  `E_ASSET_DECODE_FAILED` with the plugin's message when its decode failed, at the brief's line.
+  The outlined box still stands in for the art. A guide asks no decoder: `tyto guide` writes the
+  guide for a cited `.psd` with no plugin installed, the guide itself included.
+- Updated dependencies [8fe6719]
+  - @tyto/core@0.55.1
+  - @tyto/pipeline@0.13.3
+  - @tyto/brief-lang@0.12.7
+  - @tyto/export-html@0.8.13
+  - @tyto/export-psd@0.1.3
+  - @tyto/export-svg@2.1.13
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.35
+  - @tyto/io@5.14.1
+  - @tyto/plugin-api@0.28.2
+  - @tyto/raster@0.2.5
+  - @tyto/recipe@0.14.3
+  - @tyto/template-lang@0.8.32
+  - @tyto/templates@1.3.4
+
 ## 0.11.3
 
 ### Patch Changes
