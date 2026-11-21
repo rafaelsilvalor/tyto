@@ -72,6 +72,80 @@ export function rangeOfArtwork(
   return artworks.find((artwork) => artwork.id === id)?.range;
 }
 
+/** One line of a text: where it starts, how long it is without its ending, and with it. */
+interface Line {
+  readonly start: number;
+  readonly length: number;
+  readonly raw: string;
+}
+
+/** The lines of `text`, each with its own ending, by the same rule as {@link lineColumnAt}. */
+function linesOf(text: string): readonly Line[] {
+  const lines: Line[] = [];
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character !== '\n' && character !== '\r') continue;
+    const length = index - start;
+    if (character === '\r' && text[index + 1] === '\n') index += 1;
+    lines.push({ start, length, raw: text.slice(start, index + 1) });
+    start = index + 1;
+  }
+  lines.push({ start, length: text.length - start, raw: text.slice(start) });
+  return lines;
+}
+
+/**
+ * Where `range`, a pair of offsets into `compiled`, falls in `current` (TYTO-819).
+ *
+ * An artwork's range indexes the text it was rendered from, and the buffer may have moved on
+ * by the time a thumbnail is clicked: the compile waits for a pause in typing. Used as they
+ * are, the offsets of the slide after an edit that shortened the text by two characters land
+ * two characters late, and the cursor ends on the next slide's line.
+ *
+ * **Compared line by line, from both ends.** The lines the two texts share at the top keep
+ * their offsets, the lines they share at the bottom keep their place counted from the end,
+ * and a line between the two is taken to be the edited one at the same distance from the
+ * top. Whole lines rather than characters because a directive is a line: a character diff
+ * would match a slide inserted above `::lamina b` against its own `::lamina ` and leave the
+ * cursor on the newcomer. The column is kept and clamped to the line it lands on.
+ *
+ * One edit between the compile and the click — the ordinary case, since a compile follows
+ * every pause — maps exactly. Two edits far apart map exactly everywhere but between them,
+ * where the line count of the first is not accounted for; the next compile resets the base.
+ */
+export function followEdits(range: SourceRange, compiled: string, current: string): SourceRange {
+  if (compiled === current) return range;
+  const before = linesOf(compiled);
+  const after = linesOf(current);
+  const shorter = Math.min(before.length, after.length);
+  let top = 0;
+  while (top < shorter && before[top]!.raw === after[top]!.raw) top += 1;
+  let bottom = 0;
+  while (
+    bottom < shorter - top &&
+    before[before.length - 1 - bottom]!.raw === after[after.length - 1 - bottom]!.raw
+  ) {
+    bottom += 1;
+  }
+
+  const map = (offset: number): number => {
+    const clamped = Math.max(0, Math.min(offset, compiled.length));
+    let index = before.length - 1;
+    while (index > 0 && before[index]!.start > clamped) index -= 1;
+    const column = clamped - before[index]!.start;
+    let target: number;
+    if (index >= before.length - bottom) target = index - before.length + after.length;
+    else if (index < top) target = index;
+    else target = Math.min(index, Math.max(top, after.length - bottom - 1));
+    const line = after[Math.min(target, after.length - 1)]!;
+    return line.start + Math.min(column, line.length);
+  };
+
+  const start = map(range.start);
+  return { start, end: Math.max(start, map(range.end)) };
+}
+
 /**
  * As much of a CodeMirror view as moving the cursor needs.
  *
