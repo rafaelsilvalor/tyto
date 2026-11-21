@@ -408,6 +408,8 @@ export async function createExportService(options: ExportServiceOptions): Promis
             ...asked,
             assetSources: () => host.registry.assetSources(),
             fontSources: runFontSources,
+            // The run's own decoders, as its sources (ADR 0223): the activation it reports.
+            decoding: { ...asked.decoding, decoders: () => host.registry.imageDecoders() },
           };
     // The template the job loads, kept for the one question only its manifest answers: which
     // free families stand in for a face nobody can supply (ADR 0120).
@@ -469,7 +471,8 @@ export async function createExportService(options: ExportServiceOptions): Promis
             briefDirectory: request.briefDirectory,
             projectAssets: places.assets,
           });
-    const resolved = pluginSources === undefined ? files : pluginSources.cache.assets(files, call);
+    // A file a plugin decodes inside the source cache (ADR 0223), as `tyto render` composes it.
+    const resolved = pluginSources === undefined ? files : pluginSources.assets(files, call);
     // A delivery's export copies what the brief drew from into its `assets/` (ADR 0161), so it
     // records each image as the run resolves it, after the source cache, which marks a fetch.
     const recorder = forDelivery?.ok === true ? recordingAssetResolver(resolved) : undefined;

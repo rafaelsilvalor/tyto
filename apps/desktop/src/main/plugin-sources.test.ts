@@ -1,18 +1,29 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crc32, deflateSync } from 'node:zlib';
 
-import { type Plugin, PLUGIN_API_VERSION, type LoadedPlugins } from '@tyto/plugin-api';
+import {
+  type Plugin,
+  PLUGIN_API_VERSION,
+  type LoadedPlugins,
+  decodeGrants,
+} from '@tyto/plugin-api';
 import { err, ok, diagnostic } from '@tyto/core';
 import { nodeFileSystem } from '@tyto/io';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createExportService } from './export.js';
 import { fontsFor } from './fonts.js';
-import { ASK_AGAIN, type DesktopSources, NOT_FETCHED, desktopSources } from './plugin-sources.js';
+import {
+  ASK_AGAIN,
+  type DesktopSources,
+  NOT_DECODED,
+  NOT_FETCHED,
+  desktopSources,
+} from './plugin-sources.js';
 import { createPreviewService } from './preview.js';
 import { createProjectSources } from './project.js';
 import { windowPlugins } from './window-plugins.js';
@@ -56,6 +67,7 @@ function solidPng([red, green, blue]: readonly number[]): Buffer {
 }
 
 const LOGO = solidPng([12, 35, 64]);
+const OTHER = solidPng([200, 40, 40]);
 
 const briefNaming = (reference: string): string =>
   [
@@ -102,20 +114,54 @@ const sourcesPlugin: Plugin = {
     }),
 };
 
-const installed = (): LoadedPlugins => ({
-  plugins: [sourcesPlugin],
+/** Every decode the stand-in decoder answered: the file's name, size and layer. */
+let decoded: string[];
+
+/**
+ * A stand-in `image-decoder` for `.fake` (ADR 0223): it draws the logo for a file of one size
+ * and the other colour for any other, so a rewritten file is told apart by what is embedded.
+ * In process, it reads nothing through its token; the e2e reads through the real one.
+ */
+const decoderPlugin: Plugin = {
+  id: 'decodificador',
+  manifest: {
+    name: 'decodificador',
+    version: '1.0.0',
+    engine: `>=${PLUGIN_API_VERSION}`,
+    contributes: ['image-decoder'],
+    permissions: [],
+  },
+  activate: (host) =>
+    host.registerImageDecoder({
+      id: 'fake',
+      extensions: ['.fake'],
+      decode: (file, request) => {
+        decoded.push(`${file.name} ${String(file.size)} ${request.layer ?? ''}`);
+        return ok({ bytes: new Uint8Array(file.size === 4 ? LOGO : OTHER) });
+      },
+    }),
+};
+
+const installed = (plugins: readonly Plugin[] = [sourcesPlugin, decoderPlugin]): LoadedPlugins => ({
+  plugins,
   warnings: [],
   close: () => Promise.resolve(),
 });
 
-async function sources(): Promise<DesktopSources> {
-  const contributed = windowPlugins(Promise.resolve(installed()));
+async function sources(plugins?: readonly Plugin[]): Promise<DesktopSources> {
+  const contributed = windowPlugins(Promise.resolve(installed(plugins)));
   await contributed.ready;
+  const grants = decodeGrants();
   return desktopSources({
     home,
     assetSources: () => contributed.assetSources(),
     fontSources: () => contributed.fontSources(),
     trustFor: (directory) => Promise.resolve(directory === undefined ? undefined : trust),
+    decoders: {
+      imageDecoders: () => contributed.imageDecoders(),
+      decode: (decoder, subject, request) => grants.decode(decoder, subject, request),
+      versionOf: (plugin) => contributed.versionOf(plugin),
+    },
   });
 }
 
@@ -137,6 +183,7 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'tyto-desktop-sources-home-'));
   folder = mkdtempSync(join(tmpdir(), 'tyto-desktop-sources-brief-'));
   asked = [];
+  decoded = [];
   failing = false;
   trust = { trust: 'none' };
 });
@@ -216,6 +263,82 @@ describe('the preview, with a plugin that supplies images', () => {
   });
 });
 
+describe('when a compile may ask a plugin to decode (ADR 0223)', () => {
+  it.each([
+    ['typing', { trust: 'trusted' }, true, undefined],
+    ['typing', { trust: 'none' }, true, undefined],
+    ['save', { trust: 'trusted' }, true, undefined],
+    ['save', { trust: 'restricted', open: true }, false, NOT_DECODED.restricted],
+    ['typing', { trust: 'restricted' }, false, NOT_DECODED.restrictedElsewhere],
+    ['export', { trust: 'trusted' }, true, undefined],
+    ['queue', { trust: 'restricted', open: true }, true, undefined],
+    ['save', undefined, false, NOT_DECODED.unsaved],
+  ] as const)('%s with %o decodes: %s', async (intent, answer, decodes, because) => {
+    trust = answer;
+    const call = await (await sources()).callFor(folder, intent);
+    expect(call.decoding.decodes).toBe(decodes);
+    expect(call.decoding.notDecodedBecause).toBe(because);
+  });
+});
+
+describe('the preview, with a plugin that decodes a file kind (ADR 0223)', () => {
+  const embedsOther = (html: string | undefined): boolean =>
+    (html ?? '').includes(OTHER.toString('base64'));
+
+  it('draws the layer while typing, names the cited file, and redraws a rewritten one', async () => {
+    const preview = await previewWith(await sources());
+    const brief = briefNaming('capa.fake#arte');
+    writeFileSync(join(folder, 'capa.fake'), 'four');
+
+    const first = await preview.preview(brief, folder, 'typing');
+    expect(decoded).toEqual(['capa.fake 4 arte']);
+    expect(embeds(first.frames[0]?.html)).toBe(true);
+    // The file whose change redraws the preview, never the cached PNG (TYTO-741's redraw).
+    expect(first.references).toContain('capa.fake');
+    expect(first.references.some((reference) => reference.endsWith('.png'))).toBe(false);
+
+    // The same file again is the cache's: the plugin is not asked twice.
+    await preview.preview(brief, folder, 'typing');
+    expect(decoded).toHaveLength(1);
+
+    writeFileSync(join(folder, 'capa.fake'), 'painted again');
+    const redrawn = await preview.preview(brief, folder, 'typing');
+    expect(decoded).toEqual(['capa.fake 4 arte', 'capa.fake 13 arte']);
+    expect(embedsOther(redrawn.frames[0]?.html)).toBe(true);
+  });
+
+  it('serves a restricted folder the cache only, and says to trust it on a miss', async () => {
+    writeFileSync(join(folder, 'capa.fake'), 'four');
+    const preview = await previewWith(await sources());
+    await preview.preview(briefNaming('capa.fake'), folder, 'typing');
+    expect(decoded).toHaveLength(1);
+
+    trust = { trust: 'restricted', open: true };
+    const cached = await preview.preview(briefNaming('capa.fake'), folder, 'typing');
+    expect(embeds(cached.frames[0]?.html)).toBe(true);
+    const missed = await preview.preview(briefNaming('capa.fake#outra'), folder, 'save');
+    expect(decoded).toHaveLength(1);
+    const failed = missed.diagnostics.filter(({ code }) => code === 'E_ASSET_DECODE_FAILED');
+    expect(failed.map(({ message }) => message)).toEqual([
+      expect.stringContaining(NOT_DECODED.restricted),
+    ]);
+  });
+
+  it('says a plugin is needed, at the line, when none decodes the extension', async () => {
+    writeFileSync(join(folder, 'capa.fake'), 'four');
+    const preview = await previewWith(await sources([sourcesPlugin]));
+    const brief = briefNaming('capa.fake#arte');
+    const result = await preview.preview(brief, folder, 'save');
+    const missing = result.diagnostics.filter(({ code }) => code === 'E_ASSET_DECODER_MISSING');
+    expect(missing).toHaveLength(1);
+    // The editor underlines what the range covers, on the line that cites the file.
+    const start = missing[0]?.range?.start ?? -1;
+    expect(start).toBeGreaterThan(0);
+    const line = brief.slice(brief.lastIndexOf('\n', start) + 1, brief.indexOf('\n', start));
+    expect(line).toBe('imagem: capa.fake#arte');
+  });
+});
+
 describe('the export, with the same cache', () => {
   async function exportWith(pluginSources: DesktopSources) {
     return createExportService({
@@ -226,6 +349,29 @@ describe('the export, with the same cache', () => {
       pluginSources,
     });
   }
+
+  it("draws a decoded file through the run's own decoders (ADR 0223)", async () => {
+    const service = await exportWith(await sources());
+    const brief = briefNaming('capa.fake#arte');
+    const out = join(folder, 'out');
+    writeFileSync(join(folder, 'capa.fake'), 'four');
+
+    const exported = await service.run({
+      brief,
+      directory: out,
+      briefDirectory: folder,
+      label: 'promo',
+      outputs: [{ kind: 'svg' }],
+    });
+    expect(exported.diagnostics.filter(({ code }) => code.startsWith('E_'))).toEqual([]);
+    expect(decoded).toEqual(['capa.fake 4 arte']);
+    const written = readdirSync(out, { recursive: true, encoding: 'utf8' }).filter((name) =>
+      name.endsWith('.svg'),
+    );
+    expect(written).toHaveLength(1);
+    const svg = readFileSync(join(out, written[0] ?? ''), 'utf8');
+    expect(svg).toContain(LOGO.toString('base64'));
+  });
 
   it('fetches from the export box, and never for a queued task', async () => {
     const service = await exportWith(await sources());

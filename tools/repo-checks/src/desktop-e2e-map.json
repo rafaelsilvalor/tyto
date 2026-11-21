@@ -472,8 +472,12 @@
     },
     {
       "paths": ["apps/desktop/src/main/plugin-sources.ts"],
-      "e2e": ["google-fonts.desktop.test.ts", "plugin-sources.desktop.test.ts"],
-      "why": "reviewed: when the preview, the export and the queue may fetch a plugin's image or face (TYTO-280, ADR 0119); only that suite installs a source"
+      "e2e": [
+        "decoded-assets.desktop.test.ts",
+        "google-fonts.desktop.test.ts",
+        "plugin-sources.desktop.test.ts"
+      ],
+      "why": "reviewed: when the preview, the export and the queue may fetch a plugin's image or face (TYTO-280, ADR 0119), or ask a plugin to decode a file (TYTO-742, ADR 0223); only those suites install a source or a decoder"
     },
     {
       "paths": ["apps/desktop/src/main/plugin-wire.ts"],
@@ -2141,6 +2145,11 @@
       ],
       "e2e": ["art-guide.desktop.test.ts"],
       "why": "TYTO-741, ADR 0222: the external-art guide written by tyto guide in main, opened or shown in its folder, its dialog in the window, and a brief's preview compiled again when art it cites appears"
+    },
+    {
+      "paths": ["apps/desktop/e2e/decoded-assets.desktop.test.ts"],
+      "e2e": ["decoded-assets.desktop.test.ts"],
+      "why": "TYTO-742, ADR 0223: a file an installed plugin decodes through main's token table, drawn in the preview, redrawn when it is repainted, and the missing-decoder problem on the brief's line"
     }
   ]
 }

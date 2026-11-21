@@ -106,9 +106,14 @@ export interface PreviewResult {
  */
 function recording(resolver: AssetResolver, asked: Set<string>): AssetResolver {
   const recorder = Object.create(resolver) as AssetResolver & { resolve: AssetResolver['resolve'] };
-  recorder.resolve = (reference) => {
+  recorder.resolve = async (reference) => {
     asked.add(reference);
-    return resolver.resolve(reference);
+    const found = await resolver.resolve(reference);
+    // A layer of a file a plugin decodes (`capa.psd#arte`, ADR 0223) is drawn from `capa.psd`:
+    // that is the file whose change redraws it, never the reference nor the cached PNG.
+    const layer = resolver.layerOf?.(reference);
+    if (layer !== undefined) asked.add(layer.file);
+    return found;
   };
   return recorder;
 }
@@ -271,10 +276,16 @@ export async function createPreviewService(
       const { fonts } = inForce;
       const files =
         baseDirectory === undefined
-          ? noAssets
+          ? undefined
           : briefAssetResolver({ briefDirectory: baseDirectory, projectAssets: places.assets });
+      // A file a plugin decodes inside the source cache (ADR 0223), as `tyto render` composes
+      // it; an unsaved brief has no folder to decode from, and reads the source cache alone.
       const assets = recording(
-        pluginSources === undefined ? files : pluginSources.cache.assets(files, call),
+        pluginSources === undefined
+          ? (files ?? noAssets)
+          : files === undefined
+            ? pluginSources.cache.assets(noAssets, call)
+            : pluginSources.assets(files, call),
         asked,
       );
 

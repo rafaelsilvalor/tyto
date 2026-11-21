@@ -26,6 +26,10 @@ Under the list, after writing, the dialog says which files it wrote and how they
 
 Save the picture painted from the guide under the name in the **Art to save** column. The preview draws it as soon as the file is saved, with no keystroke and no change to the brief.
 
+## Cite the PSD itself
+
+With a plugin installed that decodes PSD files, the brief can cite the PSD instead of a PNG saved from it: `fundo: grafico.psd` draws the whole file, and `fundo: grafico.psd#arte` the layer named `arte` (a layer in a group is `grupo/arte`). Saving the PSD again redraws the preview, with no keystroke. With no such plugin installed, the Problems panel says `E_ASSET_DECODER_MISSING` on the brief's line. In a folder you have not trusted, no plugin decodes anything new: a picture decoded before still shows, and a new one asks you to trust the folder with **Workspace: Manage Trust**.
+
 ## A brief with unsaved edits
 
 A guide is drawn from the brief's file, not from what is typed. When the brief has edits that are not saved, **Write guides** first asks **Save the brief first?**. **Save and write** saves it and writes the guides; **Cancel** writes nothing, and the dialog says so.

@@ -46,7 +46,7 @@ import {
   syncPluginFiles as syncPluginFolders,
   withoutRefused,
 } from '@tyto/io';
-import { NO_PLUGINS, type ThemeKind, createPluginHost } from '@tyto/plugin-api';
+import { NO_PLUGINS, type ThemeKind, createPluginHost, decodeGrants } from '@tyto/plugin-api';
 
 import { type CatalogueKey, type Locale, localeFor, translate } from '../../shared/i18n/index.js';
 import {
@@ -1080,11 +1080,17 @@ async function start(): Promise<void> {
       toWindow('signin:changed', {});
     },
   });
+  // The decode tokens main hands out (ADR 0223): one table for the process, as `tyto render`
+  // keeps one, because the plugins' processes are started once and every run's host asks them.
+  // A compile mints a token through `decode` for one call; the plugin reads through it here.
+  const decodes = decodeGrants();
   const capabilities = {
     ...desktopCapabilities(credentials, (url, init) => net.fetch(url, init), {
       home: pluginsHome,
       workspace: () => workspace.state(),
     }),
+    decodeReadPart: (plugin: string, token: string, offset: number, length: number) =>
+      decodes.readPart(plugin, token, offset, length),
     ...signinCapabilities(signin),
     startProcess: programs.startProcess,
     // A tab for a plugin's declared program (ADR 0184 decision 6), such as an agent's login:
@@ -1380,6 +1386,12 @@ async function start(): Promise<void> {
     fontSources: () => contributed.fontSources(),
     trustFor: (directory) => workspace.sourceTrustFor(directory),
     ready: contributed.ready,
+    // A file a plugin decodes (ADR 0223), through the token table the plugins read from.
+    decoders: {
+      imageDecoders: () => contributed.imageDecoders(),
+      decode: (decoder, subject, request) => decodes.decode(decoder, subject, request),
+      versionOf: (plugin) => contributed.versionOf(plugin),
+    },
     // The built-in Google Fonts source (ADR 0120), behind the same cache and rule, on the
     // window's own network. Where it connects is the environment's alone: a test server.
     googleFonts: windowGoogleFonts({

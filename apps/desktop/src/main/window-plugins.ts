@@ -9,6 +9,7 @@ import {
   type InProcessHost,
   type LoadedPlugins,
   NO_PLUGINS,
+  type OwnedImageDecoder,
   type OwnedSource,
   type PanelContribution,
   type Plugin,
@@ -64,6 +65,13 @@ export interface WindowPlugins {
    */
   assetSources(): readonly OwnedSource<AssetSourceContribution>[];
   fontSources(): readonly OwnedSource<FontSourceContribution>[];
+  /**
+   * The installed plugins' `image-decoder` (ADR 0223), which the preview asks through the
+   * app's decoded cache. Empty until the plugins have started.
+   */
+  imageDecoders(): readonly OwnedImageDecoder[];
+  /** A plugin's version from its manifest, in the decoded cache's key (ADR 0223, decision 5). */
+  versionOf(plugin: string): string | undefined;
   /**
    * The settings the installed plugins declared, prefixed with their ids (TYTO-254, ADR 0145).
    * Empty until the plugins have started, like the directives.
@@ -199,6 +207,14 @@ export function pluginsInForce(
   return [...fetched, ...installed.filter((plugin) => !replaced.has(plugin.id))];
 }
 
+/** The `version` a plugin's manifest declares, read as `tyto render` reads it. */
+function versionInManifest(plugin: Plugin | undefined): string | undefined {
+  const manifest = plugin?.manifest;
+  if (typeof manifest !== 'object' || manifest === null) return undefined;
+  const { version } = manifest as { readonly version?: unknown };
+  return typeof version === 'string' ? version : undefined;
+}
+
 export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
   let installed: readonly Plugin[] = [];
   let fetched = NO_FETCHED;
@@ -251,6 +267,11 @@ export function windowPlugins(plugins: Promise<LoadedPlugins>): WindowPlugins {
     brandKits: () => (started ? registry().brandKitsByBrand() : noKits),
     assetSources: () => (started ? registry().assetSources() : []),
     fontSources: () => (started ? registry().fontSources() : []),
+    imageDecoders: () => (started ? registry().imageDecoders() : []),
+    versionOf: (plugin) =>
+      versionInManifest(
+        pluginsInForce(fetched.loaded.plugins, installed).find(({ id }) => id === plugin),
+      ),
     configurations: () => (started ? registry().configurations() : []),
     configure: (next) => {
       config = next;

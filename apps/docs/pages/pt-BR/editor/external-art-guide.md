@@ -26,6 +26,10 @@ Abaixo da lista, depois de gerar, a caixa diz quais arquivos gravou e como eles 
 
 Salve a imagem pintada a partir do gabarito com o nome da coluna **Arte a salvar**. A prévia desenha a imagem assim que o arquivo é salvo, sem tecla nenhuma e sem mudar o brief.
 
+## Citar o próprio PSD
+
+Com um plugin instalado que decodifica arquivos PSD, o brief pode citar o PSD em vez de um PNG salvo a partir dele: `fundo: grafico.psd` desenha o arquivo inteiro, e `fundo: grafico.psd#arte` a camada chamada `arte` (uma camada dentro de um grupo é `grupo/arte`). Salvar o PSD de novo redesenha a prévia, sem tecla nenhuma. Sem esse plugin instalado, o painel de problemas mostra `E_ASSET_DECODER_MISSING` na linha do brief. Numa pasta em que você não confiou, nenhum plugin decodifica nada novo: uma imagem já decodificada antes continua aparecendo, e uma nova pede para confiar na pasta com **Workspace: Manage Trust**.
+
 ## Um brief com alterações não salvas
 
 O gabarito é desenhado a partir do arquivo do brief, não do que está digitado. Quando o brief tem alterações não salvas, **Gerar gabaritos** pergunta antes **Salvar o brief antes?**. **Salvar e gerar** salva e grava os gabaritos; **Cancelar** não grava nada, e a caixa diz isso.
