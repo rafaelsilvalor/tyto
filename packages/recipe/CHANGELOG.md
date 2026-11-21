@@ -1,5 +1,13 @@
 # @tyto/recipe
 
+## 0.14.3
+
+### Patch Changes
+
+- Updated dependencies [8fe6719]
+  - @tyto/core@0.55.1
+  - @tyto/brief-lang@0.12.7
+
 ## 0.14.2
 
 ### Patch Changes

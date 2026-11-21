@@ -1,5 +1,36 @@
 # @tyto/desktop
 
+## 0.29.0
+
+### Minor Changes
+
+- fbcea50: The window's preview, export and queue draw a file an installed plugin decodes (TYTO-742,
+  ADR 0223): `capa.psd` as a whole, `capa.psd#arte` as one layer, read by the plugin through a
+  token main hands it for one call, and kept in `TYTO_HOME/cache/decoded/`. Saving the cited file
+  again redraws the preview with no keystroke. A folder the window has not trusted decodes nothing
+  new and says to trust it; with no decoder installed for the kind, the brief's line says a plugin
+  is needed.
+
+### Patch Changes
+
+- Updated dependencies [5824b78]
+- Updated dependencies [8fe6719]
+  - @tyto/command-line@0.12.0
+  - @tyto/core@0.55.1
+  - @tyto/pipeline@0.13.3
+  - @tyto/brief-lang@0.12.7
+  - @tyto/editor@0.21.10
+  - @tyto/export-html@0.8.13
+  - @tyto/export-svg@2.1.13
+  - @tyto/fonts@0.5.0
+  - @tyto/google-fonts@0.1.35
+  - @tyto/io@5.14.1
+  - @tyto/plugin-api@0.28.2
+  - @tyto/recipe@0.14.3
+  - @tyto/template-lang@0.8.32
+  - @tyto/templates@1.3.4
+  - @tyto/theme-pack@0.1.35
+
 ## 0.28.1
 
 ### Patch Changes
