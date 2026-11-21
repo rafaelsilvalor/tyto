@@ -164,3 +164,16 @@ a stand-in decoder in an e2e; the version pull request; then the PSD plugin in i
   no file has the literal name; which plugin decodes it is the render's question, not the
   guide's. With no `TYTO_HOME` the cache is not composed, so a cited `.psd` stays
   `E_ASSET_NOT_FOUND` there; a CLI always has a home in practice.
+- **2026-11-20 (TYTO-742, the desktop): one token table in main, and typing decodes.** Main
+  keeps one `decodeGrants()` for its life, beside the capabilities every plugin process is
+  started with, as the command line keeps one per process; `desktopSources` composes one
+  `decodedAssets` for the process inside the source cache, so the hash memo outlives a compile.
+  The preview asks the window plugins' decoders and an export asks its run's host, as each
+  asks its sources. Unlike a fetch (ADR 0119), a compile while typing decodes, and so does the
+  queue, as `tyto watch` does: a decode reaches no network, and a PSD saved again must redraw
+  the preview with no save of the brief. A restricted folder decodes nothing new, the queue's
+  included, its miss naming Workspace: Manage Trust; an unsaved brief has no folder and decodes
+  nothing. The
+  preview's `references` (TYTO-741) name the file a layer is drawn from, `capa.psd` for
+  `capa.psd#arte`, so saving the PSD is what recompiles the brief, and the hash memo then sees
+  a new modified time and the cache key a new hash.

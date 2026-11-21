@@ -1,7 +1,17 @@
-import { type SourceCache, type SourceCall, sourceCache } from '@tyto/io';
+import type { AssetResolver } from '@tyto/core';
+import {
+  type DecodeCall,
+  type DecodePort,
+  type LocatingAssetResolver,
+  type SourceCache,
+  type SourceCall,
+  decodedAssets,
+  sourceCache,
+} from '@tyto/io';
 import type {
   AssetSourceContribution,
   FontSourceContribution,
+  OwnedImageDecoder,
   OwnedSource,
 } from '@tyto/plugin-api';
 
@@ -42,6 +52,19 @@ export const NOT_FETCHED = {
   unsaved: 'not fetched: a brief fetches from a plugin once it is saved in a folder',
 } as const;
 
+/**
+ * What a miss says when no plugin decoded a cited file (ADR 0223, decision 8). Only a restricted
+ * folder decodes nothing new: a decode reads a file already on this machine and reaches no
+ * network, so typing and the queue decode, as `tyto watch` does. Exported for the tests.
+ */
+export const NOT_DECODED = {
+  restricted:
+    'this folder is not trusted, so no plugin decodes for it; trust it with Workspace: Manage Trust to decode',
+  restrictedElsewhere:
+    "this brief's folder is not trusted, so no plugin decodes for it; open that folder and trust it with Workspace: Manage Trust to decode",
+  unsaved: 'not decoded: a brief decodes a file through a plugin once it is saved in a folder',
+} as const;
+
 /** Added to a failed fetch's own reason, because the cache will not ask again by itself. */
 export const ASK_AGAIN = 'Tyto asks again after a restart, or for a different reference';
 
@@ -65,6 +88,21 @@ export interface DesktopSourcesOptions {
    * under the same rule. Absent: off.
    */
   readonly googleFonts?: WindowGoogleFonts;
+  /**
+   * The window plugins' `image-decoder` (ADR 0223), the call that mints a token for one decode,
+   * and each plugin's version for the cache key. Absent: a file no browser draws is
+   * `E_ASSET_NOT_FOUND`, as before plugins could decode one.
+   */
+  readonly decoders?: {
+    readonly imageDecoders: () => readonly OwnedImageDecoder[];
+    readonly decode: DecodePort;
+    readonly versionOf: (plugin: string) => string | undefined;
+  };
+}
+
+/** One compile's rule: the source cache's, and whether a plugin may decode (ADR 0223). */
+export interface DesktopCall extends SourceCall {
+  readonly decoding: DecodeCall;
 }
 
 export interface DesktopSources {
@@ -74,7 +112,13 @@ export interface DesktopSources {
   /** Every font source the preview asks: the window plugins', then Google's while it is on. */
   fontSources(): readonly OwnedSource<FontSourceContribution>[];
   /** The rule for one compile of a brief in `briefDirectory`, asked for `intent`. */
-  callFor(briefDirectory: string | undefined, intent: SourceIntent): Promise<SourceCall>;
+  callFor(briefDirectory: string | undefined, intent: SourceIntent): Promise<DesktopCall>;
+  /**
+   * `files` with what plugins supply around it: a file a plugin decodes, answered from
+   * `TYTO_HOME/cache/decoded/` (ADR 0223), inside the source cache (ADR 0117), as `tyto render`
+   * composes them. `call` is {@link callFor}'s, a run's own decoders and sources added.
+   */
+  assets(files: LocatingAssetResolver, call: DesktopCall | undefined): AssetResolver;
 }
 
 export function desktopSources(options: DesktopSourcesOptions): DesktopSources {
@@ -90,32 +134,70 @@ export function desktopSources(options: DesktopSourcesOptions): DesktopSources {
     remembersFailures: { retry: ASK_AGAIN },
   });
 
+  const decoders = options.decoders;
+  // One for the process, as the source cache: it remembers each cited file's hash by its real
+  // path, size and modified time, so a 100 MB PSD is not hashed again on every keystroke.
+  const decoded =
+    decoders === undefined
+      ? undefined
+      : decodedAssets({
+          home: options.home,
+          decoders: decoders.imageDecoders,
+          decode: decoders.decode,
+          versionOf: decoders.versionOf,
+          // Never used: every call says whether it decodes.
+          decodes: false,
+        });
+  const decoding = (decodes: boolean, because?: string): DecodeCall =>
+    because === undefined ? { decodes } : { decodes, notDecodedBecause: because };
+
   return {
     cache,
     googleFonts,
     fontSources,
     async callFor(briefDirectory, intent) {
-      const refused = (because: string): SourceCall => ({
+      const refused = (because: string, decodes: DecodeCall): DesktopCall => ({
         fetches: false,
         notFetchedBecause: because,
+        decoding: decodes,
       });
-      // Before the folder is asked anything: the queue's answer does not depend on it.
-      if (intent === 'queue') return refused(NOT_FETCHED.queue);
       const trust = await options.trustFor(briefDirectory);
-      if (trust === undefined) return refused(NOT_FETCHED.unsaved);
+      // An untrusted folder decodes nothing new, the queue's included (ADR 0223, decision 8):
+      // it is served what is cached, and the miss says to trust the folder.
+      const restricted =
+        trust?.trust === 'restricted'
+          ? decoding(
+              false,
+              trust.open === true ? NOT_DECODED.restricted : NOT_DECODED.restrictedElsewhere,
+            )
+          : undefined;
+      // The queue never fetches, whatever the folder (ADR 0118); it decodes as `tyto watch`
+      // does, unless its folder is not trusted.
+      if (intent === 'queue') return refused(NOT_FETCHED.queue, restricted ?? decoding(true));
+      if (trust === undefined) {
+        return refused(NOT_FETCHED.unsaved, decoding(false, NOT_DECODED.unsaved));
+      }
       const sections = trust.sections;
       const sectionOf =
         sections === undefined ? {} : { sectionOf: (plugin: string) => sections[plugin] };
-      if (trust.trust === 'restricted') {
+      if (restricted !== undefined) {
         const because =
           trust.open === true ? NOT_FETCHED.restricted : NOT_FETCHED.restrictedElsewhere;
-        return { ...refused(because), ...sectionOf };
+        return { ...refused(because, restricted), ...sectionOf };
       }
-      if (intent === 'typing') return { ...refused(NOT_FETCHED.typing), ...sectionOf };
+      // Typing decodes: a decode reaches no network, and a repainted PSD redraws the preview
+      // with no save (ADR 0223, decision 8).
+      if (intent === 'typing') {
+        return { ...refused(NOT_FETCHED.typing, decoding(true)), ...sectionOf };
+      }
       // Only here: typing never waits, and a compile that may fetch is worth the wait — the
       // restore of a session is the one that otherwise asks before anybody is listening.
       await options.ready;
-      return { fetches: true, ...sectionOf };
+      return { fetches: true, decoding: decoding(true), ...sectionOf };
+    },
+    assets(files, call) {
+      const inner = decoded === undefined ? files : decoded.assets(files, call?.decoding);
+      return cache.assets(inner, call);
     },
   };
 }

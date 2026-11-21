@@ -24,6 +24,8 @@ function contributed(permissions: readonly string[]): WindowPlugins {
     brandKits: () => ({ kits: new Map(), diagnostics: [] }),
     assetSources: () => [],
     fontSources: () => [],
+    imageDecoders: () => [],
+    versionOf: () => undefined,
     configurations: () => [],
     configure: () => undefined,
     running: () => ['demo'],
