@@ -160,11 +160,26 @@ async function write(): Promise<void> {
   await page.waitForSelector('tyto-recipe-step .recipe-step__panel', { state: 'detached' });
 }
 
-/** Run, then every cell's status line once there are `count` and each has a table. */
+/**
+ * Run, then every cell's status line once there are `count`, each has a table, and **the run has
+ * answered** (TYTO-820): every block's gutter counter reads a number again, not `[*]`. The
+ * previous answer's lines stay on screen until the next one arrives, and they match a table's
+ * status too, so a wait on the lines alone, polled on every frame, took them. Run draws `[*]`
+ * before `recipe.run` returns, and only the newest run's answer takes it away, in the dispatch
+ * that draws its lines (`showRecipeAnswer`). Editing and saving a recipe run it too (ADR 0148),
+ * so a new element is not the marker: a Run after that run's answer reruns nothing and keeps its
+ * elements. Whether the counter reads stale is not asked: on CI it stayed stale over the
+ * current lines (TYTO-820, cause unknown).
+ */
 async function runCells(count: number): Promise<string[]> {
   await command('recipe.run');
   const handle = await page.waitForFunction(
     (wanted) => {
+      const counters = [...document.querySelectorAll('#editor .recipe-block-count')];
+      if (counters.length === 0) return undefined;
+      if (!counters.every((counter) => /^\[\d+\]$/u.test(counter.textContent ?? ''))) {
+        return undefined;
+      }
       const lines = [...document.querySelectorAll('#editor .recipe-cell-status')];
       if (lines.length !== wanted) return undefined;
       if (lines.some((line) => line.hasAttribute('data-failed'))) return undefined;
