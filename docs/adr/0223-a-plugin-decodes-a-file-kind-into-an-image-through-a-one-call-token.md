@@ -177,3 +177,13 @@ a stand-in decoder in an e2e; the version pull request; then the PSD plugin in i
   preview's `references` (TYTO-741) name the file a layer is drawn from, `capa.psd` for
   `capa.psd#arte`, so saving the PSD is what recompiles the brief, and the hash memo then sees
   a new modified time and the cache key a new hash.
+- **2026-11-21 (TYTO-742, the plugin): decision 10 misread `ag-psd`'s `CAI ` handler.** In
+  34.2.2 the `require('util')` it names is not live: the whole handler sits inside a block
+  comment (`dist/additionalInfo.js:2746`, between `/*` at 2731 and `// */` at 2752;
+  `dist/bundle.js:3256`, between 3241 and 3262). The plugin's built bundle calls no `require`
+  (the only match for `require(` is esbuild's `__require` helper), so it imports nothing at
+  run time. The rest of decision 10 holds: the reader still needs `initializeCanvas` with a
+  `createImageData` stand-in. The plugin's manifest name is `psd-decoder`, not `psd`, because
+  Tyto ships a built-in exporter named `psd` and a second plugin of that name is
+  `E_PLUGIN_DUPLICATE`; its decoder's id stays `psd`. The repository is tagged `v0.1.0` and
+  the gallery lists it under the id `psd-decoder`.
