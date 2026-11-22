@@ -1,5 +1,11 @@
 # @tyto/command-line
 
+## 0.12.2
+
+### Patch Changes
+
+- @tyto/templates@1.3.6
+
 ## 0.12.1
 
 ### Patch Changes
