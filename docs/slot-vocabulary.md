@@ -13,7 +13,7 @@ manifest that ignores this document still parses. `formats.yaml` is the preceden
 shared list of formats instead of one per template.
 
 It covers three things a brief writer meets in every template: the slot names, the marks
-that give the lines inside a block their hierarchy (`|`, `#` to `###`, `---`), and the labels
+that give the lines inside a block their hierarchy (`|`, `#` to `######`, `---`), and the labels
 of a `Label: value` line. A template stays free to name what this document does not; what it
 names here means the same in every template, whatever the template draws for it.
 
@@ -174,7 +174,8 @@ longer blows the salary up.
 Inside, `corpo` reads the levels below as every block does. **A line with no mark is drawn
 smaller than every marked level**, so the marked lines carry the weight: the kit's
 `bodyBlock` (TYTO-831, ADR 0224) sizes it as the smallest marked size times its
-`unmarkedRatio` parameter, 0.8 by default. A template that repeats its artworks may declare
+`unmarkedRatio` parameter, 0.8 by default — the smallest marked level **the block uses**
+(TYTO-834), so a body written with `##` alone is not shrunk by a `######` it never wrote. A template that repeats its artworks may declare
 `corpo` `per: lamina` with `shared: true` (ADR 0225), so one slide can carry other facts. A
 template that has no `corpo` keeps drawing the facts from `titulo`, as before.
 
@@ -185,10 +186,12 @@ information, the template draws it.** Inside one line:
 
 - **`|` separates the parts of one line**, and each part is one level of the line's
   hierarchy. Spaces around it are not part of the words.
-- **`#`, `##` and `###` before a part mark its level**: `#` is the main part, `##` the
-  second level, `###` the third. A part with no mark is the base level. The template decides
-  what each level looks like — size, weight, case, letter spacing — so the same marks give a
-  different, consistent look in each template.
+- **`#` to `######` before a part mark its level**, followed by a space: `#` is the main
+  part, `##` the second level, down to `######`, the sixth (six since TYTO-834, three before).
+  Seven or more, or a mark glued to its word (`#1 colocado`), are words. A part with no mark is
+  the base level. The template decides what each level looks like — size, weight, colour, case,
+  letter spacing — so the same marks give a different, consistent look in each template; a
+  template that draws fewer levels draws a deeper one as the nearest level above it it draws.
 - **The block's first line, with no `#` at all, is read by position**, so most titles need no
   mark. **Any later line with no `#` is a supporting line**: all of it is the base level, after
   the block's main part — the cargos under the exam's name need no `###`, and a later line that
@@ -267,19 +270,23 @@ hierarchy of words is written with `|` and `#`, not with labels.
 ### `peso`: a block's weight
 
 `peso` is the shared adjustment that makes one block of the artwork larger or smaller than
-designed, to set its hierarchy from the brief (maintainer, 2026-11-21): `::nota {peso: 3}`.
-It takes `1`, `2` or `3`, and `2`, the design's own size, is the default.
+designed, to set its hierarchy from the brief (maintainer, 2026-11-21): `::nota {peso: 4}`.
+It takes `1` to `5`, and `3`, the design's own size, is the default (maintainer, 2026-11-22,
+TYTO-834). **Until then it took `1` to `3`, `2` the normal one**: a brief written then reads
+`{peso: 1}` as 0.7 where it was 0.85, and `{peso: 3}` as the normal size where it was 1.2.
 
 ```yaml
 adjustments:
-  peso: { type: enum, values: ['1', '2', '3'], default: '2', applies: [titulo, apelo, nota] }
+  peso:
+    { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, apelo, nota] }
 ```
 
 A template declares it on every content block it hands to the kit's block column (TYTO-824,
 ADR 0224), and reads it with the kit's `weightOf`, which turns it into the scale the block is
-built at: `1` is 0.85 of the reference sizes, `2` is 1, `3` is 1.2. The three scales are the
-column's parameters, so a template may set its own; the values a brief writes are the same in
-every template. A block written without `peso` is built as designed.
+built at: `1` is 0.7 of the reference sizes, `2` 0.85, `3` 1, `4` 1.2, `5` 1.4. The five
+scales are the column's parameters (`weight1` to `weight5`), so a template may set its own; the
+values a brief writes are the same in every template. A block written without `peso` is built as
+designed.
 
 ## Names in use that drift, not checked yet
 

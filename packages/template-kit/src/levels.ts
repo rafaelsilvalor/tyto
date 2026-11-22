@@ -24,10 +24,10 @@ import type { Inline, RichText } from '@tyto/core';
 export const DIVIDER = '---';
 
 /** The deepest mark: `###`. A run of more `#` is words, not a mark. */
-export const DEEPEST_LEVEL = 3;
+export const DEEPEST_LEVEL = 6;
 
 /** 0 is the base level (no mark); 1 is `#`, the main part; 2 is `##`; 3 is `###`. */
-export type Level = 0 | 1 | 2 | 3;
+export type Level = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /** Where a part stands against its line's main part. */
 export type LevelPosition = 'before' | 'main' | 'after';
@@ -130,11 +130,14 @@ interface Marked {
   readonly level: Level;
 }
 
-/** A part's leading `#`, `##` or `###` followed by a space, read and taken off its words. */
+/**
+ * A part's leading `#` to `######` followed by a space, read and taken off its words (six levels
+ * since TYTO-834). Seven or more, or a mark glued to its word (`#1`), are words.
+ */
 function markOf(part: RichText): Marked {
   const first = part[0];
   if (first?.kind !== 'text') return { words: part, level: 0 };
-  const match = /^(#{1,3})\s+/u.exec(first.value);
+  const match = /^(#{1,6})\s+/u.exec(first.value);
   if (match === null) return { words: part, level: 0 };
   const rest = first.value.slice(match[0].length);
   const start = Math.min(first.range.start + match[0].length, first.range.end);

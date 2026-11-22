@@ -77,7 +77,31 @@ describe('the sizes of a body’s levels', () => {
 
   it('reads a first line with no mark as the smallest level, never as a name', () => {
     const body = bodyBlock(AREA, 1, options('5 vagas imediatas\n## Salário'))!;
-    expect(sizesIn(body.draft)).toEqual([24 * 0.8, 30]);
+    expect(sizesIn(body.draft)).toEqual([30 * 0.8, 30]);
+  });
+
+  it('draws #### to ###### at their own sizes when the template gives them', () => {
+    const body = bodyBlock(
+      AREA,
+      1,
+      options('#### Quatro\n##### Cinco\n###### Seis', {
+        sizes: { ...SIZES, 4: 20, 5: 18, 6: 16 },
+      }),
+    )!;
+    expect(sizesIn(body.draft)).toEqual([20, 18, 16]);
+  });
+
+  it('draws a deeper level the template gives no size at the nearest level above it', () => {
+    const body = bodyBlock(AREA, 1, options('###### Seis\n#### Quatro'))!;
+    expect(sizesIn(body.draft)).toEqual([24, 24]);
+  });
+
+  it('sizes an unmarked line by the smallest level the block uses, not a deeper one it never wrote', () => {
+    const sizes = { ...SIZES, 6: 10 };
+    const body = bodyBlock(AREA, 1, options('## Salário\nBanca FGV', { sizes }))!;
+    expect(sizesIn(body.draft)).toEqual([30, 30 * 0.8]);
+    const deep = bodyBlock(AREA, 1, options('###### Rótulo\nBanca FGV', { sizes }))!;
+    expect(sizesIn(deep.draft)).toEqual([10, 10 * 0.8]);
   });
 
   it('keeps the unmarked level smallest whatever order the template gives the marks', () => {
@@ -99,8 +123,8 @@ describe('a body at a scale', () => {
     const plain = bodyBlock(AREA, 1, options(text))!;
     const heavy = bodyBlock(AREA, 1.2, options(text))!;
     expect(sizesIn(heavy.draft)).toEqual(sizesIn(plain.draft).map((size) => size * 1.2));
-    // 30 + 12 + 24 at scale 1; all of it times 1.2.
-    expect(plain.height).toBeCloseTo(30 + 12 + 24 * 0.8, 5);
+    // `##` 30, the gap 12, the unmarked line 0.8 of `##`, the only level used.
+    expect(plain.height).toBeCloseTo(30 + 12 + 30 * 0.8, 5);
     expect(heavy.height).toBeCloseTo(plain.height * 1.2, 5);
   });
 
@@ -110,7 +134,7 @@ describe('a body at a scale', () => {
       1,
       options('## Salário | Banca FGV', { parameters: { partGap: 5 } }),
     )!;
-    expect(body.height).toBeCloseTo(30 + 5 + 24 * 0.8, 5);
+    expect(body.height).toBeCloseTo(30 + 5 + 30 * 0.8, 5);
   });
 
   it('takes a gap per pair of lines from the template, scaled', () => {
@@ -179,7 +203,7 @@ slots:
   lamina: { type: rich-text, repeat: true, min: 1, max: 5 }
   corpo: { type: rich-text, per: lamina, shared: true }
 adjustments:
-  peso: { type: enum, values: ['1', '2', '3'], default: '2', applies: [titulo, corpo] }
+  peso: { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, corpo] }
 `,
   'manifest.yaml',
 );
@@ -262,13 +286,13 @@ describe('the body, through the real compile', async () => {
 
   it('draws the shared body on a slide that writes none, at its own sizes', () => {
     const sizes = textsOf(scene, 0).map(sizeOf);
-    // The title at 32; the body: `##` 20, unmarked 16 × 0.8.
-    expect(sizes).toEqual([32, 20, 16 * 0.8]);
+    // The title at 32; the body: `##` 20, unmarked 0.8 of `##`, the only level it uses.
+    expect(sizes).toEqual([32, 20, 20 * 0.8]);
   });
 
   it('draws a slide’s own body, at its peso, without touching the title', () => {
     const sizes = textsOf(scene, 1).map(sizeOf);
-    expect(sizes).toEqual([32, 20 * 1.2, 16 * 0.8 * 1.2]);
+    expect(sizes).toEqual([32, 20 * 1.2, 20 * 0.8 * 1.2]);
   });
 
   it('draws both slides as committed', async () => {

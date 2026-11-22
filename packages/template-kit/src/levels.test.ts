@@ -103,8 +103,14 @@ describe('levelsOf', () => {
     expect(read('a | ## b | ### c')).toEqual([['0:before:a', '2:main:b', '3:after:c']]);
   });
 
-  it('reads #### and #word as words, not as a mark', () => {
-    expect(read('#### a | #1 colocado')).toEqual([['1:main:#### a', '0:after:#1 colocado']]);
+  it('reads ####### and #word as words, not as a mark', () => {
+    expect(read('####### a | #1 colocado')).toEqual([['1:main:####### a', '0:after:#1 colocado']]);
+  });
+
+  it('reads #### to ###### as levels 4 to 6 (TYTO-834)', () => {
+    expect(read('# Nome | #### Quatro | ##### Cinco | ###### Seis')).toEqual([
+      ['1:main:Nome', '4:after:Quatro', '5:after:Cinco', '6:after:Seis'],
+    ]);
   });
 
   it('keeps a bold span whole across a | written inside it', () => {

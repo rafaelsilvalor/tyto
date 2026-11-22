@@ -4,14 +4,14 @@ formats: [grid]
 ---
 // The head once, two slides, and a note under every slide that writes none of its own.
 
-::titulo {peso: 3}
+::titulo {peso: 4}
   Concurso Exemplo
 
 ::lamina
   oferta
 ::nota
   Só nesta versão.
-::apelo {peso: 1}
+::apelo {peso: 2}
   Pacotes com 40% OFF
 
 ::lamina

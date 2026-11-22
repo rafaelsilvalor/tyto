@@ -57,8 +57,22 @@ export const BODY_PARAMETERS = {
 
 export type BodyParameters = ValuesOf<typeof BODY_PARAMETERS>;
 
-/** The reference size of each marked level: `#`, `##` and `###`. */
-export type MarkedSizes = Readonly<Record<Exclude<Level, 0>, number>>;
+/**
+ * The reference size of each marked level: `#`, `##` and `###` always, `####` to `######` when
+ * the template draws them (TYTO-834). A deeper level the template gives no size takes the size of
+ * the nearest level above it that has one.
+ */
+export type MarkedSizes = Readonly<Record<1 | 2 | 3, number>> &
+  Partial<Readonly<Record<4 | 5 | 6, number>>>;
+
+/** A marked level's size, or the nearest level above it that has one. */
+function markedSize(level: Exclude<Level, 0>, sizes: MarkedSizes): number {
+  for (let at = level; at >= 1; at--) {
+    const size = (sizes as Readonly<Record<number, number | undefined>>)[at];
+    if (size !== undefined) return size;
+  }
+  return sizes[1];
+}
 
 export interface BodyOptions {
   /**
@@ -81,15 +95,22 @@ export interface BodyOptions {
   readonly name?: string;
 }
 
-/** The size a part is drawn at, at scale 1: its level's, or the unmarked size. */
+/**
+ * The size a part is drawn at, at scale 1: its level's, or the unmarked size — `unmarkedRatio`
+ * times the smallest of the marked levels **used** (TYTO-834), so a block that uses `##` alone is
+ * not shrunk by a `######` it never wrote. With no level given, the smallest of `#` to `###`.
+ */
 export function bodySize(
   level: Level,
   sizes: MarkedSizes,
   parameters: Partial<BodyParameters> = {},
+  used: readonly Level[] = [1, 2, 3],
 ): number {
-  if (level !== 0) return sizes[level];
+  if (level !== 0) return markedSize(level, sizes);
   const values = parameterValues(BODY_PARAMETERS, parameters);
-  return Math.min(sizes[1], sizes[2], sizes[3]) * values.unmarkedRatio;
+  const marked = used.filter((each): each is Exclude<Level, 0> => each !== 0);
+  const reference = marked.length === 0 ? ([1, 2, 3] as const) : marked;
+  return Math.min(...reference.map((each) => markedSize(each, sizes))) * values.unmarkedRatio;
 }
 
 /**
@@ -99,6 +120,9 @@ export function bodySize(
 export function bodyBlock(area: Area, scale: number, options: BodyOptions): Block | undefined {
   const items = levelsOf(options.words, { readByPosition: false });
   if (items.length === 0) return undefined;
+  const used = items.flatMap((item) =>
+    item.kind === 'line' ? item.parts.map((part) => part.level) : [],
+  );
   const values = parameterValues(BODY_PARAMETERS, options.parameters);
   const lineGap: LevelGap<LevelItem> =
     options.lineGapBetween === undefined
@@ -112,7 +136,7 @@ export function bodyBlock(area: Area, scale: number, options: BodyOptions): Bloc
     items,
     {
       name: options.name ?? 'body',
-      look: (part) => options.look(part, bodySize(part.level, options.sizes, values) * scale),
+      look: (part) => options.look(part, bodySize(part.level, options.sizes, values, used) * scale),
       gap: values.partGap * scale,
       lineGap,
       ...(options.divider === undefined
