@@ -1,5 +1,23 @@
 # @tyto/editor
 
+## 0.23.0
+
+### Minor Changes
+
+- 4b6f4fc: A brief's frontmatter shows a small square of the colour beside each hex colour, so a writer sees the exam's colour without rendering (TYTO-835).
+- 4387c26: TYTO-833: at the start of a frontmatter line the editor offers the values the template declares
+  (ADR 0226), with their kind and default; a colour's completion writes the quotes. An image value
+  is not offered.
+
+### Patch Changes
+
+- Updated dependencies [4387c26]
+- Updated dependencies [3b06a14]
+  - @tyto/core@0.57.0
+  - @tyto/brief-lang@0.12.9
+  - @tyto/recipe@0.14.5
+  - @tyto/template-lang@0.8.34
+
 ## 0.22.0
 
 ### Minor Changes

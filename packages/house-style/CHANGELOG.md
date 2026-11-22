@@ -1,5 +1,15 @@
 # @tyto/house-style
 
+## 0.6.12
+
+### Patch Changes
+
+- Updated dependencies [4387c26]
+- Updated dependencies [6df5351]
+- Updated dependencies [3b06a14]
+  - @tyto/core@0.57.0
+  - @tyto/template-kit@0.18.0
+
 ## 0.6.11
 
 ### Patch Changes
