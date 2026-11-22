@@ -665,6 +665,34 @@ describe('a template reports beside its frame (ADR 0058)', () => {
     ]);
   });
 
+  it('turns a contrast report into W_TEMPLATE_LOW_CONTRAST with both colours and the ratio (TYTO-837)', async () => {
+    const pale = defineTemplate(MANIFEST, (context) => {
+      if (context.artwork.index === 1 && context.format === 'feed') {
+        context.report({
+          code: 'W_TEMPLATE_LOW_CONTRAST',
+          foreground: '#eceaea',
+          background: '#f2c200',
+          ratio: 1.5432,
+        });
+      }
+      return promoCurso.build(context);
+    });
+
+    const result = compile(await resolved(PLACED), pale, { formats: FORMATS });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diagnostics).toEqual([
+      {
+        severity: 'warning',
+        code: 'W_TEMPLATE_LOW_CONTRAST',
+        message:
+          "Artwork 'slide-2' in format 'feed': '#eceaea' on '#f2c200' has a contrast of 1.5:1, too little for template 'promo-curso' to read well; the colours are kept.",
+        range: SLIDES[1],
+      },
+    ]);
+  });
+
   it('says nothing for a template that reports nothing, which is the control', async () => {
     const result = compile(await resolved(PLACED), promoCurso, { formats: FORMATS });
 

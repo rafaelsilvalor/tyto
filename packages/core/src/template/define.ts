@@ -221,6 +221,19 @@ export type TemplateReport =
       readonly path: string;
       /** Never set, for the reason the orphan report gives. */
       readonly overflow?: undefined;
+    }
+  | {
+      /**
+       * Two colours the template draws text in measure less contrast than it reads well at
+       * (TYTO-837): `foreground` on `background`, both hex, and the WCAG 2 `ratio` between them
+       * (`contrastRatio`). The template keeps the colours; the threshold is its own.
+       */
+      readonly code: 'W_TEMPLATE_LOW_CONTRAST';
+      readonly foreground: string;
+      readonly background: string;
+      readonly ratio: number;
+      /** Never set, for the reason the orphan report gives. */
+      readonly overflow?: undefined;
     };
 
 /** Every code a template may report, for the checks that cannot read a type. */
@@ -228,6 +241,7 @@ export const templateReportCodes = [
   'W_TEMPLATE_OVERFLOW',
   'W_TEMPLATE_ORPHAN',
   'W_TEMPLATE_FILE_MISSING',
+  'W_TEMPLATE_LOW_CONTRAST',
 ] as const;
 
 /**

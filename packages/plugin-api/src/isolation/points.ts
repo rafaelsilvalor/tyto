@@ -233,6 +233,9 @@ const templateCallSchema = z.strictObject({
  * The host writes the diagnostic, so a plugin cannot put an error, a message or a range of its
  * choosing into the author's run.
  */
+/** A hex colour as a declared value takes it (ADR 0153): the two colours of a contrast report. */
+const REPORT_HEX = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/u;
+
 const templateReportSchema = z.discriminatedUnion('code', [
   z.strictObject({ code: z.literal('W_TEMPLATE_OVERFLOW'), overflow: z.number().nonnegative() }),
   z.strictObject({
@@ -242,6 +245,13 @@ const templateReportSchema = z.discriminatedUnion('code', [
   z.strictObject({
     code: z.literal('W_TEMPLATE_FILE_MISSING'),
     path: z.string().min(1).max(FILE_PATH_LIMIT),
+  }),
+  z.strictObject({
+    code: z.literal('W_TEMPLATE_LOW_CONTRAST'),
+    foreground: z.string().regex(REPORT_HEX),
+    background: z.string().regex(REPORT_HEX),
+    // The WCAG 2 ratio is 1 to 21 by definition (TYTO-837).
+    ratio: z.number().min(1).max(21),
   }),
 ]);
 
