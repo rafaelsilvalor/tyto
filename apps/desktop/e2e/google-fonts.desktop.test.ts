@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { PLUGIN_API_VERSION } from '@tyto/plugin-api';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
@@ -100,6 +100,26 @@ let server: Server;
 let base: string;
 /** Every request the server received, as its path: one per request the window made. */
 const requests: string[] = [];
+/**
+ * Every request and every step this file took, in order and timed: printed when a count is
+ * wrong, so a red names the extra request and what the window was doing when it came (TYTO-821).
+ */
+const timeline: string[] = [];
+const started = Date.now();
+function note(line: string): void {
+  timeline.push(`+${String(Date.now() - started)}ms ${line}`);
+}
+
+/** The count of requests so far, with the timeline on stdout when it is not `count`. */
+function expectRequests(count: number): void {
+  if (requests.length !== count) {
+    process.stdout.write(
+      `[TYTO-821] ${String(requests.length)} requests where ${String(count)} were expected:\n` +
+        `${timeline.join('\n')}\n`,
+    );
+  }
+  expect(requests).toHaveLength(count);
+}
 const face = readFileSync(FACE_FILE);
 const faceBase64 = face.toString('base64');
 
@@ -138,14 +158,23 @@ function install(): void {
   if (installed.status !== 0) throw new Error(`install failed: ${installed.stderr}`);
 }
 
+/** The name on the tab in front: the document `editor.save` acts on. */
+const front = async (): Promise<string> =>
+  page.evaluate(
+    () => document.querySelector('.tabs__tab--on .tabs__label')?.textContent?.trim() ?? '',
+  );
+
 /** Runs a command the way the command bar would, and fails loudly if it was refused. */
 async function run(commandId: string): Promise<void> {
-  const ran = await page.evaluate((id) => {
+  // The front tab is read in the same call, so the timeline costs the window no extra trip.
+  const { ran, inFront } = await page.evaluate((id) => {
     const bar = document.querySelector('tyto-command-bar') as {
       run?: (id: string) => boolean;
     } | null;
-    return bar?.run?.(id) ?? false;
+    const label = document.querySelector('.tabs__tab--on .tabs__label')?.textContent ?? '';
+    return { ran: bar?.run?.(id) ?? false, inFront: label.trim() };
   }, commandId);
+  note(`${commandId} with '${inFront}' in front`);
   if (!ran) throw new Error(`the command bar refused '${commandId}'`);
 }
 
@@ -160,6 +189,10 @@ async function open(template: string): Promise<void> {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
   }, path);
   await run('editor.open');
+  // The command answers before main does. Until the brief's tab is in front, a save saves the
+  // tab that was there before, compiled under whatever the setting says by then (TYTO-821).
+  // The label is itself the condition: were this brief already in front, the save lands on it.
+  await expect.poll(front, { timeout: 15_000 }).toBe(`${template}.brief`);
 }
 
 const problems = async (): Promise<string> =>
@@ -175,6 +208,7 @@ async function problemsSay(text: string): Promise<void> {
 /** The setting, as a person writes it; main watches the file and applies it with no restart. */
 function setGoogleFonts(on: boolean): void {
   writeFileSync(join(userData, 'settings.json'), `{\n  "googleFonts": ${String(on)}\n}\n`);
+  note(`settings.json says googleFonts: ${String(on)}`);
 }
 
 /**
@@ -187,7 +221,9 @@ async function settled(embeds: boolean): Promise<void> {
       async () => {
         await run('editor.save');
         await page.waitForTimeout(500);
-        return (await previewSrcdoc(page)).includes(faceBase64);
+        const embedded = (await previewSrcdoc(page)).includes(faceBase64);
+        note(`the preview ${embedded ? 'embeds' : 'does not embed'} the face`);
+        return embedded;
       },
       { timeout: 30_000, interval: 500 },
     )
@@ -208,6 +244,7 @@ beforeAll(async () => {
   server = createServer((request, response) => {
     const path = request.url ?? '';
     requests.push(path);
+    note(`request ${path}`);
     if (path === CSS_PATH) {
       response
         .writeHead(200, { 'content-type': 'text/css' })
@@ -243,6 +280,10 @@ beforeAll(async () => {
   await waitForWindowTemplates(page, ['tipo-google'], 60_000);
 }, 180_000);
 
+beforeEach((context) => {
+  note(`test '${context.task.name}'`);
+});
+
 afterAll(async () => {
   await closeApp(app);
   await new Promise<void>((done) => server.close(() => done()));
@@ -254,6 +295,7 @@ describe('a missing face from Google Fonts in the window (ADR 0120)', () => {
     await open('tipo-google');
     await expect.poll(() => previewSrcdoc(page), { timeout: 30_000 }).toContain(faceBase64);
     // The face's two requests, the stylesheet and its file, and nothing else.
+    expectRequests(2);
     expect(requests).toEqual([CSS_PATH, FILE_PATH]);
     expect(await problems()).not.toContain('Syne Mono');
     const cold = await previewSrcdoc(page);
@@ -261,7 +303,7 @@ describe('a missing face from Google Fonts in the window (ADR 0120)', () => {
 
     await run('editor.save');
     await page.waitForTimeout(1_500);
-    expect(requests).toHaveLength(2);
+    expectRequests(2);
     expect(await previewSrcdoc(page)).toBe(cold);
   }, 60_000);
 
@@ -269,20 +311,20 @@ describe('a missing face from Google Fonts in the window (ADR 0120)', () => {
     setGoogleFonts(false);
     // Off, the fetched face is not drawn either: the preview is what it was before the feature.
     await settled(false);
-    expect(requests).toHaveLength(2);
+    expectRequests(2);
 
     await open('tipo-inter');
     await problemsSay("Font 'Inter 400 normal' is not installed on this machine; drawn in");
     await run('editor.save');
     await page.waitForTimeout(1_500);
-    expect(requests).toHaveLength(2);
+    expectRequests(2);
   }, 90_000);
 
   it('never asks for a licensed family, and names it in the Problems panel', async () => {
     setGoogleFonts(true);
     await open('tipo-google');
     await settled(true);
-    expect(requests).toHaveLength(2);
+    expectRequests(2);
 
     await open('tipo-licenciado');
     await problemsSay("Font 'Tyto Licensed Sans 500' is not installed on this machine and Tyto");
@@ -292,7 +334,7 @@ describe('a missing face from Google Fonts in the window (ADR 0120)', () => {
     expect(await problems()).not.toContain('W_FONT_SUBSTITUTED');
     await run('editor.save');
     await page.waitForTimeout(1_500);
-    expect(requests).toHaveLength(2);
+    expectRequests(2);
     await shot('problems-font-unavailable');
   }, 90_000);
 });
