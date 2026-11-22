@@ -1,5 +1,13 @@
 # @tyto/brief-lang
 
+## 0.12.10
+
+### Patch Changes
+
+- 8264b41: Pipeline tests for named shared blocks and blocks that add up (TYTO-838); nothing ships.
+- Updated dependencies [8264b41]
+  - @tyto/core@0.58.0
+
 ## 0.12.9
 
 ### Patch Changes

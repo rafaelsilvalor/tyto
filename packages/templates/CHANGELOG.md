@@ -1,5 +1,15 @@
 # @tyto/templates
 
+## 1.3.8
+
+### Patch Changes
+
+- Updated dependencies [f5a7aec]
+- Updated dependencies [8264b41]
+  - @tyto/template-kit@0.19.0
+  - @tyto/core@0.58.0
+  - @tyto/house-style@0.6.13
+
 ## 1.3.7
 
 ### Patch Changes
