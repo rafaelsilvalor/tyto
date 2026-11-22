@@ -55,8 +55,16 @@ export type LevelItem =
  * first line with none gets its main part by position — the only part, the first of two, or the
  * second of three or more — at level 1, the others at the base level; any later line with none
  * is all base level, after the block's main part.
+ *
+ * `readByPosition: false` turns the positional reading off: every line with no mark is the base
+ * level, the first included. A body under a title (TYTO-831) reads so — its first line is a
+ * fact, never a name.
  */
-export function levelsOf(text: RichText): LevelItem[] {
+export function levelsOf(
+  text: RichText,
+  options: { readonly readByPosition?: boolean } = {},
+): LevelItem[] {
+  const byPosition = options.readByPosition ?? true;
   const items: LevelItem[] = [];
   for (const line of blockLines(text)) {
     const written = plain(line).trim();
@@ -70,7 +78,7 @@ export function levelsOf(text: RichText): LevelItem[] {
       .filter((part) => plain(part).trim() !== '')
       .map(markOf);
     if (parts.length === 0) continue;
-    const first = !items.some((item) => item.kind === 'line');
+    const first = byPosition && !items.some((item) => item.kind === 'line');
     items.push({ kind: 'line', parts: ranked(parts, first) });
   }
   return items;

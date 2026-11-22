@@ -1,0 +1,21 @@
+---
+template: corpo-teste
+formats: [grid]
+---
+// A title for every slide, a body shared by the first and the second's own, heavier.
+
+::titulo
+  Concurso Exemplo
+
+::corpo
+  ## Até R$ 9 mil
+  Banca Ômega
+
+::lamina
+  oferta
+
+::lamina
+  atemporal
+::corpo {peso: 3}
+  ## Até R$ 9 mil
+  Banca Ômega
