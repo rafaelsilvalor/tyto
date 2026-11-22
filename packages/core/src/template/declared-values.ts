@@ -85,6 +85,13 @@ export type Checked = { readonly value: TemplateValue } | { readonly problem: st
 export function checkValue(declaration: DeclaredValue, value: unknown): Checked {
   switch (declaration.type) {
     case 'color':
+      if (value === null || value === undefined) {
+        // YAML reads an unquoted `#e30613` as a comment, so the key arrives empty (ADR 0226).
+        return {
+          problem:
+            "is empty: a hex colour is written in quotes, as in '#5900a7', since YAML reads an unquoted # as a comment",
+        };
+      }
       return typeof value === 'string' && HEX_COLOR.test(value)
         ? { value }
         : { problem: "is not a hex colour such as '#5900a7'" };

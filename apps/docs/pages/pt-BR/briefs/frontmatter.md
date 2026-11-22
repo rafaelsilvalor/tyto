@@ -24,3 +24,13 @@ Um slot de valor curto e fixo fica mais legível aqui do que no corpo. Três tip
 - **Uma linha de texto simples**, como `subtitulo: Saturday, 10 am to 4 pm`. Simples quer dizer simples: negrito, itálico e marcas de cor não são lidos no cabeçalho, e o Tyto avisa com `W_MARKUP_IN_FRONTMATTER`. Texto que precisa de formatação vai no corpo, como [diretiva](./directives.md). A exceção é um template que desenha `**…**` e `{cor:…}…{/}` num valor do cabeçalho: o manifesto dele declara isso para aquele campo, e então essas duas marcas são desenhadas e não geram aviso, e o limite de caracteres do campo conta só as palavras que elas desenham, como numa diretiva.
 
 Um valor com dois-pontos seguidos de espaço, ou que começa com aspas ou colchete, precisa de aspas em volta: `subtitulo: "Aberto: 10h"`.
+
+## Os valores do template no cabeçalho
+
+Um template pode declarar valores que dá para mudar sem mexer nele — uma cor, uma margem, um tamanho. A [galeria](../templates/gallery.md) mostra cada um com o padrão. Escreva um no cabeçalho, pelo nome, para mudar só neste brief:
+
+```yaml
+destaque: '#e30613'
+```
+
+O valor do brief vence o de uma configuração, e um valor que você não escreve fica o do template. **Cor vai entre aspas**: sem elas, o YAML lê `#e30613` como comentário, e o Tyto avisa e usa o padrão. Um valor do tipo errado ou fora dos limites dá o mesmo aviso, `W_TEMPLATE_VALUE_INVALID`, na linha. Imagem ainda não se muda aqui; uma configuração muda.
