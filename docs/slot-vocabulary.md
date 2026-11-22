@@ -158,6 +158,26 @@ because what the panel says is not always an offer, and over `destaque`, which t
 already uses as its example adjustment (`::lamina {destaque}`), the same clash that made
 `cor` give way to `tom`.
 
+### `corpo`: the general information under the title
+
+| Name    | Type                     | Role, in one sentence                                                                                   |
+| ------- | ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `corpo` | `rich-text`, with levels | The general information under the title — vacancies, exam board, roles, salary — as a block of its own. |
+
+**The title names; the body informs** (maintainer, 2026-11-22). A `titulo` holds the name (`#`)
+and what qualifies it in the same breath (a status as `##` before the name); the facts a reader
+checks after it — `**700 vagas** · Banca Cebraspe`, `## Salário inicial de R$ 5,6 mil` — go in
+`corpo`. Kept apart, each block takes its own size and its own `peso`: a long name that shrinks
+to fit its width no longer takes the vacancies down with it, and a short one that grows no
+longer blows the salary up.
+
+Inside, `corpo` reads the levels below as every block does. **A line with no mark is drawn
+smaller than every marked level**, so the marked lines carry the weight: the kit's
+`bodyBlock` (TYTO-831, ADR 0224) sizes it as the smallest marked size times its
+`unmarkedRatio` parameter, 0.8 by default. A template that repeats its artworks may declare
+`corpo` `per: lamina` with `shared: true` (ADR 0225), so one slide can carry other facts. A
+template that has no `corpo` keeps drawing the facts from `titulo`, as before.
+
 ### Levels inside a block: `|`, `#` and `---`
 
 **Each line of a block is drawn in the order written; the brief writer orders the

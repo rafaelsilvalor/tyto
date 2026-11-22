@@ -80,6 +80,15 @@ export {
 export { type Mark, mark } from './mark.js';
 
 export {
+  BODY_PARAMETERS,
+  type BodyOptions,
+  type BodyParameters,
+  type MarkedSizes,
+  bodyBlock,
+  bodySize,
+} from './body.js';
+
+export {
   type Adjusted,
   BLOCK_COLUMN_PARAMETERS,
   type BlockColumnOptions,
