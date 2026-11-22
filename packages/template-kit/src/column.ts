@@ -1,3 +1,4 @@
+import type { ResolvedSlot } from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
 import { group } from '@tyto/core/template';
 
@@ -198,6 +199,63 @@ export function columnOrder<Entry extends { readonly name: string }>(
   }
   const queue = [...written];
   return entries.map((entry) => (written.includes(entry) ? queue.shift()! : entry));
+}
+
+/**
+ * One block of `context.order` (ADR 0225, ADR 0227) as the column reads it: the slot's name and
+ * the value drawn there, with its adjustments. Structural, so a hand-built order fits too.
+ */
+export interface OrderedBlock {
+  readonly name: string;
+  readonly slot?: (Adjusted & { readonly value: ResolvedSlot['value'] }) | undefined;
+}
+
+/** What a kind of block builds from one placed value: the column entry, less its name. */
+export type BlockOfKind = (
+  slot: NonNullable<OrderedBlock['slot']>,
+) => Omit<ColumnEntry, 'name'> | undefined;
+
+/**
+ * The column's entries one per **placed block** (TYTO-839, ADR 0227): two `::corpo`, or a shared
+ * title and a slide's own, are two entries in the brief's order, each built by its kind's
+ * `build` from its own value and usually at `weightOf` its own `peso`. `fallback` is the
+ * template's own order, as `entries` is to `columnOrder`: its entries that the brief named give
+ * their places to the placed blocks, in the brief's order, and the blocks past those places come
+ * right after the last of them; an entry the brief did not name keeps its place.
+ *
+ * Pass the result as `entries` with no `order`: it is already in drawing order, and a name may
+ * appear more than once. An order with no values (a context built by hand) falls back to
+ * `columnOrder(fallback, order)`, as before.
+ */
+export function entriesInOrder(
+  order: readonly OrderedBlock[] | undefined,
+  kinds: Readonly<Record<string, BlockOfKind>>,
+  fallback: readonly ColumnEntry[] = [],
+): ColumnEntry[] {
+  if (order === undefined || order.some((placed) => placed.slot === undefined)) {
+    return columnOrder(fallback, order);
+  }
+  const placed: ColumnEntry[] = [];
+  for (const block of order) {
+    const kind = kinds[block.name];
+    const built = block.slot === undefined || kind === undefined ? undefined : kind(block.slot);
+    if (built !== undefined) placed.push({ name: block.name, ...built });
+  }
+  const written = new Set(placed.map((entry) => entry.name));
+  const result: ColumnEntry[] = [];
+  let next = 0;
+  let lastWritten = -1;
+  for (const entry of fallback) {
+    if (written.has(entry.name)) {
+      if (next < placed.length) result.push(placed[next++]!);
+      lastWritten = result.length;
+      continue;
+    }
+    result.push(entry);
+  }
+  const rest = placed.slice(next);
+  result.splice(lastWritten < 0 ? result.length : lastWritten, 0, ...rest);
+  return result;
 }
 
 /**

@@ -93,13 +93,16 @@ export {
   BLOCK_COLUMN_PARAMETERS,
   type BlockColumnOptions,
   type BlockColumnParameters,
+  type BlockOfKind,
   type Column,
   type ColumnEntry,
+  type OrderedBlock,
   type PlacedBlock,
   WEIGHT,
   WEIGHTS,
   blockColumn,
   columnOrder,
+  entriesInOrder,
   weightOf,
 } from './column.js';
 
