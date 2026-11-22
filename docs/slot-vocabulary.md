@@ -244,6 +244,23 @@ templates each; `Salário:`, `Inscrições:` and `Prova:` by two each, under the
 table below in two more. A label is for a fact with a name; a
 hierarchy of words is written with `|` and `#`, not with labels.
 
+### `peso`: a block's weight
+
+`peso` is the shared adjustment that makes one block of the artwork larger or smaller than
+designed, to set its hierarchy from the brief (maintainer, 2026-11-21): `::nota {peso: 3}`.
+It takes `1`, `2` or `3`, and `2`, the design's own size, is the default.
+
+```yaml
+adjustments:
+  peso: { type: enum, values: ['1', '2', '3'], default: '2', applies: [titulo, apelo, nota] }
+```
+
+A template declares it on every content block it hands to the kit's block column (TYTO-824,
+ADR 0224), and reads it with the kit's `weightOf`, which turns it into the scale the block is
+built at: `1` is 0.85 of the reference sizes, `2` is 1, `3` is 1.2. The three scales are the
+column's parameters, so a template may set its own; the values a brief writes are the same in
+every template. A block written without `peso` is built as designed.
+
 ## Names in use that drift, not checked yet
 
 These were counted on 2026-11-19 over the 14 production templates in their own repositories
