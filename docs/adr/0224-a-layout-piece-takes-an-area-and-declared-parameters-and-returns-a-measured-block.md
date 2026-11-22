@@ -13,8 +13,10 @@ block — and then a hand-written assembly places the three from the bottom up w
 2026-11-21 feedback comes from: a large empty gap between head and offer, a title that does
 not grow into its space, and a card that grows without a limit.
 
-The maintainer wants a node-based template editor later, in the manner of a geometry-node graph:
-pieces wired together, each with a panel of controls. Such an editor can only be built over
+The maintainer wants templates to become more dynamic: build a set of elements on their own,
+and arrange them into a template, so the same element is reused across different templates by
+including it as one node (2026-11-22). Later, a node-based template editor, in the manner of a
+geometry-node graph: pieces wired together, each with a panel of controls. Such an editor can only be built over
 pieces that share one contract and say what they accept. The kit's pieces today take a width
 and return a `Block` (`{ width, height, draft }` in `packages/template-kit/src/blocks.ts`), but
 the height available never reaches them, and each hides numbers in its body. TYTO-824 and
@@ -51,7 +53,25 @@ editor. So the rule is fixed first.
    `build` becomes a wiring of pieces into one root arrangement over the frame's area, with no
    assembly of its own beyond that wiring.
 
-4. **How the open cards apply it.**
+4. **A template is an arrangement of components.** The goal these rules serve: an element — a
+   title head, an offer card, a proof note, a logo foot — is built, tested and versioned on its
+   own, and dropped into any template as one node. Two kinds of piece, one contract:
+   - A **primitive** is a mechanism with no subject: a text block, `levelStack`, `card`, the
+     column. It knows how to measure and arrange, never what it shows.
+   - A **component** is a piece that has a subject: it reads named slots or values (`::titulo`
+     with its levels, `::apelo` as a card) and composes primitives into one block — the head,
+     the offer, the note. It is what a template author picks from a list and places.
+     Both take an area and declared parameters and return a measured block (decisions 1 and 2);
+     that shared contract is what makes a component pluggable into any arrangement. A template is
+     then a root arrangement of components over the frame's area, plus the values it sets.
+     **Where they live:** primitives and generic components with no brand in them belong in
+     `@tyto/template-kit` (public). A component that carries a brand — a logo, a house colour, a
+     house layout — lives only in a private package or template repository, never in this
+     repository or the kit, by the public-repository rule in `AGENTS.md` and ADR 0151. The name
+     **component** ("componente" in Portuguese) is this record's proposal; the maintainer may
+     rename it, and the rename is a wording change, not a new decision.
+
+5. **How the open cards apply it.**
    - **TYTO-823** (core): the brief's block order reaches `TemplateContext` per artwork. It is
      the graph's input list — which pieces, in which order — and adds no layout.
    - **TYTO-824** (kit): the block column is the first arrangement under decision 3. It takes an
@@ -64,16 +84,18 @@ editor. So the rule is fixed first.
      height cap, its minimum, maximum and cap ratios declared; the column shrinks every child by
      one factor down to a declared floor before it reports an overflow.
    - **TYTO-826** (anuncio): `build` replaces its hand-written assembly with the column over the
-     panel's area, the head, offer and note as its children; the fixed gaps become parameters
+     panel's area, the head, offer and note as its children, each written as a component under
+     decision 4 (generic ones may later move to the kit, anything with brand stays private); the fixed gaps become parameters
      with the reference's values as defaults, and the photograph's minimum height (25% of the
      frame) is a parameter of the template, not a constant buried in a function.
    - Existing kit pieces (`levelStack`, `card`, `grownTextBlock`…) are not rewritten by this
      record. Each moves to the contract when a card touches it; a piece that does not yet take
      an area is called with one built from its width.
 
-5. **What this record does not decide.** The editor itself (its interface, where it runs,
-   whether it edits code or a separate document); how a graph of pieces is serialised, stored or
-   versioned; whether a template may be authored as a graph instead of TypeScript; how a piece's
+6. **What this record does not decide.** The visual editor itself (its interface, where it
+   runs, whether it edits code or a separate document); how a graph of pieces is serialised,
+   stored or versioned; how a component is packaged and distributed on its own (a package per
+   component, a catalogue of them, a plugin extension point); whether a template may be authored as a graph instead of TypeScript; how a piece's
    parameter schema maps to a manifest's `values` beyond "may feed"; and the shape of a piece
    that needs a context other than an area (a picture's file, a brand kit). Each is its own
    record when the editor is planned.
