@@ -2126,6 +2126,73 @@ describe('an isolated template sees every artwork’s adjustments (ADR 0203)', (
   });
 });
 
+describe('an isolated template sees its artwork’s blocks in drawing order (ADR 0225)', () => {
+  const ORDER = [
+    { name: 'titulo', place: 'before' },
+    { name: 'nota', place: 'own' },
+    { name: 'rodape', place: 'after' },
+  ] as const;
+  const CALL: TemplateCall = {
+    format: 'feed',
+    size: { w: 10, h: 10 },
+    idPrefix: 'lamina-1.feed',
+    artwork: { id: 'lamina-1', index: 0, count: 2 },
+    slots: {},
+    adjustments: {},
+    order: ORDER,
+    brand: {},
+  };
+
+  /** Builds once in a real guest with `call`, handing back what it saw as `order`. */
+  async function seenWith(call: unknown): Promise<Result<TemplateAnswer, Diagnostics>> {
+    const pack: TemplatePack = {
+      id: 'demo',
+      templates: [],
+      // `format` is the one free string a frame carries back, so what it saw rides in it.
+      build: (_template, context) => ({
+        format: JSON.stringify(context.order ?? 'none'),
+        size: context.size,
+        children: [],
+      }),
+    };
+    const { connected } = await isolate((host) => host.registerTemplatePack(pack), {
+      contributes: ['template-pack'],
+    });
+    if (!connected.ok) throw new Error(connected.error[0]?.message);
+    const host = createPluginHost();
+    const activated = host.tryActivate(connected.value.plugin);
+    if (!activated.ok) throw new Error(activated.error[0]?.message);
+    const [registered] = host.registry.templatePacks();
+    const build = registered?.build as unknown as IsolatedPackBuild;
+    return build('demo', call as TemplateCall, [], NO_SHIPPED_FILES);
+  }
+
+  it('crosses to the plugin’s process as the host sent it', async () => {
+    const answer = await seenWith(CALL);
+
+    expect(answer.ok && JSON.parse(answer.value.frame.format)).toEqual(ORDER);
+  });
+
+  it('is still optional, so a host that sends none is answered', async () => {
+    const { order: _order, ...without } = CALL;
+    const answer = await seenWith(without);
+
+    expect(answer.ok && answer.value.frame.format).toBe('"none"');
+  });
+
+  it('refuses an entry with a place it does not know or a slot’s content', async () => {
+    const unknownPlace = await seenWith({ ...CALL, order: [{ name: 'nota', place: 'middle' }] });
+    const withContent = await seenWith({
+      ...CALL,
+      order: [{ name: 'nota', place: 'own', text: 'outro slide' }],
+    });
+
+    expect(
+      [unknownPlace, withContent].map((answer) => (answer.ok ? 'ok' : answer.error[0]?.code)),
+    ).toEqual(['E_PLUGIN_CALL', 'E_PLUGIN_CALL']);
+  });
+});
+
 describe('an isolated template sees the slots nested inside a slide’s own (ADR 0207)', () => {
   const at = { start: 0, end: 1 };
   const textOf = (value: string) => ({

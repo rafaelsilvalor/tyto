@@ -88,6 +88,15 @@ TYTO-190 made it a carousel the way the agenda is one: each `::lamina` is a slid
 specialties and rows, so `lista` left the template (3.0.0) rather than living beside a
 `lamina` that carries the same rows.
 
+## `comum` is no slot's name
+
+**`comum` is reserved by the brief language, not by this list** (ADR 0225): `::comum` is the
+line that closes a brief's slides, so a manifest that declares a slot `comum` is refused. What
+is written after it is shared by every slide and drawn below each one's own blocks — a slot
+whose manifest says `per: lamina, shared: true`. Such a slot keeps its standard name: a note
+the same on every slide but one is still `nota`, written once before the slides and once inside
+the slide that differs, not a second slot named for the exception.
+
 ## `cor` and `tom`: one role, and `tom` wins
 
 `promo-curso`'s `cor` and `carrossel-lista`'s `tom` are the same role — the closed list that
@@ -234,6 +243,23 @@ same label means the same fact in every template. `Banca:` and `Vagas:` are writ
 templates each; `Salário:`, `Inscrições:` and `Prova:` by two each, under the synonyms in the
 table below in two more. A label is for a fact with a name; a
 hierarchy of words is written with `|` and `#`, not with labels.
+
+### `peso`: a block's weight
+
+`peso` is the shared adjustment that makes one block of the artwork larger or smaller than
+designed, to set its hierarchy from the brief (maintainer, 2026-11-21): `::nota {peso: 3}`.
+It takes `1`, `2` or `3`, and `2`, the design's own size, is the default.
+
+```yaml
+adjustments:
+  peso: { type: enum, values: ['1', '2', '3'], default: '2', applies: [titulo, apelo, nota] }
+```
+
+A template declares it on every content block it hands to the kit's block column (TYTO-824,
+ADR 0224), and reads it with the kit's `weightOf`, which turns it into the scale the block is
+built at: `1` is 0.85 of the reference sizes, `2` is 1, `3` is 1.2. The three scales are the
+column's parameters, so a template may set its own; the values a brief writes are the same in
+every template. A block written without `peso` is built as designed.
 
 ## Names in use that drift, not checked yet
 

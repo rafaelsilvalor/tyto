@@ -208,6 +208,15 @@ const templateCallSchema = z.strictObject({
       }),
     )
     .optional(),
+  // This artwork's blocks in drawing order (ADR 0225): names and places, no content.
+  order: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1),
+        place: z.enum(['before', 'own', 'after']),
+      }),
+    )
+    .optional(),
   // Data, so it crosses as it is (ADR 0063): the kit of the template's own brand.
   brand: brandKitSchema,
   // The declared values, resolved by the host (ADR 0153, TYTO-439): an image is the ref the

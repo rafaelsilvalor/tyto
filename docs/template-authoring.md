@@ -110,6 +110,13 @@ These are the rules it enforces beyond the shape:
   `per` slot neither repeats nor takes a `default`. Several may belong to one slide
   (`imagem` and `foto`). This replaces numbered slots (`imagem-1` … `imagem-4`) picked with
   an adjustment, which capped the carousel at the number declared.
+- **`shared: true` beside `per: lamina` makes a slot shared or a slide's own** (ADR 0225):
+  `nota: { type: rich-text, per: lamina, shared: true }` written before the first `::lamina`,
+  in the frontmatter or after `::comum` is every slide's; written after a `::lamina` it is that
+  slide's own and replaces the shared one there. `slots.nota` is whichever applies to this
+  artwork, and `context.order` lists the artwork's written blocks in drawing order as
+  `{ name, place: 'before' | 'own' | 'after' }`. Only on a `per` that names the repeatable slot,
+  and not beside `multiple`. A slot may not be named `comum`.
 - **`per` may name another `per` slot, to any depth** (ADR 0207): with
   `bloco: { per: lamina }` and `paragrafo: { per: bloco }`, a `::paragrafo` belongs to the
   `::bloco` open above it in the same slide. The chain must end at the repeatable slot; a cycle
@@ -636,18 +643,19 @@ remembering.
 build: (context: TemplateContext) => Frame;
 ```
 
-| `context`     | What it is                                                                                                                                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `format`      | the format this call is for, one of the manifest's                                                                                                                                                                 |
-| `idPrefix`    | **pass it to `frame({ idPrefix })`** — see below                                                                                                                                                                   |
-| `artwork`     | `{ id, index, count }`, so a slide can number itself `2/3`                                                                                                                                                         |
-| `slots`       | every slot the brief gave a value, with the repeatable one already resolved to _this_ artwork's occurrence — `slots.slide` is this slide                                                                           |
-| `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                                                                                                |
-| `artworks`    | every artwork of the brief, in order, as `{ adjustments }` — `artworks[artwork.index]` is this one; how a bare `{continua}` knows it follows an answer. Adjustments only, never another slide's content (ADR 0203) |
-| `measure`     | `measure(textDraft)` — the lines, width and height a text node will be laid out at, or `undefined` when nothing can measure (ADR 0038)                                                                             |
-| `report`      | `report({ code: 'W_TEMPLATE_OVERFLOW', overflow })` — a warning about this frame, from a closed list, which `compile` writes (ADR 0058)                                                                            |
-| `files`       | `files.image(path)` and `files.svg(path)` — the files in the template's own folder, by folder-relative path, or `undefined` (ADR 0062)                                                                             |
-| `brand`       | `{ logo?, wordmark?, signature?, colors? }` — the kit a plugin supplied for the configuration's `brand`, else the manifest's; all `undefined` when there is none (ADR 0063, 0066, 0155)                            |
+| `context`     | What it is                                                                                                                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `format`      | the format this call is for, one of the manifest's                                                                                                                                                                                                |
+| `idPrefix`    | **pass it to `frame({ idPrefix })`** — see below                                                                                                                                                                                                  |
+| `artwork`     | `{ id, index, count }`, so a slide can number itself `2/3`                                                                                                                                                                                        |
+| `slots`       | every slot the brief gave a value, with the repeatable one already resolved to _this_ artwork's occurrence — `slots.slide` is this slide                                                                                                          |
+| `adjustments` | this artwork's, flattened: `true` for a flag, the value for an enum                                                                                                                                                                               |
+| `artworks`    | every artwork of the brief, in order, as `{ adjustments }` — `artworks[artwork.index]` is this one; how a bare `{continua}` knows it follows an answer. Adjustments only, never another slide's content (ADR 0203)                                |
+| `order`       | this artwork's written blocks in drawing order, as `{ name, place }` with `place` `before`, `own` or `after`: shared slots written before the first slide, the slide's own, then shared slots written after a slide or after `::comum` (ADR 0225) |
+| `measure`     | `measure(textDraft)` — the lines, width and height a text node will be laid out at, or `undefined` when nothing can measure (ADR 0038)                                                                                                            |
+| `report`      | `report({ code: 'W_TEMPLATE_OVERFLOW', overflow })` — a warning about this frame, from a closed list, which `compile` writes (ADR 0058)                                                                                                           |
+| `files`       | `files.image(path)` and `files.svg(path)` — the files in the template's own folder, by folder-relative path, or `undefined` (ADR 0062)                                                                                                            |
+| `brand`       | `{ logo?, wordmark?, signature?, colors? }` — the kit a plugin supplied for the configuration's `brand`, else the manifest's; all `undefined` when there is none (ADR 0063, 0066, 0155)                                                           |
 
 **`measure` is how a box grows with its text.** Build the text node first, ask, then size
 what surrounds it: `const m = context.measure(title)` and a pill `m.height + padding` tall.

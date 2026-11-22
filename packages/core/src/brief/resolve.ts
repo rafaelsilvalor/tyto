@@ -11,7 +11,12 @@ import { type SourceRange, sourceRange } from '../source/range.js';
 import type { TemplateConfigurations, TemplateSelection } from '../template/configurations.js';
 import { type BriefDefaults, measured } from '../template/configured-brief.js';
 import type { SuppliedValues } from '../template/declared-values.js';
-import { type Slot, type TemplateManifest, listsOccurrences } from '../template/manifest.js';
+import {
+  CLOSES_SLIDES,
+  type Slot,
+  type TemplateManifest,
+  listsOccurrences,
+} from '../template/manifest.js';
 import type { TemplateRegistry } from '../template/registry.js';
 
 /**
@@ -400,6 +405,12 @@ class Resolver {
    * the parent holds under the slot's name (ADR 0207, note of 2026-11-16).
    */
   private readonly siblings = new Map<ResolvedSlot, ResolvedSlot[]>();
+  /**
+   * Where `::comum` closed the slides (ADR 0225): after it a `shared` slot is shared and drawn
+   * below every slide's own blocks, and a slide or a slide's own slot has no slide to open or
+   * join. Undefined while the slides are open.
+   */
+  private closedAt: SourceRange | undefined;
   /** Each external slot's own file per format (ADR 0222), for `ResolvedBrief.externalArt`. */
   private readonly externalArt = new Map<string, Readonly<Record<string, AssetRef>>>();
   /**
@@ -438,7 +449,27 @@ class Resolver {
       return;
     }
 
-    if (slot.per !== undefined && fromFrontmatter) {
+    // Shared or a slide's own (ADR 0225): before the first slide, in the frontmatter or after
+    // `::comum` there is no slide to own it, so the value is the brief's, like a slot without
+    // `per`. Anywhere else it is the slide's own, as a `per` slot always was.
+    const shared =
+      slot.shared === true &&
+      (fromFrontmatter || this.artworks.length === 0 || this.closedAt !== undefined);
+
+    if (this.closedAt !== undefined && !shared && (slot.repeat || slot.per !== undefined)) {
+      this.report(
+        badValue(
+          candidate.name,
+          slot.repeat
+            ? `is written after '::${CLOSES_SLIDES}', which closes the slides; a new '${candidate.name}' goes above it`
+            : `belongs to a '${slot.per}', and '::${CLOSES_SLIDES}' above it closes the slides`,
+          candidate.range,
+        ),
+      );
+      return;
+    }
+
+    if (slot.per !== undefined && fromFrontmatter && !shared) {
       this.report(
         badValue(
           candidate.name,
@@ -491,7 +522,7 @@ class Resolver {
       return;
     }
 
-    if (slot.per !== undefined) {
+    if (slot.per !== undefined && !shared) {
       this.takeForOccurrence(resolved, slot.per);
       return;
     }
@@ -507,6 +538,50 @@ class Resolver {
       return;
     }
     this.slots.set(candidate.name, resolved);
+  }
+
+  /**
+   * `::comum`: closes the slides (ADR 0225). What is written after it is no slide's — a
+   * `shared` slot is shared and drawn below every slide's own blocks — and a new slide or a
+   * slide's own slot is refused there. It takes no text and no adjustments; when it carries
+   * some they are refused at their own range and the line still closes the slides, because
+   * that is what it was written for. Where there are no slides to close — a template with no
+   * repeatable slot, before the first slide, or a second time — it is refused and closes
+   * nothing, so the rest of the brief reads as written.
+   */
+  closeSlides(directive: Directive): void {
+    const problem = (text: string, range: SourceRange): void => {
+      this.report(diagnostic('E_BAD_COMUM', { problem: text }, { range }));
+    };
+    const repeatable = Object.entries(this.manifest.slots).find(([, slot]) => slot.repeat)?.[0];
+    if (repeatable === undefined) {
+      problem(
+        `closes the slides, and template '${this.manifest.name}' has no repeatable slot`,
+        directive.nameRange,
+      );
+      return;
+    }
+    if (this.closedAt !== undefined) {
+      problem('is written a second time, and the slides close once', directive.nameRange);
+      return;
+    }
+    if (this.artworks.length === 0) {
+      problem(`closes the slides, and no '::${repeatable}' comes before it`, directive.nameRange);
+      return;
+    }
+    const first = directive.body[0];
+    const last = directive.body[directive.body.length - 1];
+    if (first !== undefined && last !== undefined && plainText(directive.body).trim() !== '') {
+      problem(
+        'takes no text: what follows it is written as the directives it is',
+        sourceRange(first.range.start, last.range.end),
+      );
+    }
+    for (const adjustment of directive.adjustments) {
+      problem(`takes no adjustments, and '{${adjustment.name}}' is one`, adjustment.range);
+    }
+    this.closedAt = directive.range;
+    this.open = [];
   }
 
   /**
@@ -1032,6 +1107,8 @@ class Resolver {
    */
   private finishPerOccurrence(name: string, slot: Slot): void {
     if (!slot.required) return;
+    // A shared value stands in on every slide that wrote none of its own (ADR 0225).
+    if (slot.shared === true && this.slots.has(name)) return;
     if (slot.per !== undefined && this.manifest.slots[slot.per]?.repeat !== true) {
       this.finishNested(name, slot.per);
       return;
@@ -1324,6 +1401,10 @@ export async function resolve(
       for (const replacement of await expand(directive, directive.namespace, options, resolver)) {
         await resolver.take(candidateOf(replacement), false);
       }
+      continue;
+    }
+    if (directive.name === CLOSES_SLIDES) {
+      resolver.closeSlides(directive);
       continue;
     }
     await resolver.take(candidateOf(directive), false);

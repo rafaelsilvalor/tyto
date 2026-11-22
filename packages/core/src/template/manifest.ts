@@ -31,6 +31,12 @@ import type { Size } from '../scene/primitives.js';
  */
 const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_-]*$/u;
 
+/**
+ * The directive that closes a brief's slides (ADR 0225): what is written after it is shared
+ * and drawn below every slide's own blocks. Reserved, so no manifest may name a slot so.
+ */
+export const CLOSES_SLIDES = 'comum';
+
 /** `major.minor.patch`, with an optional prerelease — the form Changesets produces. */
 const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 
@@ -96,6 +102,14 @@ export const slotSchema = z
      */
     per: z.string().min(1).optional(),
     /**
+     * Shared or a slide's own (ADR 0225): with `per` naming the repeatable slot, a value written
+     * before the first slide, in the frontmatter, or after `::comum` is the same on every
+     * artwork, and one written after a slide is that slide's own and replaces the shared one
+     * there. Optional rather than defaulted, like `multiple`, so a manifest that never says it
+     * parses to the same object it did before.
+     */
+    shared: z.boolean().optional(),
+    /**
      * A `per` slot that takes several values in one occurrence of its parent. On an image slot
      * whose `per` is the repeatable one it keeps ADR 0160's amended meaning (2026-10-31): each
      * `::imagem` after the same `::lamina` adds one, and the lines written under it continue
@@ -155,6 +169,15 @@ export const slotSchema = z
     // worse of the two.
     // On a `multiple` slot `max` counts occurrences per parent, whatever the type, and `min`
     // is not built: a count nobody wrote has no parent line to be reported at yet.
+    // A shared value has no slide to count it in, so a list of them has no parent either.
+    if (slot.shared === true && slot.multiple === true) {
+      context.addIssue({
+        code: 'custom',
+        path: ['shared'],
+        message: 'shared is not built on a multiple slot',
+      });
+    }
+
     if (slot.multiple === true && slot.min !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -425,6 +448,16 @@ export const templateManifestSchema = z
       }
     }
 
+    // `::comum` closes a brief's slides (ADR 0225), so a slot under that name could never be
+    // written: the brief would read the line as the close.
+    if (CLOSES_SLIDES in manifest.slots) {
+      context.addIssue({
+        code: 'custom',
+        path: ['slots', CLOSES_SLIDES],
+        message: `'${CLOSES_SLIDES}' is reserved: '::${CLOSES_SLIDES}' closes a brief's slides`,
+      });
+    }
+
     for (const [name, adjustment] of Object.entries(manifest.adjustments)) {
       for (const [index, slot] of adjustment.applies.entries()) {
         if (!(slot in manifest.slots)) {
@@ -482,6 +515,18 @@ export const templateManifestSchema = z
           code: 'custom',
           path: ['slots', name, 'multiple'],
           message: 'multiple is only meaningful on a slot that declares per',
+        });
+      }
+      // Shared or a slide's own (ADR 0225): only a slide has a shared value to fall back on.
+      // A nested slot belongs to a block inside a slide, which no artwork shares.
+      if (slot.shared === true && manifest.slots[slot.per ?? '']?.repeat !== true) {
+        context.addIssue({
+          code: 'custom',
+          path: ['slots', name, 'shared'],
+          message:
+            slot.per === undefined
+              ? 'shared is only meaningful on a slot that declares per, and a slot without per is shared already'
+              : `shared is only meaningful on a slot whose per names the repeatable slot, and '${slot.per}' does not repeat`,
         });
       }
       if (slot.per === undefined) continue;

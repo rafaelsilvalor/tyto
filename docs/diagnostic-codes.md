@@ -24,6 +24,7 @@ non-zero.
 | `E_UNKNOWN_FORMAT` | error | no | A requested format is not one the chosen template renders. |
 | `E_FORMAT_NOT_IN_BRIEF` | error | no | A run asks for a format the template renders but the brief does not list. |
 | `E_BAD_SLOT_VALUE` | error | no | A slot is set to something the manifest does not allow for it. |
+| `E_BAD_COMUM` | error | no | A `::comum` line, which closes the slides, carries text or adjustments, or is written where there are no slides to close. |
 | `E_UNKNOWN_SLOT` | error | no | A directive names a slot the template manifest does not declare. |
 | `E_UNKNOWN_DIRECTIVE` | error | no | A directive matches no template slot and no installed plugin. |
 | `E_DIRECTIVE_ARGUMENT` | error | no | A plugin directive was written without an argument it needs, or with one it cannot use. |
@@ -287,6 +288,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_UNKNOWN_FORMAT` | no | The formats the template does render are unaffected. |
 | `E_FORMAT_NOT_IN_BRIEF` | no | The brief's own formats that were also requested still render. |
 | `E_BAD_SLOT_VALUE` | no | The value of one slot; it stays unset and the rest of the artwork is drawn anyway. |
+| `E_BAD_COMUM` | no | One line: what it carries is ignored, and a misplaced one closes nothing while the rest of the brief is read as written. |
 | `E_UNKNOWN_SLOT` | no | The slot does not exist, and the ones that do are unaffected. |
 | `E_UNKNOWN_DIRECTIVE` | no | The same: a directive nothing claims contributes nothing to skip. |
 | `E_DIRECTIVE_ARGUMENT` | no | The directive contributes nothing; every other directive is resolved. |
@@ -545,6 +547,20 @@ Slot '{slot}' is invalid: {problem}.
 ```
 
 Parameters: `slot`, `problem`
+
+### `E_BAD_COMUM`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/brief-language.md`
+
+A `::comum` line, which closes the slides, carries text or adjustments, or is written where there are no slides to close.
+
+One line: what it carries is ignored, and a misplaced one closes nothing while the rest of the brief is read as written.
+
+```
+'::comum' {problem}.
+```
+
+Parameters: `problem`
 
 ### `E_UNKNOWN_SLOT`
 

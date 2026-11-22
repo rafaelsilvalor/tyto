@@ -6,7 +6,7 @@ import {
 } from '@codemirror/autocomplete';
 import { type Extension } from '@codemirror/state';
 import { type SyntaxNode } from '@lezer/common';
-import { type TemplateManifest } from '@tyto/core';
+import { CLOSES_SLIDES, type TemplateManifest } from '@tyto/core';
 
 import { type BriefAnalysis, briefAnalysisField } from './analysis.js';
 import { briefLanguage } from './brief-language.js';
@@ -65,6 +65,8 @@ const slotOption = (name: string, manifest: TemplateManifest): Completion => {
     // Said in the list because nothing else on the line says it: `::imagem` belongs to the
     // `::lamina` written before it (ADR 0160).
     slot?.per === undefined ? undefined : `per ${slot.per}`,
+    // Before the first slide or after `::comum` it is every slide's (ADR 0225).
+    slot?.shared === true ? 'shared' : undefined,
     // Several on one slide, each where it is written among the slide's lines (ADR 0160,
     // amended 2026-10-31).
     slot?.multiple === true ? 'multiple' : undefined,
@@ -119,6 +121,15 @@ const templateOptions = (analysis: BriefAnalysis): Completion[] => {
     };
   });
 };
+
+/**
+ * `::comum`, which closes the slides (ADR 0225): offered only where there are slides to close,
+ * a template with a repeatable slot. It is no slot, so it is said in words what it does.
+ */
+const closesSlidesOption = (manifest: TemplateManifest): Completion[] =>
+  Object.values(manifest.slots).some((slot) => slot.repeat)
+    ? [{ label: CLOSES_SLIDES, type: 'keyword', detail: 'closes the slides' }]
+    : [];
 
 const directiveOption = (name: string): Completion => ({
   label: name,
@@ -186,8 +197,10 @@ const completeFrontmatter = (
   const scalar = /^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*([a-zA-Z0-9_-]*)$/u.exec(before);
   if (scalar) {
     const slot = manifest.slots[scalar[1] ?? ''];
-    // A slide's own slot is never a frontmatter key (ADR 0160), so it offers nothing there.
-    if (slot?.type === 'enum' && slot.values !== undefined && slot.per === undefined) {
+    // A slide's own slot is never a frontmatter key (ADR 0160), so it offers nothing there;
+    // a shared one is the brief's when written there (ADR 0225).
+    const keyable = slot?.per === undefined || slot.shared === true;
+    if (slot?.type === 'enum' && slot.values !== undefined && keyable) {
       const written = at(scalar, 2);
       const options = slot.values.map(valueOption);
       // A value that is selected — a skeleton's field (TYTO-275) — is one about to be
@@ -244,7 +257,10 @@ const directiveNames = (
   const slots =
     namespaced || manifest === undefined
       ? []
-      : Object.keys(manifest.slots).map((name) => slotOption(name, manifest));
+      : [
+          ...Object.keys(manifest.slots).map((name) => slotOption(name, manifest)),
+          ...closesSlidesOption(manifest),
+        ];
   const plugins = (analysis.directives ?? []).map(directiveOption);
   return result(written, [...slots, ...plugins], /^[a-zA-Z0-9_/-]*$/u);
 };

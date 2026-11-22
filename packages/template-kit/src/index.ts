@@ -79,6 +79,40 @@ export {
 
 export { type Mark, mark } from './mark.js';
 
+export {
+  type Adjusted,
+  BLOCK_COLUMN_PARAMETERS,
+  type BlockColumnOptions,
+  type BlockColumnParameters,
+  type Column,
+  type ColumnEntry,
+  type PlacedBlock,
+  WEIGHT,
+  WEIGHTS,
+  blockColumn,
+  columnOrder,
+  weightOf,
+} from './column.js';
+
+export {
+  MAIN_LINE_FIT_PARAMETERS,
+  type MainLineFitOptions,
+  type MainLineFitParameters,
+  mainLineScale,
+} from './fit.js';
+
+export {
+  type Area,
+  type ChoiceParameter,
+  type LengthParameter,
+  type Parameter,
+  type ParameterSchema,
+  type RatioParameter,
+  type ValueOf,
+  type ValuesOf,
+  parameterValues,
+} from './parameters.js';
+
 export { imageHeight } from './image.js';
 
 export { type BandedPageOptions, type Seal, bandedPage, reportOverflow, sealed } from './page.js';

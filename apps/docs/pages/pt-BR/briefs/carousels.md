@@ -34,6 +34,12 @@ Quem decide o que fica dentro de quê é o template, não os espaços no começo
 
 Quando a galeria mostra um slot como "multiple", você pode escrevê-lo mais de uma vez dentro do mesmo pai: dois `::bloco` num slide, cada um com as suas linhas de `::paragrafo`, saem na ordem em que você os escreveu. Cada `::paragrafo` vai para o `::bloco` escrito por último acima dele. Se o template define um número máximo, o que passar dele fica sublinhado na própria linha. Um slot sem "multiple" continua aceitando um por pai, e o segundo fica sublinhado.
 
+### Uma nota de todos os slides, ou só de um
+
+Quando a galeria mostra um slot como "comum ou per lamina", o lugar onde você o escreve decide de quem ele é. Antes do primeiro `::lamina`, ou no frontmatter, ele vai em todos os slides, acima das linhas próprias de cada um. Logo depois de um `::lamina` ele é só daquele slide, e nesse slide toma o lugar do que vale para todos; os outros slides continuam com o comum. Isso vale também depois do último `::lamina`.
+
+Para colocar um embaixo de todos os slides, escreva uma linha com `::comum` depois do último slide, e o slot depois dela. O `::comum` fecha os slides: não leva texto nem ajustes, e um `::lamina` novo ou um slot que pertence a um só slide escrito depois dele fica sublinhado. O editor só oferece `::comum` num template que tem slides.
+
 ## Quantos slides
 
 Um template pode definir um número mínimo e um máximo de slides. A galeria mostra os dois no slot que repete, como "no mínimo" e "no máximo". Um brief sem nenhum `::lamina` gera uma arte com os outros slots — é assim que o `notice` funciona, e outros templates podem exigir pelo menos um.

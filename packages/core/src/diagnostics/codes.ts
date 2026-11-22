@@ -104,6 +104,16 @@ export const diagnosticCodes = {
     fatal: false,
     fatality: 'The value of one slot; it stays unset and the rest of the artwork is drawn anyway.',
   },
+  E_BAD_COMUM: {
+    severity: 'error',
+    summary:
+      'A `::comum` line, which closes the slides, carries text or adjustments, or is written where there are no slides to close.',
+    template: "'::comum' {problem}.",
+    spec: 'docs/brief-language.md',
+    fatal: false,
+    fatality:
+      'One line: what it carries is ignored, and a misplaced one closes nothing while the rest of the brief is read as written.',
+  },
   E_UNKNOWN_SLOT: {
     severity: 'error',
     summary: 'A directive names a slot the template manifest does not declare.',

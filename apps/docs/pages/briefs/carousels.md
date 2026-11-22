@@ -34,6 +34,12 @@ The template decides what sits inside what, not the spaces in front of a line. Y
 
 When the gallery lists a slot as "multiple", you may write it more than once inside the same parent: two `::bloco` in one slide, each with its own `::paragrafo` lines, come out in the order you wrote them. Each `::paragrafo` goes to the `::bloco` written last above it. If the template sets a largest number, the one past it is underlined on its own line. A slot without "multiple" still takes one per parent, and a second one is underlined.
 
+### A note shared by every slide, or a slide's own
+
+When the gallery lists a slot as "shared or per lamina", where you write it decides whose it is. Before the first `::lamina`, or in the frontmatter, it goes on every slide, above each slide's own lines. Right after a `::lamina` it belongs to that slide alone, and on that slide it takes the place of the shared one; the other slides keep the shared one. That is true after the last `::lamina` too.
+
+To put one under every slide instead, write a line with `::comum` after the last slide, and the slot after it. `::comum` closes the slides: it takes no text and no adjustments, and a new `::lamina` or a slot that belongs to a single slide after it is underlined. The editor offers `::comum` only in a template that has slides.
+
 ## How many slides
 
 A template can set a smallest and a largest number of slides. The gallery shows both under the repeating slot, as "at least" and "at most". A brief with no `::lamina` at all makes one artwork from the other slots — that is how `notice` works, and other templates may require at least one.
