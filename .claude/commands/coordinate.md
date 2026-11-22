@@ -184,7 +184,14 @@ long and must outlive this coordinator, or when Rafael asks for one. Then:
 - it sends its plan and its report to you with
   `mcp__ccd_session_mgmt__send_message`. Reach it the same way with its
   `session_id` (it wakes the session even when it is idle), and read what it
-  did with `list_events`.
+  did with `list_events`;
+- **when its work is done, it renames itself**, so Rafael sees in the sidebar
+  that it can be archived without opening it (Rafael, 2026-11-22):
+  `set_session_title` on `"self"` with `✅ Concluída — <its title>`, right
+  after it sends its final report and waits on nothing more. Resumed for a
+  loose end, it drops the prefix while it works and puts it back when it
+  reports again. The session template carries this; internal executors are
+  agents, not sidebar sessions, and have no title to change.
 
 ### A cloud executor
 
@@ -245,7 +252,12 @@ step 12) leaves its worktree and branch for you:
 - **A cloud executor:** `--delete-branch` on the merge removes its branch;
   delete any other branch it pushed (`git ls-remote --heads`) once its PR is
   merged or closed.
-- **A separate local session:** stop it, and offer Rafael to archive it.
+- **A separate local session:** stop it; if its title does not start with
+  `✅ Concluída — `, rename it yourself (`set_session_title` with its
+  `session_id`), and offer Rafael to archive it.
+- **A cloud session** gets the same title from you once its PR is merged or
+  closed. Renaming a cloud session from here is not measured: if the tool
+  refuses, write it in the batch file and tell Rafael which one is done.
 - A deletion the permission system refuses becomes a PowerShell command for
   Rafael, in your next message; never work around it. Write in the batch file
   what you removed and what is left.
@@ -321,7 +333,10 @@ batch, with a reason):
 6. **Clean up your own noise.** Stop your background commands and watchers,
    remove your rows from the registry (coordinator, packages, ADRs), and end the
    batch file with what is left on disk and whose it is, so the next
-   coordinator finds nothing unexplained.
+   coordinator finds nothing unexplained. Last, rename this session
+   `✅ Concluída — Coordenadora <name>` (`set_session_title` on `"self"`), so
+   Rafael knows it can be archived. A coordinator that hands the batch to a
+   new one renames itself the same way once the hand-over is written.
 
 ## Executor template
 
@@ -371,6 +386,12 @@ English.
 Read and follow docs/executor-protocol.md, with two differences: before code,
 send the coordinator a plan of 3 to 6 lines and WAIT for GO; and your report is
 a message to the coordinator, not your last message.
+
+When your work is done (your final report is sent and you wait on nothing),
+rename this session with mcp__ccd_session_mgmt__set_session_title, session_id
+"self", title "✅ Concluída — <your current title>", so Rafael knows it can be
+archived. If the coordinator resumes you, drop the prefix while you work and
+put it back when you report again.
 
 Card: <KEY> "<title>". Branch <feat|fix|chore|docs>/<KEY>-<slug>. Card text
 (already read; do not call Jira):

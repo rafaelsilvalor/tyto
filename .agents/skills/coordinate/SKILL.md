@@ -206,7 +206,10 @@ Its own cleanup (`docs/executor-protocol.md`, step 12) leaves its worktree and b
   `git log origin/<branch>..HEAD` is empty (`git worktree remove --force <path>`), delete its
   branch with `git branch -D`, and delete its `<KEY>.last.md`. A worktree that installed
   `node_modules` may fail with `Filename too long`.
-- A thread the maintainer watches in the Codex app: tell him it is done, so he can archive it.
+- A thread the maintainer watches in the Codex app: rename it `✅ Concluída — <its name>` the
+  way Start names this thread, as the Claude Code command does with a finished session (the
+  maintainer, 2026-11-22), so he sees it can be archived without opening it. Where Codex
+  gives you no way to rename it, tell him it is done, so he can archive it.
 - A deletion the sandbox or an approval refuses becomes a command for the maintainer, in your
   next message; never work around it. Write in the batch file what you removed and what is
   left.
@@ -276,7 +279,9 @@ reason):
 6. **Clean up your own noise.** Stop your background jobs, remove your rows from the registry
    (coordinator, packages, ADRs) and the `<KEY>.last.md` files of the batch, and end the batch
    file with what is left on disk and whose it is, so the next coordinator finds nothing
-   unexplained.
+   unexplained. Last, rename this thread `✅ Concluída — Coordenadora <name>`, so the
+   maintainer knows it can be archived; a coordinator that hands the batch over renames itself
+   the same way once the hand-over is written.
 
 ## Executor template
 
