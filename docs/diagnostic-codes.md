@@ -153,7 +153,7 @@ non-zero.
 | `W_TEMPLATE_FILE_MISSING` | warning | no | A file an artwork's template draws with is not in the template's folder in one format. |
 | `W_EXTERNAL_ART_MISSING` | warning | no | A slot whose art is painted outside Tyto has no file yet, and an outlined box stands in for it (ADR 0220). |
 | `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
-| `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration sets a declared value to one of the wrong kind or outside its limits. |
+| `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration or a brief's frontmatter sets a declared value to one of the wrong kind or outside its limits. |
 | `E_TEMPLATE_ALIAS_TAKEN` | error | no | A plugin file gives a configuration an alias that is a template's name. |
 | `W_CONFIGURATION_BRIEF_INVALID` | warning | no | A configuration's brief block sets something the template cannot take. |
 | `W_EDITOR_RULE_LOOSER` | warning | no | A configuration's editor rule allows more than the template's manifest does. |
@@ -3074,7 +3074,7 @@ Parameters: `template`, `name`
 
 **Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0153-a-template-declares-its-configurable-values-in-its-manifest.md`
 
-A configuration sets a declared value to one of the wrong kind or outside its limits.
+A configuration or a brief's frontmatter sets a declared value to one of the wrong kind or outside its limits.
 
 A warning never replaces a value (ADR 0013).
 

@@ -1394,7 +1394,7 @@ export const diagnosticCodes = {
   W_TEMPLATE_VALUE_INVALID: {
     severity: 'warning',
     summary:
-      'A configuration sets a declared value to one of the wrong kind or outside its limits.',
+      "A configuration or a brief's frontmatter sets a declared value to one of the wrong kind or outside its limits.",
     template: "Value '{name}' of template '{template}' {problem}; the template's default is used.",
     spec: 'docs/adr/0153-a-template-declares-its-configurable-values-in-its-manifest.md',
     fatal: false,

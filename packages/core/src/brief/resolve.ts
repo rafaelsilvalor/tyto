@@ -10,7 +10,7 @@ import type { AssetRef } from '../scene/primitives.js';
 import { type SourceRange, sourceRange } from '../source/range.js';
 import type { TemplateConfigurations, TemplateSelection } from '../template/configurations.js';
 import { type BriefDefaults, measured } from '../template/configured-brief.js';
-import type { SuppliedValues } from '../template/declared-values.js';
+import type { SuppliedValue, SuppliedValues } from '../template/declared-values.js';
 import {
   CLOSES_SLIDES,
   type Slot,
@@ -156,7 +156,11 @@ export interface ResolvedBrief {
    * the entry's `default` for the template's own name. Absent when no file configures it.
    */
   readonly configuration?: string;
-  /** That configuration's values, checked already, for `compile` (ADR 0153). */
+  /**
+   * The values the template is given (ADR 0153): the configuration's, with the ones the brief's
+   * frontmatter sets over them (ADR 0226). Checked by `compile`, which warns at each one's range.
+   * Absent when neither sets any.
+   */
   readonly values?: SuppliedValues;
   /**
    * The brand that configuration draws (ADR 0155), whose kit `compile` hands the template in
@@ -1390,9 +1394,32 @@ export async function resolve(
   );
   resolver.formats = formats;
 
+  // A frontmatter key that is no slot but a value the template declares sets that value
+  // (ADR 0226): `destaque: '#e30613'`. A slot of the same name wins, as it always has.
+  const briefValues: Record<string, SuppliedValue> = {};
   for (const [key, value] of Object.entries(ast.frontmatter.data)) {
     if (RESERVED.has(key)) continue;
     const range = ast.frontmatter.ranges[key] ?? ast.frontmatter.range ?? ast.range;
+    const declared = manifest.values?.[key];
+    if (manifest.slots[key] === undefined && declared !== undefined) {
+      if (declared.type === 'image') {
+        resolver.report(
+          diagnostic(
+            'W_TEMPLATE_VALUE_INVALID',
+            {
+              template: manifest.name,
+              name: key,
+              problem:
+                "is an image, which a brief's frontmatter does not set yet (a configuration does)",
+            },
+            { range },
+          ),
+        );
+        continue;
+      }
+      briefValues[key] = { value, range };
+      continue;
+    }
     await resolver.take(scalarCandidate(key, String(value), range), true);
   }
 
@@ -1418,15 +1445,21 @@ export async function resolve(
   resolver.finish(ast.frontmatter.range ?? ast.range);
 
   const built = resolver.build(formats);
+  // The brief's values over the configuration's, value by value (ADR 0226).
+  const configured = selection?.configuration === undefined ? undefined : selection.values;
+  const values =
+    Object.keys(briefValues).length === 0 ? configured : { ...configured, ...briefValues };
   return fromPartial(
-    selection?.configuration === undefined
-      ? built
-      : {
-          ...built,
-          configuration: selection.configuration,
-          values: selection.values,
-          ...(selection.brand === undefined ? {} : { brand: selection.brand }),
-        },
+    {
+      ...built,
+      ...(selection?.configuration === undefined
+        ? {}
+        : {
+            configuration: selection.configuration,
+            ...(selection.brand === undefined ? {} : { brand: selection.brand }),
+          }),
+      ...(values === undefined ? {} : { values }),
+    },
     resolver.diagnostics,
   );
 }

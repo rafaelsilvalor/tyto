@@ -83,6 +83,10 @@ const adjustmentOption = (name: string, manifest: TemplateManifest): Completion 
 
 const valueOption = (value: string): Completion => ({ label: value, type: 'enum' });
 
+/** A declared value's default as the completion's detail shows it. */
+const defaultText = (value: unknown): string =>
+  typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
+
 const result = (
   written: Written,
   options: readonly Completion[],
@@ -160,7 +164,9 @@ const directiveOption = (name: string): Completion => ({
 const inFrontmatter = (node: SyntaxNode): boolean => node.name === 'Frontmatter';
 
 /**
- * Inside the frontmatter: `template`, `formats`, and any enum slot set as a scalar.
+ * Inside the frontmatter: `template`, `formats`, any enum slot set as a scalar, and — as a key at
+ * the start of a line — the values the template declares, which a brief may set there (ADR 0226),
+ * each with its kind and default.
  *
  * The frontmatter and a `::directive` set the same slots — "they differ in where the value
  * came from and in nothing else" (`docs/brief-language.md`) — so an enum slot completes
@@ -192,6 +198,25 @@ const completeFrontmatter = (
   const formats = /^\s*formats\s*:\s*(?:\[)?(?:[^[\]]*,)?\s*([a-zA-Z0-9_-]*)$/u.exec(before);
   if (formats) {
     return result(at(formats, 1), (analysis.formats ?? manifest.formats).map(valueOption));
+  }
+
+  // A key being typed at the start of a line: the values the template declares (ADR 0226). An
+  // image is set by a configuration, not by a brief, so it is not offered.
+  const key = /^([a-zA-Z_][a-zA-Z0-9_-]*)?$/u.exec(before);
+  if (key) {
+    const options = Object.entries(manifest.values ?? {})
+      .filter(([name, declared]) => declared.type !== 'image' && manifest.slots[name] === undefined)
+      .map(([name, declared]): Completion => ({
+        label: name,
+        type: 'property',
+        detail:
+          declared.default === undefined
+            ? declared.type
+            : `${declared.type} · ${defaultText(declared.default)}`,
+        apply:
+          declared.type === 'color' ? `${name}: '${String(declared.default ?? '#')}'` : `${name}: `,
+      }));
+    return result(at(key, 1), options);
   }
 
   const scalar = /^\s*([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*([a-zA-Z0-9_-]*)$/u.exec(before);

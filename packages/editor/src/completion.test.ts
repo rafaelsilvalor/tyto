@@ -120,6 +120,40 @@ const labelsOf = (result: CompletionResult | null): string[] =>
 const frontmatter = (...lines: readonly string[]): string =>
   ['---', 'template: carrossel-lista', ...lines, '---', ''].join('\n');
 
+const VALORES = manifestOf(`
+name: valores
+version: 1.0.0
+formats: [feed]
+slots:
+  titulo: { type: rich-text }
+values:
+  destaque: { type: color, default: '#1363d0' }
+  margem: { type: length, default: 60 }
+  logo: { type: image }
+`);
+
+describe('a declared value as a frontmatter key (TYTO-833, ADR 0226)', () => {
+  const doc = (line: string): string => ['---', 'template: valores', line, '---', ''].join('\n');
+
+  it('offers the declared values, an image left out, at the start of a line', () => {
+    const result = completeAt(doc('|'), analysisOf(VALORES));
+    expect(labelsOf(result)).toEqual(['destaque', 'margem']);
+    const destaque = result?.options.find((option) => option.label === 'destaque');
+    expect(destaque?.detail).toBe('color · #1363d0');
+    expect(destaque?.apply).toBe("destaque: '#1363d0'");
+  });
+
+  it('replaces the key being typed from its first letter', () => {
+    const marked = doc('des|');
+    const result = completeAt(marked, analysisOf(VALORES));
+    expect(result?.from).toBe(marked.indexOf('des|'));
+  });
+
+  it('offers no value after the colon, where a scalar slot’s values are', () => {
+    expect(labelsOf(completeAt(doc('destaque: |'), analysisOf(VALORES)))).toEqual([]);
+  });
+});
+
 describe('completeBrief', () => {
   it('offers exactly the slots the manifest declares, after ::', () => {
     const result = completeAt(`${frontmatter()}::|`, analysisOf(CARROSSEL));

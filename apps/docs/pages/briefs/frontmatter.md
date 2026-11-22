@@ -24,3 +24,13 @@ A slot whose value is short and fixed reads better here than in the body. Three 
 - **A line of plain text**, like `subtitulo: Saturday, 10 am to 4 pm`. Plain is the word: bold, italic and colour marks are not read in the frontmatter and Tyto warns with `W_MARKUP_IN_FRONTMATTER`. Text that needs formatting goes in the body, as a [directive](./directives.md). The exception is a template that draws `**…**` and `{cor:…}…{/}` in a frontmatter value itself: its manifest says so for that field, and then those two marks are drawn and not warned about, and a field's character limit counts only the words they draw, as it does for a directive.
 
 A value with a colon followed by a space, or one that starts with a quote or a bracket, needs quotes around it: `subtitulo: "Open: 10 am"`.
+
+## A template's values in the frontmatter
+
+A template may declare values you can change without touching it — a colour, a margin, a size. The [gallery](../templates/gallery.md) lists them with their defaults. Write one in the frontmatter, by its name, to change it for this brief only:
+
+```yaml
+destaque: '#e30613'
+```
+
+The brief's value wins over a configuration's, and a value you leave out keeps the template's. **A colour goes in quotes**: without them, YAML reads `#e30613` as a comment, and Tyto warns and keeps the default. A value of the wrong kind or out of its limits is the same warning, `W_TEMPLATE_VALUE_INVALID`, at the line. An image is not set here yet; a configuration sets it.
