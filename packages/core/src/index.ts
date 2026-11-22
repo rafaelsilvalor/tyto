@@ -161,6 +161,7 @@ export { contrastRatio, relativeLuminance } from './template/contrast.js';
 export {
   type ResolveOptions,
   type ResolvedAdjustment,
+  type ResolvedAnchor,
   type ResolvedArtwork,
   type ResolvedBrief,
   type ResolvedSlot,

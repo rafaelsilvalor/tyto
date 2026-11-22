@@ -2221,6 +2221,20 @@ describe('an isolated template sees its artwork’s blocks in drawing order (ADR
       [unknownPlace, withContent].map((answer) => (answer.ok ? 'ok' : answer.error[0]?.code)),
     ).toEqual(['E_PLUGIN_CALL', 'E_PLUGIN_CALL']);
   });
+
+  // ADR 0227: a shared block placed by an empty directive, with the value drawn there.
+  it('carries an anchored entry and each entry’s value to the plugin’s process', async () => {
+    const slot = {
+      name: 'corpo',
+      value: { kind: 'rich-text', text: [{ kind: 'text', value: 'Vagas' }] },
+      adjustments: [{ name: 'nome', value: 'vagas', range: { start: 0, end: 1 } }],
+      range: { start: 0, end: 1 },
+    };
+    const order = [{ name: 'corpo', place: 'anchored', slot }];
+    const answer = await seenWith({ ...CALL, order });
+
+    expect(answer.ok && JSON.parse(answer.value.frame.format)).toEqual(order);
+  });
 });
 
 describe('an isolated template sees the slots nested inside a slide’s own (ADR 0207)', () => {

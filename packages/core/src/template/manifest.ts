@@ -37,6 +37,12 @@ const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_-]*$/u;
  */
 export const CLOSES_SLIDES = 'comum';
 
+/**
+ * The adjustment that names a shared block (ADR 0227), so an empty directive inside a slide
+ * places it there: `::corpo {nome: vagas}`. Reserved, so no manifest may declare it.
+ */
+export const BLOCK_NAME = 'nome';
+
 /** `major.minor.patch`, with an optional prerelease — the form Changesets produces. */
 const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 
@@ -169,12 +175,14 @@ export const slotSchema = z
     // worse of the two.
     // On a `multiple` slot `max` counts occurrences per parent, whatever the type, and `min`
     // is not built: a count nobody wrote has no parent line to be reported at yet.
-    // A shared value has no slide to count it in, so a list of them has no parent either.
-    if (slot.shared === true && slot.multiple === true) {
+    // Several shared blocks of one kind are a list too (ADR 0227), counted by `max` among the
+    // shared ones. Not the pictures among a slide's lines (ADR 0160): those are the slide's
+    // body, which no other slide shares.
+    if (slot.shared === true && slot.multiple === true && slot.type === 'image') {
       context.addIssue({
         code: 'custom',
         path: ['shared'],
-        message: 'shared is not built on a multiple slot',
+        message: 'shared is not built on a multiple image slot',
       });
     }
 
@@ -455,6 +463,16 @@ export const templateManifestSchema = z
         code: 'custom',
         path: ['slots', CLOSES_SLIDES],
         message: `'${CLOSES_SLIDES}' is reserved: '::${CLOSES_SLIDES}' closes a brief's slides`,
+      });
+    }
+
+    // `{nome}` names a shared block on any slot (ADR 0227), so a template's own meaning for
+    // it would never reach the template.
+    if (BLOCK_NAME in manifest.adjustments) {
+      context.addIssue({
+        code: 'custom',
+        path: ['adjustments', BLOCK_NAME],
+        message: `'${BLOCK_NAME}' is reserved: '{${BLOCK_NAME}: …}' names a shared block`,
       });
     }
 

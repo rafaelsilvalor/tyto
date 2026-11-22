@@ -12,6 +12,7 @@ import type { TemplateConfigurations, TemplateSelection } from '../template/conf
 import { type BriefDefaults, measured } from '../template/configured-brief.js';
 import type { SuppliedValue, SuppliedValues } from '../template/declared-values.js';
 import {
+  BLOCK_NAME,
   CLOSES_SLIDES,
   type Slot,
   type TemplateManifest,
@@ -93,6 +94,16 @@ export type SlideBlock =
   | { readonly kind: 'text'; readonly text: RichText; readonly range: SourceRange }
   | { readonly kind: 'slot'; readonly slot: ResolvedSlot };
 
+/**
+ * A shared block placed on one slide by an empty directive there (ADR 0227): `slot` is the
+ * shared value drawn, `range` the anchor's line, which decides where among the slide's own
+ * blocks it is drawn.
+ */
+export interface ResolvedAnchor {
+  readonly slot: ResolvedSlot;
+  readonly range: SourceRange;
+}
+
 /** One occurrence of the repeatable slot; each becomes an `Artwork` in `compile`. */
 export interface ResolvedArtwork {
   readonly index: number;
@@ -105,6 +116,19 @@ export interface ResolvedArtwork {
   readonly slots: Readonly<Record<string, ResolvedSlot>>;
   /** The required `per` slots this occurrence left unset; `compile` stamps only its frames. */
   readonly missingRequiredSlots: readonly string[];
+  /**
+   * The shared blocks this slide places among its own (ADR 0227), in the order written. Present
+   * only when there is one, so a slide without anchors is the object it was.
+   */
+  readonly anchors?: readonly ResolvedAnchor[];
+}
+
+/** An empty directive inside a slide, before the shared block it places is known. */
+interface PendingAnchor {
+  readonly slot: string;
+  /** The `{nome}` it names; absent, it places the next shared block of `slot` not yet placed. */
+  readonly label?: string;
+  readonly range: SourceRange;
 }
 
 /** An occurrence while the brief is still being read: its own slots arrive after it. */
@@ -387,6 +411,9 @@ function scalarCandidate(name: string, value: string, range: SourceRange): Candi
   };
 }
 
+/** A shared block's name (ADR 0227): one a person types again in each slide's anchor. */
+const BLOCK_LABEL = /^[\p{L}\p{N}_-]+$/u;
+
 class Resolver {
   private readonly problems: Diagnostic[] = [];
   private readonly slots = new Map<string, ResolvedSlot>();
@@ -415,6 +442,10 @@ class Resolver {
    * join. Undefined while the slides are open.
    */
   private closedAt: SourceRange | undefined;
+  /** Each slide's anchors as written, by slide index (ADR 0227); placed in `finish`. */
+  private readonly pendingAnchors = new Map<number, PendingAnchor[]>();
+  /** Each slide's anchors once placed, by slide index. */
+  private readonly anchors = new Map<number, ResolvedAnchor[]>();
   /** Each external slot's own file per format (ADR 0222), for `ResolvedBrief.externalArt`. */
   private readonly externalArt = new Map<string, Readonly<Record<string, AssetRef>>>();
   /**
@@ -504,6 +535,18 @@ class Resolver {
       return;
     }
 
+    // An empty directive of a shared slot inside a slide places a shared block there (ADR 0227).
+    if (
+      slot.shared === true &&
+      !shared &&
+      !fromFrontmatter &&
+      slot.type === 'rich-text' &&
+      plainText(candidate.text).trim() === ''
+    ) {
+      this.anchor(candidate);
+      return;
+    }
+
     const adjustments = this.checkAdjustments(candidate, slot);
     const value = await this.valueOf(candidate, slot, fromFrontmatter);
     if (value === undefined) return;
@@ -531,7 +574,14 @@ class Resolver {
       return;
     }
 
-    if (this.slots.has(candidate.name)) {
+    const first = this.slots.get(candidate.name);
+    // Several shared blocks of one kind (ADR 0227) are a list, as a slide's own are.
+    const listed = slot.shared === true && slot.multiple === true;
+    if (first !== undefined && listed) {
+      this.addSibling(first, resolved, 'the shared blocks');
+      return;
+    }
+    if (first !== undefined) {
       this.report(
         badValue(
           candidate.name,
@@ -542,6 +592,127 @@ class Resolver {
       return;
     }
     this.slots.set(candidate.name, resolved);
+    if (listed) this.siblings.set(resolved, [resolved]);
+  }
+
+  /**
+   * An empty directive of a shared slot inside a slide (ADR 0227): kept as written, and placed
+   * in `finish`, once every shared block is known — one written after `::comum` included. It
+   * takes no adjustment but `{nome}`; a weight goes on the shared block it places.
+   */
+  private anchor(candidate: Candidate): void {
+    const slide = this.artworks[this.artworks.length - 1];
+    if (slide === undefined) return;
+    let label: string | undefined;
+    for (const adjustment of candidate.adjustments) {
+      if (adjustment.name !== BLOCK_NAME) {
+        this.badBlockName(
+          candidate.name,
+          `with no text places a shared block, and takes no '{${adjustment.name}}': it goes on the shared block`,
+          adjustment.range,
+        );
+        continue;
+      }
+      if (this.validLabel(candidate.name, adjustment)) label = adjustment.value;
+    }
+    const pending = this.pendingAnchors.get(slide.index) ?? [];
+    pending.push({
+      slot: candidate.name,
+      ...(label === undefined ? {} : { label }),
+      range: candidate.range,
+    });
+    this.pendingAnchors.set(slide.index, pending);
+    // An anchor is one of this slide's blocks: what follows still belongs to the slide.
+    this.open = this.open.slice(0, 1);
+  }
+
+  /** `{nome: x}` with a name a person can write again in an anchor; reported otherwise. */
+  private validLabel(slot: string, adjustment: ResolvedAdjustment): boolean {
+    if (adjustment.value !== undefined && BLOCK_LABEL.test(adjustment.value)) return true;
+    this.badBlockName(
+      slot,
+      `needs a name of letters, digits, '-' or '_' in '{${BLOCK_NAME}: …}', as in {${BLOCK_NAME}: vagas}`,
+      adjustment.range,
+    );
+    return false;
+  }
+
+  private badBlockName(slot: string, problem: string, range: SourceRange): void {
+    this.report(diagnostic('E_BAD_BLOCK_NAME', { slot, problem }, { range }));
+  }
+
+  /**
+   * Every slide's anchors, matched to the shared blocks they place (ADR 0227): by name, or
+   * without one the first shared block of that slot the slide has not placed yet. A name no
+   * shared block carries, a slot with no shared block left, or a block placed twice on one
+   * slide is reported at the anchor, and that anchor places nothing.
+   */
+  private placeAnchors(): void {
+    const labelled = new Map<string, Map<string, ResolvedSlot>>();
+    for (const [name, first] of this.slots) {
+      if (this.manifest.slots[name]?.shared !== true) continue;
+      const byLabel = new Map<string, ResolvedSlot>();
+      for (const block of this.siblings.get(first) ?? [first]) {
+        const label = block.adjustments.find((item) => item.name === BLOCK_NAME);
+        if (label?.value === undefined) continue;
+        if (byLabel.has(label.value)) {
+          this.badBlockName(
+            name,
+            `names a second shared block '${label.value}'; each name is given once`,
+            label.range,
+          );
+          continue;
+        }
+        byLabel.set(label.value, block);
+      }
+      labelled.set(name, byLabel);
+    }
+
+    for (const [index, pending] of this.pendingAnchors) {
+      const placed: ResolvedAnchor[] = [];
+      const used = new Set<ResolvedSlot>();
+      for (const anchor of pending) {
+        const first = this.slots.get(anchor.slot);
+        const all = first === undefined ? [] : (this.siblings.get(first) ?? [first]);
+        let target: ResolvedSlot | undefined;
+        if (anchor.label !== undefined) {
+          target = labelled.get(anchor.slot)?.get(anchor.label);
+          if (target === undefined) {
+            const names = [...(labelled.get(anchor.slot)?.keys() ?? [])];
+            this.badBlockName(
+              anchor.slot,
+              `with no text places the shared block '${anchor.label}', and no shared '::${anchor.slot}' is named so` +
+                (names.length === 0 ? '' : `; named: ${names.join(', ')}`),
+              anchor.range,
+            );
+            continue;
+          }
+        } else {
+          target = all.find((block) => !used.has(block));
+          if (target === undefined) {
+            this.badBlockName(
+              anchor.slot,
+              all.length === 0
+                ? `with no text places a shared block, and no '::${anchor.slot}' is written outside the slides`
+                : `with no text places the next shared block, and every shared '::${anchor.slot}' is already placed on this slide`,
+              anchor.range,
+            );
+            continue;
+          }
+        }
+        if (used.has(target)) {
+          this.badBlockName(
+            anchor.slot,
+            'places a shared block a second time on this slide; each goes in one place',
+            anchor.range,
+          );
+          continue;
+        }
+        used.add(target);
+        placed.push({ slot: target, range: anchor.range });
+      }
+      if (placed.length > 0) this.anchors.set(index, placed);
+    }
   }
 
   /**
@@ -726,6 +897,19 @@ class Resolver {
     const kept: ResolvedAdjustment[] = [];
 
     for (const adjustment of candidate.adjustments) {
+      // Reserved on every slot (ADR 0227): it names a shared block, and only a shared slot has one.
+      if (adjustment.name === BLOCK_NAME) {
+        if (slot.shared !== true) {
+          this.badBlockName(
+            candidate.name,
+            `is not shared by the slides, so '{${BLOCK_NAME}}' has nothing to name`,
+            adjustment.range,
+          );
+          continue;
+        }
+        if (this.validLabel(candidate.name, adjustment)) kept.push(adjustment);
+        continue;
+      }
       const declared = this.manifest.adjustments[adjustment.name];
       if (declared === undefined || !declared.applies.includes(candidate.name)) {
         const usable = Object.entries(this.manifest.adjustments)
@@ -1013,6 +1197,7 @@ class Resolver {
 
   /** Manifest defaults, the required slots nobody set, and the repeat count. */
   finish(fallbackRange: SourceRange | undefined): void {
+    this.placeAnchors();
     for (const [name, slot] of Object.entries(this.manifest.slots)) {
       if (slot.per !== undefined) {
         this.finishPerOccurrence(name, slot);
@@ -1187,11 +1372,22 @@ class Resolver {
     return {
       template: this.manifest.name,
       formats,
-      slots: Object.fromEntries(this.slots),
+      // `withNested` lists several shared blocks of one kind on the first (ADR 0227).
+      slots: Object.fromEntries(
+        [...this.slots].map(([name, slot]) => [name, this.withNested(slot)]),
+      ),
       artworks: this.artworks.map((open) => {
         const slots: Record<string, ResolvedSlot> = {};
         for (const [name, slot] of Object.entries(open.slots)) slots[name] = this.withNested(slot);
-        const artwork: ResolvedArtwork = { ...open, slots };
+        const anchors = this.anchors.get(open.index)?.map((anchor) => ({
+          ...anchor,
+          slot: this.withNested(anchor.slot),
+        }));
+        const artwork: ResolvedArtwork = {
+          ...open,
+          slots,
+          ...(anchors === undefined ? {} : { anchors }),
+        };
         const blocks = this.blocks.get(artwork.index);
         return blocks === undefined ? artwork : { ...artwork, slot: { ...artwork.slot, blocks } };
       }),

@@ -36,9 +36,13 @@ Quando a galeria mostra um slot como "multiple", você pode escrevê-lo mais de 
 
 ### Uma nota de todos os slides, ou só de um
 
-Quando a galeria mostra um slot como "comum ou per lamina", o lugar onde você o escreve decide de quem ele é. Antes do primeiro `::lamina`, ou no frontmatter, ele vai em todos os slides, acima das linhas próprias de cada um. Logo depois de um `::lamina` ele é só daquele slide, e nesse slide toma o lugar do que vale para todos; os outros slides continuam com o comum. Isso vale também depois do último `::lamina`.
+Quando a galeria mostra um slot como "comum ou per lamina", o lugar onde você o escreve decide de quem ele é. Antes do primeiro `::lamina`, ou no frontmatter, ele vai em todos os slides, acima das linhas próprias de cada um. Logo depois de um `::lamina` ele é só daquele slide, e nesse slide vem junto com o que vale para todos; os outros slides ficam só com o comum. Isso vale também depois do último `::lamina`.
 
 Para colocar um embaixo de todos os slides, escreva uma linha com `::comum` depois do último slide, e o slot depois dela. O `::comum` fecha os slides: não leva texto nem ajustes, e um `::lamina` novo ou um slot que pertence a um só slide escrito depois dele fica sublinhado. O editor só oferece `::comum` num template que tem slides.
+
+### Dar nome a um bloco comum e colocá-lo em cada slide
+
+Quando a galeria mostra um slot como "comum ou per lamina" e "multiple", você pode escrevê-lo mais de uma vez fora dos slides, cada um com os seus ajustes, como dois `::corpo` com pesos diferentes. Dê um nome ao bloco comum com `{nome: …}` e, dentro de cada slide, escreva a mesma diretiva **sem texto** onde esse bloco entra. Com `::corpo {nome: vagas}` e `::corpo {nome: salario, peso: 4}` escritos uma vez antes dos slides, um slide que traz `::corpo {nome: vagas}`, depois o seu `::apelo` e depois `::corpo {nome: salario}` mostra as vagas acima da oferta e o salário abaixo dela. Um slide que não coloca um bloco comum fica com ele acima das próprias linhas (ou abaixo, quando foi escrito depois de `::comum`). Uma diretiva vazia sem nome coloca o próximo bloco comum daquele slot que o slide ainda não colocou. Vários ajustes vão nas mesmas chaves, separados por vírgula: `{nome: salario, peso: 4}`. Um nome que nenhum bloco comum tem, um nome usado duas vezes ou um bloco colocado duas vezes no mesmo slide fica sublinhado na linha, para um bloco nunca sumir sem aviso.
 
 ## Quantos slides
 

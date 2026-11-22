@@ -79,12 +79,13 @@ export interface TemplateContext {
   readonly artworks?: readonly ArtworkSummary[];
 
   /**
-   * This artwork's blocks in drawing order, as the brief wrote them top to bottom (ADR 0225):
-   * the shared slots written before the first slide, then this slide's own (its `per` slots
-   * directly under the slide, not the repeatable slot itself nor anything nested deeper), then
-   * the shared slots written after a slide or after `::comum`, each group by position. A shared
-   * slot this slide replaced with its own is listed once, as `own`. A slot nobody wrote — a
-   * manifest default — is not listed.
+   * This artwork's blocks in drawing order, as the brief wrote them top to bottom (ADR 0225,
+   * ADR 0227): the shared slots written before the first slide, then this slide's own (its `per`
+   * slots directly under the slide, not the repeatable slot itself nor anything nested deeper)
+   * with the shared blocks it placed by an empty directive among them, then the shared slots
+   * written after a slide or after `::comum`, each group by position. A slide's own block adds
+   * to a shared one of the same name, and each occurrence of a `multiple` slot is its own entry.
+   * A slot nobody wrote — a manifest default — is not listed.
    *
    * Optional, because a context built by hand has none. `compile` always sets it, and it
    * crosses to a template running in its plugin's process with the call.
@@ -157,12 +158,19 @@ export interface TemplateContext {
 }
 
 /**
- * One block of an artwork in drawing order (ADR 0225): the slot's name, and whether it is a
- * shared value placed before the slides, this slide's own, or a shared value placed after.
+ * One block of an artwork in drawing order (ADR 0225, ADR 0227): the slot's name; whether it is
+ * a shared value placed before the slides, this slide's own, a shared value this slide placed
+ * among its own with an empty directive (`anchored`), or a shared value placed after; and the
+ * value drawn there, so two blocks of one name are read apart.
  */
 export interface PlacedSlot {
   readonly name: string;
-  readonly place: 'before' | 'own' | 'after';
+  readonly place: 'before' | 'own' | 'anchored' | 'after';
+  /**
+   * The value drawn at this place, with its adjustments (its `peso`). Optional, because a
+   * context built by hand may list names only; `compile` always sets it.
+   */
+  readonly slot?: ResolvedSlot;
 }
 
 /**

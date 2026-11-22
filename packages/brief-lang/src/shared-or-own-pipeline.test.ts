@@ -174,10 +174,11 @@ describe('a slot that is shared or a slide’s own', () => {
     ]);
   });
 
-  it('written shared and inside slide 2, gives slide 2 its own and slide 1 the shared', async () => {
+  // ADR 0227: a slide's own block adds to the shared one; `slots.nota` still reads the own one.
+  it('written shared and inside slide 2, gives slide 2 both and slide 1 the shared', async () => {
     expect(await drawn('::nota Comum\n::lamina Um\n::lamina Dois\n::nota Própria\n')).toEqual([
       ['order: nota/before', 'nota: Comum'],
-      ['order: nota/own', 'nota: Própria'],
+      ['order: nota/before nota/own', 'nota: Própria'],
     ]);
   });
 
@@ -202,8 +203,8 @@ describe('the order a template reads', () => {
           '::lamina Dois\n::comum\n::nota Embaixo\n',
       ),
     ).toEqual([
-      // The slide's own `nota` replaces the shared one there, and is listed once.
-      ['order: titulo/before extra/own nota/own rodape/after', 'nota: N1'],
+      // The slide's own `nota` adds to the shared one written after `::comum` (ADR 0227).
+      ['order: titulo/before extra/own nota/own rodape/after nota/after', 'nota: N1'],
       ['order: titulo/before rodape/after nota/after', 'nota: Embaixo'],
     ]);
   });
@@ -217,7 +218,11 @@ describe('the order a template reads', () => {
     });
     compile(value, solto, { formats: FORMATS });
 
-    expect(seen).toEqual([[{ name: 'titulo', place: 'before' }]]);
+    expect(seen.map((order) => order?.map(({ name, place }) => ({ name, place })))).toEqual([
+      [{ name: 'titulo', place: 'before' }],
+    ]);
+    // ADR 0227: each entry carries the value drawn there.
+    expect(seen[0]?.[0]?.slot).toBe(value.slots.titulo);
   });
 });
 

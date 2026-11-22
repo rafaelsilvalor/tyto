@@ -36,9 +36,13 @@ When the gallery lists a slot as "multiple", you may write it more than once ins
 
 ### A note shared by every slide, or a slide's own
 
-When the gallery lists a slot as "shared or per lamina", where you write it decides whose it is. Before the first `::lamina`, or in the frontmatter, it goes on every slide, above each slide's own lines. Right after a `::lamina` it belongs to that slide alone, and on that slide it takes the place of the shared one; the other slides keep the shared one. That is true after the last `::lamina` too.
+When the gallery lists a slot as "shared or per lamina", where you write it decides whose it is. Before the first `::lamina`, or in the frontmatter, it goes on every slide, above each slide's own lines. Right after a `::lamina` it belongs to that slide alone, and on that slide it comes in addition to the shared one; the other slides have only the shared one. That is true after the last `::lamina` too.
 
 To put one under every slide instead, write a line with `::comum` after the last slide, and the slot after it. `::comum` closes the slides: it takes no text and no adjustments, and a new `::lamina` or a slot that belongs to a single slide after it is underlined. The editor offers `::comum` only in a template that has slides.
+
+### Naming a shared block and placing it on each slide
+
+When the gallery lists a slot as "shared or per lamina" and "multiple", you may write it more than once outside the slides, each with its own adjustments, such as two `::corpo` with different weights. Give a shared block a name with `{nome: …}`, and inside each slide write the same directive **with no text** where that block goes. With `::corpo {nome: vagas}` and `::corpo {nome: salario, peso: 4}` written once before the slides, a slide that reads `::corpo {nome: vagas}`, then its `::apelo`, then `::corpo {nome: salario}` shows the vacancies above the offer and the salary below it. A slide that does not place a shared block keeps it above its own lines (or below them, when it was written after `::comum`). An empty directive without a name places the next shared block of that slot the slide has not placed yet. Several adjustments go in one brace, separated by commas: `{nome: salario, peso: 4}`. A name no shared block has, a name used twice, or a block placed twice on one slide is underlined at its line, so a block never goes missing in silence.
 
 ## How many slides
 

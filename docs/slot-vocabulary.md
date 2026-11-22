@@ -176,8 +176,11 @@ smaller than every marked level**, so the marked lines carry the weight: the kit
 `bodyBlock` (TYTO-831, ADR 0224) sizes it as the smallest marked size times its
 `unmarkedRatio` parameter, 0.8 by default — the smallest marked level **the block uses**
 (TYTO-834), so a body written with `##` alone is not shrunk by a `######` it never wrote. A template that repeats its artworks may declare
-`corpo` `per: lamina` with `shared: true` (ADR 0225), so one slide can carry other facts. A
-template that has no `corpo` keeps drawing the facts from `titulo`, as before.
+`corpo` `per: lamina` with `shared: true` (ADR 0225), so one slide can carry other facts, and
+`multiple: true` (ADR 0227), so a brief writes the vacancies and the salary as two `::corpo`,
+each with its own `peso`, named with `{nome: vagas}` and placed per slide by an empty
+`::corpo {nome: vagas}`. A template that has no `corpo` keeps drawing the facts from `titulo`,
+as before.
 
 ### Levels inside a block: `|`, `#` and `---`
 
