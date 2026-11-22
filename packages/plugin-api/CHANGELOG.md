@@ -1,5 +1,17 @@
 # @tyto/plugin-api
 
+## 0.31.0
+
+### Minor Changes
+
+- 8264b41: A slide's own block adds to the shared ones instead of replacing them; a `shared` slot may be `multiple`; `{nome: …}` names a shared block and an empty directive inside a slide places it there; `context.order` carries each block's value and the `anchored` place (ADR 0227, TYTO-838).
+
+### Patch Changes
+
+- Updated dependencies [8264b41]
+  - @tyto/core@0.58.0
+  - @tyto/recipe@0.14.6
+
 ## 0.30.0
 
 ### Minor Changes

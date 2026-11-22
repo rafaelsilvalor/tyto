@@ -1,5 +1,20 @@
 # @tyto/template-kit
 
+## 0.19.0
+
+### Minor Changes
+
+- f5a7aec: `entriesInOrder` gives the block column one entry per placed block of `context.order`, so two `::corpo`, or a shared title and a slide's own, are two blocks in the brief's order, each at its own `peso` (TYTO-839, ADR 0227).
+
+### Patch Changes
+
+- Updated dependencies [8264b41]
+- Updated dependencies [8264b41]
+  - @tyto/brief-lang@0.12.10
+  - @tyto/core@0.58.0
+  - @tyto/export-html@0.8.16
+  - @tyto/template-lang@0.8.35
+
 ## 0.18.0
 
 ### Minor Changes
