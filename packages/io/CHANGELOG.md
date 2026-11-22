@@ -1,5 +1,19 @@
 # @tyto/io
 
+## 5.14.2
+
+### Patch Changes
+
+- Updated dependencies [65053a6]
+- Updated dependencies [65053a6]
+  - @tyto/core@0.56.0
+  - @tyto/plugin-api@0.29.0
+  - @tyto/export-html@0.8.14
+  - @tyto/export-svg@2.1.14
+  - @tyto/pipeline@0.13.4
+  - @tyto/recipe@0.14.4
+  - @tyto/template-lang@0.8.33
+
 ## 5.14.1
 
 ### Patch Changes

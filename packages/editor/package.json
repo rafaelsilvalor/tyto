@@ -1,6 +1,6 @@
 {
   "name": "@tyto/editor",
-  "version": "0.21.10",
+  "version": "0.22.0",
   "type": "module",
   "description": "CodeMirror 6 setup for the brief and template languages.",
   "license": "UNLICENSED",

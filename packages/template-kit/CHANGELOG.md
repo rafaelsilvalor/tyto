@@ -1,5 +1,35 @@
 # @tyto/template-kit
 
+## 0.16.0
+
+### Minor Changes
+
+- 6f162da: TYTO-824: `blockColumn` lays a template's information blocks out as one column over an area
+  (ADR 0224): in the brief's order (`context.order`, ADR 0225), a block the brief left out taking
+  no room, the gaps the template states per pair, and the group centred between the area's top and
+  bottom, with what does not fit reported as `overflow`. `weightOf` reads a slot's `peso`
+  adjustment (`1`, `2`, `3`) as the scale its block is built at, 0.85, 1 and 1.2 by default. Every
+  number the column uses is a declared parameter in `BLOCK_COLUMN_PARAMETERS`, read with
+  `parameterValues`; `Area` and the parameter schema types are exported for the pieces that follow.
+- 7adc40a: TYTO-825: `mainLineScale` answers the scale at which a title's `#` part fills its area's width
+  on one line, kept between `minScale` and `maxScale` (0.7 and 1.6 by default) and lowered until
+  the head fits the area's height when the caller says how tall it comes out (`heightAt`).
+  `blockColumn` fits a group taller than its area: every block is rebuilt smaller by one factor,
+  down to `shrinkFloor` (0.7), then the column grows above its top by up to `reach` (`rise`), and
+  what is still left over is `overflow`. Both pieces declare their numbers as parameters
+  (ADR 0224).
+
+### Patch Changes
+
+- 94b7fa4: `levelsOf` keeps a `\` the author typed inside its part, drawn as a line break there, instead of
+  starting a new level line; the spaces against it and a break at either end of a part are taken
+  off. `cardSegments` reads through it, so a card's band, title and foot break the same way.
+- Updated dependencies [65053a6]
+  - @tyto/core@0.56.0
+  - @tyto/brief-lang@0.12.8
+  - @tyto/export-html@0.8.14
+  - @tyto/template-lang@0.8.33
+
 ## 0.15.1
 
 ### Patch Changes

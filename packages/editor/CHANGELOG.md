@@ -1,5 +1,21 @@
 # @tyto/editor
 
+## 0.22.0
+
+### Minor Changes
+
+- 65053a6: TYTO-823: after `::` the editor offers `comum`, which closes the slides (ADR 0225), in a
+  template with a repeatable slot; a slot declared shared says `shared` beside `per lamina`, and a
+  shared enum offers its values as a frontmatter key.
+
+### Patch Changes
+
+- Updated dependencies [65053a6]
+  - @tyto/core@0.56.0
+  - @tyto/brief-lang@0.12.8
+  - @tyto/recipe@0.14.4
+  - @tyto/template-lang@0.8.33
+
 ## 0.21.10
 
 ### Patch Changes
