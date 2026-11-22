@@ -64,12 +64,23 @@ editor. So the rule is fixed first.
      Both take an area and declared parameters and return a measured block (decisions 1 and 2);
      that shared contract is what makes a component pluggable into any arrangement. A template is
      then a root arrangement of components over the frame's area, plus the values it sets.
-     **Where they live:** primitives and generic components with no brand in them belong in
-     `@tyto/template-kit` (public). A component that carries a brand — a logo, a house colour, a
-     house layout — lives only in a private package or template repository, never in this
-     repository or the kit, by the public-repository rule in `AGENTS.md` and ADR 0151. The name
-     **component** ("componente" in Portuguese) is this record's proposal; the maintainer may
-     rename it, and the rename is a wording change, not a new decision.
+     **A component is open in two ways, and only these** (maintainer, 2026-11-22):
+     - **Minimal customisation.** It declares the few parameters a template may set — a colour,
+       a radius, size bounds, a gap — each with a default (decision 2), and nothing more. What is
+       not declared is the component's own design; a template that needs more uses another
+       component or a new one, it never reaches inside.
+     - **Typed inputs for what it receives.** Content that comes from outside enters through
+       named, typed inputs: a slot's text, another block or component, or an asset. A shape
+       whose content input accepts a raster image (PNG) or a vector path (SVG geometry, coloured
+       by the template) is the model. Composition is plugging an element into a component's
+       input, never editing the component; an input's type says what may be plugged, and an
+       empty optional input draws nothing, as an absent slot does.
+       **Where they live:** primitives and generic components with no brand in them belong in
+       `@tyto/template-kit` (public). A component that carries a brand — a logo, a house colour, a
+       house layout — lives only in a private package or template repository, never in this
+       repository or the kit, by the public-repository rule in `AGENTS.md` and ADR 0151. The name
+       **component** ("componente" in Portuguese) is this record's proposal; the maintainer may
+       rename it, and the rename is a wording change, not a new decision.
 
 5. **How the open cards apply it.**
    - **TYTO-823** (core): the brief's block order reaches `TemplateContext` per artwork. It is
