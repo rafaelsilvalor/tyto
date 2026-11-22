@@ -1,5 +1,20 @@
 # @tyto/plugin-api
 
+## 0.30.0
+
+### Minor Changes
+
+- 3b06a14: TYTO-837: a template running in its plugin's process may send back `W_TEMPLATE_LOW_CONTRAST`
+  (two hex colours, a ratio from 1 to 21); anything else in it is refused as `E_PLUGIN_PROTOCOL`.
+  The RPC protocol is 31.
+
+### Patch Changes
+
+- Updated dependencies [4387c26]
+- Updated dependencies [3b06a14]
+  - @tyto/core@0.57.0
+  - @tyto/recipe@0.14.5
+
 ## 0.29.0
 
 ### Minor Changes
