@@ -35,7 +35,13 @@ export default defineConfig({
     // Every window a second launch unless a suite asks for a first one (TYTO-287): the first
     // opens the preview to the side, and every suite starts in a folder with no session.
     // And Google Fonts off in every launch that does not ask for it (TYTO-281, ADR 0120).
-    setupFiles: ['e2e/not-a-first-launch.setup.ts', 'e2e/no-google-fonts.setup.ts'],
+    // And unlimited frames in every launch: a hidden window paints one frame a second, and
+    // Playwright waits for one per input it sends (TYTO-341, ADR 0104).
+    setupFiles: [
+      'e2e/not-a-first-launch.setup.ts',
+      'e2e/no-google-fonts.setup.ts',
+      'e2e/unlimited-frames.setup.ts',
+    ],
     // Launching Electron is seconds, not milliseconds, and the first run on a machine also
     // downloads the binary. The 5s default would read that as a hang.
     testTimeout: 120_000,

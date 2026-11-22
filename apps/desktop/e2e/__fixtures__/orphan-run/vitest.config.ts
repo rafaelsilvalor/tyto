@@ -15,7 +15,7 @@ export default defineConfig({
   test: {
     include: ['orphan.fixture.ts'],
     globalSetup: ['../../launch-ledger.global-setup.ts'],
-    setupFiles: ['../../not-a-first-launch.setup.ts'],
+    setupFiles: ['../../not-a-first-launch.setup.ts', '../../unlimited-frames.setup.ts'],
     testTimeout: 120_000,
     hookTimeout: 120_000,
     fileParallelism: false,

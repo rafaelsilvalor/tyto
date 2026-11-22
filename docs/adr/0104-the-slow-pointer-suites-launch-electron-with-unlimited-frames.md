@@ -2,6 +2,24 @@
 
 Status: accepted · 2026-10-19 · TYTO-291
 
+> **Amended 2026-11-21 (TYTO-341): every launch, from the shared wrapper.** The one reason below
+> for holding the switch back, vim's Escape taken by a pending completion, was a product bug and
+> TYTO-331 fixed it. So `--disable-frame-rate-limit` is no longer written into any suite's
+> `args`. `e2e/unlimited-frames.setup.ts` appends it to every `_electron.launch`, as a
+> `setupFiles` entry of `vitest.desktop.config.ts` beside `not-a-first-launch.setup.ts`, and of
+> the nested run `orphan-guard.desktop.test.ts` starts. A launch that already names the switch
+> is left as it is. The five per-file copies (`tab-drag`, `sticky-scroll`, `group-splitter`,
+> `tabs`, `keybindings`) are gone, and so is the consequence below that a new suite pays ~1 s
+> per input until it passes the switch: it no longer has to. `pnpm shots`
+> (`vitest.shots.config.ts`) does not load the wrapper; pictures run on demand, are not a test,
+> and were not measured with it. A red the switch exposes is a race in the app or the test, to
+> be fixed there, not a reason to launch slower.
+>
+> Measured locally on 9 files, the wrapper as written against the wrapper made to pass its
+> options through unchanged: 102.4 s against 589.4 s summed. A probe that asked main
+> `app.commandLine.hasSwitch('disable-frame-rate-limit')` read `true` with the wrapper and
+> `false` without. The CI sums, before and after, are in the pull request.
+
 ## Context
 
 The end-to-end suites launch the app with `TYTO_HEADLESS=1`, and under it the main window is

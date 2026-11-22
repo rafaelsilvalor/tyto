@@ -2055,6 +2055,11 @@
       "why": "reviewed: the nested run it kills a worker in (TYTO-292); it reaches only the launch harness, and a harness change already runs everything"
     },
     {
+      "paths": ["apps/desktop/e2e/unlimited-frames.setup.ts"],
+      "e2e": "all",
+      "why": "TYTO-341: the launch wrapper that gives every e2e launch unlimited frames (ADR 0104); as a harness file it already runs everything"
+    },
+    {
       "paths": [
         "apps/desktop/src/main/verification-mode.ts",
         "apps/desktop/e2e/verify-probe.test.ts",

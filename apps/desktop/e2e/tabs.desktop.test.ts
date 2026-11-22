@@ -233,10 +233,7 @@ beforeAll(async () => {
   writeFileSync(windowsPath, FIRST.split('\n').join('\r\n'), 'utf8');
 
   app = await _electron.launch({
-    // A `show: false` window paints about one frame a second, and Playwright waits a frame for
-    // much of the input it sends. Unlimited frames take that wait away. Test side only; the
-    // app ships unchanged (ADR 0104).
-    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`, '--disable-frame-rate-limit'],
+    args: ['.', `--user-data-dir=${join(scratch, 'userData')}`],
     cwd: join(here, '..'),
     env: { ...process.env, TYTO_HEADLESS: '1', TYTO_HOME: join(scratch, 'tyto-home') },
   });
