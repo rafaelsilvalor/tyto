@@ -27,6 +27,7 @@ import {
 } from '@codemirror/view';
 
 import { activeLine } from './active-line.js';
+import { colourSwatches } from './colour-swatch.js';
 import { brief } from './brief-language.js';
 import { nestingChanged } from './brief-blocks.js';
 import { type MarkedDiagnostic, diagnosticsSpec } from './diagnostic-markers.js';
@@ -518,6 +519,8 @@ export interface EditorHandle extends EditorPane {
 const baseExtensions = (): Extension[] => [
   highlightActiveLineGutter(),
   activeLine(),
+  // A square of the colour beside each hex colour of a frontmatter (TYTO-835); none elsewhere.
+  colourSwatches(),
   // A brief's folds follow the nesting its analysis brings (TYTO-748), which lands with no edit.
   foldGutter({ foldingChanged: nestingChanged }),
   historyExtension(),
