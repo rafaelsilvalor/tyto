@@ -95,6 +95,13 @@ export {
 } from './column.js';
 
 export {
+  MAIN_LINE_FIT_PARAMETERS,
+  type MainLineFitOptions,
+  type MainLineFitParameters,
+  mainLineScale,
+} from './fit.js';
+
+export {
   type Area,
   type ChoiceParameter,
   type LengthParameter,
