@@ -88,6 +88,15 @@ TYTO-190 made it a carousel the way the agenda is one: each `::lamina` is a slid
 specialties and rows, so `lista` left the template (3.0.0) rather than living beside a
 `lamina` that carries the same rows.
 
+## `comum` is no slot's name
+
+**`comum` is reserved by the brief language, not by this list** (ADR 0225): `::comum` is the
+line that closes a brief's slides, so a manifest that declares a slot `comum` is refused. What
+is written after it is shared by every slide and drawn below each one's own blocks — a slot
+whose manifest says `per: lamina, shared: true`. Such a slot keeps its standard name: a note
+the same on every slide but one is still `nota`, written once before the slides and once inside
+the slide that differs, not a second slot named for the exception.
+
 ## `cor` and `tom`: one role, and `tom` wins
 
 `promo-curso`'s `cor` and `carrossel-lista`'s `tom` are the same role — the closed list that

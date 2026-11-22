@@ -79,6 +79,19 @@ export interface TemplateContext {
   readonly artworks?: readonly ArtworkSummary[];
 
   /**
+   * This artwork's blocks in drawing order, as the brief wrote them top to bottom (ADR 0225):
+   * the shared slots written before the first slide, then this slide's own (its `per` slots
+   * directly under the slide, not the repeatable slot itself nor anything nested deeper), then
+   * the shared slots written after a slide or after `::comum`, each group by position. A shared
+   * slot this slide replaced with its own is listed once, as `own`. A slot nobody wrote — a
+   * manifest default — is not listed.
+   *
+   * Optional, because a context built by hand has none. `compile` always sets it, and it
+   * crosses to a template running in its plugin's process with the call.
+   */
+  readonly order?: readonly PlacedSlot[];
+
+  /**
    * How big `node` will come out once it is laid out — asked before it is placed (ADR 0038).
    *
    * The same `measureText` that `compile` runs on the frame afterwards, against the same
@@ -141,6 +154,15 @@ export interface TemplateContext {
    * crosses to a template running in its plugin's process with the call (TYTO-439).
    */
   readonly values?: TemplateValues;
+}
+
+/**
+ * One block of an artwork in drawing order (ADR 0225): the slot's name, and whether it is a
+ * shared value placed before the slides, this slide's own, or a shared value placed after.
+ */
+export interface PlacedSlot {
+  readonly name: string;
+  readonly place: 'before' | 'own' | 'after';
 }
 
 /**

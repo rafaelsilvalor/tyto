@@ -24,6 +24,7 @@ import {
   type DeferredTemplate,
   type Template,
   type ArtworkSummary,
+  type PlacedSlot,
   type TemplateContext,
   type TemplateFiles,
   type TemplateReport,
@@ -369,6 +370,45 @@ interface Plan {
   readonly adjustments: Readonly<Record<string, string | true>>;
   /** Whether a required slot is unset for this artwork, so its frames carry the stamp. */
   readonly gap: boolean;
+  /** This artwork's blocks in drawing order (ADR 0225), for `context.order`. */
+  readonly order: readonly PlacedSlot[];
+}
+
+/** Written slots by where the brief wrote them; a slot with no range was never written. */
+function byPosition(slots: Iterable<ResolvedSlot>): ResolvedSlot[] {
+  return [...slots]
+    .filter((slot) => slot.range !== undefined)
+    .sort((left, right) => (left.range?.start ?? 0) - (right.range?.start ?? 0));
+}
+
+/**
+ * An artwork's blocks in drawing order (ADR 0225): the shared slots written before the first
+ * slide, then the slide's own, then the shared slots written after a slide — `resolve` keeps a
+ * `shared` slot written after a slide as that slide's own unless `::comum` closed the slides,
+ * so what is shared and after one is either after `::comum` or a slot without `per`. A shared
+ * slot the slide replaced is left out of the shared groups, so it is listed once, as `own`.
+ */
+function orderOf(
+  shared: Readonly<Record<string, ResolvedSlot>>,
+  own: Readonly<Record<string, ResolvedSlot>>,
+  firstSlide: SourceRange | undefined,
+): readonly PlacedSlot[] {
+  const placed = (slot: ResolvedSlot, place: PlacedSlot['place']): PlacedSlot => ({
+    name: slot.name,
+    place,
+  });
+  const before: PlacedSlot[] = [];
+  const after: PlacedSlot[] = [];
+  for (const slot of byPosition(Object.values(shared))) {
+    if (slot.name in own) continue;
+    const isBefore = firstSlide === undefined || (slot.range?.start ?? 0) < firstSlide.start;
+    (isBefore ? before : after).push(placed(slot, isBefore ? 'before' : 'after'));
+  }
+  return [
+    ...before,
+    ...byPosition(Object.values(own)).map((slot) => placed(slot, 'own')),
+    ...after,
+  ];
 }
 
 /**
@@ -402,9 +442,12 @@ function plannedArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): r
         slots: resolved.slots,
         adjustments: {},
         gap: resolved.missingRequiredSlots.length > 0,
+        order: orderOf(resolved.slots, {}, undefined),
       },
     ];
   }
+
+  const firstSlide = resolved.artworks[0]?.slot.range;
 
   return resolved.artworks.map((artwork) => ({
     id: `${repeatable}-${artwork.index + 1}`,
@@ -415,6 +458,7 @@ function plannedArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): r
     slots: { ...resolved.slots, ...artwork.slots, [repeatable]: artwork.slot },
     adjustments: flatten(artwork.slot),
     gap: resolved.missingRequiredSlots.length > 0 || artwork.missingRequiredSlots.length > 0,
+    order: orderOf(resolved.slots, artwork.slots, firstSlide),
   }));
 }
 
@@ -613,6 +657,7 @@ function contextOf(
     slots: withExternalArtSizes(plan.slots, manifest, format, copies),
     adjustments: plan.adjustments,
     artworks,
+    order: plan.order,
     measure,
     files,
     brand,
