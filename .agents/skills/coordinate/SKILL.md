@@ -52,6 +52,18 @@ order among themselves, and a batch can gain cards, lose cards or be split while
   registry before every GO and every merge, edit it in single-row changes, and remove your rows
   when a PR merges or a card leaves the batch.
 
+- **Tell the other active coordinators; never rely on the file alone.** The registry is seen
+  only when someone pulls it. At your start, tell every coordinator in its active table what you
+  reserve and occupy, and ask what it has queued in the same packages or files. Then send one
+  line before a GO on a package or file another batch may touch, at each ADR reservation, each
+  package taken or freed, and before asking the maintainer for a merge, and ask the same of it.
+  Codex cannot message a Claude desktop session (`docs/agents.md` › How the two talk to each
+  other): write a dated line in the registry, push it, and ask the maintainer to tell that
+  session to read it. Another Codex coordinator gets the same dated line. On an overlap, agree
+  who merges first: the second merges `origin/main` and reruns CI, and the overlap goes under
+  "Sobreposições declaradas" in the registry. A silent coordinator does not block you: the
+  registry still rules, and you tell the maintainer.
+
 Jira calls follow `AGENTS.md` › Operational rules › Jira (fields, connector fallback,
 transition ids); each step below names the `fields` it reads.
 

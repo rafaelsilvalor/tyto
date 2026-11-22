@@ -48,6 +48,21 @@ and a batch can gain cards, lose cards or be split while it runs.
   appends or single-row changes, and remove your rows when a PR merges or a
   card leaves the batch.
 
+- **Tell the other active coordinators; never rely on the file alone.** The
+  registry is seen only when someone pulls it. At your start, message every
+  coordinator in its active table: what you reserve and occupy, and what it
+  has queued in the same packages or files. Then send one line before a GO on
+  a package or file another batch may touch, at each ADR reservation, each
+  package taken or freed, and before asking Rafael for a merge, and ask the
+  same of it. A Claude Code session is reached with
+  `mcp__ccd_session_mgmt__send_message` to the session id in the table; a
+  Codex coordinator (`codex:<thread id>`) through a dated line in the
+  registry, the shared-file channel of `docs/agents.md`. On an overlap, agree
+  who merges first: the second merges `origin/main` and reruns CI, and the
+  overlap goes under "Sobreposições declaradas" in the registry. A silent
+  coordinator does not block you: the registry still rules, and you tell
+  Rafael.
+
 Jira calls follow AGENTS.md › Operational rules › Jira (fields, connector
 fallback, transition ids); each step below names the `fields` it reads.
 
