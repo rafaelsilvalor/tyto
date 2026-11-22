@@ -125,8 +125,9 @@ describe('completeBrief', () => {
     const result = completeAt(`${frontmatter()}::|`, analysisOf(CARROSSEL));
 
     // Exactly: the acceptance criterion is that the list *matches the manifest*, so this
-    // is an equality and not a `toContain`.
-    expect(labelsOf(result)).toEqual(['item', 'titulo', 'tom']);
+    // is an equality and not a `toContain`. `comum` closes the slides of a template with a
+    // repeatable slot (ADR 0225), so it is offered beside them.
+    expect(labelsOf(result)).toEqual(['comum', 'item', 'titulo', 'tom']);
   });
 
   it('offers nothing in the indent in front of a comment line inside a block (TYTO-680)', () => {
@@ -142,6 +143,7 @@ describe('completeBrief', () => {
 
     expect(completeAt(`${frontmatter()}::titulo\nDireito Cons|\n`, analysis)).toBeNull();
     expect(labelsOf(completeAt(`${frontmatter()}::titulo\nDireito\n::ti|`, analysis))).toEqual([
+      'comum',
       'item',
       'titulo',
       'tom',
@@ -153,7 +155,7 @@ describe('completeBrief', () => {
     const result = completeAt(doc, analysisOf(CARROSSEL));
 
     expect(result?.from).toBe(doc.indexOf('|') - 2);
-    expect(labelsOf(result)).toEqual(['item', 'titulo', 'tom']);
+    expect(labelsOf(result)).toEqual(['comum', 'item', 'titulo', 'tom']);
   });
 
   it('says what kind of slot each one is', () => {
@@ -179,6 +181,34 @@ describe('completeBrief', () => {
     const foto = result?.options.find((option) => option.label === 'foto');
 
     expect(foto?.detail).toBe('image · per lamina · multiple');
+  });
+
+  it('offers comum only to a template with slides to close, saying what it does (ADR 0225)', () => {
+    const withSlides = completeAt(`${frontmatter()}::|`, analysisOf(CARROSSEL));
+    const comum = withSlides?.options.find((option) => option.label === 'comum');
+    const promo = ['---', 'template: promo-curso', '---', '::|'].join('\n');
+
+    expect(comum?.detail).toBe('closes the slides');
+    expect(labelsOf(completeAt(promo, analysisOf(PROMO)))).toEqual(['headline', 'imagem']);
+  });
+
+  it('says a slide slot is shared, and offers its values as a frontmatter key', () => {
+    const shared = manifestOf(`
+name: questao
+version: 1.0.0
+formats: [feed]
+slots:
+  lamina: { type: rich-text, repeat: true, min: 1 }
+  tom: { type: enum, values: [claro, escuro], per: lamina, shared: true }
+`);
+    const directive = ['---', 'template: questao', '---', '::lamina', '  Um', '::|'].join('\n');
+    const key = ['---', 'template: questao', 'tom: |', '---'].join('\n');
+    const tom = completeAt(directive, analysisOf(shared))?.options.find(
+      (option) => option.label === 'tom',
+    );
+
+    expect(tom?.detail).toBe('enum · per lamina · shared');
+    expect(labelsOf(completeAt(key, analysisOf(shared)))).toEqual(['claro', 'escuro']);
   });
 
   it('offers no frontmatter value for a per-slide enum, which is never a key there', () => {
@@ -367,7 +397,7 @@ describe('completeBrief', () => {
       directives: ['demo/shout'],
     });
 
-    expect(labelsOf(result)).toEqual(['demo/shout', 'item', 'titulo', 'tom']);
+    expect(labelsOf(result)).toEqual(['comum', 'demo/shout', 'item', 'titulo', 'tom']);
     expect(result?.options.find((option) => option.label === 'demo/shout')?.detail).toBe('plugin');
   });
 
