@@ -114,6 +114,18 @@ export const diagnosticCodes = {
     fatality:
       'One line: what it carries is ignored, and a misplaced one closes nothing while the rest of the brief is read as written.',
   },
+  // An error, not a warning (ADR 0227): an anchor that places nothing would leave the block
+  // off that artwork without a word.
+  E_BAD_BLOCK_NAME: {
+    severity: 'error',
+    summary:
+      "A shared block's name, or an empty directive that places one on a slide, does not name a shared block once.",
+    template: "'::{slot}' {problem}.",
+    spec: 'docs/adr/0227-shared-and-slide-blocks-add-up-and-a-named-block-is-placed-by-name.md',
+    fatal: false,
+    fatality:
+      'One line: the name or the anchor is ignored, and the shared block is drawn where it was written.',
+  },
   E_UNKNOWN_SLOT: {
     severity: 'error',
     summary: 'A directive names a slot the template manifest does not declare.',

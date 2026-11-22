@@ -1,4 +1,4 @@
-import type { ResolvedBrief, ResolvedSlot } from './resolve.js';
+import type { ResolvedAnchor, ResolvedBrief, ResolvedSlot } from './resolve.js';
 import { type FormatCatalogue, undefinedFormats } from '../config/formats.js';
 import { type Diagnostic, diagnostic, hasFatal } from '../diagnostics/diagnostic.js';
 import { type Diagnostics, type Result, err, withDiagnostics } from '../result/result.js';
@@ -381,34 +381,47 @@ function byPosition(slots: Iterable<ResolvedSlot>): ResolvedSlot[] {
     .sort((left, right) => (left.range?.start ?? 0) - (right.range?.start ?? 0));
 }
 
+/** A slot and, for a `multiple` one, every value beside it (ADR 0207, ADR 0227). */
+const eachOccurrence = (slot: ResolvedSlot): readonly ResolvedSlot[] => slot.occurrences ?? [slot];
+
 /**
- * An artwork's blocks in drawing order (ADR 0225): the shared slots written before the first
- * slide, then the slide's own, then the shared slots written after a slide — `resolve` keeps a
- * `shared` slot written after a slide as that slide's own unless `::comum` closed the slides,
- * so what is shared and after one is either after `::comum` or a slot without `per`. A shared
- * slot the slide replaced is left out of the shared groups, so it is listed once, as `own`.
+ * An artwork's blocks in drawing order (ADR 0225, ADR 0227): the shared slots written before the
+ * first slide, then the slide's own with the shared blocks it placed by an empty directive among
+ * them, by position, then the shared slots written after a slide — `resolve` keeps a `shared`
+ * slot written after a slide as that slide's own unless `::comum` closed the slides, so what is
+ * shared and after one is either after `::comum` or a slot without `per`. A slide's own block
+ * adds to a shared one of its name; a shared block the slide placed is drawn there only.
  */
 function orderOf(
   shared: Readonly<Record<string, ResolvedSlot>>,
   own: Readonly<Record<string, ResolvedSlot>>,
   firstSlide: SourceRange | undefined,
+  anchors: readonly ResolvedAnchor[] = [],
 ): readonly PlacedSlot[] {
   const placed = (slot: ResolvedSlot, place: PlacedSlot['place']): PlacedSlot => ({
     name: slot.name,
     place,
+    slot,
   });
+  const anchored = new Set(anchors.map((anchor) => anchor.slot.range?.start));
   const before: PlacedSlot[] = [];
   const after: PlacedSlot[] = [];
-  for (const slot of byPosition(Object.values(shared))) {
-    if (slot.name in own) continue;
+  for (const slot of byPosition(Object.values(shared).flatMap(eachOccurrence))) {
+    if (anchored.has(slot.range?.start)) continue;
     const isBefore = firstSlide === undefined || (slot.range?.start ?? 0) < firstSlide.start;
     (isBefore ? before : after).push(placed(slot, isBefore ? 'before' : 'after'));
   }
-  return [
-    ...before,
-    ...byPosition(Object.values(own)).map((slot) => placed(slot, 'own')),
-    ...after,
-  ];
+  const middle = [
+    ...byPosition(Object.values(own).flatMap(eachOccurrence)).map((slot) => ({
+      at: slot.range?.start ?? 0,
+      entry: placed(slot, 'own'),
+    })),
+    ...anchors.map((anchor) => ({
+      at: anchor.range.start,
+      entry: placed(anchor.slot, 'anchored'),
+    })),
+  ].sort((left, right) => left.at - right.at);
+  return [...before, ...middle.map((item) => item.entry), ...after];
 }
 
 /**
@@ -458,7 +471,7 @@ function plannedArtworks(resolved: ResolvedBrief, manifest: TemplateManifest): r
     slots: { ...resolved.slots, ...artwork.slots, [repeatable]: artwork.slot },
     adjustments: flatten(artwork.slot),
     gap: resolved.missingRequiredSlots.length > 0 || artwork.missingRequiredSlots.length > 0,
-    order: orderOf(resolved.slots, artwork.slots, firstSlide),
+    order: orderOf(resolved.slots, artwork.slots, firstSlide, artwork.anchors),
   }));
 }
 

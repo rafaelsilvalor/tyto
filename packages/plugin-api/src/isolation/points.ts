@@ -208,12 +208,14 @@ const templateCallSchema = z.strictObject({
       }),
     )
     .optional(),
-  // This artwork's blocks in drawing order (ADR 0225): names and places, no content.
+  // This artwork's blocks in drawing order (ADR 0225), each with the value drawn there (ADR
+  // 0227), checked as `slots` is: Tyto's own `ResolvedSlot`, whose shape the host guarantees.
   order: z
     .array(
       z.strictObject({
         name: z.string().min(1),
-        place: z.enum(['before', 'own', 'after']),
+        place: z.enum(['before', 'own', 'anchored', 'after']),
+        slot: z.unknown().optional(),
       }),
     )
     .optional(),

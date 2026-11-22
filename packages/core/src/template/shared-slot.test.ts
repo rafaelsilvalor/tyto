@@ -77,12 +77,28 @@ describe('a slot that is shared or a slide’s own', () => {
     expect(problems[0]?.message).toContain("'bloco' does not repeat");
   });
 
-  it('is refused beside multiple, since a shared value has no slide to count it in', () => {
-    const problems = rejected(
+  // Several shared blocks of one kind are a list (ADR 0227); the pictures among a slide's lines
+  // are that slide's body, which no other slide shares.
+  it('is accepted beside multiple on text, and refused on a multiple image', () => {
+    const manifest = accepted(
       withSlot('nota: { type: rich-text, per: lamina, shared: true, multiple: true }'),
     );
+    const problems = rejected(
+      withSlot('foto: { type: image, per: lamina, shared: true, multiple: true }'),
+    );
 
-    expect(pathsOf(problems)).toEqual(['slots.nota.shared']);
+    expect(manifest.slots['nota']?.multiple).toBe(true);
+    expect(pathsOf(problems)).toEqual(['slots.foto.shared']);
+  });
+
+  it('refuses a manifest adjustment named nome, which names a shared block', () => {
+    const problems = rejected(
+      `${withSlot('nota: { type: rich-text, per: lamina, shared: true }')}adjustments:
+  nome: { type: enum, values: [a], applies: [nota] }
+`,
+    );
+
+    expect(pathsOf(problems)).toEqual(['adjustments.nome']);
   });
 
   it('keeps refusing a default, as every per slot does', () => {

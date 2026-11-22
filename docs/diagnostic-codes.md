@@ -25,6 +25,7 @@ non-zero.
 | `E_FORMAT_NOT_IN_BRIEF` | error | no | A run asks for a format the template renders but the brief does not list. |
 | `E_BAD_SLOT_VALUE` | error | no | A slot is set to something the manifest does not allow for it. |
 | `E_BAD_COMUM` | error | no | A `::comum` line, which closes the slides, carries text or adjustments, or is written where there are no slides to close. |
+| `E_BAD_BLOCK_NAME` | error | no | A shared block's name, or an empty directive that places one on a slide, does not name a shared block once. |
 | `E_UNKNOWN_SLOT` | error | no | A directive names a slot the template manifest does not declare. |
 | `E_UNKNOWN_DIRECTIVE` | error | no | A directive matches no template slot and no installed plugin. |
 | `E_DIRECTIVE_ARGUMENT` | error | no | A plugin directive was written without an argument it needs, or with one it cannot use. |
@@ -290,6 +291,7 @@ incomplete brief, and a crossed box where a picture the exporter could not load 
 | `E_FORMAT_NOT_IN_BRIEF` | no | The brief's own formats that were also requested still render. |
 | `E_BAD_SLOT_VALUE` | no | The value of one slot; it stays unset and the rest of the artwork is drawn anyway. |
 | `E_BAD_COMUM` | no | One line: what it carries is ignored, and a misplaced one closes nothing while the rest of the brief is read as written. |
+| `E_BAD_BLOCK_NAME` | no | One line: the name or the anchor is ignored, and the shared block is drawn where it was written. |
 | `E_UNKNOWN_SLOT` | no | The slot does not exist, and the ones that do are unaffected. |
 | `E_UNKNOWN_DIRECTIVE` | no | The same: a directive nothing claims contributes nothing to skip. |
 | `E_DIRECTIVE_ARGUMENT` | no | The directive contributes nothing; every other directive is resolved. |
@@ -562,6 +564,20 @@ One line: what it carries is ignored, and a misplaced one closes nothing while t
 ```
 
 Parameters: `problem`
+
+### `E_BAD_BLOCK_NAME`
+
+**Severity:** error · **Fatal:** no · **Spec:** `docs/adr/0227-shared-and-slide-blocks-add-up-and-a-named-block-is-placed-by-name.md`
+
+A shared block's name, or an empty directive that places one on a slide, does not name a shared block once.
+
+One line: the name or the anchor is ignored, and the shared block is drawn where it was written.
+
+```
+'::{slot}' {problem}.
+```
+
+Parameters: `slot`, `problem`
 
 ### `E_UNKNOWN_SLOT`
 
