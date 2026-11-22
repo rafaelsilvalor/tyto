@@ -1,0 +1,24 @@
+---
+template: coluna-teste
+formats: [grid]
+---
+// The head once, two slides, and a note under every slide that writes none of its own.
+
+::titulo {peso: 3}
+  Concurso Exemplo
+
+::lamina
+  oferta
+::nota
+  Só nesta versão.
+::apelo {peso: 1}
+  Pacotes com 40% OFF
+
+::lamina
+  atemporal
+::apelo
+  Assine e estude
+
+::comum
+::nota
+  Para todas as versões.
