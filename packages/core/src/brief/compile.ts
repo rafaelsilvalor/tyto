@@ -682,6 +682,20 @@ function reportDiagnostic(
   if (report.code === 'W_TEMPLATE_ORPHAN') {
     return diagnostic(report.code, { artwork: plan.id, format, word: report.word }, where);
   }
+  if (report.code === 'W_TEMPLATE_LOW_CONTRAST') {
+    return diagnostic(
+      report.code,
+      {
+        artwork: plan.id,
+        format,
+        foreground: report.foreground,
+        background: report.background,
+        ratio: report.ratio.toFixed(1),
+        template,
+      },
+      where,
+    );
+  }
   if (report.code === 'W_TEMPLATE_FILE_MISSING') {
     return diagnostic(
       report.code,

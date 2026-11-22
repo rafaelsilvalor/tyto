@@ -74,11 +74,13 @@ import {
  * schema of a host on 28 would refuse and a field the strict frame schema of a guest on 28
  * would refuse (ADR 0221, TYTO-740); 30 since a plugin may register an `image-decoder` and read
  * the file a decode call names through its token, a point a host on 29 would refuse to
- * register and a request it would refuse as an unknown capability (ADR 0223, TYTO-742). The
- * number is the host's and its own guest bootstrap's: a plugin's code carries none, so a
- * plugin built before 30 runs on 30 unchanged.
+ * register and a request it would refuse as an unknown capability (ADR 0223, TYTO-742); 31
+ * since a template may report `W_TEMPLATE_LOW_CONTRAST`, a code the strict report schema of a
+ * host on 30 would refuse with the whole answer (ADR 0058, TYTO-837). The number is the host's
+ * and its own guest bootstrap's: a plugin's code carries none, so a plugin built before 31 runs
+ * on 31 unchanged.
  */
-export const RPC_PROTOCOL_VERSION = 30;
+export const RPC_PROTOCOL_VERSION = 31;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 

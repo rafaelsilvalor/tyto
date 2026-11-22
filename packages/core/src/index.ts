@@ -156,6 +156,7 @@ export {
   imageValue,
   numberValue,
 } from './template/value-readers.js';
+export { contrastRatio, relativeLuminance } from './template/contrast.js';
 
 export {
   type ResolveOptions,

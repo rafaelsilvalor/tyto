@@ -151,6 +151,7 @@ non-zero.
 | `W_TEMPLATE_OVERFLOW` | warning | no | An artwork's content runs past the room its template has for it in one format. |
 | `W_TEMPLATE_ORPHAN` | warning | no | A paragraph of an artwork ends on a line holding a single word in one format. |
 | `W_TEMPLATE_FILE_MISSING` | warning | no | A file an artwork's template draws with is not in the template's folder in one format. |
+| `W_TEMPLATE_LOW_CONTRAST` | warning | no | Two colours an artwork draws text in have too little contrast to read well. |
 | `W_EXTERNAL_ART_MISSING` | warning | no | A slot whose art is painted outside Tyto has no file yet, and an outlined box stands in for it (ADR 0220). |
 | `W_TEMPLATE_VALUE_UNKNOWN` | warning | no | A configuration sets a value the template does not declare configurable. |
 | `W_TEMPLATE_VALUE_INVALID` | warning | no | A configuration or a brief's frontmatter sets a declared value to one of the wrong kind or outside its limits. |
@@ -3041,6 +3042,20 @@ Artwork '{artwork}' is drawn without '{path}' in format '{format}': template '{t
 ```
 
 Parameters: `artwork`, `path`, `format`, `template`
+
+### `W_TEMPLATE_LOW_CONTRAST`
+
+**Severity:** warning · **Fatal:** no · **Spec:** `docs/adr/0058-a-template-reports-warnings-beside-its-frame.md`
+
+Two colours an artwork draws text in have too little contrast to read well.
+
+A warning never replaces a value (ADR 0013).
+
+```
+Artwork '{artwork}' in format '{format}': '{foreground}' on '{background}' has a contrast of {ratio}:1, too little for template '{template}' to read well; the colours are kept.
+```
+
+Parameters: `artwork`, `format`, `foreground`, `background`, `ratio`, `template`
 
 ### `W_EXTERNAL_ART_MISSING`
 
