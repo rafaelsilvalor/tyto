@@ -2050,6 +2050,36 @@ describe('an isolated template’s reports (ADR 0058)', () => {
     ]);
   });
 
+  it('carries a contrast report with its colours and ratio (TYTO-837)', async () => {
+    const report = {
+      code: 'W_TEMPLATE_LOW_CONTRAST',
+      foreground: '#eceaea',
+      background: '#f2c200',
+      ratio: 1.54,
+    };
+    const answer = await buildIn([report]);
+
+    expect(answer.ok && answer.value.reports).toEqual([report]);
+  });
+
+  it('refuses a contrast report with a colour that is no hex, or a ratio outside 1 to 21', async () => {
+    const named = await buildIn([
+      { code: 'W_TEMPLATE_LOW_CONTRAST', foreground: 'white', background: '#000', ratio: 21 },
+    ]);
+    const high = await buildIn([
+      { code: 'W_TEMPLATE_LOW_CONTRAST', foreground: '#fff', background: '#000', ratio: 22 },
+    ]);
+    const low = await buildIn([
+      { code: 'W_TEMPLATE_LOW_CONTRAST', foreground: '#fff', background: '#000', ratio: 0.5 },
+    ]);
+
+    expect([named, high, low].map((answer) => (answer.ok ? 'ok' : answer.error[0]?.code))).toEqual([
+      'E_PLUGIN_PROTOCOL',
+      'E_PLUGIN_PROTOCOL',
+      'E_PLUGIN_PROTOCOL',
+    ]);
+  });
+
   it('refuses a missing-file report whose path is empty, too long, or smuggles a number', async () => {
     const empty = await buildIn([{ code: 'W_TEMPLATE_FILE_MISSING', path: '' }]);
     const long = await buildIn([{ code: 'W_TEMPLATE_FILE_MISSING', path: 'x'.repeat(261) }]);
