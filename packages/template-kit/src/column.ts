@@ -63,6 +63,21 @@ export const BLOCK_COLUMN_PARAMETERS = {
     min: 0,
     description: 'The scale of a block written with {peso: 3}.',
   },
+  shrinkFloor: {
+    kind: 'ratio',
+    default: 0.7,
+    min: 0,
+    max: 1,
+    description:
+      'The smallest share of its size every block shrinks to, all by one factor, when the group is taller than its area (TYTO-825).',
+  },
+  reach: {
+    kind: 'length',
+    default: 0,
+    min: 0,
+    description:
+      'How far above its top edge the column may grow once every block is at the floor; what is still left over is the overflow.',
+  },
 } as const satisfies ParameterSchema;
 
 export type BlockColumnParameters = ValuesOf<typeof BLOCK_COLUMN_PARAMETERS>;
@@ -136,8 +151,15 @@ export interface Column {
   readonly block: Block;
   /** The blocks drawn, in the order drawn. */
   readonly placed: readonly PlacedBlock[];
-  /** How much taller than the area the group came out; 0 when it fits. */
+  /** How much taller than its room the group came out, after shrinking and reaching; 0 when it fits. */
   readonly overflow: number;
+  /** The factor every block was shrunk by to fit the area: 1 when it fitted as built. */
+  readonly shrink: number;
+  /**
+   * How far above the area's top the column grew to hold the group at the floor, within the
+   * `reach` parameter: the caller places the block this much higher than the area's top.
+   */
+  readonly rise: number;
 }
 
 /**
@@ -163,28 +185,51 @@ export function columnOrder<Entry extends { readonly name: string }>(
  * The column: every entry measured against the area at its scale, the absent ones dropped, the
  * rest stacked with their gaps and the group aligned between the area's edges. When the area's
  * height is unbounded, the column is as tall as the group.
+ *
+ * A group taller than a bounded area is fitted in three steps, in this order (TYTO-825): every
+ * block is rebuilt smaller by one factor, the largest that fits, never below `shrinkFloor` (the
+ * gaps keep their size); at the floor, the column grows above its top edge by up to `reach`
+ * (`rise`); what is still taller is `overflow`, for the caller to report (`reportOverflow`).
  */
 export function blockColumn(area: Area, options: BlockColumnOptions): Column {
   const values = parameterValues(BLOCK_COLUMN_PARAMETERS, options.parameters);
 
-  // First pass: measure. Nothing is placed before every size is known.
-  const measured: { name: string; block: Block; scale: number }[] = [];
-  for (const entry of columnOrder(options.entries, options.order)) {
-    const scale = entry.scale ?? 1;
-    const built = entry.build(area, scale);
-    if (built === undefined || built.height <= 0) continue;
-    measured.push({ name: entry.name, block: built, scale });
-  }
+  const entries = columnOrder(options.entries, options.order);
+  const gapOf = (above: string, below: string): number =>
+    Math.max(0, options.gapBetween?.(above, below) ?? values.gap);
 
-  const gaps = measured.map((item, index) => {
-    const below = measured[index + 1];
-    if (below === undefined) return 0;
-    return Math.max(0, options.gapBetween?.(item.name, below.name) ?? values.gap);
-  });
-  const content = measured.reduce((sum, item, index) => sum + item.block.height + gaps[index]!, 0);
-
+  // First pass: measure. Nothing is placed before every size is known; when the group is taller
+  // than its area, it is measured again with every block shrunk by one factor, down to the floor.
   const bounded = Number.isFinite(area.height);
-  const room = bounded ? area.height : content;
+  let shrink = 1;
+  let laid = measuredAt(entries, area, 1, gapOf);
+  if (bounded && laid.content > area.height && values.shrinkFloor < 1) {
+    const floor = measuredAt(entries, area, values.shrinkFloor, gapOf);
+    if (floor.content > area.height) {
+      shrink = values.shrinkFloor;
+      laid = floor;
+    } else {
+      // The largest factor at which the group fits: text that wraps makes the height step, so
+      // it is searched rather than divided out.
+      let fits = values.shrinkFloor;
+      let tooTall = 1;
+      let fitting = floor;
+      while (tooTall - fits > SHRINK_PRECISION) {
+        const middle = (fits + tooTall) / 2;
+        const tried = measuredAt(entries, area, middle, gapOf);
+        if (tried.content <= area.height) {
+          fits = middle;
+          fitting = tried;
+        } else tooTall = middle;
+      }
+      shrink = fits;
+      laid = fitting;
+    }
+  }
+  const { measured, gaps, content } = laid;
+
+  const rise = bounded ? Math.min(values.reach, Math.max(0, content - area.height)) : 0;
+  const room = bounded ? area.height + rise : content;
   const free = room - content;
 
   // Second pass: place, from the top the alignment leaves.
@@ -212,7 +257,40 @@ export function blockColumn(area: Area, options: BlockColumnOptions): Column {
     },
     placed,
     overflow: Math.max(0, -free),
+    shrink,
+    rise,
   };
+}
+
+/** The shrink search stops when two factors are this close. */
+const SHRINK_PRECISION = 0.005;
+
+interface Laid {
+  readonly measured: readonly { name: string; block: Block; scale: number }[];
+  readonly gaps: readonly number[];
+  readonly content: number;
+}
+
+/** Every entry built at its own scale times `factor`, the absent ones dropped, and the gaps. */
+function measuredAt(
+  entries: readonly ColumnEntry[],
+  area: Area,
+  factor: number,
+  gapOf: (above: string, below: string) => number,
+): Laid {
+  const measured: { name: string; block: Block; scale: number }[] = [];
+  for (const entry of entries) {
+    const scale = (entry.scale ?? 1) * factor;
+    const built = entry.build(area, scale);
+    if (built === undefined || built.height <= 0) continue;
+    measured.push({ name: entry.name, block: built, scale });
+  }
+  const gaps = measured.map((item, index) => {
+    const below = measured[index + 1];
+    return below === undefined ? 0 : gapOf(item.name, below.name);
+  });
+  const content = measured.reduce((sum, item, index) => sum + item.block.height + gaps[index]!, 0);
+  return { measured, gaps, content };
 }
 
 function offsetFor(align: 'start' | 'center' | 'end', free: number): number {
