@@ -6,9 +6,12 @@ import {
   type LevelLook,
   type LevelPart,
   levelStack,
+  levelsOf,
 } from './levels.js';
 import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 import type { Measure } from './text.js';
+
+import type { RichText } from '@tyto/core';
 
 /**
  * A body: the lines of general information under a title, as one block of its own (TYTO-831,
@@ -58,8 +61,12 @@ export type BodyParameters = ValuesOf<typeof BODY_PARAMETERS>;
 export type MarkedSizes = Readonly<Record<Exclude<Level, 0>, number>>;
 
 export interface BodyOptions {
-  /** The body's lines, as `levelsOf` reads them. */
-  readonly items: readonly LevelItem[];
+  /**
+   * The body's words. They are read with `levelsOf` with no positional reading: a line with no
+   * mark is always the base level, the first one included, since a body's first line is a fact
+   * and never a name.
+   */
+  readonly words: RichText;
   /** Each marked level's size at scale 1. */
   readonly sizes: MarkedSizes;
   /** How a part looks at the size the body chose for its level: face, weight, colour. */
@@ -90,7 +97,8 @@ export function bodySize(
  * when it has nothing to draw, so a column leaves no room for it.
  */
 export function bodyBlock(area: Area, scale: number, options: BodyOptions): Block | undefined {
-  if (options.items.length === 0) return undefined;
+  const items = levelsOf(options.words, { readByPosition: false });
+  if (items.length === 0) return undefined;
   const values = parameterValues(BODY_PARAMETERS, options.parameters);
   const lineGap: LevelGap<LevelItem> =
     options.lineGapBetween === undefined
@@ -101,7 +109,7 @@ export function bodyBlock(area: Area, scale: number, options: BodyOptions): Bloc
             (options.lineGapBetween as (a: LevelItem, b: LevelItem) => number)(above, below) *
             scale;
   const drawn = levelStack(
-    options.items,
+    items,
     {
       name: options.name ?? 'body',
       look: (part) => options.look(part, bodySize(part.level, options.sizes, values) * scale),

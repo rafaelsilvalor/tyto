@@ -17,7 +17,6 @@ import { at, sized } from './blocks.js';
 import { BODY_PARAMETERS, type BodyOptions, bodyBlock, bodySize } from './body.js';
 import { type ColumnEntry, blockColumn, weightOf } from './column.js';
 import { richTextOfPlain } from './highlight.js';
-import { levelsOf } from './levels.js';
 import { parameterValues } from './parameters.js';
 import { compileTemplate, placeholderFont } from './testing.js';
 import { type Measure, grownTextBlock } from './text.js';
@@ -39,7 +38,7 @@ const SIZES = { 1: 40, 2: 30, 3: 24 } as const;
 
 function options(text: string, extra: Partial<BodyOptions> = {}): BodyOptions {
   return {
-    items: levelsOf(richTextOfPlain(text)),
+    words: richTextOfPlain(text),
     sizes: SIZES,
     look: (_part, size) => ({
       style: { font: font('Test'), size, weight: 400, color: '#202020' },
@@ -74,6 +73,11 @@ describe('the sizes of a body’s levels', () => {
     const [marked, unmarked] = sizesIn(body.draft);
     expect(unmarked).toBeLessThan(marked!);
     expect(unmarked).toBeCloseTo(24 * 0.8, 5);
+  });
+
+  it('reads a first line with no mark as the smallest level, never as a name', () => {
+    const body = bodyBlock(AREA, 1, options('5 vagas imediatas\n## Salário'))!;
+    expect(sizesIn(body.draft)).toEqual([24 * 0.8, 30]);
   });
 
   it('keeps the unmarked level smallest whatever order the template gives the marks', () => {
@@ -209,7 +213,7 @@ const bodyTemplate: Template = defineTemplate(parsedManifest.value, (context) =>
       scale: weightOf(context.slots['corpo']),
       build: (area, scale) =>
         bodyBlock(area, scale, {
-          items: levelsOf(words('corpo')),
+          words: words('corpo'),
           sizes: { 1: 24, 2: 20, 3: 16 },
           look: (_part, size) => ({
             style: { font: font('Test'), size, weight: 400, color: '#202020' },
