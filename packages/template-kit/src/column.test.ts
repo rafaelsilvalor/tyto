@@ -151,16 +151,19 @@ describe('peso', () => {
     adjustments: value === undefined ? [] : [{ name: 'peso', value }],
   });
 
-  it('scales a block 0.85, 1 and 1.2 by default', () => {
-    expect([slot('1'), slot('2'), slot('3')].map((item) => weightOf(item))).toEqual([0.85, 1, 1.2]);
+  it('scales a block 0.7, 0.85, 1, 1.2 and 1.4 by default, 3 the block as designed', () => {
+    expect(['1', '2', '3', '4', '5'].map((value) => weightOf(slot(value)))).toEqual([
+      0.7, 0.85, 1, 1.2, 1.4,
+    ]);
   });
 
-  it('is the normal weight when not written, absent or not one of the three values', () => {
+  it('is the designed size when not written, absent or not one of the five values', () => {
     expect([weightOf(slot()), weightOf(undefined), weightOf(slot('9'))]).toEqual([1, 1, 1]);
   });
 
   it('reads the weights from the column’s parameters', () => {
-    expect(weightOf(slot('3'), { heavyWeight: 1.5 })).toBe(1.5);
+    expect(weightOf(slot('5'), { weight5: 1.6 })).toBe(1.6);
+    expect(weightOf(slot('1'), { weight1: 0.5 })).toBe(0.5);
   });
 
   it('builds the block at its scale, and the column measures what came out', () => {
@@ -168,8 +171,8 @@ describe('peso', () => {
       { width: 100, height: Infinity },
       {
         entries: [
-          entry('titulo', 100, weightOf(slot('3'))),
-          entry('apelo', 100, weightOf(slot('1'))),
+          entry('titulo', 100, weightOf(slot('4'))),
+          entry('apelo', 100, weightOf(slot('2'))),
         ],
       },
     );
@@ -249,9 +252,11 @@ describe('the parameters', () => {
       gap: 0,
       verticalAlign: 'center',
       horizontalAlign: 'center',
-      lightWeight: 0.85,
-      normalWeight: 1,
-      heavyWeight: 1.2,
+      weight1: 0.7,
+      weight2: 0.85,
+      weight3: 1,
+      weight4: 1.2,
+      weight5: 1.4,
       shrinkFloor: 0.7,
       reach: 0,
     });
@@ -282,7 +287,7 @@ slots:
   apelo: { type: rich-text, per: lamina }
   nota: { type: rich-text, per: lamina, shared: true }
 adjustments:
-  peso: { type: enum, values: ['1', '2', '3'], default: '2', applies: [titulo, apelo, nota] }
+  peso: { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, apelo, nota] }
 `,
   'manifest.yaml',
 );

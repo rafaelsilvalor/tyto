@@ -23,8 +23,11 @@ import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from 
 /** The adjustment a brief writes on a block to make it larger or smaller: `{peso: 3}`. */
 export const WEIGHT = 'peso';
 
-/** The values `peso` takes: `1` lighter, `2` as designed (the default), `3` heavier. */
-export const WEIGHTS = ['1', '2', '3'] as const;
+/**
+ * The values `peso` takes, lightest to heaviest: `3` is the block as designed, and the default
+ * (maintainer, 2026-11-22, TYTO-834). Until then there were three, `2` the normal one.
+ */
+export const WEIGHTS = ['1', '2', '3', '4', '5'] as const;
 
 export const BLOCK_COLUMN_PARAMETERS = {
   gap: {
@@ -45,23 +48,35 @@ export const BLOCK_COLUMN_PARAMETERS = {
     choices: ['start', 'center', 'end'],
     description: 'Where a block narrower than the area sits across it.',
   },
-  lightWeight: {
+  weight1: {
     kind: 'ratio',
-    default: 0.85,
+    default: 0.7,
     min: 0,
     description: 'The scale of a block written with {peso: 1}.',
   },
-  normalWeight: {
+  weight2: {
+    kind: 'ratio',
+    default: 0.85,
+    min: 0,
+    description: 'The scale of a block written with {peso: 2}.',
+  },
+  weight3: {
     kind: 'ratio',
     default: 1,
     min: 0,
-    description: 'The scale of a block written with {peso: 2}, or with no peso.',
+    description: 'The scale of a block written with {peso: 3}, or with no peso: as designed.',
   },
-  heavyWeight: {
+  weight4: {
     kind: 'ratio',
     default: 1.2,
     min: 0,
-    description: 'The scale of a block written with {peso: 3}.',
+    description: 'The scale of a block written with {peso: 4}.',
+  },
+  weight5: {
+    kind: 'ratio',
+    default: 1.4,
+    min: 0,
+    description: 'The scale of a block written with {peso: 5}.',
   },
   shrinkFloor: {
     kind: 'ratio',
@@ -88,9 +103,9 @@ export interface Adjusted {
 }
 
 /**
- * The scale a block is built at, from the `peso` its slot was written with: the light, normal or
- * heavy weight of the column's parameters. A slot written without `peso`, absent, or given a
- * value outside `1`, `2` and `3` is built at the normal weight.
+ * The scale a block is built at, from the `peso` its slot was written with: `weight1` to
+ * `weight5` of the column's parameters. A slot written without `peso`, absent, or given a value
+ * outside `1` to `5` is built at `weight3`, the block as designed.
  */
 export function weightOf(
   slot: Adjusted | undefined,
@@ -100,11 +115,15 @@ export function weightOf(
   const written = slot?.adjustments.find((adjustment) => adjustment.name === WEIGHT)?.value;
   switch (written) {
     case '1':
-      return values.lightWeight;
-    case '3':
-      return values.heavyWeight;
+      return values.weight1;
+    case '2':
+      return values.weight2;
+    case '4':
+      return values.weight4;
+    case '5':
+      return values.weight5;
     default:
-      return values.normalWeight;
+      return values.weight3;
   }
 }
 
