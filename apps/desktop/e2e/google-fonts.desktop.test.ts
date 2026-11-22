@@ -158,17 +158,23 @@ function install(): void {
   if (installed.status !== 0) throw new Error(`install failed: ${installed.stderr}`);
 }
 
+/** The name on the tab in front: the document `editor.save` acts on. */
+const front = async (): Promise<string> =>
+  page.evaluate(
+    () => document.querySelector('.tabs__tab--on .tabs__label')?.textContent?.trim() ?? '',
+  );
+
 /** Runs a command the way the command bar would, and fails loudly if it was refused. */
 async function run(commandId: string): Promise<void> {
   // The front tab is read in the same call, so the timeline costs the window no extra trip.
-  const { ran, front } = await page.evaluate((id) => {
+  const { ran, inFront } = await page.evaluate((id) => {
     const bar = document.querySelector('tyto-command-bar') as {
       run?: (id: string) => boolean;
     } | null;
     const label = document.querySelector('.tabs__tab--on .tabs__label')?.textContent ?? '';
-    return { ran: bar?.run?.(id) ?? false, front: label.trim() };
+    return { ran: bar?.run?.(id) ?? false, inFront: label.trim() };
   }, commandId);
-  note(`${commandId} with '${front}' in front`);
+  note(`${commandId} with '${inFront}' in front`);
   if (!ran) throw new Error(`the command bar refused '${commandId}'`);
 }
 
@@ -183,6 +189,10 @@ async function open(template: string): Promise<void> {
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [chosen] });
   }, path);
   await run('editor.open');
+  // The command answers before main does. Until the brief's tab is in front, a save saves the
+  // tab that was there before, compiled under whatever the setting says by then (TYTO-821).
+  // The label is itself the condition: were this brief already in front, the save lands on it.
+  await expect.poll(front, { timeout: 15_000 }).toBe(`${template}.brief`);
 }
 
 const problems = async (): Promise<string> =>
