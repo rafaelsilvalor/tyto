@@ -213,6 +213,11 @@ information, the template draws it.** Inside one line:
   is one main part drawn on two lines, both at the main level; it never starts a new line of
   the block. Spaces against the `\` are not words, and a `\` at either end of a part breaks
   nothing (TYTO-822).
+- **A blank line between two lines of the block opens a paragraph** (ADR 0205): the lines
+  written together stay together, and the template sets the larger space the blank line asks
+  for. `levelsOf` marks the item after it `paragraph: true` (TYTO-845), so a template's
+  `lineGap` function gives that pair its own space; a template that reads no mark spaces it as
+  any other pair.
 
 The same words, three hierarchies:
 

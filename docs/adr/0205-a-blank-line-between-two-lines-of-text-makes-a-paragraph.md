@@ -68,3 +68,13 @@ groups apart now has a number to set instead of an empty line to ask the author 
   `runsOf` without `paragraphSpacing`, so its paragraphs are drawn at 0. A CSS property for it
   is the follow-up; until then a markup template draws exactly what it drew before.
 - First-line indent and every other paragraph style stay out (TYTO-557's scope).
+
+## Note of 2026-11-23: levelled blocks (TYTO-845)
+
+A block read in levels (`levelsOf`, the shared vocabulary's `|` and `#`) is drawn one text node per
+line, so the `space` on a `LineBreak` never reached it: the boundary was cut away with the break.
+`levelsOf` now marks the item a blank line separates from the one before it `paragraph: true`
+(a line or a divider; never the first item, and a mark is kept across an empty line the block
+drops). A template sets that pair's space in its `lineGap` function (`levelStack`) or
+`lineGapBetween` (`bodyBlock`); one that reads no mark spaces it as any other pair, so its output
+does not move.
