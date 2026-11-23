@@ -63,6 +63,28 @@ describe('drawPattern', () => {
     expect([drawn!.width, drawn!.height]).toEqual([45, 90]);
   });
 
+  it('lays the tiles both ways from the phase, so a corner falls where the art puts it', () => {
+    // A corner at (5, 30) with 20 × 40 tiles: the first column starts at -15, the first row at
+    // -10, and the area of 30 × 70 needs columns at -15, 5, 25 and rows at -10, 30.
+    const drawn = drawPattern(KIT, {
+      size: { w: 30, h: 70 },
+      tileWidth: 20,
+      inks: INKS,
+      opacity: 1,
+      phase: { x: 5, y: 30 },
+    });
+
+    const corners = childrenOf(drawn!.draft).map((tile) => [tile.transform.x, tile.transform.y]);
+    expect(corners).toEqual([
+      [-15, -10],
+      [5, -10],
+      [25, -10],
+      [-15, 30],
+      [5, 30],
+      [25, 30],
+    ]);
+  });
+
   it('strokes a stroked layer and fills a filled one, each tone in its ink, scaled with its tile', () => {
     const drawn = drawPattern(KIT, {
       size: { w: 20, h: 40 },

@@ -94,6 +94,17 @@ export interface PatternOptions {
    * vector of every tile. Without one the last row and column of tiles run past the area.
    */
   readonly mask?: MaskRef;
+  /**
+   * Where a tile's top-left corner falls, from the area's top-left corner; `{ x: 0, y: 0 }`
+   * when absent. Tiles are laid both ways from there, so the corner may sit anywhere in the
+   * area and the art's own registration is kept (the reference's lattice has a dot 40 px in).
+   */
+  readonly phase?: { readonly x: number; readonly y: number };
+}
+
+/** The first tile's offset at or before 0, so that one tile corner falls on `phase`. */
+function firstOffset(phase: number, step: number): number {
+  return phase - Math.ceil(phase / step) * step;
 }
 
 /**
@@ -109,8 +120,10 @@ export function drawPattern(kit: BrandKit, options: PatternOptions): Block | und
 
   const scale = options.tileWidth / pattern.tile.w;
   const tileHeight = pattern.tile.h * scale;
-  const columns = Math.ceil(options.size.w / options.tileWidth);
-  const rows = Math.ceil(options.size.h / tileHeight);
+  const left = firstOffset(options.phase?.x ?? 0, options.tileWidth);
+  const top = firstOffset(options.phase?.y ?? 0, tileHeight);
+  const columns = Math.ceil((options.size.w - left) / options.tileWidth);
+  const rows = Math.ceil((options.size.h - top) / tileHeight);
 
   const tiles = [];
   for (let row = 0; row < rows; row += 1) {
@@ -118,7 +131,7 @@ export function drawPattern(kit: BrandKit, options: PatternOptions): Block | und
       tiles.push(
         group({
           name: `pattern-${String(row)}-${String(column)}`,
-          transform: { x: column * options.tileWidth, y: row * tileHeight },
+          transform: { x: left + column * options.tileWidth, y: top + row * tileHeight },
           children: pattern.layers.map((layer, index) => {
             const ink = solid(options.inks[layer.tone]);
             return vector({

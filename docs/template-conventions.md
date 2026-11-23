@@ -242,7 +242,7 @@ passes the colour of each, and `oneInk(colour)` where it draws the logo in one. 
 into a tracked text file.
 
 **A brand's background pattern comes from the kit too** (ADR 0228). `drawPattern(context.brand,
-{ size, tileWidth, inks, opacity, mask })` lays its tile over an area and answers `undefined`
+{ size, tileWidth, inks, opacity, mask, phase })` lays its tile over an area and answers `undefined`
 when the kit has none, so draw nothing in its place. The template picks each tone's ink and the
 opacity, and cuts the pattern with `mask`, naming the node that defines the area (a panel rect
 with an `id`). `drawPattern` puts the mask on each vector: a group has no box to `clip` to, and

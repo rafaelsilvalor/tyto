@@ -44,10 +44,12 @@ an installed code template answers.
 
 ### How a template lays it
 
-`drawPattern(kit, { size, tileWidth, inks, opacity, mask? })` in `@tyto/house-style` does the
+`drawPattern(kit, { size, tileWidth, inks, opacity, mask?, phase? })` in `@tyto/house-style` does the
 laying:
 
-- It lays tiles edge to edge from the area's top-left corner, each tile drawn `tileWidth` wide.
+- It lays tiles edge to edge, each drawn `tileWidth` wide, with a tile corner at `phase` from
+  the area's top-left corner (0, 0 by default). The reference lattice has a dot 40 px in from
+  the panel's edge, and a template keeps that registration with `phase`.
 - Each tile is a group of one vector per layer, scaled as `drawBrandMark` scales a toned mark.
 - The opacity goes on the whole pattern once. Where a line runs past its tile into the
   neighbour, the neighbour draws the same line in the same ink, so nothing darkens.
@@ -87,4 +89,4 @@ held, as with the wordmark (ADR 0066).
 - Not decided:
   - a third tone. The lattice's fine grid is a third colour in the reference, and the kit
     either draws it in one of the two tones or leaves it out;
-  - an offset or a rotation for the tiles, which waits for art that needs one.
+  - a rotation for the tiles, which waits for art that needs one.
