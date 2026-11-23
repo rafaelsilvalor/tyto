@@ -71,6 +71,40 @@ export interface BrandKit {
   readonly signature?: string;
   /** The brand's colours (ADR 0155). A template reads each with a fallback of its own. */
   readonly colors?: BrandColors;
+  /** A tile the brand repeats behind its art (ADR 0228). A template that has no use for it ignores it. */
+  readonly pattern?: BrandPattern;
+}
+
+/**
+ * One layer of a pattern's tile: a shape and its tone, filled, or stroked at `stroke` units of
+ * the tile's own box (ADR 0228). A lattice is lines, and a line is a stroke; holding it as a
+ * thin filled outline instead would make the kit's author draw what the exporter already does.
+ */
+export type PatternLayer =
+  | {
+      readonly tone: MarkTone;
+      readonly d: string;
+      readonly fillRule: 'nonzero' | 'evenodd';
+    }
+  | {
+      readonly tone: MarkTone;
+      readonly d: string;
+      /** The line's width, in the tile box's units. */
+      readonly stroke: number;
+    };
+
+/**
+ * A brand's background pattern (ADR 0228): a tile, repeated edge to edge, held as geometry and
+ * drawn in the tones' inks a template chooses, like a mark. **No colour and no opacity**: the
+ * same lattice is faint on one panel and bolder on another, decided where it is placed.
+ *
+ * Tiles are laid edge to edge from the area's top-left corner. A line that leaves the box is
+ * drawn on into the neighbour, which draws the same line in the same ink, so the overlap does
+ * not show; the template cuts the whole to its area (`drawPattern` in `@tyto/house-style`).
+ */
+export interface BrandPattern {
+  readonly tile: { readonly w: number; readonly h: number };
+  readonly layers: readonly PatternLayer[];
 }
 
 /** The colours a kit carries: the brand's accent, and nothing else until an ADR adds one. */

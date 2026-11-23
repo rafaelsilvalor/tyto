@@ -656,6 +656,10 @@ it with `context.brand.colors?.accent ?? '<the colour you drew before>'` (a hous
 and the kit's accent wins, so switching a configuration's brand switches its colour with its
 logo. Do not declare the accent as a configurable value: the brand is its only source.
 
+**Lay the kit's pattern, if it has one.** A kit may carry a background tile (ADR 0228);
+`drawPattern` from `@tyto/house-style` lays it over an area in the inks and the opacity you
+choose, masked by a node of your frame, and answers `undefined` without one.
+
 ## Which formats a configuration renders
 
 A configuration may restrict its formats with `formats:` beside `brand:` (ADR 0155 decision 6):

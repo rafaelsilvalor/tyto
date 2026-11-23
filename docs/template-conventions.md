@@ -241,6 +241,12 @@ leaves a field out (ADR 0065). A kit's mark may come in two tones (ADR 0066); th
 passes the colour of each, and `oneInk(colour)` where it draws the logo in one. `tools/repo-checks` fails when a known brand token comes back
 into a tracked text file.
 
+**A brand's background pattern comes from the kit too** (ADR 0228). `drawPattern(context.brand,
+{ size, tileWidth, inks, opacity, mask })` lays its tile over an area and answers `undefined`
+when the kit has none, so draw nothing in its place. The template picks each tone's ink and the
+opacity, and cuts the pattern with `mask`, naming the node that defines the area (a panel rect
+with an `id`): a group has no box to `clip` to.
+
 **A path vector's `size` is its viewport, not the size it is drawn at.** `export-html` emits
 `<svg width="size.w" height="size.h" viewBox="0 0 size.w size.h">` around the `d`, so anything
 outside that box is clipped, and `export-svg` writes the `d` straight into the node's own
