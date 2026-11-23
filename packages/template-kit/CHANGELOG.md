@@ -1,5 +1,15 @@
 # @tyto/template-kit
 
+## 0.19.1
+
+### Patch Changes
+
+- Updated dependencies [5981718]
+  - @tyto/core@0.59.0
+  - @tyto/brief-lang@0.12.11
+  - @tyto/export-html@0.8.17
+  - @tyto/template-lang@0.8.36
+
 ## 0.19.0
 
 ### Minor Changes
