@@ -734,7 +734,8 @@ class Scanner {
         const prefix = absolute.slice(0, absolute.indexOf(RUNTIME));
         if (isInside(prefix, workspace.directory) && prefix.length > workspace.directory.length)
           continue;
-        if (!isInside(prefix, this.root) && !isInside(this.root, prefix)) continue;
+        // A known part above the repository root anchors nothing in it (a `file:${…}` spec).
+        if (!isInside(prefix, this.root)) continue;
         const pattern = this.relative(absolute);
         const shown = pattern.split(RUNTIME).join('<runtime>');
         const matcher = new RegExp(
@@ -1151,7 +1152,9 @@ function asPath(value: Value | null): Value | null {
     if (value?.kind === 'url' && value.href.startsWith('file:')) {
       return { kind: 'path', path: fileURLToPath(value.href) };
     }
-    if (value?.kind === 'text' && value.text.startsWith('file:')) {
+    // Only a whole `file:` literal: `file:${path}` with a runtime path is no anchor, and
+    // `fileURLToPath` reads it as `/…` on Linux and refuses it on Windows (CI found this).
+    if (value?.kind === 'text' && value.text.startsWith('file:') && !value.text.includes(RUNTIME)) {
       return { kind: 'path', path: fileURLToPath(value.text) };
     }
   } catch {
