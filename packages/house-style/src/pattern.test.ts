@@ -86,7 +86,7 @@ describe('drawPattern', () => {
     expect(dot).not.toHaveProperty('stroke');
   });
 
-  it('puts the opacity and the mask on the whole pattern, once', () => {
+  it('puts the opacity on the whole pattern once, and the mask on every shape', () => {
     const mask = { nodeId: 'panel', mode: 'alpha' as const };
     const drawn = drawPattern(KIT, {
       size: { w: 20, h: 40 },
@@ -96,8 +96,13 @@ describe('drawPattern', () => {
       mask,
     });
 
-    expect(drawn!.draft).toMatchObject({ kind: 'group', opacity: 0.08, mask });
-    for (const tile of childrenOf(drawn!.draft)) expect(tile.opacity).toBe(1);
+    expect(drawn!.draft).toMatchObject({ kind: 'group', opacity: 0.08 });
+    // A group has no box for export-html to mask inside, so the mask goes on each vector.
+    expect(drawn!.draft).not.toHaveProperty('mask');
+    for (const tile of childrenOf(drawn!.draft)) {
+      expect(tile.opacity).toBe(1);
+      for (const shape of childrenOf(tile)) expect(shape).toMatchObject({ opacity: 1, mask });
+    }
   });
 
   it('makes a frame the scene schema accepts, masked by a node of that frame', () => {

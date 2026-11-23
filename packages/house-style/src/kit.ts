@@ -90,8 +90,8 @@ export interface PatternOptions {
   /** The whole pattern's opacity, applied once, so where tiles overlap nothing darkens. */
   readonly opacity: number;
   /**
-   * The shape the pattern is cut to — a node of the same frame, by its id. A group has no box
-   * in the IR to clip to, so without one the last row and column of tiles run past the area.
+   * The shape the pattern is cut to — a node of the same frame, by its id, put on every
+   * vector of every tile. Without one the last row and column of tiles run past the area.
    */
   readonly mask?: MaskRef;
 }
@@ -133,6 +133,10 @@ export function drawPattern(kit: BrandKit, options: PatternOptions): Block | und
                 ? { stroke: { paint: ink, width: layer.stroke, align: 'center' as const } }
                 : { fill: ink }),
               transform: { scaleX: scale, scaleY: scale },
+              // On each vector, not on the group: a group has no box in the IR, and
+              // export-html masks an element only inside its own box, so a masked group
+              // draws nothing (measured 2026-11-22, TYTO-842). A vector's box is its size.
+              ...(options.mask !== undefined ? { mask: options.mask } : {}),
             });
           }),
         }),
@@ -146,7 +150,6 @@ export function drawPattern(kit: BrandKit, options: PatternOptions): Block | und
     group({
       name: 'pattern',
       opacity: options.opacity,
-      ...(options.mask !== undefined ? { mask: options.mask } : {}),
       children: tiles,
     }),
   );

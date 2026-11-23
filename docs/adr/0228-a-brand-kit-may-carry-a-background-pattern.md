@@ -53,9 +53,18 @@ laying:
   neighbour, the neighbour draws the same line in the same ink, so nothing darkens.
 
 **The template cuts the pattern with a mask**: a node of the same frame named by its id, which
-is usually the panel itself. A group has no box in the IR, so `clip` on a group means nothing
-(`export-html`'s `clipDeclarations`). Without a mask, the last row and column of tiles run past
-the area by up to one tile.
+is usually the panel itself. `drawPattern` puts the mask on every vector, not on the group:
+
+- A group has no box in the IR, so `clip` on a group means nothing (`export-html`'s
+  `clipDeclarations`).
+- A masked group draws nothing in `export-html`. Its element is a 0×0 box, and CSS paints a
+  mask only inside the element's box. This was measured on 2026-11-22 in the system Chrome:
+  a lattice under a panel mask came out as a blank panel. `mask-clip: no-clip` made it visible,
+  but then nothing was cut: a pixel outside the panel's rounded corner stayed blue.
+- With the mask on each vector, whose box is its size, the same probe was cut at the corner
+  and kept the lattice inside it.
+
+Without a mask, the last row and column of tiles run past the area by up to one tile.
 
 **No placeholder.** `drawPattern` returns `undefined` for a kit without a pattern. A stand-in
 would change every render without a kit, which ADR 0065 fixed. No layout needs a pattern's room
