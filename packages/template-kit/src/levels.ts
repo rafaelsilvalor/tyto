@@ -39,8 +39,14 @@ export interface LevelPart {
   readonly position: LevelPosition;
 }
 
+/**
+ * One item of a block. `paragraph` is `true` on an item a blank line separates from the item
+ * before it (ADR 0205, TYTO-845), so a template can set the space a paragraph opens apart from
+ * the one between two lines that stay together. Absent on every other item, the first included.
+ */
 export type LevelItem =
-  { readonly kind: 'line'; readonly parts: readonly LevelPart[] } | { readonly kind: 'divider' };
+  | { readonly kind: 'line'; readonly parts: readonly LevelPart[]; readonly paragraph?: true }
+  | { readonly kind: 'divider'; readonly paragraph?: true };
 
 /**
  * A block's rich text as its items, in the order written.
@@ -66,11 +72,16 @@ export function levelsOf(
 ): LevelItem[] {
   const byPosition = options.readByPosition ?? true;
   const items: LevelItem[] = [];
-  for (const line of blockLines(text)) {
+  // A blank line before a line the block drops (an empty one) still separates what comes next.
+  let pendingParagraph = false;
+  for (const { inlines: line, paragraph } of blockLines(text)) {
+    pendingParagraph ||= paragraph;
     const written = plain(line).trim();
     if (written === '') continue;
+    const opens = pendingParagraph && items.length > 0 ? { paragraph: true as const } : {};
     if (written === DIVIDER) {
-      items.push({ kind: 'divider' });
+      items.push({ kind: 'divider', ...opens });
+      pendingParagraph = false;
       continue;
     }
     const parts = fields(line)
@@ -79,7 +90,8 @@ export function levelsOf(
       .map(markOf);
     if (parts.length === 0) continue;
     const first = byPosition && !items.some((item) => item.kind === 'line');
-    items.push({ kind: 'line', parts: ranked(parts, first) });
+    items.push({ kind: 'line', parts: ranked(parts, first), ...opens });
+    pendingParagraph = false;
   }
   return items;
 }
@@ -89,11 +101,12 @@ export function levelsOf(
  * which is right for a table reading each line as a record but would make a typed `\` start a
  * new level line.
  */
-function blockLines(text: RichText): RichText[] {
-  const result: Inline[][] = [[]];
+function blockLines(text: RichText): { inlines: RichText; paragraph: boolean }[] {
+  const result: { inlines: Inline[]; paragraph: boolean }[] = [{ inlines: [], paragraph: false }];
   for (const inline of text) {
-    if (inline.kind === 'break' && inline.typed !== true) result.push([]);
-    else result[result.length - 1]!.push(inline);
+    if (inline.kind === 'break' && inline.typed !== true) {
+      result.push({ inlines: [], paragraph: inline.paragraph === true });
+    } else result[result.length - 1]!.inlines.push(inline);
   }
   return result;
 }

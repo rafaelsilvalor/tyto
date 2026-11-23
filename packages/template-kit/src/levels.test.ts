@@ -267,6 +267,51 @@ describe('a typed break (TYTO-822)', () => {
   });
 });
 
+describe('a blank line (ADR 0205, TYTO-845)', () => {
+  const paragraph = (): Inline => ({ kind: 'break', paragraph: true, range: { start: 0, end: 0 } });
+  const opened = (text: RichText): boolean[] =>
+    levelsOf(text).map((item) => item.paragraph === true);
+
+  it('marks the line a blank line separates from the one before, and no other', () => {
+    const text = [
+      span('### 700 vagas'),
+      boundary(),
+      span('Banca Cebraspe'),
+      paragraph(),
+      span('## Salário de R$ 5,6 mil'),
+    ];
+
+    expect(opened(text)).toEqual([false, false, true]);
+  });
+
+  it('never marks the first item, even after a blank line the block opens with', () => {
+    expect(opened([paragraph(), span('# Alfa'), boundary(), span('Beta')])).toEqual([false, false]);
+  });
+
+  it('keeps the mark across a line the block drops', () => {
+    const text = [span('# Alfa'), paragraph(), span('   '), boundary(), span('Beta')];
+
+    expect(opened(text)).toEqual([false, true]);
+  });
+
+  it('marks a divider a blank line opens', () => {
+    const items = levelsOf([span('# Alfa'), paragraph(), span('---'), boundary(), span('Beta')]);
+
+    expect(items.map((item) => [item.kind, item.paragraph === true])).toEqual([
+      ['line', false],
+      ['divider', true],
+      ['line', false],
+    ]);
+  });
+
+  it('adds no field where there is no blank line, so an item reads as it did', () => {
+    expect(levelsOf(rich('# Alfa\nBeta'))).toEqual([
+      { kind: 'line', parts: [expect.objectContaining({ level: 1 })] },
+      { kind: 'line', parts: [expect.objectContaining({ level: 0 })] },
+    ]);
+  });
+});
+
 describe('levelStack', () => {
   it('stacks a line’s parts one per row, with the line gap between lines', () => {
     expect(rows(levelsOf(rich('Edital | # TRT 4\n---\nGanhe')))).toEqual([
