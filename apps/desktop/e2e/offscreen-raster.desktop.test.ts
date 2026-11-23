@@ -15,6 +15,8 @@ import { closeApp } from './close-app.js';
 
 import sceneFixture from './__fixtures__/offscreen.scene.json';
 
+import { CAPTURE_WINDOW_OPTIONS } from '../src/main/rasterizer.js';
+
 /**
  * **Can a `BrowserWindow` in main produce a finished picture on Linux, and at the size asked
  * for?** TYTO-30's first deliverable and TYTO-125's evidence. The adapter is still not written
@@ -478,6 +480,14 @@ describe('an offscreen BrowserWindow, through the paint event', () => {
  * work area here is 1024 tall against win32's 1680, so a 1920 frame is not 240 px past the clamp
  * but 896. First run in CI: `created=800x600 asked=1080x1920 got=1080x1920 workArea=1280x1024`,
  * beside the paint route's `size=1080x1024` on the same machine and the same document.
+ *
+ * **The window is the production one, `CAPTURE_WINDOW_OPTIONS`, since TYTO-511.** This helper
+ * used to build a plain `show: false` window — ADR 0027's decision as first written — after
+ * ADR 0033 had made the production window offscreen, because `Page.captureScreenshot` on a
+ * hidden window waits for a frame nobody draws. The copy kept the old window alive here, and
+ * CI caught it once: `Unable to capture screenshot`, run 45030747020 attempt 3, a failure of a
+ * window the app no longer creates. The options cross `app.evaluate` as data, the way
+ * `raster.desktop.test.ts` passes them.
  */
 async function captureThroughDebugger({
   asked,
@@ -495,13 +505,9 @@ async function captureThroughDebugger({
   return app.evaluate(
     async ({ BrowserWindow, screen }, options) => {
       const window = new BrowserWindow({
-        show: false,
+        ...options.window,
         width: options.createdWidth,
         height: options.createdHeight,
-        useContentSize: true,
-        frame: false,
-        transparent: true,
-        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
       });
 
       const contents = window.webContents;
@@ -538,6 +544,7 @@ async function captureThroughDebugger({
       }
     },
     {
+      window: CAPTURE_WINDOW_OPTIONS as Electron.BrowserWindowConstructorOptions,
       file: documentFile,
       width: asked.width,
       height: asked.height,
@@ -580,7 +587,8 @@ describe('a hidden BrowserWindow, through the debugger (ADR 0027)', () => {
         `asked=${String(STORY.width)}x${String(STORY.height)} ` +
         `got=${String(image.width)}x${String(image.height)} ` +
         `workArea=${String(captured.workArea.width)}x${String(captured.workArea.height)} ` +
-        `attached=${String(captured.attached)} pngBytes=${String(bytes.byteLength)}\n`,
+        `attached=${String(captured.attached)} offscreen=${String(captured.offscreen)} ` +
+        `pngBytes=${String(bytes.byteLength)}\n`,
     );
 
     expect({ width: image.width, height: image.height }).toEqual({
