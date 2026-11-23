@@ -595,6 +595,10 @@ describe('a hidden BrowserWindow, through the debugger (ADR 0027)', () => {
       width: STORY.width,
       height: STORY.height,
     });
+    // The window the app captures on, and not the hidden one ADR 0027 first named: ADR 0033
+    // made it offscreen, and a helper that drifts back to a plain `show: false` window measures
+    // a window the app no longer creates (TYTO-511).
+    expect(captured.offscreen, 'the capture window is not offscreen (ADR 0033)').toBe(true);
   });
 
   it('paints the document, and gives the same bytes twice', async () => {
