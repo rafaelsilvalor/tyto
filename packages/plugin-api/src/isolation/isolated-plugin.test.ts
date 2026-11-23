@@ -2560,6 +2560,11 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
     },
     wordmark: TRIANGLE,
   } as const;
+  // Invented: a diagonal stroked across a square tile.
+  const PATTERN = {
+    tile: { w: 10, h: 10 },
+    layers: [{ tone: 'primary', d: 'M0 0L10 10', stroke: 1 }],
+  } as const;
 
   async function registered(
     kit: BrandKitContribution,
@@ -2588,6 +2593,14 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
 
     expect(activated.ok).toBe(true);
     expect(activated.host.registry.brandKitsByBrand().kits.get('test-brand')).toEqual(coloured);
+  });
+
+  it('crosses a background pattern as data (ADR 0228)', async () => {
+    const patterned = { ...KIT, pattern: PATTERN };
+    const activated = await registered({ id: 'kit', brands: { 'test-brand': patterned } });
+
+    expect(activated.ok).toBe(true);
+    expect(activated.host.registry.brandKitsByBrand().kits.get('test-brand')).toEqual(patterned);
   });
 
   it('crosses a toned logo and a wordmark as data (ADR 0066)', async () => {
@@ -2667,6 +2680,7 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
           logoPaths(context.brand.logo),
           logoPaths(context.brand.wordmark),
           context.brand.colors?.accent ?? 'none',
+          context.brand.pattern?.layers.map((layer) => layer.d).join(',') ?? 'none',
         ].join('|'),
         size: context.size,
         children: [],
@@ -2700,15 +2714,25 @@ describe('an isolated plugin’s brand kit (ADR 0063)', () => {
       NO_SHIPPED_FILES,
     );
 
+    const withPattern = await build(
+      'demo',
+      { ...call, brand: { ...KIT, pattern: PATTERN } },
+      [],
+      NO_SHIPPED_FILES,
+    );
+
     expect(withKit.ok && withKit.value.frame.format).toBe(
-      '@test-brand|M0 10 L5 0 L10 10 Z|none|none',
+      '@test-brand|M0 10 L5 0 L10 10 Z|none|none|none',
     );
     expect(withTonedKit.ok && withTonedKit.value.frame.format).toBe(
-      'none|secondary:M0 0H10V10H0Z M2 2V8H8V2Z,primary:M3 3H7V7H3Z|M0 10 L5 0 L10 10 Z|none',
+      'none|secondary:M0 0H10V10H0Z M2 2V8H8V2Z,primary:M3 3H7V7H3Z|M0 10 L5 0 L10 10 Z|none|none',
     );
-    expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none|none|none');
+    expect(withoutKit.ok && withoutKit.value.frame.format).toBe('none|none|none|none|none');
     expect(withColours.ok && withColours.value.frame.format).toBe(
-      '@test-brand|M0 10 L5 0 L10 10 Z|none|#5900a6',
+      '@test-brand|M0 10 L5 0 L10 10 Z|none|#5900a6|none',
+    );
+    expect(withPattern.ok && withPattern.value.frame.format).toBe(
+      '@test-brand|M0 10 L5 0 L10 10 Z|none|none|M0 0L10 10',
     );
   });
 

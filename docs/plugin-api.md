@@ -69,7 +69,7 @@ The last five are named `<id>.tyto-plugin.json` and that is the one place a buil
 | `exporter`          | one **frame** to a document + mime + extension + the kinds it produces                    | html, svg                                             |
 | `rasterizer`        | `Rasterizer` — `raster(html, opts): Promise<Uint8Array>`                                  | chromium                                              |
 | `template-pack`     | folder of templates                                                                       | built-in templates                                    |
-| `brand-kit`         | a logo, a wordmark and a signature per brand id (ADR 0063, ADR 0066)                      | —                                                     |
+| `brand-kit`         | a logo, a wordmark, a signature and a pattern per brand id (ADR 0063, 0066, 0228)         | —                                                     |
 | `directive`         | `::ns/name` in the brief → the slot directives it stands for (ADR 0043)                   | —                                                     |
 | `editor.command`    | `{ id, title }`, data only: nothing runs it yet (TYTO-261, ADR 0079)                      | —                                                     |
 | `editor.keymap`     | binding → command id (normal and vim)                                                     | default-keymap, vim                                   |
@@ -361,14 +361,18 @@ what a `font:<family>` permission sends.
 A kit is what a template draws as its brand's logo and signature, supplied by a plugin rather
 than written into the template (ADR 0063). The contribution is `{ id, brands }`: `id` names the
 kit, and `brands` maps a brand id — spelled as a manifest's `brand` (ADR 0052) — to
-`{ logo?, wordmark?, signature?, colors? }`. A logo or a wordmark is a `MarkShape`, `{ box, d, fillRule }`,
+`{ logo?, wordmark?, signature?, colors?, pattern? }`. A logo or a wordmark is a `MarkShape`, `{ box, d, fillRule }`,
 or toned layers, `{ box, layers: [{ tone, d, fillRule }] }` with `tone` `primary` or
 `secondary` (ADR 0066) — never a colour: the template decides each tone's colour where it places
 the mark, and a one-shape mark is all `primary`. A mark's paths together are at most 65 536
 characters, a toned mark has at most 16 layers, and a signature is at most 500 characters.
 `colors` holds the brand's `accent`, a hex colour, and nothing else (ADR 0155): any other key
 is refused at activation, and a second colour joins by an ADR. Protocol 11 carries it; a guest
-or host on 10 refuses a kit with colours, so the handshake refuses the pair first.
+or host on 10 refuses a kit with colours, so the handshake refuses the pair first. `pattern`
+is a background tile, `{ tile: { w, h }, layers }`, each layer `{ tone, d, fillRule }` filled
+or `{ tone, d, stroke }` stroked at `stroke` units of the tile's box — no colour and no opacity,
+under a toned mark's bounds, a stroke no wider than the tile (ADR 0228). Protocol 32 carries
+it; `drawPattern` in `@tyto/house-style` lays it over an area.
 
 A template reads the kit of **its brand** from `context.brand`: the brand of the plugin file
 configuration the brief reached, else its manifest's (ADR 0155), and never another's. A

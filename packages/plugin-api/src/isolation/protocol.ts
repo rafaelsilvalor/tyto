@@ -76,11 +76,12 @@ import {
  * the file a decode call names through its token, a point a host on 29 would refuse to
  * register and a request it would refuse as an unknown capability (ADR 0223, TYTO-742); 31
  * since a template may report `W_TEMPLATE_LOW_CONTRAST`, a code the strict report schema of a
- * host on 30 would refuse with the whole answer (ADR 0058, TYTO-837). The number is the host's
- * and its own guest bootstrap's: a plugin's code carries none, so a plugin built before 31 runs
- * on 31 unchanged.
+ * host on 30 would refuse with the whole answer (ADR 0058, TYTO-837); 32 since a brand kit may
+ * carry a `pattern`, a field the strict kit schema of a host or guest on 31 would refuse (ADR
+ * 0228, TYTO-842). The number is the host's and its own guest bootstrap's: a plugin's code
+ * carries none, so a plugin built before 32 runs on 32 unchanged.
  */
-export const RPC_PROTOCOL_VERSION = 31;
+export const RPC_PROTOCOL_VERSION = 32;
 
 const protocol = z.literal(RPC_PROTOCOL_VERSION);
 
