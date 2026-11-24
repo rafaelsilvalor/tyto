@@ -3,6 +3,7 @@ import { frame, rect, solid, systemFont } from '@tyto/core/template';
 import { describe, expect, it } from 'vitest';
 
 import { block } from './blocks.js';
+import { mainLineScale } from './fit.js';
 import {
   type LevelItem,
   type LevelPart,
@@ -266,6 +267,113 @@ describe('a typed break (TYTO-822)', () => {
     ]);
   });
 });
+
+describe('a mark after a typed break (TYTO-854, ADR 0229)', () => {
+  const pieces = (text: RichText): string[][] =>
+    levelsOf(text).map((item) =>
+      item.kind === 'divider'
+        ? ['---']
+        : item.parts.map(
+            (part) =>
+              `${part.level}:${part.position}:${shown(part.words)}${part.joined === true ? ':joined' : ''}`,
+          ),
+    );
+
+  it('starts a piece at its level, joined to the piece before it', () => {
+    expect(pieces([span('Prepare-se com o '), typed(), span(' # líder em aprovações')])).toEqual([
+      ['0:before:Prepare-se com o', '1:main:líder em aprovações:joined'],
+    ]);
+  });
+
+  it('keeps text after a typed break with no mark in the piece before it, at its level', () => {
+    expect(
+      pieces([span('# Concurso '), typed(), span(' ABIN '), typed(), span(' ## 2027')]),
+    ).toEqual([['1:main:Concurso/ABIN', '2:after:2027:joined']]);
+  });
+
+  it('makes the first piece at the highest level the main one', () => {
+    expect(
+      pieces([span('## Edital '), typed(), span(' # TRT 4 '), typed(), span(' # Sul')]),
+    ).toEqual([['2:before:Edital', '1:main:TRT 4:joined', '1:after:Sul:joined']]);
+  });
+
+  it('reads seven #, or a mark glued to its word, as words', () => {
+    expect(pieces([span('a '), typed(), span(' ####### b')])).toEqual([['1:main:a/####### b']]);
+    expect(pieces([span('a '), typed(), span(' #1 b')])).toEqual([['1:main:a/#1 b']]);
+  });
+
+  it('joins pieces only inside one | part, and a part opened by a typed break is not joined', () => {
+    expect(pieces([span('Edital | '), typed(), span(' # TRT 4')])).toEqual([
+      ['0:before:Edital', '1:main:TRT 4'],
+    ]);
+  });
+
+  it('draws a joined piece as the next line, with no part gap above it', () => {
+    // Edital (10) | no gap | TRT 4 (30) | 5 | Sul (10)
+    expect(rows(levelsOf([span('Edital '), typed(), span(' # TRT 4 | Sul')]))).toEqual([
+      { name: 'titulo-before-0', y: 0 },
+      { name: 'titulo-main-1', y: 10 },
+      { name: 'titulo-after-2', y: 45 },
+    ]);
+  });
+
+  it('grows the joined main piece alone to the width, as a main part of its own', () => {
+    const fit = (text: RichText): number =>
+      mainLineScale(
+        { width: 200, height: Infinity },
+        { items: levelsOf(text), look: STYLE.look, measure: wide },
+      );
+    expect(fit([span('Prepare-se com o '), typed(), span(' # TRT')])).toBe(fit(rich('# TRT')));
+  });
+
+  it('reaches levelsOf from a real brief, through parse, resolve and compile', async () => {
+    let titulo: RichText = [];
+    const template = defineTemplate(PROBE_MANIFEST, (context) => {
+      const value = context.slots['titulo']?.value;
+      titulo = value?.kind === 'rich-text' ? value.text : [];
+      return frame({
+        format: context.format,
+        size: context.size,
+        idPrefix: context.idPrefix,
+        background: solid('#ffffff'),
+        children: [],
+      });
+    });
+    const brief = [
+      '---',
+      'template: niveis',
+      'formats: [grid]',
+      '---',
+      '::titulo',
+      '  Prepare-se com o \\ # líder em aprovações',
+      '  # Concurso ABIN \\ 2027',
+    ].join('\n');
+    const compiled = await compileTemplate({
+      brief,
+      template,
+      formats: formatCatalogue({ grid: { w: 100, h: 100 } }),
+    });
+    expect(compiled.ok).toBe(true);
+    expect(pieces(titulo)).toEqual([
+      ['0:before:Prepare-se com o', '1:main:líder em aprovações:joined'],
+      ['1:main:Concurso ABIN/2027'],
+    ]);
+  });
+});
+
+/** A measure that reads a text's natural width: 10 per character at size 10. */
+const wide: Measure = (node) => {
+  const words = node.runs.map((run) => (run.kind === 'text' ? run.text : '')).join('');
+  const size = Math.max(...node.runs.map((run) => (run.kind === 'text' ? run.size : 0)));
+  return {
+    runs: node.runs,
+    lines: 1,
+    width: [...words].length * size,
+    height: node.lineHeight * size,
+    scale: 1,
+    overflow: 0,
+  };
+};
 
 describe('a blank line (ADR 0205, TYTO-845)', () => {
   const paragraph = (): Inline => ({ kind: 'break', paragraph: true, range: { start: 0, end: 0 } });

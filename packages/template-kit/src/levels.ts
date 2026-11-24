@@ -37,6 +37,12 @@ export interface LevelPart {
   readonly words: RichText;
   readonly level: Level;
   readonly position: LevelPosition;
+  /**
+   * `true` on a piece a typed break followed by a mark split from the piece before it, inside
+   * one `|` part: `Prepare-se com o \ # líder` (TYTO-854, ADR 0229). It is drawn as the next
+   * line of one text, with no part gap above it. Absent on every other part.
+   */
+  readonly joined?: true;
 }
 
 /**
@@ -53,8 +59,12 @@ export type LevelItem =
  *
  * A line ends where the block's line ends, never at a `\` the author typed: that break stays
  * inside its part and is drawn there, so `# Concurso ABIN \ 2027` is one main part on two
- * lines (TYTO-822). The spaces against a typed break are not words, and a break at either end
- * of a part breaks nothing, so both are taken off.
+ * lines (TYTO-822). A typed break followed by a mark (`#` to `######` and a space) is the one
+ * exception: it starts a new piece of the part at that level, marked `joined`, so
+ * `Prepare-se com o \ # líder` is a base-level piece and a main one (TYTO-854, ADR 0229). Text
+ * after a typed break with no mark stays in the piece before it, at its level. The spaces
+ * against a typed break are not words, and a break at either end of a piece breaks nothing, so
+ * both are taken off.
  *
  * Empty lines and empty parts are dropped, so `a | | b` is two parts. In a line with marks,
  * the main part is the first one at the highest level written (`#` before `##`). The block's
@@ -84,10 +94,7 @@ export function levelsOf(
       pendingParagraph = false;
       continue;
     }
-    const parts = fields(line)
-      .map(tidied)
-      .filter((part) => plain(part).trim() !== '')
-      .map(markOf);
+    const parts = fields(line).flatMap(piecesOf);
     if (parts.length === 0) continue;
     const first = byPosition && !items.some((item) => item.kind === 'line');
     items.push({ kind: 'line', parts: ranked(parts, first), ...opens });
@@ -109,6 +116,44 @@ function blockLines(text: RichText): { inlines: RichText; paragraph: boolean }[]
     } else result[result.length - 1]!.inlines.push(inline);
   }
   return result;
+}
+
+/** A mark at the start of a piece's words: `#` to `######` followed by a space. */
+const MARK = /^(#{1,6})\s+/u;
+
+/**
+ * One `|` part as its pieces, read: cut before every typed break whose next words start with a
+ * mark, each piece tidied, the empty ones dropped, every piece after the part's first `joined`.
+ */
+function piecesOf(part: RichText): Marked[] {
+  const cuts: Inline[][] = [[]];
+  part.forEach((inline, index) => {
+    const next = part[index + 1];
+    const opensPiece =
+      inline.kind === 'break' &&
+      inline.typed === true &&
+      next?.kind === 'text' &&
+      MARK.test(next.value.trimStart());
+    if (opensPiece) cuts.push([]);
+    else cuts[cuts.length - 1]!.push(inline);
+  });
+  // The spaces against a cut were against a typed break: not words, as `tidied` reads them.
+  const ends = cuts.length === 1 ? cuts : cuts.map(trimmedEnds);
+  const kept = ends.map(tidied).filter((piece) => plain(piece).trim() !== '');
+  return kept.map((piece, index) => {
+    const marked = markOf(piece);
+    return index === 0 ? marked : { ...marked, joined: true as const };
+  });
+}
+
+/** A piece with the spaces at its two ends taken off. */
+function trimmedEnds(piece: readonly Inline[]): Inline[] {
+  const inlines = [...piece];
+  const first = inlines[0];
+  if (first?.kind === 'text') inlines[0] = trimmed(first, 'start');
+  const last = inlines[inlines.length - 1];
+  if (last?.kind === 'text') inlines[inlines.length - 1] = trimmed(last, 'end');
+  return inlines;
 }
 
 /** A part with the spaces against each typed break, and any break at its ends, taken off. */
@@ -141,6 +186,7 @@ function trimmed(inline: TextInline, side: 'start' | 'end'): TextInline {
 interface Marked {
   readonly words: RichText;
   readonly level: Level;
+  readonly joined?: true;
 }
 
 /**
@@ -150,7 +196,7 @@ interface Marked {
 function markOf(part: RichText): Marked {
   const first = part[0];
   if (first?.kind !== 'text') return { words: part, level: 0 };
-  const match = /^(#{1,6})\s+/u.exec(first.value);
+  const match = MARK.exec(first.value);
   if (match === null) return { words: part, level: 0 };
   const rest = first.value.slice(match[0].length);
   const start = Math.min(first.range.start + match[0].length, first.range.end);
@@ -171,7 +217,12 @@ function ranked(parts: readonly Marked[], first: boolean): LevelPart[] {
   let main: number;
   let levels: Level[];
   if (marked.length === 0 && !first) {
-    return parts.map((part) => ({ words: part.words, level: 0, position: 'after' }));
+    return parts.map((part) => ({
+      ...joinedOf(part),
+      words: part.words,
+      level: 0,
+      position: 'after',
+    }));
   }
   if (marked.length === 0) {
     main = parts.length >= 3 ? 1 : 0;
@@ -182,10 +233,15 @@ function ranked(parts: readonly Marked[], first: boolean): LevelPart[] {
     levels = parts.map((part) => part.level);
   }
   return parts.map((part, index) => ({
+    ...joinedOf(part),
     words: part.words,
     level: levels[index]!,
     position: index < main ? 'before' : index === main ? 'main' : 'after',
   }));
+}
+
+function joinedOf(part: Marked): { joined?: true } {
+  return part.joined === true ? { joined: true } : {};
 }
 
 /* ------------------------------------------------------------------------ the stack -- */
@@ -220,7 +276,8 @@ interface LevelStackLook {
 }
 
 /**
- * How a stack is drawn. `gap` is the space between two parts of one line, each on its own row;
+ * How a stack is drawn. `gap` is the space between two parts of one line, each on its own row,
+ * never above a piece `joined` to the one before it by a typed break (TYTO-854);
  * `lineGap` the space between two lines, or a line and a divider, from the two items drawn
  * around it (a divider left out is not a neighbour). `lineGap` defaults to `gap` only when `gap`
  * is a number: a function of two parts cannot space two lines.
@@ -280,8 +337,10 @@ export function levelStack(
       continue;
     }
     for (const [row, piece] of each.rows.entries()) {
-      if (row > 0) {
-        y += spaceOf(style.gap, each.item.parts[row - 1]!, each.item.parts[row]!);
+      // A piece joined by a typed break is the next line of one text: no part gap above it.
+      const part = each.item.parts[row]!;
+      if (row > 0 && part.joined !== true) {
+        y += spaceOf(style.gap, each.item.parts[row - 1]!, part);
       }
       children.push(at(offsetOf(align, width, piece.width), y, piece));
       y += piece.height;
