@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      // `src/main/command-templates.test.ts` copies the example pack from `examples/plugins/`
+      // into a scratch repository, installs it as a plugin and expects its `aviso` template
+      // among the offered ones. The pack is in no package this one depends on, so before this
+      // input an edit to it moved no hash of this task and the cache replayed the last green
+      // (TYTO-253, ADR 0072). `turbo-inputs.test.ts` in `tools/repo-checks` finds such reads.
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/examples/plugins/tyto-plugin-example-pack/**"]
+    }
+  }
+}
