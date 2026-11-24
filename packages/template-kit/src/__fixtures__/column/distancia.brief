@@ -1,0 +1,15 @@
+---
+template: coluna-teste
+formats: [grid]
+---
+// tamanho on the title, the offer close under it, the note twice its gap away (TYTO-853).
+
+::titulo {tamanho: 8, espaco: 1}
+  Concurso Exemplo
+
+::lamina
+  oferta
+::apelo {distancia: 1}
+  Pacotes com 40% OFF
+::nota {distancia: 5}
+  Só nesta versão.
