@@ -1,5 +1,22 @@
 # @tyto/template-kit
 
+## 0.21.0
+
+### Minor Changes
+
+- 0af3cbd: TYTO-853: a block's letters, its inner spaces and the room above it come apart. `peso` takes
+  `1` to `8` (`weight6` to `weight8`: 1.6, 1.8, 2); `tamanho` scales only the letters and
+  `espaco` only the spaces inside the block, each replacing its side of `peso`; `distancia`
+  multiplies the gap above its block (`distance1` to `distance5`: 0, 0.5, 1, 1.5, 2).
+  `scalesOf(slot)` reads all four for a column entry, which now carries `spacing` and
+  `distance` beside `scale`; `build` receives the spacing as a third argument, and
+  `bodyBlock` takes it as a fourth. A brief that writes none of the new adjustments draws as
+  before.
+- 9276e0e: TYTO-854 (ADR 0229): inside one `|` part, a typed `\` followed by a mark starts a piece at that
+  level, returned by `levelsOf` as one more part marked `joined: true` and drawn by `levelStack`
+  as the next line of one text, with no part gap above it. Text after a `\` with no mark stays in
+  the piece before it, so `# Concurso ABIN \ 2027` reads as before.
+
 ## 0.20.0
 
 ### Minor Changes
