@@ -213,6 +213,13 @@ information, the template draws it.** Inside one line:
   is one main part drawn on two lines, both at the main level; it never starts a new line of
   the block. Spaces against the `\` are not words, and a `\` at either end of a part breaks
   nothing (TYTO-822).
+- **A `\` followed by a mark starts a piece at that level** (ADR 0229, TYTO-854).
+  `Prepare-se com o \ # líder em aprovações` is a base-level piece on one line and the main
+  piece on the next, drawn as two lines of one text with no part gap between them. Text after a
+  `\` with no mark stays in the piece before it, at its level, so `# Concurso ABIN \ 2027` is
+  still one name on two lines; to drop to the base level, use `|`. The main piece of a line is
+  the first at the highest level written, as for parts, and it is the one that grows to the
+  width. `levelsOf` marks every piece after a part's first `joined: true`.
 - **A blank line between two lines of the block opens a paragraph** (ADR 0205): the lines
   written together stay together, and the template sets the larger space the blank line asks
   for. `levelsOf` marks the item after it `paragraph: true` (TYTO-845), so a template's
