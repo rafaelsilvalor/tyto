@@ -18,6 +18,10 @@ import {
   type ColumnEntry,
   blockColumn,
   columnOrder,
+  distanceOf,
+  scalesOf,
+  sizeOf,
+  spacingOf,
   weightOf,
 } from './column.js';
 import { MAIN_LINE_FIT_PARAMETERS, mainLineScale } from './fit.js';
@@ -27,6 +31,7 @@ import { parameterValues } from './parameters.js';
 import { compileTemplate, placeholderFont } from './testing.js';
 import { type Measure, grownTextBlock } from './text.js';
 import columnBrief from './__fixtures__/column/coluna.brief?raw';
+import distanceBrief from './__fixtures__/column/distancia.brief?raw';
 
 /**
  * The block column (TYTO-824, ADR 0224) on blocks of known size: a block of `height` at scale 1
@@ -157,7 +162,11 @@ describe('peso', () => {
     ]);
   });
 
-  it('is the designed size when not written, absent or not one of the five values', () => {
+  it('scales a block 1.6, 1.8 and 2 at 6, 7 and 8 (TYTO-853)', () => {
+    expect(['6', '7', '8'].map((value) => weightOf(slot(value)))).toEqual([1.6, 1.8, 2]);
+  });
+
+  it('is the designed size when not written, absent or not one of the eight values', () => {
     expect([weightOf(slot()), weightOf(undefined), weightOf(slot('9'))]).toEqual([1, 1, 1]);
   });
 
@@ -181,6 +190,100 @@ describe('peso', () => {
       ['apelo', 85, 0.85],
     ]);
     expect(column.block.height).toBe(205);
+  });
+});
+
+describe('tamanho, espaco and distancia (TYTO-853)', () => {
+  const written = (...pairs: [string, string][]) => ({
+    adjustments: pairs.map(([name, value]) => ({ name, value })),
+  });
+
+  it('take peso for both sides when neither is written, as before', () => {
+    expect(scalesOf(written(['peso', '4']))).toEqual({ scale: 1.2, spacing: 1.2, distance: 1 });
+    expect(scalesOf(undefined)).toEqual({ scale: 1, spacing: 1, distance: 1 });
+  });
+
+  it('let tamanho replace the letters’ side only, on the scales of peso up to 8', () => {
+    const slot = written(['peso', '2'], ['tamanho', '8']);
+    expect([sizeOf(slot), spacingOf(slot)]).toEqual([2, 0.85]);
+  });
+
+  it('let espaco replace the spaces’ side only, on the scales of peso 1 to 5', () => {
+    const slot = written(['peso', '5'], ['espaco', '1']);
+    expect([sizeOf(slot), spacingOf(slot)]).toEqual([1.4, 0.7]);
+  });
+
+  it('read an espaco past 5, or any unknown value, as not written', () => {
+    expect(spacingOf(written(['peso', '4'], ['espaco', '6']))).toBe(1.2);
+    expect(sizeOf(written(['tamanho', 'grande']))).toBe(1);
+    expect(distanceOf(written(['distancia', '0']))).toBe(1);
+  });
+
+  it('read distancia as 0, 0.5, 1, 1.5 and 2 of the gap, and never from peso', () => {
+    expect(
+      ['1', '2', '3', '4', '5'].map((value) => distanceOf(written(['distancia', value]))),
+    ).toEqual([0, 0.5, 1, 1.5, 2]);
+    expect(distanceOf(written(['peso', '8']))).toBe(1);
+    expect(distanceOf(written(['distancia', '5']), { distance5: 3 })).toBe(3);
+  });
+
+  /** An entry `height` tall whose letters and inner spaces take 10 each at scale 1. */
+  const twoSided = (name: string, scales: Partial<ColumnEntry>): ColumnEntry => ({
+    name,
+    build: (_area, scale, spacing) => box(name, 100, 10 * scale + 10 * (spacing ?? scale)),
+    ...scales,
+  });
+
+  it('build a block with its letters and its spaces apart', () => {
+    const column = blockColumn(
+      { width: 100, height: Infinity },
+      { entries: [twoSided('titulo', scalesOf(written(['tamanho', '8'], ['espaco', '1'])))] },
+    );
+    // 10 × 2 of letters, 10 × 0.7 of spaces.
+    expect(column.placed.map((item) => [item.height, item.scale, item.spacing])).toEqual([
+      [27, 2, 0.7],
+    ]);
+  });
+
+  it('give the spaces the letters’ scale when an entry states only one', () => {
+    const column = blockColumn(
+      { width: 100, height: Infinity },
+      { entries: [twoSided('titulo', { scale: 1.2 })] },
+    );
+    expect(column.placed.map((item) => [item.height, item.spacing])).toEqual([[24, 1.2]]);
+  });
+
+  it('shrink the letters and the spaces by the same factor', () => {
+    const column = blockColumn(
+      { width: 100, height: 14 },
+      { entries: [twoSided('titulo', { scale: 1, spacing: 1 })] },
+    );
+    expect(column.shrink).toBe(0.7);
+    expect(column.placed.map((item) => [item.scale, item.spacing])).toEqual([[0.7, 0.7]]);
+  });
+
+  it('scale the gap above a block by its own distancia, the first block’s changing nothing', () => {
+    const topsWith = (distance: string, where: 'titulo' | 'apelo'): number[] =>
+      blockColumn(
+        { width: 100, height: Infinity },
+        {
+          entries: [
+            {
+              ...entry('titulo', 10),
+              ...(where === 'titulo' ? scalesOf(written(['distancia', distance])) : {}),
+            },
+            {
+              ...entry('apelo', 10),
+              ...(where === 'apelo' ? scalesOf(written(['distancia', distance])) : {}),
+            },
+          ],
+          gapBetween: () => 20,
+        },
+      ).placed.map((item) => item.top);
+    expect(['1', '2', '3', '4', '5'].map((value) => topsWith(value, 'apelo')[1])).toEqual([
+      10, 20, 30, 40, 50,
+    ]);
+    expect(topsWith('5', 'titulo')).toEqual([0, 30]);
   });
 });
 
@@ -257,6 +360,14 @@ describe('the parameters', () => {
       weight3: 1,
       weight4: 1.2,
       weight5: 1.4,
+      weight6: 1.6,
+      weight7: 1.8,
+      weight8: 2,
+      distance1: 0,
+      distance2: 0.5,
+      distance3: 1,
+      distance4: 1.5,
+      distance5: 2,
       shrinkFloor: 0.7,
       reach: 0,
     });
@@ -287,7 +398,10 @@ slots:
   apelo: { type: rich-text, per: lamina }
   nota: { type: rich-text, per: lamina, shared: true }
 adjustments:
-  peso: { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, apelo, nota] }
+  peso: { type: enum, values: ['1', '2', '3', '4', '5', '6', '7', '8'], default: '3', applies: [titulo, apelo, nota] }
+  tamanho: { type: enum, values: ['1', '2', '3', '4', '5', '6', '7', '8'], default: '3', applies: [titulo, apelo, nota] }
+  espaco: { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, apelo, nota] }
+  distancia: { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, apelo, nota] }
 `,
   'manifest.yaml',
 );
@@ -297,11 +411,15 @@ if (!parsedManifest.ok) {
 const FORMATS = formatCatalogue({ grid: { w: 600, h: 400 } });
 const SIZES: Readonly<Record<string, number>> = { titulo: 32, apelo: 24, nota: 16 };
 
-/** A template that hands its three blocks to the column and does nothing else. */
+/**
+ * A template that hands its three blocks to the column and does nothing else. It adopts `peso`,
+ * `tamanho`, `espaco` and `distancia` the way any template does: the manifest declares them and
+ * each entry spreads `scalesOf` its slot (TYTO-853).
+ */
 const columnTemplate: Template = defineTemplate(parsedManifest.value, (context) => {
   const entries: ColumnEntry[] = ['titulo', 'apelo', 'nota'].map((name) => ({
     name,
-    scale: weightOf(context.slots[name]),
+    ...scalesOf(context.slots[name]),
     build: (area, scale) => {
       const value = context.slots[name]?.value;
       if (value?.kind !== 'rich-text' || value.text.length === 0) return undefined;
@@ -386,6 +504,59 @@ describe('the column, through the real compile', async () => {
         `./__snapshots__/column/lamina-${String(index + 1)}.grid.svg`,
       );
     }
+  });
+});
+
+describe('tamanho and distancia, through the real compile (TYTO-853)', async () => {
+  const compiled = await compileTemplate({
+    brief: distanceBrief,
+    template: columnTemplate,
+    formats: FORMATS,
+    faces,
+  });
+  if (!compiled.ok) throw new Error(compiled.error.map((item) => item.message).join('; '));
+  const { scene } = compiled.value;
+  const control = await compileTemplate({
+    brief: distanceBrief.replace(/ \{[^}]*\}/gu, ''),
+    template: columnTemplate,
+    formats: FORMATS,
+    faces,
+  });
+  if (!control.ok) throw new Error(control.error.map((item) => item.message).join('; '));
+
+  /** The room between the bottom of one text and the top of the next, by their tops. */
+  const tops = (of: Scene): number[] => textsOf(of, 0).map(([, top]) => top);
+
+  it('takes the adjustments the manifest declares, and the control none', () => {
+    expect(textsOf(scene, 0).map(([name]) => name)).toEqual(['titulo', 'apelo', 'nota']);
+    expect(tops(scene)).not.toEqual(tops(control.value.scene));
+  });
+
+  it('draws the title at its tamanho, 2 times its size', () => {
+    const run = (of: Scene): number | undefined => {
+      const walk = (nodes: readonly SceneNode[]): number | undefined => {
+        for (const node of nodes) {
+          if (node.kind === 'text' && node.name === 'titulo') {
+            const first = node.runs.find((each) => each.kind === 'text');
+            return first?.kind === 'text' ? first.size : undefined;
+          }
+          if (node.kind === 'group') {
+            const found = walk(node.children);
+            if (found !== undefined) return found;
+          }
+        }
+        return undefined;
+      };
+      return walk(of.artworks[0]?.frames[0]?.children ?? []);
+    };
+    expect([run(scene), run(control.value.scene)]).toEqual([64, 32]);
+  });
+
+  it('leaves no room above the offer written {distancia: 1}, and twice the gap above the note', () => {
+    // The title is one line of 64 × 1.25; the offer one of 24 × 1.25, then 2 × 12 above the note.
+    const [titulo, apelo, nota] = tops(scene);
+    expect(apelo! - titulo!).toBeCloseTo(64 * 1.25, 5);
+    expect(nota! - apelo!).toBeCloseTo(24 * 1.25 + 24, 5);
   });
 });
 

@@ -114,10 +114,17 @@ export function bodySize(
 }
 
 /**
- * The body as one block inside the area's width, every size and gap times `scale`; `undefined`
- * when it has nothing to draw, so a column leaves no room for it.
+ * The body as one block inside the area's width, every size times `scale` and every gap inside
+ * it times `spacing` (TYTO-853), which is `scale` when left out; `undefined` when it has nothing
+ * to draw, so a column leaves no room for it. A column entry passes on the two scales its
+ * `build` receives.
  */
-export function bodyBlock(area: Area, scale: number, options: BodyOptions): Block | undefined {
+export function bodyBlock(
+  area: Area,
+  scale: number,
+  options: BodyOptions,
+  spacing: number = scale,
+): Block | undefined {
   const items = levelsOf(options.words, { readByPosition: false });
   if (items.length === 0) return undefined;
   const used = items.flatMap((item) =>
@@ -126,18 +133,18 @@ export function bodyBlock(area: Area, scale: number, options: BodyOptions): Bloc
   const values = parameterValues(BODY_PARAMETERS, options.parameters);
   const lineGap: LevelGap<LevelItem> =
     options.lineGapBetween === undefined
-      ? values.lineGap * scale
+      ? values.lineGap * spacing
       : typeof options.lineGapBetween === 'number'
-        ? options.lineGapBetween * scale
+        ? options.lineGapBetween * spacing
         : (above, below) =>
             (options.lineGapBetween as (a: LevelItem, b: LevelItem) => number)(above, below) *
-            scale;
+            spacing;
   const drawn = levelStack(
     items,
     {
       name: options.name ?? 'body',
       look: (part) => options.look(part, bodySize(part.level, options.sizes, values, used) * scale),
-      gap: values.partGap * scale,
+      gap: values.partGap * spacing,
       lineGap,
       ...(options.divider === undefined
         ? {}

@@ -155,6 +155,22 @@ describe('a body at a scale', () => {
     expect(body.height).toBeCloseTo(2 * (30 + 5 + 30), 5);
   });
 
+  it('scales its letters by the scale and its gaps by the spacing apart (TYTO-853)', () => {
+    const text = '## Salário | ## Banca\n## Cargos';
+    const parameters = { partGap: 5, lineGap: 10 };
+    const larger = bodyBlock(AREA, 2, options(text, { parameters }), 1)!;
+    const looser = bodyBlock(AREA, 1, options(text, { parameters }), 2)!;
+    expect(sizesIn(larger.draft)).toEqual([60, 60, 60]);
+    expect(larger.height).toBeCloseTo(3 * 60 + 5 + 10, 5);
+    expect(sizesIn(looser.draft)).toEqual([30, 30, 30]);
+    expect(looser.height).toBeCloseTo(3 * 30 + 2 * (5 + 10), 5);
+  });
+
+  it('scales a gap per pair of lines by the spacing, not the scale', () => {
+    const body = bodyBlock(AREA, 2, options('## A\n## B', { lineGapBetween: () => 7 }), 0.5)!;
+    expect(body.height).toBeCloseTo(2 * 30 + 2 * 30 + 0.5 * 7, 5);
+  });
+
   it('is nothing when its lines draw nothing, as a divider alone', () => {
     expect(bodyBlock(AREA, 1, options('---'))).toBeUndefined();
   });

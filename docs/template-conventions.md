@@ -115,6 +115,31 @@ it first through `context.measure` (ADR 0038).
 Placement **adds** to the coordinate a node already carries rather than replacing it, so a
 node nudged by hand keeps its nudge wherever it is put.
 
+### A block's size and spacing come from the brief through the kit
+
+A template whose blocks sit in the kit's `blockColumn` takes the four block adjustments of the
+vocabulary (`docs/slot-vocabulary.md`) without reading any of them itself (TYTO-853): `peso`,
+`tamanho`, `espaco` and `distancia`. Three steps, the same in every template:
+
+1. Declare them in the manifest, on the blocks the column holds, with the vocabulary's values.
+2. Spread `scalesOf(slot)` into each column entry. It reads `tamanho` or `peso` for the letters,
+   `espaco` or `peso` for the spaces inside the block, and `distancia` for the gap above it.
+3. In `build(area, scale, spacing)`, multiply every size by `scale` and every space **inside**
+   the block by `spacing`. `bodyBlock(area, scale, options, spacing)` already does; a block
+   that leaves `spacing` out scales its spaces with its letters, as every block did before.
+
+```ts
+const entry: ColumnEntry = {
+  name: 'nota',
+  ...scalesOf(context.slots['nota']),
+  build: (area, scale, spacing) => bodyBlock(area, scale, noteOptions, spacing),
+};
+```
+
+The gap between two blocks stays the template's (`gapBetween`); the column multiplies it by
+the lower block's `distancia`, and shrinks letters and inner spaces by one factor when the
+group is too tall.
+
 ### 2. Brand tokens — values, no logic
 
 Colours, type scale, spacing, and flat geometry, in `_<brand>/tokens.ts`. Exported constants.

@@ -279,22 +279,61 @@ hierarchy of words is written with `|` and `#`, not with labels.
 
 `peso` is the shared adjustment that makes one block of the artwork larger or smaller than
 designed, to set its hierarchy from the brief (maintainer, 2026-11-21): `::nota {peso: 4}`.
-It takes `1` to `5`, and `3`, the design's own size, is the default (maintainer, 2026-11-22,
-TYTO-834). **Until then it took `1` to `3`, `2` the normal one**: a brief written then reads
-`{peso: 1}` as 0.7 where it was 0.85, and `{peso: 3}` as the normal size where it was 1.2.
+It scales the block's letters and the spaces inside it together. It takes `1` to `8`, and `3`,
+the design's own size, is the default (maintainer, 2026-11-22, TYTO-834; `6` to `8` since
+2026-11-24, TYTO-853). **Until 2026-11-22 it took `1` to `3`, `2` the normal one**: a brief
+written then reads `{peso: 1}` as 0.7 where it was 0.85, and `{peso: 3}` as the normal size
+where it was 1.2.
+
+`1` is 0.7 of the reference sizes, `2` 0.85, `3` 1, `4` 1.2, `5` 1.4, `6` 1.6, `7` 1.8, `8` 2.
+The scales are the block column's parameters (`weight1` to `weight8`), so a template may set
+its own; the values a brief writes are the same in every template. A block written without
+`peso` is built as designed.
+
+### `tamanho`, `espaco` and `distancia`: a block's letters, its spaces, and the room above it
+
+Three more adjustments split what `peso` does and add the one it never did (maintainer,
+2026-11-24, TYTO-853):
+
+| Adjustment  | Values    | What it scales                                                                                    |
+| ----------- | --------- | ------------------------------------------------------------------------------------------------- |
+| `tamanho`   | `1` – `8` | Only the letters, on the scales of `peso`.                                                        |
+| `espaco`    | `1` – `5` | Only the spaces **inside** the block: between parts, between lines, a blank line's paragraph.     |
+| `distancia` | `1` – `5` | The gap **above** the block, the one the template states for the pair: 0, 0.5, 1, 1.5 or 2 of it. |
+
+`tamanho` and `espaco`, when written, replace their side; `peso` applies to the side left
+unwritten, so `{peso: 5, espaco: 2}` draws the letters at 1.4 and the spaces at 0.85. A brief
+that writes neither draws as before. `distancia` belongs to the lower of two blocks, so a gap
+has one owner; on the first block of a column it changes nothing. It does not follow `peso`.
+A shared block, or a named block placed by an anchor (ADR 0227), carries it wherever it is
+drawn. These are per-block levels; the header's `espaco-partes` and `respiro`, where a template
+declares them, are numbers for the whole artwork.
 
 ```yaml
 adjustments:
   peso:
+    {
+      type: enum,
+      values: ['1', '2', '3', '4', '5', '6', '7', '8'],
+      default: '3',
+      applies: [titulo, apelo, nota],
+    }
+  tamanho:
+    {
+      type: enum,
+      values: ['1', '2', '3', '4', '5', '6', '7', '8'],
+      default: '3',
+      applies: [titulo, apelo, nota],
+    }
+  espaco:
+    { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, apelo, nota] }
+  distancia:
     { type: enum, values: ['1', '2', '3', '4', '5'], default: '3', applies: [titulo, apelo, nota] }
 ```
 
-A template declares it on every content block it hands to the kit's block column (TYTO-824,
-ADR 0224), and reads it with the kit's `weightOf`, which turns it into the scale the block is
-built at: `1` is 0.7 of the reference sizes, `2` 0.85, `3` 1, `4` 1.2, `5` 1.4. The five
-scales are the column's parameters (`weight1` to `weight5`), so a template may set its own; the
-values a brief writes are the same in every template. A block written without `peso` is built as
-designed.
+A template declares them on every content block it hands to the kit's block column (TYTO-824,
+ADR 0224) and reads them all with the kit's `scalesOf`; `docs/template-conventions.md` says
+how in three steps. `weightOf`, `sizeOf`, `spacingOf` and `distanceOf` read one each.
 
 ## Names in use that drift, not checked yet
 

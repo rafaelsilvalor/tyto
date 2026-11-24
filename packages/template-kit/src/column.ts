@@ -26,9 +26,38 @@ export const WEIGHT = 'peso';
 
 /**
  * The values `peso` takes, lightest to heaviest: `3` is the block as designed, and the default
- * (maintainer, 2026-11-22, TYTO-834). Until then there were three, `2` the normal one.
+ * (maintainer, 2026-11-22, TYTO-834). `6` to `8` since TYTO-853 (maintainer, 2026-11-24).
  */
-export const WEIGHTS = ['1', '2', '3', '4', '5'] as const;
+export const WEIGHTS = ['1', '2', '3', '4', '5', '6', '7', '8'] as const;
+
+/**
+ * The adjustment that scales a block's letters only, leaving the spaces inside it to `peso`:
+ * `{tamanho: 6}` (TYTO-853). It takes the values and the scales of `peso`.
+ */
+export const SIZE = 'tamanho';
+
+/** The values `tamanho` takes: those of `peso`. */
+export const SIZES = WEIGHTS;
+
+/**
+ * The adjustment that scales only the spaces inside a block (between two parts, two lines, and
+ * the paragraph a blank line opens), leaving its letters to `peso`: `{espaco: 4}` (TYTO-853).
+ * Its values take the scales of `peso` 1 to 5.
+ */
+export const SPACING = 'espaco';
+
+/** The values `espaco` takes. */
+export const SPACINGS = ['1', '2', '3', '4', '5'] as const;
+
+/**
+ * The adjustment that sets the room **above** a block, between it and the block over it:
+ * `{distancia: 5}` (TYTO-853). It multiplies the gap the template states for that pair; it does
+ * not follow `peso`, and on the first block of a column there is nothing above to space.
+ */
+export const DISTANCE = 'distancia';
+
+/** The values `distancia` takes: `3`, the default, is the template's own gap. */
+export const DISTANCES = ['1', '2', '3', '4', '5'] as const;
 
 export const BLOCK_COLUMN_PARAMETERS = {
   gap: {
@@ -79,6 +108,55 @@ export const BLOCK_COLUMN_PARAMETERS = {
     min: 0,
     description: 'The scale of a block written with {peso: 5}.',
   },
+  weight6: {
+    kind: 'ratio',
+    default: 1.6,
+    min: 0,
+    description: 'The scale of a block written with {peso: 6}.',
+  },
+  weight7: {
+    kind: 'ratio',
+    default: 1.8,
+    min: 0,
+    description: 'The scale of a block written with {peso: 7}.',
+  },
+  weight8: {
+    kind: 'ratio',
+    default: 2,
+    min: 0,
+    description: 'The scale of a block written with {peso: 8}.',
+  },
+  distance1: {
+    kind: 'ratio',
+    default: 0,
+    min: 0,
+    description: 'The share of its gap left above a block written with {distancia: 1}.',
+  },
+  distance2: {
+    kind: 'ratio',
+    default: 0.5,
+    min: 0,
+    description: 'The share of its gap left above a block written with {distancia: 2}.',
+  },
+  distance3: {
+    kind: 'ratio',
+    default: 1,
+    min: 0,
+    description:
+      'The share of its gap left above a block written with {distancia: 3}, or with none: as designed.',
+  },
+  distance4: {
+    kind: 'ratio',
+    default: 1.5,
+    min: 0,
+    description: 'The share of its gap left above a block written with {distancia: 4}.',
+  },
+  distance5: {
+    kind: 'ratio',
+    default: 2,
+    min: 0,
+    description: 'The share of its gap left above a block written with {distancia: 5}.',
+  },
   shrinkFloor: {
     kind: 'ratio',
     default: 0.7,
@@ -103,18 +181,19 @@ export interface Adjusted {
   readonly adjustments: readonly { readonly name: string; readonly value?: string }[];
 }
 
-/**
- * The scale a block is built at, from the `peso` its slot was written with: `weight1` to
- * `weight5` of the column's parameters. A slot written without `peso`, absent, or given a value
- * outside `1` to `5` is built at `weight3`, the block as designed.
- */
-export function weightOf(
+/** The value a slot was written with for one adjustment, when it is one of `allowed`. */
+function writtenOf(
   slot: Adjusted | undefined,
-  parameters: Partial<BlockColumnParameters> = {},
-): number {
-  const values = parameterValues(BLOCK_COLUMN_PARAMETERS, parameters);
-  const written = slot?.adjustments.find((adjustment) => adjustment.name === WEIGHT)?.value;
-  switch (written) {
+  name: string,
+  allowed: readonly string[],
+): string | undefined {
+  const value = slot?.adjustments.find((adjustment) => adjustment.name === name)?.value;
+  return value !== undefined && allowed.includes(value) ? value : undefined;
+}
+
+/** The scale of a `peso` level, `3` and anything unknown being the block as designed. */
+function weightScale(level: string | undefined, values: BlockColumnParameters): number {
+  switch (level) {
     case '1':
       return values.weight1;
     case '2':
@@ -123,9 +202,100 @@ export function weightOf(
       return values.weight4;
     case '5':
       return values.weight5;
+    case '6':
+      return values.weight6;
+    case '7':
+      return values.weight7;
+    case '8':
+      return values.weight8;
     default:
       return values.weight3;
   }
+}
+
+/**
+ * The scale a block is built at, from the `peso` its slot was written with: `weight1` to
+ * `weight8` of the column's parameters. A slot written without `peso`, absent, or given a value
+ * outside `1` to `8` is built at `weight3`, the block as designed.
+ */
+export function weightOf(
+  slot: Adjusted | undefined,
+  parameters: Partial<BlockColumnParameters> = {},
+): number {
+  const values = parameterValues(BLOCK_COLUMN_PARAMETERS, parameters);
+  return weightScale(writtenOf(slot, WEIGHT, WEIGHTS), values);
+}
+
+/** The scale of a block's letters: its `tamanho` when written, else its `peso` (TYTO-853). */
+export function sizeOf(
+  slot: Adjusted | undefined,
+  parameters: Partial<BlockColumnParameters> = {},
+): number {
+  const size = writtenOf(slot, SIZE, SIZES);
+  if (size === undefined) return weightOf(slot, parameters);
+  return weightScale(size, parameterValues(BLOCK_COLUMN_PARAMETERS, parameters));
+}
+
+/**
+ * The scale of the spaces inside a block: its `espaco` when written, read on the scales of
+ * `peso` 1 to 5, else its `peso` (TYTO-853).
+ */
+export function spacingOf(
+  slot: Adjusted | undefined,
+  parameters: Partial<BlockColumnParameters> = {},
+): number {
+  const spacing = writtenOf(slot, SPACING, SPACINGS);
+  if (spacing === undefined) return weightOf(slot, parameters);
+  return weightScale(spacing, parameterValues(BLOCK_COLUMN_PARAMETERS, parameters));
+}
+
+/**
+ * The share of its gap a block keeps above it, from its `distancia`: `distance1` to
+ * `distance5`, `3` or none being the template's own gap (TYTO-853).
+ */
+export function distanceOf(
+  slot: Adjusted | undefined,
+  parameters: Partial<BlockColumnParameters> = {},
+): number {
+  const values = parameterValues(BLOCK_COLUMN_PARAMETERS, parameters);
+  switch (writtenOf(slot, DISTANCE, DISTANCES)) {
+    case '1':
+      return values.distance1;
+    case '2':
+      return values.distance2;
+    case '4':
+      return values.distance4;
+    case '5':
+      return values.distance5;
+    default:
+      return values.distance3;
+  }
+}
+
+/** What a column entry reads of its slot's adjustments. */
+export interface BlockScales {
+  /** The letters' scale: `tamanho`, else `peso`. */
+  readonly scale: number;
+  /** The inner spaces' scale: `espaco`, else `peso`. */
+  readonly spacing: number;
+  /** The share of the gap above the block: `distancia`. */
+  readonly distance: number;
+}
+
+/**
+ * Everything a column entry reads of its slot's adjustments, ready to spread into the entry:
+ * `{ ...scalesOf(slot), build: (area, scale, spacing) => ... }`. A template adopts `peso`,
+ * `tamanho`, `espaco` and `distancia` at once through it (TYTO-853).
+ */
+export function scalesOf(
+  slot: Adjusted | undefined,
+  parameters: Partial<BlockColumnParameters> = {},
+): BlockScales {
+  return {
+    scale: sizeOf(slot, parameters),
+    spacing: spacingOf(slot, parameters),
+    distance: distanceOf(slot, parameters),
+  };
 }
 
 /**
@@ -136,9 +306,21 @@ export function weightOf(
  */
 export interface ColumnEntry {
   readonly name: string;
-  readonly build: (area: Area, scale: number) => Block | undefined;
-  /** The scale to build it at, usually `weightOf` its slot. Defaults to 1. */
+  /**
+   * The block at `scale` for its letters and `spacing` for the spaces inside it. A block that
+   * scales both alike reads `scale` alone; the column always passes both, and a caller that
+   * passes one means the spaces at `scale`.
+   */
+  readonly build: (area: Area, scale: number, spacing?: number) => Block | undefined;
+  /** The scale of its letters, usually `sizeOf` its slot. Defaults to 1. */
   readonly scale?: number;
+  /** The scale of the spaces inside it, usually `spacingOf` its slot. Defaults to `scale`. */
+  readonly spacing?: number;
+  /**
+   * The share of the gap above it it keeps, usually `distanceOf` its slot. Defaults to 1. The
+   * first block drawn has no gap above, so its distance changes nothing.
+   */
+  readonly distance?: number;
 }
 
 export interface BlockColumnOptions {
@@ -164,6 +346,8 @@ export interface PlacedBlock {
   readonly width: number;
   readonly height: number;
   readonly scale: number;
+  /** The scale its inner spaces were built at. */
+  readonly spacing: number;
 }
 
 export interface Column {
@@ -218,7 +402,7 @@ export type BlockOfKind = (
 /**
  * The column's entries one per **placed block** (TYTO-839, ADR 0227): two `::corpo`, or a shared
  * title and a slide's own, are two entries in the brief's order, each built by its kind's
- * `build` from its own value and usually at `weightOf` its own `peso`. `fallback` is the
+ * `build` from its own value and usually at `scalesOf` its own adjustments. `fallback` is the
  * template's own order, as `entries` is to `columnOrder`: its entries that the brief named give
  * their places to the placed blocks, in the brief's order, and the blocks past those places come
  * right after the last of them; an entry the brief did not name keeps its place.
@@ -322,6 +506,7 @@ export function blockColumn(area: Area, options: BlockColumnOptions): Column {
       width: item.block.width,
       height: item.block.height,
       scale: item.scale,
+      spacing: item.spacing,
     });
     top += item.block.height + gaps[index]!;
   });
@@ -342,29 +527,42 @@ export function blockColumn(area: Area, options: BlockColumnOptions): Column {
 /** The shrink search stops when two factors are this close. */
 const SHRINK_PRECISION = 0.005;
 
+interface Measured {
+  readonly name: string;
+  readonly block: Block;
+  readonly scale: number;
+  readonly spacing: number;
+  readonly distance: number;
+}
+
 interface Laid {
-  readonly measured: readonly { name: string; block: Block; scale: number }[];
+  readonly measured: readonly Measured[];
   readonly gaps: readonly number[];
   readonly content: number;
 }
 
-/** Every entry built at its own scale times `factor`, the absent ones dropped, and the gaps. */
+/**
+ * Every entry built at its own scales times `factor`, the absent ones dropped, and the gaps: each
+ * the pair's gap times the lower block's distance.
+ */
 function measuredAt(
   entries: readonly ColumnEntry[],
   area: Area,
   factor: number,
   gapOf: (above: string, below: string) => number,
 ): Laid {
-  const measured: { name: string; block: Block; scale: number }[] = [];
+  const measured: Measured[] = [];
   for (const entry of entries) {
     const scale = (entry.scale ?? 1) * factor;
-    const built = entry.build(area, scale);
+    const spacing = (entry.spacing ?? entry.scale ?? 1) * factor;
+    const built = entry.build(area, scale, spacing);
     if (built === undefined || built.height <= 0) continue;
-    measured.push({ name: entry.name, block: built, scale });
+    const distance = entry.distance ?? 1;
+    measured.push({ name: entry.name, block: built, scale, spacing, distance });
   }
   const gaps = measured.map((item, index) => {
     const below = measured[index + 1];
-    return below === undefined ? 0 : gapOf(item.name, below.name);
+    return below === undefined ? 0 : gapOf(item.name, below.name) * below.distance;
   });
   const content = measured.reduce((sum, item, index) => sum + item.block.height + gaps[index]!, 0);
   return { measured, gaps, content };
