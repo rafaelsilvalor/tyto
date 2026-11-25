@@ -197,6 +197,7 @@ export {
   type TextBlockOptions,
   type TextStyle,
   atLeastOne,
+  capitals,
   grownTextBlock,
   naturalWidth,
   textBlock,
@@ -219,6 +220,23 @@ export {
   pillTable,
   slotTable,
 } from './slot-table.js';
+
+export {
+  type Button,
+  type ButtonRowOptions,
+  type ButtonStyle,
+  buttonRow,
+  buttonWidth,
+} from './button-row.js';
+
+export {
+  ARROW_ICON,
+  BALLOON_ICON,
+  HEART_ICON,
+  type Icon,
+  PAPER_PLANE_ICON,
+  icon,
+} from './icons.js';
 
 export {
   type Corners,

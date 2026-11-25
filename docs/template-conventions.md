@@ -103,6 +103,14 @@ measures the row before it places anything. The template composes as many compon
 needs and stacks them; the table is one of them. `slotTable` is `table` with a reading on top:
 one brief line per row, `|` between cells, words drawn by column style.
 
+**A call to action is a row of buttons** (TYTO-860). `buttonRow` draws one or more pills, each
+filled, outlined or both, holding an optional leading piece (an icon), its words, and an
+optional end cap with its own piece (an arrow). One button with an end cap is "Escreva X nos
+comentários →"; three with leading icons are "Curta · Comente · Compartilhe". The template
+builds the words with the text components and the icons with `icon` (`HEART_ICON`,
+`BALLOON_ICON`, `PAPER_PLANE_ICON`, `ARROW_ICON`: geometry in the kit, colour from the
+caller), and says every size and colour in the style.
+
 ```ts
 const sessions = slotTable(sessionTable, { text: lamina, width, measure: context.measure });
 const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, imagem } });
