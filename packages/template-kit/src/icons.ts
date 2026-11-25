@@ -49,6 +49,12 @@ export const ARROW_ICON: Icon = {
   paint: { kind: 'fill' },
 };
 
+/**
+ * No paint at all. A vector with a stroke and no `fill` is filled black by the exporter, so an
+ * outlined icon states that its inside is empty (measured on informativo's icons, TYTO-699).
+ */
+const NO_FILL = solid({ r: 0, g: 0, b: 0, a: 0 });
+
 /** An icon `height` tall, in `color`, as wide as its box at that height. */
 export function icon(shape: Icon, height: number, color: string, name: string): Block {
   const scale = height / shape.box.h;
@@ -56,6 +62,7 @@ export function icon(shape: Icon, height: number, color: string, name: string): 
     shape.paint.kind === 'fill'
       ? { fill: solid(color) }
       : {
+          fill: NO_FILL,
           stroke: {
             paint: solid(color),
             width: shape.paint.width,

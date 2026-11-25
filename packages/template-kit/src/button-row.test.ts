@@ -175,6 +175,10 @@ describe('icons', () => {
     expect((arrow.draft as Draft).fill).toBeDefined();
     expect((arrow.draft as Draft).stroke).toBeUndefined();
     expect((heart.draft as Draft).stroke).toBeDefined();
-    expect((heart.draft as Draft).fill).toBeUndefined();
+    // Outlined: its inside painted with nothing, or the exporter fills it black.
+    expect((heart.draft as Draft).fill).toEqual({
+      kind: 'solid',
+      color: { r: 0, g: 0, b: 0, a: 0 },
+    });
   });
 });
