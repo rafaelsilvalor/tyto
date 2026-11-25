@@ -50,12 +50,22 @@ import {
   group,
   lineBreak,
   numberValue,
-  rect,
   run,
   solid,
   text,
 } from '@tyto/core/template';
-import { type Block, at, block, lines, plain, reportOverflow } from '@tyto/template-kit';
+import {
+  type Block,
+  type TableCell,
+  type TableRow as KitRow,
+  type TableStyle,
+  at,
+  block,
+  lines,
+  plain,
+  reportOverflow,
+  table as kitTable,
+} from '@tyto/template-kit';
 
 import { accentOf, drawLogo, oneInk, signatureOf } from './kit.js';
 import { pieces } from './breaks.js';
@@ -84,7 +94,7 @@ import { BLACK, BOLD, BOOK, FACE } from './tokens.js';
 import type { TableBrand } from './brands.js';
 import type { TableContent, TableRow } from './table-text.js';
 import type { BrandKit, RichText, TemplateBuild, TemplateContext, TextRun } from '@tyto/core';
-import type { NodeDraft, NonEmpty } from '@tyto/core/template';
+import type { NonEmpty } from '@tyto/core/template';
 import type { Measure } from '@tyto/template-kit';
 
 /** The build for one brand's table. */
@@ -867,6 +877,10 @@ function drawTitle(
 /**
  * The table: the header row in the accent, the body rows zebra-striped from the first, a
  * band across every column in the accent. Rounded cells with small gaps between them.
+ *
+ * Laid out and painted by the kit's `table` (TYTO-878); what is the house's is every number it
+ * is handed. The widths and heights are the fit loop's, so each cell's content is a block of
+ * exactly its row's planned height, and the table's own measuring agrees with the plan.
  */
 function drawTable(
   table: TableContent,
@@ -876,83 +890,83 @@ function drawTable(
   look: TableLook,
 ): Block {
   const whole = sum(plan.widths) + CELL.gapX * Math.max(0, plan.widths.length - 1);
-  const children: NodeDraft[] = [];
-  let y = 0;
-  let striped = 0;
-
-  const drawRow = (
-    name: string,
-    cells: readonly string[],
-    role: Role,
-    spans: readonly number[],
-    fill: string | undefined,
-    height: number,
-  ): void => {
-    const style = roleStyle(role, look);
-    const cellNodes: NodeDraft[] = [];
-    let x = 0;
-    for (const [column, words] of cells.entries()) {
-      const span = spans[column]!;
-      if (fill !== undefined) {
-        cellNodes.push(
-          rect({
-            name: 'cell',
-            size: { w: span, h: height },
-            radius: CELL.radius,
-            fill: solid(fill),
-            transform: { x, y },
-          }),
-        );
-      }
-      if (words !== '') {
-        // The full height of the cell, centred: its block padding is the room around the
-        // words, and subtracting it back out would leave a box a rounding error shorter than
-        // the lines it was measured for.
-        // Lowered by trimming the box's top twice the drop, so the centre moves by the drop and
-        // the box stays inside the cell; the block padding is far wider than the trim.
-        const padX = style.inline * plan.size;
-        const trim = 2 * look.opticalDrop * plan.size;
-        cellNodes.push(
-          text({
-            ...cellText(words, role, plan.size, look),
-            name: 'cell-text',
-            box: { w: span - 2 * padX, h: height - trim },
-            align: 'center',
-            valign: 'middle',
-            ...(plan.unmeasured ? { overflow: 'shrink' as const } : {}),
-            transform: { x: x + padX, y: y + trim },
-          }),
-        );
-      }
-      x += span + CELL.gapX;
-    }
-    children.push(group({ name, children: cellNodes }));
+  const style: TableStyle = {
+    columns: plan.widths.map((width) => ({ name: 'cell', width })),
+    kinds: {
+      header: { name: 'header-row', fill: accent },
+      // The first body row is striped, as in the approved art; a band does not count.
+      body: { name: 'body-row', zebra: [look.zebra, null] },
+      band: { name: 'band-row', fill: accent },
+    },
+    columnGap: CELL.gapX,
+    rowGap: CELL.gapY,
+    minRowHeight: 0,
+    corners: { radius: CELL.radius, at: 'every-cell' },
+    names: { table: 'table', row: 'body-row', band: 'cell' },
   };
 
-  drawRow('header-row', glued.header, 'header', plan.widths, accent, plan.heights[0]!);
-  y += plan.heights[0]! + CELL.gapY;
-
-  for (const [index, row] of table.rows.entries()) {
-    const height = plan.heights[index + 1]!;
-    if (row.kind === 'band') {
-      drawRow('band-row', glued.rows[index]!, 'band', [whole], accent, height);
-    } else {
-      // The first body row is striped, as in the approved art; a band does not count.
-      drawRow(
-        'body-row',
-        glued.rows[index]!,
-        'cell',
-        plan.widths,
-        striped % 2 === 0 ? look.zebra : undefined,
-        height,
-      );
-      striped += 1;
+  const row = (
+    kind: 'header' | 'body' | 'band',
+    cells: readonly string[],
+    role: Role,
+    height: number,
+  ): KitRow => {
+    const drawn: (TableCell | undefined)[] = cells.map((words) =>
+      cellBlock(words, role, height, plan, look),
+    );
+    // A row with no words at all still stands at its planned height.
+    if (cells.length > 0 && !drawn.some((cell) => cell !== undefined)) {
+      drawn[0] = { draw: (width) => block(width, height, group({ children: [] })) };
     }
-    y += height + CELL.gapY;
-  }
+    return { kind, cells: drawn, ...(kind === 'band' ? { span: true } : {}) };
+  };
 
-  const height = Math.max(0, y - CELL.gapY);
-  return block(whole, height, group({ name: 'table', children }));
+  const rows: KitRow[] = [row('header', glued.header, 'header', plan.heights[0]!)];
+  for (const [index, each] of table.rows.entries()) {
+    const height = plan.heights[index + 1]!;
+    rows.push(
+      each.kind === 'band'
+        ? row('band', glued.rows[index]!, 'band', height)
+        : row('body', glued.rows[index]!, 'cell', height),
+    );
+  }
+  return kitTable(style, rows, whole);
+}
+
+/**
+ * A cell's words as the table's content: a block of the row's full height holding the text,
+ * centred. Nothing when the cell has no words.
+ */
+function cellBlock(
+  words: string,
+  role: Role,
+  height: number,
+  plan: TablePlan,
+  look: TableLook,
+): TableCell | undefined {
+  if (words === '') return undefined;
+  const style = roleStyle(role, look);
+  return {
+    draw: (span) => {
+      // The full height of the cell, centred: its block padding is the room around the
+      // words, and subtracting it back out would leave a box a rounding error shorter than
+      // the lines it was measured for.
+      // Lowered by trimming the box's top twice the drop, so the centre moves by the drop and
+      // the box stays inside the cell; the block padding is far wider than the trim.
+      const padX = style.inline * plan.size;
+      const trim = 2 * look.opticalDrop * plan.size;
+      const node = text({
+        ...cellText(words, role, plan.size, look),
+        name: 'cell-text',
+        box: { w: span - 2 * padX, h: height - trim },
+        align: 'center',
+        valign: 'middle',
+        ...(plan.unmeasured ? { overflow: 'shrink' as const } : {}),
+        transform: { x: padX, y: trim },
+      });
+      return block(span, height, node);
+    },
+  };
 }
 
 /** The signature, centred and tracked out, standing on the foot of its row. */
