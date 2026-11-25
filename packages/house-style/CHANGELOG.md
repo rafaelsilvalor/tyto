@@ -1,5 +1,16 @@
 # @tyto/house-style
 
+## 0.8.0
+
+### Minor Changes
+
+- 43f4b29: `oneImageTable` draws its cells through the kit's `table` (TYTO-878). The art is the same to the pixel; the scene is one level deeper: each cell is a group named `cell` holding its rect, now unnamed, and its `cell-text`, and each row group carries its own place. A reader of the scene that looked for rects named `cell` directly under a row finds the cell groups instead.
+
+### Patch Changes
+
+- Updated dependencies [337b8db]
+  - @tyto/template-kit@0.24.0
+
 ## 0.7.5
 
 ### Patch Changes
