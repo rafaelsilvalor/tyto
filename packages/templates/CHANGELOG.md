@@ -1,5 +1,13 @@
 # @tyto/templates
 
+## 1.3.13
+
+### Patch Changes
+
+- Updated dependencies [fab7333]
+  - @tyto/template-kit@0.23.0
+  - @tyto/house-style@0.7.4
+
 ## 1.3.12
 
 ### Patch Changes

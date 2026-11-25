@@ -1,6 +1,6 @@
 {
   "name": "@tyto/cli",
-  "version": "0.13.13",
+  "version": "0.13.14",
   "private": true,
   "type": "module",
   "description": "Command-line interface (commander).",
