@@ -95,7 +95,8 @@ stated size.
 
 **A table lays out cells and draws no words** (TYTO-859). `table` owns the columns (fixed,
 `fill`, or `measured` from the content), the row kinds the caller names (`plain`,
-`highlight`…, each with its fill per column and its zebra), bands across every column, corners
+`highlight`…, each with its fill per column, its zebra — `null` leaves that row bare — and,
+optionally, its own row name), bands across every column, corners
 on every cell or on the table's outer edge only, the gaps and each column's padding. A cell's
 content is a block built by the components that draw words or pictures — `textBlock`,
 `grownTextBlock`, `levelStack`, an image — handed in as `draw(width, height?)`, so the table

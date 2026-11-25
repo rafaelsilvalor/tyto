@@ -197,6 +197,45 @@ describe('row kinds', () => {
     ]);
   });
 
+  it('leaves a row bare where its zebra says `null`, still counting it in the alternation', () => {
+    const style: TableStyle = {
+      ...PLAIN,
+      kinds: { ...PLAIN.kinds, plain: { zebra: ['#dddddd', null] } },
+    };
+    const rows = [
+      plain(cell(5), cell(5)),
+      highlight(cell(5), cell(5)),
+      plain(cell(5), cell(5)),
+      plain(cell(5), cell(5)),
+    ];
+
+    expect(fillsOf(table(style, rows, WIDTH), 'left')).toEqual([
+      '#dddddd',
+      '#880000',
+      undefined,
+      '#dddddd',
+    ]);
+  });
+
+  it('names a row’s group by its kind when the kind has a name, by the table’s otherwise', () => {
+    const style: TableStyle = {
+      ...PLAIN,
+      kinds: { ...PLAIN.kinds, highlight: { fill: '#880000', name: 'highlight-row' } },
+    };
+    const drawn = table(
+      style,
+      [
+        plain(cell(5), cell(5)),
+        highlight(cell(5), cell(5)),
+        { kind: 'highlight', cells: [cell(5)], span: true },
+      ],
+      WIDTH,
+    );
+    const rows = (drawn.draft as Draft).children ?? [];
+
+    expect(rows.map((row) => row.name)).toEqual(['row', 'highlight-row', 'highlight-row']);
+  });
+
   it('paints one fill per column, and no shape where a column has none', () => {
     const style: TableStyle = {
       ...PLAIN,

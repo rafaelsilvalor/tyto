@@ -62,11 +62,15 @@ export interface TableRowKind {
   readonly fill?: string | readonly (string | undefined)[];
   /**
    * Colours that alternate along the rows of this kind, from the first; over `fill`. A row of
-   * another kind between two does not break the alternation.
+   * another kind between two does not break the alternation. `null` is a row with no shape:
+   * `[stripe, null]` stripes every other row and leaves the rest bare. `null` and not
+   * `undefined`, so the entry survives a style written out as JSON.
    */
-  readonly zebra?: readonly string[];
+  readonly zebra?: readonly (string | null)[];
   /** A row of this kind is never shorter than this. Over the table's `minRowHeight`. */
   readonly minHeight?: number;
+  /** The group a row of this kind is drawn in, over the table's {@link TableStyle.names}. */
+  readonly name?: string;
 }
 
 export interface TableStyle {
@@ -95,6 +99,7 @@ export interface TableStyle {
   readonly names: {
     /** The stack of rows; absent, the stack has no name. */
     readonly table?: string;
+    /** A row's group, unless its kind names its own. */
     readonly row: string;
     /** A band's cell; default `band`. */
     readonly band?: string;
@@ -199,7 +204,7 @@ function fillOf(style: TableStyle, kind: string, column: number, count: number) 
   const paint = style.kinds[kind];
   if (paint === undefined) return undefined;
   if (paint.zebra !== undefined && paint.zebra.length > 0) {
-    return paint.zebra[count % paint.zebra.length];
+    return paint.zebra[count % paint.zebra.length] ?? undefined;
   }
   return typeof paint.fill === 'string' ? paint.fill : paint.fill?.[column];
 }
@@ -290,7 +295,7 @@ function drawRow(
     width,
     height,
     group({
-      name: style.names.row,
+      name: rowNameOf(style, row.kind),
       // Painted in order, so under `overlap` the earlier cells go last and cover the
       // rounded left ends of the later ones.
       children: overlap ? drawn.reverse() : drawn,
@@ -332,7 +337,7 @@ function drawBand(
     width,
     height,
     group({
-      name: style.names.row,
+      name: rowNameOf(style, row.kind),
       children: [
         cellGroup(
           style.names.band ?? 'band',
@@ -345,6 +350,10 @@ function drawBand(
       ],
     }),
   );
+}
+
+function rowNameOf(style: TableStyle, kind: string): string {
+  return style.kinds[kind]?.name ?? style.names.row;
 }
 
 function minHeightOf(style: TableStyle, kind: string): number {
