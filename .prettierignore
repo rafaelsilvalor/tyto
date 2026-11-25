@@ -41,6 +41,10 @@ packages/google-fonts/src/catalogue.json
 packages/recipe/src/__fixtures__/*.json
 packages/recipe/src/__snapshots__/*.json
 
+# The house's slot-table drafts, compared byte for byte as JSON.stringify writes them
+# (TYTO-859).
+packages/house-style/src/__snapshots__/*.json
+
 # Tyto template markup. It looks like HTML+CSS and is not: Prettier reflows it as a
 # stylesheet and rewrites `"Source Sans 3"` to single quotes, which the grammar refuses
 # (docs/template-authoring.md says so about its own code block).

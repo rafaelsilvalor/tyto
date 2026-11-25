@@ -1,0 +1,1164 @@
+{
+ "width": 880,
+ "height": 510,
+ "draft": {
+  "transform": {
+   "x": 0,
+   "y": 0,
+   "rotation": 0,
+   "scaleX": 1,
+   "scaleY": 1,
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "opacity": 1,
+  "blend": "normal",
+  "visible": true,
+  "clip": false,
+  "effects": [],
+  "name": "session-table",
+  "kind": "group",
+  "children": [
+   {
+    "transform": {
+     "x": 0,
+     "y": 0,
+     "rotation": 0,
+     "scaleX": 1,
+     "scaleY": 1,
+     "anchor": {
+      "x": 0,
+      "y": 0
+     }
+    },
+    "opacity": 1,
+    "blend": "normal",
+    "visible": true,
+    "clip": false,
+    "effects": [],
+    "name": "discipline-group",
+    "kind": "group",
+    "children": [
+     {
+      "transform": {
+       "x": 0,
+       "y": 0,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "name": "discipline",
+      "kind": "text",
+      "runs": [
+       {
+        "kind": "text",
+        "text": "DIREITO CIVIL",
+        "font": {
+         "family": "CircularXX",
+         "source": "system"
+        },
+        "size": 64,
+        "weight": 500,
+        "style": "normal",
+        "color": {
+         "kind": "solid",
+         "color": {
+          "r": 18,
+          "g": 52,
+          "b": 86,
+          "a": 1
+         }
+        }
+       }
+      ],
+      "box": {
+       "w": 880,
+       "h": 78
+      },
+      "align": "center",
+      "valign": "top",
+      "lineHeight": 1.2,
+      "letterSpacing": 0,
+      "overflow": "shrink"
+     },
+     {
+      "transform": {
+       "x": 0,
+       "y": 94,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "name": "sessions",
+      "kind": "group",
+      "children": [
+       {
+        "transform": {
+         "x": 0,
+         "y": 0,
+         "rotation": 0,
+         "scaleX": 1,
+         "scaleY": 1,
+         "anchor": {
+          "x": 0,
+          "y": 0
+         }
+        },
+        "opacity": 1,
+        "blend": "normal",
+        "visible": true,
+        "clip": false,
+        "effects": [],
+        "name": "session",
+        "kind": "group",
+        "children": [
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "session-pill",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "rect",
+            "size": {
+             "w": 880,
+             "h": 118
+            },
+            "radius": [
+             43,
+             43,
+             43,
+             43
+            ],
+            "fill": {
+             "kind": "solid",
+             "color": {
+              "r": 221,
+              "g": 221,
+              "b": 221,
+              "a": 1
+             }
+            }
+           },
+           {
+            "transform": {
+             "x": 252,
+             "y": 12,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "session-title",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "Contratos e obrigações em espécie, parte longa",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 22,
+                "weight": 500,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 60,
+                  "g": 60,
+                  "b": 60,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 596,
+               "h": 60
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             },
+             {
+              "transform": {
+               "x": 0,
+               "y": 64,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "professor",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "Prof. Ana",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 22,
+                "weight": 300,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 60,
+                  "g": 60,
+                  "b": 60,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 596,
+               "h": 30
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "date-pill",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "rect",
+            "size": {
+             "w": 220,
+             "h": 118
+            },
+            "radius": [
+             43,
+             43,
+             43,
+             43
+            ],
+            "fill": {
+             "kind": "solid",
+             "color": {
+              "r": 18,
+              "g": 52,
+              "b": 86,
+              "a": 1
+             }
+            }
+           },
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "date",
+            "kind": "text",
+            "runs": [
+             {
+              "kind": "text",
+              "text": "23/09",
+              "font": {
+               "family": "CircularXX",
+               "source": "system"
+              },
+              "size": 26,
+              "weight": 500,
+              "style": "normal",
+              "color": {
+               "kind": "solid",
+               "color": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "a": 1
+               }
+              }
+             }
+            ],
+            "box": {
+             "w": 220,
+             "h": 118
+            },
+            "align": "center",
+            "valign": "middle",
+            "lineHeight": 1.2,
+            "letterSpacing": 0,
+            "overflow": "clip"
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "transform": {
+         "x": 0,
+         "y": 122,
+         "rotation": 0,
+         "scaleX": 1,
+         "scaleY": 1,
+         "anchor": {
+          "x": 0,
+          "y": 0
+         }
+        },
+        "opacity": 1,
+        "blend": "normal",
+        "visible": true,
+        "clip": false,
+        "effects": [],
+        "name": "session",
+        "kind": "group",
+        "children": [
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "session-pill",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "rect",
+            "size": {
+             "w": 880,
+             "h": 88
+            },
+            "radius": [
+             43,
+             43,
+             43,
+             43
+            ],
+            "fill": {
+             "kind": "solid",
+             "color": {
+              "r": 221,
+              "g": 221,
+              "b": 221,
+              "a": 1
+             }
+            }
+           },
+           {
+            "transform": {
+             "x": 252,
+             "y": 12,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "session-title",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "Curta",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 22,
+                "weight": 500,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 60,
+                  "g": 60,
+                  "b": 60,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 596,
+               "h": 30
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             },
+             {
+              "transform": {
+               "x": 0,
+               "y": 34,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "professor",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "Prof. Bia",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 22,
+                "weight": 300,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 60,
+                  "g": 60,
+                  "b": 60,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 596,
+               "h": 30
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "date-pill",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "rect",
+            "size": {
+             "w": 220,
+             "h": 88
+            },
+            "radius": [
+             43,
+             43,
+             43,
+             43
+            ],
+            "fill": {
+             "kind": "solid",
+             "color": {
+              "r": 18,
+              "g": 52,
+              "b": 86,
+              "a": 1
+             }
+            }
+           },
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "date",
+            "kind": "text",
+            "runs": [
+             {
+              "kind": "text",
+              "text": "24/09",
+              "font": {
+               "family": "CircularXX",
+               "source": "system"
+              },
+              "size": 26,
+              "weight": 500,
+              "style": "normal",
+              "color": {
+               "kind": "solid",
+               "color": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "a": 1
+               }
+              }
+             }
+            ],
+            "box": {
+             "w": 220,
+             "h": 88
+            },
+            "align": "center",
+            "valign": "middle",
+            "lineHeight": 1.2,
+            "letterSpacing": 0,
+            "overflow": "clip"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "transform": {
+     "x": 0,
+     "y": 328,
+     "rotation": 0,
+     "scaleX": 1,
+     "scaleY": 1,
+     "anchor": {
+      "x": 0,
+      "y": 0
+     }
+    },
+    "opacity": 1,
+    "blend": "normal",
+    "visible": true,
+    "clip": false,
+    "effects": [],
+    "name": "discipline-group",
+    "kind": "group",
+    "children": [
+     {
+      "transform": {
+       "x": 0,
+       "y": 0,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "name": "discipline",
+      "kind": "text",
+      "runs": [
+       {
+        "kind": "text",
+        "text": "PENAL",
+        "font": {
+         "family": "CircularXX",
+         "source": "system"
+        },
+        "size": 64,
+        "weight": 500,
+        "style": "normal",
+        "color": {
+         "kind": "solid",
+         "color": {
+          "r": 18,
+          "g": 52,
+          "b": 86,
+          "a": 1
+         }
+        }
+       }
+      ],
+      "box": {
+       "w": 880,
+       "h": 78
+      },
+      "align": "center",
+      "valign": "top",
+      "lineHeight": 1.2,
+      "letterSpacing": 0,
+      "overflow": "shrink"
+     },
+     {
+      "transform": {
+       "x": 0,
+       "y": 94,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "name": "sessions",
+      "kind": "group",
+      "children": [
+       {
+        "transform": {
+         "x": 0,
+         "y": 0,
+         "rotation": 0,
+         "scaleX": 1,
+         "scaleY": 1,
+         "anchor": {
+          "x": 0,
+          "y": 0
+         }
+        },
+        "opacity": 1,
+        "blend": "normal",
+        "visible": true,
+        "clip": false,
+        "effects": [],
+        "name": "session",
+        "kind": "group",
+        "children": [
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "session-pill",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "rect",
+            "size": {
+             "w": 880,
+             "h": 88
+            },
+            "radius": [
+             43,
+             43,
+             43,
+             43
+            ],
+            "fill": {
+             "kind": "solid",
+             "color": {
+              "r": 221,
+              "g": 221,
+              "b": 221,
+              "a": 1
+             }
+            }
+           },
+           {
+            "transform": {
+             "x": 252,
+             "y": 12,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "session-title",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "Teoria do crime",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 22,
+                "weight": 500,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 60,
+                  "g": 60,
+                  "b": 60,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 596,
+               "h": 30
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             },
+             {
+              "transform": {
+               "x": 0,
+               "y": 34,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "professor",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "Prof. Caio",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 22,
+                "weight": 300,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 60,
+                  "g": 60,
+                  "b": 60,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 596,
+               "h": 30
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "date-pill",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "kind": "rect",
+            "size": {
+             "w": 220,
+             "h": 88
+            },
+            "radius": [
+             43,
+             43,
+             43,
+             43
+            ],
+            "fill": {
+             "kind": "solid",
+             "color": {
+              "r": 18,
+              "g": 52,
+              "b": 86,
+              "a": 1
+             }
+            }
+           },
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "date",
+            "kind": "text",
+            "runs": [
+             {
+              "kind": "text",
+              "text": "25/09",
+              "font": {
+               "family": "CircularXX",
+               "source": "system"
+              },
+              "size": 26,
+              "weight": 500,
+              "style": "normal",
+              "color": {
+               "kind": "solid",
+               "color": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "a": 1
+               }
+              }
+             }
+            ],
+            "box": {
+             "w": 220,
+             "h": 88
+            },
+            "align": "center",
+            "valign": "middle",
+            "lineHeight": 1.2,
+            "letterSpacing": 0,
+            "overflow": "clip"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

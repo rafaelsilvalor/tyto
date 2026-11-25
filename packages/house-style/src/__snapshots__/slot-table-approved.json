@@ -1,0 +1,1053 @@
+{
+ "width": 880,
+ "height": 328,
+ "draft": {
+  "transform": {
+   "x": 0,
+   "y": 0,
+   "rotation": 0,
+   "scaleX": 1,
+   "scaleY": 1,
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "opacity": 1,
+  "blend": "normal",
+  "visible": true,
+  "clip": false,
+  "effects": [],
+  "name": "approved-table",
+  "kind": "group",
+  "children": [
+   {
+    "transform": {
+     "x": 0,
+     "y": 0,
+     "rotation": 0,
+     "scaleX": 1,
+     "scaleY": 1,
+     "anchor": {
+      "x": 0,
+      "y": 0
+     }
+    },
+    "opacity": 1,
+    "blend": "normal",
+    "visible": true,
+    "clip": false,
+    "effects": [],
+    "name": "specialty-group",
+    "kind": "group",
+    "children": [
+     {
+      "transform": {
+       "x": 0,
+       "y": 0,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "name": "specialty",
+      "kind": "text",
+      "runs": [
+       {
+        "kind": "text",
+        "text": "Clínica",
+        "font": {
+         "family": "CircularXX",
+         "source": "system"
+        },
+        "size": 46,
+        "weight": 700,
+        "style": "normal",
+        "color": {
+         "kind": "solid",
+         "color": {
+          "r": 18,
+          "g": 52,
+          "b": 86,
+          "a": 1
+         }
+        }
+       }
+      ],
+      "box": {
+       "w": 880,
+       "h": 58
+      },
+      "align": "center",
+      "valign": "top",
+      "lineHeight": 1.2,
+      "letterSpacing": 0,
+      "overflow": "shrink"
+     },
+     {
+      "transform": {
+       "x": 0,
+       "y": 81,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "kind": "group",
+      "children": [
+       {
+        "transform": {
+         "x": 217.5,
+         "y": 0,
+         "rotation": 0,
+         "scaleX": 1,
+         "scaleY": 1,
+         "anchor": {
+          "x": 0,
+          "y": 0
+         }
+        },
+        "opacity": 1,
+        "blend": "normal",
+        "visible": true,
+        "clip": false,
+        "effects": [],
+        "name": "approved",
+        "kind": "group",
+        "children": [
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "approved-row",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "name-pill",
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {
+               "w": 445,
+               "h": 39
+              },
+              "radius": [
+               19.5,
+               19.5,
+               19.5,
+               19.5
+              ],
+              "fill": {
+               "kind": "solid",
+               "color": {
+                "r": 221,
+                "g": 221,
+                "b": 221,
+                "a": 1
+               }
+              }
+             },
+             {
+              "transform": {
+               "x": 107,
+               "y": 8.5,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "group",
+              "children": [
+               {
+                "transform": {
+                 "x": 0,
+                 "y": 0,
+                 "rotation": 0,
+                 "scaleX": 1,
+                 "scaleY": 1,
+                 "anchor": {
+                  "x": 0,
+                  "y": 0
+                 }
+                },
+                "opacity": 1,
+                "blend": "normal",
+                "visible": true,
+                "clip": false,
+                "effects": [],
+                "name": "name",
+                "kind": "text",
+                "runs": [
+                 {
+                  "kind": "text",
+                  "text": "MARIA DA SILVA PEREIRA",
+                  "font": {
+                   "family": "CircularXX",
+                   "source": "system"
+                  },
+                  "size": 16,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                   "kind": "solid",
+                   "color": {
+                    "r": 60,
+                    "g": 60,
+                    "b": 60,
+                    "a": 1
+                   }
+                  }
+                 }
+                ],
+                "box": {
+                 "w": 308,
+                 "h": 30
+                },
+                "align": "left",
+                "valign": "top",
+                "lineHeight": 1.2,
+                "letterSpacing": 0,
+                "overflow": "clip"
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "rank-pill",
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {
+               "w": 92,
+               "h": 39
+              },
+              "radius": [
+               19.5,
+               19.5,
+               19.5,
+               19.5
+              ],
+              "fill": {
+               "kind": "solid",
+               "color": {
+                "r": 18,
+                "g": 52,
+                "b": 86,
+                "a": 1
+               }
+              }
+             },
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "rank",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "1º Lugar",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 17,
+                "weight": 700,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 92,
+               "h": 39
+              },
+              "align": "center",
+              "valign": "middle",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "transform": {
+           "x": 0,
+           "y": 44,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "approved-row",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "name-pill",
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {
+               "w": 445,
+               "h": 39
+              },
+              "radius": [
+               19.5,
+               19.5,
+               19.5,
+               19.5
+              ],
+              "fill": {
+               "kind": "solid",
+               "color": {
+                "r": 221,
+                "g": 221,
+                "b": 221,
+                "a": 1
+               }
+              }
+             },
+             {
+              "transform": {
+               "x": 107,
+               "y": 8.5,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "group",
+              "children": [
+               {
+                "transform": {
+                 "x": 0,
+                 "y": 0,
+                 "rotation": 0,
+                 "scaleX": 1,
+                 "scaleY": 1,
+                 "anchor": {
+                  "x": 0,
+                  "y": 0
+                 }
+                },
+                "opacity": 1,
+                "blend": "normal",
+                "visible": true,
+                "clip": false,
+                "effects": [],
+                "name": "name",
+                "kind": "text",
+                "runs": [
+                 {
+                  "kind": "text",
+                  "text": "JOÃO",
+                  "font": {
+                   "family": "CircularXX",
+                   "source": "system"
+                  },
+                  "size": 16,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                   "kind": "solid",
+                   "color": {
+                    "r": 60,
+                    "g": 60,
+                    "b": 60,
+                    "a": 1
+                   }
+                  }
+                 }
+                ],
+                "box": {
+                 "w": 308,
+                 "h": 30
+                },
+                "align": "left",
+                "valign": "top",
+                "lineHeight": 1.2,
+                "letterSpacing": 0,
+                "overflow": "clip"
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "rank-pill",
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {
+               "w": 92,
+               "h": 39
+              },
+              "radius": [
+               19.5,
+               19.5,
+               19.5,
+               19.5
+              ],
+              "fill": {
+               "kind": "solid",
+               "color": {
+                "r": 18,
+                "g": 52,
+                "b": 86,
+                "a": 1
+               }
+              }
+             },
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "rank",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "2º Lugar",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 17,
+                "weight": 700,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 92,
+               "h": 39
+              },
+              "align": "center",
+              "valign": "middle",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "transform": {
+     "x": 0,
+     "y": 208,
+     "rotation": 0,
+     "scaleX": 1,
+     "scaleY": 1,
+     "anchor": {
+      "x": 0,
+      "y": 0
+     }
+    },
+    "opacity": 1,
+    "blend": "normal",
+    "visible": true,
+    "clip": false,
+    "effects": [],
+    "name": "specialty-group",
+    "kind": "group",
+    "children": [
+     {
+      "transform": {
+       "x": 0,
+       "y": 0,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "name": "specialty",
+      "kind": "text",
+      "runs": [
+       {
+        "kind": "text",
+        "text": "Cirurgia",
+        "font": {
+         "family": "CircularXX",
+         "source": "system"
+        },
+        "size": 46,
+        "weight": 700,
+        "style": "normal",
+        "color": {
+         "kind": "solid",
+         "color": {
+          "r": 18,
+          "g": 52,
+          "b": 86,
+          "a": 1
+         }
+        }
+       }
+      ],
+      "box": {
+       "w": 880,
+       "h": 58
+      },
+      "align": "center",
+      "valign": "top",
+      "lineHeight": 1.2,
+      "letterSpacing": 0,
+      "overflow": "shrink"
+     },
+     {
+      "transform": {
+       "x": 0,
+       "y": 81,
+       "rotation": 0,
+       "scaleX": 1,
+       "scaleY": 1,
+       "anchor": {
+        "x": 0,
+        "y": 0
+       }
+      },
+      "opacity": 1,
+      "blend": "normal",
+      "visible": true,
+      "clip": false,
+      "effects": [],
+      "kind": "group",
+      "children": [
+       {
+        "transform": {
+         "x": 350.5,
+         "y": 0,
+         "rotation": 0,
+         "scaleX": 1,
+         "scaleY": 1,
+         "anchor": {
+          "x": 0,
+          "y": 0
+         }
+        },
+        "opacity": 1,
+        "blend": "normal",
+        "visible": true,
+        "clip": false,
+        "effects": [],
+        "name": "approved",
+        "kind": "group",
+        "children": [
+         {
+          "transform": {
+           "x": 0,
+           "y": 0,
+           "rotation": 0,
+           "scaleX": 1,
+           "scaleY": 1,
+           "anchor": {
+            "x": 0,
+            "y": 0
+           }
+          },
+          "opacity": 1,
+          "blend": "normal",
+          "visible": true,
+          "clip": false,
+          "effects": [],
+          "name": "approved-row",
+          "kind": "group",
+          "children": [
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "name-pill",
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {
+               "w": 179,
+               "h": 39
+              },
+              "radius": [
+               19.5,
+               19.5,
+               19.5,
+               19.5
+              ],
+              "fill": {
+               "kind": "solid",
+               "color": {
+                "r": 221,
+                "g": 221,
+                "b": 221,
+                "a": 1
+               }
+              }
+             },
+             {
+              "transform": {
+               "x": 107,
+               "y": 8.5,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "group",
+              "children": [
+               {
+                "transform": {
+                 "x": 0,
+                 "y": 0,
+                 "rotation": 0,
+                 "scaleX": 1,
+                 "scaleY": 1,
+                 "anchor": {
+                  "x": 0,
+                  "y": 0
+                 }
+                },
+                "opacity": 1,
+                "blend": "normal",
+                "visible": true,
+                "clip": false,
+                "effects": [],
+                "name": "name",
+                "kind": "text",
+                "runs": [
+                 {
+                  "kind": "text",
+                  "text": "ANA",
+                  "font": {
+                   "family": "CircularXX",
+                   "source": "system"
+                  },
+                  "size": 16,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                   "kind": "solid",
+                   "color": {
+                    "r": 60,
+                    "g": 60,
+                    "b": 60,
+                    "a": 1
+                   }
+                  }
+                 }
+                ],
+                "box": {
+                 "w": 42,
+                 "h": 30
+                },
+                "align": "left",
+                "valign": "top",
+                "lineHeight": 1.2,
+                "letterSpacing": 0,
+                "overflow": "clip"
+               }
+              ]
+             }
+            ]
+           },
+           {
+            "transform": {
+             "x": 0,
+             "y": 0,
+             "rotation": 0,
+             "scaleX": 1,
+             "scaleY": 1,
+             "anchor": {
+              "x": 0,
+              "y": 0
+             }
+            },
+            "opacity": 1,
+            "blend": "normal",
+            "visible": true,
+            "clip": false,
+            "effects": [],
+            "name": "rank-pill",
+            "kind": "group",
+            "children": [
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "kind": "rect",
+              "size": {
+               "w": 92,
+               "h": 39
+              },
+              "radius": [
+               19.5,
+               19.5,
+               19.5,
+               19.5
+              ],
+              "fill": {
+               "kind": "solid",
+               "color": {
+                "r": 18,
+                "g": 52,
+                "b": 86,
+                "a": 1
+               }
+              }
+             },
+             {
+              "transform": {
+               "x": 0,
+               "y": 0,
+               "rotation": 0,
+               "scaleX": 1,
+               "scaleY": 1,
+               "anchor": {
+                "x": 0,
+                "y": 0
+               }
+              },
+              "opacity": 1,
+              "blend": "normal",
+              "visible": true,
+              "clip": false,
+              "effects": [],
+              "name": "rank",
+              "kind": "text",
+              "runs": [
+               {
+                "kind": "text",
+                "text": "3º Lugar",
+                "font": {
+                 "family": "CircularXX",
+                 "source": "system"
+                },
+                "size": 17,
+                "weight": 700,
+                "style": "normal",
+                "color": {
+                 "kind": "solid",
+                 "color": {
+                  "r": 255,
+                  "g": 255,
+                  "b": 255,
+                  "a": 1
+                 }
+                }
+               }
+              ],
+              "box": {
+               "w": 92,
+               "h": 39
+              },
+              "align": "center",
+              "valign": "middle",
+              "lineHeight": 1.2,
+              "letterSpacing": 0,
+              "overflow": "clip"
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}
