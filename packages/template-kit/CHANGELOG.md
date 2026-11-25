@@ -1,5 +1,11 @@
 # @tyto/template-kit
 
+## 0.24.0
+
+### Minor Changes
+
+- 337b8db: `table`: a row kind may name its rows' group (`name`, over `names.row`), and a zebra entry may be `null`, a row of that kind with no shape (TYTO-878).
+
 ## 0.23.1
 
 ### Patch Changes
