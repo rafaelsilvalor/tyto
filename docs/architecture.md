@@ -33,7 +33,7 @@ packages/
   export-psd     a guide frame of the Scene → a layered PSD's bytes, with ag-psd and pixels the host decodes (ADR 0221)
   raster         Rasterizer port + chromium adapter (Electron offscreen or Playwright)
   templates      the built-in test templates (template-pack plugin); production templates live in their own repositories (TYTO-436)
-  template-kit   what a TypeScript template composes with: arrangement and configurable components (pillTable)
+  template-kit   what a TypeScript template composes with: arrangement and configurable components (table, slotTable)
   house-style    the house's tokens, presets and shared parts its templates are drawn with, azul's under /azul (ADR 0151)
   theme-pack     well-known colour themes (Dracula, Nord, Solarized…) as a theme plugin, bundled into main
   fonts          the faces Tyto ships, and the reader that hands them to the exporters and to measurement

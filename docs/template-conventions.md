@@ -86,15 +86,25 @@ them could be reused without copying.
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
-the bottom edge, the middle centred between them); `pillTable` for a table read out of one
-slot; `titleBlock` for a centred column of optional pieces — a picture, lines of words, a
+the bottom edge, the middle centred between them); `table` for rows of cells in columns, and
+`slotTable` for a table read out of one slot (it was `pillTable`); `titleBlock` for a centred column of optional pieces — a picture, lines of words, a
 rule; `card` and `cardRow` for an outlined box cut into a title, a filled band and a foot,
 shaped by the parts of an `::apelo` through `cardSegments` (cards side by side share one
 height, their bands lined up); `mark` and `textBlock` for a path icon and a brief's words at a
 stated size.
 
+**A table lays out cells and draws no words** (TYTO-859). `table` owns the columns (fixed,
+`fill`, or `measured` from the content), the row kinds the caller names (`plain`,
+`highlight`…, each with its fill per column and its zebra), bands across every column, corners
+on every cell or on the table's outer edge only, the gaps and each column's padding. A cell's
+content is a block built by the components that draw words or pictures — `textBlock`,
+`grownTextBlock`, `levelStack`, an image — handed in as `draw(width, height?)`, so the table
+measures the row before it places anything. The template composes as many components as it
+needs and stacks them; the table is one of them. `slotTable` is `table` with a reading on top:
+one brief line per row, `|` between cells, words drawn by column style.
+
 ```ts
-const sessions = pillTable(sessionTable, { text: lamina, width, measure: context.measure });
+const sessions = slotTable(sessionTable, { text: lamina, width, measure: context.measure });
 const title = titleBlock(resultTitle, { width, fields: { titulo, chamada, imagem } });
 ```
 
@@ -166,7 +176,7 @@ token** — see "Geometry in, colour out" below.
 A **preset** is a component in the brand's look — a constant, not a function:
 
 ```ts
-export const sessionTable: PillTableStyle = { layering: 'overlap', columns: [badge(…), { kind: 'lines', … }], … };
+export const sessionTable: SlotTableStyle = { layering: 'overlap', columns: [badge(…), { kind: 'lines', … }], … };
 ```
 
 A **part** is a function returning a `Block` for something only this brand draws: the azul
@@ -417,7 +427,7 @@ nothing stays as written. `titulo: Questão **comentada**` is highlighted; `2 **
 ## The limit that is left
 
 A box can grow with the text inside it since ADR 0038: `context.measure` answers how tall a
-text node will be, and `grownTextBlock` in the kit (what `pillTable`'s cells use) builds on it.
+text node will be, and `grownTextBlock` in the kit (what `slotTable`'s cells use) builds on it.
 **Where nothing can measure** — no faces in that compile — `measure` answers `undefined`, the
 box falls back to the height somebody chose, and a long line shrinks into it. So the chosen
 heights still matter: they are the floor, and the whole answer when nothing measures.
@@ -440,7 +450,7 @@ What it has instead is a choice about `box.h`, and the choice matters:
 ## How the next template reuses the others
 
 Look in the kit first, then in the brand's folder. A template that wants a table uses
-`pillTable` with the brand's preset, or adds a preset beside it; a template that wants a
+`table` with cells built by the text components, or `slotTable` with the brand's preset, or adds a preset beside it; a template that wants a
 different look from the same preset spreads it and overrides the field
 (`{ ...sessionTable, rowGap: 8 }`).
 

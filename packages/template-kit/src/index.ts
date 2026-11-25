@@ -11,7 +11,7 @@
  * `docs/template-conventions.md` is the long form, ADR 0047 the decision. In short:
  *
  * 1. **Configurable components and arrangement — here.** {@link stack}, {@link row},
- *    {@link inset}, {@link at}; {@link pillTable}; {@link mark}, {@link textBlock}; the
+ *    {@link inset}, {@link at}; {@link table}, {@link slotTable}; {@link mark}, {@link textBlock}; the
  *    brief-row readers. Everything here is the same whatever brand draws it: a component
  *    takes every colour, face and size as configuration.
  * 2. **Brand tokens** — colours, type scale, spacing, flat geometry. **Not here**, because
@@ -213,5 +213,20 @@ export {
   type PillTableContent,
   type PillTableStyle,
   type Rewrite,
+  type SlotTableColumn,
+  type SlotTableContent,
+  type SlotTableStyle,
   pillTable,
-} from './pill-table.js';
+  slotTable,
+} from './slot-table.js';
+
+export {
+  type Corners,
+  type CellPadding,
+  type TableCell,
+  type TableColumn,
+  type TableRow,
+  type TableRowKind,
+  type TableStyle,
+  table,
+} from './table.js';
