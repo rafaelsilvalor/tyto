@@ -197,6 +197,7 @@ export {
   type TextBlockOptions,
   type TextStyle,
   atLeastOne,
+  capitals,
   grownTextBlock,
   naturalWidth,
   textBlock,

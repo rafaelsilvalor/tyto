@@ -140,3 +140,13 @@ export function naturalWidth(
   const measured = measure(text({ runs, box: {} }));
   return measured === undefined ? undefined : Math.ceil(measured.width);
 }
+
+/**
+ * A brief's words in capitals, as Portuguese sets them (`ç` → `Ç`), whatever the brief typed.
+ * Only the words change: emphasis, marks and line breaks stay where they were (TYTO-860).
+ */
+export function capitals(value: RichText): RichText {
+  return value.map((inline) =>
+    inline.kind === 'text' ? { ...inline, value: inline.value.toLocaleUpperCase('pt-BR') } : inline,
+  );
+}
