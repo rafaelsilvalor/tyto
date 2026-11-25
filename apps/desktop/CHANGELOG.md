@@ -1,5 +1,12 @@
 # @tyto/desktop
 
+## 0.29.10
+
+### Patch Changes
+
+- @tyto/templates@1.3.14
+  - @tyto/command-line@0.12.10
+
 ## 0.29.9
 
 ### Patch Changes
