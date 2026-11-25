@@ -2,17 +2,20 @@ import { group, rect, solid } from '@tyto/core/template';
 
 import { type Block, at, block, stack } from './blocks.js';
 import { type RowGroup, rowGroups } from './rows.js';
+import { type TableCell, type TableColumn, type TableStyle, table } from './table.js';
 import { type Measure, type TextStyle, grownTextBlock, naturalWidth, textBlock } from './text.js';
 
 import type { RichText } from '@tyto/core';
 import type { NodeDraft, TextOptions } from '@tyto/core/template';
 
 /**
- * A table whose rows are read from one slot and whose cells can be pills.
+ * A table whose rows are read from one slot and whose cells draw the slot's words.
  *
- * The first configurable component (TYTO-185, ADR 0047). One structure — one line of the
+ * The first configurable component (TYTO-185, ADR 0047), called `pillTable` until TYTO-859
+ * moved its layout into the generic {@link table}: this is that table with a reading on top.
+ * One structure — one line of the
  * brief is one row, `|` separates its cells, an optional line with no `|` heads a group —
- * drawn by a {@link PillTableStyle} that says everything about the look: the azul agenda's
+ * drawn by a {@link SlotTableStyle} that says everything about the look: the azul agenda's
  * sessions (`date | title | professor`, a blue pill laid over a grey one), the azul approved
  * list (`rank | name`), or a plain table with no shapes at all.
  *
@@ -81,7 +84,7 @@ export interface LinesColumn {
   };
 }
 
-export type PillTableColumn = LabelColumn | LinesColumn;
+export type SlotTableColumn = LabelColumn | LinesColumn;
 
 /**
  * A field as the brief wrote it, turned into what a cell draws. Runs on non-empty fields
@@ -93,8 +96,8 @@ function rewritten(value: RichText, rewrite: Rewrite | undefined): RichText {
   return rewrite === undefined || value.length === 0 ? value : rewrite(value);
 }
 
-export interface PillTableStyle {
-  readonly columns: readonly PillTableColumn[];
+export interface SlotTableStyle {
+  readonly columns: readonly SlotTableColumn[];
   /**
    * `side-by-side`: each cell sits in its own slot, `columnGap` apart.
    *
@@ -158,7 +161,7 @@ export interface PillTableStyle {
   };
 }
 
-/** The band under a group heading: {@link PillTableStyle}'s `groups.caption`. */
+/** The band under a group heading: {@link SlotTableStyle}'s `groups.caption`. */
 export interface CaptionStyle {
   readonly name: string;
   readonly height: number;
@@ -178,18 +181,11 @@ export interface CaptionStyle {
   readonly gap: number;
 }
 
-export interface PillTableContent {
+export interface SlotTableContent {
   /** The slot's value: one line per row. */
   readonly text: RichText;
   readonly width: number;
   readonly measure: Measure;
-}
-
-/** A column resolved against the table's width: where it starts and how wide it is. */
-interface Placed {
-  readonly column: PillTableColumn;
-  readonly x: number;
-  readonly width: number;
 }
 
 /**
@@ -197,7 +193,7 @@ interface Placed {
  *
  * Under `fit` a group's rows can be narrower than `width`; they are centred in it.
  */
-export function pillTable(style: PillTableStyle, content: PillTableContent): Block {
+export function slotTable(style: SlotTableStyle, content: SlotTableContent): Block {
   const fieldCount = style.columns.reduce((sum, column) => sum + fieldsOf(column), 0);
   const caption = style.groups?.caption;
   const groups = rowGroups(
@@ -214,12 +210,11 @@ export function pillTable(style: PillTableStyle, content: PillTableContent): Blo
     band?: RichText,
   ) => {
     const width = rowWidth(style, rows, content);
-    const placed = placeColumns(style, width);
-    const drawn = stack({
-      ...(name === undefined ? {} : { name }),
-      gap,
-      items: rows.map((fields) => drawRow(style, placed, fields, width, content.measure)),
-    });
+    const drawn = table(
+      { ...tableStyleOf(style, name), rowGap: gap },
+      rows.map((fields) => ({ kind: ROW, cells: cellsOf(style, fields, content.measure) })),
+      width,
+    );
     if (caption === undefined || band === undefined) return centred(drawn, content.width);
     return centred(
       stack({ gap: caption.gap, items: [captionBand(caption, band, width), drawn] }),
@@ -307,9 +302,9 @@ function centred(item: Block, width: number): Block {
 
 /** The width a group's rows are drawn at: the table's, or under `fit` their widest row's. */
 function rowWidth(
-  style: PillTableStyle,
+  style: SlotTableStyle,
   rows: RowGroup['rows'],
-  content: PillTableContent,
+  content: SlotTableContent,
 ): number {
   if (style.fit === undefined) return content.width;
   const cap = Math.min(style.fit.max, content.width);
@@ -325,7 +320,7 @@ function rowWidth(
 
 /** How wide one row is with every line on one line, or nothing when nothing can measure. */
 function naturalRowWidth(
-  style: PillTableStyle,
+  style: SlotTableStyle,
   fields: readonly RichText[],
   measure: Measure,
 ): number | undefined {
@@ -355,80 +350,78 @@ function naturalRowWidth(
   return total;
 }
 
-function fieldsOf(column: PillTableColumn): number {
+function fieldsOf(column: SlotTableColumn): number {
   return column.kind === 'label' ? 1 : column.lines.length;
 }
 
-function placeColumns(style: PillTableStyle, width: number): Placed[] {
-  const gap = style.layering === 'side-by-side' ? (style.columnGap ?? 0) : 0;
-  const fixed = style.columns.reduce(
-    (sum, column) => sum + (column.width === 'fill' ? 0 : column.width),
-    0,
-  );
-  const fill = width - fixed - gap * Math.max(0, style.columns.length - 1);
-
-  let x = 0;
-  return style.columns.map((column) => {
-    const columnWidth = column.width === 'fill' ? fill : column.width;
-    const result = { column, x, width: columnWidth };
-    x += columnWidth + gap;
-    return result;
-  });
+/** The style's columns as the generic table's: their widths, padding and shapes. */
+function tableStyleOf(style: SlotTableStyle, name: string | undefined): TableStyle {
+  return {
+    columns: style.columns.map((column): TableColumn => ({
+      name: column.name,
+      width: column.width,
+      ...(column.kind === 'lines' ? { padding: column.padding } : {}),
+      ...(column.shape === undefined ? {} : { radius: column.shape.radius }),
+    })),
+    kinds: { [ROW]: { fill: style.columns.map((column) => column.shape?.fill) } },
+    layering: style.layering,
+    ...(style.columnGap === undefined ? {} : { columnGap: style.columnGap }),
+    rowGap: style.rowGap,
+    minRowHeight: style.minRowHeight,
+    names: { ...(name === undefined ? {} : { table: name }), row: style.names.row },
+  };
 }
 
-/** One row: every cell as tall as the tallest one needs, and never below the minimum. */
-function drawRow(
-  style: PillTableStyle,
-  placed: readonly Placed[],
+/** The one row kind a slot table draws: every row painted by its columns' shapes. */
+const ROW = 'row';
+
+/** One brief line's fields as the generic table's cells, each column taking its own in order. */
+function cellsOf(
+  style: SlotTableStyle,
   fields: readonly RichText[],
-  width: number,
   measure: Measure,
-): Block {
-  // Each column takes its fields in order; a field the brief did not write is empty.
+): TableCell[] {
   let next = 0;
-  const cells = placed.map((each) => {
-    const count = fieldsOf(each.column);
+  return style.columns.map((column) => {
+    const count = fieldsOf(column);
     const own = Array.from({ length: count }, (_, index) => fields[next + index] ?? []);
     next += count;
-    return { ...each, fields: own };
+    return column.kind === 'lines'
+      ? { draw: (width: number) => linesOf(column, width, own, measure) }
+      : labelCell(column, own[0] ?? []);
   });
-
-  const stacks = cells.map((cell) =>
-    cell.column.kind === 'lines'
-      ? linesOf(cell.column, cell.width, cell.fields, measure)
-      : undefined,
-  );
-
-  const height = cells.reduce((tallest, cell, index) => {
-    const lines = stacks[index];
-    if (lines === undefined || cell.column.kind !== 'lines') return tallest;
-    return Math.max(tallest, lines.height + cell.column.padding.top + cell.column.padding.bottom);
-  }, style.minRowHeight);
-
-  const drawn = cells.map((cell, index) =>
-    drawCell(style, cell, cell.fields, stacks[index], height),
-  );
-
-  return block(
-    width,
-    height,
-    group({
-      name: style.names.row,
-      // Painted in order, so under `overlap` the earlier cells go last and cover the
-      // rounded left ends of the later ones.
-      children: style.layering === 'overlap' ? drawn.reverse() : drawn,
-    }),
-  );
 }
 
-/** A lines column's words, stacked, before the row's height is known. */
+/**
+ * A label column's cell: its words laid out in the whole cell, so `valign` centres them on
+ * the row whatever its height. It never sets the row's height.
+ */
+function labelCell(column: LabelColumn, value: RichText): TableCell {
+  return {
+    sizesRow: false,
+    draw: (width, height) =>
+      height === undefined
+        ? block(width, 0, group({ children: [] }))
+        : textBlock(
+            rewritten(value, column.text.rewrite),
+            { w: width, h: height },
+            column.text.style,
+            {
+              name: column.text.name,
+              ...(column.text.align === undefined ? {} : { align: column.text.align }),
+              ...(column.text.valign === undefined ? {} : { valign: column.text.valign }),
+            },
+          ),
+  };
+}
+
+/** A lines column's words, stacked, in the cell's inner width. */
 function linesOf(
   column: LinesColumn,
-  width: number,
+  inner: number,
   fields: readonly RichText[],
   measure: Measure,
 ): Block {
-  const inner = width - column.padding.left - column.padding.right;
   return stack({
     gap: column.lineGap,
     items: column.lines.map((line, index) =>
@@ -446,59 +439,17 @@ function linesOf(
   });
 }
 
-function drawCell(
-  style: PillTableStyle,
-  cell: Placed,
-  fields: readonly RichText[],
-  lines: Block | undefined,
-  height: number,
-): NodeDraft {
-  const overlap = style.layering === 'overlap';
-  // Under `overlap` the cell's group sits at the row's left edge and its shape reaches from
-  // there to the cell's right edge; the words are offset to where the cell starts.
-  const origin = overlap ? 0 : cell.x;
-  const start = overlap ? cell.x : 0;
-  const shapeWidth = overlap ? cell.x + cell.width : cell.width;
-
-  const children: NodeDraft[] = [];
-  if (cell.column.shape !== undefined) {
-    children.push(
-      rect({
-        size: { w: shapeWidth, h: height },
-        radius: cell.column.shape.radius,
-        fill: solid(cell.column.shape.fill),
-      }),
-    );
-  }
-
-  if (cell.column.kind === 'label') {
-    const words = textBlock(
-      rewritten(fields[0] ?? [], cell.column.text.rewrite),
-      { w: cell.width, h: height },
-      cell.column.text.style,
-      {
-        name: cell.column.text.name,
-        ...(cell.column.text.align === undefined ? {} : { align: cell.column.text.align }),
-        ...(cell.column.text.valign === undefined ? {} : { valign: cell.column.text.valign }),
-      },
-    );
-    children.push(shift(words.draft, start, 0));
-  } else if (lines !== undefined) {
-    children.push(
-      shift(
-        lines.draft,
-        start + cell.column.padding.left,
-        cell.column.padding.top +
-          (height - cell.column.padding.top - cell.column.padding.bottom - lines.height) / 2,
-      ),
-    );
-  }
-
-  return shift(group({ name: cell.column.name, children }), origin, 0);
-}
-
 /** A draft moved by an offset, added to the coordinate it already carries. */
 function shift(draft: NodeDraft, dx: number, dy: number): NodeDraft {
   if (dx === 0 && dy === 0) return draft;
   return at(dx, dy, block(0, 0, draft));
 }
+
+/** @deprecated The old name of {@link slotTable} (TYTO-859); kept until its callers move. */
+export const pillTable = slotTable;
+/** @deprecated The old name of {@link SlotTableStyle}. */
+export type PillTableStyle = SlotTableStyle;
+/** @deprecated The old name of {@link SlotTableColumn}. */
+export type PillTableColumn = SlotTableColumn;
+/** @deprecated The old name of {@link SlotTableContent}. */
+export type PillTableContent = SlotTableContent;

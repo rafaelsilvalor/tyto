@@ -17,7 +17,7 @@ import {
   TYPE,
 } from './tokens.js';
 
-import type { PillTableStyle, TextStyle } from '@tyto/template-kit';
+import type { SlotTableStyle, TextStyle } from '@tyto/template-kit';
 
 const style = (size: number, weight: number, color: string): TextStyle => ({
   font: FACE,
@@ -34,11 +34,11 @@ export const EXAM_STYLE: TextStyle = style(TYPE.exam, BOOK, ROW_INK);
  *
  * Written in the brief as `Domingo 26/10 | Aplicação às 08h30 & correção às 14h`, then one
  * line per exam — the heading line carries the band's words, so a line with one separator
- * is a day and a line with none is an exam (`pillTable`'s caption). Every row is the table's
+ * is a day and a line with none is an exam (`slotTable`'s caption). Every row is the table's
  * width, as the references draw them; the composition picks that width from the longest name
  * (`tableWidth` in `compose.ts`), and a name past the maximum wraps and makes its row taller.
  */
-export function examTable(accent: string): PillTableStyle {
+export function examTable(accent: string): SlotTableStyle {
   return {
     layering: 'side-by-side',
     rowGap: TABLE.row.gap,

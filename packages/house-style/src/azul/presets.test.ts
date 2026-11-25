@@ -1,5 +1,5 @@
 import { measureNothing } from '@tyto/core';
-import { pillTable } from '@tyto/template-kit';
+import { slotTable } from '@tyto/template-kit';
 import { describe, expect, it } from 'vitest';
 
 import { approvedTable, sessionTable } from './presets.js';
@@ -46,7 +46,7 @@ function words(draft: NodeDraft, name: string): string[] {
 const WIDTH = 940;
 
 describe('approvedTable', () => {
-  const table = pillTable(approvedTable(INK), {
+  const table = slotTable(approvedTable(INK), {
     text: rich('ENDODONTIA\n1º | Ana Beatriz Souza\n2º | Carlos Menezes\n43º | daniela prado'),
     width: APPROVED.table.max,
     measure: measureNothing,
@@ -74,7 +74,7 @@ describe('approvedTable', () => {
   });
 
   it('adds nothing to a rank the brief left empty', () => {
-    const empty = pillTable(approvedTable(INK), {
+    const empty = slotTable(approvedTable(INK), {
       text: rich('ENDODONTIA\n | Sem colocação'),
       width: APPROVED.table.max,
       measure: measureNothing,
@@ -85,7 +85,7 @@ describe('approvedTable', () => {
 
 describe('sessionTable', () => {
   it('reads a discipline heading and its sessions out of one slot', () => {
-    const table = pillTable(sessionTable(INK), {
+    const table = slotTable(sessionTable(INK), {
       text: rich('FARMÁCIA\n16/09 - 14:00 | Farmacologia Geral | Profª. Marcela Rocha'),
       width: WIDTH,
       measure: measureNothing,

@@ -7,7 +7,7 @@ import {
   type LinesColumn,
   type PillTableStyle,
   pillTable,
-} from './pill-table.js';
+} from './slot-table.js';
 import { rich } from './rich-text.fixture.js';
 
 import type { GroupDraft, NodeDraft } from '@tyto/core/template';

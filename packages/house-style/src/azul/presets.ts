@@ -25,7 +25,7 @@ import {
 } from './tokens.js';
 
 import type { Inline, RichText } from '@tyto/core';
-import type { LabelColumn, PillTableStyle, TextStyle, TitleBlockStyle } from '@tyto/template-kit';
+import type { LabelColumn, SlotTableStyle, TextStyle, TitleBlockStyle } from '@tyto/template-kit';
 
 const style = (size: number, weight: number, color: string): TextStyle => ({
   font: FACE,
@@ -68,7 +68,7 @@ function badge(options: {
  * end, as the published slide draws the two — one shape, no gap between them. A title that
  * wraps makes its pill, and the row, taller (TYTO-184).
  */
-export function sessionTable(accent: string): PillTableStyle {
+export function sessionTable(accent: string): SlotTableStyle {
   return {
     layering: 'overlap',
     rowGap: GAP.sessions,
@@ -174,7 +174,7 @@ function capitals(value: RichText): RichText {
  * specialty's rows are as wide as its longest name, up to 800 (`fit`). The brief writes `1º`;
  * the badge draws `1º Lugar`.
  */
-export function approvedTable(accent: string): PillTableStyle {
+export function approvedTable(accent: string): SlotTableStyle {
   return {
     layering: 'overlap',
     rowGap: APPROVED.gap.rows,

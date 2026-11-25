@@ -40,7 +40,7 @@ import {
   at,
   grownTextBlock,
   naturalWidth,
-  pillTable,
+  slotTable,
   reportOverflow,
   rowGroups,
   sealed,
@@ -66,7 +66,7 @@ export function simuladosDaSemana(own: Brand): TemplateBuild {
     const room = context.size.w - MARGIN * 2;
 
     const lamina = richTextOf(context, 'lamina') ?? [];
-    const table = pillTable(examTable(brand.accent), {
+    const table = slotTable(examTable(brand.accent), {
       text: lamina,
       width: tableWidth(lamina, context.measure),
       measure: context.measure,
