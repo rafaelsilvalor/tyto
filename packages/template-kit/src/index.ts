@@ -303,29 +303,42 @@ export {
   type LevelLook,
   type LevelPart,
   type LevelPosition,
+  LEVEL_STACK_PARAMETERS,
+  type LevelStackParameters,
   type LevelStackStyle,
   levelStack,
+  levelStackIn,
   levelsOf,
 } from './levels.js';
 export {
+  TITLE_BLOCK_PARAMETERS,
   type TitleBlockContent,
+  type TitleBlockParameters,
   type TitleBlockStyle,
   type TitleImagePart,
   type TitlePart,
   type TitleRulePart,
   type TitleTextPart,
   titleBlock,
+  titleBlockIn,
 } from './title-block.js';
 
 export {
+  GROWN_TEXT_PARAMETERS,
+  type GrownTextParameters,
   type Measure,
+  TEXT_PARAMETERS,
   type TextBlockOptions,
+  type TextNodeOptions,
+  type TextParameters,
   type TextStyle,
   atLeastOne,
   capitals,
   grownTextBlock,
+  grownTextIn,
   naturalWidth,
   textBlock,
+  textIn,
 } from './text.js';
 
 export { FIELD_SEPARATOR, type RowGroup, fields, lines, plain, rowGroups } from './rows.js';

@@ -158,7 +158,12 @@ return how far they run past a bounded area as `overflow`. A stack item may stat
 `gapAbove`, and `stackIn` and `blockColumn` take `measureFrom: 'capitals'` to run a gap from a
 baseline to the next capitals. `weightedSpacing` returns a mismatch of weights as a result;
 `stack`, `row`, `inset`, `mark`, `icon` and `spaceByWeight` stay as they were, wrappers over the
-new forms, until the recomposition batch moves their last caller.
+new forms, until the recomposition batch moves their last caller. So do the text pieces:
+`textIn`, `grownTextIn`, `titleBlockIn` and `levelStackIn` take an area and a schema
+(`TEXT_PARAMETERS`, `GROWN_TEXT_PARAMETERS`, `TITLE_BLOCK_PARAMETERS`, `LEVEL_STACK_PARAMETERS`)
+and carry an anchor at their first capitals and last baseline; `titleBlockIn` takes
+`measureFrom: 'capitals'`. `textBlock`, `grownTextBlock`, `titleBlock` and `levelStack` are their
+wrappers and return what they returned, with no anchor.
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
