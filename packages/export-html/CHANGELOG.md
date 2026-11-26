@@ -1,5 +1,17 @@
 # @tyto/export-html
 
+## 0.9.0
+
+### Minor Changes
+
+- 5021080: A run's box is drawn (ADR 0231, TYTO-900): a band from the face's metrics in a span around the run, one per line the run breaks across, the same in Electron 44 and Chrome 158. A box without metrics covers the glyph box and reports `W_EXPORT_APPROXIMATED`. Output with no box is unchanged.
+
+### Patch Changes
+
+- Updated dependencies [5021080]
+  - @tyto/core@0.60.0
+  - @tyto/plugin-api@0.32.1
+
 ## 0.8.17
 
 ### Patch Changes

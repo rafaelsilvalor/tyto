@@ -1,5 +1,14 @@
 # @tyto/export-svg
 
+## 2.1.18
+
+### Patch Changes
+
+- 5021080: A run's box is not drawn in SVG, which measures no text, and each boxed run reports `W_EXPORT_APPROXIMATED` (ADR 0231, TYTO-900). Its text is drawn as before.
+- Updated dependencies [5021080]
+  - @tyto/core@0.60.0
+  - @tyto/plugin-api@0.32.1
+
 ## 2.1.17
 
 ### Patch Changes
