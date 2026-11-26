@@ -2,6 +2,7 @@ import { group, rect } from '@tyto/core/template';
 
 import { type Block, at, block } from './blocks.js';
 import { reportOverflow } from './page.js';
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 import type { LevelItem, LevelPart } from './levels.js';
 import type { TemplateContext } from '@tyto/core';
@@ -79,15 +80,62 @@ export function card(
   style: CardStyle,
   report?: TemplateContext['report'],
 ): Card {
+  const drawn = cardIn({ width: style.width, height: style.height ?? Infinity }, segments, style);
+  // The older form reported its own overflow, and only for a fixed height; the area form
+  // returns it.
+  if (report !== undefined && style.height !== undefined && segments.length > 0) {
+    reportOverflow(report, drawn.overflow, 0);
+  }
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft, segments: drawn.segments };
+}
+
+/** The number a card's style states (TYTO-891): its corners; the width and height are the area's. */
+export const CARD_PARAMETERS = {
+  radius: {
+    kind: 'length',
+    default: 0,
+    min: 0,
+    description: "The card's corner radius, in px; a band at an edge takes that edge's corners.",
+  },
+} as const satisfies ParameterSchema;
+
+export type CardParameters = ValuesOf<typeof CARD_PARAMETERS>;
+
+/**
+ * The segments drawn one under the next in a card as wide as `area`, and as tall as a bounded
+ * area (the room going before its foot) or as its segments. The radius given is laid over the
+ * style's. `overflow` is how far the segments run past a bounded height.
+ */
+export function cardIn(
+  area: Area,
+  segments: readonly CardSegment[],
+  style: CardStyle,
+  given: Partial<CardParameters> = {},
+): Card & { readonly overflow: number } {
+  const bounded = Number.isFinite(area.height);
+  const { height: _height, ...unsized } = style;
+  return drawCard(segments, {
+    ...unsized,
+    width: area.width,
+    radius:
+      given.radius === undefined ? style.radius : parameterValues(CARD_PARAMETERS, given).radius,
+    ...(bounded ? { height: area.height } : {}),
+  });
+}
+
+/** The card itself, as `card` drew it before TYTO-891, its overflow returned. */
+function drawCard(
+  segments: readonly CardSegment[],
+  style: CardStyle,
+): Card & { readonly overflow: number } {
   if (segments.length === 0) {
-    return { ...block(0, 0, group({ name: style.name, children: [] })), segments: [] };
+    return { ...block(0, 0, group({ name: style.name, children: [] })), segments: [], overflow: 0 };
   }
 
   const natural = naturalCardHeight(segments);
   const height = style.height ?? natural;
-  if (report !== undefined && style.height !== undefined) {
-    reportOverflow(report, natural, style.height);
-  }
+  const overflow =
+    style.height !== undefined && natural - style.height > 0 ? natural - style.height : 0;
   // The room a fixed or shared height adds goes before the last segment, so the foot sits at
   // the bottom and the bands of cards side by side line up at the top (maintainer, 2026-11-20).
   const room = Math.max(0, height - natural);
@@ -129,7 +177,7 @@ export function card(
     ...(style.stroke === undefined ? {} : { stroke: style.stroke }),
   });
   const drawn = group({ name: style.name, children: [outline, ...bands, ...words] });
-  return { ...block(style.width, height, drawn), segments: placed };
+  return { ...block(style.width, height, drawn), segments: placed, overflow };
 }
 
 /**
@@ -159,6 +207,32 @@ export function cardRow(
   report?: TemplateContext['report'],
   name = 'card-row',
 ): Block {
+  const drawn = cardRowIn({ width: Infinity, height: Infinity }, rowItems, { gap }, { name });
+  // Every card is as tall as the tallest, so none runs past its own height; the older form
+  // reported each card's overflow all the same, and so does this, for the same answer.
+  if (report !== undefined) for (const each of drawn.cards) reportOverflow(report, each, 0);
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft };
+}
+
+/** The number a row of cards uses (TYTO-891). */
+export const CARD_ROW_PARAMETERS = {
+  gap: { kind: 'length', default: 0, description: 'Between two cards, in px.' },
+} as const satisfies ParameterSchema;
+
+export type CardRowParameters = ValuesOf<typeof CARD_ROW_PARAMETERS>;
+
+/**
+ * Cards side by side in `area`, lined up as `cardRow` lines them. `overflow` is how far the row
+ * runs past a bounded area, across or down; `cards` is each card's own overflow, in order.
+ */
+export function cardRowIn(
+  area: Area,
+  rowItems: readonly CardRowItem[],
+  given: Partial<CardRowParameters> = {},
+  options: { readonly name?: string } = {},
+): Block & { readonly overflow: number; readonly cards: readonly number[] } {
+  const { gap } = parameterValues(CARD_ROW_PARAMETERS, given);
+  const name = options.name ?? 'card-row';
   const items = bandsLinedUp(rowItems);
   const height = items.reduce(
     (tallest, item) => Math.max(tallest, item.style.height ?? 0, naturalCardHeight(item.segments)),
@@ -166,13 +240,22 @@ export function cardRow(
   );
   let x = 0;
   const children: NodeDraft[] = [];
+  const cards: number[] = [];
   for (const [index, item] of items.entries()) {
     if (index > 0) x += gap;
-    const drawn = card(item.segments, { ...item.style, height }, report);
+    const drawn = drawCard(item.segments, { ...item.style, height });
+    if (item.segments.length > 0) cards.push(drawn.overflow);
     children.push(at(x, 0, drawn));
     x += drawn.width;
   }
-  return block(x, items.length === 0 ? 0 : height, group({ name, children }));
+  const rowHeight = items.length === 0 ? 0 : height;
+  const across = Number.isFinite(area.width) ? x - area.width : 0;
+  const down = Number.isFinite(area.height) ? rowHeight - area.height : 0;
+  return {
+    ...block(x, rowHeight, group({ name, children })),
+    overflow: Math.max(0, across, down),
+    cards,
+  };
 }
 
 /** Where a card's first band starts with nothing added; nothing for no band or one on top. */
