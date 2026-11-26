@@ -444,12 +444,3 @@ function shift(draft: NodeDraft, dx: number, dy: number): NodeDraft {
   if (dx === 0 && dy === 0) return draft;
   return at(dx, dy, block(0, 0, draft));
 }
-
-/** @deprecated The old name of {@link slotTable} (TYTO-859); kept until its callers move. */
-export const pillTable = slotTable;
-/** @deprecated The old name of {@link SlotTableStyle}. */
-export type PillTableStyle = SlotTableStyle;
-/** @deprecated The old name of {@link SlotTableColumn}. */
-export type PillTableColumn = SlotTableColumn;
-/** @deprecated The old name of {@link SlotTableContent}. */
-export type PillTableContent = SlotTableContent;

@@ -210,14 +210,10 @@ export {
   type CellShape,
   type LabelColumn,
   type LinesColumn,
-  type PillTableColumn,
-  type PillTableContent,
-  type PillTableStyle,
   type Rewrite,
   type SlotTableColumn,
   type SlotTableContent,
   type SlotTableStyle,
-  pillTable,
   slotTable,
 } from './slot-table.js';
 

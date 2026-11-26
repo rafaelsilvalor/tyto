@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
   type LabelColumn,
   type LinesColumn,
-  type PillTableStyle,
-  pillTable,
+  type SlotTableStyle,
+  slotTable,
 } from './slot-table.js';
 import { rich } from './rich-text.fixture.js';
 
@@ -36,7 +36,7 @@ const lines: LinesColumn = {
   ],
 };
 
-const BASE: PillTableStyle = {
+const BASE: SlotTableStyle = {
   layering: 'overlap',
   rowGap: 4,
   minRowHeight: 50,
@@ -53,7 +53,7 @@ const BASE: PillTableStyle = {
   names: { table: 'table', rows: 'rows', row: 'row' },
 };
 
-const GROUPED: PillTableStyle = {
+const GROUPED: SlotTableStyle = {
   ...BASE,
   groups: {
     heading: { name: 'heading', height: 40, style: STYLE },
@@ -74,8 +74,8 @@ function childrenOf(draft: NodeDraft | undefined): readonly NodeDraft[] {
   return (draft as GroupDraft).children;
 }
 
-function draw(style: PillTableStyle, source: string, measure: Measure = measureNothing) {
-  return pillTable(style, { text: rich(source), width: WIDTH, measure });
+function draw(style: SlotTableStyle, source: string, measure: Measure = measureNothing) {
+  return slotTable(style, { text: rich(source), width: WIDTH, measure });
 }
 
 describe('overlap', () => {
@@ -195,7 +195,7 @@ describe('caption', () => {
     ...lines,
     lines: [{ name: 'title', style: STYLE, minHeight: 30 }],
   };
-  const CAPTIONED: PillTableStyle = {
+  const CAPTIONED: SlotTableStyle = {
     ...GROUPED,
     columns: [single],
     groups: {
@@ -243,7 +243,7 @@ describe('caption', () => {
 });
 
 describe('rewrite', () => {
-  const suffixed: PillTableStyle = {
+  const suffixed: SlotTableStyle = {
     ...BASE,
     columns: [
       {
@@ -284,7 +284,7 @@ describe('fit', () => {
       overflow: 0,
     }) as ReturnType<Measure>;
 
-  const FIT: PillTableStyle = { ...GROUPED, fit: { max: 400 } };
+  const FIT: SlotTableStyle = { ...GROUPED, fit: { max: 400 } };
 
   it('gives every row of a group the width of its widest row, and each group its own', () => {
     const table = draw(
