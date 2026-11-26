@@ -7,6 +7,8 @@ import type {
 } from '@tyto/core/template';
 import { group } from '@tyto/core/template';
 
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
+
 /**
  * Arrangement for a template written in TypeScript: stacks, rows and padding, resolved to
  * the absolute coordinates the IR wants (`docs/ir-schema.md`).
@@ -170,30 +172,21 @@ export interface StackOptions {
   readonly name?: string;
 }
 
-/** Children one below the next, top to bottom. The stack is as wide as its widest child. */
+/**
+ * Children one below the next, top to bottom. The stack is as wide as its widest child.
+ *
+ * The form every template written before TYTO-891 calls; it is {@link stackIn} over an
+ * unbounded area and draws the same bytes.
+ */
 export function stack(options: StackOptions): Block {
-  const gap = options.gap ?? 0;
-  const align = options.align ?? 'start';
-  const width = options.items.reduce((widest, item) => Math.max(widest, item.width), 0);
-
-  let y = 0;
-  const children: NodeDraft[] = [];
-  const tops: number[] = [];
-  for (const item of options.items) {
-    children.push(shifted(item.draft, offsetFor(align, width, item.width), y));
-    tops.push(y);
-    y += item.height + gap;
-  }
-
-  // The trailing gap is charged per neighbour, so an empty stack is 0 and a stack of one
-  // is exactly its child.
-  const height = options.items.length === 0 ? 0 : y - gap;
-  return {
-    width,
-    height,
-    draft: groupOf(children, options.name),
-    ...anchorAcross(options.items, tops),
-  };
+  return blockOnly(
+    stackIn(
+      UNBOUNDED,
+      options.items,
+      { gap: options.gap ?? 0, align: options.align ?? 'start' },
+      { ...(options.name === undefined ? {} : { name: options.name }) },
+    ),
+  );
 }
 
 export interface RowOptions {
@@ -204,29 +197,16 @@ export interface RowOptions {
   readonly name?: string;
 }
 
-/** Children left to right. The row is as tall as its tallest child. */
+/** Children left to right. The row is as tall as its tallest child; {@link rowIn}, unbounded. */
 export function row(options: RowOptions): Block {
-  const gap = options.gap ?? 0;
-  const align = options.align ?? 'start';
-  const height = options.items.reduce((tallest, item) => Math.max(tallest, item.height), 0);
-
-  let x = 0;
-  const children: NodeDraft[] = [];
-  const tops: number[] = [];
-  for (const item of options.items) {
-    const top = offsetFor(align, height, item.height);
-    children.push(shifted(item.draft, x, top));
-    tops.push(top);
-    x += item.width + gap;
-  }
-
-  const width = options.items.length === 0 ? 0 : x - gap;
-  return {
-    width,
-    height,
-    draft: groupOf(children, options.name),
-    ...anchorAcross(options.items, tops),
-  };
+  return blockOnly(
+    rowIn(
+      UNBOUNDED,
+      options.items,
+      { gap: options.gap ?? 0, align: options.align ?? 'start' },
+      { ...(options.name === undefined ? {} : { name: options.name }) },
+    ),
+  );
 }
 
 export interface InsetOptions {
@@ -235,14 +215,198 @@ export interface InsetOptions {
   readonly name?: string;
 }
 
-/** The same block with room around it, grown by the padding rather than clipped to it. */
+/** The same block with room around it, grown by the padding; {@link insetIn}, unbounded. */
 export function inset(options: InsetOptions): Block {
   const sides = sidesOf(options.padding);
+  return blockOnly(
+    insetIn(UNBOUNDED, options.item, sides, {
+      ...(options.name === undefined ? {} : { name: options.name }),
+    }),
+  );
+}
+
+/* --------------------------------------------------------- the area-taking forms -- */
+
+const UNBOUNDED: Area = { width: Infinity, height: Infinity };
+
+/** A block without what an area-taking form adds to it: the shape the older forms return. */
+function blockOnly(item: Block & { readonly overflow: number }): Block {
   return {
-    width: options.item.width + sides.left + sides.right,
-    height: options.item.height + sides.top + sides.bottom,
-    draft: groupOf([shifted(options.item.draft, sides.left, sides.top)], options.name),
-    ...anchorAcross([options.item], [sides.top]),
+    width: item.width,
+    height: item.height,
+    draft: item.draft,
+    ...(item.anchor === undefined ? {} : { anchor: item.anchor }),
+  };
+}
+
+/** How far a block runs past a bounded side of its area; 0 for an unbounded one. */
+function overrun(size: number, room: number): number {
+  return Number.isFinite(room) ? Math.max(0, size - room) : 0;
+}
+
+/** The numbers a stack uses (TYTO-891, ADR 0224 decision 2); defaults are the older form's. */
+export const STACK_PARAMETERS = {
+  gap: {
+    kind: 'length',
+    default: 0,
+    description: 'Space between neighbours, in px; an item may state its own gap above it.',
+  },
+  align: {
+    kind: 'choice',
+    default: 'start',
+    choices: ['start', 'center', 'end'],
+    description: 'Where a narrower child sits across the stack.',
+  },
+  measureFrom: {
+    kind: 'choice',
+    default: 'box',
+    choices: ['box', 'capitals'],
+    description:
+      "Where a gap runs from: one box's foot to the next one's top, or one block's last " +
+      "baseline to the next one's first capitals (ADR 0230 decision 2).",
+  },
+} as const satisfies ParameterSchema;
+
+export type StackParameters = ValuesOf<typeof STACK_PARAMETERS>;
+
+/** A stack's item with its own gap above it, instead of the stack's. */
+export interface StackItem {
+  readonly item: Block;
+  readonly gapAbove: number;
+}
+
+function stackItemOf(entry: Block | StackItem): { readonly block: Block; readonly gap?: number } {
+  return 'item' in entry ? { block: entry.item, gap: entry.gapAbove } : { block: entry };
+}
+
+/**
+ * Children one below the next in `area`: as wide as the area when it has a width, else as its
+ * widest child; each gap the stack's or the item's own. With `measureFrom: 'capitals'` a gap
+ * runs from the block above's last baseline to the next one's first capitals, each read by its
+ * anchor (a block with none, by its box). `overflow` is how far it runs past a bounded area.
+ */
+export function stackIn(
+  area: Area,
+  items: readonly (Block | StackItem)[],
+  given: Partial<StackParameters> = {},
+  options: { readonly name?: string } = {},
+): Block & { readonly overflow: number } {
+  const values = parameterValues(STACK_PARAMETERS, given);
+  const entries = items.map(stackItemOf);
+  const blocks = entries.map((entry) => entry.block);
+  const widest = blocks.reduce((most, item) => Math.max(most, item.width), 0);
+  const width = Number.isFinite(area.width) ? area.width : widest;
+
+  let y = 0;
+  const children: NodeDraft[] = [];
+  const tops: number[] = [];
+  for (const [index, entry] of entries.entries()) {
+    const above = blocks[index - 1];
+    if (above !== undefined) {
+      const gap = entry.gap ?? values.gap;
+      // In box mode the older form's own arithmetic, a sum added at a time, so its bytes stay.
+      y =
+        values.measureFrom === 'capitals'
+          ? tops[index - 1]! + anchorOf(above).baseline + gap - anchorOf(entry.block).capTop
+          : y + (above.height + gap);
+    }
+    children.push(shifted(entry.block.draft, offsetFor(values.align, width, entry.block.width), y));
+    tops.push(y);
+  }
+
+  const last = blocks[blocks.length - 1];
+  // The trailing gap is charged per neighbour, so an empty stack is 0 and a stack of one is
+  // exactly its child; in box mode the older form added a gap after the last and took it back.
+  const height =
+    last === undefined
+      ? 0
+      : values.measureFrom === 'capitals'
+        ? y + last.height
+        : y + (last.height + values.gap) - values.gap;
+  return {
+    width,
+    height,
+    draft: groupOf(children, options.name),
+    ...anchorAcross(blocks, tops),
+    overflow: overrun(height, area.height),
+  };
+}
+
+/** The numbers a row uses; defaults are the older form's. */
+export const ROW_PARAMETERS = {
+  gap: { kind: 'length', default: 0, description: 'Space between neighbours, in px.' },
+  align: {
+    kind: 'choice',
+    default: 'start',
+    choices: ['start', 'center', 'end'],
+    description: 'Where a shorter child sits down the row.',
+  },
+} as const satisfies ParameterSchema;
+
+export type RowParameters = ValuesOf<typeof ROW_PARAMETERS>;
+
+/**
+ * Children left to right in `area`: as tall as the area when it has a height, else as its
+ * tallest child. `overflow` is how far it runs past a bounded width.
+ */
+export function rowIn(
+  area: Area,
+  items: readonly Block[],
+  given: Partial<RowParameters> = {},
+  options: { readonly name?: string } = {},
+): Block & { readonly overflow: number } {
+  const values = parameterValues(ROW_PARAMETERS, given);
+  const tallest = items.reduce((most, item) => Math.max(most, item.height), 0);
+  const height = Number.isFinite(area.height) ? area.height : tallest;
+
+  let x = 0;
+  const children: NodeDraft[] = [];
+  const tops: number[] = [];
+  for (const item of items) {
+    const top = offsetFor(values.align, height, item.height);
+    children.push(shifted(item.draft, x, top));
+    tops.push(top);
+    x += item.width + values.gap;
+  }
+
+  const width = items.length === 0 ? 0 : x - values.gap;
+  return {
+    width,
+    height,
+    draft: groupOf(children, options.name),
+    ...anchorAcross(items, tops),
+    overflow: overrun(width, area.width),
+  };
+}
+
+/** The room an inset adds on each side; defaults are none. */
+export const INSET_PARAMETERS = {
+  top: { kind: 'length', default: 0, description: 'Room above the block, in px.' },
+  right: { kind: 'length', default: 0, description: 'Room right of the block, in px.' },
+  bottom: { kind: 'length', default: 0, description: 'Room below the block, in px.' },
+  left: { kind: 'length', default: 0, description: 'Room left of the block, in px.' },
+} as const satisfies ParameterSchema;
+
+export type InsetParameters = ValuesOf<typeof INSET_PARAMETERS>;
+
+/**
+ * `item` with room around it, grown by the room rather than clipped to it. `overflow` is how
+ * far the result runs past a bounded area's height.
+ */
+export function insetIn(
+  area: Area,
+  item: Block,
+  given: Partial<InsetParameters> = {},
+  options: { readonly name?: string } = {},
+): Block & { readonly overflow: number } {
+  const sides = parameterValues(INSET_PARAMETERS, given);
+  const height = item.height + sides.top + sides.bottom;
+  return {
+    width: item.width + sides.left + sides.right,
+    height,
+    draft: groupOf([shifted(item.draft, sides.left, sides.top)], options.name),
+    ...anchorAcross([item], [sides.top]),
+    overflow: overrun(height, area.height),
   };
 }
 

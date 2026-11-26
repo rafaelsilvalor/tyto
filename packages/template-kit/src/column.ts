@@ -2,7 +2,7 @@ import type { ResolvedSlot } from '@tyto/core';
 import type { NodeDraft } from '@tyto/core/template';
 import { group } from '@tyto/core/template';
 
-import { type Block, at } from './blocks.js';
+import { type Block, anchorOf, at } from './blocks.js';
 import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 /**
@@ -77,6 +77,14 @@ export const BLOCK_COLUMN_PARAMETERS = {
     default: 'center',
     choices: ['start', 'center', 'end'],
     description: 'Where a block narrower than the area sits across it.',
+  },
+  measureFrom: {
+    kind: 'choice',
+    default: 'box',
+    choices: ['box', 'capitals'],
+    description:
+      "Where a gap runs from: one block's foot to the next one's top, or one block's last " +
+      "baseline to the next one's first capitals (ADR 0230 decision 2, TYTO-891).",
   },
   weight1: {
     kind: 'ratio',
@@ -463,9 +471,10 @@ export function blockColumn(area: Area, options: BlockColumnOptions): Column {
   // than its area, it is measured again with every block shrunk by one factor, down to the floor.
   const bounded = Number.isFinite(area.height);
   let shrink = 1;
-  let laid = measuredAt(entries, area, 1, gapOf);
+  const capitals = values.measureFrom === 'capitals';
+  let laid = measuredAt(entries, area, 1, gapOf, capitals);
   if (bounded && laid.content > area.height && values.shrinkFloor < 1) {
-    const floor = measuredAt(entries, area, values.shrinkFloor, gapOf);
+    const floor = measuredAt(entries, area, values.shrinkFloor, gapOf, capitals);
     if (floor.content > area.height) {
       shrink = values.shrinkFloor;
       laid = floor;
@@ -477,7 +486,7 @@ export function blockColumn(area: Area, options: BlockColumnOptions): Column {
       let fitting = floor;
       while (tooTall - fits > SHRINK_PRECISION) {
         const middle = (fits + tooTall) / 2;
-        const tried = measuredAt(entries, area, middle, gapOf);
+        const tried = measuredAt(entries, area, middle, gapOf, capitals);
         if (tried.content <= area.height) {
           fits = middle;
           fitting = tried;
@@ -543,13 +552,16 @@ interface Laid {
 
 /**
  * Every entry built at its own scales times `factor`, the absent ones dropped, and the gaps: each
- * the pair's gap times the lower block's distance.
+ * the pair's gap times the lower block's distance. Measured from the capitals, a gap is moved by
+ * what lies below the upper block's last baseline and above the lower block's first capitals,
+ * so the room between the boxes is the gap less those (ADR 0230 decision 2).
  */
 function measuredAt(
   entries: readonly ColumnEntry[],
   area: Area,
   factor: number,
   gapOf: (above: string, below: string) => number,
+  capitals: boolean,
 ): Laid {
   const measured: Measured[] = [];
   for (const entry of entries) {
@@ -562,7 +574,10 @@ function measuredAt(
   }
   const gaps = measured.map((item, index) => {
     const below = measured[index + 1];
-    return below === undefined ? 0 : gapOf(item.name, below.name) * below.distance;
+    if (below === undefined) return 0;
+    const gap = gapOf(item.name, below.name) * below.distance;
+    if (!capitals) return gap;
+    return gap + (anchorOf(item.block).baseline - item.block.height) - anchorOf(below.block).capTop;
   });
   const content = measured.reduce((sum, item, index) => sum + item.block.height + gaps[index]!, 0);
   return { measured, gaps, content };

@@ -37,17 +37,27 @@ export {
   type Align,
   type Anchor,
   type Block,
+  INSET_PARAMETERS,
   type InsetOptions,
+  type InsetParameters,
   type Padding,
+  ROW_PARAMETERS,
   type RowOptions,
+  type RowParameters,
+  STACK_PARAMETERS,
+  type StackItem,
   type StackOptions,
+  type StackParameters,
   anchorOf,
   at,
   block,
   inset,
+  insetIn,
   row,
+  rowIn,
   sized,
   stack,
+  stackIn,
 } from './blocks.js';
 
 export {
@@ -120,7 +130,7 @@ export {
   richTextOfPlain,
 } from './highlight.js';
 
-export { type Mark, mark } from './mark.js';
+export { MARK_PARAMETERS, type Mark, type MarkParameters, mark, markIn } from './mark.js';
 
 export {
   BODY_PARAMETERS,
@@ -261,11 +271,13 @@ export {
   type Settled,
   type Spaced,
   type WeightedSpacing,
+  type WeightsMismatch,
   orphanOf,
   rebreak,
   reportOrphan,
   settle,
   spaceByWeight,
+  weightedSpacing,
 } from './rhythm.js';
 
 export {
@@ -344,10 +356,13 @@ export {
   BOOKMARK_ICON,
   HEART_ICON,
   ICON_IN_DISC_PARAMETERS,
+  ICON_PARAMETERS,
   type Icon,
   type IconInDiscParameters,
+  type IconParameters,
   PAPER_PLANE_ICON,
   icon,
+  iconIn,
   iconInDisc,
 } from './icons.js';
 export {

@@ -1,6 +1,7 @@
 import { type MarkShape, solid, vector } from '@tyto/core/template';
 
 import { type Block, block } from './blocks.js';
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 /**
  * A mark: a flat, single-colour icon held as geometry — the box its `d` was drawn in, and
@@ -28,17 +29,51 @@ export type Mark = MarkShape;
  * placed the block at stays exactly where they put it.
  */
 export function mark(shape: Mark, height: number, fill: string, name: string): Block {
+  const drawn = markIn(shape, { width: Infinity, height }, fill, {}, { name });
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft };
+}
+
+/** The numbers a mark uses (TYTO-891): its height when its area does not bound one. */
+export const MARK_PARAMETERS = {
+  height: {
+    kind: 'length',
+    default: 24,
+    min: 0,
+    description: "The mark's height, in px; absent, the area's height when it has one.",
+  },
+} as const satisfies ParameterSchema;
+
+export type MarkParameters = ValuesOf<typeof MARK_PARAMETERS>;
+
+/**
+ * A mark in `area`, as tall as the given height, else the area's, else the default; as wide as
+ * its box at that height. `overflow` is how far it runs past a bounded area's width.
+ */
+export function markIn(
+  shape: Mark,
+  area: Area,
+  fill: string,
+  given: Partial<MarkParameters> = {},
+  options: { readonly name?: string } = {},
+): Block & { readonly overflow: number } {
+  const values = parameterValues(MARK_PARAMETERS, given);
+  const height =
+    given.height !== undefined || !Number.isFinite(area.height) ? values.height : area.height;
   const scale = height / shape.box.h;
 
-  return block(
-    shape.box.w * scale,
-    height,
-    vector({
-      name,
-      geometry: { kind: 'path', d: shape.d, fillRule: shape.fillRule },
-      size: shape.box,
-      fill: solid(fill),
-      transform: { scaleX: scale, scaleY: scale },
-    }),
-  );
+  const width = shape.box.w * scale;
+  return {
+    ...block(
+      width,
+      height,
+      vector({
+        name: options.name ?? 'mark',
+        geometry: { kind: 'path', d: shape.d, fillRule: shape.fillRule },
+        size: shape.box,
+        fill: solid(fill),
+        transform: { scaleX: scale, scaleY: scale },
+      }),
+    ),
+    overflow: Number.isFinite(area.width) ? Math.max(0, width - area.width) : 0,
+  };
 }
