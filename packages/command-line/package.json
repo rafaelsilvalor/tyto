@@ -51,8 +51,8 @@
     "@types/pngjs": "^6.0.5",
     "@tyto/recipe": "workspace:*",
     "ag-psd": "^34.2.2",
-    "esbuild": "0.27.7",
+    "esbuild": "0.28.2",
     "playwright": "^1.63.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.1.1"
   }
 }
