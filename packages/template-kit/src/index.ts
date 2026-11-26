@@ -180,6 +180,17 @@ export {
 } from './parameters.js';
 
 export { imageHeight } from './image.js';
+export {
+  BARE_PICTURE_PARAMETERS,
+  type BarePictureParameters,
+  FRAMED_PICTURE_PARAMETERS,
+  type FramedPictureNames,
+  type FramedPictureParameters,
+  type FramedPicturePaints,
+  barePicture,
+  frameOutlinePath,
+  framedPicture,
+} from './picture.js';
 
 export { type BandedPageOptions, type Seal, bandedPage, reportOverflow, sealed } from './page.js';
 
