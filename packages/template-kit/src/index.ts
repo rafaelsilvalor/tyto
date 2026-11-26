@@ -351,8 +351,12 @@ export {
   type Rewrite,
   type SlotTableColumn,
   type SlotTableContent,
+  SLOT_TABLE_PARAMETERS,
+  type SlotTableParameters,
   type SlotTableStyle,
   slotTable,
+  slotTableIn,
+  slotTableStyleWith,
 } from './slot-table.js';
 
 export {
@@ -392,6 +396,10 @@ export {
   type TableColumn,
   type TableRow,
   type TableRowKind,
+  TABLE_PARAMETERS,
+  type TableParameters,
   type TableStyle,
   table,
+  tableIn,
+  tableStyleWith,
 } from './table.js';

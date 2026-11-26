@@ -1,6 +1,7 @@
 import { group, rect, solid } from '@tyto/core/template';
 
 import { type Block, at, block, stack } from './blocks.js';
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 import { type RowGroup, rowGroups } from './rows.js';
 import { type TableCell, type TableColumn, type TableStyle, table } from './table.js';
 import { type Measure, type TextStyle, grownTextBlock, naturalWidth, textBlock } from './text.js';
@@ -194,6 +195,92 @@ export interface SlotTableContent {
  * Under `fit` a group's rows can be narrower than `width`; they are centred in it.
  */
 export function slotTable(style: SlotTableStyle, content: SlotTableContent): Block {
+  const drawn = slotTableIn({ width: content.width, height: Infinity }, style, content);
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft };
+}
+
+/**
+ * The numbers and choices a slot table's style states (TYTO-891), each default the value the
+ * table reads when the style says nothing. A style always states `rowGap`, `minRowHeight` and
+ * `layering`; `fitMax` 0 is no fit, as a style with no `fit`.
+ */
+export const SLOT_TABLE_PARAMETERS = {
+  columnGap: {
+    kind: 'length',
+    default: 0,
+    description: 'Space between cells, in px; side by side only.',
+  },
+  rowGap: { kind: 'length', default: 0, description: 'Space between rows, in px.' },
+  minRowHeight: {
+    kind: 'length',
+    default: 0,
+    min: 0,
+    description: 'The least height a row takes, in px, however short its words.',
+  },
+  layering: {
+    kind: 'choice',
+    default: 'side-by-side',
+    choices: ['side-by-side', 'overlap'],
+    description:
+      'Cells in slots of their own, or each shape from the row’s left edge, laid over the next.',
+  },
+  fitMax: {
+    kind: 'length',
+    default: 0,
+    min: 0,
+    description: 'The widest the rows may grow to fit their words, in px; 0 is the whole width.',
+  },
+} as const satisfies ParameterSchema;
+
+export type SlotTableParameters = ValuesOf<typeof SLOT_TABLE_PARAMETERS>;
+
+/** `style` with the numbers `given` states laid over its own; nothing given, the style itself. */
+export function slotTableStyleWith(
+  style: SlotTableStyle,
+  given: Partial<SlotTableParameters>,
+): SlotTableStyle {
+  if (Object.keys(given).length === 0) return style;
+  const values = parameterValues(SLOT_TABLE_PARAMETERS, {
+    ...(style.columnGap === undefined ? {} : { columnGap: style.columnGap }),
+    rowGap: style.rowGap,
+    minRowHeight: style.minRowHeight,
+    layering: style.layering,
+    ...(style.fit === undefined ? {} : { fitMax: style.fit.max }),
+    ...given,
+  });
+  const { fit: _fit, ...rest } = style;
+  return {
+    ...rest,
+    columnGap: values.columnGap,
+    rowGap: values.rowGap,
+    minRowHeight: values.minRowHeight,
+    layering: values.layering,
+    ...(values.fitMax > 0 ? { fit: { max: values.fitMax } } : {}),
+  };
+}
+
+/**
+ * The slot's rows as a table across `area`, its style's numbers overridden by `given`.
+ * `overflow` is how far it runs past a bounded area's height.
+ */
+export function slotTableIn(
+  area: Area,
+  style: SlotTableStyle,
+  content: Omit<SlotTableContent, 'width'>,
+  given: Partial<SlotTableParameters> = {},
+): Block & { readonly overflow: number } {
+  const drawn = drawSlotTable(slotTableStyleWith(style, given), {
+    ...content,
+    width: area.width,
+  });
+  return {
+    ...drawn,
+    overflow: Number.isFinite(area.height) ? Math.max(0, drawn.height - area.height) : 0,
+  };
+}
+
+/** The slot table itself, as `slotTable` drew it before TYTO-891. */
+function drawSlotTable(style: SlotTableStyle, content: SlotTableContent): Block {
   const fieldCount = style.columns.reduce((sum, column) => sum + fieldsOf(column), 0);
   const caption = style.groups?.caption;
   const groups = rowGroups(
