@@ -1,8 +1,9 @@
 import { group } from '@tyto/core/template';
 
-import { type Align, type Block, at, block, stack } from './blocks.js';
+import { type Align, type Block, anchorOf, at, block, stack } from './blocks.js';
+import { type Area, type ParameterSchema, type ValuesOf } from './parameters.js';
 import { fields, plain } from './rows.js';
-import { type Measure, type TextStyle, grownTextBlock } from './text.js';
+import { type Measure, type TextStyle, grownTextIn } from './text.js';
 
 import type { Inline, RichText } from '@tyto/core';
 
@@ -302,7 +303,38 @@ export function levelStack(
   width: number,
   measure: Measure,
 ): Block {
-  const align = style.align ?? 'center';
+  const drawn = levelStackIn({ width, height: Infinity }, items, style, {}, { measure });
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft };
+}
+
+/** The choice a level stack makes (TYTO-891); the default is the older form's. */
+export const LEVEL_STACK_PARAMETERS = {
+  align: {
+    kind: 'choice',
+    default: 'center',
+    choices: ['start', 'center', 'end'],
+    description: 'Where each row sits across the stack, when the style does not say.',
+  },
+} as const satisfies ParameterSchema;
+
+export type LevelStackParameters = ValuesOf<typeof LEVEL_STACK_PARAMETERS>;
+
+/**
+ * The items drawn top to bottom across `area`, one part per row, each row as tall as its words
+ * measure. Its anchor is its first row's capitals and its last row's baseline; `overflow` is how
+ * far it runs past a bounded area. The alignment is the one given, else the style's, else the
+ * default.
+ */
+export function levelStackIn(
+  area: Area,
+  items: readonly LevelItem[],
+  style: LevelStackStyle,
+  given: Partial<LevelStackParameters> = {},
+  options: { readonly measure?: Measure } = {},
+): Block & { readonly overflow: number } {
+  const width = area.width;
+  const measure: Measure = options.measure ?? (() => undefined);
+  const align = given.align ?? style.align ?? LEVEL_STACK_PARAMETERS.align.default;
   const lineGap: LevelGap<LevelItem> = style.lineGap ?? (style.gap as number);
 
   type Drawn =
@@ -329,10 +361,12 @@ export function levelStack(
 
   let y = 0;
   const children = [];
+  const placed: { readonly top: number; readonly item: Block }[] = [];
   for (const [index, each] of kept.entries()) {
     if (index > 0) y += spaceOf(lineGap, kept[index - 1]!.item, each.item);
     if (each.kind === 'divider') {
       children.push(at(offsetOf(align, width, each.drawing.width), y, each.drawing));
+      placed.push({ top: y, item: each.drawing });
       y += each.drawing.height;
       continue;
     }
@@ -343,12 +377,22 @@ export function levelStack(
         y += spaceOf(style.gap, each.item.parts[row - 1]!, part);
       }
       children.push(at(offsetOf(align, width, piece.width), y, piece));
+      placed.push({ top: y, item: piece });
       y += piece.height;
     }
   }
 
-  if (children.length === 0) return stack({ name: style.name, items: [] });
-  return block(width, y, group({ name: style.name, children }));
+  if (children.length === 0) return { ...stack({ name: style.name, items: [] }), overflow: 0 };
+  const first = placed[0]!;
+  const last = placed[placed.length - 1]!;
+  return {
+    ...block(width, y, group({ name: style.name, children })),
+    anchor: {
+      capTop: first.top + anchorOf(first.item).capTop,
+      baseline: last.top + anchorOf(last.item).baseline,
+    },
+    overflow: Number.isFinite(area.height) ? Math.max(0, y - area.height) : 0,
+  };
 }
 
 function spaceOf<Neighbour>(gap: LevelGap<Neighbour>, above: Neighbour, below: Neighbour): number {
@@ -366,12 +410,18 @@ function rowOf(
   const look = style.look(part);
   const lineHeight = look.lineHeight ?? 1.2;
   const words = look.transform === undefined ? part.words : look.transform(part.words);
-  return grownTextBlock(words, width, look.style.size * lineHeight, look.style, measure, {
-    name: `${style.name}-${part.position}-${index}`,
-    align: TEXT_ALIGN[align],
-    lineHeight,
-    ...(look.letterSpacing === undefined ? {} : { letterSpacing: look.letterSpacing }),
-  });
+  return grownTextIn(
+    words,
+    { width, height: Infinity },
+    look.style,
+    {
+      minHeight: look.style.size * lineHeight,
+      align: TEXT_ALIGN[align],
+      lineHeight,
+      ...(look.letterSpacing === undefined ? {} : { letterSpacing: look.letterSpacing }),
+    },
+    { measure, text: { name: `${style.name}-${part.position}-${index}` } },
+  );
 }
 
 const TEXT_ALIGN = { start: 'left', center: 'center', end: 'right' } as const;

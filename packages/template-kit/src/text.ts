@@ -1,10 +1,12 @@
 import { group, runsOf, text } from '@tyto/core/template';
 
-import { type Block, block } from './blocks.js';
+import { type Anchor, type Block, block } from './blocks.js';
+import { DEFAULT_METRICS, type FontMetrics, capOffset } from './cap-text.js';
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 import type { Highlights } from './highlight.js';
 import type { FontRef, RichText, TemplateContext, TextRun } from '@tyto/core';
-import type { NonEmpty, TextOptions } from '@tyto/core/template';
+import type { NonEmpty, TextDraft, TextOptions } from '@tyto/core/template';
 
 /**
  * Text as a {@link Block}: a brief's words at a size somebody stated, or at the size they
@@ -82,10 +84,10 @@ export function textBlock(
   style: TextStyle,
   options: TextBlockOptions = {},
 ): Block {
-  const runs = runsIn(value, style);
-  if (runs === undefined) return nothing(size.w, size.h);
-
-  return block(size.w, size.h, text({ ...options, runs, box: { w: size.w, h: size.h } }));
+  const { given, rest } = splitOptions(options);
+  return withoutAnchor(
+    textIn(value, { width: size.w, height: size.h }, style, given, { text: rest }),
+  );
 }
 
 /**
@@ -107,20 +109,199 @@ export function grownTextBlock(
   measure: Measure,
   options: TextBlockOptions = {},
 ): Block {
+  const { given, rest } = splitOptions(options);
+  return withoutAnchor(
+    grownTextIn(
+      value,
+      { width, height: Infinity },
+      style,
+      { ...given, minHeight },
+      { measure, text: rest },
+    ),
+  );
+}
+
+/* --------------------------------------------------------- the area-taking forms -- */
+
+/** The numbers and choices a text block uses (TYTO-891); defaults are `text()`'s own. */
+export const TEXT_PARAMETERS = {
+  lineHeight: {
+    kind: 'ratio',
+    default: 1.2,
+    min: 0,
+    description: 'From one line to the next, as a multiple of the size.',
+  },
+  letterSpacing: { kind: 'length', default: 0, description: 'Space added between letters, in px.' },
+  align: {
+    kind: 'choice',
+    default: 'left',
+    choices: ['left', 'center', 'right', 'justify'],
+    description: 'Where each line sits across the box.',
+  },
+  valign: {
+    kind: 'choice',
+    default: 'top',
+    choices: ['top', 'middle', 'bottom'],
+    description: 'Where the lines sit down the box.',
+  },
+  overflow: {
+    kind: 'choice',
+    default: 'clip',
+    choices: ['clip', 'shrink', 'grow'],
+    description: 'What the text does when it does not fit its box.',
+  },
+} as const satisfies ParameterSchema;
+
+export type TextParameters = ValuesOf<typeof TEXT_PARAMETERS>;
+
+/** The numbers a grown text block uses: the text's, and the least height it takes. */
+export const GROWN_TEXT_PARAMETERS = {
+  ...TEXT_PARAMETERS,
+  minHeight: {
+    kind: 'length',
+    default: 0,
+    min: 0,
+    description: 'The least height the block takes, in px, however few its lines.',
+  },
+} as const satisfies ParameterSchema;
+
+export type GrownTextParameters = ValuesOf<typeof GROWN_TEXT_PARAMETERS>;
+
+/** Everything `text()` takes that the schema does not: the node's name, id, effects… */
+export type TextNodeOptions = Omit<TextBlockOptions, keyof TextParameters>;
+
+interface TextFormOptions {
+  readonly text?: TextNodeOptions;
+  readonly measure?: Measure;
+  readonly metrics?: FontMetrics;
+}
+
+/**
+ * `value` in a box as large as `area`, drawn empty when the brief left it empty, with its anchor
+ * at its first capitals and last baseline (ADR 0230 decision 2): its lines are measured when
+ * `measure` can, else counted as written. With an unbounded height the box has none and the
+ * block is as tall as its lines. `overflow` is how far the lines run past a bounded box.
+ */
+export function textIn(
+  value: RichText,
+  area: Area,
+  style: TextStyle,
+  given: Partial<TextParameters> = {},
+  options: TextFormOptions = {},
+): Block & { readonly overflow: number } {
+  const values = parameterValues(TEXT_PARAMETERS, given);
   const runs = runsIn(value, style);
-  if (runs === undefined) return nothing(width, minHeight);
+  const bounded = Number.isFinite(area.height);
+  if (runs === undefined) return { ...nothing(area.width, bounded ? area.height : 0), overflow: 0 };
 
-  const measured = measure(text({ ...options, runs, box: { w: width } }));
-  if (measured === undefined) {
-    return block(
-      width,
-      minHeight,
-      text({ ...options, runs, box: { w: width, h: minHeight }, overflow: 'shrink' }),
-    );
-  }
+  const draft = text({
+    ...options.text,
+    runs,
+    box: bounded ? { w: area.width, h: area.height } : { w: area.width },
+    ...values,
+  });
+  const laid = linesOf(draft, runs, options.measure);
+  const tall = laid.lines * values.lineHeight * style.size;
+  const height = bounded ? area.height : (laid.height ?? tall);
+  return {
+    width: area.width,
+    height,
+    draft,
+    anchor: anchorIn(height, laid.lines, style.size, values, options.metrics),
+    overflow: bounded ? Math.max(0, (laid.height ?? tall) - area.height) : 0,
+  };
+}
 
-  const height = Math.max(minHeight, measured.height);
-  return block(width, height, text({ ...options, runs, box: { w: width, h: height } }));
+/**
+ * `value` as tall as its lines measure at `area`'s width, never shorter than `minHeight`; with
+ * nothing to measure, `minHeight` tall and shrunk into it. Its anchor as {@link textIn}'s;
+ * `overflow` is how far it runs past a bounded area.
+ */
+export function grownTextIn(
+  value: RichText,
+  area: Area,
+  style: TextStyle,
+  given: Partial<GrownTextParameters> = {},
+  options: TextFormOptions = {},
+): Block & { readonly overflow: number } {
+  const { minHeight, ...values } = parameterValues(GROWN_TEXT_PARAMETERS, given);
+  const width = area.width;
+  const runs = runsIn(value, style);
+  if (runs === undefined) return { ...nothing(width, minHeight), overflow: 0 };
+
+  const node = (box: { readonly w: number; readonly h?: number }, overflow = values.overflow) =>
+    text({ ...options.text, runs, box, ...values, overflow });
+  const measured = (options.measure ?? (() => undefined))(node({ w: width }));
+  const finished =
+    measured === undefined
+      ? { height: minHeight, draft: node({ w: width, h: minHeight }, 'shrink') }
+      : (() => {
+          const height = Math.max(minHeight, measured.height);
+          return { height, draft: node({ w: width, h: height }) };
+        })();
+  const lines = measured?.lines ?? linesWritten(runs);
+  return {
+    width,
+    height: finished.height,
+    draft: finished.draft,
+    anchor: anchorIn(finished.height, lines, style.size, values, options.metrics),
+    overflow: Number.isFinite(area.height) ? Math.max(0, finished.height - area.height) : 0,
+  };
+}
+
+/** The lines a text takes, and its height, when `measure` can tell; else as written. */
+function linesOf(
+  draft: TextDraft,
+  runs: NonEmpty<TextRun>,
+  measure: Measure | undefined,
+): { readonly lines: number; readonly height?: number } {
+  const probe = draft.box.h === undefined ? draft : { ...draft, box: { w: draft.box.w } };
+  const measured = measure?.(probe);
+  return measured === undefined
+    ? { lines: linesWritten(runs) }
+    : { lines: measured.lines, height: measured.height };
+}
+
+function linesWritten(runs: readonly TextRun[]): number {
+  return runs.filter((each) => each.kind === 'break').length + 1;
+}
+
+/** A box's first capitals and last baseline, the lines set by its vertical alignment. */
+function anchorIn(
+  boxHeight: number,
+  lines: number,
+  size: number,
+  values: Pick<TextParameters, 'lineHeight' | 'valign'>,
+  metrics: FontMetrics = DEFAULT_METRICS,
+): Anchor {
+  const pitch = size * values.lineHeight;
+  const room = boxHeight - lines * pitch;
+  const top = values.valign === 'middle' ? room / 2 : values.valign === 'bottom' ? room : 0;
+  const capTop = top + capOffset(size, values.lineHeight, metrics);
+  return { capTop, baseline: capTop + (lines - 1) * pitch + size * metrics.capHeight };
+}
+
+/** The text options the schema names, and everything else for the node. */
+function splitOptions(options: TextBlockOptions): {
+  readonly given: Partial<TextParameters>;
+  readonly rest: TextNodeOptions;
+} {
+  const { lineHeight, letterSpacing, align, valign, overflow, ...rest } = options;
+  return {
+    given: {
+      ...(lineHeight === undefined ? {} : { lineHeight }),
+      ...(letterSpacing === undefined ? {} : { letterSpacing }),
+      ...(align === undefined ? {} : { align }),
+      ...(valign === undefined ? {} : { valign }),
+      ...(overflow === undefined ? {} : { overflow }),
+    },
+    rest,
+  };
+}
+
+/** The block the older forms returned: no anchor, no overflow. */
+function withoutAnchor(item: Block): Block {
+  return { width: item.width, height: item.height, draft: item.draft };
 }
 
 /**
