@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { acceptCompletion } from './accept-completion.js';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 import { openPreviewBeside } from './preview-pane.js';
@@ -232,8 +233,7 @@ describe('picking a template', () => {
     await page.keyboard.type('/');
     await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
     await page.keyboard.type('promo-c');
-    await page.waitForTimeout(150);
-    await page.keyboard.press('Enter');
+    await acceptCompletion(page, 'promo-curso');
     await page.waitForTimeout(900);
 
     const firstLines = await page.evaluate(() =>

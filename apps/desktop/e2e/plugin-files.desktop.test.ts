@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { acceptCompletion } from './accept-completion.js';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 
@@ -275,8 +276,7 @@ describe('the plugin files in the window', () => {
     await page.keyboard.press('Control+A');
     await page.keyboard.press('Delete');
     await page.keyboard.type('/aviso-curto');
-    await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
-    await page.keyboard.press('Enter');
+    await acceptCompletion(page, 'aviso-curto');
 
     const text = () =>
       page.evaluate(() => document.querySelector<HTMLElement>('#editor .cm-content')?.innerText);
