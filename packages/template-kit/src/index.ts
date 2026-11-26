@@ -181,6 +181,23 @@ export {
 
 export { imageHeight } from './image.js';
 export {
+  type BalanceRequest,
+  type Balanced,
+  ENUMERATION_CAP,
+  type SizeRange,
+  balance,
+  breakPieces,
+  endsOnFunctionWord,
+} from './balance.js';
+export {
+  FIT_TEXT_PARAMETERS,
+  type Fit,
+  type FitPolicy,
+  type FitTextParameters,
+  fitSizes,
+  fitText,
+} from './fit-text.js';
+export {
   HUGGED_TEXT_PARAMETERS,
   type HuggedTextParameters,
   PADDED_CARD_PARAMETERS,
