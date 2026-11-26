@@ -114,8 +114,7 @@ export function callToComment(
           overflow: 'shrink',
         }),
       },
-      // The balloon sits in `words` until the kit's buttons can hold an icon alone (TYTO-884).
-      { name: 'cta-balloon', style: bare, words: mark(BALLOON, CTA.balloon, accent, 'balloon') },
+      { name: 'cta-balloon', style: bare, leading: mark(BALLOON, CTA.balloon, accent, 'balloon') },
     ],
     { gap: CTA.balloonGap, name: 'call-to-comment' },
   );

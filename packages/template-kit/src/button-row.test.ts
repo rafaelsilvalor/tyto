@@ -142,6 +142,54 @@ describe('three buttons with leading icons', () => {
   });
 });
 
+describe('a button with an icon alone (TYTO-884)', () => {
+  const bare: ButtonStyle = { height: 48, radius: 0, padding: { left: 6, right: 4 }, gap: 14 };
+  const button: Button = { style: bare, leading: icon(BALLOON_ICON, 36, '#880000', 'icon') };
+
+  it('is as wide as its padding and icon, with no gap for words it does not have', () => {
+    expect(buttonWidth(button)).toBe(6 + 36 + 4);
+  });
+
+  it('puts the icon after the padding, centred on the height, and draws nothing else', () => {
+    const [drawn] = named(buttonRow([button], { gap: 0 }).draft, 'button');
+
+    expect(placeOf(drawn!, 'icon')).toEqual({ x: 6, y: 6 });
+    expect(drawn?.children).toHaveLength(1);
+  });
+});
+
+describe('a trailing piece with no box (TYTO-884)', () => {
+  const style: ButtonStyle = { ...OUTLINED, fill: '#880000' };
+  const button: Button = {
+    style,
+    words: words(120),
+    trailing: icon(ARROW_ICON, 36, '#ffffff', 'arrow'),
+  };
+
+  it('counts the piece and its gap in the width, and no end box', () => {
+    expect(buttonWidth(button)).toBe(30 + 120 + 14 + 36 + 30);
+  });
+
+  it('sits after the words, gap apart, centred on the height, with no end cap drawn', () => {
+    const [drawn] = named(buttonRow([button], { gap: 0 }).draft, 'button');
+
+    expect(placeOf(drawn!, 'words')).toEqual({ x: 30, y: 16 });
+    expect(placeOf(drawn!, 'arrow')).toEqual({ x: 30 + 120 + 14, y: 10 });
+    expect(named(drawn!, 'end')).toEqual([]);
+  });
+
+  it('stays in the end box when the style has one, as before', () => {
+    const boxed: Button = {
+      ...button,
+      style: { ...style, trailing: { width: 80, fill: '#000000', radius: 28 } },
+    };
+    const [drawn] = named(buttonRow([boxed], { gap: 0 }).draft, 'button');
+
+    expect(buttonWidth(boxed)).toBe(30 + 120 + 30 + 80);
+    expect(placeOf(drawn!, 'arrow').x).toBe(30 + 120 + 30 + (80 - 36) / 2);
+  });
+});
+
 describe('the room', () => {
   it('reports a row wider than its room, by how much', () => {
     const reports: TemplateReport[] = [];

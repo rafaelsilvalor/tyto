@@ -13,7 +13,9 @@ import type { NodeDraft } from '@tyto/core/template';
  * A button is a pill — filled, outlined, or both — holding an optional leading piece (an
  * icon), its words, and an optional trailing box: a filled end cap holding its own piece (an
  * arrow). One button with a trailing box is "Escreva X nos comentários →"; three buttons with
- * leading icons are "♡ Curta · ◯ Comente · ➤ Compartilhe". **The template decides what each
+ * leading icons are "♡ Curta · ◯ Comente · ➤ Compartilhe". A button may hold an icon alone,
+ * with no words, and a trailing piece may sit after the words with no box of its own
+ * (TYTO-884): "Confira →" on a pill of one colour. **The template decides what each
  * button holds and how it looks**: the words and icons arrive as blocks built by the
  * components that draw them (`textBlock`, `icon`…), and every size and colour in the style.
  * The kit holds the mechanism and no house value.
@@ -36,11 +38,14 @@ export interface ButtonStyle {
 
 export interface Button {
   readonly style: ButtonStyle;
-  /** The words, as wide as they need: the button grows to hold them. */
-  readonly words: Block;
+  /** The words, as wide as they need: the button grows to hold them. Absent: an icon alone. */
+  readonly words?: Block;
   /** Before the words, centred on the pill's height. */
   readonly leading?: Block;
-  /** Centred in the trailing box; drawn only when the style has one. */
+  /**
+   * Centred in the trailing box when the style has one; without a box, after the words, `gap`
+   * apart and centred on the pill's height, like the leading piece on the other side.
+   */
   readonly trailing?: Block;
   /** The button's group in the scene. Default `button`. */
   readonly name?: string;
@@ -62,12 +67,26 @@ export interface ButtonRowOptions {
   readonly name?: string;
 }
 
-/** How wide one button is: its padding, leading piece, words and trailing box. */
+/**
+ * What sits between the padding, in order: the leading piece, the words, and a trailing piece
+ * the style gives no box. `gap` apart.
+ */
+function piecesOf(button: Button): Block[] {
+  const boxless = button.style.trailing === undefined ? button.trailing : undefined;
+  return [button.leading, button.words, boxless].filter(
+    (piece): piece is Block => piece !== undefined,
+  );
+}
+
+/** How wide one button is: its padding, its pieces `gap` apart, and its trailing box. */
 export function buttonWidth(button: Button): number {
   const { style } = button;
-  const leading = button.leading === undefined ? 0 : button.leading.width + style.gap;
+  const pieces = piecesOf(button);
+  const inner =
+    pieces.reduce((sum, piece) => sum + piece.width, 0) +
+    style.gap * Math.max(0, pieces.length - 1);
   const trailing = style.trailing?.width ?? 0;
-  return style.padding.left + leading + button.words.width + style.padding.right + trailing;
+  return style.padding.left + inner + style.padding.right + trailing;
 }
 
 /** The buttons, side by side, centred on the tallest one's middle. */
@@ -142,11 +161,10 @@ function drawButton(button: Button, width: number): Block {
   }
 
   let x = style.padding.left;
-  if (button.leading !== undefined) {
-    children.push(at(x, middle(button.leading), button.leading));
-    x += button.leading.width + style.gap;
+  for (const piece of piecesOf(button)) {
+    children.push(at(x, middle(piece), piece));
+    x += piece.width + style.gap;
   }
-  children.push(at(x, middle(button.words), button.words));
 
   return block(width, h, group({ name: button.name ?? 'button', children }));
 }
