@@ -89,6 +89,8 @@ channel by 24 of 255 (TYTO-881).
    TYTO-793 gives the anchor to the text pieces and makes the arrangements pass it on; TYTO-891
    adds `measureFrom` with the arrangements' parameter schemas.
 
+   2026-11-26: `at` returns a draft, not a Block, so it ends the anchor chain; TYTO-793.
+
 3. **The older kit pieces follow the contract on a schedule, not when touched.** ADR 0224
    decision 5 is replaced for these pieces: TYTO-891 moves `table`, `slotTable`, `buttonRow`,
    `card`, `cardRow`, `titleBlock`, `levelStack`, `textBlock`, `grownTextBlock`, `stack`, `row`,

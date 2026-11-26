@@ -97,6 +97,13 @@ primitives land (TYTO-625, TYTO-886), an image or a shape may be drawn with core
 local function whose comment names it as pending. The six templates still drawn by hand are
 recomposed in the batch template-recompose; ADR 0230 says when each binds.
 
+**Text placed by the top of its capitals is `capText`** (TYTO-793): the runs as a block whose
+`anchor` holds the top of the first line's capitals and the last line's baseline, the face's
+metrics passed as data (`DEFAULT_METRICS` when absent). Place it at the height the reference
+gives the capitals less `anchor.capTop`; `stack`, `row` and `inset` pass the anchor on, and a
+block with no words is read by its box's edges. A slot is read with `slotText`, `richTextOf`,
+`slideRichLines` or `slotRichLines`, never with a local copy.
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and

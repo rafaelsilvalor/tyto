@@ -35,11 +35,13 @@
 
 export {
   type Align,
+  type Anchor,
   type Block,
   type InsetOptions,
   type Padding,
   type RowOptions,
   type StackOptions,
+  anchorOf,
   at,
   block,
   inset,
@@ -47,6 +49,20 @@ export {
   sized,
   stack,
 } from './blocks.js';
+
+export {
+  CAP_TEXT_PARAMETERS,
+  type CapTextOptions,
+  type CapTextParameters,
+  type CapTextStyle,
+  DEFAULT_METRICS,
+  type FontMetrics,
+  capOffset,
+  capText,
+  plainRuns,
+} from './cap-text.js';
+
+export { richTextOf, slideRichLines, slotRichLines, slotText, trimmed } from './slots.js';
 
 export {
   KEEP_TOGETHER_RULES,
