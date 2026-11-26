@@ -47,6 +47,44 @@ export interface Block {
   readonly width: number;
   readonly height: number;
   readonly draft: NodeDraft;
+  /**
+   * Where a block's words sit, in its own coordinates (ADR 0230 decision 2): the top of the
+   * first line's capitals and the baseline of the last line. A block of text answers it; a block
+   * with no text leaves it out, and is read as {@link anchorOf} reads it: its own top and foot.
+   */
+  readonly anchor?: Anchor;
+}
+
+/** The top of a block's first capitals and its last baseline, from the block's top. */
+export interface Anchor {
+  readonly capTop: number;
+  readonly baseline: number;
+}
+
+/** A block's anchor, or its box's own edges when it has none (ADR 0230 decision 2). */
+export function anchorOf(item: Block): Anchor {
+  return item.anchor ?? { capTop: 0, baseline: item.height };
+}
+
+/**
+ * The anchor of an arrangement: its first child's capitals and its last child's baseline, each
+ * moved by where the arrangement put it. Absent when no child has words, so a block of shapes
+ * reads exactly as it did before anchors existed.
+ */
+function anchorAcross(
+  items: readonly Block[],
+  offsets: readonly number[],
+): { readonly anchor?: Anchor } {
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (first === undefined || last === undefined) return {};
+  if (!items.some((item) => item.anchor !== undefined)) return {};
+  return {
+    anchor: {
+      capTop: offsets[0]! + anchorOf(first).capTop,
+      baseline: offsets[items.length - 1]! + anchorOf(last).baseline,
+    },
+  };
 }
 
 /** Cross-axis placement of a child smaller than the arrangement around it. */
@@ -140,15 +178,22 @@ export function stack(options: StackOptions): Block {
 
   let y = 0;
   const children: NodeDraft[] = [];
+  const tops: number[] = [];
   for (const item of options.items) {
     children.push(shifted(item.draft, offsetFor(align, width, item.width), y));
+    tops.push(y);
     y += item.height + gap;
   }
 
   // The trailing gap is charged per neighbour, so an empty stack is 0 and a stack of one
   // is exactly its child.
   const height = options.items.length === 0 ? 0 : y - gap;
-  return { width, height, draft: groupOf(children, options.name) };
+  return {
+    width,
+    height,
+    draft: groupOf(children, options.name),
+    ...anchorAcross(options.items, tops),
+  };
 }
 
 export interface RowOptions {
@@ -167,13 +212,21 @@ export function row(options: RowOptions): Block {
 
   let x = 0;
   const children: NodeDraft[] = [];
+  const tops: number[] = [];
   for (const item of options.items) {
-    children.push(shifted(item.draft, x, offsetFor(align, height, item.height)));
+    const top = offsetFor(align, height, item.height);
+    children.push(shifted(item.draft, x, top));
+    tops.push(top);
     x += item.width + gap;
   }
 
   const width = options.items.length === 0 ? 0 : x - gap;
-  return { width, height, draft: groupOf(children, options.name) };
+  return {
+    width,
+    height,
+    draft: groupOf(children, options.name),
+    ...anchorAcross(options.items, tops),
+  };
 }
 
 export interface InsetOptions {
@@ -189,6 +242,7 @@ export function inset(options: InsetOptions): Block {
     width: options.item.width + sides.left + sides.right,
     height: options.item.height + sides.top + sides.bottom,
     draft: groupOf([shifted(options.item.draft, sides.left, sides.top)], options.name),
+    ...anchorAcross([options.item], [sides.top]),
   };
 }
 
@@ -196,7 +250,9 @@ export function inset(options: InsetOptions): Block {
  * A block's draft, moved to where it belongs in the frame.
  *
  * The one place a coordinate is written by hand, which is the point: everything inside an
- * arrangement is relative, and a template says once where the arrangement starts.
+ * arrangement is relative, and a template says once where the arrangement starts. It returns a
+ * draft, not a block, so a block's anchor ends here: to put a text's capitals at a height, place
+ * it at that height less `anchorOf(item).capTop`.
  */
 export function at(x: number, y: number, item: Block): NodeDraft {
   return shifted(item.draft, x, y);
