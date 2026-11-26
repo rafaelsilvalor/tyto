@@ -166,7 +166,10 @@ and carry an anchor at their first capitals and last baseline; `titleBlockIn` ta
 wrappers and return what they returned, with no anchor. The tables too: `tableIn` and
 `slotTableIn` take an area, and `TABLE_PARAMETERS` and `SLOT_TABLE_PARAMETERS` name the numbers
 a style states (gaps, the least row height, the layering, the corners, the fit); a number given
-as a parameter is laid over the style's own (`tableStyleWith`, `slotTableStyleWith`).
+as a parameter is laid over the style's own (`tableStyleWith`, `slotTableStyleWith`). And the
+buttons and cards: `buttonRowIn`, `cardIn` and `cardRowIn` (`BUTTON_ROW_PARAMETERS`,
+`CARD_PARAMETERS`, `CARD_ROW_PARAMETERS`) return their overflow instead of reporting it; the
+older `buttonRow`, `card` and `cardRow` still report it themselves, the same amount as before.
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on

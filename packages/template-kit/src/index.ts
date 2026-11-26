@@ -281,8 +281,12 @@ export {
 } from './rhythm.js';
 
 export {
+  CARD_PARAMETERS,
+  CARD_ROW_PARAMETERS,
   type Card,
+  type CardParameters,
   type CardRole,
+  type CardRowParameters,
   type CardRowItem,
   type CardSegment,
   type CardSegmentKind,
@@ -290,7 +294,9 @@ export {
   type PlacedSegment,
   bandBottom,
   card,
+  cardIn,
   cardRow,
+  cardRowIn,
   cardSegments,
   naturalCardHeight,
 } from './card.js';
@@ -360,10 +366,13 @@ export {
 } from './slot-table.js';
 
 export {
+  BUTTON_ROW_PARAMETERS,
   type Button,
   type ButtonRowOptions,
+  type ButtonRowParameters,
   type ButtonStyle,
   buttonRow,
+  buttonRowIn,
   buttonWidth,
 } from './button-row.js';
 

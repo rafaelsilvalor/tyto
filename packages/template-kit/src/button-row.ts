@@ -2,6 +2,7 @@ import { group, rect, solid } from '@tyto/core/template';
 
 import { type Block, at, block } from './blocks.js';
 import { reportOverflow } from './page.js';
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 import type { Corners } from './table.js';
 import type { TemplateContext } from '@tyto/core';
@@ -91,15 +92,51 @@ export function buttonWidth(button: Button): number {
 
 /** The buttons, side by side, centred on the tallest one's middle. */
 export function buttonRow(buttons: readonly Button[], options: ButtonRowOptions): Block {
+  const drawn = buttonRowIn(
+    { width: options.width ?? Infinity, height: Infinity },
+    buttons,
+    { gap: options.gap, ...(options.arrange === undefined ? {} : { arrange: options.arrange }) },
+    { ...(options.name === undefined ? {} : { name: options.name }) },
+  );
+  // The older form reported its own overflow, before drawing; the area form returns it.
+  if (options.report !== undefined) reportOverflow(options.report, drawn.overflow, 0);
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft };
+}
+
+/** The numbers and choice a row of buttons uses (TYTO-891); defaults are the older form's. */
+export const BUTTON_ROW_PARAMETERS = {
+  gap: { kind: 'length', default: 0, description: 'Between two buttons, at least, in px.' },
+  arrange: {
+    kind: 'choice',
+    default: 'packed',
+    choices: ['packed', 'justified'],
+    description:
+      'With room to spare: centred at `gap` apart, or spread so the first and last touch its edges.',
+  },
+} as const satisfies ParameterSchema;
+
+export type ButtonRowParameters = ValuesOf<typeof BUTTON_ROW_PARAMETERS>;
+
+/**
+ * The buttons left to right in `area`: centred in its width, or spread across it, when it has
+ * one; as wide as they are otherwise. `overflow` is how far they run past a bounded width.
+ */
+export function buttonRowIn(
+  area: Area,
+  buttons: readonly Button[],
+  given: Partial<ButtonRowParameters> = {},
+  options: { readonly name?: string } = {},
+): Block & { readonly overflow: number } {
+  const values = parameterValues(BUTTON_ROW_PARAMETERS, given);
   const widths = buttons.map(buttonWidth);
   const natural =
-    widths.reduce((sum, each) => sum + each, 0) + options.gap * Math.max(0, buttons.length - 1);
-  const room = options.width ?? natural;
-  if (options.report !== undefined) reportOverflow(options.report, natural, room);
+    widths.reduce((sum, each) => sum + each, 0) + values.gap * Math.max(0, buttons.length - 1);
+  const room = Number.isFinite(area.width) ? area.width : natural;
+  const overflow = natural - room > 0 ? natural - room : 0;
 
   const spare = Math.max(0, room - natural);
-  const justified = options.arrange === 'justified' && buttons.length > 1;
-  const gap = justified ? options.gap + spare / (buttons.length - 1) : options.gap;
+  const justified = values.arrange === 'justified' && buttons.length > 1;
+  const gap = justified ? values.gap + spare / (buttons.length - 1) : values.gap;
   const height = buttons.reduce((tallest, each) => Math.max(tallest, each.style.height), 0);
 
   let x = justified ? 0 : spare / 2;
@@ -110,11 +147,10 @@ export function buttonRow(buttons: readonly Button[], options: ButtonRowOptions)
     return placed;
   });
 
-  return block(
-    Math.max(room, natural),
-    height,
-    group({ name: options.name ?? 'buttons', children }),
-  );
+  return {
+    ...block(Math.max(room, natural), height, group({ name: options.name ?? 'buttons', children })),
+    overflow,
+  };
 }
 
 function drawButton(button: Button, width: number): Block {
