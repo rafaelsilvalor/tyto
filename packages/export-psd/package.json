@@ -26,6 +26,6 @@
   "dependencies": {
     "@tyto/core": "workspace:*",
     "@tyto/plugin-api": "workspace:*",
-    "ag-psd": "^34.2.2"
+    "ag-psd": "^34.2.3"
   }
 }
