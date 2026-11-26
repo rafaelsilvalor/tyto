@@ -136,6 +136,13 @@ last baseline, with a shadow when the caller gives its colour. Facts written `La
 it hands in, never kit vocabulary. A `titleBlock` text part that says `measured` takes its
 measured height when the content hands a `measure`.
 
+**The largest size that fits is `fitText`** (TYTO-889): the sizes tried come from `fitSizes`,
+whose step rule is data (`start` from the ceiling or the whole pixel under it, `floorLast`
+always or only on a step, `step` 0 for continuous), and a policy says what fits: `oneLine`,
+`fill` (the area's width and height, with a line cap and the written lines kept first) or
+`balance` (the kit's `balance`, with the caller's `functionWords`). When even the floor does not
+fit, the floor, reported as an overflow. A template keeps its own step rule to keep its sizes.
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and

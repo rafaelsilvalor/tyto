@@ -15,6 +15,8 @@
  * and still find each character's style at the same offset.
  */
 
+import { breakPieces, endsOnFunctionWord as kitEndsOnFunctionWord } from '@tyto/template-kit';
+
 /** The space that draws and measures as one and is never a line break. */
 export const NO_BREAK_SPACE = ' ';
 
@@ -47,7 +49,7 @@ export function glueParenthesised(text: string, before: RegExp, maxWords = Infin
  * Split on the plain space only, as the layout breaks; an empty text has no pieces.
  */
 export function pieces(glued: string): string[] {
-  return glued.split(' ').filter((piece) => piece !== '');
+  return breakPieces(glued);
 }
 
 /**
@@ -88,7 +90,5 @@ export const FUNCTION_WORDS: ReadonlySet<string> = new Set([
  * counts, and case does not.
  */
 export function endsOnFunctionWord(piece: string): boolean {
-  const words = piece.split(NO_BREAK_SPACE);
-  const last = words[words.length - 1] ?? '';
-  return FUNCTION_WORDS.has(last.toLocaleLowerCase('pt-BR'));
+  return kitEndsOnFunctionWord(piece, FUNCTION_WORDS, 'pt-BR');
 }
