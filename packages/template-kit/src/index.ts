@@ -181,6 +181,21 @@ export {
 
 export { imageHeight } from './image.js';
 export {
+  HUGGED_TEXT_PARAMETERS,
+  type HuggedTextParameters,
+  PADDED_CARD_PARAMETERS,
+  type PaddedCardPaints,
+  type PaddedCardParameters,
+  huggedText,
+  paddedCard,
+} from './hug-card.js';
+export {
+  LABEL_VALUE_PARAMETERS,
+  type LabelValueParameters,
+  type LabelValueStyles,
+  labelValueRuns,
+} from './label-value.js';
+export {
   BARE_PICTURE_PARAMETERS,
   type BarePictureParameters,
   FRAMED_PICTURE_PARAMETERS,
