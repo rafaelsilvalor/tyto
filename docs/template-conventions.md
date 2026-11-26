@@ -152,6 +152,14 @@ which roles carry on; the slides before are read from `context.artworks` (ADR 02
 flags on one slide come back as `conflict`. Read a flag with `flag` and an enum with `oneOf`;
 an enum value the manifest does not list is reported by the compiler, never by the template.
 
+**The arrangements take an area and a schema** (TYTO-891): `stackIn`, `rowIn`, `insetIn`,
+`markIn` and `iconIn`, each with its `*_PARAMETERS` whose defaults are the older forms' values,
+return how far they run past a bounded area as `overflow`. A stack item may state its own
+`gapAbove`, and `stackIn` and `blockColumn` take `measureFrom: 'capitals'` to run a gap from a
+baseline to the next capitals. `weightedSpacing` returns a mismatch of weights as a result;
+`stack`, `row`, `inset`, `mark`, `icon` and `spaceByWeight` stay as they were, wrappers over the
+new forms, until the recomposition batch moves their last caller.
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and

@@ -355,6 +355,7 @@ describe('the parameters', () => {
       gap: 0,
       verticalAlign: 'center',
       horizontalAlign: 'center',
+      measureFrom: 'box',
       weight1: 0.7,
       weight2: 0.85,
       weight3: 1,

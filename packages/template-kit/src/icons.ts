@@ -1,7 +1,7 @@
 import { group, rect, solid, vector } from '@tyto/core/template';
 
 import { type Block, at, block } from './blocks.js';
-import { type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 /**
  * Five single-colour icons for calls to action (TYTO-860, TYTO-888): a heart, a speech balloon,
@@ -71,6 +71,37 @@ const NO_FILL = solid({ r: 0, g: 0, b: 0, a: 0 });
 
 /** An icon `height` tall, in `color`, as wide as its box at that height. */
 export function icon(shape: Icon, height: number, color: string, name: string): Block {
+  const drawn = iconIn(shape, { width: Infinity, height }, color, {}, { name });
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft };
+}
+
+/** The numbers an icon uses (TYTO-891): its height when its area does not bound one. */
+export const ICON_PARAMETERS = {
+  height: {
+    kind: 'length',
+    default: 24,
+    min: 0,
+    description: "The icon's height, in px; absent, the area's height when it has one.",
+  },
+} as const satisfies ParameterSchema;
+
+export type IconParameters = ValuesOf<typeof ICON_PARAMETERS>;
+
+/**
+ * An icon in `area`, as tall as the given height, else the area's, else the default, in
+ * `color`. `overflow` is how far it runs past a bounded area's width.
+ */
+export function iconIn(
+  shape: Icon,
+  area: Area,
+  color: string,
+  given: Partial<IconParameters> = {},
+  options: { readonly name?: string } = {},
+): Block & { readonly overflow: number } {
+  const values = parameterValues(ICON_PARAMETERS, given);
+  const height =
+    given.height !== undefined || !Number.isFinite(area.height) ? values.height : area.height;
+  const name = options.name ?? 'icon';
   const scale = height / shape.box.h;
   const paint =
     shape.paint.kind === 'fill'
@@ -83,17 +114,21 @@ export function icon(shape: Icon, height: number, color: string, name: string): 
             align: 'center' as const,
           },
         };
-  return block(
-    shape.box.w * scale,
-    height,
-    vector({
-      name,
-      geometry: { kind: 'path', d: shape.d, fillRule: shape.fillRule ?? 'nonzero' },
-      size: shape.box,
-      ...paint,
-      transform: { scaleX: scale, scaleY: scale },
-    }),
-  );
+  const width = shape.box.w * scale;
+  return {
+    ...block(
+      width,
+      height,
+      vector({
+        name,
+        geometry: { kind: 'path', d: shape.d, fillRule: shape.fillRule ?? 'nonzero' },
+        size: shape.box,
+        ...paint,
+        transform: { scaleX: scale, scaleY: scale },
+      }),
+    ),
+    overflow: Number.isFinite(area.width) ? Math.max(0, width - area.width) : 0,
+  };
 }
 
 /** The numbers an icon in a disc uses. */

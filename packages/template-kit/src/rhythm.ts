@@ -1,6 +1,6 @@
 import { ORPHAN_WORD_LIMIT, isStandaloneOperator } from '@tyto/core/template';
 
-import type { TemplateContext, TextRun } from '@tyto/core';
+import type { Result, TemplateContext, TextRun } from '@tyto/core';
 
 /**
  * Blocks spaced by weight between two edges, and text kept from ending a paragraph on a line
@@ -44,12 +44,10 @@ export interface Spaced {
  * proportions — the largest stays the largest — whatever the text's length. When the blocks do
  * not fit, the gaps are 0 and `overflow` says by how much, for the caller to report (ADR 0058).
  */
-export function spaceByWeight(spacing: WeightedSpacing): Spaced {
+export function weightedSpacing(spacing: WeightedSpacing): Result<Spaced, WeightsMismatch> {
   const { top, bottom, heights, weights } = spacing;
   if (weights.length !== heights.length + 1) {
-    throw new RangeError(
-      `spaceByWeight takes ${String(heights.length + 1)} weights for ${String(heights.length)} blocks, got ${String(weights.length)}`,
-    );
+    return { ok: false, error: { expected: heights.length + 1, got: weights.length } };
   }
   const used = heights.reduce((sum, height) => sum + height, 0);
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
@@ -63,7 +61,33 @@ export function spaceByWeight(spacing: WeightedSpacing): Spaced {
     tops.push(cursor);
     cursor += height;
   });
-  return { tops, unit, overflow: Math.max(0, -free) };
+  return { ok: true, value: { tops, unit, overflow: Math.max(0, -free) }, diagnostics: [] };
+}
+
+/** Weights that do not number one more than the blocks: what `weightedSpacing` refuses. */
+export interface WeightsMismatch {
+  readonly expected: number;
+  readonly got: number;
+}
+
+/**
+ * {@link weightedSpacing}, throwing a `RangeError` when the weights do not number one more than
+ * the blocks, as it always has.
+ *
+ * @deprecated Since TYTO-891: call `weightedSpacing`, which returns that case as a result
+ * instead of throwing (`AGENTS.md`: no exceptions for expected errors). Kept, throwing as before,
+ * for its callers: questao-estrategica's `fitStack` and the kit's `fittedColumn`; the
+ * recomposition batch moves them and then removes this.
+ */
+export function spaceByWeight(spacing: WeightedSpacing): Spaced {
+  const spaced = weightedSpacing(spacing);
+  if (!spaced.ok) {
+    const { heights, weights } = spacing;
+    throw new RangeError(
+      `spaceByWeight takes ${String(heights.length + 1)} weights for ${String(heights.length)} blocks, got ${String(weights.length)}`,
+    );
+  }
+  return spaced.value;
 }
 
 /* ------------------------------------------------------------------------------ orphans -- */
