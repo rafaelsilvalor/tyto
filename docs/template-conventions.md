@@ -146,6 +146,12 @@ A column of pieces built at a trial size is `fittedColumn`: the largest size at 
 gap of `spaceByWeight` stays above `gapFloor`, then the text it is fitted by, and each extra that
 follows its size, settled for an orphan through `settle`.
 
+**A slide's role is `roleOf`** (TYTO-552): the template lists its role flags in precedence order
+and the default, and, when a bare flag carries a slide on from the one before (`{continua}`),
+which roles carry on; the slides before are read from `context.artworks` (ADR 0203). Two role
+flags on one slide come back as `conflict`. Read a flag with `flag` and an enum with `oneOf`;
+an enum value the manifest does not list is reported by the compiler, never by the template.
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and

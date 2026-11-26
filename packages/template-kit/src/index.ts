@@ -207,6 +207,14 @@ export {
   fittedColumn,
 } from './fitted-column.js';
 export {
+  type AdjustedContext,
+  type RoleSpec,
+  type SlideRole,
+  flag,
+  oneOf,
+  roleOf,
+} from './slide-role.js';
+export {
   HUGGED_TEXT_PARAMETERS,
   type HuggedTextParameters,
   PADDED_CARD_PARAMETERS,
