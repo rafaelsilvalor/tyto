@@ -121,6 +121,13 @@ weight and colour the template's; and a layer as large as the page `sealed` retu
 (0, 0), that stands the signature and an optional leading and trailing piece (the next-slide
 arrow) on that page's foot, so a seal lifts them with no arithmetic in the template.
 
+**The slide counter is `slideCounter`, an icon on a disc `iconInDisc`** (TYTO-888): `01 I 04`
+from the artwork's index and count, the current number in its own weight, placed by its
+capitals; and an icon centred in a filled circle. An `Icon` that needs holes says
+`fillRule: 'evenodd'`. A like bar is a `buttonRow`: one button is the pill, its words a row of
+icon-only buttons each holding its icon at the reference's offset (`like-bar.test.ts` is the
+example).
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and

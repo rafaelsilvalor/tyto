@@ -1,11 +1,13 @@
-import { solid, vector } from '@tyto/core/template';
+import { group, rect, solid, vector } from '@tyto/core/template';
 
-import { type Block, block } from './blocks.js';
+import { type Block, at, block } from './blocks.js';
+import { type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 /**
- * Four single-colour icons for calls to action (TYTO-860): a heart, a speech balloon, a paper
- * plane and an arrow. Geometry only, drawn for the kit on a 24-unit box and never copied from
- * a brand file; the colour comes from the caller (`AGENTS.md`: geometry in, colour out).
+ * Five single-colour icons for calls to action (TYTO-860, TYTO-888): a heart, a speech balloon,
+ * a paper plane, a bookmark and an arrow. Geometry only, drawn for the kit on a 24-unit box and
+ * never copied from a brand file; the colour comes from the caller (`AGENTS.md`: geometry in,
+ * colour out).
  *
  * An icon is either filled or stroked. A stroke is in the box's units, so it scales with the
  * icon: a 2-unit line on a 24-unit box is a 3 px line on an icon 36 px tall.
@@ -15,6 +17,11 @@ export interface Icon {
   readonly d: string;
   /** Filled, or outlined by a line this many box units wide. */
   readonly paint: { readonly kind: 'fill' } | { readonly kind: 'stroke'; readonly width: number };
+  /**
+   * How the path's overlaps fill: `evenodd` leaves a hole where a subpath lies inside another (a
+   * ring, a lens). A property of the geometry, so it travels with it (TYTO-888); absent, nonzero.
+   */
+  readonly fillRule?: 'nonzero' | 'evenodd';
 }
 
 /** An outlined heart: like. */
@@ -39,6 +46,13 @@ export const BALLOON_ICON: Icon = {
 export const PAPER_PLANE_ICON: Icon = {
   box: { w: 24, h: 24 },
   d: 'M21 3L2.8 10.4L10.2 13.8L13.6 21.2L21 3ZM10.2 13.8L21 3',
+  paint: { kind: 'stroke', width: 1.8 },
+};
+
+/** An outlined bookmark: save (TYTO-888). */
+export const BOOKMARK_ICON: Icon = {
+  box: { w: 24, h: 24 },
+  d: 'M6 3.5H18V20.5L12 15.8L6 20.5Z',
   paint: { kind: 'stroke', width: 1.8 },
 };
 
@@ -74,10 +88,54 @@ export function icon(shape: Icon, height: number, color: string, name: string): 
     height,
     vector({
       name,
-      geometry: { kind: 'path', d: shape.d, fillRule: 'nonzero' },
+      geometry: { kind: 'path', d: shape.d, fillRule: shape.fillRule ?? 'nonzero' },
       size: shape.box,
       ...paint,
       transform: { scaleX: scale, scaleY: scale },
+    }),
+  );
+}
+
+/** The numbers an icon in a disc uses. */
+export const ICON_IN_DISC_PARAMETERS = {
+  iconRatio: {
+    kind: 'ratio',
+    default: 0.5,
+    min: 0,
+    max: 1,
+    description: "The icon's height as a share of the disc's diameter.",
+  },
+} as const satisfies ParameterSchema;
+
+export type IconInDiscParameters = ValuesOf<typeof ICON_IN_DISC_PARAMETERS>;
+
+/**
+ * An icon centred in a filled disc `diameter` wide (TYTO-888): the disc in `colors.disc`, the
+ * icon in `colors.icon`, its height `iconRatio` of the diameter.
+ */
+export function iconInDisc(
+  shape: Icon,
+  diameter: number,
+  colors: { readonly disc: string; readonly icon: string },
+  given: Partial<IconInDiscParameters> = {},
+  options: { readonly name?: string; readonly discName?: string; readonly iconName?: string } = {},
+): Block {
+  const { iconRatio } = parameterValues(ICON_IN_DISC_PARAMETERS, given);
+  const glyph = icon(shape, diameter * iconRatio, colors.icon, options.iconName ?? 'icon');
+  return block(
+    diameter,
+    diameter,
+    group({
+      name: options.name ?? 'icon-in-disc',
+      children: [
+        rect({
+          name: options.discName ?? 'disc',
+          size: { w: diameter, h: diameter },
+          radius: diameter / 2,
+          fill: solid(colors.disc),
+        }),
+        at((diameter - glyph.width) / 2, (diameter - glyph.height) / 2, glyph),
+      ],
     }),
   );
 }
