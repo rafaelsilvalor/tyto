@@ -198,6 +198,15 @@ export {
   fitText,
 } from './fit-text.js';
 export {
+  type ColumnExtra,
+  type ColumnPiece,
+  type ColumnStack,
+  type ColumnTuning,
+  FITTED_COLUMN_PARAMETERS,
+  type FittedColumnParameters,
+  fittedColumn,
+} from './fitted-column.js';
+export {
   HUGGED_TEXT_PARAMETERS,
   type HuggedTextParameters,
   PADDED_CARD_PARAMETERS,

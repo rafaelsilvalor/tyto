@@ -142,6 +142,9 @@ always or only on a step, `step` 0 for continuous), and a policy says what fits:
 `fill` (the area's width and height, with a line cap and the written lines kept first) or
 `balance` (the kit's `balance`, with the caller's `functionWords`). When even the floor does not
 fit, the floor, reported as an overflow. A template keeps its own step rule to keep its sizes.
+A column of pieces built at a trial size is `fittedColumn`: the largest size at which every
+gap of `spaceByWeight` stays above `gapFloor`, then the text it is fitted by, and each extra that
+follows its size, settled for an orphan through `settle`.
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
