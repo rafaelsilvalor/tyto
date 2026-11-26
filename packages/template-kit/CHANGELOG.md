@@ -1,5 +1,11 @@
 # @tyto/template-kit
 
+## 0.25.0
+
+### Minor Changes
+
+- ae7f24b: `buttonRow`: a button's `words` are optional, so a button may hold an icon alone, and a trailing piece may sit after the words with no box when the style gives none (TYTO-884). A button with words and no box-less piece is as wide and drawn as before.
+
 ## 0.24.0
 
 ### Minor Changes
