@@ -110,7 +110,8 @@ optional end cap with its own piece (an arrow). One button with an end cap is "E
 comentários →"; three with leading icons are "Curta · Comente · Compartilhe". The template
 builds the words with the text components and the icons with `icon` (`HEART_ICON`,
 `BALLOON_ICON`, `PAPER_PLANE_ICON`, `ARROW_ICON`: geometry in the kit, colour from the
-caller), and says every size and colour in the style.
+caller), and says every size and colour in the style. A button may hold an icon alone, with
+no words, and a trailing piece may sit after the words with no box of its own (TYTO-884).
 
 ```ts
 const sessions = slotTable(sessionTable, { text: lamina, width, measure: context.measure });
