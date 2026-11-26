@@ -92,10 +92,10 @@ an offer card, a signature foot). Both take an area and declared parameters and 
 measured `Block` (ADR 0224 decisions 1 and 2). So a new template is written in two moves: pick
 the components it needs, and wire them into one root arrangement over the frame's area, the
 reference's coordinates and sizes handed in as data. `template.ts` calls no core `rect`, `text`,
-`vector` or `image` node; a piece the kit lacks is a kit card first. Until the picture and shape
-primitives land (TYTO-625, TYTO-886), an image or a shape may be drawn with core nodes only in a
-local function whose comment names it as pending. The six templates still drawn by hand are
-recomposed in the batch template-recompose; ADR 0230 says when each binds.
+`vector` or `image` node; a piece the kit lacks is a kit card first. The picture and shape
+primitives exist (TYTO-625, TYTO-886), so an image or a shape goes through them. The six
+templates still drawn by hand are recomposed in the batch template-recompose; ADR 0230 says when
+each binds.
 
 **Text placed by the top of its capitals is `capText`** (TYTO-793): the runs as a block whose
 `anchor` holds the top of the first line's capitals and the last line's baseline, the face's
@@ -109,6 +109,11 @@ block with no words is read by its box's edges. A slot is read with `slotText`, 
 `arrowShape`, each given its size and its paint — solid or a linear gradient, the caller's — and
 returning a block. `roundedRectPath`, `circlePath` and `capsulePath` build the path data of a
 glyph the template keeps as data (a network's logo, an institution's emblem).
+
+**A picture is `framedPicture` or `barePicture`** (TYTO-625): the file in the area's width, as
+tall as its own shape makes it within the area's height and the declared `widest` and `tallest`
+shapes, framed (border, bar, rounded inside corners as one even-odd outline, a shadow when the
+caller gives its colour) or alone for `{sem-quadro}`. Place a framed picture on a whole pixel.
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on

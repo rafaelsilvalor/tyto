@@ -70,6 +70,10 @@ channel by 24 of 255 (TYTO-881).
      an image or a shape with core nodes, only inside a local function whose comment names it as
      pending and the card that replaces it.
 
+   2026-11-26: both exist — the shapes and the arrow since TYTO-886, `framedPicture` and
+   `barePicture` since TYTO-625 — so the allowance above no longer applies to new work; the six
+   hand-drawn templates keep their copies until their recomposition card.
+
 2. **A `Block` carries an optional text anchor: `anchor?: { capTop, baseline }`.** Both numbers
    are in the block's own coordinates: `capTop` is the top of the first line's capitals,
    `baseline` the baseline of its last line.
