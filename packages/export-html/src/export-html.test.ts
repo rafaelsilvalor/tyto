@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { exportHtml } from './export-html.js';
 import type { HtmlFontFace, HtmlResources } from './html.js';
+import boxedFixture from './__fixtures__/boxed.json';
 import formulaFixture from './__fixtures__/formula.json';
 import mappingFixture from './__fixtures__/mapping.json';
 import paragraphsFixture from './__fixtures__/paragraphs.json';
@@ -137,6 +138,41 @@ describe('a scene becomes one self-contained document per frame', () => {
     const [feed] = htmlOf(sceneOf(paragraphsFixture));
 
     await expect(feed).toMatchFileSnapshot('./__snapshots__/paragraphs.feed.html');
+  });
+
+  it('renders the boxed fixture to its committed snapshot (ADR 0231)', async () => {
+    const [midLine, broken, noMetrics] = htmlOf(sceneOf(boxedFixture));
+
+    await expect(midLine).toMatchFileSnapshot('./__snapshots__/boxed.mid-line.html');
+    await expect(broken).toMatchFileSnapshot('./__snapshots__/boxed.break.html');
+    await expect(noMetrics).toMatchFileSnapshot('./__snapshots__/boxed.no-metrics.html');
+  });
+
+  it('places the band from the metrics: 4.4 px into the glyph box, 70.6 px tall (ADR 0231)', () => {
+    const [midLine = ''] = htmlOf(sceneOf(boxedFixture));
+    // Source Sans 3 at 60 px: ascent 60, cap height 39.6, so the band starts 60 - 39.6 - 16
+    // below the glyph box's top and is 16 + 39.6 + 15 tall; the glyph box reaches 20 px below
+    // the baseline, past `under`, so neither side is padded.
+    expect(midLine).toContain('padding: 0px 17px 0px');
+    expect(midLine).toContain('background-size: 100% 70.6px');
+    expect(midLine).toContain('background-position: 0 4.4px');
+  });
+
+  it('writes a box only around a run that carries one (ADR 0231)', () => {
+    const boxed = htmlOf(sceneOf(boxedFixture)).join('');
+    expect(boxed.match(/box-decoration-break: clone/gu)).toHaveLength(3);
+    expect(boxed.match(/rx%3D/gu)).toHaveLength(1);
+    for (const fixture of [promoFixture, paragraphsFixture, formulaFixture, mappingFixture]) {
+      expect(htmlOf(sceneOf(fixture)).join('')).not.toContain('box-decoration-break');
+    }
+  });
+
+  it('reports a box whose face metrics are missing, and only that one (ADR 0231)', () => {
+    const approximated = problemsOf(sceneOf(boxedFixture)).filter(
+      (problem) => problem.code === 'W_EXPORT_APPROXIMATED',
+    );
+    expect(approximated).toHaveLength(1);
+    expect(approximated[0]?.message).toContain('no-metrics');
   });
 
   it('renders the formula fixture to its committed snapshot (ADR 0206)', async () => {

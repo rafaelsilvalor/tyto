@@ -1,0 +1,350 @@
+{
+  "version": 1,
+  "fonts": [
+    {
+      "family": "Source Sans 3",
+      "source": "bundled"
+    }
+  ],
+  "assets": [],
+  "artworks": [
+    {
+      "id": "boxed",
+      "label": "A run on a filled box, measured from the capitals (ADR 0231)",
+      "frames": [
+        {
+          "format": "mid-line",
+          "size": {
+            "w": 640,
+            "h": 320
+          },
+          "background": {
+            "kind": "solid",
+            "color": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            }
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "mid-line",
+              "name": "a boxed word in the middle of a line",
+              "transform": {
+                "x": 40,
+                "y": 40
+              },
+              "box": {
+                "w": 560
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.6,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Set the ",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "TEXT",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 255,
+                      "g": 255,
+                      "b": 255
+                    }
+                  },
+                  "box": {
+                    "paint": {
+                      "kind": "solid",
+                      "color": {
+                        "r": 200,
+                        "g": 0,
+                        "b": 0
+                      }
+                    },
+                    "padding": {
+                      "x": 17,
+                      "over": 16,
+                      "under": 15
+                    },
+                    "metrics": {
+                      "ascent": 1,
+                      "descent": 0.326,
+                      "capHeight": 0.66
+                    }
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " here",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "format": "break",
+          "size": {
+            "w": 640,
+            "h": 320
+          },
+          "background": {
+            "kind": "solid",
+            "color": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            }
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "break",
+              "name": "a boxed run the line breaks in two: one box per line",
+              "transform": {
+                "x": 40,
+                "y": 40
+              },
+              "box": {
+                "w": 320
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.6,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Set ",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "TEXT TEXT",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 255,
+                      "g": 255,
+                      "b": 255
+                    }
+                  },
+                  "box": {
+                    "paint": {
+                      "kind": "solid",
+                      "color": {
+                        "r": 200,
+                        "g": 0,
+                        "b": 0
+                      }
+                    },
+                    "padding": {
+                      "x": 17,
+                      "over": 16,
+                      "under": 15
+                    },
+                    "metrics": {
+                      "ascent": 1,
+                      "descent": 0.326,
+                      "capHeight": 0.66
+                    },
+                    "radius": 8
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " now",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "format": "no-metrics",
+          "size": {
+            "w": 640,
+            "h": 320
+          },
+          "background": {
+            "kind": "solid",
+            "color": {
+              "r": 255,
+              "g": 255,
+              "b": 255
+            }
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "no-metrics",
+              "name": "a box with no face metrics: drawn over the glyph box, reported",
+              "transform": {
+                "x": 40,
+                "y": 40
+              },
+              "box": {
+                "w": 560
+              },
+              "align": "left",
+              "valign": "top",
+              "lineHeight": 1.6,
+              "overflow": "clip",
+              "runs": [
+                {
+                  "kind": "text",
+                  "text": "Set the ",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "TEXT",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 700,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 255,
+                      "g": 255,
+                      "b": 255
+                    }
+                  },
+                  "box": {
+                    "paint": {
+                      "kind": "solid",
+                      "color": {
+                        "r": 200,
+                        "g": 0,
+                        "b": 0
+                      }
+                    },
+                    "padding": {
+                      "x": 17,
+                      "over": 16,
+                      "under": 15
+                    }
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " here",
+                  "font": {
+                    "family": "Source Sans 3",
+                    "source": "bundled"
+                  },
+                  "size": 60,
+                  "weight": 400,
+                  "style": "normal",
+                  "color": {
+                    "kind": "solid",
+                    "color": {
+                      "r": 0,
+                      "g": 0,
+                      "b": 0
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,7 @@ import type { RasterFormat } from './rasterizer.js';
 
 import { compileFormulaBrief, readFormulaBrief } from './__fixtures__/formula-brief.js';
 import alphaFixture from './__fixtures__/alpha.json';
+import boxedFixture from './__fixtures__/boxed.json';
 import shadowFixture from './__fixtures__/shadow.json';
 import shapesFixture from './__fixtures__/shapes.json';
 import spreadFixture from './__fixtures__/spread.json';
@@ -938,5 +939,140 @@ describe('a tracked line', () => {
         .soft(Math.abs(offset), `${exporter}: ${offset.toFixed(2)} px from its untracked twin`)
         .toBeLessThanOrEqual(INK_TOLERANCE);
     }
+  });
+});
+
+/**
+ * A run on a filled box (`boxed.json`, ADR 0231): red box, white capitals, padding x 17,
+ * over 16, under 15 — the concursos-abertos-ec sign-off's numbers.
+ *
+ * Measured on the pixels rather than against a reference PNG, because the claim is a
+ * relation: the box reaches `over` above the capitals' ink and `under` below the baseline,
+ * and `x` past the ink on each side give or take the glyphs' side bearings. The text is
+ * capitals with flat tops and no descenders, so the ink's top is the cap height and its
+ * bottom the baseline. The break frame's run wraps: one box per line, each the same height.
+ */
+describe('a run on a filled box (ADR 0231)', () => {
+  const PADDING = { x: 17, over: 16, under: 15 };
+  /** A pixel row or column the box edge or the cap top half covers lands either side. */
+  const EDGE_TOLERANCE = 1.5;
+  /** The capitals' side bearings at 60 px bold, measured at 1 px each side. */
+  const BEARING = 3;
+
+  interface Fragment {
+    readonly box: {
+      readonly top: number;
+      readonly bottom: number;
+      readonly left: number;
+      readonly right: number;
+    };
+    readonly ink: {
+      readonly top: number;
+      readonly bottom: number;
+      readonly left: number;
+      readonly right: number;
+    };
+  }
+
+  const at = (png: PNG, x: number, y: number): number => (y * png.width + x) * 4;
+  const isBox = (png: PNG, x: number, y: number): boolean =>
+    (png.data[at(png, x, y)] ?? 0) > 100 && (png.data[at(png, x, y) + 1] ?? 255) < 100;
+  /** White ink over the red box; the white page around the box is outside every row's span. */
+  const isInk = (png: PNG, x: number, y: number): boolean =>
+    (png.data[at(png, x, y) + 1] ?? 0) > 128;
+
+  /** Each run of consecutive rows that hold box pixels is one line's box. */
+  function fragmentsOf(png: PNG): readonly Fragment[] {
+    const spans: { top: number; bottom: number }[] = [];
+    for (let y = 0; y < png.height; y += 1) {
+      let found = false;
+      for (let x = 0; x < png.width && !found; x += 1) found = isBox(png, x, y);
+      if (!found) continue;
+      const last = spans[spans.length - 1];
+      if (last !== undefined && last.bottom === y - 1) last.bottom = y;
+      else spans.push({ top: y, bottom: y });
+    }
+    return spans.map(({ top, bottom }) => {
+      const box = { top, bottom, left: png.width, right: -1 };
+      const ink = { top: png.height, bottom: -1, left: png.width, right: -1 };
+      for (let y = top; y <= bottom; y += 1) {
+        let first = -1;
+        let last = -1;
+        for (let x = 0; x < png.width; x += 1) {
+          if (!isBox(png, x, y)) continue;
+          if (first === -1) first = x;
+          last = x;
+        }
+        box.left = Math.min(box.left, first);
+        box.right = Math.max(box.right, last);
+        // Only between the row's first and last box pixel: a rounded corner's white is page.
+        for (let x = first; x !== -1 && x <= last; x += 1) {
+          if (!isInk(png, x, y)) continue;
+          ink.top = Math.min(ink.top, y);
+          ink.bottom = Math.max(ink.bottom, y);
+          ink.left = Math.min(ink.left, x);
+          ink.right = Math.max(ink.right, x);
+        }
+      }
+      return { box, ink };
+    });
+  }
+
+  const documents = documentsOf(boxedFixture);
+
+  async function fragments(format: string): Promise<readonly Fragment[]> {
+    const document = documents.find((candidate) => candidate.name === `boxed.${format}`);
+    if (document === undefined) throw new Error(`The boxed fixture has no ${format} frame.`);
+    return fragmentsOf(PNG.sync.read(Buffer.from(await render(document))));
+  }
+
+  function expectHugsTheCapitals(fragment: Fragment, label: string): void {
+    const { box, ink } = fragment;
+    const over = ink.top - box.top;
+    const under = box.bottom - ink.bottom;
+    expect
+      .soft(Math.abs(over - PADDING.over), `${label}: ${String(over)} px over the capitals`)
+      .toBeLessThanOrEqual(EDGE_TOLERANCE);
+    expect
+      .soft(Math.abs(under - PADDING.under), `${label}: ${String(under)} px under the baseline`)
+      .toBeLessThanOrEqual(EDGE_TOLERANCE);
+    const left = ink.left - box.left;
+    expect
+      .soft(left, `${label}: ${String(left)} px left of the ink`)
+      .toBeGreaterThanOrEqual(PADDING.x);
+    expect
+      .soft(left, `${label}: ${String(left)} px left of the ink`)
+      .toBeLessThanOrEqual(PADDING.x + BEARING);
+  }
+
+  function expectEndsAtItsPadding(fragment: Fragment, label: string): void {
+    const right = fragment.box.right - fragment.ink.right;
+    expect
+      .soft(right, `${label}: ${String(right)} px right of the ink`)
+      .toBeGreaterThanOrEqual(PADDING.x);
+    expect
+      .soft(right, `${label}: ${String(right)} px right of the ink`)
+      .toBeLessThanOrEqual(PADDING.x + BEARING);
+  }
+
+  it('reaches its padding past the capitals of a word in the middle of a line', async () => {
+    const found = await fragments('mid-line');
+    expect(found).toHaveLength(1);
+    const [only] = found as [Fragment];
+    expectHugsTheCapitals(only, 'mid-line');
+    expectEndsAtItsPadding(only, 'mid-line');
+  });
+
+  it('draws one box per line when the run breaks, each the same height', async () => {
+    const found = await fragments('break');
+    expect(found).toHaveLength(2);
+    const [first, second] = found as [Fragment, Fragment];
+    expectHugsTheCapitals(first, 'first line');
+    expectHugsTheCapitals(second, 'second line');
+    // The first line's box also covers the space the line broke at (ADR 0231); the run's
+    // own end is on the second line, and that one ends at its padding.
+    expectEndsAtItsPadding(second, 'second line');
+    expect(first.box.bottom - first.box.top).toBe(second.box.bottom - second.box.top);
+    expect(second.box.top).toBeGreaterThan(first.box.bottom);
   });
 });

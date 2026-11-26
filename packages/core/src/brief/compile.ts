@@ -5,6 +5,7 @@ import { type Diagnostics, type Result, err, withDiagnostics } from '../result/r
 import type { SceneNode, TextNode } from '../scene/nodes.js';
 import type { FaceCache } from '../text/face.js';
 import { measureText } from '../text/layout.js';
+import { withBoxMetrics } from '../text/box-metrics.js';
 import { originOf } from '../text/origin.js';
 import type { SourceRange } from '../source/range.js';
 import type { AssetRef, FontRef, Paint } from '../scene/primitives.js';
@@ -241,9 +242,10 @@ function layoutText(
     // not measured, and the one whose export is going to fail.
     reportUnavailableFaces(node, faces, report, problems);
 
-    const measured = measureText(node, faces);
+    const boxed = withBoxMetrics(node, faces);
+    const measured = measureText(boxed, faces);
     // No face, no measurement: the node keeps the lines its template wrote.
-    if (measured === undefined) return node;
+    if (measured === undefined) return boxed;
 
     if (measured.missing !== undefined && measured.missing.length > 0) {
       const { name, range } = provenance(node, slots);
@@ -271,7 +273,7 @@ function layoutText(
     }
 
     return {
-      ...node,
+      ...boxed,
       runs: [...measured.runs],
       ...(node.overflow === 'shrink' ? { overflow: 'clip' as const } : {}),
     };

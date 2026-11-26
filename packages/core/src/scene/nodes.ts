@@ -7,6 +7,7 @@ import {
   type Transform,
   assetRefSchema,
   blendModeSchema,
+  colorSchema,
   effectSchema,
   fitSchema,
   fontRefSchema,
@@ -53,6 +54,44 @@ export type TextVerticalAlign = z.infer<typeof textVerticalAlignSchema>;
 export const textOverflowSchema = z.enum(['clip', 'shrink', 'grow']);
 export type TextOverflow = z.infer<typeof textOverflowSchema>;
 
+const roomSchema = z.number().finite().nonnegative();
+const emSchema = z.number().finite().positive();
+
+/**
+ * A filled box behind a run (ADR 0231): a word set on a colour, inside the text's own line
+ * breaking.
+ *
+ * It is measured from the type, not from the line: `over` reaches above the cap height and
+ * `under` below the baseline, both in px, so the box hugs the capitals the way a designer
+ * draws it rather than covering the font's whole ascent and descent. `x` is added on each
+ * side and takes room in the line, as any inline padding does. A run the exporter breaks
+ * across lines draws one box per line, each with its full padding and `radius`.
+ *
+ * `metrics` are the run's face's vertical metrics in em, which the box is placed by. The
+ * exporter cannot read a font — it is handed a URI per face — so the stage that holds the
+ * face writes them here (`compile`'s text layout), and the exporter stays a function of the
+ * Scene. Absent when no face could be read: the exporter then draws the box over the line's
+ * own glyph box and says so.
+ */
+export const runBoxSchema = z.strictObject({
+  /** Solid only: the box is painted as a shape, and a gradient or an image in it is a later ADR. */
+  paint: z.strictObject({ kind: z.literal('solid'), color: colorSchema }),
+  padding: z.strictObject({ x: roomSchema, over: roomSchema, under: roomSchema }),
+  /** Corner radius in px; absent is square. */
+  radius: roomSchema.optional(),
+  metrics: z
+    .strictObject({
+      /** hhea ascent: where the browser puts the top of a run's glyph box. */
+      ascent: emSchema,
+      /** hhea descent, positive: where the glyph box ends below the baseline. */
+      descent: emSchema,
+      /** OS/2 cap height: what `over` is measured from. */
+      capHeight: emSchema,
+    })
+    .optional(),
+});
+export type RunBox = z.infer<typeof runBoxSchema>;
+
 export const textSpanSchema = z.strictObject({
   kind: z.literal('text'),
   text: z.string(),
@@ -68,6 +107,7 @@ export const textSpanSchema = z.strictObject({
   style: z.enum(['normal', 'italic']),
   color: paintSchema,
   decoration: z.enum(['underline', 'line-through']).optional(),
+  box: runBoxSchema.optional(),
 });
 export type TextSpan = z.infer<typeof textSpanSchema>;
 

@@ -254,6 +254,16 @@ function textElement(node: TextNode, lines: readonly Line[], sink: Sink): string
           return '';
         }
         remember(run, sink);
+        if (run.box !== undefined) {
+          // A box sits behind where the run lands, and SVG does not know where that is: it
+          // measures no glyph widths, so a rect has no x and no width (ADR 0231).
+          approximated(
+            sink,
+            node.id,
+            'a box behind a run',
+            'SVG measures no text, so it cannot tell where the run lands: the text is drawn without its box',
+          );
+        }
         const shift = skip === 0 ? '' : attribute('dx', svgNumber(skip));
         skip = 0;
         return element('tspan', [shift, runAttributes(run, node, sink)], escapeXml(run.text));

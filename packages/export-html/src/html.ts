@@ -11,6 +11,7 @@ import type {
   Matrix,
   Paint,
   RectNode,
+  RunBox,
   Scene,
   SceneFontFace,
   SceneNode,
@@ -535,7 +536,78 @@ function breakHtml(run: LineBreak): string {
 }
 
 function spanHtml(run: TextSpan, nodeId: string, emit: Emit): string {
-  return `<span style="${escapeHtml(runDeclarations(run, nodeId, emit).join('; '))}">${escapeHtml(run.text)}</span>`;
+  const span = `<span style="${escapeHtml(runDeclarations(run, nodeId, emit).join('; '))}">${escapeHtml(run.text)}</span>`;
+  return run.box === undefined ? span : boxedHtml(run, run.box, span, nodeId, emit);
+}
+
+/**
+ * A run's box (ADR 0231) as a span of its own around the run's span.
+ *
+ * Its own span because a gradient run already spends `background` on its glyphs
+ * (`background-clip: text`). The box is not the span's background box: an inline box is as
+ * tall as its face's ascent plus descent, and the box ADR 0231 draws reaches `over` above
+ * the capitals and `under` below the baseline. So the box is a band painted inside the span
+ * — sized and placed from the face's metrics the Scene carries, and padded out where the
+ * band reaches past the glyph box — and `box-decoration-break: clone` gives every line the
+ * run breaks across a band, padding and radius of its own. The band is an SVG rect so that
+ * `radius` rounds the band and not the span's taller box.
+ *
+ * No metrics, no capitals to measure from: the band is the span's whole padded box, which is
+ * what a background on an inline element covers, and the export says so.
+ */
+function boxedHtml(run: TextSpan, box: RunBox, inner: string, nodeId: string, emit: Emit): string {
+  const band = bandOf(run.size, box);
+  if (box.metrics === undefined) {
+    approximated(
+      emit,
+      nodeId,
+      'a box behind a run',
+      "its face's metrics are not in the Scene, so the box covers the run's glyph box rather than reaching from its capitals",
+    );
+  }
+  const radius = box.radius === undefined ? '' : ` rx='${cssNumber(box.radius)}'`;
+  const rect = `<svg xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%'${radius} fill='${cssColor(box.paint.color)}'/></svg>`;
+  const declarations = [
+    `font-family: "${run.font.family}"`,
+    `font-size: ${cssLength(run.size)}`,
+    `font-weight: ${cssNumber(run.weight)}`,
+    ...(run.style === 'normal' ? [] : [`font-style: ${run.style}`]),
+    `padding: ${cssLength(band.paddingTop)} ${cssLength(box.padding.x)} ${cssLength(band.paddingBottom)}`,
+    `background-image: url("data:image/svg+xml,${encodeURIComponent(rect)}")`,
+    `background-size: 100% ${band.height === undefined ? '100%' : cssLength(band.height)}`,
+    `background-position: 0 ${cssLength(band.top)}`,
+    'background-repeat: no-repeat',
+    'box-decoration-break: clone',
+  ];
+  return `<span style="${escapeHtml(declarations.join('; '))}">${inner}</span>`;
+}
+
+/**
+ * Where a run's box band sits in its span, px. The span's glyph box runs from `ascent` above
+ * the baseline to `descent` below it; the band from `capHeight + over` above to `under`
+ * below. Padding grows the span only where the band reaches past the glyph box, because
+ * padding cannot be negative; where it does not, the band starts inside the span.
+ */
+function bandOf(
+  size: number,
+  box: RunBox,
+): { paddingTop: number; paddingBottom: number; top: number; height: number | undefined } {
+  const { over, under } = box.padding;
+  if (box.metrics === undefined) {
+    return { paddingTop: over, paddingBottom: under, top: 0, height: undefined };
+  }
+  const { ascent, descent, capHeight } = box.metrics;
+  // Chromium rounds a face's ascent and descent to whole pixels before it builds a glyph box
+  // (measured: 60 and 20 px for Source Sans 3 at 60 px, whose descent is 19.56), so the band
+  // is placed from the rounded edges it actually draws from.
+  const fromTop = Math.round(ascent * size) - capHeight * size - over;
+  const fromBottom = Math.round(descent * size) - under;
+  return {
+    paddingTop: Math.max(0, -fromTop),
+    paddingBottom: Math.max(0, -fromBottom),
+    top: Math.max(0, fromTop),
+    height: over + capHeight * size + under,
+  };
 }
 
 /** A formula's colour as an SVG fill. A gradient or an image is drawn in a solid colour. */

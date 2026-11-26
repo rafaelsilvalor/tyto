@@ -85,6 +85,7 @@ export {
   type AtLeastTwo,
   type ColorChannels,
   type NonEmpty,
+  type RunBoxOptions,
   type RunOptions,
   color,
   font,

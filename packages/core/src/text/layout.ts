@@ -120,6 +120,37 @@ function tokenize(text: string): Token[] {
 interface Piece {
   readonly run: TextSpan | FormulaRun;
   readonly text: string;
+  /** The run's last token: where a boxed run's box closes (ADR 0231). */
+  readonly end?: boolean;
+}
+
+/** A boxed run's padding on each side, px; 0 for a run with no box. */
+function sidePadding(run: TextSpan | FormulaRun): number {
+  return run.kind === 'text' && run.box !== undefined ? run.box.padding.x : 0;
+}
+
+/**
+ * The room a word's boxes add, starting after `previous` (ADR 0231). A box opens with its
+ * padding wherever its run starts on a line — a run broken across lines has a box per line —
+ * and closes with it at the run's end. `visible` also closes a box the word leaves open,
+ * because that is the width if the line ends here, which is what has to fit; `flowing` does
+ * not, because a box that goes on draws no padding mid-line.
+ */
+function boxRoom(
+  pieces: readonly Piece[],
+  previous: TextSpan | FormulaRun | undefined,
+): { readonly flowing: number; readonly visible: number } {
+  let flowing = 0;
+  let before = previous;
+  for (const piece of pieces) {
+    const padding = sidePadding(piece.run);
+    if (padding > 0 && before !== piece.run) flowing += padding;
+    if (padding > 0 && piece.end === true) flowing += padding;
+    before = piece.run;
+  }
+  const last = pieces[pieces.length - 1];
+  const open = last !== undefined && last.end !== true ? sidePadding(last.run) : 0;
+  return { flowing, visible: flowing + open };
 }
 
 interface Line {
@@ -321,16 +352,25 @@ function layoutAt(
     let leading = 0;
     for (const piece of pieces.slice(0, -1)) leading += widthOf(piece.run, piece.text);
     const last = pieces[pieces.length - 1]!;
-    const flowing = leading + widthOf(last.run, last.text);
-    const visible = leading + widthOf(last.run, last.text.replace(/ +$/, ''));
+    const glyphs = leading + widthOf(last.run, last.text);
+    const trimmed = leading + widthOf(last.run, last.text.replace(/ +$/, ''));
 
     let line = lines[lines.length - 1]!;
     let start = line.flowing;
+    const here = boxRoom(pieces, line.pieces[line.pieces.length - 1]?.run);
+    const flowing = glyphs + here.flowing;
+    const visible = trimmed + here.visible;
     // A word that does not fit starts a line — unless the line is empty, in which case
     // nothing would be gained by moving it and a word longer than its box would loop.
     if (limit !== undefined && line.pieces.length > 0 && line.flowing + visible > limit) {
-      // A wrap is no paragraph: the line it starts takes no space above it.
-      line = { ...emptyLine(), flowing, visible };
+      // A wrap is no paragraph: the line it starts takes no space above it. A box the word
+      // continues opens again on the new line.
+      const fresh = boxRoom(pieces, undefined);
+      line = {
+        ...emptyLine(),
+        flowing: glyphs + fresh.flowing,
+        visible: trimmed + fresh.visible,
+      };
       lines.push(line);
       start = 0;
     } else {
@@ -364,8 +404,13 @@ function layoutAt(
       continue;
     }
 
-    for (const token of tokenize(run.text)) {
-      word.push({ run, text: token.text });
+    const tokens = tokenize(run.text);
+    for (const [index, token] of tokens.entries()) {
+      word.push(
+        index === tokens.length - 1
+          ? { run, text: token.text, end: true }
+          : { run, text: token.text },
+      );
       if (token.text !== token.trimmed) close();
     }
   }

@@ -13,8 +13,9 @@ Base     { id; name?; kind; transform: Transform; opacity: 0..1; blend: BlendMod
 Group    extends Base { children: Node[] }
 Rect     extends Base { size; radius: [tl,tr,br,bl]; fill?: Paint; stroke?: Stroke }
 Text     extends Base { box: {w?, h?}; runs: TextRun[]; align; valign; lineHeight; letterSpacing; overflow: 'clip'|'shrink'|'grow' }
-TextRun  = TextSpan{kind:'text', text, font: FontRef, size, weight, style, color: Paint, decoration?} | LineBreak{kind:'break', space?}
+TextRun  = TextSpan{kind:'text', text, font: FontRef, size, weight, style, color: Paint, decoration?, box?: RunBox} | LineBreak{kind:'break', space?}
          | FormulaRun{kind:'formula', text, math: MathItem[], font, size, weight, style, color, layout?: FormulaLayout}
+RunBox   { paint: solid Paint; padding: {x, over, under}; radius?; metrics?: {ascent, descent, capHeight} }   // ADR 0231
 MathItem = {kind:'text', text} | {kind:'fraction', numerator: MathItem[], denominator: MathItem[]} | {kind:'scripts', superscript?, subscript?}
 FormulaLayout { offset; lineWidth; width; ascent; descent; above; below;
                 glyphs: {text, font, size, weight, style, x, y}[]; rules: {x, y, width, thickness}[] }   // ADR 0206
@@ -78,13 +79,19 @@ The prose above is the contract; these are the decisions taken while writing the
   `text` is the linear reading, drawn only when the formula has no `layout`. Every face a
   piece names must be in `Scene.fonts`, and a node holding only a formula is not empty.
 - **Adjacent runs that would draw the same thing are one run.** `runsOf` merges a run into
-  its predecessor when `font`, `size`, `weight`, `style`, `color` and `decoration` all
+  its predecessor when `font`, `size`, `weight`, `style`, `color`, `decoration` and `box` all
   match, so a mark the template never declared costs nothing downstream: a sentence split
   by `{cor:roxo}…{/}` in a template with no `.cor-roxo` rule is one span, not three. This
   is about a split with no cause — `a **b** c` is three runs with two styles and stays
   three. A `LineBreak` is never a merge target, so consecutive breaks survive (ADR 0016),
   and the merged run's origin spans both sources so a `W_TEXT_OVERFLOW` still points at the
   whole stretch the author wrote.
+- **A run's box is measured from its capitals, and its face metrics are in the Scene** (ADR
+  0231). `over` reaches above the cap height, `under` below the baseline, `x` each side and
+  in the line's width. A template writes no `metrics`: `compile` writes them from the run's
+  face, because an exporter cannot read a font. export-html paints one band per line the run
+  breaks across; without metrics it covers the glyph box and warns, and export-svg draws the
+  text without its box and warns (`W_EXPORT_APPROXIMATED`).
 
 ## Walking a scene
 

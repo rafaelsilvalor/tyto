@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="320" viewBox="0 0 640 320">
+  <defs>
+    <style>@font-face{font-family:"Source Sans 3";font-weight:400;font-style:normal;src:url("data:font/woff2;base64,Source Sans 3-400-normal")}@font-face{font-family:"Source Sans 3";font-weight:700;font-style:normal;src:url("data:font/woff2;base64,Source Sans 3-700-normal")}
+    </style>
+  </defs>
+  <rect width="640" height="320" fill="#ffffff"/>
+  <g id="mid-line" transform="matrix(1 0 0 1 40 40)">
+    <text x="0" y="66" xml:space="preserve"><tspan font-family="&quot;Source Sans 3&quot;" font-size="60" font-weight="400" fill="#000000">Set the </tspan><tspan font-family="&quot;Source Sans 3&quot;" font-size="60" font-weight="700" fill="#ffffff">TEXT</tspan><tspan font-family="&quot;Source Sans 3&quot;" font-size="60" font-weight="400" fill="#000000"> here</tspan></text>
+  </g>
+</svg>

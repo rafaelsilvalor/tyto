@@ -33,6 +33,8 @@ interface FontkitFont {
   readonly unitsPerEm: number;
   readonly ascent: number;
   readonly descent: number;
+  /** OS/2 `sCapHeight`; fontkit answers 0 or undefined for a face without one. */
+  readonly capHeight?: number;
   layout(text: string): {
     readonly advanceWidth: number;
     readonly bbox: { readonly minY: number; readonly maxY: number };
@@ -67,6 +69,11 @@ export interface Face {
    */
   readonly ascent?: number;
   readonly descent?: number;
+  /**
+   * The face's cap height (OS/2 `sCapHeight`), in em: what a run's box is measured from
+   * (ADR 0231), and the number CSS's `cap` unit reads. Absent when the face declares none.
+   */
+  readonly capHeight?: number;
   /**
    * How far the ink of `text` reaches above and below the baseline, in em, below positive:
    * the glyphs' bounding box, which is what a fraction's clearance is measured from (ADR
@@ -153,6 +160,9 @@ function build(bytes: Uint8Array | undefined): Face | undefined {
     contentHeight: (font.ascent - font.descent) / unitsPerEm,
     ascent: font.ascent / unitsPerEm,
     descent: -font.descent / unitsPerEm,
+    ...(typeof font.capHeight === 'number' && font.capHeight > 0
+      ? { capHeight: font.capHeight / unitsPerEm }
+      : {}),
     ink(text: string) {
       const box = font.layout(text).bbox;
       if (!Number.isFinite(box.minY) || !Number.isFinite(box.maxY)) return undefined;

@@ -316,3 +316,31 @@ describe('a face nothing can measure', () => {
     expect(measureText(node([{ kind: 'break' }]), faces)).toBeUndefined();
   });
 });
+
+describe('a boxed run takes its padding in the line (ADR 0231)', () => {
+  const box = {
+    paint: { kind: 'solid', color: { r: 200, g: 0, b: 0, a: 1 } },
+    padding: { x: 5, over: 2, under: 2 },
+  } as const;
+
+  it('adds its padding on both sides, so a line that fit without the box wraps with it', () => {
+    // aa 10 + space 5 + (5 + bb 10 + 5) + space 5 + cc 10 = 50: past 49, and 40 without the box.
+    const boxed = [span('aa '), span('bb', { box }), span(' cc')];
+    expect(linesOf(measureText(node(boxed, { box: { w: 49 } }), faces)?.runs ?? [])).toEqual([
+      'aa bb',
+      'cc',
+    ]);
+    const plain = [span('aa '), span('bb'), span(' cc')];
+    expect(measureText(node(plain, { box: { w: 49 } }), faces)?.lines).toBe(1);
+    expect(measureText(node(boxed, { box: { w: 60 } }), faces)?.width).toBe(50);
+  });
+
+  it('closes and reopens its box at a wrap, each line with both paddings', () => {
+    // One line would be 5 + bb 10 + space 5 + cc 10 + 5 = 35, past 30; 25 without the box.
+    const measured = measureText(node([span('bb cc', { box })], { box: { w: 30 } }), faces);
+    expect(linesOf(measured?.runs ?? [])).toEqual(['bb', 'cc']);
+    // Each line is its box: 5 + 10 + 5.
+    expect(measured?.width).toBe(20);
+    expect(measureText(node([span('bb cc')], { box: { w: 30 } }), faces)?.lines).toBe(1);
+  });
+});

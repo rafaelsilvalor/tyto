@@ -11,6 +11,7 @@ import invalidShape from './__fixtures__/invalid-shape.json';
 import svgMarkup from './__fixtures__/invalid-svg-markup.json';
 import validLineBreaks from './__fixtures__/valid-line-breaks.json';
 import validPromo from './__fixtures__/valid-promo.json';
+import { textSpanSchema } from './nodes.js';
 import { identityTransform } from './primitives.js';
 import { isScene, parseScene, sceneSchema } from './scene.js';
 import type { DiagnosticCode } from '../diagnostics/codes.js';
@@ -377,6 +378,40 @@ describe('line breaks in a run list (ADR 0016)', () => {
     if (!parsed.ok) {
       expect(parsed.error).toHaveLength(1);
       expect(parsed.error[0]?.message).toContain('runs.0');
+    }
+  });
+});
+
+describe('a box behind a run (ADR 0231)', () => {
+  const span = {
+    kind: 'text',
+    text: 'VAGAS',
+    font: { family: 'Inter', source: 'bundled' },
+    size: 40,
+    weight: 900,
+    style: 'normal',
+    color: { kind: 'solid', color: { r: 255, g: 255, b: 255, a: 1 } },
+  } as const;
+  const box = {
+    paint: { kind: 'solid', color: { r: 200, g: 0, b: 0, a: 1 } },
+    padding: { x: 17, over: 16, under: 15 },
+  } as const;
+
+  it('is optional, and a run with one keeps it whole', () => {
+    expect(textSpanSchema.safeParse(span).success).toBe(true);
+    const parsed = textSpanSchema.safeParse({ ...span, box: { ...box, radius: 8 } });
+    expect(parsed.success && parsed.data.box).toEqual({ ...box, radius: 8 });
+  });
+
+  it('refuses negative room, a missing side and a field it does not know', () => {
+    const refused = [
+      { ...box, padding: { ...box.padding, over: -1 } },
+      { ...box, radius: -2 },
+      { paint: box.paint, padding: { x: 17, over: 16 } },
+      { ...box, edge: 'line' },
+    ];
+    for (const candidate of refused) {
+      expect(textSpanSchema.safeParse({ ...span, box: candidate }).success).toBe(false);
     }
   });
 });
