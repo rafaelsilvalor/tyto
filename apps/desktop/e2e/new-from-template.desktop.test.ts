@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { type ElectronApplication, type Page, _electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { acceptCompletion } from './accept-completion.js';
 import { closeApp } from './close-app.js';
 import { firstWindow } from './first-window.js';
 import { openPreviewBeside } from './preview-pane.js';
@@ -206,8 +207,7 @@ describe('New brief from template…', () => {
     await page.keyboard.type('/');
     await page.waitForSelector('.cm-tooltip-autocomplete', { state: 'visible', timeout: 15_000 });
     await page.keyboard.type('banner-t');
-    await page.waitForTimeout(150);
-    await page.keyboard.press('Enter');
+    await acceptCompletion(page, 'banner-teste');
 
     await expect.poll(editorText, { timeout: 10_000 }).toContain('template: banner-teste');
     expect(await editorText()).toContain('::titulo titulo\n');
