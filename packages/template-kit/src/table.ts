@@ -1,6 +1,7 @@
 import { group, rect, solid } from '@tyto/core/template';
 
 import { type Block, at, block, stack } from './blocks.js';
+import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 import type { NodeDraft } from '@tyto/core/template';
 
@@ -139,6 +140,100 @@ interface Placed {
 
 /** The table, drawn: `width` wide, as tall as its rows. */
 export function table(style: TableStyle, rows: readonly TableRow[], width: number): Block {
+  const drawn = tableIn({ width, height: Infinity }, style, rows);
+  return { width: drawn.width, height: drawn.height, draft: drawn.draft };
+}
+
+/**
+ * The numbers and choices a table's style states (TYTO-891, ADR 0224 decision 2), each default
+ * the value the table reads when the style says nothing. A style always states `rowGap` and
+ * `minRowHeight`; their defaults, 0, are a panel's starting point.
+ */
+export const TABLE_PARAMETERS = {
+  columnGap: {
+    kind: 'length',
+    default: 0,
+    description: 'Space between cells, in px; side by side only.',
+  },
+  rowGap: { kind: 'length', default: 0, description: 'Space between rows, in px.' },
+  minRowHeight: {
+    kind: 'length',
+    default: 0,
+    min: 0,
+    description: 'The least height a row takes, in px, however short its content.',
+  },
+  layering: {
+    kind: 'choice',
+    default: 'side-by-side',
+    choices: ['side-by-side', 'overlap'],
+    description:
+      'Cells in slots of their own, or each shape from the row’s left edge, laid over the next.',
+  },
+  cornerRadius: {
+    kind: 'length',
+    default: 0,
+    min: 0,
+    description: "The cells' corner radius, in px; 0 is square.",
+  },
+  cornersAt: {
+    kind: 'choice',
+    default: 'every-cell',
+    choices: ['every-cell', 'outer'],
+    description: 'Every cell rounded, or only the table’s four outer corners.',
+  },
+} as const satisfies ParameterSchema;
+
+export type TableParameters = ValuesOf<typeof TABLE_PARAMETERS>;
+
+/**
+ * `style` with the numbers `given` states laid over its own; nothing given, the style itself.
+ * Values pass through `parameterValues`, so they keep the schema's limits.
+ */
+export function tableStyleWith(style: TableStyle, given: Partial<TableParameters>): TableStyle {
+  if (Object.keys(given).length === 0) return style;
+  const values = parameterValues(TABLE_PARAMETERS, {
+    ...(style.columnGap === undefined ? {} : { columnGap: style.columnGap }),
+    rowGap: style.rowGap,
+    minRowHeight: style.minRowHeight,
+    ...(style.layering === undefined ? {} : { layering: style.layering }),
+    ...(style.corners === undefined
+      ? {}
+      : { cornerRadius: style.corners.radius, cornersAt: style.corners.at }),
+    ...given,
+  });
+  const rounded =
+    given.cornerRadius !== undefined ||
+    given.cornersAt !== undefined ||
+    style.corners !== undefined;
+  return {
+    ...style,
+    columnGap: values.columnGap,
+    rowGap: values.rowGap,
+    minRowHeight: values.minRowHeight,
+    layering: values.layering,
+    ...(rounded ? { corners: { radius: values.cornerRadius, at: values.cornersAt } } : {}),
+  };
+}
+
+/**
+ * The rows as a table across `area`, its style's numbers overridden by `given`. `overflow` is how
+ * far it runs past a bounded area's height.
+ */
+export function tableIn(
+  area: Area,
+  style: TableStyle,
+  rows: readonly TableRow[],
+  given: Partial<TableParameters> = {},
+): Block & { readonly overflow: number } {
+  const drawn = drawTable(tableStyleWith(style, given), rows, area.width);
+  return {
+    ...drawn,
+    overflow: Number.isFinite(area.height) ? Math.max(0, drawn.height - area.height) : 0,
+  };
+}
+
+/** The table itself, as `table` drew it before TYTO-891. */
+function drawTable(style: TableStyle, rows: readonly TableRow[], width: number): Block {
   const placed = placeColumns(style, rows, width);
   const seen = new Map<string, number>();
 

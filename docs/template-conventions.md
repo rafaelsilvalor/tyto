@@ -163,7 +163,10 @@ new forms, until the recomposition batch moves their last caller. So do the text
 (`TEXT_PARAMETERS`, `GROWN_TEXT_PARAMETERS`, `TITLE_BLOCK_PARAMETERS`, `LEVEL_STACK_PARAMETERS`)
 and carry an anchor at their first capitals and last baseline; `titleBlockIn` takes
 `measureFrom: 'capitals'`. `textBlock`, `grownTextBlock`, `titleBlock` and `levelStack` are their
-wrappers and return what they returned, with no anchor.
+wrappers and return what they returned, with no anchor. The tables too: `tableIn` and
+`slotTableIn` take an area, and `TABLE_PARAMETERS` and `SLOT_TABLE_PARAMETERS` name the numbers
+a style states (gaps, the least row height, the layering, the corners, the fit); a number given
+as a parameter is laid over the style's own (`tableStyleWith`, `slotTableStyleWith`).
 
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
