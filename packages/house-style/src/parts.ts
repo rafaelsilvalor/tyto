@@ -6,8 +6,16 @@
  * every number is a token (ADR 0047).
  */
 
-import { group, rect, run, solid, text } from '@tyto/core/template';
-import { type Block, at, block, mark, naturalWidth, textBlock } from '@tyto/template-kit';
+import { group, run, text } from '@tyto/core/template';
+import {
+  type Block,
+  type ButtonStyle,
+  block,
+  buttonRow,
+  mark,
+  naturalWidth,
+  textBlock,
+} from '@tyto/template-kit';
 
 import { drawLogo, oneInk, signatureOf } from './kit.js';
 import { BALLOON } from './marks.js';
@@ -65,6 +73,10 @@ export function signOff(brand: Brand, kit: BrandKit, width: number): Block {
  *
  * The pill hugs its words, so it is measured; where nothing can measure it takes the width
  * it is offered, which is a guess the exporter's own layout may not agree with.
+ *
+ * Drawn by the kit's `buttonRow` (TYTO-880): the pill is an outlined button whose words fill
+ * it edge to edge, centred, so the width rule above stays the house's; the balloon is a second
+ * button with no shape, `CTA.balloonGap` to its right and centred on its height.
  */
 export function callToComment(
   words: RichText,
@@ -80,27 +92,31 @@ export function callToComment(
       ? width - balloonRoom
       : Math.min(width - balloonRoom, natural + CTA.padding * 2);
 
-  const glyph = mark(BALLOON, CTA.balloon, accent, 'balloon');
-  return block(
-    pill + balloonRoom,
-    CTA.height,
-    group({
-      name: 'call-to-comment',
-      children: [
-        rect({
-          name: 'cta-pill',
-          size: { w: pill, h: CTA.height },
+  const bare: ButtonStyle = {
+    height: CTA.height,
+    radius: 0,
+    padding: { left: 0, right: 0 },
+    gap: 0,
+  };
+  return buttonRow(
+    [
+      {
+        name: 'cta-pill',
+        style: {
+          ...bare,
           radius: CTA.height / 2,
-          stroke: { paint: solid(accent), width: CTA.stroke, align: 'inside' },
-        }),
-        textBlock(words, { w: pill, h: CTA.height }, style, {
+          stroke: { color: accent, width: CTA.stroke },
+        },
+        words: textBlock(words, { w: pill, h: CTA.height }, style, {
           name: 'cta',
           align: 'center',
           valign: 'middle',
           overflow: 'shrink',
-        }).draft,
-        at(pill + CTA.balloonGap, (CTA.height - glyph.height) / 2, glyph),
-      ],
-    }),
+        }),
+      },
+      // The balloon sits in `words` until the kit's buttons can hold an icon alone (TYTO-884).
+      { name: 'cta-balloon', style: bare, words: mark(BALLOON, CTA.balloon, accent, 'balloon') },
+    ],
+    { gap: CTA.balloonGap, name: 'call-to-comment' },
   );
 }
