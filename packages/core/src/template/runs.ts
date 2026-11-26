@@ -3,9 +3,9 @@ import { linearReading } from '../text/formula.js';
 import { originOf, rememberOrigin } from '../text/origin.js';
 import { unionRanges } from '../source/range.js';
 import type { SourceRange } from '../source/range.js';
-import type { ColorChannels } from './values.js';
+import type { ColorChannels, RunBoxOptions } from './values.js';
 import type { Inline, RichText } from '../brief/ast.js';
-import type { TextRun, TextSpan } from '../scene/nodes.js';
+import type { RunBox, TextRun, TextSpan } from '../scene/nodes.js';
 import type { Color, FontRef, GradientStop, Paint } from '../scene/primitives.js';
 
 /**
@@ -30,6 +30,11 @@ export interface RunStyle {
   readonly weight?: number;
   readonly style?: 'normal' | 'italic';
   readonly decoration?: 'underline' | 'line-through';
+  /**
+   * A filled box behind the text (ADR 0231). A highlight that names one boxes the words it
+   * wraps, and the exporter breaks the lines, so the box follows wherever they land.
+   */
+  readonly box?: RunBoxOptions;
 }
 
 export interface RunsOptions {
@@ -98,6 +103,21 @@ function samePaint(a: Paint, b: Paint): boolean {
 const sameFont = (a: FontRef, b: FontRef) =>
   a.family === b.family && a.source === b.source && a.path === b.path;
 
+/**
+ * Two boxes draw the same when every field matches. Two neighbouring runs with the same box
+ * merge into one box, which is what a designer drawing one word set on a colour means.
+ */
+function sameBox(a: RunBox | undefined, b: RunBox | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  return (
+    a.padding.x === b.padding.x &&
+    a.padding.over === b.padding.over &&
+    a.padding.under === b.padding.under &&
+    a.radius === b.radius &&
+    samePaint(a.paint, b.paint)
+  );
+}
+
 /** Every field a `TextSpan` has except `text`: what "these two would draw the same" means. */
 const sameStyle = (a: TextSpan, b: TextSpan) =>
   a.size === b.size &&
@@ -105,7 +125,8 @@ const sameStyle = (a: TextSpan, b: TextSpan) =>
   a.style === b.style &&
   a.decoration === b.decoration &&
   sameFont(a.font, b.font) &&
-  samePaint(a.color, b.color);
+  samePaint(a.color, b.color) &&
+  sameBox(a.box, b.box);
 
 /**
  * One run where two would have drawn the same thing.

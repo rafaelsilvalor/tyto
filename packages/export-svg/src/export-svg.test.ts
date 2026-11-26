@@ -7,6 +7,7 @@ import { exportSvg } from './export-svg.js';
 import type { SvgExportOptions } from './svg.js';
 import mappingFixture from './__fixtures__/mapping.json';
 import formulaFixture from './__fixtures__/formula.json';
+import boxedFixture from './__fixtures__/boxed.json';
 import paragraphsFixture from './__fixtures__/paragraphs.json';
 import promoFixture from './__fixtures__/promo.json';
 import twoIconsFixture from './__fixtures__/two-icons.json';
@@ -130,6 +131,33 @@ describe('a scene becomes one SVG document per frame', () => {
     const [feed] = svgOf(sceneOf(paragraphsFixture));
 
     await expect(feed).toMatchFileSnapshot('./__snapshots__/paragraphs.feed.svg');
+  });
+
+  it('renders the boxed fixture to its committed snapshot, text without its box (ADR 0231)', async () => {
+    const [midLine, broken, noMetrics] = svgOf(sceneOf(boxedFixture));
+
+    await expect(midLine).toMatchFileSnapshot('./__snapshots__/boxed.mid-line.svg');
+    await expect(broken).toMatchFileSnapshot('./__snapshots__/boxed.break.svg');
+    await expect(noMetrics).toMatchFileSnapshot('./__snapshots__/boxed.no-metrics.svg');
+    expect(midLine).toContain('>TEXT</tspan>');
+    expect(midLine).not.toContain('#c80000');
+  });
+
+  it('reports each boxed run it draws without its box (ADR 0231)', () => {
+    const approximated = problemsOf(sceneOf(boxedFixture), { resources }).filter(
+      (problem) => problem.code === 'W_EXPORT_APPROXIMATED',
+    );
+    expect(approximated).toHaveLength(3);
+    expect(approximated[0]?.message).toContain('mid-line');
+    expect(approximated[1]?.message).toContain('break');
+    expect(approximated[2]?.message).toContain('no-metrics');
+    for (const problem of approximated) expect(problem.message).toContain('box behind a run');
+    for (const fixture of [promoFixture, paragraphsFixture]) {
+      const plain = problemsOf(sceneOf(fixture), { resources }).filter(
+        (problem) => problem.code === 'W_EXPORT_APPROXIMATED',
+      );
+      expect(plain.map((problem) => problem.message).join()).not.toContain('box behind a run');
+    }
   });
 
   it('renders the mapping fixture to its committed snapshot', async () => {

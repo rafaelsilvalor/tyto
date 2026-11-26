@@ -332,3 +332,55 @@ describe('a formula (ADR 0206 decision 16, TYTO-734)', () => {
     expect(runs.map((run) => run.kind)).toEqual(['text', 'formula', 'text']);
   });
 });
+
+describe('a box behind a run (ADR 0231)', () => {
+  const BOX = { paint: '#c80000', padding: { x: 17, over: 16, under: 15 } } as const;
+  const boldWord: RichText = [
+    { kind: 'text', value: 'Comente ', range: AT },
+    { kind: 'bold', children: plain('VAGAS'), range: AT },
+    { kind: 'text', value: ' agora', range: AT },
+  ];
+
+  it('boxes what a highlight wraps, with its colour turned into a paint', () => {
+    const runs = runsOf(boldWord, BASE, { bold: { box: BOX } });
+    expect(runs.map((run) => (run.kind === 'text' ? run.box : undefined))).toEqual([
+      undefined,
+      {
+        paint: { kind: 'solid', color: { r: 200, g: 0, b: 0, a: 1 } },
+        padding: { x: 17, over: 16, under: 15 },
+      },
+      undefined,
+    ]);
+  });
+
+  it('keeps a radius when the style names one, and adds none when it does not', () => {
+    const [, rounded] = runsOf(boldWord, BASE, { bold: { box: { ...BOX, radius: 8 } } });
+    expect(rounded?.kind === 'text' && rounded.box?.radius).toBe(8);
+    const [, square] = runsOf(boldWord, BASE, { bold: { box: BOX } });
+    expect(square?.kind === 'text' && square.box !== undefined && 'radius' in square.box).toBe(
+      false,
+    );
+  });
+
+  it('merges neighbours with the same box into one box, and keeps different boxes apart', () => {
+    const twoMarks: RichText = [
+      { kind: 'mark', key: 'caixa', value: 'a', children: plain('ONE '), range: AT },
+      { kind: 'mark', key: 'caixa', value: 'b', children: plain('TWO'), range: AT },
+    ];
+    const same = runsOf(twoMarks, BASE, { mark: () => ({ box: BOX }) });
+    expect(same.map((run) => (run.kind === 'text' ? run.text : '⏎'))).toEqual(['ONE TWO']);
+
+    const different = runsOf(twoMarks, BASE, {
+      mark: (_key: string, value: string) => ({
+        box: { ...BOX, padding: { ...BOX.padding, x: value === 'a' ? 17 : 18 } },
+      }),
+    });
+    expect(different.map((run) => (run.kind === 'text' ? run.text : '⏎'))).toEqual(['ONE ', 'TWO']);
+  });
+
+  it('writes no box field on a run nobody boxed', () => {
+    for (const run of runsOf(boldWord, BASE, { bold: 700 })) {
+      expect(run.kind === 'text' && 'box' in run).toBe(false);
+    }
+  });
+});

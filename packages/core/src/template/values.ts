@@ -8,7 +8,7 @@ import type {
   Paint,
   UnitPoint,
 } from '../scene/primitives.js';
-import type { LineBreak, TextSpan } from '../scene/nodes.js';
+import type { LineBreak, RunBox, TextSpan } from '../scene/nodes.js';
 
 /**
  * The leaf values a template writes, in the form a template author wants to write them.
@@ -114,6 +114,18 @@ export interface RunOptions {
   readonly weight?: number;
   readonly style?: 'normal' | 'italic';
   readonly decoration?: 'underline' | 'line-through';
+  /** A filled box behind the run (ADR 0231); its paint may be a colour, as `color` may. */
+  readonly box?: RunBoxOptions;
+}
+
+/**
+ * A run's box as a template writes it: the IR's `RunBox` with a colour allowed for its paint,
+ * and no metrics, which `compile` writes from the run's face (ADR 0231).
+ */
+export interface RunBoxOptions {
+  readonly paint: string | ColorChannels | RunBox['paint'];
+  readonly padding: RunBox['padding'];
+  readonly radius?: number;
 }
 
 /** A paint passes through; anything else is a colour on its way to becoming one. */
@@ -135,6 +147,18 @@ export function run(text: string, options: RunOptions): TextSpan {
     style: options.style ?? 'normal',
     color: paintOf(options.color),
     ...(options.decoration !== undefined ? { decoration: options.decoration } : {}),
+    ...(options.box !== undefined ? { box: boxOf(options.box) } : {}),
+  };
+}
+
+function boxOf(box: RunBoxOptions): RunBox {
+  return {
+    paint:
+      typeof box.paint === 'object' && 'kind' in box.paint
+        ? box.paint
+        : { kind: 'solid', color: color(box.paint) },
+    padding: { x: box.padding.x, over: box.padding.over, under: box.padding.under },
+    ...(box.radius !== undefined ? { radius: box.radius } : {}),
   };
 }
 
