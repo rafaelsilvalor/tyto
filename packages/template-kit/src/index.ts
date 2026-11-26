@@ -65,6 +65,33 @@ export {
 export { richTextOf, slideRichLines, slotRichLines, slotText, trimmed } from './slots.js';
 
 export {
+  ARROW_SHAPE_PARAMETERS,
+  type ArrowShapeParameters,
+  CAPSULE_PATH_PARAMETERS,
+  CORNER_BRACKET_PARAMETERS,
+  type CapsulePathParameters,
+  type CornerBracketParameters,
+  type Outline,
+  PLUS_PARAMETERS,
+  type PlusParameters,
+  RULE_PARAMETERS,
+  type RuleParameters,
+  SHAPE_PARAMETERS,
+  type ShapeParameters,
+  type Size,
+  arrowPath,
+  arrowShape,
+  capsulePath,
+  circlePath,
+  cornerBracket,
+  cornerBracketPath,
+  plus,
+  roundedRectPath,
+  rule,
+  shape,
+} from './shapes.js';
+
+export {
   KEEP_TOGETHER_RULES,
   type KeepTogetherRule,
   NO_BREAK_SPACE,

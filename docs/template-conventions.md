@@ -104,6 +104,12 @@ gives the capitals less `anchor.capTop`; `stack`, `row` and `inset` pass the anc
 block with no words is read by its box's edges. A slot is read with `slotText`, `richTextOf`,
 `slideRichLines` or `slotRichLines`, never with a local copy.
 
+**Shapes, rules, corner brackets, the "+" and the next-slide arrow are kit primitives**
+(TYTO-886): `shape` (rect, rounded, capsule, circle), `rule`, `cornerBracket`, `plus` and
+`arrowShape`, each given its size and its paint — solid or a linear gradient, the caller's — and
+returning a block. `roundedRectPath`, `circlePath` and `capsulePath` build the path data of a
+glyph the template keeps as data (a network's logo, an institution's emblem).
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and
