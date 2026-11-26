@@ -1,5 +1,13 @@
 # @tyto/house-style
 
+## 0.9.1
+
+### Patch Changes
+
+- ae7f24b: `callToComment`'s balloon is its button's leading piece rather than its words, now that the kit's buttons hold an icon alone (TYTO-884). The scene and the art are unchanged.
+- Updated dependencies [ae7f24b]
+  - @tyto/template-kit@0.25.0
+
 ## 0.9.0
 
 ### Minor Changes
