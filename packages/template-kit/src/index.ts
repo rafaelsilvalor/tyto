@@ -292,11 +292,21 @@ export {
 export {
   ARROW_ICON,
   BALLOON_ICON,
+  BOOKMARK_ICON,
   HEART_ICON,
+  ICON_IN_DISC_PARAMETERS,
   type Icon,
+  type IconInDiscParameters,
   PAPER_PLANE_ICON,
   icon,
+  iconInDisc,
 } from './icons.js';
+export {
+  SLIDE_COUNTER_PARAMETERS,
+  type SlideCounterParameters,
+  type SlideCounterStyle,
+  slideCounter,
+} from './slide-counter.js';
 
 export {
   type Corners,
