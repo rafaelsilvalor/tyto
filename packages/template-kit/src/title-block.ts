@@ -1,7 +1,7 @@
 import { group, image, rect, solid } from '@tyto/core/template';
 
 import { type Block, at, block, stack } from './blocks.js';
-import { type TextStyle, textBlock } from './text.js';
+import { type Measure, type TextStyle, textBlock } from './text.js';
 
 import type { AssetRef, RichText } from '@tyto/core';
 import type { TextOptions } from '@tyto/core/template';
@@ -34,8 +34,16 @@ export interface TitleTextPart {
   readonly field: string;
   readonly name: string;
   readonly style: TextStyle;
-  /** The box's height: one line and its leading, or more if the piece may wrap. */
+  /**
+   * The box's height: one line and its leading, or more if the piece may wrap. With `measured`,
+   * only what is used when nothing can measure.
+   */
   readonly height: number;
+  /**
+   * Measure the words and take their height instead of `height` (TYTO-890), when the content
+   * hands a `measure`. Absent, the stated height, as before.
+   */
+  readonly measured?: true;
   readonly lineHeight?: number;
   readonly letterSpacing?: number;
   readonly overflow?: TextOptions['overflow'];
@@ -64,6 +72,8 @@ export interface TitleBlockContent {
   /** What each field holds; a field that is absent or empty draws nothing. */
   readonly fields: Readonly<Record<string, RichText | AssetRef | undefined>>;
   readonly width: number;
+  /** Measures a text part that says `measured`; absent, every part takes its stated height. */
+  readonly measure?: Measure;
 }
 
 /** The block, drawn: as wide as `width`, as tall as the pieces that had something to draw. */
@@ -117,13 +127,35 @@ function pieceOf(part: TitlePart, content: TitleBlockContent): Block | undefined
     case 'text': {
       const value = content.fields[part.field];
       if (value === undefined || !Array.isArray(value) || value.length === 0) return undefined;
-      return textBlock(value as RichText, { w: content.width, h: part.height }, part.style, {
+      const options = {
         name: part.name,
-        align: 'center',
+        align: 'center' as const,
         ...(part.lineHeight === undefined ? {} : { lineHeight: part.lineHeight }),
         ...(part.letterSpacing === undefined ? {} : { letterSpacing: part.letterSpacing }),
         ...(part.overflow === undefined ? {} : { overflow: part.overflow }),
-      });
+      };
+      const words = value as RichText;
+      const height =
+        part.measured === true && content.measure !== undefined
+          ? (measuredHeight(words, content.width, part, options, content.measure) ?? part.height)
+          : part.height;
+      return textBlock(words, { w: content.width, h: height }, part.style, options);
     }
   }
+}
+
+/**
+ * The height `words` take at `width`, as the text part would draw them with no height of its
+ * own: measured, or nothing when nothing can measure.
+ */
+function measuredHeight(
+  words: RichText,
+  width: number,
+  part: TitleTextPart,
+  options: Parameters<typeof textBlock>[3],
+  measure: Measure,
+): number | undefined {
+  const probe = textBlock(words, { w: width, h: part.height }, part.style, options).draft;
+  if (probe.kind !== 'text') return undefined;
+  return measure({ ...probe, box: { w: width } })?.height;
 }

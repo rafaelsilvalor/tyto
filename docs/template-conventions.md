@@ -128,6 +128,14 @@ capitals; and an icon centred in a filled circle. An `Icon` that needs holes say
 icon-only buttons each holding its icon at the reference's offset (`like-bar.test.ts` is the
 example).
 
+**A card that hugs its words is `huggedText` in a `paddedCard`** (TYTO-890): the text as wide as
+its widest line up to a limit, wrapped and measured again past it, on a rounded surface padded
+per side, from the content's box or, with `measureFrom: 'capitals'`, from its first capitals and
+last baseline, with a shadow when the caller gives its colour. Facts written `Label: value` are
+`labelValueRuns`; a template's own glue between words (its language's connectors) is a function
+it hands in, never kit vocabulary. A `titleBlock` text part that says `measured` takes its
+measured height when the content hands a `measure`.
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and
