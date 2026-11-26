@@ -1,5 +1,25 @@
 # @tyto/house-style
 
+## 0.9.3
+
+### Patch Changes
+
+- 6a53068: `balance` and the break helpers run on the kit's mechanism (TYTO-889); the house's Portuguese function words stay here and are handed in, and the API is unchanged.
+- Updated dependencies [c9821b2]
+- Updated dependencies [7c7172f]
+- Updated dependencies [9eb8096]
+- Updated dependencies [6a53068]
+- Updated dependencies [b9c843e]
+- Updated dependencies [f100351]
+- Updated dependencies [7d3eedd]
+- Updated dependencies [f9bf98c]
+- Updated dependencies [7c71fd9]
+- Updated dependencies [920a37a]
+- Updated dependencies [7201ccb]
+- Updated dependencies [ece2dde]
+- Updated dependencies [4a253f2]
+  - @tyto/template-kit@0.27.0
+
 ## 0.9.2
 
 ### Patch Changes
