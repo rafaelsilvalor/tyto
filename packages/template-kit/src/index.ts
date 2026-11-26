@@ -191,6 +191,16 @@ export {
   frameOutlinePath,
   framedPicture,
 } from './picture.js';
+export {
+  CAROUSEL_FOOTER_PARAMETERS,
+  type CarouselFooterParameters,
+  type CarouselFooterPieces,
+  SIGNATURE_LINE_PARAMETERS,
+  type SignatureLineParameters,
+  type SignatureStyle,
+  carouselFooter,
+  signatureLine,
+} from './signature.js';
 
 export { type BandedPageOptions, type Seal, bandedPage, reportOverflow, sealed } from './page.js';
 

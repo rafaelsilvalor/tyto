@@ -115,6 +115,12 @@ tall as its own shape makes it within the area's height and the declared `widest
 shapes, framed (border, bar, rounded inside corners as one even-odd outline, a shadow when the
 caller gives its colour) or alone for `{sem-quadro}`. Place a framed picture on a whole pixel.
 
+**The signature is `signatureLine`, the footer `carouselFooter`** (TYTO-887): the words
+(`signatureOf(kit)` or a slot's text) on one measured line placed by its capitals, the face,
+weight and colour the template's; and a layer as large as the page `sealed` returns, placed at
+(0, 0), that stands the signature and an optional leading and trailing piece (the next-slide
+arrow) on that page's foot, so a seal lifts them with no arithmetic in the template.
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and
