@@ -1,6 +1,6 @@
 {
   "name": "@tyto/export-svg",
-  "version": "2.1.17",
+  "version": "2.1.18",
   "type": "module",
   "description": "Scene visitor that emits SVG.",
   "license": "UNLICENSED",
