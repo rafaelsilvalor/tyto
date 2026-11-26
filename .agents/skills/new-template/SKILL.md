@@ -164,6 +164,10 @@ install` refused. `--brief <file>` picks another example.
 
 - **Distances and centring are measured in the PNG's pixels** (PIL), never read by eye. PIL's
   `getbbox` on RGBA reads only alpha: convert to RGB and diff against the paper colour.
+- **Every drawn element is a kit primitive or component** (ADR 0224, ADR 0230;
+  `docs/template-conventions.md` › The four layers › 1): pick the components and wire them into
+  one root arrangement; `template.ts` calls no core `rect`/`text`/`vector`/`image`. A piece the
+  kit lacks is a kit card first, never a local copy.
 - **Geometry goes into the code; colour, sizes and gaps are `values`** (ADR 0153), as long as
   changing one never changes which pieces appear or their order (ADR 0151).
 - Faces: only Regular and Bold exist in Tyto's font package; italic breaks the render.

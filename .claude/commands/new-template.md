@@ -201,6 +201,10 @@ Rules for the loop:
   or column between bands), never read by eye from his reference. Say each time that a number
   read from the reference may be a few pixels off. PIL's `getbbox` on an RGBA image reads only
   alpha: convert to RGB and diff against the paper colour.
+- **Every drawn element is a kit primitive or component** (ADR 0224, ADR 0230;
+  `docs/template-conventions.md` › The four layers › 1): pick the components and wire them into
+  one root arrangement; `template.ts` calls no core `rect`/`text`/`vector`/`image`. A piece the
+  kit lacks is a kit card first, never a local copy.
 - **Geometry goes into the code; colour, sizes and gaps are `values`** with defaults (ADR 0153),
   as long as changing one never changes which pieces appear or their order (ADR 0151 decision
   1). Hide-the-logo or two-columns is a second template or a brief-side choice.

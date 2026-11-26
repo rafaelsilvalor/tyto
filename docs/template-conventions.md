@@ -84,6 +84,19 @@ them could be reused without copying.
 
 ### 1. Configurable components and arrangement — `@tyto/template-kit`
 
+**A template draws nothing itself: every element is a primitive or a component** (ADR 0224,
+ADR 0230). A **primitive** is a mechanism with no subject — a text block, a shape, `table`, a
+column — that knows how to measure and arrange, never what it shows. A **component** has a
+subject: it reads named slots or values and composes primitives into one block (a title head,
+an offer card, a signature foot). Both take an area and declared parameters and return a
+measured `Block` (ADR 0224 decisions 1 and 2). So a new template is written in two moves: pick
+the components it needs, and wire them into one root arrangement over the frame's area, the
+reference's coordinates and sizes handed in as data. `template.ts` calls no core `rect`, `text`,
+`vector` or `image` node; a piece the kit lacks is a kit card first. Until the picture and shape
+primitives land (TYTO-625, TYTO-886), an image or a shape may be drawn with core nodes only in a
+local function whose comment names it as pending. The six templates still drawn by hand are
+recomposed in the batch template-recompose; ADR 0230 says when each binds.
+
 The layer that is the same whatever brand draws it: `stack`, `row`, `inset`, `at` for
 arrangement, and `bandedPage` for the page every azul slide is (a header band, a footer on
 the bottom edge, the middle centred between them); `table` for rows of cells in columns, and
