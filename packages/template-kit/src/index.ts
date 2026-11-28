@@ -61,6 +61,22 @@ export {
 } from './blocks.js';
 
 export {
+  AREA_PARAMETERS,
+  type AreaChild,
+  type AreaDescription,
+  type AreaItem,
+  type AreaOptions,
+  type AreaParameters,
+  type AreaSlot,
+  type Float,
+  type FloatAnchor,
+  type AreaSize,
+  type Leaf,
+  area,
+  areaIn,
+} from './area.js';
+
+export {
   CAP_TEXT_PARAMETERS,
   type CapTextOptions,
   type CapTextParameters,

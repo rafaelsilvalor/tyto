@@ -51,8 +51,10 @@ const ITEMS: readonly (readonly Block[])[] = [
   [box(100, 40, 'a'), box(60.5, 20.25, 'b'), box(80, 10 / 3, 'c')],
   [worded(300, 48, 9.6, 43.6, 'title'), box(200, 2, 'rule'), worded(250, 96, 7.2, 89.1, 'body')],
   [box(10, 10, 'a'), worded(40.3, 33.3, 1.1, 30.7, 'w')],
+  // Sizes whose sums round differently by grouping: a + (b + c) is not (a + b) + c here.
+  [box(1, 0.1, 'p'), box(1, 0.2, 'q'), box(1, 0.3, 'r'), box(1, 0.7, 's')],
 ];
-const GAPS = [undefined, 0, 12, 0.1, 1 / 3, -4];
+const GAPS = [undefined, 0, 12, 0.1, 0.3, 1 / 3, -4];
 const ALIGNS: readonly (Align | undefined)[] = [undefined, 'start', 'center', 'end'];
 const NAMES = [undefined, 'pilha'];
 
