@@ -222,6 +222,17 @@ it first through `context.measure` (ADR 0038).
 Placement **adds** to the coordinate a node already carries rather than replacing it, so a
 node nudged by hand keeps its nudge wherever it is put.
 
+**An area lays out what the template wires** (TYTO-912, ADR 0232). `area({ … })` describes a
+column or a row of children — kit pieces wrapped as `(room) => xIn(room, …)`, ready blocks, or
+other areas — with a gap (a child may state its own `gapAbove`), padding, `justify` and `align`;
+`areaIn(room, description)` lays it out. Each child is sized by a number, `'hug'` (its content),
+`'fill'` or `{ fill: weight }` (a share of the room left), within its own `min` and `max`; a child
+with a `float` is held to one of nine points of the area's box and drawn above the flow; an
+absent child (`undefined`, or a piece that answers `undefined`) takes no room and no gap, and an
+area left with nothing in its flow takes none in its parent. `order: context.order` puts the
+named children in the brief's order, as `blockColumn` does. `AREA_PARAMETERS` names its numbers
+and words, its own size included. `stackIn`, `rowIn` and `insetIn` are shortcuts over it.
+
 ### A block's size and spacing come from the brief through the kit
 
 A template whose blocks sit in the kit's `blockColumn` takes the four block adjustments of the
