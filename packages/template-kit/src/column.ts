@@ -3,6 +3,7 @@ import type { NodeDraft } from '@tyto/core/template';
 import { group } from '@tyto/core/template';
 
 import { type Block, anchorOf, at } from './blocks.js';
+import { columnOrder } from './order.js';
 import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from './parameters.js';
 
 /**
@@ -22,6 +23,8 @@ import { type Area, type ParameterSchema, type ValuesOf, parameterValues } from 
  */
 
 /** The adjustment a brief writes on a block to make it larger or smaller: `{peso: 3}`. */
+export { columnOrder } from './order.js';
+
 export const WEIGHT = 'peso';
 
 /**
@@ -372,25 +375,6 @@ export interface Column {
    * `reach` parameter: the caller places the block this much higher than the area's top.
    */
   readonly rise: number;
-}
-
-/**
- * The entries in drawing order: the template's own order, with the places of the entries the
- * brief named filled by those entries in the brief's order.
- */
-export function columnOrder<Entry extends { readonly name: string }>(
-  entries: readonly Entry[],
-  order: readonly { readonly name: string }[] | undefined,
-): Entry[] {
-  if (order === undefined) return [...entries];
-  const byName = new Map(entries.map((entry) => [entry.name, entry]));
-  const written: Entry[] = [];
-  for (const { name } of order) {
-    const entry = byName.get(name);
-    if (entry !== undefined && !written.includes(entry)) written.push(entry);
-  }
-  const queue = [...written];
-  return entries.map((entry) => (written.includes(entry) ? queue.shift()! : entry));
 }
 
 /**
